@@ -2528,6 +2528,34 @@ any unchanged fixture failure as it occurs. The most likely remaining gap is
 whether the live model follows the clearer relative/clock-time distinction.
 Task #711 still needs physical touch qualification; #699 stays deferred.
 
+## 2026-10-15 — Relative reminder checkpoint and focused checks
+
+Ready for lamp-voice: no
+
+Task head [365e36dbcd78ff247adf30b2d18afd4d9d6f1065](https://github.com/autonomous-ai/lampOS/commit/365e36dbcd78ff247adf30b2d18afd4d9d6f1065)
+changes the two enabled Actions descriptions, one host regression and their
+English docs. The new test reads the server's actual published `tools.json`.
+All 711 frozen Rust/manifest/toolchain files match the committed blobs;
+production Voice, Schedule, clocks, schemas, switches and deadlines are
+unchanged. Only the Actions binary will need replacement on the lamp; restart
+Actions before Voice so the provider session reads the new catalog.
+
+On the same Third Intel i7-10700K x86_64 Mac (macOS 26.6.2 / Darwin 25.6.0,
+64 GiB RAM, Rust/Cargo 1.96.0), formatting, strict all-target Clippy for the
+four affected packages and workspace build passed. The new exact catalog
+regression passed **1 / 0 / 0**; Voice's `tools::` filter passed **18 / 0 / 0**.
+[Raw outputs, commands, timings and source identity](https://github.com/autonomous-ai/lampOS/blob/365e36dbcd78ff247adf30b2d18afd4d9d6f1065/lampOS/docs/verification/relative-reminders-host-20261015/README.md)
+retain the preliminary new-assertion format diff and the corrected full
+format pass. These are host process durations, not model or lamp latency.
+
+Native ARM64 run [38644608947](https://github.com/autonomous-ai/lampOS/actions/runs/38644608947)
+is running on that exact head. A separate source-only copy is checking the
+old-catalog negative control, implementation tests and disabled byte equality.
+The full four-package serial host gate follows after its Cargo work ends;
+no local heavy build/test overlap is planned. No readiness or live model
+selection is claimed. The [qualification record](verification/relative-reminders-qualification-20261015/README.md)
+tracks the remaining results and First's concrete lamp replay.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

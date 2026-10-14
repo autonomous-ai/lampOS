@@ -1,0 +1,20 @@
+[
+  {
+    "source": "/private/tmp/lamp-third-relative-committed-head.json",
+    "retained": "checkpoint.json",
+    "bytes": 234,
+    "sha256": "2a90257ec0c63a48647d691520145b4a0e0d715201342ec925211833f92a5170"
+  },
+  {
+    "source": "/private/tmp/lamp-third-relative-native-first-runs.json",
+    "retained": "native-first-runs.json",
+    "bytes": 264,
+    "sha256": "40471450fedb4c1fdc2377064dd45122cfe79da4cbffe30ef0844ec5c6ef3566"
+  },
+  {
+    "source": "/private/tmp/lamp-third-relative-claim-verified.json",
+    "retained": "claim-verified.json",
+    "bytes": 3547,
+    "sha256": "e14956b5c3f77f987cb657af210c949cf3e8d7f75907c96d9f982c5ada7840e8"
+  }
+]

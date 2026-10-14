@@ -24,4 +24,16 @@ First will repeat relative-time examples on the lamp using the new CI artifact.
 
 [The log rebase](log-rebase.json) preserved all 418 existing log/evidence paths
 byte for byte. [Retention hashes](retention.json) identify every captured input.
-No source change or validation result for this follow-up is claimed yet.
+The [committed checkpoint](checkpoint.json) is
+`365e36dbcd78ff247adf30b2d18afd4d9d6f1065`; all 711 frozen code/manifest/
+toolchain paths match its blobs. [The focused evidence](https://github.com/autonomous-ai/lampOS/blob/365e36dbcd78ff247adf30b2d18afd4d9d6f1065/lampOS/docs/verification/relative-reminders-host-20261015/README.md)
+records passing formatting, strict all-target Clippy for Actions/Voice/Voice
+Eval/Memory, the published-catalog regression (1/0/0), Voice tools (18/0/0)
+and the workspace build. A preliminary assertion-format diff is preserved.
+
+Exact-head native ARM64 run [38644608947](https://github.com/autonomous-ai/lampOS/actions/runs/38644608947)
+is running; [the initial run observation](native-first-runs.json) is not a
+terminal result. The independent copies/negative-control/default-off checks
+are underway. The full serial affected-package host gate will follow when
+the copy worker releases Cargo, avoiding overlapping local build/test load.
+No ready PR is offered yet.
