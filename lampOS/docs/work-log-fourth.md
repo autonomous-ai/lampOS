@@ -302,11 +302,150 @@ question blocking completion of this study.
   and exact installation instructions for the first builder, leaving
   `deploy/` untouched. All acting behavior must remain opt-in.
 
+## 2026-10-14: task 15, records-bound — done on Fourth's branch
+
+**Built:** new `lamp-records`, [records.md](records.md), a disabled example
+configuration, and three unit templates inside `crates/records/systemd/`.
+The task branch is `fourth/records-bound`, from `96e5b83a7` plus Fourth's
+completed work. Workspace registration adds only this crate; existing
+dependency versions are unchanged. Nothing under `deploy/`, a hands-off
+crate, or the shared task list changed.
+
+The timer job retains recognized closed voice-service metadata by allocated
+bytes and newest mtime, oldest first, proposing 500,000,000 bytes and 14 days.
+It inventories first, then obtains bounded systemd plus host-procfs evidence
+for current, surviving and manual producers. Unknown evidence refuses the
+whole root. Active sessions survive every age/size limit. The safety contract
+requires today's trusted voice producer to exclusively create new output
+directories; it cannot acquire an existing candidate after the scan.
+
+Descriptor-relative validation rejects links, hard links, mount crossings,
+changed identities, unexpected layouts and wrong ownership/permissions.
+Same-root private quarantine permits interrupted removal to be resumed.
+Partial progress is accounted for without claiming a whole session removed.
+Dry runs write only stdout. Removal needs both `--apply` and `enabled:true`;
+disabled apply does not open retention roots. No transcript is read, and
+memory files are outside the recognized adapter. A separate reporter
+publishes bounded content-free diagnostics every second, binding the receipt
+to current settings by SHA-256 and exposing missing, failed and stale results.
+
+**Measured and verified on the development Mac:** macOS 26.6.2 (25G83),
+x86_64 Intel Core i7-10700K 3.80 GHz, 16 logical CPUs, 64 GiB RAM;
+Rust/Cargo 1.96.0. Commands ran from `lampOS/` with
+`/Users/autonomous/.cargo/bin/cargo`:
+
+| Command | Final result |
+|---|---|
+| `cargo fmt --all --check` | Pass |
+| `cargo clippy -p lamp-records --all-targets --offline -- -D warnings` | Pass, no warnings |
+| `cargo test -p lamp-records --offline` | 96 passed: 87 library, five CLI, four integration; one timing test normally ignored |
+| `cargo build --workspace --offline` | Pass; workspace also built before the task |
+| `cargo tree -i lamp-records --offline` | No dependent workspace crate |
+| `cargo +stable clippy -p lamp-records --all-targets --target aarch64-unknown-linux-gnu --offline -- -D warnings` | Pass; cross-target source checking, not ARM execution |
+| `cargo test -p lamp-records --release --test records records_cost -- --ignored --nocapture` | One invocation passed; finite fixture timing below |
+
+For 1,000 disposable sessions, each with five 1,024-byte logical files, first
+inventory was 153.317235 ms. Thirty more inventories had median/p95/worst
+148.485177/158.1607/170.073146 ms. Thirty pure plans had
+0.172239/0.192564/0.286491 ms. Thirty single-session removals, including syncs,
+had 2.045649/2.15702/2.188294 ms and unlinked 614,400 allocated bytes. Cache
+was not evicted; fixture creation/store opening were excluded. The live set
+was injected, so none of these numbers times the real systemd/procfs guard,
+the lamp, its filesystem or concurrent conversation. The stated subsecond
+development inventory target passed. No before/after lamp claim is made.
+
+**Standalone Linux checks:** copied 704 source files to
+`/private/tmp/lamp-fourth-records-final-nq595cud`, without the parent repository,
+`.git`, credentials or build outputs. The local Podman VM runs Linux
+6.12.13-200.fc41.x86_64, six configured CPUs and 8 GiB RAM; despite its name
+`lampos-arm64`, this execution was x86_64. The final suite passed 97 tests
+(88 library, five CLI, four integration), with two deliberate normal ignores.
+The cached image supplies Rust/Cargo 1.96.0. Exact invocation:
+
+```sh
+/usr/local/bin/podman run --rm --network none \
+  -v /private/tmp/lamp-fourth-records-final-nq595cud:/source:ro \
+  -v /Users/autonomous/.cargo/registry:/root/.cargo/registry:ro \
+  -v /Users/autonomous/.cargo/git:/root/.cargo/git:ro \
+  -w /source localhost/lampos-arm64-cross:latest \
+  /bin/sh -c 'CARGO_TARGET_DIR=/tmp/records-target cargo test -p lamp-records --offline --locked --target x86_64-unknown-linux-gnu'
+```
+
+The same container command with `--cap-add SYS_ADMIN` and the test selector
+`--test records bind_mounts_are_refused_even_on_the_same_filesystem --
+--ignored --nocapture` passed one additional test. It mounted only disposable
+fixture objects within the container's isolated namespace; same-filesystem
+file and directory bind mounts were refused and the outside sentinel stayed
+unchanged. Source/cache mounts remained read-only. The ignored release-cost
+test ran on the Mac as reported above, not in this VM.
+
+The three templates passed systemd 252.39-1~deb12u2 syntax verification in
+disposable `debian:bookworm` (image SHA-256 starts `94926f0fd968`). Exact
+substantive command, after mounting the template directory read-only at
+`/templates` and installing `systemd` only in that disposable container:
+
+```sh
+systemd-analyze verify /templates/lamp-records.service /templates/lamp-records-report.service /templates/lamp-records.timer
+```
+
+Initially it exited 1 with the two expected missing-executable errors. After
+container-only `mkdir -p /opt/lampOS/bin` and
+`ln -s /bin/true /opt/lampOS/bin/lamp-records`, the unchanged verify command
+emitted nothing and exited 0. The `--rm` container was removed. This checks
+unit parsing/directives, not startup, the real executable, or systemd on the
+lamp. No device or host service was touched.
+
+**Failures kept:** an early portable special-file fixture exceeded macOS's
+Unix-socket path limit and sandbox binding permissions; it was corrected to
+test portable unknown entries plus a real Linux FIFO. A transitional missing
+report-fingerprint initializer and one clippy collapsible-if diagnostic were
+fixed before the final gate. An initial offline container build lacked the
+workspace's cached git dependency; mounting public Cargo caches read-only
+resolved it. ARM checking first failed E0463 because the named `1.96.0`
+toolchain lacked the target standard library; `+stable` has that target and
+the same compiler commit, and passed without downloading a toolchain.
+Review also fixed unrelated `serve` processes being mistaken for voice,
+reserved report-temp names colliding with configuration, and invalid trash
+entries escaping the shared enumeration bound. All have regressions. No
+failing test remains in this task's handback.
+
+**One first command on the lamp:** after First installs the qualified ARM64
+binary and the disabled example configuration:
+
+```sh
+sudo /opt/lampOS/bin/lamp-records check /etc/lampOS/records.json
+```
+
+Expect `mode:"dry_run"`, `enabled:false`, zero removals, the running invocation
+protected in `active`, oldest known closed IDs in `planned` when over either
+bound, and plausible nonzero disk capacity. A guard error must leave the plan
+empty; historical unknown layouts must remain refused. No present disk
+percentage/count is asserted from this machine. First inspects that evidence
+before installing/enabling the timer/reporter and changing `enabled` to true.
+The document describes those steps and the reporter's boot gap: `/run` loses
+the receipt, so an enabled reporter may show an error until the next timer
+run. Qualification should also compare voice latency/drop counters during
+cleanup and verify recovery on a disposable fixture.
+
+**Most likely to be wrong on the lamp:** the loaded `ExecStart` serialization,
+host procfs visibility and identification of surviving/manual writers; then
+the layout/permissions of old sessions. Strict refusal is intentional; do not
+weaken it to obtain a removal count. A producer that reuses old directories
+or a malicious root namespace writer is outside the current contract.
+
+**Coverage left explicit for First:** the current shared journal stays under
+journald's native ownership. Proposed dedicated-namespace limits are documented,
+not installed. Bus capture directories and policy logs lack a supported
+completion/ownership adapter and are not globally bounded by this crate.
+First must assign their stable roots and closure contract before such adapters
+can be safe. This does not block the voice-root handback or task 16. No account,
+key, paid service, owner relay, lamp access or deployment was used.
+
 ## Not shown
 
-No lamp access or deployment, Linux ARM64 execution, physical power-loss
-test, real extraction model, speaker recognition, natural multi-day spoken
-test, provider-context deletion, or end-to-end lamp latency. All new
-behavior remains behind `--memory-days` until the first builder qualifies
-it on the lamp. The log contains no unanswered question requiring the
-owner to relay a message.
+No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
+real extraction model, speaker recognition, natural multi-day spoken test,
+provider-context deletion, or end-to-end lamp latency. Memory remains behind
+`--memory-days`; record deletion requires explicit apply and its disabled-by-
+default configuration switch. The log contains no unanswered question requiring
+the owner to relay a message.
