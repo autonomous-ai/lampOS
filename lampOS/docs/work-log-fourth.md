@@ -1099,6 +1099,96 @@ substituted for it. No lamp access, deployment, paid service, account,
 real key, ARM64 execution or real-service performance was used here.
 Fetch the running list again for the next task.
 
+## 2026-10-14: task 17, rebase and current busy-room floor
+
+Fetched the running list and rebased Fourth onto
+`e93b9684929d62248394d61c87ec57120db43229`. No new Fourth task is listed:
+13, 14, 15 and 16 are integrated; 21 and 17 are complete in this log.
+Git dropped task 21's already-integrated code patch. That does not prove
+its physical installation or qualification. The only rebase conflict was
+the append in `reuse-decisions.md`; both Expression reviews and the local
+judge review remain. Original task 17 code is now `5ee7efc73`; the
+`96b0c3c7c` evidence above still identifies the original tested build.
+
+The fetch exposed a real comparison change: First's `e07449e13` added a
+sure-name branch in Voice's `first_output_busy`, before `decide_busy`.
+An eligible score ≥0.999 can permit output in a busy room without a facing
+face. Follow-up **`39a45c173f1dff42d264e177ff794cd6ae568bdf`**, built on
+`fourth/local-judge-floor` and fast-forwarded onto Fourth, mirrors that
+branch. It requires `named_sure` in each supplied baseline snapshot and
+records the audited source in model records/fitting reports. Missing/null
+latch evidence is rejected, not converted to false. For an actual Voice
+first-output comparison, capture its retained per-request bit; a later weak
+hearing does not erase an earlier sure one. Policy's runtime comparison
+remains a separately labelled score projection with different time joins.
+
+The opt-in shadow guard now accepts a valid score ≥0.999 as call evidence;
+0.993 alone in a busy room still triggers the no-call guard. This does not
+force an answer or alter the model probabilities, coefficients or mixture.
+All behavior remains behind `--local-judge` and always shadow. The updated
+test enumerates the additional latch input and checks exact score boundaries,
+invalid/unknown values and required JSON evidence. A read-only source audit
+found no discrepancy with First's current gate.
+
+**Verification:** same macOS 26.6.2 x86_64 i7-10700K/64 GiB development Mac
+and same x86_64 Linux Podman VM (six vCPUs/8192 MiB), Rust/Cargo 1.96.0,
+as the original record. **143 passed, zero failed, two manual measurements
+ignored by the normal suite in each environment**; both measurements ran
+separately on the Mac. From `lampOS/`:
+
+```sh
+cargo fmt --all --check
+cargo clippy -p lamp-policy --all-targets --offline -- -D warnings
+RUST_TEST_THREADS=1 cargo test -p lamp-policy --offline
+cargo build --workspace --offline
+```
+
+The independent source-only Linux copy, without parent files/Git/credentials
+and with external networking disabled, passed Policy clean, strict lint,
+tests and workspace build with `--offline --locked --target
+x86_64-unknown-linux-gnu`, `CARGO_BUILD_JOBS=4`, `RUST_TEST_THREADS=1`.
+The [follow-up evidence](verification/local-judge-floor-20261014/README.md)
+lists each exact command and all 32 source hashes, which matched both
+trees. Mac Clippy/workspace elapsed times were 5.06/24.08 seconds; Linux
+3.63/21.50 seconds, with existing caches. The same inherited Body warnings
+remain. No gate/test failed in this follow-up; earlier failures stay in the
+original record. No previously integrated Fourth crate differs in source
+from the pinned fetched upstream; Policy is the only changed crate and
+no crate depends on it.
+
+Fresh release measurements on this Mac, alone with OS cache not cleared:
+local `ask` first 8.427 µs; next 1,000 median/p95/p99/max
+1.425/1.442/1.454/2.149 µs, with the same parsing/allocation boundary.
+Separate weights loading was 102.271 µs. The held-slow shadow fixture's
+eligibility-to-internal-choice boundary measured 100.244 ms first, then
+15/19/30/34 µs for 100 local-only choices. The first still exceeds the
+nominal completion budget by 0.244 ms. Both manual commands and exclusions
+are in the evidence; no acoustic or lamp timing is inferred.
+
+**Comparison remains insufficient:** the current nine authored rows add a
+0.999 busy-room call without a pose. That row is floor `play`, seed
+`look_up`, probability 0.4067034, with no guard override. Six of nine
+permissions differ. On the authored intentions, the floor permits two of
+four negatives and misses none of five calls; the local seed permits no
+negatives but misses four calls. No recorded Voice first-output row or
+independent lamp corpus was supplied. The original eight-row evidence is
+retained under its earlier rule, not rewritten as a result of this one.
+
+**First on the lamp:** the same 60-second command above still applies,
+after stopping the existing Policy owner; never run two. In addition to
+the earlier played scenes, compare a sub-0.999 meeting detection and a
+≥0.999 call with no facing face. Capture the actual `named_sure` latch
+along with Voice's prefix, conversation/own-turn state, room and face view.
+Use the updated fitting schema; old snapshots lacking this bit cannot
+reproduce the new rule and must not be filled with an invented false value.
+Fit independent labelled sessions and evaluate held-out lamp records before
+action wiring. Most likely wrong remains the unfitted weights, then the
+name/face receipt-time association. No lamp access, spending, account,
+real key, deployment or ARM64 execution occurred.
+
+The branch is ready for First to read; monitoring continues on the required
+half-hour cycle when the fetched Fourth queue remains empty.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
