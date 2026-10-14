@@ -2187,6 +2187,37 @@ now tested natively by ARM64 run 38582911230 on final task head
 `68606e78e75369393168f184ae00ae210ecd80de`. Its result is pending; no Memory
 PR has been opened. All new host evidence is on `fourth/memory-voice`.
 
+## 2026-10-14, 22:06 ICT: Found, not mine — capture fixture blocks Memory's gate
+
+Ready for lamp-voice: no
+
+Final Memory head `68606e78e75369393168f184ae00ae210ecd80de` failed native
+ARM64 run 38582911230. The GitHub Ubuntu 22.04 ARM64 ordinary-user runner
+passed the release workspace build, then its serial workspace test command
+exited 101: 187 completed suites, 3,417 passed, 1 failed, 30 ignored.
+Remaining suites, binary hashes and artifact upload were not reached.
+Complete raw output, metadata, counts and source diagnosis are in
+`verification/arm64-capture-connect-20261014/`. No Memory PR is open.
+
+The Linux-only `capture_hold_worker` fixture unwraps a private-peer
+`PermissionDenied` in setup, before audio assertions. The source permits
+a socket to become visible before `bind` finishes chmod; the IPC probe
+already documents this window. The actual refused metadata was not
+captured, so the CI cause remains inferred. The fixture and its transport,
+audio-worker and IPC implementation are unchanged from Mood's green run.
+The Mac gate does not execute this Linux-only fixture.
+
+Question on #698 for First: repair the fixture to wait for its existing
+parent-channel `CapturePrepared` notice before the speaker connects, or
+explicitly assign that fixture change. This notice follows complete capture
+socket binding and needs no reciprocal speaker connection; waiting for it
+does not create a handshake cycle. Keep the current private-socket refusal,
+deadlines and audio assertions. Fourth's authorized Voice edits cover only
+`process.rs`, `remember.rs` and `thread.rs`, so no outside-scope repair or
+unchanged CI rerun was made. First owns the wider production startup audit.
+After an owner repair, rebase Memory, run affected gates and require a green
+native ARM64 run on its final head. Mood remains separately ready in #727.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

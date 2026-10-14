@@ -36,9 +36,12 @@ head and green native run in the last row. Its local Mac/Linux gates also
 pass, including 1,764 current-base Mac tests. Memory's subsequent full Mac
 gate passed 1,469 tests, and its rebase including First's installed capture
 passes focused Mac checks and strict Linux lint/cross-build. Its final head
-still needs its own native ARM64 run; Memory is not ready yet. Earlier
-privacy/motor failures remain retained. Green checkpoints do not certify
-later heads or explain prior intermittent failures.
+failed its final native ARM64 run 38582911230 in a Linux-only capture
+fixture's private-socket setup: 3,417 passed, 1 failed, 30 ignored before
+Cargo stopped. Memory is not ready. The complete failure and owner-facing
+diagnosis are in [the capture setup report](../arm64-capture-connect-20261014/).
+Earlier privacy/motor failures remain retained. Green checkpoints do not
+certify later heads or explain prior intermittent failures.
 
 Mood's uploaded `lamp-mood` SHA-256 is
 `4b5b2b681aab0a33a0de7b14daefb68a21d5f422aca4c85a4ba4ad59aa9fa114`.
