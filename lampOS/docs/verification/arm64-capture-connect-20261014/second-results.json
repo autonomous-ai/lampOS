@@ -1,0 +1,12 @@
+{
+  "head": "ad368abb1b81ec6561eb6497d74c18a2bfd9fd6c",
+  "base": "3773c1fb88190fb5289bf1378eaa1f5fe5d134cb",
+  "runtime_identical_to_base": true,
+  "conclusion": "failure",
+  "exit_code": 101,
+  "suites_completed": 184,
+  "passed": 3398,
+  "failed": 1,
+  "ignored": 29,
+  "raw_sha256": "61f614f0b393ffd3141a26167fd929705ca88b326ac3279a96b63e33edaf8ab1"
+}

@@ -2251,6 +2251,51 @@ been mended or bypassed. No Memory PR or new ready claim; no lamp or external
 service was used. Work now waits for the owner response already requested
 on #698, while the half-hour queue/PR review continues.
 
+## 2026-10-14, 23:26 ICT: Mood merged and tried by First
+
+Ready for lamp-voice: yes (#727)
+
+The 23:23 queue/review check found #727 merged and #713 closed. First's
+[23:01 receipt](https://github.com/autonomous-ai/lampOS/issues/713#issuecomment-6172610004)
+says its CI build from run 38578348793 passed `serve` without `--enable`
+(disabled, exit 0), then the one-minute enabled run on lamp-4ace starting
+22:59:57. First reports 60 `mood/state` publications; received 829, accepted
+171, engine rejected 3, all error counts zero. The 23:00:24 state, with
+nobody about, was asleep, awake 0.0, energy 0.3, warmth 0.6, familiarity
+unknown. These are First's reported measurements, not runs made by Fourth.
+
+First has not installed Mood as a service: it is waiting for the eye and
+always-alive layer to read it. The metadata day is recording until tomorrow
+18:23 ICT. Mood's code task is closed; that later evidence remains pending.
+The queue now contains only #698 for Fourth.
+
+## 2026-10-14, 23:26 ICT: capture setup also fails without Memory's changes
+
+Ready for lamp-voice: no
+
+Found, not mine: native ARM64 run 38593943161 on documentation-branch
+`ad368abb1b81ec6561eb6497d74c18a2bfd9fd6c` failed the same capture fixture
+at line 212 with the same private-peer `PermissionDenied`. Its runtime is
+identical to upstream `3773c1fb8`; every Fourth change on that branch is
+under `lampOS/docs/`, and none of Memory's unmerged runtime/test additions
+is present. The release workspace build passed, then serial tests exited
+101 after 3,398 passed / 1 failed / 29 ignored across 184 completed suites.
+Later tests, hashes and upload were not reached. Raw output, metadata and
+counts are `second-*` in `verification/arm64-capture-connect-20261014/`.
+
+This second run establishes the failure without the Memory task's code,
+but still does not capture socket metadata or prove the inferred bind/chmod
+cause. The owner question on #698 is unanswered; no fixture or permission
+check has been changed. This new evidence is being added to that issue
+without repeating the request.
+
+Memory is now locally rebased to `d5d765862ab1f73629ee7a2c5a9a8086f0246d11`,
+including the merged Mood, Body window, always-alive Expression and Gemini
+probe work. Local task head `2d081316b44f81dfc50589a3e6b554af2c88d993`
+has the same nine task source/test/manifest files as the last passing host
+gate. The new upstream dependencies still need their local gate. The remote
+task branch remains at `68606e78e`, with no Memory PR or ready claim.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

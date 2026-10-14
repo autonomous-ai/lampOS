@@ -30,10 +30,15 @@ deployment claim.
 Completed handoffs: First merged
 [Records #721](https://github.com/autonomous-ai/lampOS/pull/721) and
 [judge audit #722](https://github.com/autonomous-ai/lampOS/pull/722), both
-offered non-draft on the exact heads above. Mood is ready in non-draft
-[PR #727](https://github.com/autonomous-ai/lampOS/pull/727), with its latest
-head and green native run in the last row. Its local Mac/Linux gates also
-pass, including 1,764 current-base Mac tests. Memory's subsequent full Mac
+offered non-draft on the exact heads above. First also merged
+[Mood #727](https://github.com/autonomous-ai/lampOS/pull/727) at 23:01 ICT,
+using the head and green native run in the last row. Its local Mac/Linux
+gates passed, including 1,764 current-base Mac tests. First reports the
+disabled check and a one-minute enabled trial on lamp-4ace passed;
+[the receipt is on #713](https://github.com/autonomous-ai/lampOS/issues/713#issuecomment-6172610004).
+It is not installed as a service yet, and First's metadata day continues
+until tomorrow at 18:23 ICT. Those are First's observations, not Fourth's
+measurements. Memory's subsequent full Mac
 gate passed 1,469 tests, and its rebase including First's installed capture
 passes focused Mac checks and strict Linux lint/cross-build. Its final head
 failed its final native ARM64 run 38582911230 in a Linux-only capture

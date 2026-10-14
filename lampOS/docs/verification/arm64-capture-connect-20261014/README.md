@@ -81,6 +81,35 @@ in `Worker::spawn`; this fixture starts `capture_on` with `std::thread`
 and does not call it. These comparisons support reporting an inherited
 setup finding; they do not replace a passing gate for Memory.
 
+## Second occurrence without the Memory task's runtime changes
+
+Native ARM64 [run 38593943161](https://github.com/autonomous-ai/lampOS/actions/runs/38593943161)
+failed on documentation-branch head
+`ad368abb1b81ec6561eb6497d74c18a2bfd9fd6c`. Every file changed from its
+base `3773c1fb88190fb5289bf1378eaa1f5fe5d134cb` is under `lampOS/docs/`;
+its runtime source is exactly that upstream base. None of the Memory/Voice
+task's unmerged runtime or test additions is included.
+
+The same GitHub Ubuntu 22.04 ARM64 ordinary-user configuration and Rust
+1.96.0 passed the release workspace build, then failed the same fixture
+at the same line 212 with the same private-peer `PermissionDenied`. The
+fixture finished 2 passed / 1 failed. The workspace test command exited
+101 after **3,398 passed, 1 failed, 29 ignored**, 184 completed suites.
+Later tests, binary hashing and upload were not reached.
+
+`second-run.txt` is the complete unmodified `gh run view 38593943161 --repo
+autonomous-ai/lampOS --log` output; `second-run.json` contains run/job/step
+metadata and `second-results.json` contains counts and source identity.
+The raw log's SHA-256 is
+`61f614f0b393ffd3141a26167fd929705ca88b326ac3279a96b63e33edaf8ab1`.
+Exclude this raw log from documentation whitespace checks for the same
+byte-preservation reason as `run.txt`.
+
+This establishes that the failure can occur without the Memory task's
+changes. It still does not record the refused socket's metadata or prove
+that the bind/chmod window caused either occurrence. The fixture and its
+security checks remain unchanged; the original owner question is pending.
+
 ## Limits
 
 No lamp, microphone device, cloud provider, or physical audio latency was
