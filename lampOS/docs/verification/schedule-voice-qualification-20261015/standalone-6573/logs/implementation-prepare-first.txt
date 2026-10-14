@@ -1,0 +1,15 @@
+{
+  "report": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone.json",
+  "root": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-6xt7k7hn/lampOS",
+  "base": "6573ce6c1b594bf9c8cf7836bbd0e162c09e4cd1",
+  "task_commit": "acb628b494df0c38842ea467d1289eec8d35d2ca",
+  "source_file_count": 1621,
+  "gate_path_count": 697,
+  "overlays": 45,
+  "omitted_nonruntime_count": 654,
+  "helpers": {
+    "crates/actions/examples/schedule_off_actions.rs": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1",
+    "crates/voice/examples/schedule_off_voice.rs": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+  },
+  "status": "prepared; Cargo execution awaits explicit parent release"
+}

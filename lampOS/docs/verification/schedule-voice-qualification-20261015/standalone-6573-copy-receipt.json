@@ -1,0 +1,12 @@
+{
+  "source": "/private/tmp/lamp-third-schedule-room-policy-text-export-owvvxe3q",
+  "destination": "/private/tmp/lamp-third-touch-log/lampOS/docs/verification/schedule-voice-qualification-20261015/standalone-6573",
+  "files": 39,
+  "bytes": 14021131,
+  "all_export_hashes_verified": true,
+  "all_copy_bytes_identical": true,
+  "sidecar_original": "/private/tmp/lamp-third-schedule-room-policy-text-export-verification.json",
+  "sidecar_sha256": "65023f6a6786940c0b824920eb065e33fe57c209f72812226b0ad731c2631e0c",
+  "index_sha256": "c6f916b155f266ae96c0eca3d9d8016f5eb14115a23e01f6064f4ba4d2308513",
+  "checksums_sha256": "ca3189ece6b2a9cff6264c84b3400ce7e6eb20484da47e38a5cbc62c877a40eb"
+}

@@ -1,0 +1,19 @@
+ M lampOS/crates/voice/src/admission.rs
+ M lampOS/crates/voice/src/provider_worker.rs
+ M lampOS/crates/voice/src/provider_worker/reminder_policy.rs
+ M lampOS/crates/voice/src/provider_worker/tests/reminders.rs
+ M lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs
+ M lampOS/crates/voice/src/reminders/transport.rs
+ M lampOS/docs/reuse-decisions.md
+ M lampOS/docs/schedule.md
+ M lampOS/docs/tools.md
+?? lampOS/docs/verification/schedule-voice-host-20261014/room-policy-6573/format-record.json
+?? lampOS/docs/verification/schedule-voice-host-20261014/room-policy-6573/issue-709-answers.json
+?? lampOS/docs/verification/schedule-voice-host-20261014/room-policy-6573/issue-739-ownership.json
+?? lampOS/docs/verification/schedule-voice-host-20261014/room-policy-6573/provider-edit-audit-before-format.json
+?? lampOS/docs/verification/schedule-voice-host-20261014/room-policy-6573/queue.json
+?? lampOS/docs/verification/schedule-voice-host-20261014/room-policy-6573/rebase.json
+?? lampOS/docs/verification/schedule-voice-host-20261014/room-policy-6573/retention-pre-validation.json
+?? lampOS/docs/verification/schedule-voice-host-20261014/room-policy-6573/review-ledger-recovery-c0.md
+?? lampOS/docs/verification/schedule-voice-host-20261014/room-policy-6573/review-native-boundary-c0.md
+?? lampOS/docs/verification/schedule-voice-host-20261014/room-policy-6573/source.json

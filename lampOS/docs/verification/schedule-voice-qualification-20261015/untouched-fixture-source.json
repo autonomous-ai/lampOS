@@ -1,0 +1,37 @@
+{
+  "base": "6573ce6c1b594bf9c8cf7836bbd0e162c09e4cd1",
+  "head": "acb628b494df0c38842ea467d1289eec8d35d2ca",
+  "paths": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator/motor.rs",
+      "bytes": 37408,
+      "sha256": "29b82801801be234ae865f7593c957a79537acc3469805401b759c21cf6c748e",
+      "identical_at_base_head_and_worktree": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/motor/head.rs",
+      "bytes": 8452,
+      "sha256": "4de64a3ab9fe22f6329e990bf1cc990d065fa781f2f38ff69b603fe9b05870b0",
+      "identical_at_base_head_and_worktree": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs",
+      "bytes": 38628,
+      "sha256": "62d1f0b5746ecca1167bc02ce0377cf24d2a94ff3e1e73b92aa972d2ab67af33",
+      "identical_at_base_head_and_worktree": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/motor/tests/native_head.rs",
+      "bytes": 15938,
+      "sha256": "a6870c6a1c2f063f5b83ec4e17bf3ed3f7e4d1c6c0bff3ee1942d1108ada38cc",
+      "identical_at_base_head_and_worktree": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/early_end.rs",
+      "bytes": 47198,
+      "sha256": "2e9c141baa4a4935015b05d28cb367b550790e95435808eb36afe2d051f72e2f",
+      "identical_at_base_head_and_worktree": true
+    }
+  ],
+  "limits": "Source identity only, not a claim that any full-gate failure passes alone. First assigns fixture repair to Fourth under #739. No assertion/deadline/runtime mutation."
+}

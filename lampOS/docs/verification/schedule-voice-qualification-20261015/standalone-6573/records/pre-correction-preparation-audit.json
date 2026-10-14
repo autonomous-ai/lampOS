@@ -1,0 +1,269 @@
+{
+  "status": "prepared only; explicit parent Cargo release still required",
+  "audited_at": "2026-10-14T19:42:07.122301+00:00",
+  "integration_base": "6573ce6c1b594bf9c8cf7836bbd0e162c09e4cd1",
+  "observed_copy_head": "168856fbd349a7931a962458f17509953b3a254d",
+  "frozen_gate_recorded_head": "168856fbd349a7931a962458f17509953b3a254d",
+  "frozen_source": {
+    "path": "/private/tmp/lamp-third-schedule-room-policy-source-frozen.json",
+    "sha256": "e0c5985563535bf46d6af76d3bae71634ab3f1f03d8c713d55f202f95972ca7f",
+    "paths": 697
+  },
+  "baseline": {
+    "report": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline.json",
+    "report_sha256": "934d45f0df7c9e61ed66a9e8c0ed79b3c2058b0fc41c7dbf691afeee4e714437",
+    "root": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS",
+    "source_files": 1603,
+    "source_bytes": 25406926,
+    "manifest_files_from_tree": 35,
+    "archive": {
+      "path": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline.tar",
+      "sha256": "b70e8551e981b70f1fa09606eb4d002c01970359b3c297f23002e7541c9240d7",
+      "command": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline.tar",
+        "6573ce6c1b594bf9c8cf7836bbd0e162c09e4cd1",
+        "lampOS"
+      ],
+      "cwd": "/Users/d/code/autonomous-os"
+    }
+  },
+  "implementation": {
+    "report": "/private/tmp/lamp-third-schedule-room-policy-standalone.json",
+    "report_sha256": "9bf269811c171b5e23f7a0e69330ca21a902ba522aa2dcf5f3aefc3a395ec276",
+    "root": "/private/tmp/lamp-third-schedule-room-policy-standalone-hhpoundm/lampOS",
+    "source_files": 1621,
+    "source_bytes": 25852993,
+    "manifest_files_from_tree": 35,
+    "overlays_from_integration_base": 45,
+    "omitted_verification_files_at_copy": 638,
+    "archive": {
+      "path": "/private/tmp/lamp-third-schedule-room-policy-standalone-integration-base.tar",
+      "sha256": "b70e8551e981b70f1fa09606eb4d002c01970359b3c297f23002e7541c9240d7",
+      "command": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=/private/tmp/lamp-third-schedule-room-policy-standalone-integration-base.tar",
+        "6573ce6c1b594bf9c8cf7836bbd0e162c09e4cd1",
+        "lampOS"
+      ],
+      "cwd": "/Users/d/code/autonomous-os"
+    }
+  },
+  "helpers": {
+    "crates/actions/examples/schedule_off_actions.rs": {
+      "bytes": 179,
+      "sha256": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1"
+    },
+    "crates/voice/examples/schedule_off_voice.rs": {
+      "bytes": 1576,
+      "sha256": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+    }
+  },
+  "helper_total_bytes_per_copy": 1755,
+  "matrix": {
+    "profiles": [
+      "ordinary",
+      "tasks"
+    ],
+    "switches": [
+      "LAMP_SCHEDULE_TOOLS",
+      "LAMP_SCHEDULE_SPEAK"
+    ],
+    "values": [
+      null,
+      "off",
+      "ON",
+      "true",
+      "1",
+      " on "
+    ],
+    "cases": 72,
+    "baseline_helper_invocations": 144,
+    "implementation_helper_invocations": 144,
+    "exact_stdout_comparisons": 144,
+    "stderr_required_empty": true,
+    "normalization": false
+  },
+  "tasks_defaults_review": {
+    "watch_defaults_on": true,
+    "explicit_no_watch_switch": true,
+    "task_source_files_equal_between_copies": 14,
+    "existing_catalog_route_source_delta_from_d8": "Only agent_tasks.rs documentation comment changed; tools.rs and Actions source unchanged in integration delta. Fresh baseline output counts/bytes will be measured, never carried from d8."
+  },
+  "preserved": {
+    "manifest": "/private/tmp/lamp-third-schedule-room-policy-preserved-v2.json",
+    "manifest_sha256": "d9d133ca55698774135ae77132d107d306ff6ca6dcdab4984404afd4c721aa55",
+    "historical_files": 2684,
+    "excludes_mutable_top_level_prose_and_current_room_policy_retention": true
+  },
+  "scripts": {
+    "/private/tmp/lamp_third_schedule_room_policy_support.py": {
+      "bytes": 5424,
+      "sha256": "464ad53bf43f9bc6d8b9cd30dd37f74f114c20e1dc86cf6a806563cbc6c68a53"
+    },
+    "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-prepare.py": {
+      "bytes": 5638,
+      "sha256": "12381db77c93d47f35b8660b2a2f8c750514d852a233b35cdafbe55708c055bf"
+    },
+    "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-capture.py": {
+      "bytes": 8003,
+      "sha256": "3976f6a59ba2e7834b1368f9eba08c2a2d7f2a8aee3462480fbced555714982f"
+    },
+    "/private/tmp/lamp-third-schedule-room-policy-standalone-prepare.py": {
+      "bytes": 10621,
+      "sha256": "e883f30d68178ad534d7bc9027512212e7d71bcd5db2c938121ad021b84e5cc5"
+    },
+    "/private/tmp/lamp-third-schedule-room-policy-standalone-run.py": {
+      "bytes": 8986,
+      "sha256": "27ec2d7b2d7c0816fc8a62509e25a731296a4d921f131e1b1d8f0acf294e1668"
+    },
+    "/private/tmp/lamp-third-schedule-room-policy-standalone-audit.py": {
+      "bytes": 4232,
+      "sha256": "4fc8bcb831c7787b7f97832b1b3009b2ab8236f21b61d337a3b4345b1a1b26ba"
+    }
+  },
+  "commands_after_explicit_release": [
+    [
+      "python3",
+      "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-capture.py",
+      "--parent-cargo-released"
+    ],
+    [
+      "python3",
+      "/private/tmp/lamp-third-schedule-room-policy-standalone-run.py",
+      "--parent-cargo-released"
+    ],
+    [
+      "python3",
+      "/private/tmp/lamp-third-schedule-room-policy-standalone-audit.py",
+      "/private/tmp/lamp-third-schedule-room-policy-standalone.json"
+    ]
+  ],
+  "baseline_cargo_commands": [
+    [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-actions",
+      "-p",
+      "lamp-voice",
+      "--example",
+      "schedule_off_actions",
+      "--example",
+      "schedule_off_voice"
+    ],
+    [
+      "cargo",
+      "metadata",
+      "--offline",
+      "--locked",
+      "--format-version",
+      "1"
+    ]
+  ],
+  "implementation_cargo_commands": [
+    [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--workspace"
+    ],
+    [
+      "cargo",
+      "metadata",
+      "--offline",
+      "--locked",
+      "--format-version",
+      "1"
+    ],
+    [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-actions",
+      "-p",
+      "lamp-voice",
+      "--example",
+      "schedule_off_actions",
+      "--example",
+      "schedule_off_voice"
+    ],
+    [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-actions",
+      "--all-targets",
+      "--",
+      "--test-threads=1"
+    ],
+    [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-schedule",
+      "--all-targets",
+      "--",
+      "--test-threads=1"
+    ],
+    [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "reminder",
+      "--",
+      "--test-threads=1"
+    ],
+    [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "tools",
+      "--",
+      "--test-threads=1"
+    ]
+  ],
+  "execution_rules": {
+    "one_cargo_owner": true,
+    "baseline_must_pass_before_implementation": true,
+    "require_escalated_local_ipc": true,
+    "offline_locked_cargo": true,
+    "no_provider_or_device_environment": true,
+    "no_automatic_retries": true,
+    "stop_dependent_stages_on_failure": true,
+    "logs_create_exclusive": true,
+    "prepared_reports_immutable": true,
+    "progress_reports_mutable_only_during_their_single_new_run": true,
+    "no_git_head_equality_required_during_execution": true,
+    "metadata_must_prove_all_local_manifests_inside_each_copy": true,
+    "invalid_relative_schedule_paths_must_remain_absent": true
+  },
+  "limits": [
+    "No Cargo, cargo metadata, helper, Rust test, compiler or formatter command was run during preparation; Python AST parsing and filesystem/hash audits only.",
+    "The broader standalone Voice filter is tools, not the focused main tools:: filter. Test counts are read from new logs, never asserted from earlier d8 totals.",
+    "Original 1576-byte Voice helper checks its fixed existing route list and ordinary Written wire bytes; it declares check_agent_task but does not directly route it, and it does not serialize End.sound.",
+    "The 72-case corpus proves exact default-off catalog/environment/tool-declaration/route/Written bytes for the listed matrix. It is not a complete gate, on-device result, or runtime/acoustic latency measurement.",
+    "No main source, docs, log, Git state, lamp, provider or account mutation by this preparation."
+  ]
+}

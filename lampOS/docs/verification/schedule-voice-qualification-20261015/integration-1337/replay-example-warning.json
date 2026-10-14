@@ -1,0 +1,21 @@
+{
+  "scope": "Inherited workspace example artifact filename collision, not changed by Task31",
+  "base": "6573ce6c1b594bf9c8cf7836bbd0e162c09e4cd1",
+  "head": "acb628b494df0c38842ea467d1289eec8d35d2ca",
+  "source": [
+    {
+      "path": "lampOS/crates/controls/examples/replay_cost.rs",
+      "bytes": 1611,
+      "sha256": "89dbd5557c93596a1effa3e4961a9f1d1a8232bd32ccd51cc751c718543ef2df",
+      "unchanged_from_integration": true
+    },
+    {
+      "path": "lampOS/crates/expression/examples/replay_cost.rs",
+      "bytes": 2055,
+      "sha256": "13cabe07608834d2e26d01a3fe92942cb78e7d9baa6389d5d4986f894b5c551f",
+      "unchanged_from_integration": true
+    }
+  ],
+  "observation": "Both c0 and01192 native logs contain output filename collision warnings for examples/replay_cost and replay_cost.dwp in build and test steps. Production lamp-actions/lamp-schedule/lamp-voice names are distinct.",
+  "limitation": "The unqualified replay_cost artifact name alone does not identify which package example was copied. No cleanup is included outside #709."
+}

@@ -1,0 +1,47 @@
+{
+  "purpose": "Final doc-only correction and source/CI identity; no pending result promoted to terminal success",
+  "originals": [
+    {
+      "original": "/private/tmp/lamp-third-schedule-room-policy-source-frozen.json",
+      "retained": "source-frozen.json",
+      "bytes": 75691,
+      "sha256": "e0c5985563535bf46d6af76d3bae71634ab3f1f03d8c713d55f202f95972ca7f"
+    },
+    {
+      "original": "/private/tmp/lamp-third-schedule-01192-source-identity.json",
+      "retained": "source-01192-identity.json",
+      "bytes": 500,
+      "sha256": "059f467483bf60955b3301c77d160bf3cee7998c54500aca40c7926e966f4e38"
+    },
+    {
+      "original": "/private/tmp/lamp-third-schedule-runbook-checkpoint-head.json",
+      "retained": "source-acb628-amendment.json",
+      "bytes": 1377,
+      "sha256": "bdff54c130136fc4d2c6cb0082a0e088bfef7308aa6c7bff96aa39fd16e827cb"
+    },
+    {
+      "original": "/private/tmp/lamp-third-schedule-final-source-qualification-plan.json",
+      "retained": "qualification-plan.json",
+      "bytes": 1939,
+      "sha256": "447ad01b9e2fbe6ed53476887f30b3f102a6596b7776125e1eb462a761f5c902"
+    },
+    {
+      "original": "/private/tmp/lamp-third-schedule-final-runbook-audit.md",
+      "retained": "runbook-audit.md",
+      "bytes": 3848,
+      "sha256": "30e00b39967b58714530b191a49ce87f452b0e5e20674b4afba86e5157b69146"
+    },
+    {
+      "original": "/private/tmp/lamp-third-schedule-final-native-first-runs.json",
+      "retained": "final-native-first-runs.json",
+      "bytes": 260,
+      "sha256": "d5499da5a247226a4b983367662e6a5e423c4da4d2aae2bf1c1b0efa12da338f"
+    },
+    {
+      "original": "/private/tmp/lamp-third-schedule-unchanged-fixture-source-identity.json",
+      "retained": "untouched-fixture-source.json",
+      "bytes": 1502,
+      "sha256": "72e6ec65c5d6d2c36763165c9485a22805840af43b353b0f492c42b2ce1f8d88"
+    }
+  ]
+}

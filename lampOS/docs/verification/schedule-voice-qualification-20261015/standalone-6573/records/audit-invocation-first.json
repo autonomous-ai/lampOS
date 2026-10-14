@@ -1,0 +1,15 @@
+{
+  "command": [
+    "python3",
+    "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-audit.py",
+    "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone.json"
+  ],
+  "started_at": "2026-10-14T20:17:18.327454+00:00",
+  "finished_at": "2026-10-14T20:17:19.611828+00:00",
+  "elapsed_seconds": 1.284309055,
+  "exit_code": 0,
+  "stdout_file": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-audit-first.json",
+  "stdout_sha256": "2ba565bc08b0dc6268b2a7e2fa0432770981f4b9a4ed2e7de9d3962a2fc3c37a",
+  "stderr_file": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-audit-first.stderr",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

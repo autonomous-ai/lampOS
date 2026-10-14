@@ -1,0 +1,121 @@
+{
+  "scope": "Identities only: helper source, archives and executables are deliberately not exported. Source file hashes remain in original reports and the frozen map.",
+  "helpers": [
+    {
+      "copy": "baseline",
+      "path": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/actions/examples/schedule_off_actions.rs",
+      "bytes": 179,
+      "sha256": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1"
+    },
+    {
+      "copy": "baseline",
+      "path": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/voice/examples/schedule_off_voice.rs",
+      "bytes": 1576,
+      "sha256": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+    },
+    {
+      "copy": "implementation",
+      "path": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-6xt7k7hn/lampOS/crates/actions/examples/schedule_off_actions.rs",
+      "bytes": 179,
+      "sha256": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1"
+    },
+    {
+      "copy": "implementation",
+      "path": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-6xt7k7hn/lampOS/crates/voice/examples/schedule_off_voice.rs",
+      "bytes": 1576,
+      "sha256": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+    }
+  ],
+  "archives": [
+    {
+      "copy": "baseline",
+      "path": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline.tar",
+      "sha256": "b70e8551e981b70f1fa09606eb4d002c01970359b3c297f23002e7541c9240d7",
+      "command": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline.tar",
+        "6573ce6c1b594bf9c8cf7836bbd0e162c09e4cd1",
+        "lampOS"
+      ],
+      "cwd": "/Users/d/code/autonomous-os",
+      "bytes": 26787840
+    },
+    {
+      "copy": "implementation",
+      "path": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-integration-base.tar",
+      "sha256": "b70e8551e981b70f1fa09606eb4d002c01970359b3c297f23002e7541c9240d7",
+      "command": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-integration-base.tar",
+        "6573ce6c1b594bf9c8cf7836bbd0e162c09e4cd1",
+        "lampOS"
+      ],
+      "cwd": "/Users/d/code/autonomous-os",
+      "bytes": 26787840
+    }
+  ],
+  "executables": [
+    {
+      "copy": "baseline",
+      "name": "schedule_off_actions",
+      "path": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/target/debug/examples/schedule_off_actions",
+      "sha256": "522cfb89b005415ed109f43feb9b9e7ee0ebc14b9cb8fb99def1a22e1c3a848c",
+      "bytes": 801904,
+      "hash_boundary": "After helper build, before that copy\u2019s helper capture; rechecked at export."
+    },
+    {
+      "copy": "baseline",
+      "name": "schedule_off_voice",
+      "path": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/target/debug/examples/schedule_off_voice",
+      "sha256": "9fc05d239d9a803aa407eecc112b520bfe78adcb4b9464974da30bab5fdec205",
+      "bytes": 1911808,
+      "hash_boundary": "After helper build, before that copy\u2019s helper capture; rechecked at export."
+    },
+    {
+      "copy": "implementation",
+      "name": "schedule_off_actions",
+      "path": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-6xt7k7hn/lampOS/target/debug/examples/schedule_off_actions",
+      "sha256": "65746b7589bc2a3ce425edbea32ab7a9ff03cbd9aa4ec27c6e939ba7ebd036a0",
+      "bytes": 803992,
+      "hash_boundary": "After helper build, before that copy\u2019s helper capture; rechecked at export."
+    },
+    {
+      "copy": "implementation",
+      "name": "schedule_off_voice",
+      "path": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-6xt7k7hn/lampOS/target/debug/examples/schedule_off_voice",
+      "sha256": "76da4204912da42889711e30caac0da8cb4d6c9bed895c54f7ae5d2bdcb8ad03",
+      "bytes": 1994872,
+      "hash_boundary": "After helper build, before that copy\u2019s helper capture; rechecked at export."
+    }
+  ],
+  "script_identities": {
+    "/private/tmp/lamp_third_schedule_room_policy_support.py": {
+      "bytes": 5424,
+      "sha256": "464ad53bf43f9bc6d8b9cd30dd37f74f114c20e1dc86cf6a806563cbc6c68a53"
+    },
+    "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-prepare.py": {
+      "bytes": 5638,
+      "sha256": "12381db77c93d47f35b8660b2a2f8c750514d852a233b35cdafbe55708c055bf"
+    },
+    "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-capture.py": {
+      "bytes": 8003,
+      "sha256": "3976f6a59ba2e7834b1368f9eba08c2a2d7f2a8aee3462480fbced555714982f"
+    },
+    "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-prepare.py": {
+      "bytes": 12192,
+      "sha256": "d85dfc09827f546cedfab51af0a52f4ed173fa50e2a8e63db86a53efeedc3f5f"
+    },
+    "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-run.py": {
+      "bytes": 9010,
+      "sha256": "596a8290002f102d945902db7ab4782b870a1ec8234c1cbc2f2612bba40829ec"
+    },
+    "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-audit.py": {
+      "bytes": 4232,
+      "sha256": "4fc8bcb831c7787b7f97832b1b3009b2ab8236f21b61d337a3b4345b1a1b26ba"
+    }
+  }
+}

@@ -1,0 +1,106 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling libc v0.2.190
+   Compiling serde_core v1.0.229
+   Compiling itoa v1.0.18
+   Compiling cfg-if v1.0.5
+   Compiling zmij v1.0.23
+   Compiling version_check v0.9.5
+   Compiling serde_json v1.0.151
+   Compiling serde v1.0.229
+   Compiling memchr v2.8.3
+   Compiling typenum v1.20.1
+   Compiling cpufeatures v0.3.1
+   Compiling rustix v1.1.5
+   Compiling bitflags v2.13.2
+   Compiling find-msvc-tools v0.1.14
+   Compiling shlex v2.0.1
+   Compiling once_cell v1.21.4
+   Compiling zeroize v1.9.1
+   Compiling cc v1.7.0
+   Compiling pin-project-lite v0.2.17
+   Compiling untrusted v0.9.0
+   Compiling generic-array v0.14.7
+   Compiling rustls-pki-types v1.15.1
+   Compiling unicode-xid v0.2.6
+   Compiling rustls v0.23.45
+   Compiling bytes v1.12.1
+   Compiling getrandom v0.4.3
+   Compiling rand_core v0.10.1
+   Compiling cpufeatures v0.2.17
+   Compiling sonora-simd v0.2.0
+   Compiling thiserror v2.0.21
+   Compiling const-oid v0.10.2
+   Compiling hybrid-array v0.4.15
+   Compiling sonora-fft v0.2.0
+   Compiling httparse v1.10.1
+   Compiling subtle v2.6.1
+   Compiling chacha20 v0.10.2
+   Compiling tracing-core v0.1.36
+   Compiling http v1.5.0
+   Compiling webpki-roots v1.0.9
+   Compiling signal-hook v0.4.4
+   Compiling crypto-common v0.2.2
+   Compiling block-buffer v0.12.1
+   Compiling futures-sink v0.3.34
+   Compiling slab v0.4.12
+   Compiling log v0.4.34
+   Compiling futures-task v0.3.34
+   Compiling futures-core v0.3.34
+   Compiling data-encoding v2.11.1
+   Compiling ring v0.17.14
+   Compiling futures-util v0.3.34
+   Compiling webpki-roots v0.26.11
+   Compiling sonora-ns v0.2.0
+   Compiling digest v0.11.3
+   Compiling base64 v0.22.1
+   Compiling hound v3.5.1
+   Compiling sha1 v0.11.0
+   Compiling rtrb v0.4.0
+   Compiling syn v3.0.7
+   Compiling syn v2.0.119
+   Compiling errno v0.3.14
+   Compiling getrandom v0.2.17
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.4
+   Compiling signal-hook-registry v1.4.8
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling rand v0.10.3
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling lamp-camera v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/camera)
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling bytemuck_derive v1.12.1
+   Compiling tokio-macros v2.7.2
+   Compiling lamp-ipc v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/ipc)
+   Compiling bytemuck v1.25.2
+   Compiling derive_more-impl v2.1.1
+   Compiling tracing-attributes v0.1.31
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/turn-end-wire)
+   Compiling tracing v0.1.44
+   Compiling derive_more v2.1.1
+   Compiling tokio v1.53.1
+   Compiling sonora-common-audio v0.2.0
+   Compiling sonora-aec3 v0.2.0
+   Compiling sonora-agc2 v0.2.0
+   Compiling rustls-webpki v0.103.15
+   Compiling lamp-bus v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/turn-owner)
+   Compiling sonora v0.2.0
+   Compiling lamp-ring v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/ring)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/msgs)
+   Compiling lamp-audio v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/audio)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/keeper)
+   Compiling lamp-controls v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/controls)
+   Compiling lamp-actions v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/actions)
+   Compiling lamp-expression v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/expression)
+   Compiling lamp-body v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/body)
+   Compiling tungstenite v0.30.0
+   Compiling tokio-rustls v0.26.6
+   Compiling tokio-tungstenite v0.30.0
+   Compiling lamp-gemini v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/gemini)
+   Compiling lamp-voice v0.1.0 (/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/crates/voice)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 29.80s

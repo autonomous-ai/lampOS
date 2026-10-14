@@ -1,0 +1,19 @@
+{
+  "bundle": "/private/tmp/lamp-third-schedule-room-policy-text-export-owvvxe3q",
+  "files": 39,
+  "bytes": 14021131,
+  "original_paths": 612,
+  "comparison_stdout_originals": 288,
+  "comparison_stderr_originals": 288,
+  "stdout_comparisons": 144,
+  "retention_index_sha256": "c6f916b155f266ae96c0eca3d9d8016f5eb14115a23e01f6064f4ba4d2308513",
+  "checksums_sha256": "ca3189ece6b2a9cff6264c84b3400ce7e6eb20484da47e38a5cbc62c877a40eb",
+  "readme_links_checked": 10,
+  "all_original_bytes_equal": true,
+  "all_text_utf8": true,
+  "no_prohibited_artifacts": true,
+  "historical_source_report_identities_preserved": true,
+  "baseline_report_sha256": "53102f1eedd70fa0d9de5b6d4df147d7d73fbc50614d0d2b110faf262ca1503e",
+  "implementation_report_sha256": "8486fdc25bec8ebc761744c1b35f8d24a0ef11a5e8633c5e7075b5cc6e586b94",
+  "execution_audit_sha256": "2ba565bc08b0dc6268b2a7e2fa0432770981f4b9a4ed2e7de9d3962a2fc3c37a"
+}

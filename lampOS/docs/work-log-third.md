@@ -2248,6 +2248,70 @@ retirement, flash stalls and the child's RR20-to-Other/nice-19 transition.
 No lamp, real provider or physical audio was used. Build/test durations are
 not interaction latency.
 
+
+## 2026-10-15 — Task 31 completed checks retained; incoming Memory integration taken
+
+Ready for lamp-voice: no
+
+The settled-policy native run
+[38626209078](https://github.com/autonomous-ai/lampOS/actions/runs/38626209078)
+passed for `01192ba0fbfda04afb19e1db63aa86423c21fd6d`: release workspace build,
+**4,338 passed / 0 failed / 33 ignored**, 279 harnesses on GitHub Ubuntu
+22.04 ARM64. [Its raw log, result and binary checksums](verification/schedule-voice-qualification-20261015/native-01192/README.md)
+are retained. Four inherited Cargo filename-collision warnings concern the
+Controls/Expression `replay_cost` examples, not distinct production binary
+names; [source identities](verification/schedule-voice-qualification-20261015/integration-1337/replay-example-warning.json)
+record this outside Task 31. No warning-free workspace claim is made.
+
+On Third's Intel i7-10700K x86_64 Mac, macOS 26.6.2 / Darwin 25.6.0,
+64 GiB RAM, Rust/Cargo 1.96.0, the complete affected-package gate **failed:
+1,602 passed / 1 failed / 8 ignored**, 62 harnesses, 1,732.493697235 seconds.
+The only failure was
+`coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch`,
+asserting the original Voice owner at `motor/tests.rs:722`; it was not the
+older startup/reap timeout. The same compiled test passed once alone,
+**1 passed / 0 failed / 0 ignored**, in 1.519097596 seconds. The five relevant
+motor/early-end source files match integration exactly. The isolated binary's
+hash was captured after the complete run, not before it. The failed packet
+and peer were not captured; no cause is established. [Both raw runs](verification/schedule-voice-qualification-20261015/full-host/README.md)
+keep their actual outcomes. First's existing #709 exception permits this
+untouched failure plus isolated pass to be listed in the PR with
+[#739](https://github.com/autonomous-ai/lampOS/issues/739). No failing run is
+relabeled and no motor assertion or deadline was changed.
+
+The independent implementation copy at
+`acb628b494df0c38842ea467d1289eec8d35d2ca` passed workspace/helper builds,
+**287 tests / 0 failed / 2 ignored**, and 72 default-off cases / **144 exact
+stdout comparisons** against a fresh clean `6573ce6c1b` copy. Both resolve
+all 34 local package manifests internally. [The verified text export](verification/schedule-voice-qualification-20261015/standalone-6573/README.md)
+retains 612 original-path mappings. All 697 frozen runtime hashes match
+`01192` and `acb628`; their only difference is the explicit daemon-reload
+and Actions-before-Voice disable instructions. The exact `acb628` native run
+[38627179829](https://github.com/autonomous-ai/lampOS/actions/runs/38627179829)
+is pending at this checkpoint. These command times are host measurements,
+not acoustic or lamp latency.
+
+The scheduled fetch found integration
+`1337e7e1d8b88e102ec9fd12f544841569856f75`: First installed and merged Memory
+across days, then changed Tasks news persistence and its reply-size bound.
+Task 31 rebased cleanly to `f959aaa5e8b43b9ddea8d0031d0034272dcaa7af`.
+[The review and exact rebase record](verification/schedule-voice-qualification-20261015/integration-1337/review.md)
+find no concrete conflict. Memory now depends on Voice, so it joins the gate.
+A focused test will prove that a kept-out reminder cannot enter the new Days
+journal while a subsequent ordinary exchange still does. New-source checks
+are pending; older passes remain tied to their original source. No ready PR
+or runtime change on `lamp-third` is offered.
+
+The latest Queue still leaves #709 as Third's first MVP task, enabled Touch
+qualification with First/person, and #699 after the MVP. First's seven lamp
+cases remain in the task's `docs/schedule.md` qualification section: begin
+with both new switches absent; then a one-minute timer immediately after
+restart in Unknown; all room classifications; interruption/generation
+replacement; storage/restart failures; tool injection; owed camera/Second
+Look. Most likely wrong there: provider schema/wording, timely local silence
+in a busy office, ALSA final retirement, flash stalls and RR20-to-Other/nice-19
+child scheduling. No lamp or real provider was accessed.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

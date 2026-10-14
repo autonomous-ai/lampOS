@@ -1,0 +1,20 @@
+{
+  "head": "acb628b494df0c38842ea467d1289eec8d35d2ca",
+  "previous_head": "01192ba0fbfda04afb19e1db63aa86423c21fd6d",
+  "base": "6573ce6c1b594bf9c8cf7836bbd0e162c09e4cd1",
+  "changed_paths": [
+    "lampOS/docs/schedule.md"
+  ],
+  "source_sha256": "e0c5985563535bf46d6af76d3bae71634ab3f1f03d8c713d55f202f95972ca7f",
+  "source_paths": 697,
+  "all_frozen_runtime_hashes_unchanged": true,
+  "reason": "Explicit daemon-reload before disabling unit drop-ins; no runtime or test change",
+  "diff": "diff --git a/lampOS/docs/schedule.md b/lampOS/docs/schedule.md\nindex 4cbbc81d5..732d0ee44 100644\n--- a/lampOS/docs/schedule.md\n+++ b/lampOS/docs/schedule.md\n@@ -770,8 +770,9 @@ Environment=LAMP_SCHEDULE_DELIVERY_DIR=/var/lib/lampOS/voice/schedule-delivery\n \n First reloads the units and restarts Actions before Voice. If the installed\n Voice user differs, provision the ledger for that actual UID instead. To\n-disable this integration, remove both Schedule switches and restart those\n-two owners; keep the persistent ledger and claim file.\n+disable this integration, remove both Schedule switches, run\n+`systemctl daemon-reload`, and restart Actions before Voice. Keep the\n+persistent ledger and claim file.\n \n Read the parent policy during the off-state minute, then inspect both after\n enabling. These commands read scheduling metadata without printing provider\n",
+  "runtime_qualified_by_source_manifest": "e0c5985563535bf46d6af76d3bae71634ab3f1f03d8c713d55f202f95972ca7f",
+  "current_native_run": 38627179829,
+  "native_status_observed": "pending",
+  "native_initial_source": "/private/tmp/lamp-third-schedule-final-native-first-runs.json",
+  "native_initial_sha256": "d5499da5a247226a4b983367662e6a5e423c4da4d2aae2bf1c1b0efa12da338f",
+  "preceding_native_run": 38626209078,
+  "preceding_native_scope": "01192 head, same frozen runtime, before daemon-reload documentation clarification; must keep its own terminal identity"
+}

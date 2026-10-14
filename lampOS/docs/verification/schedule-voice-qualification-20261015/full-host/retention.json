@@ -1,0 +1,32 @@
+{
+  "originals": [
+    {
+      "original": "/private/tmp/lamp-third-schedule-room-policy-full-first.json",
+      "retained": "full.json",
+      "bytes": 2082,
+      "sha256": "1978de8750ae935f50e93969123251a0b93084252be3e91391d03498922d37b6"
+    },
+    {
+      "original": "/private/tmp/lamp-third-schedule-room-policy-full-first-tests.txt",
+      "retained": "full-tests.txt",
+      "bytes": 163752,
+      "sha256": "038c354d347a78fc33bc2b572aea1e757f33430828c798e1ef3b71243143a6fd"
+    },
+    {
+      "original": "/private/tmp/lamp-third-schedule-room-policy-isolated-first.json",
+      "retained": "isolated.json",
+      "bytes": 2119,
+      "sha256": "cfcee41d6c80508a277099f0d7596620c4808c5fed686741336d2a1716139bf6"
+    },
+    {
+      "original": "/private/tmp/lamp-third-schedule-room-policy-isolated-first.txt",
+      "retained": "isolated-test.txt",
+      "bytes": 218,
+      "sha256": "499775cfc75a46ab62b3b2695aedb2744037f42407a374a32cc5794c44df622c"
+    }
+  ],
+  "anchored_summary_counts_match_original_report": true,
+  "failure_classification": "Untouched motor test at tests.rs:722 Authority assertion, not the earlier tests.rs:441 startup/reap timeout; exact peer and received packet were not recorded. One isolated exact execution passed. No cause inferred and full gate remains failed.",
+  "scope_answer": "https://github.com/autonomous-ai/lampOS/issues/709#issuecomment-6176285386",
+  "repair_owner": "Fourth under #739"
+}

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-capture.py",
+    "--parent-cargo-released"
+  ],
+  "started_at": "2026-10-14T20:11:54.590060+00:00",
+  "finished_at": "2026-10-14T20:12:30.577824+00:00",
+  "elapsed_seconds": 35.988743756,
+  "exit_code": 0,
+  "first_output": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-capture-first.txt",
+  "first_output_sha256": "68fba207401e397ba8bb4a638969e2a4ab057bff300e9f62f8c2064ff238ac72",
+  "execution_permission": "Parent-authorized offline build and catalog serialization; local IPC permitted, no provider/device operations."
+}

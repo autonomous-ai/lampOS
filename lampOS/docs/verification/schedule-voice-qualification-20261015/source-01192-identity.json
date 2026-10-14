@@ -1,0 +1,9 @@
+{
+  "head": "01192ba0fbfda04afb19e1db63aa86423c21fd6d",
+  "base": "6573ce6c1b594bf9c8cf7836bbd0e162c09e4cd1",
+  "source_file": "/private/tmp/lamp-third-schedule-room-policy-source-frozen.json",
+  "source_sha256": "e0c5985563535bf46d6af76d3bae71634ab3f1f03d8c713d55f202f95972ca7f",
+  "source_paths": 697,
+  "every_committed_blob_matches_frozen_map_and_current_worktree": true,
+  "purpose": "Bridge the pre-amend frozen map to the pushed runtime head without relabeling earlier test execution HEAD."
+}

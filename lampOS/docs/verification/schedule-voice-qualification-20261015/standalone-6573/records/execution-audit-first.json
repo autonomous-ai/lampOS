@@ -1,0 +1,150 @@
+{
+  "scope": "Filesystem-only exact-byte audit; no Cargo, tests, helpers or device operation.",
+  "audited_at": "2026-10-14T20:17:19.540221+00:00",
+  "report": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone.json",
+  "report_sha256": "8486fdc25bec8ebc761744c1b35f8d24a0ef11a5e8633c5e7075b5cc6e586b94",
+  "status": "passed",
+  "base": "6573ce6c1b594bf9c8cf7836bbd0e162c09e4cd1",
+  "observed_copy_head": "acb628b494df0c38842ea467d1289eec8d35d2ca",
+  "frozen_gate_recorded_head": "168856fbd349a7931a962458f17509953b3a254d",
+  "gate_paths": 697,
+  "source_files_verified": 1621,
+  "source_file_bytes": 25853029,
+  "baseline_source_files_verified": 1603,
+  "baseline_source_file_bytes": 25406926,
+  "helper_total_bytes_per_copy": 1755,
+  "helpers_verified": {
+    "crates/actions/examples/schedule_off_actions.rs": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1",
+    "crates/voice/examples/schedule_off_voice.rs": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+  },
+  "historical_paths_unchanged": 2690,
+  "mutable_current_evidence_excluded": true,
+  "commands": [
+    {
+      "name": "workspace-build-first",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 81.455834035,
+      "log": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-6xt7k7hn/evidence/workspace-build-first.txt",
+      "stdout_sha256": "63e01a640563a7bdd74b50da14f0288c2c98815b9def383d023cd29493ea9791"
+    },
+    {
+      "name": "helper-build-first",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-voice",
+        "--example",
+        "schedule_off_actions",
+        "--example",
+        "schedule_off_voice"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 26.076194209000008,
+      "log": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-6xt7k7hn/evidence/helper-build-first.txt",
+      "stdout_sha256": "719e0a48736f3ef519f5624d2f68ca7a52f865de213a351288d1ecd99f419df4"
+    },
+    {
+      "name": "actions-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "--all-targets",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 30.060316487999984,
+      "log": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-6xt7k7hn/evidence/actions-tests-first.txt",
+      "stdout_sha256": "186db8347c67bee5a41853f9fcfdd80689b1f403e403d94c8c8609ae8fe9f952"
+    },
+    {
+      "name": "schedule-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-schedule",
+        "--all-targets",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 35.03890230900001,
+      "log": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-6xt7k7hn/evidence/schedule-tests-first.txt",
+      "stdout_sha256": "d0db0ead16e79d920e6ac0b929fd6ca0f4f895a570065890252d8571707304bd"
+    },
+    {
+      "name": "voice-reminder-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "reminder",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 34.465421107,
+      "log": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-6xt7k7hn/evidence/voice-reminder-tests-first.txt",
+      "stdout_sha256": "b01663ccf86244e4d8a219ba016929fb9f82c9ea82bc2afd51020864d646b8f9"
+    },
+    {
+      "name": "voice-tools-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "tools",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.993207257000023,
+      "log": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-6xt7k7hn/evidence/voice-tools-tests-first.txt",
+      "stdout_sha256": "4b90cd034739618c2057147ec9f71f894e7c4caa68c9ae01cbc864d164768b4a"
+    }
+  ],
+  "test_execution_totals": {
+    "passed": 287,
+    "failed": 0,
+    "ignored": 2
+  },
+  "completed_stdout_comparisons": 144,
+  "corpus": {
+    "baseline_stdout_bytes": 576648,
+    "implementation_stdout_bytes": 576648,
+    "baseline_stderr_count": 144,
+    "implementation_stderr_count": 144
+  },
+  "distinct_stdout_payloads": 3,
+  "distinct_stdout_bytes": 14824,
+  "local_manifests": 34,
+  "skipped_stages": [],
+  "no_complete_gate_or_lamp_claim": true
+}

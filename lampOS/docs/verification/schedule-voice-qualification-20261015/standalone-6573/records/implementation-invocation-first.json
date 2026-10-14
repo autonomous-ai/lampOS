@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-run.py",
+    "--parent-cargo-released"
+  ],
+  "started_at": "2026-10-14T20:12:59.216982+00:00",
+  "finished_at": "2026-10-14T20:16:45.279192+00:00",
+  "elapsed_seconds": 226.069719991,
+  "exit_code": 0,
+  "first_output": "/private/tmp/lamp-third-schedule-room-policy-doc-amended-standalone-run-first.txt",
+  "first_output_sha256": "5d28aad4b2fafe9daed0808f38206d920648a99d77a2560673b488171b417135",
+  "execution_permission": "Parent-authorized isolated offline build/tests and exact-byte comparison, with local Unix sockets permitted; no provider/device operations."
+}

@@ -1,0 +1,107 @@
+{
+  "report": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline.json",
+  "status": "passed",
+  "build": {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-actions",
+      "-p",
+      "lamp-voice",
+      "--example",
+      "schedule_off_actions",
+      "--example",
+      "schedule_off_voice"
+    ],
+    "cwd": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS",
+    "exit_code": 0,
+    "elapsed_seconds": 29.880328562,
+    "timeout_seconds": 900,
+    "timed_out": false,
+    "stdout_file": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-build-first.txt",
+    "stdout_sha256": "7886b5dc6b3a759f543aac1d633034ba0ee38c283c73b8b74a0fb39e2afd71d4",
+    "stderr_file": null,
+    "stderr_sha256": null,
+    "stderr_merged_into_stdout": true,
+    "log": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-build-first.txt",
+    "target_directory": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS/target"
+  },
+  "metadata": {
+    "command": [
+      "cargo",
+      "metadata",
+      "--offline",
+      "--locked",
+      "--format-version",
+      "1"
+    ],
+    "cwd": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/lampOS",
+    "exit_code": 0,
+    "elapsed_seconds": 0.40789588600000215,
+    "timeout_seconds": 60,
+    "timed_out": false,
+    "stdout_file": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/evidence/cargo-metadata.json",
+    "stdout_sha256": "21766b71fc525ce16fad06ab138c7a5a90e9f74611baab90a0bc6012c27b0e14",
+    "stderr_file": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/evidence/cargo-metadata.stderr",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_merged_into_stdout": false,
+    "file": "/private/tmp/lamp-third-schedule-room-policy-6573ce6c1b-baseline-s8i9ibfc/evidence/cargo-metadata.json",
+    "sha256": "21766b71fc525ce16fad06ab138c7a5a90e9f74611baab90a0bc6012c27b0e14",
+    "all_local_dependencies_inside_copy": true
+  },
+  "case_count": 72,
+  "profiles": {
+    "ordinary": {
+      "cases": 36,
+      "actions_sha256": "86e2d2bd148df7f1521f2123b59e4566d72948350d2a3cb2f7e3996c5872a2c3",
+      "voice_sha256": "85dd841072070e8536465959aab18f7bfd574d140de65e9c51b411af221a736c",
+      "actions_bytes": 1194,
+      "voice_bytes": 6082,
+      "declared_names": [
+        "not_for_me",
+        "the_time",
+        "remember",
+        "recall",
+        "forget",
+        "volume_up",
+        "volume_down",
+        "volume_mute",
+        "volume_unmute",
+        "light_on",
+        "light_off",
+        "light_colour",
+        "light_brighter",
+        "light_dimmer"
+      ]
+    },
+    "tasks": {
+      "cases": 36,
+      "actions_sha256": "86e2d2bd148df7f1521f2123b59e4566d72948350d2a3cb2f7e3996c5872a2c3",
+      "voice_sha256": "22f86d5e493dd5f1d2bef76dd509341e3122456a78164b262d71fd319485afea",
+      "actions_bytes": 1194,
+      "voice_bytes": 7548,
+      "declared_names": [
+        "not_for_me",
+        "the_time",
+        "remember",
+        "recall",
+        "forget",
+        "start_agent_task",
+        "confirm_agent_task",
+        "check_agent_task",
+        "volume_up",
+        "volume_down",
+        "volume_mute",
+        "volume_unmute",
+        "light_on",
+        "light_off",
+        "light_colour",
+        "light_brighter",
+        "light_dimmer"
+      ]
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "purpose": "One exact isolated execution of the sole unchanged motor failure from the revised full gate; no assertion/deadline/source change. It does not relabel the full gate as passed.",
+  "command": [
+    "/Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-a714350f33563503",
+    "--exact",
+    "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "cwd": "/Users/d/code/autonomous-os/lampOS/crates/voice",
+  "started_at": "2026-10-14T20:10:58.365965+00:00",
+  "finished_at": "2026-10-14T20:10:59.886428+00:00",
+  "elapsed_seconds": 1.5190975960000002,
+  "exit_code": 0,
+  "timed_out": false,
+  "timeout_seconds": 30,
+  "full_gate": "/private/tmp/lamp-third-schedule-room-policy-full-first.json",
+  "full_gate_sha256": "1978de8750ae935f50e93969123251a0b93084252be3e91391d03498922d37b6",
+  "source_manifest": "/private/tmp/lamp-third-schedule-room-policy-source-frozen.json",
+  "source_sha256": "e0c5985563535bf46d6af76d3bae71634ab3f1f03d8c713d55f202f95972ca7f",
+  "source_unchanged": true,
+  "binary": {
+    "path": "/Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-a714350f33563503",
+    "bytes": 42967456,
+    "sha256_before_isolation": "266c7d8a00f10a229875bf5baa431f8f7b6c1ddd804c4062859bcb0de3244427",
+    "sha256_after_isolation": "266c7d8a00f10a229875bf5baa431f8f7b6c1ddd804c4062859bcb0de3244427",
+    "identity_boundary": "Captured after complete full-gate process exited, before this isolated run; no pre-full-run binary digest was captured."
+  },
+  "log": "/private/tmp/lamp-third-schedule-room-policy-isolated-first.txt",
+  "log_sha256": "499775cfc75a46ab62b3b2695aedb2744037f42407a374a32cc5794c44df622c",
+  "counts": {
+    "harnesses": 1,
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0
+  },
+  "machine": "Third Intel i7-10700K x86_64 Mac; macOS 26.6.2/Darwin 25.6.0; 64 GiB RAM; Rust/Cargo 1.96.0; no lamp or live provider",
+  "extra_environment": {
+    "RUST_BACKTRACE": "1"
+  },
+  "scope_answer": "https://github.com/autonomous-ai/lampOS/issues/709#issuecomment-6176285386"
+}
