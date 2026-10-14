@@ -1,0 +1,20 @@
+{
+  "verified_at": "2026-10-14T22:08:58.431596+00:00",
+  "source_bundle": "/private/tmp/lamp-third-relative-cf2-text-export-on8al4ca",
+  "retained_bundle": "independent-copy",
+  "files": 37,
+  "bytes": 21299773,
+  "original_paths_checked": 611,
+  "all_originals_equal_retained_bytes": true,
+  "all_bundle_checksums_match": true,
+  "all_files_utf8": true,
+  "all_copied_bytes_equal": true,
+  "bundle_identity": {
+    "retention-index.json": "e866591edda93cd91e7e07c599b0d2251cf1197fc992eb34b054a467603bf743",
+    "SHA256SUMS.txt": "87eb870da1f8c10b23c9274a3cd9121c292dc1df1ef0a1becb3dc96f25485956"
+  },
+  "source_head": "365e36dbcd78ff247adf30b2d18afd4d9d6f1065",
+  "source_map_sha256": "517af82a7dde4930ccacc48934bd635dd59df983b9d410e9b8c49e2917822c1c",
+  "full_gate_started_at": "2026-10-14T22:06:17.892286+00:00",
+  "limits": "Filesystem audit only; the full host gate and native CI are still running. Copy checks establish host semantics, not model selection or lamp elapsed timing."
+}

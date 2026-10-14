@@ -1,0 +1,176 @@
+{"command": ["cargo", "build", "--offline", "--locked", "--workspace"], "cwd": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS", "exit_code": 0, "elapsed_seconds": 80.881996933, "timeout_seconds": 1200, "timed_out": false, "stdout_file": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/workspace-build-first.txt", "stdout_sha256": "d1d6b667eade840c49e779d28c9e94298e6a65cd7d49713ef5acfbef7d7b70ea", "stderr_file": null, "stderr_sha256": null, "stderr_merged_into_stdout": true, "name": "workspace-build-first", "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/workspace-build-first.txt"}
+{"command": ["cargo", "build", "--offline", "--locked", "-p", "lamp-actions", "-p", "lamp-voice", "--example", "schedule_off_actions", "--example", "schedule_off_voice"], "cwd": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS", "exit_code": 0, "elapsed_seconds": 25.722381692, "timeout_seconds": 1200, "timed_out": false, "stdout_file": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/helper-build-first.txt", "stdout_sha256": "0e6dab4456e38e508b642e041dcfb242c7b5e786e175e73dfdae90bebb9403e3", "stderr_file": null, "stderr_sha256": null, "stderr_merged_into_stdout": true, "name": "helper-build-first", "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/helper-build-first.txt"}
+{"command": ["cargo", "test", "--offline", "--locked", "-p", "lamp-actions", "--all-targets", "--", "--test-threads=1"], "cwd": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS", "exit_code": 0, "elapsed_seconds": 29.395052909000015, "timeout_seconds": 1200, "timed_out": false, "stdout_file": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/actions-tests-first.txt", "stdout_sha256": "d548716c3018e988baf349a8357e789c379514e553e606102d416dc59c24c8f9", "stderr_file": null, "stderr_sha256": null, "stderr_merged_into_stdout": true, "name": "actions-tests-first", "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/actions-tests-first.txt", "test_summaries": [{"passed": 14, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0}, {"passed": 1, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0}, {"passed": 15, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0}, {"passed": 4, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0}, {"passed": 0, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0}], "test_totals": {"passed": 34, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 0}}
+{"command": ["cargo", "test", "--offline", "--locked", "-p", "lamp-voice", "--lib", "tools", "--", "--test-threads=1"], "cwd": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS", "exit_code": 0, "elapsed_seconds": 28.19556462600002, "timeout_seconds": 1200, "timed_out": false, "stdout_file": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/voice-tools-tests-first.txt", "stdout_sha256": "50be0419e76ebd7cc2a431ba164ac467c871b402f20949bd26fcda1de51dbeaa", "stderr_file": null, "stderr_sha256": null, "stderr_merged_into_stdout": true, "name": "voice-tools-tests-first", "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/voice-tools-tests-first.txt", "test_summaries": [{"passed": 20, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 936}], "test_totals": {"passed": 20, "failed": 0, "ignored": 0, "measured": 0, "filtered_out": 936}}
+{
+  "status": "passed",
+  "report": "/private/tmp/lamp-third-relative-cf2-implementation.json",
+  "base": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "observed_copy_head": "365e36dbcd78ff247adf30b2d18afd4d9d6f1065",
+  "gate_paths": 711,
+  "source_files": 1025,
+  "local_manifests": 35,
+  "baseline_cases": 72,
+  "stages": [
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ],
+      "cwd": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS",
+      "exit_code": 0,
+      "elapsed_seconds": 80.881996933,
+      "timeout_seconds": 1200,
+      "timed_out": false,
+      "stdout_file": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/workspace-build-first.txt",
+      "stdout_sha256": "d1d6b667eade840c49e779d28c9e94298e6a65cd7d49713ef5acfbef7d7b70ea",
+      "stderr_file": null,
+      "stderr_sha256": null,
+      "stderr_merged_into_stdout": true,
+      "name": "workspace-build-first",
+      "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/workspace-build-first.txt"
+    },
+    {
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-voice",
+        "--example",
+        "schedule_off_actions",
+        "--example",
+        "schedule_off_voice"
+      ],
+      "cwd": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS",
+      "exit_code": 0,
+      "elapsed_seconds": 25.722381692,
+      "timeout_seconds": 1200,
+      "timed_out": false,
+      "stdout_file": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/helper-build-first.txt",
+      "stdout_sha256": "0e6dab4456e38e508b642e041dcfb242c7b5e786e175e73dfdae90bebb9403e3",
+      "stderr_file": null,
+      "stderr_sha256": null,
+      "stderr_merged_into_stdout": true,
+      "name": "helper-build-first",
+      "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/helper-build-first.txt"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "--all-targets",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS",
+      "exit_code": 0,
+      "elapsed_seconds": 29.395052909000015,
+      "timeout_seconds": 1200,
+      "timed_out": false,
+      "stdout_file": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/actions-tests-first.txt",
+      "stdout_sha256": "d548716c3018e988baf349a8357e789c379514e553e606102d416dc59c24c8f9",
+      "stderr_file": null,
+      "stderr_sha256": null,
+      "stderr_merged_into_stdout": true,
+      "name": "actions-tests-first",
+      "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/actions-tests-first.txt",
+      "test_summaries": [
+        {
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 15,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        }
+      ],
+      "test_totals": {
+        "passed": 34,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      }
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "tools",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS",
+      "exit_code": 0,
+      "elapsed_seconds": 28.19556462600002,
+      "timeout_seconds": 1200,
+      "timed_out": false,
+      "stdout_file": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/voice-tools-tests-first.txt",
+      "stdout_sha256": "50be0419e76ebd7cc2a431ba164ac467c871b402f20949bd26fcda1de51dbeaa",
+      "stderr_file": null,
+      "stderr_sha256": null,
+      "stderr_merged_into_stdout": true,
+      "name": "voice-tools-tests-first",
+      "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/voice-tools-tests-first.txt",
+      "test_summaries": [
+        {
+          "passed": 20,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 936
+        }
+      ],
+      "test_totals": {
+        "passed": 20,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 936
+      }
+    }
+  ]
+}

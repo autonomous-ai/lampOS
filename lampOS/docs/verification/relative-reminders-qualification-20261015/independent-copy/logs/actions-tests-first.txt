@@ -1,0 +1,77 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling getrandom v0.4.3
+   Compiling once_cell v1.21.4
+   Compiling tempfile v3.27.0
+   Compiling syn v3.0.7
+   Compiling serde_derive v1.0.229
+   Compiling serde v1.0.229
+   Compiling lamp-bus v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/bus)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/msgs)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/schedule)
+   Compiling lamp-actions v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/actions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.14s
+     Running unittests src/lib.rs (target/debug/deps/lamp_actions-d6ab0df2b436130c)
+
+running 14 tests
+test light::tests::a_colour_is_set_by_name_said_by_name_and_switches_the_light_on ... ok
+test light::tests::a_light_that_cannot_be_read_or_does_not_change_is_said_so ... ok
+test light::tests::brighter_and_dimmer_are_one_level_keep_the_colour_and_stop_at_the_ends ... ok
+test light::tests::on_and_off_keep_the_colour_and_the_level_and_neither_is_asked_twice ... ok
+test light::tests::through_the_bus_a_request_is_kept_and_a_stale_state_is_no_light ... ok
+test sound::tests::a_control_that_rounds_by_a_point_is_taken_as_set_and_the_level_read_is_the_one_said ... ok
+test sound::tests::a_failure_is_said_as_a_failure ... ok
+test sound::tests::louder_is_one_step_and_stops_at_the_ceiling ... ok
+test sound::tests::mute_remembers_where_the_volume_was_and_unmute_puts_it_back ... ok
+test sound::tests::one_louder_undoes_one_quieter ... ok
+test sound::tests::quieter_is_one_step_and_stops_where_it_can_still_be_heard ... ok
+test sound::tests::the_level_is_read_from_what_amixer_prints ... ok
+test tests::an_outcome_is_one_line_the_voice_can_hand_to_the_model ... ok
+test tests::only_what_can_be_done_now_is_offered_and_every_function_is_one_the_voice_accepts ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+
+     Running unittests src/main.rs (target/debug/deps/lamp_actions-ff7e65555bcdd868)
+
+running 1 test
+test tests::the_options_are_read_and_anything_else_is_refused_with_the_reason ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/schedule.rs (target/debug/deps/schedule-01024e2bdab4e700)
+
+running 15 tests
+test all_adapter_hops_share_one_deadline_and_uncertain_call_is_not_reissued ... ok
+test all_six_tools_reach_real_schedule_through_the_real_actions_server ... ok
+test definite_conflicts_are_not_retried_and_storage_failures_stay_uncertain ... ok
+test disabled_switch_preserves_the_old_catalog_and_refuses_all_six_names ... ok
+test empty_filtered_list_and_service_pagination_remain_explicit ... ok
+test host_first_and_repeated_actions_to_durable_schedule_receipts_are_measured ... ok
+test incorrect_success_identity_revision_or_deadline_never_becomes_confirmation ... ok
+test listing_keeps_complete_escaped_labels_and_returns_the_actual_remaining_cursor ... ok
+test lost_commit_reply_is_unknown_and_never_retried_with_another_guard ... ok
+test malformed_arguments_and_unknown_fields_open_no_schedule_connection ... ok
+test malformed_lists_and_snooze_nonpending_state_never_make_a_mutation ... ok
+test missing_schedule_socket_is_truthful_and_mutation_free ... ok
+test new_schemas_use_the_small_provider_vocabulary ... ok
+test published_catalog_routes_relative_reminders_to_elapsed_timers ... ok
+test real_engine_failure_before_or_after_snapshot_commit_is_never_confirmed ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.44s
+
+     Running tests/server.rs (target/debug/deps/server-72a37ae99a4c25b9)
+
+running 4 tests
+test its_report_says_what_it_can_do_and_how_much_it_did ... ok
+test one_executive_to_a_directory ... ok
+test the_light_is_offered_when_its_owner_appears_and_withdrawn_when_it_goes ... ok
+test the_list_is_there_a_call_changes_the_control_and_anything_else_is_refused_in_words ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.71s
+
+     Running unittests examples/schedule_off_actions.rs (target/debug/examples/schedule_off_actions-a59cf40afd97c81e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

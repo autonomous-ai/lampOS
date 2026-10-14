@@ -1,0 +1,80 @@
+{
+  "status": "completed",
+  "started_at": "2026-10-14T22:01:43.773090+00:00",
+  "stages": [
+    {
+      "command": [
+        "python3",
+        "/private/tmp/lamp-third-relative-cf2-baseline-regression-run.py",
+        "--parent-cargo-released"
+      ],
+      "cwd": "/private/tmp",
+      "exit_code": 0,
+      "elapsed_seconds": 18.371952031000003,
+      "timeout_seconds": 5400,
+      "timed_out": false,
+      "stdout_file": "/private/tmp/lamp-third-relative-cf2-baseline-regression-run-first.txt",
+      "stdout_sha256": "6b4616e7a76abcaf4eca6055f87dcdd24e9a2bcc07ec9ac51e78bd39eddff896",
+      "stderr_file": null,
+      "stderr_sha256": null,
+      "stderr_merged_into_stdout": true,
+      "name": "baseline-regression",
+      "script_sha256": "a15d0761b70e2df10b88cad70cce41b5713522a9b5d13c4b1d18bee69896ef0a",
+      "report": "/private/tmp/lamp-third-relative-cf2-baseline-regression.json",
+      "report_sha256": "e4ec7a16304695e2fa9c698778c8bed4ef853b5c9ef9eb6715a7fe384f44890a",
+      "status": "expected regression failure confirmed"
+    },
+    {
+      "command": [
+        "python3",
+        "/private/tmp/lamp-third-relative-cf2-baseline-capture.py",
+        "--parent-cargo-released"
+      ],
+      "cwd": "/private/tmp",
+      "exit_code": 0,
+      "elapsed_seconds": 40.42734382500001,
+      "timeout_seconds": 5400,
+      "timed_out": false,
+      "stdout_file": "/private/tmp/lamp-third-relative-cf2-baseline-capture-first.txt",
+      "stdout_sha256": "120de0b07ac2a2a80563555616725b855a8aa43c82224cb3c999a2d1424e5655",
+      "stderr_file": null,
+      "stderr_sha256": null,
+      "stderr_merged_into_stdout": true,
+      "name": "baseline",
+      "script_sha256": "0a3131616ea685f065d946e86813d94f321c0edeb1ecb65bffea551b644f4a47",
+      "report": "/private/tmp/lamp-third-relative-cf2-baseline.json",
+      "report_sha256": "e20445d55bc684c60b23b35da72f5de026953d9d4b29518700e13ef8a64d5efd",
+      "status": "passed"
+    },
+    {
+      "command": [
+        "python3",
+        "/private/tmp/lamp-third-relative-cf2-implementation-run.py",
+        "--parent-cargo-released"
+      ],
+      "cwd": "/private/tmp",
+      "exit_code": 0,
+      "elapsed_seconds": 182.317739891,
+      "timeout_seconds": 5400,
+      "timed_out": false,
+      "stdout_file": "/private/tmp/lamp-third-relative-cf2-implementation-run-first.txt",
+      "stdout_sha256": "3cfd69dadf04341306030863e395dfdd7fab81d0e5b6ebf15ac5f83803c0b66a",
+      "stderr_file": null,
+      "stderr_sha256": null,
+      "stderr_merged_into_stdout": true,
+      "name": "implementation",
+      "script_sha256": "75555fcd2b7051ed58a5d26480898c1dc7e5a606d42e1987b2e1bc7b311a36bd",
+      "report": "/private/tmp/lamp-third-relative-cf2-implementation.json",
+      "report_sha256": "e7bce2b64b297668362a89254045d125aa9cbe76becb5366e054400505b7fe67",
+      "status": "passed"
+    }
+  ],
+  "planned": [
+    "baseline-regression",
+    "baseline",
+    "implementation"
+  ],
+  "scope": "One sequential expected baseline assertion failure, clean helper baseline capture and implementation qualification; expected raw test failure is never relabelled as passing.",
+  "finished_at": "2026-10-14T22:05:44.941817+00:00",
+  "skipped_stages": []
+}

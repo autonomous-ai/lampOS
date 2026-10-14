@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "/private/tmp/lamp-third-relative-cf2-prepare.py",
+    "--prepare-only"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 4.551571025,
+  "log": "/private/tmp/lamp-third-relative-cf2-prepare-first.txt",
+  "log_sha256": "a8863e79f26bf65da657efea3cba5bccb8ad1eb5c970f36d42511be72d2dadab"
+}

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "/private/tmp/lamp-third-relative-cf2-audit.py",
+    "/private/tmp/lamp-third-relative-cf2-implementation.json"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 2.670155343,
+  "stdout": "/private/tmp/lamp-third-relative-cf2-audit-first.json",
+  "stdout_sha256": "ce8dbddcbb9701fe333316e9d10949b5c62d1ae2a737b690d5a3febf750b6776",
+  "stderr": "/private/tmp/lamp-third-relative-cf2-audit-first.stderr",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "completed_at": "2026-10-14T22:06:19.962842+00:00"
+}

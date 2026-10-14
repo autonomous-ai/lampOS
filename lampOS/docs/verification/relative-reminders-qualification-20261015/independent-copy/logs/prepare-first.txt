@@ -1,0 +1,47 @@
+{
+  "status": "prepared only; no Cargo, metadata, helper or test execution",
+  "base": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "observed_head": "365e36dbcd78ff247adf30b2d18afd4d9d6f1065",
+  "frozen_source_sha256": "517af82a7dde4930ccacc48934bd635dd59df983b9d410e9b8c49e2917822c1c",
+  "frozen_paths": 711,
+  "historical_paths_unchanged": 4005,
+  "copies": {
+    "baseline": {
+      "root": "/private/tmp/lamp-third-relative-cf2-baseline-93y4xf5_/lampOS",
+      "source_files": 1025,
+      "source_bytes": 19511879,
+      "helper_bytes": 1755,
+      "prepared_report": "/private/tmp/lamp-third-relative-cf2-baseline-prepared.json",
+      "prepared_sha256": "dbf038f1b453ce99496b7fcbce3a7410747ef05eec1315849024a4377b00ad58"
+    },
+    "baseline-regression": {
+      "root": "/private/tmp/lamp-third-relative-cf2-baseline-regression-sl7h1wnn/lampOS",
+      "source_files": 1025,
+      "source_bytes": 19513347,
+      "helper_bytes": 0,
+      "prepared_report": "/private/tmp/lamp-third-relative-cf2-baseline-regression-prepared.json",
+      "prepared_sha256": "1d02eca6f946dfc9ef84f6658c5de2847542e51aa3eda0d59c5681d35d069a41"
+    },
+    "implementation": {
+      "root": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS",
+      "source_files": 1025,
+      "source_bytes": 19517487,
+      "helper_bytes": 1755,
+      "prepared_report": "/private/tmp/lamp-third-relative-cf2-implementation-prepared.json",
+      "prepared_sha256": "1f1a6e54ee32570c6c452fb859248a2fd6ca40c8a9ebcdf5dd9aa4e7ff40fb9b"
+    }
+  },
+  "omitted_archive_members": 1516,
+  "omitted_current_verification_files": 1354,
+  "regression_only": {
+    "changed_path": "crates/actions/tests/schedule.rs",
+    "baseline_file_sha256": "27c6cafe95fa4a3e906568cf06e77647c5fa5770c50623b5acabf3d7a9166ddc",
+    "test_copy_file_sha256": "ff5daf36435cfa17eb7e1f19a341de1cded44071cea373f3df5b13cdf0819c46",
+    "inserted_block_sha256": "4ca565a5ef7bc431088215a9bd286def85efd8d779a7e03180084ef3cf4c4292",
+    "inserted_block_bytes": 1468,
+    "inserted_block_lines": 49,
+    "removing_only_inserted_block_restores_baseline_bytes": true,
+    "all_other_source_files_equal_baseline": true,
+    "production_catalog_unchanged_from_baseline": true
+  }
+}

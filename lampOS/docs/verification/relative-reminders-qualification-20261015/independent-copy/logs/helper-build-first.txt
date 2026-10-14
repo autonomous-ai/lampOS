@@ -1,0 +1,48 @@
+   Compiling serde_core v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling memchr v2.8.3
+   Compiling serde v1.0.229
+   Compiling rustix v1.1.5
+   Compiling cc v1.7.0
+   Compiling syn v3.0.7
+   Compiling subtle v2.6.1
+   Compiling smallvec v1.16.3
+   Compiling futures-sink v0.3.34
+   Compiling futures-core v0.3.34
+   Compiling futures-util v0.3.34
+   Compiling ring v0.17.14
+   Compiling libsqlite3-sys v0.38.2
+   Compiling serde_derive v1.0.229
+   Compiling bytemuck_derive v1.12.1
+   Compiling tokio-macros v2.7.2
+   Compiling thiserror-impl v2.0.21
+   Compiling tokio v1.53.1
+   Compiling jiff v0.2.38
+   Compiling thiserror v2.0.21
+   Compiling bytemuck v1.25.2
+   Compiling tempfile v3.27.0
+   Compiling lamp-ipc v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/ipc)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/turn-end-wire)
+   Compiling rustls v0.23.45
+   Compiling rusqlite v0.40.2
+   Compiling sonora-agc2 v0.2.0
+   Compiling sonora v0.2.0
+   Compiling rustls-webpki v0.103.15
+   Compiling lamp-bus v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/turn-owner)
+   Compiling lamp-camera v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/camera)
+   Compiling lamp-ring v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/ring)
+   Compiling lamp-audio v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/audio)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/msgs)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/schedule)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/keeper)
+   Compiling lamp-controls v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/controls)
+   Compiling lamp-expression v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/expression)
+   Compiling lamp-body v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/body)
+   Compiling tokio-rustls v0.26.6
+   Compiling tungstenite v0.30.0
+   Compiling tokio-tungstenite v0.30.0
+   Compiling lamp-gemini v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/gemini)
+   Compiling lamp-actions v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/actions)
+   Compiling lamp-voice v0.1.0 (/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/voice)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.61s

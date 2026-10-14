@@ -1,0 +1,67 @@
+{
+  "report": "/private/tmp/lamp-third-relative-cf2-baseline-regression.json",
+  "status": "expected regression failure confirmed",
+  "raw_cargo_exit_code": 101,
+  "test": {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-actions",
+      "--test",
+      "schedule",
+      "published_catalog_routes_relative_reminders_to_elapsed_timers",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/lamp-third-relative-cf2-baseline-regression-sl7h1wnn/lampOS",
+    "exit_code": 101,
+    "elapsed_seconds": 15.217849250999999,
+    "timeout_seconds": 1200,
+    "timed_out": false,
+    "stdout_file": "/private/tmp/lamp-third-relative-cf2-baseline-regression-sl7h1wnn/evidence/expected-regression-failure-first.txt",
+    "stdout_sha256": "492c08ab682f8d2a61b5eef93c8b4b8c8dc2eacc8d3d46d033fb750c2e37648f",
+    "stderr_file": null,
+    "stderr_sha256": null,
+    "stderr_merged_into_stdout": true,
+    "test_summaries": [
+      {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 14
+      }
+    ],
+    "test_totals": {
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 14
+    },
+    "log": "/private/tmp/lamp-third-relative-cf2-baseline-regression-sl7h1wnn/evidence/expected-regression-failure-first.txt"
+  },
+  "test_binary": {
+    "path": "/private/tmp/lamp-third-relative-cf2-baseline-regression-sl7h1wnn/lampOS/target/debug/deps/schedule-01024e2bdab4e700",
+    "sha256": "2e47057c32abe77f40c10a563a65763eabb45ef2044ee9e0f32c6948159c1953",
+    "bytes": 9124344,
+    "identity_boundary": "Hashed after the sole Cargo test invocation completed; no binary edit or test retry."
+  },
+  "source_files": 1025,
+  "local_manifests": 35,
+  "regression_only": {
+    "changed_path": "crates/actions/tests/schedule.rs",
+    "baseline_file_sha256": "27c6cafe95fa4a3e906568cf06e77647c5fa5770c50623b5acabf3d7a9166ddc",
+    "test_copy_file_sha256": "ff5daf36435cfa17eb7e1f19a341de1cded44071cea373f3df5b13cdf0819c46",
+    "inserted_block_sha256": "4ca565a5ef7bc431088215a9bd286def85efd8d779a7e03180084ef3cf4c4292",
+    "inserted_block_bytes": 1468,
+    "inserted_block_lines": 49,
+    "removing_only_inserted_block_restores_baseline_bytes": true,
+    "all_other_source_files_equal_baseline": true,
+    "production_catalog_unchanged_from_baseline": true
+  }
+}

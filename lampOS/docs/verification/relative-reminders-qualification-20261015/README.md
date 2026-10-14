@@ -31,9 +31,22 @@ records passing formatting, strict all-target Clippy for Actions/Voice/Voice
 Eval/Memory, the published-catalog regression (1/0/0), Voice tools (18/0/0)
 and the workspace build. A preliminary assertion-format diff is preserved.
 
+The [independent-copy evidence](independent-copy/README.md) records a passing
+workspace build, **54 / 0 / 0** tests and **72 cases / 144 exact disabled-output
+comparisons**. Separately, the old integration catalog plus only the new
+regression fails at the expected missing-guidance assertion (Cargo 101,
+**0 / 1 / 0**). That negative control is not included in the positive totals.
+All 711 frozen implementation paths and 4,005 historical originals remained
+unchanged. The [parent byte audit](independent-copy-parent-verification.json)
+checked all 611 original-to-export mappings and every copied byte; the
+37-file text bundle retains command output and metadata without normalization.
+
+The complete serial host gate started at 22:06:17 UTC after the copy worker
+released Cargo. It tests Actions, Voice, Voice Eval and Memory with
+`--no-fail-fast -- --test-threads=1`; the
+[pre-run Voice test binary](test-binary-before-full.json) is identified before
+execution. No overlapping task-owned local Cargo work is planned.
 Exact-head native ARM64 run [38644608947](https://github.com/autonomous-ai/lampOS/actions/runs/38644608947)
-is running; [the initial run observation](native-first-runs.json) is not a
-terminal result. The independent copies/negative-control/default-off checks
-are underway. The full serial affected-package host gate will follow when
-the copy worker releases Cargo, avoiding overlapping local build/test load.
-No ready PR is offered yet.
+is also running; [the initial run observation](native-first-runs.json) is not
+a terminal result. No ready PR is offered yet. These host checks establish
+published guidance and helper semantics, not live model choice or lamp timing.

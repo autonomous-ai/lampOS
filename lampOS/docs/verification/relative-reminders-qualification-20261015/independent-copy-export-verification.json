@@ -1,0 +1,22 @@
+{
+  "bundle": "/private/tmp/lamp-third-relative-cf2-text-export-on8al4ca",
+  "files": 37,
+  "bytes": 21299773,
+  "original_paths": 611,
+  "comparison_stdout_originals": 288,
+  "comparison_stderr_originals": 288,
+  "stdout_comparisons": 144,
+  "retention_index_sha256": "e866591edda93cd91e7e07c599b0d2251cf1197fc992eb34b054a467603bf743",
+  "checksums_sha256": "87eb870da1f8c10b23c9274a3cd9121c292dc1df1ef0a1becb3dc96f25485956",
+  "readme_links_checked": 10,
+  "all_original_bytes_equal": true,
+  "all_text_utf8": true,
+  "no_prohibited_artifacts": true,
+  "expected_failure_retained_separately": true,
+  "source_report_hashes": {
+    "baseline": "e20445d55bc684c60b23b35da72f5de026953d9d4b29518700e13ef8a64d5efd",
+    "negative_control": "e4ec7a16304695e2fa9c698778c8bed4ef853b5c9ef9eb6715a7fe384f44890a",
+    "implementation": "e7bce2b64b297668362a89254045d125aa9cbe76becb5366e054400505b7fe67",
+    "execution_audit": "ce8dbddcbb9701fe333316e9d10949b5c62d1ae2a737b690d5a3febf750b6776"
+  }
+}

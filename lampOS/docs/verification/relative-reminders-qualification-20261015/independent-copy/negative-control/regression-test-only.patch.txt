@@ -1,0 +1,60 @@
+diff --git a/lampOS/crates/actions/tests/schedule.rs b/lampOS/crates/actions/tests/schedule.rs
+index 10e1ed682..cf620acf9 100644
+--- a/lampOS/crates/actions/tests/schedule.rs
++++ b/lampOS/crates/actions/tests/schedule.rs
+@@ -336,6 +336,55 @@ fn disabled_switch_preserves_the_old_catalog_and_refuses_all_six_names() {
+     }
+ }
+ 
++#[test]
++fn published_catalog_routes_relative_reminders_to_elapsed_timers() {
++    let schedule = root();
++    let actions = Actions::new(Some(
++        Adapter::new(schedule.path().join("not-running.sock")).unwrap(),
++    ));
++    let offered: Value =
++        serde_json::from_slice(&fs::read(actions.root.path().join(CATALOG_FILE)).unwrap()).unwrap();
++    let description = |name| {
++        offered["tools"]
++            .as_array()
++            .unwrap()
++            .iter()
++            .find(|tool| tool["name"] == name)
++            .unwrap()["description"]
++            .as_str()
++            .unwrap()
++    };
++    let timer = description("set_timer");
++    for guidance in [
++        "relative reminder",
++        "duration from now",
++        "in two minutes",
++        "in ten minutes",
++        "in an hour",
++        "requested label and whole seconds",
++        "120, 600, or 3600 respectively",
++        "never round to a clock time",
++    ] {
++        assert!(
++            timer.contains(guidance),
++            "missing timer guidance: {guidance}"
++        );
++    }
++    let reminder = description("set_reminder");
++    for guidance in [
++        "requested local clock time",
++        "at nine tomorrow morning",
++        "relative times from now, use set_timer",
++        "requested label and whole seconds",
++        "do not round to HH:MM",
++    ] {
++        assert!(
++            reminder.contains(guidance),
++            "missing clock-time guidance: {guidance}"
++        );
++    }
++}
++
+ #[test]
+ fn new_schemas_use_the_small_provider_vocabulary() {
+     let tools = serde_json::to_value(catalog()).unwrap();

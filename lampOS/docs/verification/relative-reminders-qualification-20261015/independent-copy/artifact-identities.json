@@ -1,0 +1,127 @@
+{
+  "scope": "Source/helper/archive/executable identities only; these artifacts are not copied into the text evidence export. The one new test-only patch is separately retained as UTF-8 proof.",
+  "helpers": [
+    {
+      "copy": "baseline",
+      "path": "/private/tmp/lamp-third-relative-cf2-baseline-93y4xf5_/lampOS/crates/actions/examples/schedule_off_actions.rs",
+      "bytes": 179,
+      "sha256": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1"
+    },
+    {
+      "copy": "baseline",
+      "path": "/private/tmp/lamp-third-relative-cf2-baseline-93y4xf5_/lampOS/crates/voice/examples/schedule_off_voice.rs",
+      "bytes": 1576,
+      "sha256": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+    },
+    {
+      "copy": "implementation",
+      "path": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/actions/examples/schedule_off_actions.rs",
+      "bytes": 179,
+      "sha256": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1"
+    },
+    {
+      "copy": "implementation",
+      "path": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/crates/voice/examples/schedule_off_voice.rs",
+      "bytes": 1576,
+      "sha256": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+    }
+  ],
+  "archives": [
+    {
+      "copy": "baseline",
+      "path": "/private/tmp/lamp-third-relative-cf2-integration-base.tar",
+      "sha256": "160fb2817fd145610787001e1c4dccf87d5a1fe1314308f42edec5563545dfff",
+      "command": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=/private/tmp/lamp-third-relative-cf2-integration-base.tar",
+        "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+        "lampOS"
+      ],
+      "cwd": "/Users/d/code/autonomous-os",
+      "bytes": 82176000
+    },
+    {
+      "copy": "negative-control",
+      "path": "/private/tmp/lamp-third-relative-cf2-integration-base.tar",
+      "sha256": "160fb2817fd145610787001e1c4dccf87d5a1fe1314308f42edec5563545dfff",
+      "command": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=/private/tmp/lamp-third-relative-cf2-integration-base.tar",
+        "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+        "lampOS"
+      ],
+      "cwd": "/Users/d/code/autonomous-os",
+      "bytes": 82176000
+    },
+    {
+      "copy": "implementation",
+      "path": "/private/tmp/lamp-third-relative-cf2-integration-base.tar",
+      "sha256": "160fb2817fd145610787001e1c4dccf87d5a1fe1314308f42edec5563545dfff",
+      "command": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=/private/tmp/lamp-third-relative-cf2-integration-base.tar",
+        "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+        "lampOS"
+      ],
+      "cwd": "/Users/d/code/autonomous-os",
+      "bytes": 82176000
+    }
+  ],
+  "executables": [
+    {
+      "copy": "baseline",
+      "name": "schedule_off_actions",
+      "path": "/private/tmp/lamp-third-relative-cf2-baseline-93y4xf5_/lampOS/target/debug/examples/schedule_off_actions",
+      "sha256": "7a0a20c910f33f40cc450f3ba409f7959ed7877455a74fc0a7195410615dcff2",
+      "bytes": 801416,
+      "hash_boundary": "After helper build and before helper execution; checked again at export."
+    },
+    {
+      "copy": "baseline",
+      "name": "schedule_off_voice",
+      "path": "/private/tmp/lamp-third-relative-cf2-baseline-93y4xf5_/lampOS/target/debug/examples/schedule_off_voice",
+      "sha256": "b1af8c0b998dc74159e8858c5cf1f8f85d664bd9a3225e6c640dc317f15996fa",
+      "bytes": 1982328,
+      "hash_boundary": "After helper build and before helper execution; checked again at export."
+    },
+    {
+      "copy": "negative-control",
+      "path": "/private/tmp/lamp-third-relative-cf2-baseline-regression-sl7h1wnn/lampOS/target/debug/deps/schedule-01024e2bdab4e700",
+      "sha256": "2e47057c32abe77f40c10a563a65763eabb45ef2044ee9e0f32c6948159c1953",
+      "bytes": 9124344,
+      "identity_boundary": "Hashed after the sole Cargo test invocation completed; no binary edit or test retry."
+    },
+    {
+      "copy": "implementation",
+      "name": "schedule_off_actions",
+      "path": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/target/debug/examples/schedule_off_actions",
+      "sha256": "288492acee87a5df9a405815b2d3ede4ac4bd81bad146ae088e79695b6f9222d",
+      "bytes": 802120,
+      "hash_boundary": "After helper build and before helper execution; checked again at export."
+    },
+    {
+      "copy": "implementation",
+      "name": "schedule_off_voice",
+      "path": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/lampOS/target/debug/examples/schedule_off_voice",
+      "sha256": "df9d981575803f5ab6023924a140ee14cab789da95cfe1a9084294ff46e7cc62",
+      "bytes": 1985856,
+      "hash_boundary": "After helper build and before helper execution; checked again at export."
+    }
+  ],
+  "script_identities": {
+    "/private/tmp/lamp-third-relative-cf2-implementation-run.py": "75555fcd2b7051ed58a5d26480898c1dc7e5a606d42e1987b2e1bc7b311a36bd",
+    "/private/tmp/lamp-third-relative-cf2-baseline-regression-run.py": "a15d0761b70e2df10b88cad70cce41b5713522a9b5d13c4b1d18bee69896ef0a",
+    "/private/tmp/lamp-third-relative-cf2-prepare.py": "eb58b27c35537ab801cf6349fb58506b9020d6df2ce18fcae8b1b44743fff99f",
+    "/private/tmp/lamp-third-relative-cf2-adapt-runners.py": "3a5c491a7c89630dcce45526e90308f06a4b9d07d9baa188bc6408cd681027eb",
+    "/private/tmp/lamp-third-relative-cf2-audit.py": "b6957a121798ff7734fe9c002dde70e13bdf1ebf9d68b000f2b0ea5944962306",
+    "/private/tmp/lamp-third-relative-cf2-sequence.py": "5ed95969854daa2f11d968166107b37c552cb980d5436938abe8dfbe9f2672c3",
+    "/private/tmp/lamp-third-relative-cf2-baseline-capture.py": "0a3131616ea685f065d946e86813d94f321c0edeb1ecb65bffea551b644f4a47",
+    "/private/tmp/lamp_third_relative_support.py": "a759748008c0f0d8c09c0b422161d1f965d4e141071c12aef4d7291ae2e955df"
+  }
+}

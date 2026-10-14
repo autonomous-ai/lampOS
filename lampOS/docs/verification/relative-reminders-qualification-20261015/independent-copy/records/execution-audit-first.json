@@ -1,0 +1,129 @@
+{
+  "scope": "Filesystem-only exact-byte audit; no Cargo, tests, helpers or device operation.",
+  "audited_at": "2026-10-14T22:06:19.919384+00:00",
+  "report": "/private/tmp/lamp-third-relative-cf2-implementation.json",
+  "report_sha256": "e7bce2b64b297668362a89254045d125aa9cbe76becb5366e054400505b7fe67",
+  "status": "passed",
+  "base": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "observed_copy_head": "365e36dbcd78ff247adf30b2d18afd4d9d6f1065",
+  "frozen_gate_recorded_head": null,
+  "gate_paths": 711,
+  "source_files_verified": 1025,
+  "source_file_bytes": 19517487,
+  "baseline_source_files_verified": 1025,
+  "baseline_source_file_bytes": 19511879,
+  "helper_total_bytes_per_copy": 1755,
+  "helpers_verified": {
+    "crates/actions/examples/schedule_off_actions.rs": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1",
+    "crates/voice/examples/schedule_off_voice.rs": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+  },
+  "historical_paths_unchanged": 4005,
+  "mutable_current_evidence_excluded": true,
+  "commands": [
+    {
+      "name": "workspace-build-first",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 80.881996933,
+      "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/workspace-build-first.txt",
+      "stdout_sha256": "d1d6b667eade840c49e779d28c9e94298e6a65cd7d49713ef5acfbef7d7b70ea"
+    },
+    {
+      "name": "helper-build-first",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-voice",
+        "--example",
+        "schedule_off_actions",
+        "--example",
+        "schedule_off_voice"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 25.722381692,
+      "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/helper-build-first.txt",
+      "stdout_sha256": "0e6dab4456e38e508b642e041dcfb242c7b5e786e175e73dfdae90bebb9403e3"
+    },
+    {
+      "name": "actions-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "--all-targets",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 29.395052909000015,
+      "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/actions-tests-first.txt",
+      "stdout_sha256": "d548716c3018e988baf349a8357e789c379514e553e606102d416dc59c24c8f9"
+    },
+    {
+      "name": "voice-tools-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "tools",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 28.19556462600002,
+      "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/voice-tools-tests-first.txt",
+      "stdout_sha256": "50be0419e76ebd7cc2a431ba164ac467c871b402f20949bd26fcda1de51dbeaa"
+    }
+  ],
+  "test_execution_totals": {
+    "passed": 54,
+    "failed": 0,
+    "ignored": 0
+  },
+  "completed_stdout_comparisons": 144,
+  "corpus": {
+    "baseline_stdout_bytes": 554076,
+    "implementation_stdout_bytes": 554076,
+    "baseline_stderr_count": 144,
+    "implementation_stderr_count": 144
+  },
+  "distinct_stdout_payloads": 3,
+  "distinct_stdout_bytes": 14197,
+  "local_manifests": 35,
+  "skipped_stages": [],
+  "no_complete_gate_or_lamp_claim": true,
+  "expected_baseline_failure": {
+    "report": "/private/tmp/lamp-third-relative-cf2-baseline-regression.json",
+    "sha256": "e4ec7a16304695e2fa9c698778c8bed4ef853b5c9ef9eb6715a7fe384f44890a",
+    "cargo_exit_code": 101,
+    "passed": 0,
+    "failed": 1,
+    "ignored": 0,
+    "assertion": "missing timer guidance: relative reminder",
+    "included_in_positive_test_totals": false
+  },
+  "published_catalog_regression_verified": {
+    "test": "published_catalog_routes_relative_reminders_to_elapsed_timers",
+    "log": "/private/tmp/lamp-third-relative-cf2-implementation-yajih9pq/evidence/actions-tests-first.txt",
+    "log_sha256": "d548716c3018e988baf349a8357e789c379514e553e606102d416dc59c24c8f9",
+    "passed_result_line": "test published_catalog_routes_relative_reminders_to_elapsed_timers ... ok"
+  }
+}

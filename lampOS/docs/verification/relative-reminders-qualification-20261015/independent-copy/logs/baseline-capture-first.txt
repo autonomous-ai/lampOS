@@ -1,0 +1,107 @@
+{
+  "report": "/private/tmp/lamp-third-relative-cf2-baseline.json",
+  "status": "passed",
+  "build": {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-actions",
+      "-p",
+      "lamp-voice",
+      "--example",
+      "schedule_off_actions",
+      "--example",
+      "schedule_off_voice"
+    ],
+    "cwd": "/private/tmp/lamp-third-relative-cf2-baseline-93y4xf5_/lampOS",
+    "exit_code": 0,
+    "elapsed_seconds": 30.267960342,
+    "timeout_seconds": 900,
+    "timed_out": false,
+    "stdout_file": "/private/tmp/lamp-third-relative-cf2-baseline-build-first.txt",
+    "stdout_sha256": "c8f1e0c8397faad2bd2ca25a7839b8947782f1c07701931518b8150f8265c12a",
+    "stderr_file": null,
+    "stderr_sha256": null,
+    "stderr_merged_into_stdout": true,
+    "log": "/private/tmp/lamp-third-relative-cf2-baseline-build-first.txt",
+    "target_directory": "/private/tmp/lamp-third-relative-cf2-baseline-93y4xf5_/lampOS/target"
+  },
+  "metadata": {
+    "command": [
+      "cargo",
+      "metadata",
+      "--offline",
+      "--locked",
+      "--format-version",
+      "1"
+    ],
+    "cwd": "/private/tmp/lamp-third-relative-cf2-baseline-93y4xf5_/lampOS",
+    "exit_code": 0,
+    "elapsed_seconds": 0.35713147099999887,
+    "timeout_seconds": 60,
+    "timed_out": false,
+    "stdout_file": "/private/tmp/lamp-third-relative-cf2-baseline-93y4xf5_/evidence/cargo-metadata.json",
+    "stdout_sha256": "82bc6ebbd437f8b6362979e05a76a4afd982c0abe47dd194e24fd0a81128cf5b",
+    "stderr_file": "/private/tmp/lamp-third-relative-cf2-baseline-93y4xf5_/evidence/cargo-metadata.stderr",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_merged_into_stdout": false,
+    "file": "/private/tmp/lamp-third-relative-cf2-baseline-93y4xf5_/evidence/cargo-metadata.json",
+    "sha256": "82bc6ebbd437f8b6362979e05a76a4afd982c0abe47dd194e24fd0a81128cf5b",
+    "all_local_dependencies_inside_copy": true
+  },
+  "case_count": 72,
+  "profiles": {
+    "ordinary": {
+      "cases": 36,
+      "actions_sha256": "86e2d2bd148df7f1521f2123b59e4566d72948350d2a3cb2f7e3996c5872a2c3",
+      "voice_sha256": "8efeee3db16cb3b0567e7e15c6717c20fa30f0d27d516db5241d55c549faa69a",
+      "actions_bytes": 1194,
+      "voice_bytes": 5797,
+      "declared_names": [
+        "not_for_me",
+        "the_time",
+        "remember",
+        "recall",
+        "forget",
+        "volume_up",
+        "volume_down",
+        "volume_mute",
+        "volume_unmute",
+        "light_on",
+        "light_off",
+        "light_colour",
+        "light_brighter",
+        "light_dimmer"
+      ]
+    },
+    "tasks": {
+      "cases": 36,
+      "actions_sha256": "86e2d2bd148df7f1521f2123b59e4566d72948350d2a3cb2f7e3996c5872a2c3",
+      "voice_sha256": "3582ae6a0ee5af2e542975710c1bede18034d0cdf7958ef0c6f9991f55bd9f13",
+      "actions_bytes": 1194,
+      "voice_bytes": 7206,
+      "declared_names": [
+        "not_for_me",
+        "the_time",
+        "remember",
+        "recall",
+        "forget",
+        "start_agent_task",
+        "confirm_agent_task",
+        "check_agent_task",
+        "volume_up",
+        "volume_down",
+        "volume_mute",
+        "volume_unmute",
+        "light_on",
+        "light_off",
+        "light_colour",
+        "light_brighter",
+        "light_dimmer"
+      ]
+    }
+  }
+}

@@ -2556,6 +2556,36 @@ no local heavy build/test overlap is planned. No readiness or live model
 selection is claimed. The [qualification record](verification/relative-reminders-qualification-20261015/README.md)
 tracks the remaining results and First's concrete lamp replay.
 
+## 2026-10-15 — Relative reminder copy checks retained; full gates running
+
+Ready for lamp-voice: no
+
+At task head `365e36dbcd78ff247adf30b2d18afd4d9d6f1065`, independent source
+copies passed the workspace build, **54 / 0 / 0** tests (34 Actions and 20
+Voice `tools` checks), and **72 cases / 144 exact disabled-output comparisons**.
+The old integration catalog with only the new test added failed at
+`missing timer guidance: relative reminder`, as expected: Cargo 101 and
+**0 / 1 / 0**, retained separately from the implementation results. No retry,
+weakened assertion or skipped planned stage was needed. Each copy resolved
+all 35 local manifests inside itself; no parent source was used.
+
+The [copy report and raw evidence](verification/relative-reminders-qualification-20261015/independent-copy/README.md)
+record the same Third x86_64 Mac and exact process boundaries. Implementation
+workspace build took 80.881996933 seconds; Actions checks 29.395052909 seconds;
+Voice tools 28.195564626 seconds. These durations are not interaction latency.
+All 711 frozen implementation hashes and 4,005 historical originals remained
+unchanged. A parent audit verified every one of the 611 original-path mappings
+in the retained 37-file text bundle and its copied bytes.
+
+The full serial affected-package gate started at 22:06:17 UTC, after the copy
+worker released Cargo, with `--no-fail-fast -- --test-threads=1` for Actions,
+Voice, Voice Eval and Memory. Native ARM64 run
+[38644608947](https://github.com/autonomous-ai/lampOS/actions/runs/38644608947)
+is still running on the same task head. Neither is yet a completed result.
+The [qualification index](verification/relative-reminders-qualification-20261015/README.md)
+retains the pre-run test-binary identity. Actual model choice and elapsed
+reminder delivery remain First's lamp check; no provider or lamp was accessed.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

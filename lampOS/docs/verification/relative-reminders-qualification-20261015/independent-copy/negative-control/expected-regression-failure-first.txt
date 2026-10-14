@@ -1,0 +1,65 @@
+   Compiling libc v0.2.190
+   Compiling serde_core v1.0.229
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling zmij v1.0.23
+   Compiling serde_json v1.0.151
+   Compiling find-msvc-tools v0.1.14
+   Compiling shlex v2.0.1
+   Compiling memchr v2.8.3
+   Compiling pkg-config v0.3.34
+   Compiling itoa v1.0.18
+   Compiling vcpkg v0.2.15
+   Compiling rustix v1.1.5
+   Compiling bitflags v2.13.2
+   Compiling serde v1.0.229
+   Compiling foldhash v0.2.0
+   Compiling cc v1.7.0
+   Compiling getrandom v0.4.3
+   Compiling hashbrown v0.17.1
+   Compiling cfg-if v1.0.5
+   Compiling signal-hook v0.4.4
+   Compiling jiff-tzdb v0.1.9
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling fallible-iterator v0.3.0
+   Compiling smallvec v1.16.3
+   Compiling jiff-core v0.1.1
+   Compiling once_cell v1.21.4
+   Compiling fastrand v2.5.0
+   Compiling hashlink v0.12.2
+   Compiling libsqlite3-sys v0.38.2
+   Compiling syn v3.0.7
+   Compiling serde_derive v1.0.229
+   Compiling errno v0.3.14
+   Compiling signal-hook-registry v1.4.8
+   Compiling jiff v0.2.38
+   Compiling lamp-bus v0.1.0 (/private/tmp/lamp-third-relative-cf2-baseline-regression-sl7h1wnn/lampOS/crates/bus)
+   Compiling lamp-ipc v0.1.0 (/private/tmp/lamp-third-relative-cf2-baseline-regression-sl7h1wnn/lampOS/crates/ipc)
+   Compiling tempfile v3.27.0
+   Compiling lamp-msgs v0.1.0 (/private/tmp/lamp-third-relative-cf2-baseline-regression-sl7h1wnn/lampOS/crates/msgs)
+   Compiling rusqlite v0.40.2
+   Compiling lamp-schedule v0.1.0 (/private/tmp/lamp-third-relative-cf2-baseline-regression-sl7h1wnn/lampOS/crates/schedule)
+   Compiling lamp-actions v0.1.0 (/private/tmp/lamp-third-relative-cf2-baseline-regression-sl7h1wnn/lampOS/crates/actions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 14.44s
+     Running tests/schedule.rs (target/debug/deps/schedule-01024e2bdab4e700)
+
+running 1 test
+test published_catalog_routes_relative_reminders_to_elapsed_timers ... FAILED
+
+failures:
+
+---- published_catalog_routes_relative_reminders_to_elapsed_timers stdout ----
+lamp-actions: serving; can do now: set_timer set_reminder repeat_reminder list_reminders cancel_reminder snooze_reminder
+
+thread 'published_catalog_routes_relative_reminders_to_elapsed_timers' (114120514) panicked at crates/actions/tests/schedule.rs:368:9:
+missing timer guidance: relative reminder
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    published_catalog_routes_relative_reminders_to_elapsed_timers
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `-p lamp-actions --test schedule`
