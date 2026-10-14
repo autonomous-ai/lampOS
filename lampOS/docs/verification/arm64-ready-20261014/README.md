@@ -11,14 +11,17 @@ whitespace checks so that the downloaded evidence remains byte-identical.
 
 | Task | Exact tested head | Run | Passed / failed / ignored |
 |---|---|---|---|
-| Records #707 | `abc5d134ffb50b7cca0c78ab975528a40cee0096` | [38561266393](https://github.com/autonomous-ai/lampOS/actions/runs/38561266393) | 3,802 / 0 / 29 |
-| Judge audit #700 | `800ce47a5230d6b99f44dbcb92e56180646c6efc` | [38561284576](https://github.com/autonomous-ai/lampOS/actions/runs/38561284576) | 3,786 / 0 / 29 |
-| Memory checkpoint #698 | `fed759ee7557243802b704e296e1cbef11c82071` | [38561301420](https://github.com/autonomous-ai/lampOS/actions/runs/38561301420) | 3,811 / 0 / 30 |
-| Mood checkpoint #713 | `9b00b4b7ba23930b7030b4722c244e00ad345cee` | [38570324967](https://github.com/autonomous-ai/lampOS/actions/runs/38570324967) | 3,880 / 0 / 31 |
-| Mood ready #713 | `08c90d6b26ea0ba1b39f52f663b70af0f5a29865` | [38578348793](https://github.com/autonomous-ai/lampOS/actions/runs/38578348793) | 3,906 / 0 / 31 |
+| Records #707 | `abc5d134ffb50b7cca0c78ab975528a40cee0096` | [38561266393](https://github.com/autonomous-ai/lampOS/actions/runs/38561266393) | 3,814 / 0 / 29 |
+| Judge audit #700 | `800ce47a5230d6b99f44dbcb92e56180646c6efc` | [38561284576](https://github.com/autonomous-ai/lampOS/actions/runs/38561284576) | 3,798 / 0 / 29 |
+| Memory checkpoint #698 | `fed759ee7557243802b704e296e1cbef11c82071` | [38561301420](https://github.com/autonomous-ai/lampOS/actions/runs/38561301420) | 3,823 / 0 / 30 |
+| Mood checkpoint #713 | `9b00b4b7ba23930b7030b4722c244e00ad345cee` | [38570324967](https://github.com/autonomous-ai/lampOS/actions/runs/38570324967) | 3,892 / 0 / 31 |
+| Mood ready #713 | `08c90d6b26ea0ba1b39f52f663b70af0f5a29865` | [38578348793](https://github.com/autonomous-ai/lampOS/actions/runs/38578348793) | 3,918 / 0 / 31 |
 
-Counts sum Cargo's final successful test-result lines, including doctests:
-252, 253, 255, 261 and 262 suites respectively. Ignored manual/device tests were not
+Counts include standard libtest/doctest result lines and the custom
+`turn-end-wire` process harness: 253, 254, 256, 262 and 263 completed
+suites respectively. Earlier summaries omitted that custom harness's
+12 passing tests; this correction changes no raw log or run outcome.
+`test-count-audit.json` records both sets of totals and raw hashes. Ignored manual/device tests were not
 executed. All five runs completed with conclusion `success`, including
 release build, serial tests, binary hash and artifact-upload steps.
 
@@ -42,7 +45,7 @@ measurements. Memory's subsequent full Mac
 gate passed 1,469 tests, and its rebase including First's installed capture
 passes focused Mac checks and strict Linux lint/cross-build. Its final head
 failed its final native ARM64 run 38582911230 in a Linux-only capture
-fixture's private-socket setup: 3,417 passed, 1 failed, 30 ignored before
+fixture's private-socket setup: 3,429 passed, 1 failed, 30 ignored before
 Cargo stopped. Memory is not ready. The complete failure and owner-facing
 diagnosis are in [the capture setup report](../arm64-capture-connect-20261014/).
 Earlier privacy/motor failures remain retained. Green checkpoints do not

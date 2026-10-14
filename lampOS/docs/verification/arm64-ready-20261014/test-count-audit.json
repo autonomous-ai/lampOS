@@ -1,0 +1,159 @@
+{
+  "note": "Earlier summaries counted standard libtest result lines only. Corrected totals include the custom turn-end-wire process harness; raw logs and run outcomes are unchanged.",
+  "runs": [
+    {
+      "raw": "verification/arm64-ready-20261014/judge-38561284576.txt",
+      "raw_sha256": "efad78aad6462b185fdd37abecdac5c409f546ecbb4a4a0e59473610fea56a3d",
+      "standard": {
+        "suites": 253,
+        "passed": 3786,
+        "failed": 0,
+        "ignored": 29
+      },
+      "custom_turn_end_wire_process": {
+        "suites": 1,
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0
+      },
+      "total": {
+        "suites": 254,
+        "passed": 3798,
+        "failed": 0,
+        "ignored": 29
+      }
+    },
+    {
+      "raw": "verification/arm64-ready-20261014/memory-38561301420.txt",
+      "raw_sha256": "65d1278c67923ab1345c2c73b93ae750d002e013c2c929308cdf931fc704b4b4",
+      "standard": {
+        "suites": 255,
+        "passed": 3811,
+        "failed": 0,
+        "ignored": 30
+      },
+      "custom_turn_end_wire_process": {
+        "suites": 1,
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0
+      },
+      "total": {
+        "suites": 256,
+        "passed": 3823,
+        "failed": 0,
+        "ignored": 30
+      }
+    },
+    {
+      "raw": "verification/arm64-ready-20261014/mood-38570324967.txt",
+      "raw_sha256": "a69dcf0b44fd41cd939a20cdd3247438190be3421476dc2cbeac447f456fd194",
+      "standard": {
+        "suites": 261,
+        "passed": 3880,
+        "failed": 0,
+        "ignored": 31
+      },
+      "custom_turn_end_wire_process": {
+        "suites": 1,
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0
+      },
+      "total": {
+        "suites": 262,
+        "passed": 3892,
+        "failed": 0,
+        "ignored": 31
+      }
+    },
+    {
+      "raw": "verification/arm64-ready-20261014/mood-38578348793.txt",
+      "raw_sha256": "5cf8efb7b404a48defe34cdcef7076fc64a3571d3d9cfebf5181f1b6ed556c4b",
+      "standard": {
+        "suites": 262,
+        "passed": 3906,
+        "failed": 0,
+        "ignored": 31
+      },
+      "custom_turn_end_wire_process": {
+        "suites": 1,
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0
+      },
+      "total": {
+        "suites": 263,
+        "passed": 3918,
+        "failed": 0,
+        "ignored": 31
+      }
+    },
+    {
+      "raw": "verification/arm64-ready-20261014/records-38561266393.txt",
+      "raw_sha256": "00bf1d756328630760fe43315f5226b8312e52e3a3e64287adb08e1e40ccec93",
+      "standard": {
+        "suites": 252,
+        "passed": 3802,
+        "failed": 0,
+        "ignored": 29
+      },
+      "custom_turn_end_wire_process": {
+        "suites": 1,
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0
+      },
+      "total": {
+        "suites": 253,
+        "passed": 3814,
+        "failed": 0,
+        "ignored": 29
+      }
+    },
+    {
+      "raw": "verification/arm64-capture-connect-20261014/run.txt",
+      "raw_sha256": "cd4faa5f9446631d17a932f24423f3124b5b713059208d5138e1fe5549887261",
+      "standard": {
+        "suites": 187,
+        "passed": 3417,
+        "failed": 1,
+        "ignored": 30
+      },
+      "custom_turn_end_wire_process": {
+        "suites": 1,
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0
+      },
+      "total": {
+        "suites": 188,
+        "passed": 3429,
+        "failed": 1,
+        "ignored": 30
+      }
+    },
+    {
+      "raw": "verification/arm64-capture-connect-20261014/second-run.txt",
+      "raw_sha256": "61f614f0b393ffd3141a26167fd929705ca88b326ac3279a96b63e33edaf8ab1",
+      "standard": {
+        "suites": 184,
+        "passed": 3398,
+        "failed": 1,
+        "ignored": 29
+      },
+      "custom_turn_end_wire_process": {
+        "suites": 1,
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0
+      },
+      "total": {
+        "suites": 185,
+        "passed": 3410,
+        "failed": 1,
+        "ignored": 29
+      }
+    }
+  ]
+}

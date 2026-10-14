@@ -2344,7 +2344,7 @@ lint, all three capture fixtures and Memory/Voice/Tasks ARM64 cross-build.
 Its full Mac workspace attempt passed formatting/strict lint, then failed
 Health's process fixture: the host's 9% free disk correctly produced a
 board warning, while its final journal assertion expected missing Eyes.
-The run later stopped mid-Settings suite; its handle and process were gone
+The run later stopped mid-Surround suite; its handle and process were gone
 when checked, with no final exit status available. Completed suites total
 2,257 passed / 1 failed / 16 ignored, 166 suites; no passing gate is claimed.
 The earlier pre-repair Mac dependency gate remains separately green at
@@ -2366,6 +2366,46 @@ gate has restarted at local `5fa0f78d67442107bd5b9c000a9ff2e57d7c67d1`,
 based on `dcc2e6b1ee67e11e2de89f893696432e47c4d8c5`, including the new
 short-sound and Tasks changes. All nine task source/test/manifest files
 remain unchanged. No lamp measurement, deployment or new ready claim.
+
+## 2026-10-15, 00:34 ICT: correct full-workspace test totals
+
+Ready for lamp-voice: no
+
+While checking the current gate, Fourth found that its previous result-line
+parser counted standard libtest/doctest summaries but omitted the custom
+`turn-end-wire` process harness (`test result: 12 passed; 0 failed`). The
+retained successful native runs and both capture-failure runs each contain
+that additional completed suite. The ready index, capture report and their
+count JSON files now include it; `arm64-ready-20261014/test-count-audit.json`
+records the standard, custom and combined counts with unchanged raw hashes.
+Historical log entries and issue comments used the standard-only totals.
+This is a reporting correction, not additional tests or a different result.
+
+For example, Memory's failed native gate was 3,429 passed / 1 failed /
+30 ignored across 188 suites, rather than the earlier 3,417 across 187.
+Mood's accepted run was 3,918 / 0 / 31 across 263, rather than 3,906 across
+262. The present Mac full run already has a separate Tasks preflight
+timeout to investigate; no passing gate or readiness is claimed.
+
+## 2026-10-15, 00:35 ICT: Tasks fails before its descendant test begins
+
+Ready for lamp-voice: no
+
+Found, not mine: the fresh Mac workspace gate at `5fa0f78d6` passed Health
+and Memory's real-store integration cases, then Tasks' `harness` target
+reported 23 passed / 1 failed. The descendant-pipe test expected
+`Uncertain { pipes_open }` but got `NotSent { preflight_timeout }` at
+`tests/harness.rs:509`. The one-second read bound expired in the local
+fixture's `machines --json` preflight, before `new` or the cleanup checks.
+It was the first test in this target; the 23 later tests passed.
+
+The Tasks files are byte-identical to upstream `dcc2e6b1e`. Source and
+the exact excerpt are in `verification/mac-tasks-preflight-20261015/`.
+No live Harness, agent, provider or lamp was involved, and no other local
+build/test was started by Fourth. No measured cause is yet available;
+first-execution checks or scheduling remain hypotheses. No timeout or
+assertion was changed. The full gate is continuing through Voice; after
+it ends Fourth will check the same compiled fixture in isolation.
 
 ## Not shown
 

@@ -1,8 +1,8 @@
 {
   "head": "08c90d6b26ea0ba1b39f52f663b70af0f5a29865",
   "conclusion": "success",
-  "suites": 262,
-  "passed": 3906,
+  "suites": 263,
+  "passed": 3918,
   "failed": 0,
   "ignored": 31,
   "suite_results": [
@@ -63,5 +63,18 @@
         }
       ]
     }
-  ]
+  ],
+  "previous_standard_harness_counts": {
+    "suites": 262,
+    "passed": 3906,
+    "failed": 0,
+    "ignored": 31
+  },
+  "custom_harness_counts": {
+    "suites": 1,
+    "passed": 12,
+    "failed": 0,
+    "ignored": 0
+  },
+  "counts_scope": "standard libtest plus the custom turn-end-wire process harness"
 }

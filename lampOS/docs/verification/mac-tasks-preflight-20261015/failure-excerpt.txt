@@ -1,0 +1,14 @@
+thread 'a_descendant_holding_pipes_is_killed_without_an_unbounded_drain' (562084911) panicked at crates/tasks/tests/harness.rs:509:5:
+assertion `left == right` failed
+  left: NotSent { code: "preflight_timeout" }
+ right: Uncertain { code: "pipes_open" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_descendant_holding_pipes_is_killed_without_an_unbounded_drain
+
+test result: FAILED. 23 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.71s
+
+error: test failed, to rerun pass `-p lamp-tasks --test harness`
+     

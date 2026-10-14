@@ -1,0 +1,17 @@
+[
+  {
+    "path": "lampOS/crates/tasks/tests/harness.rs",
+    "sha256": "aa3a48065ff27e70d64f233ab83e9cc72bdba1061875c92043b72854d512a928",
+    "unchanged_from_upstream": true
+  },
+  {
+    "path": "lampOS/crates/tasks/tests/fixtures/harness_cli.rs",
+    "sha256": "b3f4098e3f6e084fe009c77f6b16aa6cd47da7c6cb5bd504e65fc868481d0a98",
+    "unchanged_from_upstream": true
+  },
+  {
+    "path": "lampOS/crates/tasks/src/harness.rs",
+    "sha256": "d0a68324408cb46edc9c6e1d7b58856991ae41377a36abd6af4210bb908276fb",
+    "unchanged_from_upstream": true
+  }
+]

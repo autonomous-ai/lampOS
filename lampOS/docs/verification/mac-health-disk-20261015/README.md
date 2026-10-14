@@ -7,7 +7,7 @@ The full Mac workspace gate at Memory source
 `7fbb03e1f2e61ad6dfaf184cd768bad6524c2d76`, failed one completed suite
 and was then interrupted. At 00:13 ICT on 2026-10-15 its tool handle no
 longer existed; a targeted process inspection found no gate or test
-process. The saved output ended mid-way through Settings' release suite.
+process. The saved output ended mid-way through Surround's release suite.
 The interruption's cause and final process exit status were not available.
 The log contains 166 completed Cargo suites: **2,257 passed, 1 failed,
 16 ignored**. Later suites and the workspace build were not completed.

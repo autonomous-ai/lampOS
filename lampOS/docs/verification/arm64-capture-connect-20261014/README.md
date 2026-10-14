@@ -7,7 +7,7 @@ tested Memory/Voice head `68606e78e75369393168f184ae00ae210ecd80de`, based on
 `724541a957e5e66bb4c0f4a8de537466c8a9fe55`. It ran on a GitHub-hosted
 Ubuntu 22.04 ARM64 ordinary-user runner with Rust 1.96.0, not on a lamp.
 The release workspace build passed. The serial workspace test command
-exited 101: 187 completed suites, **3,417 passed, 1 failed, 30 ignored**.
+exited 101: 188 completed suites, **3,429 passed, 1 failed, 30 ignored**.
 Cargo stopped before the remaining suites, including VoiceEval. Binary
 hashing and artifact upload were skipped. No Memory pull request is ready.
 
@@ -20,8 +20,10 @@ cargo test --locked --release --workspace -- --test-threads=1
 
 `run.txt` is the complete, unmodified `gh run view 38582911230 --repo
 autonomous-ai/lampOS --log` output; `run.json` is the run/job/step metadata.
-`results.json` sums the final Cargo result lines, including the failed
-suite. Raw GitHub timestamps/tab prefixes and progress whitespace are
+`results.json` sums the standard libtest result lines and the custom
+`turn-end-wire` process harness, including the failed suite. Earlier
+summaries omitted the custom harness's 12 passing tests; the corrected
+totals change neither raw output nor the run's failure. Raw GitHub timestamps/tab prefixes and progress whitespace are
 preserved; exclude `run.txt` from documentation whitespace checks.
 Its SHA-256 is
 `cd4faa5f9446631d17a932f24423f3124b5b713059208d5138e1fe5549887261`.
@@ -95,7 +97,7 @@ The same GitHub Ubuntu 22.04 ARM64 ordinary-user configuration and Rust
 1.96.0 passed the release workspace build, then failed the same fixture
 at the same line 212 with the same private-peer `PermissionDenied`. The
 fixture finished 2 passed / 1 failed. The workspace test command exited
-101 after **3,398 passed, 1 failed, 29 ignored**, 184 completed suites.
+101 after **3,410 passed, 1 failed, 29 ignored**, 185 completed suites.
 Later tests, binary hashing and upload were not reached.
 
 `second-run.txt` is the complete unmodified `gh run view 38593943161 --repo
