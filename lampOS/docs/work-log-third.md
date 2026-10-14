@@ -860,6 +860,36 @@ it to be reduced; it must not retime ended sound or weaken cancellation.
 Questions blocking independent work: none. Next: fetch the list and own log,
 rebase `lamp-third`, and take the next unclaimed Third task.
 
+## 2026-10-14 — task 6 taken: Schedule
+
+- Taking `schedule` on `third/schedule` after the completed Expression
+  playout addendum. Fetched `origin/lamp-voice` at
+  `d0a2b5c00092087763d1e001bfe26fefa7a16dce`, read its running list and this
+  log, rebased `lamp-third`, and pushed it with the exact prior-head lease.
+  Rebase resolved one append-only `reuse-decisions.md` conflict by retaining
+  both First's hand-control review and Third's Expression rest review.
+  Expression and Msgs runtime trees are identical to the preceding gated
+  handoff. Third's rebased handoff is `3f9644ae1`.
+- Scope: new Rust `crates/schedule` / `lamp-schedule`, its own durable store,
+  injected clock, Unix JSON-line set/list/cancel interface, retained due
+  notices and diagnostics. All service effects require an explicit enable
+  switch. No Voice, hardware owner, deployment or other builder's branch
+  changes. Propose model tools and delivery acknowledgement in
+  `docs/schedule.md`; First owns wiring a spoken turn.
+- Read the task and referenced component contract. Preparation inspected
+  V1's schedule source/tests and verdict, the current Memory/tools/bus/clock
+  boundaries, and primary assistant/time/storage documentation. V1 drops
+  work over 30 minutes late; the new task explicitly must not. A bus send
+  does not prove durable receipt or that a reminder was heard. Detailed
+  keep/change decisions will accompany the implementation.
+- First-use and repeated local request, durable-commit, due-to-publication
+  and slow-client behavior will be measured separately on this host.
+  Injected-clock results will be labelled simulated; no lamp, clock-sync,
+  flash-durability or acoustic latency result is claimed here.
+- Questions blocking independent work: none. The delivery contract will
+  state exactly what First must acknowledge and what happens across a crash,
+  busy Voice, clock correction and restart. No speculative speech is added.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
