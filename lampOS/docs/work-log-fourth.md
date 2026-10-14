@@ -2636,6 +2636,39 @@ ownership rules; no Body source is changed pending this scope answer.
 Voice-only work continues. No user response or lamp access is needed.
 
 
+## 2026-10-15, 03:09 ICT: Memory merged; clarify the missing adapter
+
+Ready for lamp-voice: no
+
+PR #743 merged at 19:49:28 UTC as `7d9d6f001f57d2eed476645564c4f58b16fdfdba`.
+First's comment 6176965033 reports its minute passed on lamp-4ace with both
+binaries from native ARM64 run 38615610362 and `LAMP_MEMORY_DAYS=on`.
+First reports yesterday's recall, a preference in a fresh session, explicit
+keep/recall and successful `conversation_end`; Memory health was okay and
+Voice did not restart. First also reports one immediate recall miss that
+did not recur in two more tries, and a forget phrase transcribed incorrectly.
+These are First's lamp observations, not measurements made by Fourth.
+
+The old Memory service rejected the new Voice's submission until both
+binaries were installed. First owns the rollout/update implication.
+First's post-merge documentation request is to explain the startup message
+`the model adapter is not configured` in `docs/memory-days.md`. A narrow
+documentation follow-up will state the capability boundary: no automatic
+extraction or inferred corrections, while explicit memories, raw/linked
+journalling, search, existing-fact notes, forgetting and expiry still work.
+The successful no-model receipt is not a queued extraction, and healthy
+storage is not proof of model readiness. No adapter or runtime change is
+being added. This responds to the review comment while #739 continues.
+
+For #739, all focused checks of the revised source passed on the Intel Mac:
+32 pilot tests; 13 privacy-related tests; 13 endpoint tests with one existing
+model-dependent ignore; and 11 early-end tests. Raw output stays in Fourth's
+scratch evidence until the task's handoff. The new frozen full-run source
+is based on `f60d6d6f9`; its formatting and strict workspace Clippy passed,
+and loaded qualification is running. The Body clock-seam question on #739
+comment 6177081830 is still unanswered. No Body file has been changed.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
