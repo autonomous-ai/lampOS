@@ -1,0 +1,5 @@
+    Checking lamp-schedule v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/schedule)
+    Checking lamp-voice v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/voice)
+    Checking lamp-actions v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/actions)
+    Checking lamp-voice-eval v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/voice-eval)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 33.80s

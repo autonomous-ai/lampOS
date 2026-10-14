@@ -1,0 +1,26 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/lamp_voice-04f83e70e13d855a)
+
+running 19 tests
+test provider_worker::tests::reminders::reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn ... ok
+test tools::schedule_integration_tests::all_six_voice_routes_reach_actual_actions_and_return_schedule_resolved_results ... ok
+test tools::schedule_integration_tests::voice_actions_boundary_rejects_malformed_model_arguments_without_schedule_ipc ... ok
+test tools::schedule_integration_tests::voice_keeps_all_escaped_list_text_across_explicit_sendable_pages ... ok
+test tools::schedule_integration_tests::voice_off_filters_a_real_enabled_actions_catalog_and_never_routes_schedule_calls ... ok
+test tools::schedule_integration_tests::voice_receives_unknown_for_a_lost_durable_mutation_reply_then_can_read_current_items ... ok
+test tools::tests::a_call_goes_to_whoever_runs_it_and_to_nobody_when_that_is_switched_off ... ok
+test tools::tests::a_session_is_told_of_the_voices_own_function_and_of_a_whole_readable_catalog_or_none_of_it ... ok
+test tools::tests::a_stale_or_malicious_schedule_catalog_cannot_declare_or_route_when_off ... ok
+test tools::tests::an_executive_that_is_gone_late_or_unreadable_costs_one_deadline_and_an_honest_answer ... ok
+test tools::tests::lost_or_unsendable_schedule_results_are_unknown_and_are_never_retried ... ok
+test tools::tests::only_on_and_an_absolute_path_become_flags_and_they_are_taken_from_the_front ... ok
+test tools::tests::schedule_exchange_keeps_the_call_envelope_and_committed_result ... ok
+test tools::tests::schedule_flags_are_exact_independent_opt_ins_and_leave_old_arguments_unchanged ... ok
+test tools::tests::tasks_then_schedule_flags_keep_both_owners_and_their_declarations ... ok
+test tools::tests::the_executive_is_asked_in_one_line_and_its_result_or_its_words_go_to_the_model ... ok
+test tools::tests::the_time_is_declared_and_answered_here_only_when_switched_on ... ok
+test tools::tests::with_a_memory_its_three_functions_are_declared_and_go_to_it_and_to_nobody_without ... ok
+test tools::tests::work_for_an_agent_is_declared_and_routed_only_with_its_directory ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 917 filtered out; finished in 2.02s
+

@@ -1,0 +1,54 @@
+Auto-merging lampOS/crates/voice/src/coordinator.rs
+Auto-merging lampOS/crates/voice/src/lib.rs
+Auto-merging lampOS/crates/voice/src/tools.rs
+On branch third/schedule-voice
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   lampOS/Cargo.lock
+	modified:   lampOS/crates/actions/Cargo.toml
+	modified:   lampOS/crates/actions/src/lib.rs
+	modified:   lampOS/crates/actions/src/main.rs
+	modified:   lampOS/crates/actions/src/server.rs
+	modified:   lampOS/crates/schedule/src/lib.rs
+	modified:   lampOS/crates/voice/Cargo.toml
+	modified:   lampOS/crates/voice/src/admission.rs
+	modified:   lampOS/crates/voice/src/coordinator.rs
+	modified:   lampOS/crates/voice/src/coordinator/cloud.rs
+	modified:   lampOS/crates/voice/src/coordinator/hand.rs
+	modified:   lampOS/crates/voice/src/coordinator/notices.rs
+	modified:   lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs
+	modified:   lampOS/crates/voice/src/coordinator/tests/hand_controls.rs
+	modified:   lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs
+	modified:   lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs
+	modified:   lampOS/crates/voice/src/coordinator/tests/turn_taking.rs
+	modified:   lampOS/crates/voice/src/fixture_provider.rs
+	modified:   lampOS/crates/voice/src/lib.rs
+	modified:   lampOS/crates/voice/src/main.rs
+	modified:   lampOS/crates/voice/src/provider_worker.rs
+	modified:   lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs
+	modified:   lampOS/crates/voice/src/thread.rs
+	modified:   lampOS/crates/voice/src/tools.rs
+	modified:   lampOS/docs/actions.md
+	modified:   lampOS/docs/reuse-decisions.md
+	modified:   lampOS/docs/schedule.md
+	modified:   lampOS/docs/tools.md
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	lampOS/crates/actions/src/schedule.rs
+	lampOS/crates/actions/tests/schedule.rs
+	lampOS/crates/schedule/src/client.rs
+	lampOS/crates/schedule/src/delivery.rs
+	lampOS/crates/schedule/tests/client.rs
+	lampOS/crates/schedule/tests/delivery_ledger.rs
+	lampOS/crates/voice/src/coordinator/tests/reminder_roundtrip.rs
+	lampOS/crates/voice/src/coordinator/tests/reminders.rs
+	lampOS/crates/voice/src/provider_worker/reminder_policy.rs
+	lampOS/crates/voice/src/provider_worker/tests/reminders.rs
+	lampOS/crates/voice/src/reminders.rs
+	lampOS/crates/voice/src/reminders/
+	lampOS/crates/voice/src/tools/
+	lampOS/docs/verification/schedule-voice-host-20261014/
+
+no changes added to commit (use "git add" and/or "git commit -a")

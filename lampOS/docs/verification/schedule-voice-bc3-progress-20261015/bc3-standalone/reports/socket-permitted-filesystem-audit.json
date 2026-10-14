@@ -1,0 +1,67 @@
+{
+  "scope": "Filesystem-only final report, raw counts and source verification",
+  "verified_at": "2026-10-14T18:02:02.247015+00:00",
+  "report": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-socket-permitted.json",
+  "report_sha256": "540244bdf77cef5aaf7095c4a3e988fa11da5339a92c2e836933fd4786b93d30",
+  "status": "passed",
+  "base": "bc3fccb546a22baaef180fcd57b3291a44e0e4c1",
+  "source_files_verified": 1455,
+  "gate_paths": 676,
+  "helpers_verified": {
+    "crates/actions/examples/schedule_off_actions.rs": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1",
+    "crates/voice/examples/schedule_off_voice.rs": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+  },
+  "old_evidence_paths_unchanged": 1158,
+  "commands": [
+    {
+      "name": "workspace-build-first",
+      "exit_code": 0,
+      "elapsed_seconds": 0.46833282900000006,
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence-socket-permitted/workspace-build-first.txt",
+      "log_sha256": "8950be1e8f4499f41b8e38ef15f09a0e2671be53a43aa5dec4d794320908881d"
+    },
+    {
+      "name": "helper-build-first",
+      "exit_code": 0,
+      "elapsed_seconds": 0.25090067900000035,
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence-socket-permitted/helper-build-first.txt",
+      "log_sha256": "299f16a2c523be18fef769975d2df00e0505521db047540feea3a74b94666887"
+    },
+    {
+      "name": "actions-tests-first",
+      "exit_code": 0,
+      "elapsed_seconds": 15.638498341000002,
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence-socket-permitted/actions-tests-first.txt",
+      "log_sha256": "d78b2a3204f0ff5fd96cd196b66deaeb9a04362d30aede17e6389a6df67c6822"
+    },
+    {
+      "name": "schedule-tests-first",
+      "exit_code": 0,
+      "elapsed_seconds": 36.943134892,
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence-socket-permitted/schedule-tests-first.txt",
+      "log_sha256": "b0ababbd07d7acdb76f89db568873040abe497f40a71dc0f4ef75b195ce2ceae"
+    },
+    {
+      "name": "voice-reminder-tests-first",
+      "exit_code": 0,
+      "elapsed_seconds": 34.568786856,
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence-socket-permitted/voice-reminder-tests-first.txt",
+      "log_sha256": "5df531f584e7f01d2dbd53f4266956e4d2463aec9517c29080e704f83770bd42"
+    },
+    {
+      "name": "voice-tools-tests-first",
+      "exit_code": 0,
+      "elapsed_seconds": 2.3625021260000096,
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence-socket-permitted/voice-tools-tests-first.txt",
+      "log_sha256": "b088a4bf50134bc3c3d8781a28ae386f331ee734ab9d6eed8531eb898e9f8144"
+    }
+  ],
+  "test_execution_totals": {
+    "passed": 282,
+    "failed": 0,
+    "ignored": 2
+  },
+  "completed_stdout_comparisons": 144,
+  "local_manifests": 34,
+  "source_and_helpers_unchanged": true
+}

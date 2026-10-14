@@ -1,0 +1,25 @@
+// Scratch-only baseline helper: reads only the fixture tools.json.
+// Declaring/routing existing Tasks tools does not start or contact an agent.
+use lamp_voice::{provider_worker::ProviderInput, tools};
+use serde_json::json;
+fn main() {
+    let mut cli = std::env::args().skip(1);
+    let path = cli.next().expect("catalog directory");
+    let profile = cli.next().expect("ordinary or tasks profile");
+    assert!(cli.next().is_none());
+    let args = tools::arguments_from_environment();
+    let (settings, rest) = tools::take(&args).expect("ordinary settings");
+    assert!(rest.is_empty());
+    assert_eq!(settings.exec.as_deref(), Some(std::path::Path::new(&path)));
+    assert!(settings.decline && settings.clock && settings.memory.is_some());
+    assert_eq!(settings.tasks.is_some(), profile == "tasks");
+    let names = [
+        "not_for_me", "the_time", "remember", "recall", "forget",
+        "volume_up", "volume_down", "volume_mute", "volume_unmute",
+        "light_on", "light_off", "light_colour", "light_brighter", "light_dimmer",
+        "start_agent_task", "confirm_agent_task", "ordinary_unknown_tool",
+    ];
+    let routes: Vec<_> = names.iter().map(|name| json!({"name":name,"route":format!("{:?}", tools::route(&settings,name))})).collect();
+    let wire: ProviderInput = serde_json::from_str(r#"{"kind":"written","request":7,"session":9,"privacy_generation":11,"text":"fixture","look":false}"#).unwrap();
+    println!("{}", json!({"arguments":args,"tools":tools::declared(&settings),"routes":routes,"written":serde_json::to_string(&wire).unwrap()}));
+}

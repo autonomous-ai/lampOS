@@ -2058,6 +2058,78 @@ qualification. The qualified Touch artifact and legacy-path check remain
 available for First's minute and enabled hand tests; Third claims no new
 lamp result and makes no default flip before that qualification.
 
+
+## 2026-10-15 — Task 31 follow-up ordering and default-off checks
+
+Ready for lamp-voice: no
+
+The reminder priority correction is implemented: an owed camera look or
+unanswered-name second look takes its turn before a due reminder, without
+consuming or acknowledging the prepared delivery. The two new sequence
+regressions pass, including delayed provider completion after final audio
+retirement. The incoming task-news/CHECK changes at `bc3fccb54` are preserved.
+
+[The retained checkpoint](verification/schedule-voice-bc3-progress-20261015/README.md)
+records exact commands, original output and hashes. On Third's Intel
+x86_64 Mac with Rust/Cargo 1.96.0, bc3 formatting and strict all-target
+Clippy passed, followed by 70 reminder checks / 0 failures / 2 ignored probes,
+eight second-look checks and 18 tool checks. Its isolated source copy passed
+workspace/helper builds, 282 test executions / 0 failures / 2 ignored probes,
+and 72 default-off cases / 144 exact stdout comparisons against clean bc3.
+The first restricted copy run failed 13 Actions tests and stopped; nine
+explicit socket permission errors and four readiness failures are retained.
+Only local socket permission changed for the passing repeat.
+
+The task is now based on `1a38f2f3e`, whose only difference in the 676-path
+source map is an upstream Tasks test fixture. All Task 31 bytes survived
+that rebase unchanged. The complete affected-package gate failed:
+**1,116 passed, 5 failed, 8 ignored** across 16 completed harnesses, exit 101
+after 683.341811104 seconds. Voice lib reported 923 passed / 5 failed /
+8 ignored in 491.89 seconds. Formatting and strict all-target Clippy passed;
+the workspace-build stage was not reached. All 676 source hashes stayed
+unchanged. No complete-gate or Task 31 native pass is claimed.
+
+All five failures use the unchanged `motor/tests.rs:441` helper, `owned child
+timed out: None`: crash/stalled-control at caller 645 (crash versus hang not
+known), explicit-current-segment at 905, failed-reap at 1001,
+frozen-config/executable at 782, and idle-ready at 503. The latter four are
+initial Ready waits. No motor assertion, deadline or production source was
+changed. Later incoming Voice/Body changes were reviewed separately from
+this frozen test source.
+
+**Evidence correction:** the earlier diagnostic report's claim that four
+markerless fixture records spawned no child was wrong. Three had spawned
+an original normal child and requested shutdown before checking a separate
+denied candidate; their entry phase was not captured. The fourth explicitly
+never starts its child. The new checkpoint links the correction and source
+locations. Original readings, hashes, test counts and timings are unchanged.
+
+**Found, not mine:** incoming `fd1a273ee` leaves task-news `said_at_us`
+unset on successful early-end speech, and local confirmation skips its
+normal assignment. Without fresh camera presence this can suppress news
+after an actual conversation. The source audit gives the trigger and a
+regression suggestion; no change outside #709 was made. The inherited
+motor failures still have no demonstrated cause or authorized repair scope.
+The earlier questions are not repeated; strict Quiet-only reminder admission
+continues while the Unknown-room decision is unanswered.
+
+First's lamp cases now include a timer due during an owed camera/SecondLook
+follow-up. Most likely wrong remain provider schema/wording, the cold-start
+Quiet delay, real ALSA retirement, storage stalls and the child's Linux
+scheduler transition. No lamp or real provider was used. #699 remains
+unclaimed after the MVP.
+
+Touch [PR #728](https://github.com/autonomous-ai/lampOS/pull/728) was merged
+at 18:17 UTC. First reports installing run 38599296426's Controls artifact
+on lamp-4ace at 01:16:03 local with the existing controls/pins and `--enable`,
+without `--touch`: active, zero restarts, health `ok`, button released and
+head not touched. Its SHA-256 is
+`8c7b8a1a6c3437853d616ae01244042057800a5a6bbc540006d78ce730b56ceb`.
+The checkpoint retains First's report and the Queue snapshot; these are
+First's reported observations, not Third's measurements. Enabled touch,
+per-pad thresholds/baseline, E4/E8 checks and the default flip wait for a
+person at the lamp during office hours.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
@@ -2071,5 +2143,6 @@ installed a production signed release or erased a real personal store. Its
 production supervisor, trusted feed, lamp storage durability and full-service
 latency remain unqualified. Schedule and Tasks passed their host gates; their
 real storage, clock, Harness and Voice integrations remain for First to qualify
-on the lamp. Task 33 is offered in #728; no hardware qualification is claimed.
+on the lamp. Task 33 is merged through #728 after First's reported minute
+without `--touch`; enabled qualification still needs First and a person there.
 Task #709 is taken and not ready; #699 waits until after the MVP.

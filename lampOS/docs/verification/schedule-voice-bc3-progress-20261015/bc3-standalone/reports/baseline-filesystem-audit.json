@@ -1,0 +1,40 @@
+{
+  "scope": "Filesystem-only verification after the clean bc3 baseline; Cargo slot released; no implementation-copy run",
+  "verified_at": "2026-10-14T17:46:19.781169+00:00",
+  "source_commit": "bc3fccb546a22baaef180fcd57b3291a44e0e4c1",
+  "report": "/private/tmp/lamp-third-schedule-bc3fccb546-baseline.json",
+  "report_sha256": "6eccdd1b6d82bd03cc1b7dc8d44e694b8d6a5ffd2c3c4beadc5bde6e260907e0",
+  "report_bytes": 457504,
+  "status": "passed",
+  "source_file_count": 1437,
+  "helpers_unchanged": {
+    "crates/actions/examples/schedule_off_actions.rs": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1",
+    "crates/voice/examples/schedule_off_voice.rs": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+  },
+  "source_tree_exactly_matches_original_files_plus_helpers": true,
+  "local_manifests": 34,
+  "all_local_manifests_inside_source_copy": true,
+  "case_count": 72,
+  "stdout_readings": 144,
+  "empty_stderr_readings": 144,
+  "distinct_stdout_payloads": 3,
+  "old_evidence_paths_unchanged": 820,
+  "invalid_relative_paths_not_created": true,
+  "raw_logs": {
+    "/private/tmp/lamp-third-schedule-bc3fccb546-baseline-prepare-first.txt": {
+      "bytes": 710,
+      "sha256": "03b48486052cbcf416f0cc18aaca1fb541f98c2fce893c905b60747c536f0c39"
+    },
+    "/private/tmp/lamp-third-schedule-bc3fccb546-baseline-build-first.txt": {
+      "bytes": 4623,
+      "sha256": "43943ae5d4ef2a0a5c4866eb5207a19f7c8012810fb5d7d732696e6347440c65"
+    },
+    "/private/tmp/lamp-third-schedule-bc3fccb546-baseline-capture-first.txt": {
+      "bytes": 2305,
+      "sha256": "6316fcc9b2403121031c5a6d5bd6f1c9c8e29530da079c41abc607b8c3fc0e95"
+    }
+  },
+  "metadata_file": "/private/tmp/lamp-third-schedule-bc3fccb546-baseline-kol5y_lz/evidence/cargo-metadata.json",
+  "metadata_sha256": "a08eca3301fc1eff081ce40d55c19f6f245c452c36bb7284181341ba81f9fc2c",
+  "dcc_baseline_and_implementation_reports_still_absent": true
+}

@@ -1,0 +1,129 @@
+{
+  "purpose": "Focused validation after the follow-up ordering fix and bc3 integration; not a passing full gate",
+  "machine": "Intel i7-10700K x86_64 Mac; macOS 26.6.2/Darwin 25.6.0; 64 GiB RAM; no lamp or live provider",
+  "extra_environment": {
+    "RUST_BACKTRACE": "1"
+  },
+  "source_manifest": "/private/tmp/lamp-third-schedule-voice-bc3-source-frozen.json",
+  "source_sha256": "5a838e0329e14d9880e2e151003ea5721394682df62e24717014231263b25059",
+  "steps": [
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.760165569,
+      "log": "/private/tmp/lamp-third-schedule-bc3-focused-first-format.txt",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-schedule",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 33.976055956,
+      "log": "/private/tmp/lamp-third-schedule-bc3-focused-first-clippy.txt",
+      "log_sha256": "4ae023c274224b2ef5383540d6e7c5bb46f5380498bbdc30d721d951d82fef46",
+      "source_unchanged": true
+    },
+    {
+      "name": "reminder",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "reminder",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 45.899190283,
+      "log": "/private/tmp/lamp-third-schedule-bc3-focused-first-reminder.txt",
+      "log_sha256": "f0846b730d1fa6156f6b5c7bb257ed458e5aa262a6970e9f85dbcebc6e0afa80",
+      "counts": {
+        "harnesses": 1,
+        "passed": 70,
+        "failed": 0,
+        "ignored": 2
+      },
+      "source_unchanged": true
+    },
+    {
+      "name": "second-look",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_look::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.3091673910000026,
+      "log": "/private/tmp/lamp-third-schedule-bc3-focused-first-second-look.txt",
+      "log_sha256": "5bcde32a91dec9f8aa29f074dca5f9689db1c674d3f259753ee2277bea4a5c81",
+      "counts": {
+        "harnesses": 1,
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      },
+      "source_unchanged": true
+    },
+    {
+      "name": "tools",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "tools::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.2690765939999977,
+      "log": "/private/tmp/lamp-third-schedule-bc3-focused-first-tools.txt",
+      "log_sha256": "0e7a6ac37a8005a696ad8ade757dbfddab73066f7740900ed0ea0bbe8d969b4b",
+      "counts": {
+        "harnesses": 1,
+        "passed": 18,
+        "failed": 0,
+        "ignored": 0
+      },
+      "source_unchanged": true
+    }
+  ]
+}

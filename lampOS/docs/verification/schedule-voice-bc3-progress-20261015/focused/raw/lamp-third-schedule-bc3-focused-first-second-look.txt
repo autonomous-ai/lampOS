@@ -1,0 +1,15 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/lamp_voice-04f83e70e13d855a)
+
+running 8 tests
+test second_look::tests::a_name_that_began_after_the_person_had_stopped_is_not_that_requests ... ok
+test second_look::tests::a_request_called_by_name_that_got_nothing_is_owed_a_second_look_once ... ok
+test second_look::tests::a_request_the_model_was_told_in_is_not_asked_about_again ... ok
+test second_look::tests::a_second_look_is_for_the_session_that_heard_the_call ... ok
+test second_look::tests::another_turns_ending_does_not_settle_the_request_in_hand ... ok
+test second_look::tests::nothing_is_owed_when_it_answered_or_was_not_called_or_was_called_faintly ... ok
+test second_look::tests::someone_who_speaks_first_is_listened_to_and_a_stale_look_is_dropped ... ok
+test second_look::tests::the_plainest_hearing_in_a_request_is_the_one_that_counts ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 928 filtered out; finished in 0.00s
+

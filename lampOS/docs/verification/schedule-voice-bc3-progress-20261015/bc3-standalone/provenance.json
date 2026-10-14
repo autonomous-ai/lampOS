@@ -1,0 +1,641 @@
+{
+  "scope": "bc3 clean baseline and Task31 source-copy evidence only; host-only results, not a full affected-package gate or lamp qualification",
+  "base": "bc3fccb546a22baaef180fcd57b3291a44e0e4c1",
+  "machine": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "architecture": "x86_64",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)"
+  },
+  "reports": {
+    "baseline": {
+      "retained": "reports/baseline.json",
+      "bytes": 457504,
+      "sha256": "6eccdd1b6d82bd03cc1b7dc8d44e694b8d6a5ffd2c3c4beadc5bde6e260907e0"
+    },
+    "restricted": {
+      "retained": "reports/restricted.json",
+      "bytes": 524387,
+      "sha256": "bed27ef97d72232799d74bc4c954feeb4b0d8257178c7c6d9a8edc7ca48fc44f"
+    },
+    "socket-permitted": {
+      "retained": "reports/socket-permitted.json",
+      "bytes": 679704,
+      "sha256": "540244bdf77cef5aaf7095c4a3e988fa11da5339a92c2e836933fd4786b93d30"
+    }
+  },
+  "metadata": {
+    "baseline": {
+      "retained": "metadata/baseline.json",
+      "bytes": 2110854,
+      "sha256": "a08eca3301fc1eff081ce40d55c19f6f245c452c36bb7284181341ba81f9fc2c"
+    },
+    "restricted": {
+      "retained": "metadata/implementation.json",
+      "bytes": 2121009,
+      "sha256": "8dd1cc1af5bb0e84638090621d04464eb9eb887e1f49b250e547ee86c4c87920"
+    },
+    "socket-permitted": {
+      "retained": "metadata/implementation.json",
+      "bytes": 2121009,
+      "sha256": "8dd1cc1af5bb0e84638090621d04464eb9eb887e1f49b250e547ee86c4c87920"
+    }
+  },
+  "frozen_source_map": {
+    "retained": "source/frozen-gate-map.json",
+    "bytes": 73280,
+    "sha256": "5a838e0329e14d9880e2e151003ea5721394682df62e24717014231263b25059"
+  },
+  "frozen_runtime_paths": 676,
+  "source_corpora": {
+    "baseline": {
+      "source_files": 1437,
+      "source_bytes_excluding_helpers": 22459378,
+      "helpers": [
+        {
+          "original_relative": "crates/actions/examples/schedule_off_actions.rs",
+          "retained": "helpers/schedule_off_actions.rs.txt",
+          "bytes": 179,
+          "sha256": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1"
+        },
+        {
+          "original_relative": "crates/voice/examples/schedule_off_voice.rs",
+          "retained": "helpers/schedule_off_voice.rs.txt",
+          "bytes": 1576,
+          "sha256": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+        }
+      ],
+      "helper_files": 2,
+      "helper_bytes": 1755
+    },
+    "implementation": {
+      "source_files": 1455,
+      "source_bytes_excluding_helpers": 22890565,
+      "helpers": [
+        {
+          "original_relative": "crates/actions/examples/schedule_off_actions.rs",
+          "retained": "helpers/schedule_off_actions.rs.txt",
+          "bytes": 179,
+          "sha256": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1"
+        },
+        {
+          "original_relative": "crates/voice/examples/schedule_off_voice.rs",
+          "retained": "helpers/schedule_off_voice.rs.txt",
+          "bytes": 1576,
+          "sha256": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+        }
+      ],
+      "helper_files": 2,
+      "helper_bytes": 1755
+    }
+  },
+  "implementation_task_overlays": 46,
+  "omitted_untracked_nonruntime_paths": 399,
+  "local_manifests_per_copy": 34,
+  "all_local_manifests_resolve_inside_their_copy": true,
+  "comparison": {
+    "cases": 72,
+    "profiles": [
+      "ordinary",
+      "tasks"
+    ],
+    "values_per_switch": [
+      null,
+      "off",
+      "ON",
+      "true",
+      "1",
+      " on "
+    ],
+    "switches": [
+      "LAMP_SCHEDULE_TOOLS",
+      "LAMP_SCHEDULE_SPEAK"
+    ],
+    "baseline_stdout_readings": 144,
+    "implementation_stdout_readings": 144,
+    "baseline_empty_stderr_readings": 144,
+    "implementation_empty_stderr_readings": 144,
+    "baseline_stdout_bytes": 562392,
+    "implementation_stdout_bytes": 562392,
+    "exact_byte_comparisons_passed": 144,
+    "distinct_stdout_payloads": 3,
+    "distinct_stdout_bytes": 14428,
+    "output_normalization": "none",
+    "same_absolute_fixture_paths_used_on_both_sides": true
+  },
+  "baseline_build": {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-actions",
+      "-p",
+      "lamp-voice",
+      "--example",
+      "schedule_off_actions",
+      "--example",
+      "schedule_off_voice"
+    ],
+    "cwd": "/private/tmp/lamp-third-schedule-bc3fccb546-baseline-kol5y_lz/lampOS",
+    "exit_code": 0,
+    "elapsed_seconds": 29.957836366000002,
+    "log": "/private/tmp/lamp-third-schedule-bc3fccb546-baseline-build-first.txt",
+    "target_directory": "/private/tmp/lamp-third-schedule-bc3fccb546-baseline-kol5y_lz/lampOS/target"
+  },
+  "restricted_stages": [
+    {
+      "name": "workspace-build-first",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ],
+      "cwd": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/lampOS",
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence/workspace-build-first.txt",
+      "exit_code": 0,
+      "elapsed_seconds": 86.940103741,
+      "timed_out": false
+    },
+    {
+      "name": "helper-build-first",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-voice",
+        "--example",
+        "schedule_off_actions",
+        "--example",
+        "schedule_off_voice"
+      ],
+      "cwd": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/lampOS",
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence/helper-build-first.txt",
+      "exit_code": 0,
+      "elapsed_seconds": 28.38371515499999,
+      "timed_out": false
+    },
+    {
+      "name": "actions-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "--all-targets",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/lampOS",
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence/actions-tests-first.txt",
+      "exit_code": 101,
+      "elapsed_seconds": 55.706211999999994,
+      "timed_out": false,
+      "test_summaries": [
+        {
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 1,
+          "failed": 13,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        }
+      ],
+      "test_totals": {
+        "passed": 16,
+        "failed": 13,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      }
+    }
+  ],
+  "restricted_test_executions": {
+    "passed": 16,
+    "failed": 13,
+    "ignored": 0
+  },
+  "restricted_failure_classification": {
+    "direct_permission_denied_socket_errors": 9,
+    "readiness_timeouts_without_individual_permission_proof": 4
+  },
+  "restricted_not_reached": [
+    "schedule-tests-first",
+    "voice-reminder-tests-first",
+    "voice-tools-tests-first",
+    "default-off comparisons"
+  ],
+  "socket_permitted_stages": [
+    {
+      "name": "workspace-build-first",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ],
+      "cwd": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/lampOS",
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence-socket-permitted/workspace-build-first.txt",
+      "exit_code": 0,
+      "elapsed_seconds": 0.46833282900000006,
+      "timed_out": false
+    },
+    {
+      "name": "helper-build-first",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-voice",
+        "--example",
+        "schedule_off_actions",
+        "--example",
+        "schedule_off_voice"
+      ],
+      "cwd": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/lampOS",
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence-socket-permitted/helper-build-first.txt",
+      "exit_code": 0,
+      "elapsed_seconds": 0.25090067900000035,
+      "timed_out": false
+    },
+    {
+      "name": "actions-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "--all-targets",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/lampOS",
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence-socket-permitted/actions-tests-first.txt",
+      "exit_code": 0,
+      "elapsed_seconds": 15.638498341000002,
+      "timed_out": false,
+      "test_summaries": [
+        {
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 14,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        }
+      ],
+      "test_totals": {
+        "passed": 33,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      }
+    },
+    {
+      "name": "schedule-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-schedule",
+        "--all-targets",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/lampOS",
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence-socket-permitted/schedule-tests-first.txt",
+      "exit_code": 0,
+      "elapsed_seconds": 36.943134892,
+      "timed_out": false,
+      "test_summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 37,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 7,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 24,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 36,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 18,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 21,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        },
+        {
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 0
+        }
+      ],
+      "test_totals": {
+        "passed": 160,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      }
+    },
+    {
+      "name": "voice-reminder-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "reminder",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/lampOS",
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence-socket-permitted/voice-reminder-tests-first.txt",
+      "exit_code": 0,
+      "elapsed_seconds": 34.568786856,
+      "timed_out": false,
+      "test_summaries": [
+        {
+          "passed": 70,
+          "failed": 0,
+          "ignored": 2,
+          "measured": 0,
+          "filtered_out": 864
+        }
+      ],
+      "test_totals": {
+        "passed": 70,
+        "failed": 0,
+        "ignored": 2,
+        "measured": 0,
+        "filtered_out": 864
+      }
+    },
+    {
+      "name": "voice-tools-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "tools",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/lampOS",
+      "log": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/evidence-socket-permitted/voice-tools-tests-first.txt",
+      "exit_code": 0,
+      "elapsed_seconds": 2.3625021260000096,
+      "timed_out": false,
+      "test_summaries": [
+        {
+          "passed": 19,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 917
+        }
+      ],
+      "test_totals": {
+        "passed": 19,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 917
+      }
+    }
+  ],
+  "socket_permitted_test_executions": {
+    "passed": 282,
+    "failed": 0,
+    "ignored": 2
+  },
+  "socket_permitted_stage_skips": [],
+  "socket_permitted_ignored_tests": 2,
+  "permission_boundary": "Parent-authorized sandbox escalation for local Unix sockets. No automatic approval rejection, provider access or device access. Source and assertions were not changed between attempts.",
+  "environment_allowlist": [
+    "HOME",
+    "PATH",
+    "LANG",
+    "LC_ALL",
+    "TMPDIR",
+    "CARGO_HOME",
+    "RUSTUP_HOME"
+  ],
+  "cargo_target_directory": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/lampOS/target",
+  "timeouts_seconds": {
+    "each_cargo_stage": 1200,
+    "cargo_metadata": 60,
+    "each_helper_invocation": 10,
+    "termination_grace": 5
+  },
+  "timing_boundary": "Elapsed monotonic host wall time around each Cargo subprocess, including launch/wait and reading/parsing its output log. Permitted build times are cached repeat builds. No device, audio or end-to-end latency is inferred.",
+  "source_check_boundary": "Source/helper file set and bytes, frozen map, baseline report, older evidence and live main frozen runtime hashes were checked before and after stages during execution. Final standalone filesystem audit does not depend on subsequently rebased main.",
+  "excluded_files": [
+    {
+      "path": "/private/tmp/lamp-third-schedule-bc3fccb546-baseline-prepare.py",
+      "bytes": 4144,
+      "sha256": "6cfa463b0fbabcf6e5ec5eaae418ee462b99b5129eea6d864a29c7150ab7446f",
+      "reason": "Scratch orchestration script excluded; no Python files are retained. Exact Cargo/helper commands, limits and outputs are retained."
+    },
+    {
+      "path": "/private/tmp/lamp-third-schedule-bc3fccb546-baseline-capture.py",
+      "bytes": 9221,
+      "sha256": "a96e4ad70f7dfccea18600be57846097a69ae999a8847ee0c4a37bc8a6061fc9",
+      "reason": "Scratch orchestration script excluded; no Python files are retained. Exact Cargo/helper commands, limits and outputs are retained."
+    },
+    {
+      "path": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-prepare.py",
+      "bytes": 7707,
+      "sha256": "705bdc7685629890ea829842c9b666c2d3bf0a334a9d02b9f9197c522631548d",
+      "reason": "Scratch orchestration script excluded; no Python files are retained. Exact Cargo/helper commands, limits and outputs are retained."
+    },
+    {
+      "path": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-run.py",
+      "bytes": 10185,
+      "sha256": "c2e1bf13031b325747b471e89f1bc6897cb462dd2f89960a56d38a7b34879bb3",
+      "reason": "Scratch orchestration script excluded; no Python files are retained. Exact Cargo/helper commands, limits and outputs are retained."
+    },
+    {
+      "path": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-socket-permitted-run.py",
+      "bytes": 10202,
+      "sha256": "0d7c5b745005f54e5abcff028d80c97500aa99e698c93be6893520ef58fb65f4",
+      "reason": "Scratch orchestration script excluded; no Python files are retained. Exact Cargo/helper commands, limits and outputs are retained."
+    },
+    {
+      "path": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-audit.py",
+      "bytes": 2950,
+      "sha256": "18baddabee4a49376417cd54a2db67bd338c0910f01c39bf0769c52f5160521b",
+      "reason": "Scratch orchestration script excluded; no Python files are retained. Exact Cargo/helper commands, limits and outputs are retained."
+    },
+    {
+      "path": "/private/tmp/lamp-third-schedule-bc3fccb546-baseline.tar",
+      "bytes": 23705600,
+      "sha256": "be9ce5ac674eba849c83e926d2c115da80641a608b29d327c1bf427654d5945f",
+      "reason": "Source tar archive excluded; exact source maps, archive command and hash remain in original reports."
+    },
+    {
+      "path": "/private/tmp/lamp-third-schedule-bc3fccb546-baseline-kol5y_lz/lampOS/target/debug/examples/schedule_off_actions",
+      "bytes": 800576,
+      "sha256": "e3d9654a12800a9e8a7217771cb38faca48a94e903df935e21e727144f592054",
+      "reason": "Compiled executable excluded. Binary identity remains in the original report; no target directory is retained."
+    },
+    {
+      "path": "/private/tmp/lamp-third-schedule-bc3fccb546-baseline-kol5y_lz/lampOS/target/debug/examples/schedule_off_voice",
+      "bytes": 1904688,
+      "sha256": "e6f7242aeff47e8e61aacc609b2af3d648ffc2e9332b43747748c23257aa1e4b",
+      "reason": "Compiled executable excluded. Binary identity remains in the original report; no target directory is retained."
+    },
+    {
+      "path": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-head.tar",
+      "bytes": 23705600,
+      "sha256": "be9ce5ac674eba849c83e926d2c115da80641a608b29d327c1bf427654d5945f",
+      "reason": "Source tar archive excluded; exact source maps, archive command and hash remain in original reports."
+    },
+    {
+      "path": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/lampOS/target/debug/examples/schedule_off_actions",
+      "bytes": 802352,
+      "sha256": "7a4c736463f69a1b7591546e3511e10bd3b3ef3c3216db608f5f3119ffb57f7a",
+      "reason": "Compiled executable excluded. Binary identity remains in the original report; no target directory is retained."
+    },
+    {
+      "path": "/private/tmp/lamp-third-schedule-voice-bc3-standalone-bppy6qa8/lampOS/target/debug/examples/schedule_off_voice",
+      "bytes": 1986464,
+      "sha256": "e81a9610cb1fb71e903f43e17ef249127d59621e3a4fadfaeb1baf1f43a91ec2",
+      "reason": "Compiled executable excluded. Binary identity remains in the original report; no target directory is retained."
+    }
+  ],
+  "historical_reference_policy": "Original reports preserve old_evidence_sha256 and older scratch-report paths verbatim. They record preservation checks at execution time. Historical 7f/dcc and earlier evidence stays in the parent verification folder; it is not duplicated or relabeled here. The current baseline/source-copy reports, logs, metadata, helper bytes and every raw comparison reading are retained and mapped by retention-index.json.",
+  "limitations": [
+    "This scope does not run the complete Voice or Tasks packages; a full affected-package gate belongs to a separate source identity.",
+    "The 282 passed test executions may include overlap between filtered Voice suites and are not a unique-test count.",
+    "This standalone run used the broader Voice filter tools (19 passes). The separate focused main-worktree run used tools:: (18 passes); these command scopes are distinct.",
+    "Two ignored reminder probes were not executed.",
+    "Helpers cover the public Actions catalog, Voice environment arguments, declared tools, a fixed old-name route list, and ordinary Written serialization.",
+    "Tasks declares 17 tools including check_agent_task; the unchanged helper route list does not directly route-check that newer name.",
+    "The helpers do not compare new End.sound serialization, provider sessions, live audio, Unix sockets, motor hardware, or lamp timing.",
+    "The exact comparison uses the same retained fixture paths on both sides. Path-bearing payload hashes are specific to this paired run.",
+    "No lamp, provider, deployment or SSH operation occurred."
+  ]
+}

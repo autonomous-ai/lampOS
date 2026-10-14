@@ -1,0 +1,4 @@
+// Scratch-only baseline helper: no service, socket, hardware or tool execution.
+fn main() {
+    println!("{}", lamp_actions::catalog_file(&lamp_actions::catalog(true, true)));
+}
