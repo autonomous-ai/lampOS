@@ -31,3 +31,10 @@ No passing whole-workspace ARM64 test run, released artifact, lamp install,
 real cleanup, or device result. The task remains on `fourth/records-exit`
 and is not ready for `lamp-voice`. A corrected workflow must execute the
 tests with meaningful permission semantics and pass the required gate.
+
+The unchanged permission failure recurred for Fourth's judge audit at
+`2c779b0c9b842bc397f65bbb99ecd6cf2898b21b`, run **38554639358**, job
+115820631943. Release workspace build passed; Surround selection had 15
+passes and the same one failure. `judge-fit-ci-failed-step.txt` is the raw
+failed step. Neither task was merged. First subsequently changed the runner
+to an ordinary user at `91a0fdb3a`; reruns after rebasing are separate evidence.

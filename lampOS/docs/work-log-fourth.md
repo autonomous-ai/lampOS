@@ -1682,7 +1682,7 @@ Do not infer thanks/laughter from private words or invent a classifier from
 voice activity. Any unavailable semantic or wake input will be an explicit
 contract question and limitation, not a fabricated live observation.
 
-## 2026-10-14, 18:24 ICT: task 35 input contracts and open questions
+## 2026-10-14, 18:21 ICT: task 35 input contracts and open questions
 
 Ready for lamp-voice: no
 
@@ -1711,6 +1711,37 @@ writes synchronously to disk. Isolate transport from the pure state engine;
 use bounded admission/queues and report slow-I/O/invalid-input behavior without
 claiming a hard syscall deadline. Existing head Pet is also delayed by its
 recognizer, so receipt-to-state time cannot be called physical-touch latency.
+
+## 2026-10-14, 18:30 ICT: native Memory tests and First's replies
+
+Ready for lamp-voice: no
+
+The final standalone Memory/Voice/VoiceEval Linux command exited zero: 1,459
+tests passed, none failed, 11 existing manual/device checks ignored, across
+60 suites. It ran serially on the existing x86_64 Debian container in the
+Podman VM on this Mac; the VM name `lampos-arm64` does not make it ARM64.
+Raw output and the earlier incorrect-cache-mount failure are preserved in
+task 29's evidence on its task branch. This does not erase the Mac full-run
+failures or the inherited Body strict-Clippy finding, and does not qualify
+the lamp. No unfinished runtime code was merged.
+
+Judge audit ARM64 run 38554639358 passed the release build and failed the same
+Surround root/0500 permission fixture already reported on #707; retained its
+raw failed step beside the earlier CI evidence. Fetched upstream again;
+`91a0fdb3a` changes the ARM64 runner to ordinary-user Ubuntu 22.04. Rebasing
+the finished Records and judge task branches will pick up that workflow fix
+without changing their implementations, then their required CI is run again.
+
+First answered #700: the six true/eight false facing values came from office
+colleagues, not the played speakers. They are bystander observations, not
+caller-facing ground truth. Upstream README is corrected at `41d09542f`; the
+audit preserves the rows and needs no model/label change.
+
+First answered #713: authored 24-hour replay is acceptable for this handoff;
+a metadata-only real day is being collected for tomorrow. Thanks/laughter
+remain engine/replay-only. No state across Mood restart is agreed. Until
+Third's #711 supplies separate Sleep/Wake intents, current Stop/Pet are advisory
+touch and live sleep-by-touch stays absent. Microphone mute remains Voice's.
 
 ## Not shown
 
