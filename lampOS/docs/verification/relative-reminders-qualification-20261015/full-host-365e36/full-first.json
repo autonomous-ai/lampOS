@@ -1,0 +1,58 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-actions",
+    "-p",
+    "lamp-voice",
+    "-p",
+    "lamp-voice-eval",
+    "-p",
+    "lamp-memory",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/Users/d/code/autonomous-os/lampOS",
+  "started_at": "2026-10-14T22:06:17.892286+00:00",
+  "finished_at": "2026-10-14T22:34:26.806898+00:00",
+  "elapsed_seconds": 1688.8147677910001,
+  "exit_code": 101,
+  "outer_timeout_seconds": 7200,
+  "outer_timeout_expired": false,
+  "machine": "Third Intel i7-10700K x86_64 Mac; macOS 26.6.2/Darwin 25.6.0; 64 GiB RAM; Rust/Cargo 1.96.0; no lamp or live provider",
+  "extra_environment": {
+    "RUST_BACKTRACE": "1"
+  },
+  "observed_head": "365e36dbcd78ff247adf30b2d18afd4d9d6f1065",
+  "source_manifest": "/private/tmp/lamp-third-relative-source-frozen.json",
+  "source_manifest_sha256": "517af82a7dde4930ccacc48934bd635dd59df983b9d410e9b8c49e2917822c1c",
+  "source_paths": 711,
+  "source_unchanged": true,
+  "log": "/private/tmp/lamp-third-relative-full-first-tests.txt",
+  "log_bytes": 168637,
+  "log_sha256": "90a283e23d435aad9aac22cbba9fff167dd87429a4caea0ef1b195ec10c8046e",
+  "counts": {
+    "harnesses": 65,
+    "passed": 1604,
+    "failed": 2,
+    "ignored": 13
+  },
+  "failed_tests": [
+    "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+    "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement"
+  ],
+  "pre_run_voice_binary": {
+    "captured_at": "2026-10-14T22:06:17.819274+00:00",
+    "binary": "/Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-a714350f33563503",
+    "bytes": 43522696,
+    "sha256": "2baf1c79df5796b498857231db44e5ae5c4627d84b5f80f02b71ee7985f63117",
+    "source_head": "365e36dbcd78ff247adf30b2d18afd4d9d6f1065",
+    "source_map_sha256": "517af82a7dde4930ccacc48934bd635dd59df983b9d410e9b8c49e2917822c1c"
+  },
+  "voice_binary_unchanged": true,
+  "limits": "Complete serial affected-package host attempt, includes dev dependents. Test/process duration only; no live model or lamp. Failures remain failures; no retry or exception inferred."
+}

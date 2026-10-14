@@ -2586,6 +2586,56 @@ The [qualification index](verification/relative-reminders-qualification-20261015
 retains the pre-run test-binary identity. Actual model choice and elapsed
 reminder delivery remain First's lamp check; no provider or lamp was accessed.
 
+## 2026-10-15 — Relative reminder terminal gates retained; not ready
+
+Ready for lamp-voice: no
+
+Task head remains `365e36dbcd78ff247adf30b2d18afd4d9d6f1065`. Native ARM64
+run [38644608947](https://github.com/autonomous-ai/lampOS/actions/runs/38644608947)
+passed: **4,410 / 0 / 35**, across 286 harnesses. The release workspace build,
+serial tests, checksum generation and artifact upload succeeded on GitHub's
+Ubuntu 22.04 ARM64 runner, Rust 1.96.0. Four inherited `replay_cost` filename
+warnings are retained. Only Actions needs installation for this follow-up:
+SHA-256 `2c4aad6713b74ccccf55e5c2b6138f88ec8af9b5dc8d898b34138c320e6e4588`.
+Voice and Schedule checksums match the original qualified Task 31 binaries.
+[Native metadata, raw output and checksums](verification/relative-reminders-qualification-20261015/native-365e36/README.md)
+identify this CI result; it is not a lamp result.
+
+The complete serial Mac gate **failed: 1,604 / 2 / 13**, 65 harnesses, exit
+101, in 1,688.814767791 seconds. It used the same Third Intel x86_64 Mac and
+`cargo test --offline --locked -p lamp-actions -p lamp-voice -p lamp-voice-eval -p lamp-memory --no-fail-fast -- --test-threads=1`.
+Both failures were unchanged motor fixtures at `motor/tests.rs:441`:
+`owned child timed out: None`. Crash/stalled-control failed its reap wait at
+645; the crash/hang iteration was not recorded. Late-started-callback failed
+its initial Ready wait at 865, before the replacement assertions.
+
+Each ran once alone from the exact original test binary, without rebuilding:
+crash/stalled-control **failed again: 0 / 1 / 0**, 4.124137126 seconds;
+late-started-callback passed **1 / 0 / 0**, 3.102594479 seconds. Binary SHA-256
+`2baf1c79df5796b498857231db44e5ae5c4627d84b5f80f02b71ee7985f63117`
+matched before the full gate and before/after isolation. All 711 frozen source
+hashes stayed unchanged, and Voice source matches the integration base.
+[Every original run, command, hash and failure phase](verification/relative-reminders-qualification-20261015/full-host-365e36/README.md)
+is retained. No cause, successful complete Mac gate, fixture repair, assertion
+change or deadline change is claimed.
+
+Found, not mine: these fixtures belong to Fourth under #739. First's existing
+handoff condition requires an untouched full-gate failure to pass alone, so
+it is **not satisfied here**. The implementation, focused checks, independent
+copy checks and native run are complete, but this follow-up remains not ready.
+A draft PR will make the exact change and blocker reviewable while Third looks
+for the owner's fixture fix; no non-draft handoff or merge is authorized by
+these results. No lamp or real provider was accessed.
+
+The [22:15 Queue read](verification/relative-reminders-qualification-20261015/watch-2215-queue.json)
+and PR replies added no task or instruction; integration remained `cf2f5b43c`.
+Touch #711 still needs First and a person, and #699 stays after MVP.
+The [22:37 #739 read](verification/relative-reminders-qualification-20261015/dependency-2237-issue-739.json)
+finds Fourth's V6 qualification running on the same `cf2f5b43c` integration,
+with no open Fourth PR. Its Body clock-seam ownership question remains pending
+with First. Third will follow that work and requalify after an accepted fixture
+fix; the existing failure is not bypassed by repeated attempts.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

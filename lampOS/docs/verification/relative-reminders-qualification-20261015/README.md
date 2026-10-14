@@ -41,12 +41,32 @@ unchanged. The [parent byte audit](independent-copy-parent-verification.json)
 checked all 611 original-to-export mappings and every copied byte; the
 37-file text bundle retains command output and metadata without normalization.
 
-The complete serial host gate started at 22:06:17 UTC after the copy worker
-released Cargo. It tests Actions, Voice, Voice Eval and Memory with
-`--no-fail-fast -- --test-threads=1`; the
-[pre-run Voice test binary](test-binary-before-full.json) is identified before
-execution. No overlapping task-owned local Cargo work is planned.
+The [complete serial Mac gate](full-host-365e36/README.md) failed:
+**1,604 / 2 / 13**, across 65 harnesses, Cargo 101. It tested Actions, Voice,
+Voice Eval and Memory with `--no-fail-fast -- --test-threads=1`, after the copy
+worker released Cargo. Both failures are unchanged motor fixtures. One passed
+in its single isolated invocation; the crash/stalled-control case also failed
+alone at its reap wait. The [pre-run Voice binary](test-binary-before-full.json)
+matched before and after both isolated invocations; all 711 frozen paths stayed
+unchanged. No fixture, assertion, deadline or source was edited or rebuilt.
 Exact-head native ARM64 run [38644608947](https://github.com/autonomous-ai/lampOS/actions/runs/38644608947)
-is also running; [the initial run observation](native-first-runs.json) is not
-a terminal result. No ready PR is offered yet. These host checks establish
-published guidance and helper semantics, not live model choice or lamp timing.
+completed successfully: **4,410 / 0 / 35**, across 286 harnesses. The
+[terminal CI evidence and Actions checksum](native-365e36/README.md) retain
+all original output, four inherited filename warnings and successful artifact
+upload. Voice and Schedule binary checksums equal the original qualified
+binaries; only Actions needs replacement for this follow-up. First's existing
+#739 handoff condition is not met because one untouched fixture also failed
+alone. The follow-up stays not ready; Fourth owns the fixture repair. These
+host checks establish published guidance and helper semantics, not live model
+choice or lamp timing.
+
+The [22:15 Queue read](watch-2215-queue.json) and
+[PR replies](watch-2215-pr-747.json) add no task or instruction. Integration
+remains `cf2f5b43c`; [touch](watch-2215-issue-711.json) still needs First and a
+person beside the lamp, and #699 remains deferred until after the MVP.
+
+The [22:37 fixture-owner issue read](dependency-2237-issue-739.json) finds
+Fourth's V6 qualification running on `cf2f5b43c`, with no ready result and
+[no open Fourth PR](dependency-2237-fourth-prs.json). Its Body clock-seam scope
+question remains pending with First. Third has not changed those fixtures or
+that separate task; a draft follow-up PR will expose this gate blocker.

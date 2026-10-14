@@ -1,0 +1,56 @@
+{
+  "verified_at": "2026-10-14T22:36:39.712605+00:00",
+  "head": "365e36dbcd78ff247adf30b2d18afd4d9d6f1065",
+  "retained_originals": [
+    {
+      "file": "full-first.json",
+      "original": "/private/tmp/lamp-third-relative-full-first.json",
+      "bytes": 2185,
+      "sha256": "de8411f388d1a952df136ea3774f5105d7d9259bee8239b23807242bbcfa9c21"
+    },
+    {
+      "file": "full-first-tests.txt",
+      "original": "/private/tmp/lamp-third-relative-full-first-tests.txt",
+      "bytes": 168637,
+      "sha256": "90a283e23d435aad9aac22cbba9fff167dd87429a4caea0ef1b195ec10c8046e"
+    },
+    {
+      "file": "isolated-first.json",
+      "original": "/private/tmp/lamp-third-relative-isolated-first.json",
+      "bytes": 3860,
+      "sha256": "ff5ca7b2a853ea2c2d5cb63ee86bba4e0508d5192a8cf06fed723954b867861a"
+    },
+    {
+      "file": "isolated-first-1.txt",
+      "original": "/private/tmp/lamp-third-relative-isolated-first-1.txt",
+      "bytes": 1852,
+      "sha256": "3b03585c8c1bba9650862f30a2fe3e0254721db60c8d45741ab9daa1fb457d81"
+    },
+    {
+      "file": "isolated-first-2.txt",
+      "original": "/private/tmp/lamp-third-relative-isolated-first-2.txt",
+      "bytes": 223,
+      "sha256": "c966ee541c7a8e7df7c9eb10a7f83198891b7b681c6e8a0491a5405d527e48e4"
+    }
+  ],
+  "full_counts": {
+    "harnesses": 65,
+    "passed": 1604,
+    "failed": 2,
+    "ignored": 13
+  },
+  "full_exit_code": 101,
+  "isolated_exit_codes": [
+    101,
+    0
+  ],
+  "source_unchanged": true,
+  "test_binary_unchanged": true,
+  "handoff_condition_satisfied": false,
+  "readiness": "no",
+  "failure_phases": {
+    "crash_and_stalled_control_never_allow_replacement_or_false_cleanup": "Full and isolated failure: reaped predicate at motor/tests.rs:645, through line-441 wait. Crash/hang iteration not recorded.",
+    "late_started_callback_cannot_restore_an_offer_after_owner_replacement": "Full failure: initial is_ready predicate at motor/tests.rs:865, through line-441 wait; passed once alone."
+  },
+  "limits": "No cause inferred. No test/source/assertion/deadline edit or test rebuild. No full-gate rerun. Native CI is a separate passing result, not a relabelling of this failed Mac gate."
+}

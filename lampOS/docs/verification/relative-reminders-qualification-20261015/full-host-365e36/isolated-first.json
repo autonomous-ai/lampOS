@@ -1,0 +1,81 @@
+{
+  "source_head": "365e36dbcd78ff247adf30b2d18afd4d9d6f1065",
+  "integration_base": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "full_gate": "/private/tmp/lamp-third-relative-full-first.json",
+  "full_gate_sha256": "de8411f388d1a952df136ea3774f5105d7d9259bee8239b23807242bbcfa9c21",
+  "machine": "Third Intel i7-10700K x86_64 Mac; macOS 26.6.2/Darwin 25.6.0; 64 GiB RAM; Rust/Cargo 1.96.0; no lamp or live provider",
+  "source_map_sha256": "517af82a7dde4930ccacc48934bd635dd59df983b9d410e9b8c49e2917822c1c",
+  "source_paths": 711,
+  "fixture": "crates/voice/src/coordinator/motor/tests.rs",
+  "fixture_sha256": "62d1f0b5746ecca1167bc02ce0377cf24d2a94ff3e1e73b92aa972d2ab67af33",
+  "fixture_equals_base": true,
+  "voice_source_diff_from_base_empty": true,
+  "binary": "/Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-a714350f33563503",
+  "binary_sha256_before_full": "2baf1c79df5796b498857231db44e5ae5c4627d84b5f80f02b71ee7985f63117",
+  "binary_sha256_before_isolation": "2baf1c79df5796b498857231db44e5ae5c4627d84b5f80f02b71ee7985f63117",
+  "invocations": [
+    {
+      "test": "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+      "command": [
+        "/Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-a714350f33563503",
+        "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/d/code/autonomous-os/lampOS/crates/voice",
+      "extra_environment": {
+        "RUST_BACKTRACE": "1"
+      },
+      "started_at": "2026-10-14T22:35:34.493460+00:00",
+      "finished_at": "2026-10-14T22:35:38.618324+00:00",
+      "elapsed_seconds": 4.124137126,
+      "exit_code": 101,
+      "outer_timeout_seconds": 120,
+      "outer_timeout_expired": false,
+      "log": "/private/tmp/lamp-third-relative-isolated-first-1.txt",
+      "log_sha256": "3b03585c8c1bba9650862f30a2fe3e0254721db60c8d45741ab9daa1fb457d81",
+      "counts": {
+        "harnesses": 1,
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      },
+      "binary_unchanged": true,
+      "source_unchanged": true
+    },
+    {
+      "test": "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement",
+      "command": [
+        "/Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-a714350f33563503",
+        "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "cwd": "/Users/d/code/autonomous-os/lampOS/crates/voice",
+      "extra_environment": {
+        "RUST_BACKTRACE": "1"
+      },
+      "started_at": "2026-10-14T22:35:38.761198+00:00",
+      "finished_at": "2026-10-14T22:35:41.863930+00:00",
+      "elapsed_seconds": 3.1025944789999995,
+      "exit_code": 0,
+      "outer_timeout_seconds": 120,
+      "outer_timeout_expired": false,
+      "log": "/private/tmp/lamp-third-relative-isolated-first-2.txt",
+      "log_sha256": "c966ee541c7a8e7df7c9eb10a7f83198891b7b681c6e8a0491a5405d527e48e4",
+      "counts": {
+        "harnesses": 1,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "binary_unchanged": true,
+      "source_unchanged": true
+    }
+  ],
+  "scope_answer": "https://github.com/autonomous-ai/lampOS/issues/709#issuecomment-6176285386",
+  "limits": "One isolated invocation per failed test, directly using the exact original full-gate binary. No rebuild, code/fixture/assertion/deadline edit, or full-gate retry. The original full gate remains failed; no timing-failure cause or lamp result inferred.",
+  "binary_sha256_after_isolation": "2baf1c79df5796b498857231db44e5ae5c4627d84b5f80f02b71ee7985f63117",
+  "source_unchanged": true,
+  "finished_at": "2026-10-14T22:35:42.146427+00:00"
+}

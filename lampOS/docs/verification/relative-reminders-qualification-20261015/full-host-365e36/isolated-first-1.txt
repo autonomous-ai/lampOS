@@ -1,0 +1,33 @@
+
+running 1 test
+test coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup ... FAILED
+
+failures:
+
+---- coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup stdout ----
+
+thread 'coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup' (114224674) panicked at crates/voice/src/coordinator/motor/tests.rs:441:9:
+owned child timed out: None
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: lamp_voice::coordinator::motor::tests::wait
+             at ./src/coordinator/motor/tests.rs:441:9
+   3: lamp_voice::coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup
+             at ./src/coordinator/motor/tests.rs:645:9
+   4: lamp_voice::coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup::{{closure}}
+             at ./src/coordinator/motor/tests.rs:642:72
+   5: core::ops::function::FnOnce::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 955 filtered out; finished in 2.87s
+

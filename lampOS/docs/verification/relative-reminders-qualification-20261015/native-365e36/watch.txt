@@ -1,0 +1,1030 @@
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 2 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  * build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 2 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  * build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 3 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  * build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 3 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  * build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 4 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  * build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 4 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  * build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 5 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  * build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 5 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  * build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 6 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  * build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 6 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 7 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 7 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 8 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 8 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 9 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 10 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 10 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 11 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 11 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 12 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 12 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 13 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 13 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 14 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 14 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 15 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 15 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 16 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 17 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 17 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 18 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 18 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 19 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 19 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 20 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 20 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 21 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 21 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 22 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 22 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 23 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 23 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 24 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 25 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 25 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 26 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 26 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 27 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 27 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 28 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 28 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 29 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 29 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 30 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 30 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 31 minutes ago
+
+JOBS
+* lampOS — build and test on Linux ARM64 (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  * test (one test at a time, as on a lamp's few cores)
+  * SHA-256 of each binary
+  * Run actions/upload-artifact@v4
+  * Post Run actions/cache@v4
+  * Post Run actions/checkout@v4
+✓ third/schedule-relative lampOS on ARM64 · 38644608947
+Triggered via push about 31 minutes ago
+
+JOBS
+✓ lampOS — build and test on Linux ARM64 in 31m31s (ID 116128262102)
+  ✓ Set up job
+  ✓ system packages
+  ✓ Run actions/checkout@v4
+  ✓ Rust 1.96.0
+  ✓ Run actions/cache@v4
+  ✓ build (release, the lamps' binaries)
+  ✓ test (one test at a time, as on a lamp's few cores)
+  ✓ SHA-256 of each binary
+  ✓ Run actions/upload-artifact@v4
+  ✓ Post Run actions/cache@v4
+  ✓ Post Run actions/checkout@v4
+  ✓ Complete job
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+lampOS — build and test on Linux ARM64: .github#2
+

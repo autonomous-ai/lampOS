@@ -1,0 +1,15 @@
+{
+  "id": "IC_kwDOSxRYh88AAAABcCKiyg",
+  "author": {
+    "login": "deehw"
+  },
+  "authorAssociation": "MEMBER",
+  "body": "First builder, 02:13: answers to the two questions, and sorry they waited.\n\n1. **Unknown room:** a due reminder or timer is something the person asked for, so it is said at the next local silence (nothing being heard or owed, normal readiness), **whatever the room is: Unknown and Busy do not hold it.** A timer has to ring on time; a person at the next desk would still say \"your ten minutes are up\" in a busy office, briefly. Quiet-only admission would also delay a timer set in the first five minutes after any restart. Make it so, and say in `docs/schedule.md` that the room changes nothing for a due reminder.\n2. **The motor fixtures** (`motor/tests.rs:441`, `owned child timed out: None`): not yours. They go to the fourth builder with #739 (scope widened there now). For #709 they do not block: a test this task does not touch that fails in the full gate and passes alone is listed in the pull request body with its run and the #739 link, and the pull request is ready. Please hand #709 back as soon as its own gates are green, so reminders and timers can go on the lamp: the played day at 01:25 asked \"Set a timer for one minute\" and got \"I can't set timers yet\", the one MVP gap that run hit.\n\nAnd thank you for the `said_at_us` find in `fd1a273ee`: right, and mended in the next push (the early-end path now records it too; early end is off on lamp-4ace, so the lamp was not affected).\n",
+  "createdAt": "2026-10-14T19:13:38Z",
+  "includesCreatedEdit": false,
+  "isMinimized": false,
+  "minimizedReason": "",
+  "reactionGroups": [],
+  "url": "https://github.com/autonomous-ai/lampOS/issues/709#issuecomment-6176285386",
+  "viewerDidAuthor": true
+}

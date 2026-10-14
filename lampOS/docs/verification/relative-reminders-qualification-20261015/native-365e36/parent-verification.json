@@ -1,0 +1,50 @@
+{
+  "verified_at": "2026-10-14T22:34:07.384094+00:00",
+  "run_id": 38644608947,
+  "head": "365e36dbcd78ff247adf30b2d18afd4d9d6f1065",
+  "status": "completed",
+  "conclusion": "success",
+  "counts": {
+    "harnesses": 286,
+    "passed": 4410,
+    "failed": 0,
+    "ignored": 35
+  },
+  "all_jobs_succeeded": true,
+  "new_regression_passed": true,
+  "actions_sha256": "2c4aad6713b74ccccf55e5c2b6138f88ec8af9b5dc8d898b34138c320e6e4588",
+  "voice_and_schedule_checksums_equal_original_qualified_binaries": true,
+  "retained_originals": [
+    {
+      "file": "terminal.json",
+      "original": "/private/tmp/lamp-third-schedule-native-38644608947-terminal.json",
+      "bytes": 2563,
+      "sha256": "7a7e106f6657ad5680c717066ac540d158a64c0f55bd4b369d6b217366f87042"
+    },
+    {
+      "file": "terminal-log.txt",
+      "original": "/private/tmp/lamp-third-schedule-native-38644608947-terminal-log.txt",
+      "bytes": 1356793,
+      "sha256": "05f2f0c8273f323bde2b2c0a855ac6c99be3693a58a52b245ac58a9be5cfec90"
+    },
+    {
+      "file": "retention.json",
+      "original": "/private/tmp/lamp-third-schedule-native-38644608947-retention.json",
+      "bytes": 4817,
+      "sha256": "19fe8b937e9a865532ea5821869e0174228154a965bd21cfa0b7dc92f43dcb10"
+    },
+    {
+      "file": "watch.txt",
+      "original": "/private/tmp/lamp-third-relative-native-watch-38644608947.txt",
+      "bytes": 32513,
+      "sha256": "ac2df833828858075ce51a65b3f42aa31a225ed18c141d2b6fe9fcedf9ac6d93"
+    }
+  ],
+  "warnings": [
+    "lampOS \u2014 build and test on Linux ARM64\tbuild (release, the lamps' binaries)\t2026-10-14T22:01:55.8064875Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost",
+    "lampOS \u2014 build and test on Linux ARM64\tbuild (release, the lamps' binaries)\t2026-10-14T22:01:55.8069919Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T22:07:42.1284458Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T22:07:42.1288772Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+  ],
+  "limits": "GitHub Ubuntu 22.04 ARM64 CI, not lamp hardware. Checksums are CI-produced artifact identities. Only Actions is proposed for installation; no lamp or provider was accessed."
+}
