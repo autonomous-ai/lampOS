@@ -1,0 +1,24 @@
+{
+  "head": "5fa0f78d67442107bd5b9c000a9ff2e57d7c67d1",
+  "base": "dcc2e6b1ee67e11e2de89f893696432e47c4d8c5",
+  "exit_code": 101,
+  "format": "passed",
+  "strict_workspace_clippy": "passed",
+  "tests": {
+    "suites": 269,
+    "passed": 3940,
+    "failed": 4,
+    "ignored": 30,
+    "measured": 0,
+    "filtered": 0
+  },
+  "workspace_build": "not reached after cargo test exit 101",
+  "machine": "Intel i7-10700K, 64 GiB, x86_64 macOS 26.6.2, Rust 1.96.0",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_TEST_THREADS": "1"
+  },
+  "raw_sha256": "d9b3297d03357bd5cb758032543e491734f9dfcdeb4da051c2a773b452cc77b0",
+  "isolated_raw_sha256": "f868e5767858b49ca4dfe61b34cafde93b5f88ecf2f5cae5f0fffc92e5dd7f8a"
+}

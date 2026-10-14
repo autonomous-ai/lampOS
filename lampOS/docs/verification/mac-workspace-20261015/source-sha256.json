@@ -1,0 +1,31 @@
+{
+  "head": "5fa0f78d67442107bd5b9c000a9ff2e57d7c67d1",
+  "base": "dcc2e6b1ee67e11e2de89f893696432e47c4d8c5",
+  "files": [
+    {
+      "path": "lampOS/crates/tasks/tests/harness.rs",
+      "sha256": "aa3a48065ff27e70d64f233ab83e9cc72bdba1061875c92043b72854d512a928",
+      "equal_to_base": true
+    },
+    {
+      "path": "lampOS/crates/tasks/tests/fixtures/harness_cli.rs",
+      "sha256": "b3f4098e3f6e084fe009c77f6b16aa6cd47da7c6cb5bd504e65fc868481d0a98",
+      "equal_to_base": true
+    },
+    {
+      "path": "lampOS/crates/tasks/src/harness.rs",
+      "sha256": "d0a68324408cb46edc9c6e1d7b58856991ae41377a36abd6af4210bb908276fb",
+      "equal_to_base": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/motor/tests.rs",
+      "sha256": "62d1f0b5746ecca1167bc02ce0377cf24d2a94ff3e1e73b92aa972d2ab67af33",
+      "equal_to_base": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+      "sha256": "f4b496880940e393841733608aeb7dfeea5c0ea33ce25dc75e72002b3776825c",
+      "equal_to_base": true
+    }
+  ]
+}

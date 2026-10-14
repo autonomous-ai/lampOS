@@ -1,0 +1,165 @@
+{"test": "a_descendant_holding_pipes_is_killed_without_an_unbounded_drain", "repetition": 1, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/harness-298e69a3e149ccfb", "--exact", "a_descendant_holding_pipes_is_killed_without_an_unbounded_drain", "--test-threads=1", "--nocapture"], "binary_sha256": "74f5d0dd34c24cc1884c2ec51de5eaec5722dc3d718489366ef48886eda8afcc"}
+
+running 1 test
+test a_descendant_holding_pipes_is_killed_without_an_unbounded_drain ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.24s
+
+{"exit_code": 0, "elapsed_seconds": 0.31996303610503674}
+{"test": "a_descendant_holding_pipes_is_killed_without_an_unbounded_drain", "repetition": 2, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/harness-298e69a3e149ccfb", "--exact", "a_descendant_holding_pipes_is_killed_without_an_unbounded_drain", "--test-threads=1", "--nocapture"], "binary_sha256": "74f5d0dd34c24cc1884c2ec51de5eaec5722dc3d718489366ef48886eda8afcc"}
+
+running 1 test
+test a_descendant_holding_pipes_is_killed_without_an_unbounded_drain ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.20s
+
+{"exit_code": 0, "elapsed_seconds": 0.22562090307474136}
+{"test": "a_descendant_holding_pipes_is_killed_without_an_unbounded_drain", "repetition": 3, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/harness-298e69a3e149ccfb", "--exact", "a_descendant_holding_pipes_is_killed_without_an_unbounded_drain", "--test-threads=1", "--nocapture"], "binary_sha256": "74f5d0dd34c24cc1884c2ec51de5eaec5722dc3d718489366ef48886eda8afcc"}
+
+running 1 test
+test a_descendant_holding_pipes_is_killed_without_an_unbounded_drain ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.21s
+
+{"exit_code": 0, "elapsed_seconds": 0.23132325010374188}
+{"test": "a_descendant_holding_pipes_is_killed_without_an_unbounded_drain", "repetition": 4, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/harness-298e69a3e149ccfb", "--exact", "a_descendant_holding_pipes_is_killed_without_an_unbounded_drain", "--test-threads=1", "--nocapture"], "binary_sha256": "74f5d0dd34c24cc1884c2ec51de5eaec5722dc3d718489366ef48886eda8afcc"}
+
+running 1 test
+test a_descendant_holding_pipes_is_killed_without_an_unbounded_drain ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.20s
+
+{"exit_code": 0, "elapsed_seconds": 0.22071262495592237}
+{"test": "a_descendant_holding_pipes_is_killed_without_an_unbounded_drain", "repetition": 5, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/harness-298e69a3e149ccfb", "--exact", "a_descendant_holding_pipes_is_killed_without_an_unbounded_drain", "--test-threads=1", "--nocapture"], "binary_sha256": "74f5d0dd34c24cc1884c2ec51de5eaec5722dc3d718489366ef48886eda8afcc"}
+
+running 1 test
+test a_descendant_holding_pipes_is_killed_without_an_unbounded_drain ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.20s
+
+{"exit_code": 0, "elapsed_seconds": 0.2293145889416337}
+{"test": "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement", "repetition": 1, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 0.80s
+
+{"exit_code": 0, "elapsed_seconds": 0.8848000732250512}
+{"test": "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement", "repetition": 2, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 0.42s
+
+{"exit_code": 0, "elapsed_seconds": 0.44839266687631607}
+{"test": "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement", "repetition": 3, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 0.42s
+
+{"exit_code": 0, "elapsed_seconds": 0.4503059769049287}
+{"test": "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement", "repetition": 4, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 0.41s
+
+{"exit_code": 0, "elapsed_seconds": 0.43928076792508364}
+{"test": "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement", "repetition": 5, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 0.43s
+
+{"exit_code": 0, "elapsed_seconds": 0.4597541969269514}
+{"test": "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch", "repetition": 1, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 0.30s
+
+{"exit_code": 0, "elapsed_seconds": 0.32712854631245136}
+{"test": "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch", "repetition": 2, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 0.30s
+
+{"exit_code": 0, "elapsed_seconds": 0.3256952320225537}
+{"test": "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch", "repetition": 3, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 0.30s
+
+{"exit_code": 0, "elapsed_seconds": 0.3253445690497756}
+{"test": "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch", "repetition": 4, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 0.30s
+
+{"exit_code": 0, "elapsed_seconds": 0.3242107010446489}
+{"test": "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch", "repetition": 5, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 0.30s
+
+{"exit_code": 0, "elapsed_seconds": 0.3259523301385343}
+{"test": "coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn", "repetition": 1, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn ... {"seconds":6,"status":"listening_ready"}
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 6.39s
+
+{"exit_code": 0, "elapsed_seconds": 6.42229612916708}
+{"test": "coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn", "repetition": 2, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn ... {"seconds":6,"status":"listening_ready"}
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 6.39s
+
+{"exit_code": 0, "elapsed_seconds": 6.420479278080165}
+{"test": "coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn", "repetition": 3, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn ... {"seconds":6,"status":"listening_ready"}
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 6.40s
+
+{"exit_code": 0, "elapsed_seconds": 6.423764276783913}
+{"test": "coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn", "repetition": 4, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn ... {"seconds":6,"status":"listening_ready"}
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 6.39s
+
+{"exit_code": 0, "elapsed_seconds": 6.420647788792849}
+{"test": "coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn", "repetition": 5, "command": ["/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d", "--exact", "coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn", "--test-threads=1", "--nocapture"], "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa"}
+
+running 1 test
+test coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn ... {"seconds":6,"status":"listening_ready"}
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 862 filtered out; finished in 6.40s
+
+{"exit_code": 0, "elapsed_seconds": 6.42601775797084}

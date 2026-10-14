@@ -1,0 +1,26 @@
+---- coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement stdout ----
+
+thread 'coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement' (562097596) panicked at crates/voice/src/coordinator/motor/tests.rs:896:68:
+called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch stdout ----
+
+thread 'coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch' (562097736) panicked at crates/voice/src/coordinator/motor/tests.rs:722:9:
+assertion failed: matches!(peer.control.receive::<LiveControl>().unwrap(),Some(LiveControl::Authority{snapshot})
+    if snapshot.owner()==Some(original))
+
+---- coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn stdout ----
+{"seconds":6,"status":"listening_ready"}
+
+thread 'coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn' (562124371) panicked at crates/voice/src/coordinator/tests/endpoint_session.rs:972:29:
+called `Result::unwrap()` on an `Err` value: Custom { kind: Other, error: "physical privacy closed or lost freshness" }
+
+
+failures:
+    coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement
+    coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch
+    coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn
+
+test result: FAILED. 854 passed; 3 failed; 6 ignored; 0 measured; 0 filtered out; finished in 452.75s
+

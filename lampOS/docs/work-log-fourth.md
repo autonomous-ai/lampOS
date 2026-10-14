@@ -2407,6 +2407,38 @@ first-execution checks or scheduling remain hypotheses. No timeout or
 assertion was changed. The full gate is continuing through Voice; after
 it ends Fourth will check the same compiled fixture in isolation.
 
+
+## 2026-10-15, 00:59 ICT: retain the completed Mac failure and take First's repair
+
+Ready for lamp-voice: no
+
+The full Mac workspace gate at `5fa0f78d6` ended with exit 101:
+3,940 passed / 4 failed / 30 ignored, 269 completed suites including the
+custom process harness. Formatting and strict workspace lint passed;
+workspace build was not reached. The Tasks preflight failure and three
+Voice failures (missing motor child-output file, unexpected authority
+message, and expired physical-privacy freshness) are retained unmodified
+in `verification/mac-workspace-20261015/`, with exact source and binary
+hashes. All 20 direct isolated follow-ups passed, five per failed test;
+these do not turn the full gate into a pass or establish the failure cause.
+The Voice fixtures are Found, not mine, and First is being told once.
+
+The 00:38 queue update keeps #698 as Fourth's sole MVP task. First's
+00:39 answer supplies `1a38f2f3e` for the Tasks rig, and Fourth has rebased
+on it, including task-news changes. First's reported three Mac harness
+passes belong to First. The previous checkpoint `f411ad600` had started
+native ARM64 run 38610164757 before this answer was read; its result is
+for that older base. A fresh source copy will run the full Linux gate as
+numeric UID 1000 with no network or capabilities, followed by ARM64
+cross-build. No account, key, provider or lamp is involved.
+
+The first Linux environment smoke command rejected unsupported Podman
+tmpfs options before starting a container; changing only that temporary
+mount to mode 1777 allowed UID 1000 to read the source/offline registry
+and write Fourth's own target cache. No project source was changed for it.
+No Memory PR or readiness claim yet; final-head native ARM64 success is
+still required.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
