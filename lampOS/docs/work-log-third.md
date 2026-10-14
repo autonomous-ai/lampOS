@@ -890,6 +890,147 @@ rebase `lamp-third`, and take the next unclaimed Third task.
   state exactly what First must acknowledge and what happens across a crash,
   busy Voice, clock correction and restart. No speculative speech is added.
 
+## 2026-10-14 — task 6 done: Schedule
+
+- Task branch: `third/schedule`,
+  `d78c4ef7b2215697c5a0b4f481f284be3b2422b1`; based on
+  `origin/lamp-voice` `d0a2b5c00092087763d1e001bfe26fefa7a16dce`, after the
+  pushed claim `ffd111fdee9008ad8871fc47926d32d092d7bcf5`.
+- Added `lamp-schedule`, an independent process **off unless `--enable` is
+  supplied**. It owns a private SQLite store, a private bounded JSON-line Unix
+  socket, retained `schedule/due` metadata and its diagnostics. It opens no
+  audio, model or actuator. No Voice, Actions, deployment, work-split or other
+  builder's branch was changed.
+- Set/list/get/cancel/snooze/exact-delivery Ack use strict typed requests.
+  Mutations require store identity, current revision and a caller request ID.
+  The last exact mutation and its original receipt survive lost replies and
+  restart. Due work is committed before publication, remains pending while
+  Voice is unavailable, and is never removed merely because a notice was sent.
+  Text stays in the private store/socket; bus reports contain only metadata.
+- Duration timers use the elapsed boot clock on the same boot and a stored
+  wall-time fallback after reboot. Calendar reminders take human-sized time,
+  date and zone fields; daily/weekly recurrences use civil calendar rules.
+  Clock trust loss, wall jumps, DST gaps/folds, skipped dates, recurrence
+  backlog, late recovery, cancellation and snooze semantics are explicit in
+  [schedule.md](schedule.md). One pending occurrence advances only on its exact
+  Ack; it does not silently discard missed dates. The bounded store holds 128
+  items with no eviction. A failed write/sync stops the owner for recovery.
+- Reviewed V1 and primary assistant, Jiff and SQLite sources before building;
+  decisions are in the part document and `reuse-decisions.md`. Proposed all
+  six model tools and First's Voice contract, including privacy/quiet admission,
+  text fetch/revalidation, interruption, durable consumer deduplication and
+  qualified completed-playout Ack. There is no claim of exactly-once speech.
+  First must register this personal store in the reset manifest before use.
+- Added **141 tests**, none ignored: 37 calendar, 22 storage, 36 engine, four
+  protocol, 18 runtime, two failure/liveness, ten qualification-client, and 12
+  message tests. The liveness cases include full unread stderr, a stalled
+  storage owner withdrawing ready/oldest metadata, and an expired queued
+  mutation not starting. Other cases cover corrupt files/receipts, write/sync
+  failure, lost replies, restart, bounded paging and fragmented/slow clients.
+- Gate on Third's **Intel i7-10700K 3.80 GHz, 16 logical CPUs, 64 GiB,
+  macOS 26.6.2 / Darwin 25.6.0 x86_64, Rust/Cargo 1.96.0**:
+  `cargo fmt --all --check`; strict all-target Clippy and serial tests for all
+  15 touched/dependent packages; `cargo build --workspace`, using Cargo
+  `--offline --locked`. **2,618 passed, zero failed, nine inherited ignored**.
+  The pre-change workspace build passed. The complete package list and commands
+  are in [results.json](verification/schedule-host-20261014/results.json).
+- The first release qualification failed on this Mac: setting a socket timeout
+  after the server closed returned `EINVAL` despite buffered reply bytes. The
+  second full run identified the exact stage; a standalone socket reproduction
+  confirmed it. Corrected only the qualification example and its Cargo
+  feature/test declaration, using nonblocking I/O and cumulative poll deadlines.
+  The production service, engine and Msgs source stayed identical to the full
+  gate. The [final supplement](verification/schedule-host-20261014/supplement-results.json)
+  passed workspace format, all 15 packages' strict all-target Clippy, **129
+  Schedule tests with zero failed/ignored**, and the workspace build.
+- A source-only copy outside the checkout contained 978 files initially,
+  28 workspace members and 29 local packages, all local paths inside the copy.
+  It built the whole workspace; after refreshing the two corrected files, that
+  build passed again and Schedule + Msgs passed **185 tests, zero failed or
+  ignored**. Final source hashes matched after gates and measurement. No
+  Linux/ARM64 or Rust 1.91 run was made here.
+- Development failures, including the failed full qualifications, sandbox
+  socket denials and a corrected large-reply test fixture, are retained in
+  [the failure ledger](verification/schedule-host-20261014/failures.md).
+  Raw Cargo output retains its original whitespace. No failed test is being
+  merged and no assertion was removed to conceal a failure.
+
+**What was measured, here.** One successful release invocation of
+`schedule_check --scratch-parent /private/tmp --samples 100`, after the fixes,
+completed in 26.364 seconds and retained **510 individual timings**. The scratch
+parent and workspace were on the APFS data volume `/dev/disk1s2`, not tmpfs.
+Five operations have a first call and 100 warm calls; five more observations
+are single runs. First means first operation after its labelled setup, not a
+cold process. Set grows the store from one to 101 items; Ack shrinks it; List
+reads one page of up to eight items. Warm medians average the middle two values.
+No other Third build or test ran concurrently; unrelated host load was not
+controlled. The exact samples, boundaries, source and binary hashes are in
+[qualification.json](verification/schedule-host-20261014/qualification.json)
+and [measurement.json](verification/schedule-host-20261014/measurement.json).
+
+| Operation, milliseconds | First call | Warm median (100) | Warm maximum |
+|---|---:|---:|---:|
+| Direct durable Set | 75.448850 | 75.2997125 | 94.280184 |
+| Direct List first page | 0.194719 | 0.139454 | 0.163894 |
+| Direct durable Ack | 76.050170 | 75.2261955 | 96.577391 |
+| Unix durable Set roundtrip | 64.582320 | 81.8781535 | 112.466039 |
+| Unix Status roundtrip | 5.208467 | 5.9593745 | 14.440621 |
+
+Direct writes include validation, serialization, SQLite commit and directory
+sync. Unix Set additionally includes connection, queue and reply read/parse;
+fetching its guard is outside the measured call. Single observations were:
+fresh Store + Engine open **218.521855 ms**, existing reopen **0.671332 ms**,
+one pending commit for all 101 overdue timers **75.228700 ms**, authored clock
+jump through scan/commit/publication to bus receipt **136.055890 ms**, and Status
+beside a silent connection **7.582396 ms**. These are host observations, not
+lamp latency or durability figures. The 250 ms response target is a reference.
+
+The clock and one-hour downtime are authored. All 101 ten-minute timers were
+retained 50 minutes late. The binary verified restart identity, exact delivery
+Acks and immediate Ack replay, zero pending after Ack/reopen, every runtime
+pending page and a reply beside a silent client. It removed its own scratch
+directory after shutdown. The host release binaries were 3,894,400 bytes for
+Schedule and 4,061,568 for the check; neither binary is committed.
+
+**First: what to run.** Build in the usual ARM64 environment:
+
+```sh
+cargo build --release --locked -p lamp-schedule --bin lamp-schedule --example schedule_check
+```
+
+Place the example through the usual deployment process. Choose a short absolute
+scratch parent on persistent storage, verified with `findmnt -T "$HOME"`; if
+home is persistent, run once:
+
+```sh
+./schedule_check --scratch-parent "$HOME" --samples 100
+```
+
+No Rust installation, source checkout or fixture files are needed on the lamp.
+The binary creates only a private `sc-*` child, runs local storage/socket/bus
+owners with authored clocks, then removes the child once owners stop. Expect
+exit 0, `ok:true`, 101 Set receipts in each path, 101 verified runtime pending
+items, and zero pending after direct Ack/reopen. Keep raw output with the lamp
+name. It opens no sound or motors and does not touch production Schedule data.
+
+Then qualify the actual service's Linux BOOTTIME/boot identity, synchronization
+marker, suspend and reboot, trust loss/correction, real flash recovery, late
+recurrences and cancel/snooze. First owns Voice wiring: preserve privacy and
+quiet admission; fetch and revalidate the exact token; leave interrupted or
+unqualified playout pending; test completed-playout Ack and the consumer crash
+window. The document gives request shapes and default-off startup commands.
+No lamp was accessed here.
+
+**Most likely wrong on the lamp:** the clock-trust marker and stored wall-time
+fallback after reboot, real flash sync/power-loss behavior, or Voice confusing
+a bus publication with completed speech. The authored-clock qualification
+cannot establish these. Provider tool declarations, personal-data reset wiring,
+final speech pacing and timezone-database upgrade recovery remain First's
+integration checks.
+
+Questions blocking independent work: none. Next: fetch the list and own log,
+rebase `lamp-third`, and take the next unclaimed Third task.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
