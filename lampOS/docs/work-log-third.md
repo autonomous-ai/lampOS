@@ -2657,6 +2657,27 @@ available. No test/source/deadline change or new attempt was made to obtain a
 passing isolated result. No lamp, live provider or other builder's branch was
 touched. Touch #711 still needs First and a person; #699 remains deferred.
 
+## 2026-10-15 — Draft #748 notified; CI complete; Queue watch
+
+Ready for lamp-voice: no
+
+The [notice on #747](https://github.com/autonomous-ai/lampOS/pull/747#issuecomment-6180109668)
+reports draft #748 and the isolated failure that leaves First's current
+handoff condition unmet. The published body was checked exactly. Generic
+PR CI [38649101194](https://github.com/autonomous-ai/lampOS/actions/runs/38649101194)
+completed successfully on `365e36db`: Go, Web and HAL jobs passed. This does
+not change the failed Mac gate or the draft's not-ready status.
+[The notification and terminal CI metadata](verification/relative-reminders-qualification-20261015/README.md)
+are retained beside the original host and native records.
+
+At 22:45 UTC, `git fetch origin`, the Queue, Third's open issues and the task/
+fixture threads showed no new integration commit, instruction or reply.
+Integration stays `cf2f5b43c`; governing documents are unchanged. Fourth's
+#739 V6 remains under qualification, with no ready fix. #711's enabled touch
+check still needs First and a person; #699 is explicitly after MVP and remains
+unclaimed. Third watches replies and rereads the Queue by 23:15 UTC. No new
+source, tests, deployment, or repeated isolated attempt was made while waiting.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
@@ -2672,5 +2693,6 @@ latency remain unqualified. Schedule and Tasks passed their host gates; their
 real storage, clock, Harness and Voice integrations remain for First to qualify
 on the lamp. Task 33 is merged through #728 after First's reported minute
 without `--touch`; enabled qualification still needs First and a person there.
-Task #709 is merged and enabled by First; its relative-time follow-up is taken
-on `third/schedule-relative`. Task #699 waits until after the MVP.
+Task #709 is merged and enabled by First; its relative-time follow-up is draft
+#748 on `third/schedule-relative`, awaiting the #739 qualification blocker.
+Task #699 waits until after the MVP.

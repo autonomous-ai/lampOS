@@ -1,0 +1,245 @@
+{
+  "queue": {
+    "number": 705,
+    "state": "OPEN",
+    "body": "The order in which each lampOS builder takes its tasks. Kept by the first builder (the one with lamp-4ace); only it edits this body. Decided by the owner and the first builder on 2026-10-14 (`fifth-P3`), replacing the list in `lampOS/docs/work-split.md`, which keeps the rules, the loops, \"What the lamp showed\" and the history of finished tasks.\n\n**A builder's next task:** the first issue in its own list below that is open and not `status:taken`. Claim it as `lampOS/docs/joining.md` says (\"Tasks as GitHub issues\"): add `status:taken`, comment `taken by <name> \u00b7 session <id> \u00b7 <lamp or none>`, then read the comments again and release it if the first \"taken\" comment is not yours. Questions and answers are comments on the task's issue. A proposal is a new issue labelled `proposal` and `builder:<name>`; the first builder answers it in a comment, and no answer means not allowed. A finished task is handed back as one pull request from `<name>/<task>` into `lamp-voice`, not a draft, with its ARM64 run green (joining.md, \"One pull request per task\", `fifth-P6`, decided 18:33); the first builder merges it after its minute on lamp-4ace, and the merge closes the issue.\n\nOwner's order of 2026-10-14, 14:00: parts that stand on their own first, the harder ones later. And at 17:22: \"reimagine the entire experience. make lamp the most fun creature to interact with\": the design is `lampOS/docs/creature.md`; its pieces (#710-#714) come first. Stopping and interruption are tested by the first builder in the evenings.\n\n## The V2 MVP first: wide, then deep (the owner, 2026-10-15 00:37)\n\n\"prioritize the tasks for builders with ruthless priority. so we have an end to end experience on lamp first. then we'll optimize each component and edge cases later \u2026 wide first. deep later \u2026 have all the pieces in place make sure the whole works. then after that, have builders optimize each component.\"\n\nSo until every piece below is on lamp-4ace and works with the others, a builder works only on its MVP tasks. Everything else waits under \"After the MVP\", even if already taken: pause it, push what you have, and say so on its issue.\n\n| What a person gets | State on lamp-4ace (2026-10-15 00:40) | Missing piece, and whose |\n|---|---|---|\n| Talk to it naturally: turns, interruptions, noise | On and working | \u2014 |\n| It looks alive: body, light, the eye, breathing, sleep at night | On; the eye and the night sleep not yet seen working | first builder checks |\n| It sees you: turns to your face, hello when you arrive, turns to a call | On; turning to a call on since 00:57 (#724 merged) | \u2014 |\n| It does things: light, volume | On | \u2014 |\n| Reminders and timers by voice | **On since 04:39** (#747 merged): \"set a timer for one minute\" \u2192 \"One minute, starting now.\" \u2026 \"Your timer is done.\"; reminders set, listed, cancelled and said when due | third: a reminder \"in two minutes\" comes up to a minute early (follow-up on #747) |\n| It remembers you, across days | **On since 02:47** (#743 merged): \"what did we talk about yesterday?\" answered from last night | \u2014 |\n| It works for you: hands tasks to Claude Code and tells you the result | **Works end to end**: the played day at 01:25 handed a poem to Claude Code and told the result unasked 39 s later | **#736 (second)**: a yes in two breaths still lost; #740's first try failed its minute (it ended the voice whenever news was told) |\n| You can touch it: button, base strip, head pads | Button on; touch merged 01:17, off until tuned with a hand | **#711 (third), first builder at the lamp today** |\n| It starts by itself after power, and every part comes back | Every part enabled at boot (the eyes since 01:32) except the body, started by hand until #703; the body's wake from fold shown; a power cut not tried | **#702, then #701 (fifth)** |\n| It is safe: gives way to a hand, never hurts itself | Not built | **#703 (fifth)** |\n| It gets new software by itself | **Works** (#741 merged): at 03:48 lamp-4ace updated itself to build 188 from a signed test channel, every part well. Publishing waits on the owner's signing key | **#737 (second)**: the `publish:` job; the owner: the key |\n\nHow a lamp is set up (phone, desktop) is not decided by the owner and is not in the MVP yet.\n\nThe first builder plays the whole lamp end to end every evening (a person's day: arrive, talk, ask, hand over work, get news, a reminder, touch, leave, night) and files each fault as an issue to a builder with room.\n\n### second\n1. #737 \u2014 45. Updates: `lamp-update` merged (#741) and tried on lamp-4ace; next the `publish:` job, ready for the owner's key (MVP)\n2. #736 \u2014 44. A yes said in two breaths still starts the task (MVP: the hand-over breaks without it)\n\nAfter the MVP: #723 (the early end; pause it), #732 (progress news through Jev), #733 (Codex and the others), #694 (the bare name: the #725 model heard 1 of 6 calls), #714 (always alive: done unless the first builder finds the sleep broken)\n\n### first (the first builder's own, while a builder is away)\n1. #712 \u2014 34. The eye (taken at 19:52 from the second, whose session was idle; on lamp-4ace since 20:15, waits for a person at the lamp)\n2. The voice's first-output record for the judge (proposed in #722's `voice-first-output.md`): first part on lamp-4ace since 20:48 (`bf01f7e6d`); `request_outcome` waits on the fourth's answer in #700\n\n### third\n1. Follow-up to #747: a time from now (\"in two minutes\") goes to `set_timer`, not a rounded `set_reminder` (MVP)\n2. #711 \u2014 33. Touch: #728 merged 01:17 (its minute without `--touch` passed). Turned on with a person at the lamp today: thresholds, E4/E8, then on by default (MVP)\n\nAfter the MVP: #699 \u2014 8. A shared log, settings, and reports from the parts that give none\n\nDone: #695 \u2014 6 (on lamp-4ace since 16:53) \u00b7 #696 \u2014 11 (on `lamp-voice`; off on lamp-4ace until the voice uses it)\n\n### fourth\n1. #739 \u2014 46. The voice's timed process tests fail on a loaded host (speed for every builder's gate)\n\nNext: the faults the first builder's end-to-end runs find.\n\nDone: #698 \u2014 29 (pull request #743, merged 02:51; on lamp-4ace since 02:47) \u00b7 #697 \u2014 28 (on lamp-4ace since 2026-10-14 16:54) \u00b7 #713 \u2014 35 (pull request #727, merged 23:01) \u00b7 #707 \u2014 30 (pull request #721, merged; on lamp-4ace since 20:21) \u00b7 #700 \u2014 17 (pull request #722, merged)\n\n### fifth\n1. #702 \u2014 23. Waking up after the power comes back: now the whole lamp, every part, from power (MVP)\n2. #701 \u2014 27. The keeper (MVP)\n3. #703 \u2014 24. Giving way to a hand, and not hurting itself (MVP)\n\nAfter the MVP: #720 (seeing someone speak; pause it), #704 (weighing and measuring the lamp)\n\nDone: #715 \u2014 37 (pull request #724, merged 01:00; on lamp-4ace with `--look-at-name on` since 00:57) \u00b7 #710 \u2014 32 (pull request #718, merged; on lamp-4ace since 18:41) \u00b7 #719 \u2014 38 (pull request #726, merged 23:00; its body on lamp-4ace)\n",
+    "comments": [
+      {
+        "id": "IC_kwDOSxRYh88AAAABb4tlxw",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "First builder, 2026-10-14 17:38, to every builder: the ARM64 run's failure in `crates/controls/tests/program.rs` (`sigterm_finishes_recording_and_releases_the_actual_serve_owner`, `No such file or directory`) was the workflow's, not your code: the Debian 12 container lacked `/bin/kill` (procps). Fixed on `lamp-voice` (`.github/workflows/lampos-arm64.yml`); rebase onto it and the run should pass. Do not change that test for it.",
+        "createdAt": "2026-10-14T10:33:43Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/issues/705#issuecomment-6166373831",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOSxRYh88AAAABb5gsgw",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "First builder, 2026-10-14 18:23, to every builder: the second ARM64 failure, `crates/surround/tests/selection.rs` (`interrupted_collection_leaves_only_unaccepted_files_and_retry_removes_them`), was the workflow again: the Debian container ran the tests as root, and root ignores the read-only folder the test relies on. Fixed on `lamp-voice` (`91a0fdb3a`): the job now runs on GitHub's Ubuntu 22.04 ARM machine as an ordinary user (glibc 2.35, so its binaries run on the lamps' Debian 12). Rebase onto it; do not change that test. If a run still fails on something that passes on your Mac, say it on your task's issue and I look at the workflow first.",
+        "createdAt": "2026-10-14T11:23:12Z",
+        "includesCreatedEdit": true,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/issues/705#issuecomment-6167211139",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOSxRYh88AAAABb6u-AA",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "First builder, 19:36, to every builder: the ARM64 run is green on `lamp-voice` for the first time (run 38559471390, `21c24fc0a`: Ubuntu 22.04 on ARM64, as an ordinary user, whole workspace built and tested one test at a time). What had kept it red was the workflow (no `procps`; tests run as root) and one Records open that only fails when not root (`O_NOATIME`, mended in `21c24fc0a`). Since `652a196e1` `cargo clippy -p lamp-body --all-targets -- -D warnings` also passes on Linux. Rebase your task branches on `origin/lamp-voice`; a pull request is ready when its own run is green (joining.md, \"One pull request per task\"). On a Mac, run `lamp-body` and `lamp-voice` tests with `-- --test-threads=1`: some of their tests fail in parallel there.",
+        "createdAt": "2026-10-14T12:36:42Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/issues/705#issuecomment-6168493568",
+        "viewerDidAuthor": true
+      }
+    ]
+  },
+  "pr-747": {
+    "number": 747,
+    "state": "MERGED",
+    "body": "Closes #709\n\nKind: off unless set.\n\n`LAMP_SCHEDULE_TOOLS=on` exposes six Schedule tools in Voice and enables their Actions routes; both roles require the exact value `on`. `LAMP_SCHEDULE_SPEAK=on` separately enables Voice's isolated reminder consumer, with `LAMP_SCHEDULE_DELIVERY_DIR` provisioned as private persistent state. No deployment file changes.\n\nDefault-off proof: fresh `1337e7e1d8` baseline and implementation source copies passed **72 cases / 144 exact stdout comparisons**, without normalization, across two profiles and all 36 combinations of absent/non-enabling switch values. The boundary is public catalogs, declarations, existing route lists and ordinary Written requests; functional tests separately exercise real routes. All 34 local package manifests resolve inside each copy. [Raw comparisons, helper sources and copy audit](https://github.com/autonomous-ai/lampOS/blob/506e9e519883191dda8db565e2e3e5283c635331/lampOS/docs/verification/schedule-voice-qualification-20261015/standalone-1337/README.md).\n\nVerification: [task source and historical evidence](https://github.com/autonomous-ai/lampOS/blob/d794cf2aca8fd5a7891af6363f2155e9fd3091fe/lampOS/docs/verification/schedule-voice-host-20261014/README.md), [final focused checks](https://github.com/autonomous-ai/lampOS/blob/d794cf2aca8fd5a7891af6363f2155e9fd3091fe/lampOS/docs/verification/schedule-voice-host-20261014/integration-1337/README.md), and [terminal qualification index](https://github.com/autonomous-ai/lampOS/blob/506e9e519883191dda8db565e2e3e5283c635331/lampOS/docs/verification/schedule-voice-qualification-20261015/README.md). Earlier failed runs retain their actual source IDs and outcomes.\n\nGate on Third's Intel i7-10700K x86_64 Mac, macOS 26.6.2 / Darwin 25.6.0, 64 GiB RAM, Rust/Cargo 1.96.0, from `lampOS/`:\n\n- `cargo fmt --all --check` \u2014 passed.\n- `cargo clippy --offline --locked -p lamp-actions -p lamp-schedule -p lamp-voice -p lamp-voice-eval -p lamp-memory --all-targets -- -D warnings` \u2014 passed.\n- Seven documented Voice filters \u2014 **136 test executions / 0 failed / 2 ignored**. The Days exclusion test appears in two filters; these are executions, not unique tests. Exact commands are retained in the focused record.\n- `cargo build --offline --locked --workspace` \u2014 passed.\n- `cargo test --offline --locked -p lamp-actions -p lamp-schedule -p lamp-voice -p lamp-voice-eval -p lamp-memory --no-fail-fast -- --test-threads=1` \u2014 **FAILED: 1,764 passed / 1 failed / 13 ignored**, 77 harnesses, exit 101, 2,013.072357316 seconds.\n- Independent source copy: workspace/helper builds passed, **435 test executions / 0 failed / 7 ignored**, plus all 144 off-switch comparisons.\n- Two existing host timing probes run explicitly once each after local builds/tests ended: **2 / 0 / 0**, 606 raw poll samples. Maximum parent poll 0.325789 ms; maximum transport poll 0.063886 ms, below the 2 ms reference. [Boundaries and samples](https://github.com/autonomous-ai/lampOS/blob/506e9e519883191dda8db565e2e3e5283c635331/lampOS/docs/verification/schedule-voice-qualification-20261015/timing-1337/README.md) exclude startup, storage, providers, audio and lamp behavior; neither probe asserts a timing threshold.\n\nThe sole complete-gate failure is unchanged `coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup`. It timed out waiting for `OptionalMotor::reaped` at `motor/tests.rs:645` through the line-441 wait assertion. The failed crash/hang iteration was not recorded; no cause is inferred. **The exact same compiled test passed once alone: 1 / 0 / 0**, 5.000996141 seconds. Its source matches integration; its binary SHA-256 was identical before the full run and before/after isolation. [Both raw runs and identities](https://github.com/autonomous-ai/lampOS/blob/506e9e519883191dda8db565e2e3e5283c635331/lampOS/docs/verification/schedule-voice-qualification-20261015/full-host-1337/README.md) are retained. This meets [First's explicit untouched-test handoff condition](https://github.com/autonomous-ai/lampOS/issues/709#issuecomment-6176285386), tracked by Fourth in #739. **The complete host gate remains failed.** No fixture, assertion or deadline was changed for this result.\n\nNative ARM64 run [38633124293](https://github.com/autonomous-ai/lampOS/actions/runs/38633124293) passed on exact head `d794cf2aca8fd5a7891af6363f2155e9fd3091fe`: **4,365 passed / 0 failed / 34 ignored**, 282 harnesses, GitHub Ubuntu 22.04 ARM64, Rust 1.96.0. Commands: `cargo build --locked --release --workspace --bins --examples`, then `cargo test --locked --release --workspace -- --test-threads=1`. Artifact: `lampos-arm64-d794cf2aca8fd5a7891af6363f2155e9fd3091fe`. [Terminal output and every binary checksum](https://github.com/autonomous-ai/lampOS/blob/506e9e519883191dda8db565e2e3e5283c635331/lampOS/docs/verification/schedule-voice-qualification-20261015/native-d794cf/README.md). Four inherited Controls/Expression `replay_cost` filename warnings remain recorded; no warning-free workspace claim is made.\n\n| Installable Task 31 binary | SHA-256 |\n| --- | --- |\n| `lamp-actions` | `33a16f446b32697b608d6ab5307ebd4917b32265635800266240b3be541dc6cb` |\n| `lamp-schedule` | `12598462e7005ecbef98838dde2a83cf9c6e557de204b3a1e1d0749c90290664` |\n| `lamp-voice` | `a29fcf3986cc58cd52c9142a39a280d4ae2dce62d41d8c7c999b9760a448d19f` |\n\nThe consumer durably correlates `(store_id, id, delivery)`, revalidates bounded offers, and waits for local silence, current privacy/readiness and owed camera/Second Look work. Unknown, Busy and Quiet all permit a requested reminder at that silence, as settled in the issue. Ack follows successful provider completion and final retirement of every audio generation. Interrupted or uncertain attempts remain pending without automatic re-speech. A due request cannot execute a tool or enter automatic Memory journalling, including Days mode. Schedule mutation failures and uncertain replies remain truthful.\n\nIntegration advanced during qualification from this task's `1337e7e1d8` base to `f2261ec48`. The incoming Update crate, lamp-owned unit snapshot and Memory doc change do not change affected-package/Bus/Msgs source. [Read-only integration review and clean merge preview](https://github.com/autonomous-ai/lampOS/blob/506e9e519883191dda8db565e2e3e5283c635331/lampOS/docs/verification/schedule-voice-qualification-20261015/integration-1337/incoming-update-review.md) found no new reminder conflict. The qualified artifact does not include or qualify the incoming Update crate or combined tree. **Install only Actions, Schedule and Voice; preserve installed Update and current lamp-owned unit settings, especially `LAMP_MEMORY_DAYS=on`.** Repoint executable paths and apply Schedule drop-ins; do not copy the older task-head Voice service over the current unit. Reminder-owned states and transcripts remain visible to Update's observational quiet gate.\n\n[First's lamp qualification](https://github.com/autonomous-ai/lampOS/blob/d794cf2aca8fd5a7891af6363f2155e9fd3091fe/lampOS/docs/schedule.md#task-31-lamp-qualification) gives the off-state minute, exact service settings and disable sequence, scheduling checks and seven spoken cases. Most likely wrong on the lamp: provider schema/wording, local-silence timing in a busy office, ALSA final retirement, flash stalls and the consumer's RR20-to-Other/nice-19 transition. No lamp or real provider was accessed; host process durations and IPC probes are not acoustic or lamp latency.\n",
+    "comments": [
+      {
+        "id": "IC_kwDOSxRYh88AAAABcE8Ypg",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "First builder, 04:46: **its minute and its spoken cases on lamp-4ace passed; merging, and it stays on.** CI run 38633124293's binaries (`lamp-actions` 33a16f44\u2026, `lamp-schedule` 12598462\u2026, `lamp-voice` a29fcf39\u2026, matching your table).\n\n- **Switches off** (04:33:49 to 04:36): time, light (\"It's already at its dimmest\u2026\"), no restarts.\n- **Switches on** as `docs/schedule.md` says (actions: tools and socket; voice: tools, socket, speak, `/var/lib/lampOS/voice/schedule-delivery` root 0700), actions restarted before the voice. One consumer, `SCHED_OTHER` priority 0, nice 19; the parent kept RR 20.\n- **First try refused**: \"Set a timer for one minute\" got \"I can't set timers yet\": the character file said \"You cannot set timers, play music, make calls\u2026\". Changed (repository `deploy/character/lamp.txt`, in the first builder's next push): it can set, repeat, list, snooze and cancel timers and reminders, and says them when due.\n- **Then:** \"set a timer for one minute\" \u2192 \"One minute, starting now.\" (1.53 s after the end of speech; `set_timer` 42 ms) and, 60.2 s later, \"Your timer is done.\" \"Remind me in two minutes to stretch my legs\" \u2192 \"I'll remind you to stretch in two minutes.\"; \"\u2026at nine tomorrow morning to call the dentist\" \u2192 confirmed; \"what reminders do I have?\" \u2192 both; \"Cancel the dentist one.\" (heard \"Hansel the Dentist 1\") \u2192 cancelled; the stretch reminder said: \"It's time to stretch your legs.\"; the list then empty. No restart.\n\n**One fault, for a quick follow-up pull request today (it belongs to the MVP):** \"in two minutes\" was set at 04:42:47 and said at about 04:44:00, 73 s later: `set_reminder` takes only `HH:MM`, so the model rounds a relative time to the next whole minute (up to 59 s early; \"in one minute\" could come at once). Tell the model in the tools' descriptions that a time from now (\"in ten minutes\", \"in an hour\") is a `set_timer` with that label, and `set_reminder` is for a clock time; a host test of the catalog text; I play it again.\n",
+        "createdAt": "2026-10-14T21:46:21Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/pull/747#issuecomment-6179199142",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOSxRYh88AAAABcFDb-A",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "taken by third \u00b7 session third-20261014-violet4 \u00b7 none\n\nTaking the relative-time MVP follow-up requested here and placed first in Queue. [The taken log is pushed](https://github.com/autonomous-ai/lampOS/blob/71d208599d0fbd4358aa73e29a35451938861753/lampOS/docs/work-log-third.md#2026-10-15--relative-reminder-catalog-follow-up-taken). New branch: `third/schedule-relative`, based on current integration `cf2f5b43c` with your character and unit changes.\n\nI will clarify both tool descriptions, test the published catalog and disabled output, and send a small follow-up PR after its host gates and exact-head ARM64 run. The new wording will use `set_timer` for durations from now, preserving the requested label and whole seconds, and reserve `set_reminder` for clock times. No lamp result for this follow-up is claimed.\n",
+        "createdAt": "2026-10-14T21:53:09Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/pull/747#issuecomment-6179314680",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOSxRYh88AAAABcFz9ZA",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "Ready for lamp-voice: no\n\nThe requested follow-up is in **draft [#748](https://github.com/autonomous-ai/lampOS/pull/748)**, exact head `365e36dbcd78ff247adf30b2d18afd4d9d6f1065`. The two catalog descriptions and published-catalog regression are complete. Focused checks, strict Clippy, workspace builds and independent-copy tests passed; all 144 disabled-output comparisons matched. Native ARM64 [run 38644608947](https://github.com/autonomous-ai/lampOS/actions/runs/38644608947) passed **4,410 / 0 / 35**. Only the new Actions binary is needed once qualified; the relative-time lamp replay is in the PR.\n\nThe complete Mac gate failed **1,604 / 2 / 13** in unchanged motor fixtures. `crash_and_stalled_control_never_allow_replacement_or_false_cleanup` failed its reap wait at `motor/tests.rs:645`, through the line-441 `owned child timed out: None` assertion, and **failed its one isolated invocation too (0 / 1 / 0)**. Crash/hang iteration was not recorded. `late_started_callback_cannot_restore_an_offer_after_owner_replacement` failed its initial Ready wait at 865, then passed once alone. Both isolated runs used the exact original compiled binary, unchanged before/after; no rebuild, fixture edit, deadline change or further retry was made.\n\nYour existing #709 condition requires the untouched failure to pass alone, so it is **not met**. [The pushed log and raw runs](https://github.com/autonomous-ai/lampOS/blob/90001afa80e75994ace78f2dd87f16155cb252ce/lampOS/docs/work-log-third.md#2026-10-15--relative-reminder-terminal-gates-retained-not-ready) preserve that distinction. Fourth's #739 V6 qualification is underway on the same integration base; no ready fix is available yet. I will watch that work and requalify after an accepted fixture fix. No failure cause or lamp measurement is inferred, and this draft is not offered for merge.\n",
+        "createdAt": "2026-10-14T22:40:42Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/pull/747#issuecomment-6180109668",
+        "viewerDidAuthor": true
+      }
+    ],
+    "reviews": [],
+    "headRefOid": "d794cf2aca8fd5a7891af6363f2155e9fd3091fe",
+    "isDraft": false
+  },
+  "pr-748": {
+    "number": 748,
+    "state": "OPEN",
+    "body": "Closes #709\n\nKind: off unless set. This is First's requested follow-up to merged #747. On lamp-4ace, First reported that \u201cremind me in two minutes\u201d selected a rounded `set_reminder` clock time and spoke about 73 seconds later. The two enabled catalog descriptions now direct relative durations to `set_timer` with the requested label and whole seconds, and reserve `set_reminder` for a requested clock time. Schemas, validation, clocks, deadlines and production Voice code are unchanged.\n\nThe existing switches remain exact-on: `LAMP_SCHEDULE_TOOLS=on` in Actions and Voice, with Voice delivery independently gated by `LAMP_SCHEDULE_SPEAK=on`. Two independent source copies passed 72 absent/nonenabling-switch cases and 144 exact public-catalog/Voice-helper output comparisons. This covers the disabled catalog, declarations, existing routing and ordinary Written serialization. It does not assert model choice or elapsed delivery.\n\nVerification: [focused host evidence](https://github.com/autonomous-ai/lampOS/blob/365e36dbcd78ff247adf30b2d18afd4d9d6f1065/lampOS/docs/verification/relative-reminders-host-20261015/README.md) and [complete qualification record](https://github.com/autonomous-ai/lampOS/blob/412a46e571f38d7b8e5bd35fa5f4677fb22af650/lampOS/docs/verification/relative-reminders-qualification-20261015/README.md). The new regression reads Actions' published `tools.json`. It passes with the new descriptions and fails at the intended missing-guidance assertion against the old catalog with only the test added. That expected negative control (Cargo 101, 0 passed / 1 failed) is retained separately from positive gates.\n\nOn Third's Intel i7-10700K x86_64 Mac, macOS 26.6.2 / Darwin 25.6.0, Rust/Cargo 1.96.0:\n\n- `cargo fmt --all --check`: passed.\n- `cargo clippy --offline --locked -p lamp-actions -p lamp-voice -p lamp-voice-eval -p lamp-memory --all-targets -- -D warnings`: passed.\n- Focused catalog / Voice tools: 19 passed / 0 failed / 0 ignored.\n- `cargo build --offline --locked --workspace`: passed, also in an independent source copy.\n- Independent-copy Actions / Voice tools: 54 passed / 0 failed / 0 ignored, plus the 144 byte comparisons above.\n- Complete serial affected-package host gate: **FAILED: 1,604 passed / 2 failed / 13 ignored**, 65 harnesses, Cargo 101, 1,688.814767791 seconds. Command: `cargo test --offline --locked -p lamp-actions -p lamp-voice -p lamp-voice-eval -p lamp-memory --no-fail-fast -- --test-threads=1`.\n\n**Ready for lamp-voice: no. This PR is a draft.** Two unchanged motor fixtures failed at `motor/tests.rs:441`, `owned child timed out: None`. `crash_and_stalled_control_never_allow_replacement_or_false_cleanup` failed its reap wait at 645 (crash/hang iteration not recorded), then **failed once alone: 0 / 1 / 0**, 4.124137126 seconds. `late_started_callback_cannot_restore_an_offer_after_owner_replacement` failed its initial Ready wait at 865, then passed once alone: 1 / 0 / 0, 3.102594479 seconds. Both isolated invocations used the exact original compiled binary, SHA-256 `2baf1c79df5796b498857231db44e5ae5c4627d84b5f80f02b71ee7985f63117`, unchanged before/after; no rebuild or fixture/assertion/deadline edit occurred. [All original outputs and identities](https://github.com/autonomous-ai/lampOS/blob/412a46e571f38d7b8e5bd35fa5f4677fb22af650/lampOS/docs/verification/relative-reminders-qualification-20261015/full-host-365e36/README.md) are retained. [First's existing condition](https://github.com/autonomous-ai/lampOS/issues/709#issuecomment-6176285386) requires an isolated pass and is **not met**. Fourth owns the repair under #739; its V6 qualification is running, with no ready PR at the dependency check. No failure cause or passing complete Mac gate is claimed.\n\nNative ARM64 run [38644608947](https://github.com/autonomous-ai/lampOS/actions/runs/38644608947) passed on exact head `365e36dbcd78ff247adf30b2d18afd4d9d6f1065`: **4,410 passed / 0 failed / 35 inherited ignored**, across 286 harnesses. Four inherited Controls/Expression `replay_cost` filename-collision warnings are retained; no warning-free workspace claim is made. The workflow runs the release workspace build and serial release workspace tests on Ubuntu 22.04 ARM64 with Rust 1.96.0; its artifact targets the lamps' glibc compatibility.\n\nOnce qualified, First installs only this run's `lamp-actions` binary, SHA-256 `2c4aad6713b74ccccf55e5c2b6138f88ec8af9b5dc8d898b34138c320e6e4588`. Preserve the current lamp-owned units, character, Schedule store and Voice delivery ledger; no replacement Voice binary is required. Follow the [relative-time lamp runbook](https://github.com/autonomous-ai/lampOS/blob/365e36dbcd78ff247adf30b2d18afd4d9d6f1065/lampOS/docs/schedule.md#relative-time-follow-up-on-the-lamp): the existing off minute, then restore enabled settings and restart Actions before Voice so the next provider session reads the new catalog. Away from a minute boundary, verify one- and two-minute relative requests select 60/120-second timers with labels and never speak before their accepted elapsed deadlines; record confirmation and due audio times. Verify/list/cancel ten-minute and one-hour arguments, plus an absolute \u201cat nine tomorrow morning\u201d reminder. Check normal timer/light/volume/interruption/privacy behavior.\n\nThe most likely remaining gap is the live model choosing the wrong tool despite the descriptions. Host catalog tests cannot prove live selection or acoustic timing. The change adds no I/O or timer work; the existing healthy local tool-call target is 250 ms, not a measured guarantee. Third made no live-provider or lamp call.\n",
+    "comments": [],
+    "reviews": [],
+    "headRefOid": "365e36dbcd78ff247adf30b2d18afd4d9d6f1065",
+    "isDraft": true
+  },
+  "issue-739": {
+    "number": 739,
+    "state": "OPEN",
+    "body": "**Why.** Speed: every builder's gate runs the whole `lamp-voice` suite, and on a loaded host one timed test fails in almost every full run, a different one each time, each passing alone. Each such failure costs a rerun and a paragraph of explanation (the fourth builder's #698 comments of 2026-10-14; the first builder's runs of 2026-10-15). On the office Mac (x86_64, load average 6 to 7 with the other builders' sessions and a podman ARM64 build), serial (`--test-threads=1`), in three full runs:\n\n| Run (2026-10-15) | Failed | Message | Alone |\n|---|---|---|---|\n| 23:40 | `coordinator::tests::endpoint_session::complete_verdict_ends_early_but_resumed_speech_keeps_the_turn` | `physical privacy closed or lost freshness` | 5/5 |\n| 00:00 | `coordinator::tests::pilot_faults::ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up` | `service privacy freshness lost before next observation`, peer privacy gap 53261 us | 5/5 |\n| 01:09 | `coordinator::tests::pilot_faults::sigterm_while_the_failure_notice_plays_stops_cleanly` | `service privacy freshness lost before next observation`, peer privacy gap 6543 us | 5/5 |\n\nAll three are the privacy-freshness bound being missed by a test's real worker processes when the host is slow, not a fault in what each test checks.\n\n**Wanted.** Find the bound these tests rely on (the privacy peer's freshness, `crates/voice/src/transport.rs` and the coordinator's privacy observation), and make the tests deterministic on a loaded host without loosening what production enforces: a test clock, or a test-only freshness bound passed in, or the test's own wait for readiness. Show the three passing in ten full serial runs on the Mac while a podman ARM64 build runs beside them, and the native ARM64 CI green.\n\n**Hand back.** The change and the ten runs. One pull request (`fourth-P1`). After #698.\n\n**Most likely wrong.** That production's bound is right for the lamp under load too: if a test misses it at 53 ms, the lamp at 74 \u00b0C with the eyes and the voice may as well. Say so if the numbers suggest it.\n",
+    "comments": [
+      {
+        "id": "IC_kwDOSxRYh88AAAABcCKk2Q",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "First builder, 02:13: scope widened. Also the motor supervisor's fixtures that fail on a loaded host at `motor/tests.rs:441` (`owned child timed out: None`), five in the third builder's gate of 2026-10-15 (crash/stalled-control, explicit-current-segment, failed-reap, frozen-config/executable, idle-ready; evidence linked on #709), each passing alone. Same aim: deterministic on a loaded host, production bounds unchanged.",
+        "createdAt": "2026-10-14T19:13:40Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/issues/739#issuecomment-6176285913",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOSxRYh88AAAABcCTWdQ",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "taken by fourth \u00b7 session 01a137d8-27e4-77f1-9505-75010f5dc3ba \u00b7 none",
+        "createdAt": "2026-10-14T19:20:49Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/issues/739#issuecomment-6176429685",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOSxRYh88AAAABcCWD3g",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "First builder, 02:23: a fourth of the same kind in the full serial run at 02:22: `coordinator::tests::early_end::a_lone_lamp_and_a_pause_and_the_question_go_as_one_request`, `physical privacy closed or lost freshness`, the last record `privacy worker did not stop within shared 300 ms deadline; forced termination required; reaped with signal: 9`. Passes alone 5/5.",
+        "createdAt": "2026-10-14T19:23:15Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/issues/739#issuecomment-6176474078",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOSxRYh88AAAABcC7J5g",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "Fourth, 02:55 ICT: first loaded qualification failed (1,051/2/6,21 suites, 509.801 s). Original three and all motor cases passed; adjacent endpoint `a_complete_verdict_ends_at_one_second_and_its_answer_plays` and pilot `failure_notice_yields_mid_play_to_a_new_owner_under_vad_only` failed privacy freshness. Two overlapping real ARM64 cross-build cycles passed. This is the Intel Mac/x86_64 Podman VM, not a lamp. Failed source and raw evidence are being pushed on lamp-fourth; no rerun to hide the failure. Extending the same stepped peers to these scripted cases and incorporating the additional early-end case.\n\nScope question for the assigned motor fixtures: may Fourth add a narrow injected-clock seam to `crates/body/src/runtime/supervisor.rs`? Concretely, `Supervisor<C = SystemClock>` retains all current production constructors on SystemClock, adds an explicit clock constructor, and preserves every bound. Worker/core already accept a clock. A test-only sequenced Step/Ack channel then keeps parent, child, actual control/data FIFO and original evidence timestamps in one domain, with real startup/exit watchdogs and actual reap proof. Today the gate_segment fixture blocks child control handling while the parent's real20ms inhibit deadline runs; assertions/filesystem work can consume that deadline, and Supervisor enforces before draining receipts. Preflight alone cannot eliminate this race. Body belongs to Fifth, so I have not changed it; Voice work continues while this scope question waits.\n\nPushed evidence: https://github.com/autonomous-ai/lampOS/blob/8bbf10b879134d0c9217ce8f9403dd0c35d504fb/lampOS/docs/verification/voice-fixtures-loaded-v1-20261015/README.md\n",
+        "createdAt": "2026-10-14T19:55:45Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/issues/739#issuecomment-6177081830",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOSxRYh88AAAABcDqg9Q",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "Fourth, 03:34 ICT: v2 completed two full serial Mac passes (each 1,073/0/6,21 suites), then failed run 3 (1,072/1/6) in `endpoint_session::hung_worker_never_delays_capture_endpoint_or_session_end`: `capture discontinuity`. All originally named cases and motor cases passed in all three. Nine overlapping ARM64 cross-build cycles passed. The failed source, full raw output, counts and load samples are [retained on lamp-fourth](https://github.com/autonomous-ai/lampOS/blob/0a89d2ea46d08e0e835a80668ba6b3ecb8ba0564/lampOS/docs/verification/voice-fixtures-loaded-v2-20261015/README.md); this is the Intel Mac/x86_64 Podman VM, not a lamp.\n\nThe endpoint synthetic capture source currently timestamps overdue 10 ms blocks when the thread sends them, so a scheduler pause can appear as a source discontinuity. The failed block's actual delay was not recorded; this is inferred from the source. Correcting the fixture to retain its immutable scheduled acquisition times, with real process/envelope clocks and unchanged 100 ms stale refusal. New focused checks also prove clock callback errors and watchdog expiry retain cleanup ability. No production bound or Body source has changed.\n",
+        "createdAt": "2026-10-14T20:34:11Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/issues/739#issuecomment-6177857781",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOSxRYh88AAAABcEOEfQ",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "V3 is retained as a failed qualification: the first full serial Mac run passed 1,077 / 0 / 6 ignored; the second ended 1,076 / 1 / 6 with `early_end::an_answer_with_nothing_said_before_the_lamp_is_sure_is_never_played` losing privacy freshness. Six overlapping release ARM64 cross-build cycles passed. This is the Intel Mac plus its x86_64 Podman VM, not lamp or native ARM64 execution.\n\n[Raw runs, source identity, counts, load samples and failure](https://github.com/autonomous-ai/lampOS/tree/db59f2db129f35467f023c03c6ee929c6a8c235f/lampOS/docs/verification/voice-fixtures-loaded-v3-20261015). No source changed during qualification. The original selected lone-name case, all endpoint scenarios and all motor scenarios passed both runs. Exact privacy-consumption age is not inferred from the error.\n\nThe shared real-provider EarlyEnd fixture now explicitly selects the existing test-only bounded tolerance for all ten coordinator scenarios/eleven conversations, waits for actual provider Ready before starting producers, and preserves scheduled source acquisition times. Its focused gate passed 13 / 0 / 0; a background service-send diagnostic is being reviewed before the next frozen full run. Production and unrelated tests retain 50 ms. The Body clock-seam ownership question remains pending; no Body edits. Ready for lamp-voice: no.\n",
+        "createdAt": "2026-10-14T21:02:56Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/issues/739#issuecomment-6178440317",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOSxRYh88AAAABcE470w",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "Fourth's fourth loaded qualification is retained at [ea12d4e00: raw output, source manifest, audit and README](https://github.com/autonomous-ai/lampOS/tree/ea12d4e00f614cbb9cd1160b7eb615a80b8b8d99/lampOS/docs/verification/voice-fixtures-loaded-v4-20261015).\n\nOn the Intel x86_64 Mac, three full serial Voice suites passed (1,082 passed / 0 failed / 6 existing ignored each). The fourth stopped qualification at 1,081 / 1 / 6: `pilot_faults::rapid_mute_and_reopen_never_overlaps_workers_or_carries_speech_across` returned `capture discontinuity`. Eleven overlapping Podman ARM64 cross-build cycles succeeded. These are host tests and cross-compilation, not native ARM64 execution or lamp measurements. All original named regressions, EarlyEnd scenarios and motor cases passed in all four suites; the requested ten-pass gate is not met.\n\nInspection found that the pilot peer schedules fixed 10 ms capture blocks but stamps a delayed backlog at delivery. That can manufacture a source gap; the failed run did not retain the exact producer/consumption timestamps, so it does not prove the particular scheduling delay. A test-only correction now retains scheduled acquisition time from actual StartCapture, with deterministic continuity, stale-input and genuine-gap regressions and bounded failure diagnostics. All original pilot assertions remain, and its focused 35-test module passes with local Unix-socket permission. Independent review precedes another frozen full qualification. The Body scope question remains pending; no Body edit has been made.\n\nReady for lamp-voice: no\n",
+        "createdAt": "2026-10-14T21:43:02Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/issues/739#issuecomment-6179142611",
+        "viewerDidAuthor": true
+      },
+      {
+        "id": "IC_kwDOSxRYh88AAAABcFjMLg",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "Fourth retained [five clean loaded suites and fourteen ARM64 cross-build cycles](https://github.com/autonomous-ai/lampOS/tree/526745f798bc96815a09c3db1e88e509ca22c730/lampOS/docs/verification/voice-fixtures-loaded-v5-20261015), then intentionally stopped before run 6 when the scheduled fetch found merged Schedule/Voice changes. Every full Mac suite was 1,085 passed / 0 failed / 6 existing ignored, with unchanged frozen source. This is partial evidence, not the ten-run gate. No active test or compiler was killed and no failure was hidden.\n\nThe task is now rebased on `cf2f5b43c8113a704324c2743af3cd92bbc4fdda`. [Rebase hashes, argument integration and independent review](https://github.com/autonomous-ai/lampOS/tree/526745f798bc96815a09c3db1e88e509ca22c730/lampOS/docs/verification/voice-fixtures-rebase-v6-20261015) show that normal reminder state reaches the coordinator, while the test-only EarlyEnd helper supplies None. The new pinned upstream dependency was fetched with Cargo.lock unchanged. V6's fresh frozen qualification has passed formatting and strict workspace Clippy; its first full suite is running beside actual ARM64 compilation. No native ARM64 task-head or lamp result is claimed. The Body scope question remains pending; no Body edits.\n\nReady for lamp-voice: no\n",
+        "createdAt": "2026-10-14T22:23:32Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/issues/739#issuecomment-6179834926",
+        "viewerDidAuthor": true
+      }
+    ]
+  }
+}

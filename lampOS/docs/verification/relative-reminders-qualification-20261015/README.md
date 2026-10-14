@@ -73,3 +73,17 @@ that separate task. [Draft PR #748](https://github.com/autonomous-ai/lampOS/pull
 now exposes this gate blocker. The [registered snapshot](pr-748-open.json)
 and [body verification](pr-748-registration.json) confirm the exact task head,
 draft state and byte-identical reviewed body. It is not a ready handoff.
+
+The [follow-up notice on #747](https://github.com/autonomous-ai/lampOS/pull/747#issuecomment-6180109668)
+reports the draft and unmet isolated-pass condition; its
+[verified original body](parent-comment-published.json) is retained. Generic
+PR CI [38649101194](https://github.com/autonomous-ai/lampOS/actions/runs/38649101194)
+completed successfully on the same task head: Go, Web and HAL jobs passed
+([terminal metadata](generic-ci-38649101194-terminal.json)). That separate CI
+success does not change the failed Mac qualification or the draft status.
+
+At the [22:45 UTC fetch and Queue check](watch-2245-observation.json),
+integration and governing documents remained unchanged at `cf2f5b43c`.
+The bounded reply watch ended without a new comment, review or Queue change.
+#748 remains a draft; no independent MVP task is available to Third while
+#739 is under qualification and touch needs a person at the lamp.

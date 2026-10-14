@@ -1,0 +1,58 @@
+{
+  "observed_at": "2026-10-14T22:45:51.155002+00:00",
+  "integration_head": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "integration_changed": false,
+  "governing_documents_changed": false,
+  "queue_or_reply_changed": false,
+  "third_open_issues": [
+    711,
+    699
+  ],
+  "ready": false,
+  "draft_pr": 748,
+  "records": [
+    {
+      "file": "watch-2245-event.json",
+      "original": "/private/tmp/lamp-third-relative-watch-2245/event.json",
+      "bytes": 336,
+      "sha256": "3aa671da83c67fddf8ba3baffd70f4308fefd210cd9961166f08c4a007ba916d"
+    },
+    {
+      "file": "watch-2245-state.json",
+      "original": "/private/tmp/lamp-third-relative-watch-2245/last-state.json",
+      "bytes": 44151,
+      "sha256": "fa10479a18ca45752aff15f4af71acd7d663c0303e9dc6680446090bc30fc2f2"
+    },
+    {
+      "file": "watch-2245-third-open.json",
+      "original": "/private/tmp/lamp-third-relative-watch-2245-third-open.json",
+      "bytes": 5303,
+      "sha256": "da6073dd8675525a22c2f93046171d8cfff8be99e8969caf65d15e08cf725271"
+    },
+    {
+      "file": "watch-2245-queue.json",
+      "original": "/private/tmp/lamp-third-relative-watch-2245/4/queue.json",
+      "bytes": 9974,
+      "sha256": "c0bdae6b8189eabfaf501ab8846c6c1b9ef558a668542bb00f6be6af1cc1281e"
+    },
+    {
+      "file": "watch-2245-pr-747.json",
+      "original": "/private/tmp/lamp-third-relative-watch-2245/4/pr-747.json",
+      "bytes": 13470,
+      "sha256": "1b543d621a9cba41efea8790a1781eb4c5852d2adbb9f2ce84370e54632de9bd"
+    },
+    {
+      "file": "watch-2245-pr-748.json",
+      "original": "/private/tmp/lamp-third-relative-watch-2245/4/pr-748.json",
+      "bytes": 5857,
+      "sha256": "9dc412f5fda734a95a8e347c1749ce4e8be1fec809a37402dff9a27135e182c3"
+    },
+    {
+      "file": "watch-2245-issue-739.json",
+      "original": "/private/tmp/lamp-third-relative-watch-2245/4/issue-739.json",
+      "bytes": 12905,
+      "sha256": "9eca6e4bd2f0801e64a3d46ac61913fc1087391f5807b72e8efb19be44cfcf05"
+    }
+  ],
+  "next_queue_check_not_later_than_utc": "2026-10-14T23:15:20+00:00"
+}

@@ -1,0 +1,11 @@
+{
+  "event": "watch-completed",
+  "reason": "deadline",
+  "finished_at": "2026-10-14T22:45:20.322807+00:00",
+  "attempts": 4,
+  "changed": [],
+  "last_snapshot": "/private/tmp/lamp-third-relative-watch-2245/last-state.json",
+  "last_capture": "/private/tmp/lamp-third-relative-watch-2245/4",
+  "new_comments": {},
+  "new_reviews": {}
+}
