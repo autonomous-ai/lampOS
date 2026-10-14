@@ -1664,6 +1664,53 @@ The new tests, gate and exact-head native run will follow before the PR.
 No lamp was accessed. #714 has only been read for dependencies, not claimed
 or implemented; its unchanged Expression baseline was saved in scratch.
 
+## 2026-10-14 — Task 33 — working pads built; replay timeout corrected
+
+Ready for lamp-voice: no
+
+The task is now `08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca` on
+`third/touch`, rebased on `a9992f272`. The per-unit working set accepts three
+to twelve electrodes; sparse orders retain the full strip span across faulty
+slots. Only explicitly excluded individual OOR bits are ignored; whole-chip,
+selected-pad, configuration and I/O failures still invalidate the strip. Raw
+acquisitions retain all twelve bits; excluded levels cannot hold a gesture.
+Each electrode's thresholds remain explicit, and the unequal example values
+are authored rather than a calibration. The complete-twelve and lamp-4ace
+ten-pad reconstructed replays are byte-identical.
+
+The first fresh source-only build passed, but its Controls/Msgs test run on
+the development Mac stopped at 320 passed and one failure: the output-file
+CLI test exceeded its five-second deadline. The partial output and full raw
+stream are retained in the task's
+[touch-output-host-20261014](https://github.com/autonomous-ai/lampOS/tree/08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca/lampOS/docs/verification/touch-output-host-20261014).
+Inspection found unbuffered writes in the new replay output-file path. It now
+uses an 8 KiB buffer and still checks the final flush. The unchanged deadline,
+private mode and overwrite rejection remain, and the test also compares the
+complete file bytes and summary to stdout. The focused 26-test CLI/replay
+rerun passed; no failure was hidden or disabled.
+
+Formatting and strict twenty-package Clippy passed on the corrected source,
+as did strict ARM64 Linux cross-target Clippy for all Controls/Msgs targets
+(compile/lint only on the Intel development Mac). The obsolete full host run
+and native run 38571800855 were interrupted/cancelled after the source fix;
+neither is a passing gate. Fresh upstream Eyes, Policy, Records and Voice
+changes were then picked up before restarting the complete gate.
+
+The final source-only build/tests and full twenty-package serial host gate
+are running; host test suites are serialized. Native ARM64 run
+[38573575450](https://github.com/autonomous-ai/lampOS/actions/runs/38573575450)
+is running on the exact task head. No PR or ready-yes handoff until all pass.
+The switch remains `--touch`, with `--enable` separately authorizing requests.
+The required lamp commands and likely physical failures remain in
+`docs/controls.md`, “Run without a lamp, then qualify on one”: qualify each
+working pad's thresholds through its shell, discover that unit's head lines,
+cross missing pads, test real fault isolation and final-owner privacy/actions.
+
+The 20:35 queue read shows #714 moved to Second. It was only inspected here,
+with no claim or source changes. The remaining Third queue is #711, #709,
+#699. Read-only Schedule integration preparation continues while touch gates
+run. No lamp, provider account or actuator was accessed.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
@@ -1677,5 +1724,5 @@ installed a production signed release or erased a real personal store. Its
 production supervisor, trusted feed, lamp storage durability and full-service
 latency remain unqualified. Schedule and Tasks passed their host gates; their
 real storage, clock, Harness and Voice integrations remain for First to qualify
-on the lamp. The current remaining Third queue is #711, #714, #709 and #699;
-Task 33 remains pending the working-pad update, its new native gate and PR.
+on the lamp. The current remaining Third queue is #711, #709 and #699;
+Task 33 remains pending its final corrected-source gates and PR.
