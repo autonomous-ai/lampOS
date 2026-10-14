@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/lamp_voice-a98444cc1c3f37e5)
+
+running 1 test
+test coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 822 filtered out; finished in 0.30s
+

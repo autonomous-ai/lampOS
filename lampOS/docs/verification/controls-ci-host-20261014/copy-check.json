@@ -1,0 +1,13 @@
+{
+  "copy": "/private/tmp/lamp-third-controls-ci-source-20261014",
+  "workspace_packages": 31,
+  "all_local_dependencies_inside_copy": true,
+  "changed_source_hashes": {
+    "Cargo.toml": "032a7a65da2a54547d995b9c0fa5cc9684deb9548b2e965dcdeb2d52c209fea6",
+    "Cargo.lock": "9ea99011f004160bcf152cd81a4a10a3a10e27dd0109588d4c130a96aa0751d1",
+    "crates/controls/Cargo.toml": "dd07dbc0d1f65ef1273937e02167c68b487ce8a23d80c026198643f8306d39e7",
+    "crates/controls/tests/program.rs": "c50dac7cff3a2eeb35b231835e3cf5cd58d7b4e348aa180297b3d3d24b5e4269"
+  },
+  "prior_target": false,
+  "parent_git": false
+}

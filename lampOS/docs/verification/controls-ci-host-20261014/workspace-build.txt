@@ -1,0 +1,2 @@
+   Compiling lamp-expression v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/expression)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.01s

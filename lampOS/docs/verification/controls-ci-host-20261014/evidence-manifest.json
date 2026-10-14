@@ -1,0 +1,86 @@
+[
+  {
+    "file": "fmt.txt",
+    "source": "/private/tmp/lamp-third-controls-ci-gate-20261014/fmt.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "clippy.txt",
+    "source": "/private/tmp/lamp-third-controls-ci-gate-20261014/clippy.txt",
+    "bytes": 1518,
+    "sha256": "600a97a7ea4b7fb86a4a0debdad64e4453c2c6dd5f0f722ae10903ac8ffbb302"
+  },
+  {
+    "file": "tests.txt",
+    "source": "/private/tmp/lamp-third-controls-ci-gate-20261014/tests.txt",
+    "bytes": 99635,
+    "sha256": "73ff8a475c0911a30316153c3d2c9e6b2305d2bf660cae063ce52ec429540c3e"
+  },
+  {
+    "file": "results.json",
+    "source": "/private/tmp/lamp-third-controls-ci-gate-20261014/results.json",
+    "bytes": 1109,
+    "sha256": "72ba813c8fcc043c0724fc686b923baf28aa0162e6dbea7b4469e22027c7b21d"
+  },
+  {
+    "file": "voice-isolated.txt",
+    "source": "/private/tmp/lamp-third-controls-ci-gate-20261014/voice-isolated.txt",
+    "bytes": 373,
+    "sha256": "2e9f029310c3281384abbc3d0064d252ddc7a2ecaab1df03b957f19f3f46677a"
+  },
+  {
+    "file": "voice-eval.txt",
+    "source": "/private/tmp/lamp-third-controls-ci-gate-20261014/voice-eval.txt",
+    "bytes": 27758,
+    "sha256": "3c93c5dbc7b24303ac243b57bb6361fc7c6eb4f2af53faba383ccfa910bcfef9"
+  },
+  {
+    "file": "workspace-build.txt",
+    "source": "/private/tmp/lamp-third-controls-ci-gate-20261014/workspace-build.txt",
+    "bytes": 163,
+    "sha256": "85adc16e3a7231b3b78ce322e2507da94cd471d154398d0e4904109f9b9ba76f"
+  },
+  {
+    "file": "supplement.json",
+    "source": "/private/tmp/lamp-third-controls-ci-gate-20261014/supplement.json",
+    "bytes": 1135,
+    "sha256": "90907a203afcc0b22d9a0af6366aa93e39c9f3ac336ec9d095cacd973c2f47bc"
+  },
+  {
+    "file": "standalone-build.txt",
+    "source": "/private/tmp/lamp-third-controls-ci-gate-20261014/standalone-build.txt",
+    "bytes": 12023,
+    "sha256": "0b2b87513cecc2424f1164800c99f8aaa37908eeb330df6a22c83184717638c9"
+  },
+  {
+    "file": "standalone-controls-tests.txt",
+    "source": "/private/tmp/lamp-third-controls-ci-gate-20261014/standalone-controls-tests.txt",
+    "bytes": 13864,
+    "sha256": "c2fe9b0e82c1f6f4ec93e19f06db54b5f02f3de697246a751405fcc162f95ce2"
+  },
+  {
+    "file": "standalone.json",
+    "source": "/private/tmp/lamp-third-controls-ci-gate-20261014/standalone.json",
+    "bytes": 723,
+    "sha256": "4a254e9ab8f0e10ae2804db768935a6fc60feae0b1df43e4797e4877b4635141"
+  },
+  {
+    "file": "superseded.patch",
+    "source": "/private/tmp/lamp-third-controls-ci-superseded.patch",
+    "bytes": 2965,
+    "sha256": "42b2392ba395a7a987b568fc260f2e4a1e55cd1d26deef4bbc9a72143ad555b1"
+  },
+  {
+    "file": "copy-check.json",
+    "source": "/private/tmp/lamp-third-controls-ci-copy-check.json",
+    "bytes": 605,
+    "sha256": "433fdb7906db0cc6f64d0cf6e766a91c7aab2d5c0a39f6362b141b7d66650732"
+  },
+  {
+    "file": "dependent-packages.json",
+    "source": "/private/tmp/lamp-third-controls-ci-packages.json",
+    "bytes": 59,
+    "sha256": "fedd4f0ca0bd623380a9dc7f89a65c6e6db4c5f4d5b0a3fe340146bf0367992d"
+  }
+]

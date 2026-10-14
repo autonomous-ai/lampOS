@@ -1,0 +1,51 @@
+[
+  {
+    "check": "voice-isolated",
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "cwd": "/Users/d/code/autonomous-os/lampOS",
+    "started_utc": "2026-10-14T10:35:44.032569+00:00",
+    "elapsed_seconds": 1.0300735650000001,
+    "exit_code": 0
+  },
+  {
+    "check": "voice-eval",
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "lamp-voice-eval",
+      "--",
+      "--test-threads=1"
+    ],
+    "cwd": "/Users/d/code/autonomous-os/lampOS",
+    "started_utc": "2026-10-14T10:35:45.063327+00:00",
+    "elapsed_seconds": 797.166813347,
+    "exit_code": 0
+  },
+  {
+    "check": "workspace-build",
+    "argv": [
+      "cargo",
+      "build",
+      "--locked",
+      "--workspace"
+    ],
+    "cwd": "/Users/d/code/autonomous-os/lampOS",
+    "started_utc": "2026-10-14T10:49:02.258539+00:00",
+    "elapsed_seconds": 3.1343526580000116,
+    "exit_code": 0
+  }
+]

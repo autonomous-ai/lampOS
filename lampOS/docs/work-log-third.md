@@ -1382,6 +1382,40 @@ Found outside this repair: `turn-end-wire/tests/process.rs` and Voice's
 Their owners or First must qualify those against the minimal CI image; Third
 will not edit those crates. The artifact list still omits `tasks_check`.
 
+## 2026-10-14, 17:51 — CI repair superseded; new Third queue
+
+Ready for lamp-voice: no
+
+Evidence only; no runtime or test change is handed back. Fetched
+`f8f0b496cec739c92bfd05386b9470ee5afb766c` and read Queue #705 and Third's
+issue comments. First added `procps` to CI in `f1ff6e857` and explicitly said
+to leave the Controls test unchanged. Discarded all four uncommitted trial
+changes (test, dev dependency, lockfile and Controls doc). The original code
+is intact. The trial diff and all measurements are retained as
+[superseded experiment evidence](verification/controls-ci-host-20261014/README.md).
+
+That trial's formatting and strict Clippy for Controls/Voice/Voice-eval passed.
+All 144 Controls tests passed. The combined gate then failed in unchanged
+Voice: 816 passed, 1 failed, 6 inherited ignored, at
+`coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch`,
+`motor/tests.rs:722`. One isolated rerun passed (0.30 s test time); the original
+failure remains a failure. Voice-eval independently passed 284 tests and the
+workspace built. The fresh standalone trial copy built all 31 packages and
+passed 144 Controls tests. Same Intel Mac, Rust 1.96.0 and APFS; no lamp.
+
+Found outside Third's edit scope: the failed Voice fixture checks the original
+owner after creating a motor and four peer workers, while `active_reply()`
+sets 500 ms capture/admission leases before that setup. The original failure
+contains no actual authority payload or setup timing, so this is only a place
+for First to inspect, not a proven expiry diagnosis. No Voice source changed.
+
+The new Third queue is #711 (touch strip/head pads), #714 (idle/sleep/waking),
+#709 (Voice schedules), then #699 (shared settings/log, returned from Fourth).
+Read #711 and both comments, including First's measured masks and the hardware
+team's per-unit wiring/calibration corrections. It is the next task to claim.
+Tasks #695 and #696 are closed as adopted by First. No lamp was accessed, and
+no discarded trial code is marked ready or merged.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

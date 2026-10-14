@@ -1,0 +1,429 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/lamp_voice_eval-50a132f45d99635b)
+
+running 84 tests
+test evaluate::completion_evidence_tests::synthetic_events_cannot_bypass_outcome_gap_consistency ... ok
+test events::tests::candidate_and_ring_vocabulary_maps_with_turns_and_ids ... ok
+test events::tests::completion_cues_require_all_terminal_fields_and_original_generation ... ok
+test events::tests::coordinator_vocabulary_maps_without_guessing ... ok
+test events::tests::cues_require_schema_one_and_consistent_times ... ok
+test events::tests::directed_cues_preserve_owner_epochs_and_cancel_reason ... ok
+test events::tests::fake_serialization_round_trips_through_the_trace_parser ... ok
+test events::tests::proposed_readiness_cues_parse_strictly_and_carry_no_owner ... ok
+test events::tests::readiness_records_map_from_the_trace ... ok
+test physical::framing::tests::a_line_at_the_bound_passes_and_one_byte_more_is_rejected_whole ... ok
+test physical::framing::tests::end_of_input_inside_a_line_is_explicit ... ok
+test physical::framing::tests::failures_have_explicit_text ... ok
+test physical::framing::tests::hashing_covers_every_byte_even_after_an_early_stop ... ok
+test physical::framing::tests::lines_split_across_reads_are_reassembled_exactly ... ok
+test physical::framing::tests::multibyte_characters_are_never_split_or_lossily_replaced ... ok
+test physical::framing::tests::oversized_input_is_counted_but_never_retained ... ok
+test physical::framing::tests::the_total_bound_counts_raw_bytes_even_inside_an_endless_line ... ok
+test physical::mac::audit_grant_tests::a_held_startup_cue_that_expired_before_the_live_map_is_refused ... ok
+test physical::mac::audit_grant_tests::audit_failed_outer_transport_cannot_certify_nominal_runtime_end ... ok
+test physical::mac::audit_grant_tests::audit_grant_deschedule_after_send_must_not_panic_or_lose_tracking ... ok
+test physical::mac::audit_grant_tests::audit_grant_within_deadline_control ... ok
+test physical::mac::audit_grant_tests::audit_nonzero_runtime_exit_must_invalidate_attempt ... ok
+test physical::mac::audit_grant_tests::audit_reaped_successful_transport_certifies_nominal_runtime_end ... ok
+test physical::mac::audit_grant_tests::audit_serve_stdout_readiness_cannot_mint_an_original_cue ... ok
+test physical::mac::audit_grant_tests::audit_startup_unmapped_expired_readiness_cannot_be_accepted ... ok
+test physical::mac::audit_grant_tests::audit_successful_runtime_exit_control ... ok
+test physical::mac::audit_grant_tests::audit_transport_that_outlives_its_bound_is_killed_and_never_certified ... ok
+test physical::mac::audit_grant_tests::fast_startup_cues_before_the_first_live_pong_are_published_in_order_with_original_times ... ok
+test physical::mac::audit_grant_tests::held_batch_resamples_after_parse_and_refuses_a_later_expired_cue ... ok
+test physical::mac::audit_grant_tests::r2_a_grant_never_outlives_the_recordings_latest_covered_start ... ok
+test physical::mac::audit_grant_tests::r2_an_actual_first_copy_after_the_covered_start_is_retained_as_a_violation ... ok
+test physical::mac::audit_grant_tests::the_original_expiry_refuses_at_equality ... ok
+test physical::mac::cue_tests::a_grant_sent_after_its_expiry_keeps_a_negative_margin_without_overflow ... ok
+test physical::mac::cue_tests::a_prompt_is_covered_only_through_its_speech_and_observation_window ... ok
+test physical::mac::cue_tests::cue_order_rejects_missing_duplicate_relabelled_and_out_of_order_owners ... ok
+test physical::mac::cue_tests::cue_receipt_at_expiry_or_before_send_is_not_fresh ... ok
+test physical::mac::cue_tests::each_occurrence_is_matched_and_only_whole_completion_is_terminal ... ok
+test physical::mac::cue_tests::fresh_delayed_child_observation_keeps_its_earlier_event_time ... ok
+test physical::mac::cue_tests::legacy_missing_occurrence_live_cue_is_withheld ... ok
+test physical::mac::cue_tests::readiness_cues_are_unowned_but_still_sequenced ... ok
+test physical::mac::cue_tests::retired_audio_can_be_cancelled_without_reviving_playback ... ok
+test physical::mac::relay_reader_tests::a_never_terminated_line_still_ends_at_the_session_byte_bound ... ok
+test physical::mac::relay_reader_tests::oversized_non_utf8_and_cut_off_lines_are_protocol_errors ... ok
+test physical::mac::relay_reader_tests::reading_stops_with_an_error_above_the_session_byte_bound ... ok
+test physical::session::runtime_flag_tests::microphone_flag_is_typed_forwarded_and_rejects_duplicates ... ok
+test physical::session::runtime_flag_tests::omitted_runtime_flags_leave_every_child_argv_unchanged ... ok
+test physical::session::runtime_flag_tests::the_endpoint_trial_reaches_serve_after_the_pilot_settings ... ok
+test physical::session::runtime_flag_tests::the_pilot_settings_reach_serve_and_directed_exactly ... ok
+test physical::session::runtime_flag_tests::values_and_combinations_lamp_voice_refuses_are_refused_before_any_child ... ok
+test physical::session::serve_metadata_tests::a_segment_without_a_valid_header_is_rejected ... ok
+test physical::session::serve_metadata_tests::gapped_overwritten_or_unacknowledged_history_is_missing_evidence ... ok
+test physical::session::serve_metadata_tests::rotated_segments_relay_in_generation_order_without_headers ... ok
+test playback::tests::legacy_single_occurrence_is_readable_but_multiple_missing_ids_are_ambiguous ... ok
+test playback::tests::overlap_is_half_open_and_empty_occurrences_prove_no_overlap ... ok
+test playback::tests::stale_retirement_cannot_close_the_next_occurrence ... ok
+test runner::occurrence_tests::a_backend_revalidation_with_harmless_events_dispatches_once ... ok
+test runner::occurrence_tests::a_cancelled_turn_also_finishes_the_wait ... ok
+test runner::occurrence_tests::a_correction_after_new_input_or_a_second_owner_is_withheld ... ok
+test runner::occurrence_tests::a_correction_binds_to_the_turn_admitted_since_the_previous_step ... ok
+test runner::occurrence_tests::a_correction_due_after_output_started_is_withheld ... ok
+test runner::occurrence_tests::a_dispatch_that_never_settles_is_withheld_after_its_bound ... ok
+test runner::occurrence_tests::a_failure_already_delivered_at_playback_time_withholds_the_stimulus ... ok
+test runner::occurrence_tests::a_failure_during_the_trigger_delay_withholds_the_stimulus ... ok
+test runner::occurrence_tests::a_failure_latches_for_the_rest_of_the_attempt ... ok
+test runner::occurrence_tests::a_link_outage_is_waited_out_by_event ... ok
+test runner::occurrence_tests::a_provider_failure_is_never_a_completion_trigger_and_is_reported ... ok
+test runner::occurrence_tests::a_retirement_taken_by_the_backend_drain_is_precondition_lost ... ok
+test runner::occurrence_tests::a_stream_without_readiness_evidence_never_waits_on_it ... ok
+test runner::occurrence_tests::a_terminal_link_during_the_wait_is_provider_unavailable ... ok
+test runner::occurrence_tests::a_turn_finished_twice_is_an_owner_fault ... ok
+test runner::occurrence_tests::an_extra_admitted_turn_during_the_wait_is_not_waited_out ... ok
+test runner::occurrence_tests::an_extra_candidate_during_the_wait_withholds_the_next_turn ... ok
+test runner::occurrence_tests::audit_a_completion_trigger_starts_inside_the_reopen_window ... ok
+test runner::occurrence_tests::availability_never_withdrawn_is_ready_at_the_finish_not_before_admission ... ok
+test runner::occurrence_tests::availability_withdrawn_before_dispatch_withholds ... ok
+test runner::occurrence_tests::completion_is_not_readiness_the_late_reopen_is_awaited_by_event ... ok
+test runner::occurrence_tests::input_between_readiness_and_dispatch_is_rechecked_at_dispatch ... ok
+test runner::occurrence_tests::lost_runner_evidence_withholds_the_next_step_at_once ... ok
+test runner::occurrence_tests::main_015_failure_before_the_first_planned_start_injects_nothing ... ok
+test runner::occurrence_tests::second_occurrence_is_speaking_but_first_retirement_is_not_completion ... ok
+test stats::tests::nearest_rank_matches_the_definition ... ok
+test stimulus::tests::conflicting_extension_definitions_are_rejected ... ok
+test stimulus::tests::measured_mix_refines_only_within_each_clip_window ... ok
+test stimulus::tests::merged_catalog_keeps_desk_definitions_and_adds_new_scenes ... ok
+
+test result: ok. 84 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.02s
+
+     Running unittests src/main.rs (target/debug/deps/lamp_voice_eval-017ca99fcc677b9b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/acceptance_boundaries.rs (target/debug/deps/acceptance_boundaries-1df9d74288de0bf8)
+
+running 5 tests
+test delayed_human_response_has_no_synthetic_timing_claim ... ok
+test human_import_with_explicit_turn_attribution_remains_separate_and_usable ... ok
+test prompt_window_does_not_prove_an_echo_was_a_human_interruption ... ok
+test unanswered_human_prompt_cannot_pass_a_silence_test ... ok
+test unfinished_background_admission_is_unknown_without_timestamp_overflow ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+     Running tests/answer_review.rs (target/debug/deps/answer_review-a50cd9a3429a0e98)
+
+running 14 tests
+test complete_positive_review_is_separate_from_unreviewed_or_partial_review ... ok
+test confirmed_duplicate_and_split_answers_are_not_successful_completion ... ok
+test evaluator_duplicate_attributed_replies_preserve_transport_and_fail_completion_rate ... ok
+test evaluator_retains_validated_review_and_transport_as_separate_facts ... ok
+test failed_answers_stay_in_the_denominator_and_existing_exclusions_stay_explicit ... ok
+test gap_accounting_and_review_failures_are_independent ... ok
+test legacy_review_findings_still_exclude_completion_without_new_review_field ... ok
+test positive_review_cannot_repair_missing_truncated_or_late_transport ... ok
+test readable_report_does_not_describe_unreviewed_playback_as_semantic_success ... ok
+test reviewed_irrelevant_or_incomplete_answer_keeps_transport_but_not_completion_credit ... ok
+test separate_source_groups_preserve_reviewed_answer_denominators ... ok
+test source_specific_headings_do_not_call_humans_loudspeakers ... ok
+test unlistened_or_mismatched_recording_review_cannot_disqualify_playback ... ok
+test unrelated_ring_fault_and_unconfirmed_or_other_step_findings_do_not_change_answer_credit ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+
+     Running tests/audit_final_dispatch.rs (target/debug/deps/audit_final_dispatch-45d5b44293d9aaff)
+
+running 2 tests
+test final_dispatch_must_not_start_after_cue_protocol_failure ... ok
+test final_dispatch_must_not_start_after_session_end ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+     Running tests/audit_importer.rs (target/debug/deps/audit_importer-a8886b3f9bff8919)
+
+running 11 tests
+test a_receipt_changed_after_import_fails_review_time_verification ... ok
+test a_valid_receipt_and_its_wav_are_verified_as_room_evidence ... ok
+test a_wav_in_another_format_or_length_is_refused ... ok
+test an_imported_trace_with_a_receipt_is_annotated_and_scored_only_after_listening ... ok
+test an_invalid_receipt_keeps_the_attempt_with_unmeasured_acoustics ... ok
+test audit_malformed_frame_count_is_invalid_evidence_not_a_panic ... ok
+test audit_missing_receipt_is_retained_as_unmeasured_evidence ... ok
+test audit_original_receipt_must_bind_the_wav_reverified_for_scoring ... ok
+test inconsistent_or_unsafe_receipts_are_refused ... ok
+test roots_real_invalid_receipt_is_retained_and_refused ... ok
+test samples_that_differ_from_the_received_pcm_are_refused ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+
+     Running tests/audit_runner_dispatch.rs (target/debug/deps/audit_runner_dispatch-7d4d1a8314d6a4e7)
+
+running 2 tests
+test final_drain_must_recheck_speaking_precondition_before_injection ... ok
+test final_drain_must_recheck_trigger_lateness_before_injection ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/canary_plan.rs (target/debug/deps/canary_plan-41860dfab9f58521)
+
+running 3 tests
+test custom_catalog_profiles_and_deadline_do_not_change_canary_inputs ... ok
+test every_result_identifies_the_embedded_canonical_plan_and_catalog ... ok
+test subset_plan_does_not_need_the_named_canary_scenarios ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/evaluator.rs (target/debug/deps/evaluator-81add3c535d12b58)
+
+running 14 tests
+test a_trace_with_run_start_but_no_run_end_is_not_scored ... ok
+test a_trace_without_run_records_is_unscored_not_passed ... ok
+test acoustic_latency_requires_a_listened_annotation_of_the_same_recording ... ok
+test annotation_files_reject_negative_or_nonfinite_times ... ok
+test imported_h4_trace_is_a_false_interruption_by_unattributed_input ... ok
+test imported_zejfwxq7_like_chain_counts_every_cancelled_answer ... ok
+test imports_must_declare_every_stimulus_and_undeclared_steps_are_unscored ... ok
+test legacy_retirement_before_revocation_does_not_prove_whole_answer_complete ... ok
+test loudspeaker_and_direct_human_attempts_are_reported_separately ... ok
+test provider_mismatch_and_unknown_turns_are_rejected_on_import ... ok
+test rates_exclude_invalid_attempts_and_unscored_opportunities ... ok
+test reviewer_judgments_fail_and_negative_intervals_stay_unscored ... ok
+test the_evaluator_detects_every_injected_failure_and_passes_clean_controls ... ok
+test the_shipped_plan_is_valid_and_mutations_are_rejected ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.64s
+
+     Running tests/fake_runtime.rs (target/debug/deps/fake_runtime-3b9ad7176619f16a)
+
+running 23 tests
+test a_lost_overlap_precondition_withholds_the_stimulus ... ok
+test a_missing_trigger_is_recorded_not_replaced_by_a_fixed_delay ... ok
+test a_session_that_ends_after_a_disconnect_is_scored_as_no_recovery ... ok
+test a_stale_trigger_withholds_the_stimulus_instead_of_playing_it_late ... ok
+test acknowledgments_and_asides_falsely_interrupt_the_current_policy ... ok
+test an_admission_during_a_noise_only_scene_fails_that_silence_step ... ok
+test an_unfinished_question_with_a_long_pause_splits_and_its_resumption_yields ... ok
+test background_talk_that_revokes_the_request_is_a_false_interruption_not_a_split ... ok
+test echo_leak_profile_reproduces_the_h4_false_admission ... ok
+test echo_loop_profile_reproduces_a_self_sustaining_admission_chain ... ok
+test fixed_reply_second_turn_is_unsupported_not_failed ... ok
+test follow_ups_are_triggered_by_the_end_of_each_answer ... ok
+test hesitation_longer_than_the_endpoint_splits_the_turn ... ok
+test multiple_generations_of_one_turn_still_wait_for_completion_and_keep_overlap ... ok
+test provider_faults_are_reported_honestly ... ok
+test quick_chat_is_one_complete_answer_with_simulated_latency_only ... ok
+test repeated_interruptions_each_yield_on_their_own_trigger ... ok
+test retained_v1_plan_bytes_still_parse_with_occurrence_retirement_triggers ... ok
+test same_seed_reproduces_identical_events ... ok
+test signal_mode_uses_lamp_voice_vad_on_the_exact_cached_mix ... ok
+test topic_change_yields_as_planned_and_measures_software_yield ... ok
+test unaddressed_speech_gets_admitted_and_answered_without_an_addressee_gate ... ok
+test voice_and_ring_state_stay_consistent_through_cancellation_and_breaks_are_detected ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.33s
+
+     Running tests/final_dispatch.rs (target/debug/deps/final_dispatch-2be0e45f92045b8c)
+
+running 13 tests
+test a_final_drain_that_exhausts_its_budget_requires_revalidation ... ok
+test a_healthy_session_still_dispatches_once ... ok
+test a_known_invalid_cue_withholds_dispatch_as_a_protocol_failure ... ok
+test a_known_run_end_cue_withholds_dispatch ... ok
+test a_known_session_end_withholds_dispatch ... ok
+test a_relay_framing_error_first_seen_in_the_final_drain_withholds ... ok
+test a_session_end_first_seen_in_the_final_drain_withholds_and_is_kept ... ok
+test a_transport_closed_during_the_final_drain_withholds ... ok
+test an_invalid_cue_first_seen_in_the_final_drain_withholds ... ok
+test an_unobserved_event_in_the_final_drain_requires_revalidation ... ok
+test audit_physical_boundary_does_not_dispatch_during_post_exit_trace_relay ... ok
+test audit_physical_boundary_rejects_a_target_already_over_100ms_late ... ok
+test the_first_terminal_cause_wins_and_a_provider_failure_stays_provider_unavailable ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.36s
+
+     Running tests/next_turn_ready.rs (target/debug/deps/next_turn_ready-97d59fb158a38c3b)
+
+running 2 tests
+test next_turn_ready_validates_only_after_a_step_that_expects_a_turn ... ok
+test the_fake_runtime_reports_readiness_and_follow_ups_start_on_it ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/physical_loopback.rs (target/debug/deps/physical_loopback-73aa8e66306f77a9)
+
+running 12 tests
+test a_transport_that_closes_mid_trace_invalidates_the_attempt ... ok
+test cue_triggered_acknowledgment_is_injected_during_playback_and_scored ... ok
+test directed_followup_waits_for_whole_reply_completion_then_admits_a_new_turn ... ok
+test directed_interruption_during_second_occurrence_preserves_owner_and_yields ... ok
+test directed_missing_or_stale_retirement_never_falls_back_to_a_timer_or_final_trace ... ok
+test directed_mode_keeps_provider_fault_and_asset_restrictions ... ok
+test directed_natural_interruption_runs_during_reply_with_original_cancel_reason ... ok
+test directed_two_occurrences_wait_for_true_completion_before_followup ... ok
+test echo_only_window_passes_through_the_relay_without_extra_admissions ... ok
+test missing_or_stale_whole_completion_withholds_followup_after_valid_retirement ... ok
+test physical_next_turn_ready_follows_lamp_voice_readiness_cues ... ok
+test undelivered_stimuli_are_withheld_not_scored_as_silence ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 246.05s
+
+     Running tests/playback_occurrences.rs (target/debug/deps/playback_occurrences-0f238fa351a9f6aa)
+
+running 10 tests
+test cancellation_between_generations_is_not_whole_turn_completion ... ok
+test cancellation_during_second_generation_is_not_a_complete_answer ... ok
+test completion_missing_gap_count_is_retained_invalid_not_normalized_to_success ... ok
+test completion_relabelled_to_another_generation_or_with_contradictory_gaps_is_invalid ... ok
+test every_occurrence_is_used_for_ring_state_and_latency_uses_the_first_word ... ok
+test historical_terminal_without_generation_is_readable ... ok
+test missing_second_identity_duplicate_retirement_and_early_completion_cannot_pass ... ok
+test recognized_lifecycle_records_cannot_disappear_when_identity_or_time_is_missing ... ok
+test stale_first_retirement_during_second_is_invalid_and_does_not_shorten_exposure ... ok
+test two_complete_occurrences_sum_exposure_without_counting_the_gap ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.09s
+
+     Running tests/provider_failed.rs (target/debug/deps/provider_failed-255901f61cd67e79)
+
+running 7 tests
+test a_failure_after_a_partial_answer_keeps_its_audio_evidence_and_fails ... ok
+test a_failure_before_audio_is_a_failed_answer_not_a_silent_missing_terminal ... ok
+test a_failure_while_audio_is_still_playing_is_inconsistent_evidence ... ok
+test a_late_failed_answer_keeps_both_causes_and_the_provider_evidence ... ok
+test provider_session_and_outcome_survive_trace_parsing_bounded ... ok
+test the_drain_endpoint_is_recorded_but_never_a_normal_endpoint ... ok
+test the_failed_terminal_cue_is_readable_with_or_without_gaps ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s
+
+     Running tests/recording_evidence.rs (target/debug/deps/recording_evidence-1b7c571df828313d)
+
+running 19 tests
+test actual_wav_hash_format_frames_and_duration_are_verified ... ok
+test annotation_parser_rejects_negative_values_without_using_software_hints ... ok
+test duration_rate_and_channel_bounds_are_enforced ... ok
+test empty_and_over_byte_limit_files_fail_before_sample_allocation ... ok
+test failed_or_timed_out_recorder_cannot_reuse_valid_metadata ... ok
+test incomplete_sample_frame_and_nonfinite_float_are_rejected ... ok
+test interruption_times_and_uncertainties_are_checked_too ... ok
+test matching_metadata_and_annotation_strings_cannot_mint_acoustic_evidence ... ok
+test missing_or_corrupt_metadata_retains_the_attempt_and_reason ... ok
+test observer_float_and_extensible_multichannel_pcm_are_supported ... ok
+test observer_frame_format_and_error_claims_must_match_actual_bytes ... ok
+test removing_wav_after_import_invalidates_report_regeneration ... ok
+test reversed_intervals_do_not_erase_independent_content_review ... ok
+test same_length_replacement_after_import_is_not_the_reviewed_recording ... ok
+test symlink_and_nonregular_paths_cannot_be_recordings ... ok
+test truncated_riff_and_payload_are_rejected_even_with_their_new_hash ... ok
+test unrepresentable_path_is_an_invalid_receipt_not_a_serialization_panic ... ok
+test valid_metadata_without_its_recording_is_retained_as_invalid_evidence ... ok
+test wrong_run_and_outside_recording_boundaries_are_unscored ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.31s
+
+     Running tests/recording_import.rs (target/debug/deps/recording_import-e1a81fdc877345cc)
+
+running 10 tests
+test a_receipt_changed_after_import_fails_review_time_verification ... ok
+test a_valid_receipt_and_its_wav_are_verified_as_room_evidence ... ok
+test a_wav_in_another_format_or_length_is_refused ... ok
+test an_absurd_receipt_frame_count_is_invalid_evidence_not_a_panic ... ok
+test an_imported_trace_with_a_receipt_is_annotated_and_scored_only_after_listening ... ok
+test an_invalid_receipt_keeps_the_attempt_with_unmeasured_acoustics ... ok
+test inconsistent_or_unsafe_receipts_are_refused ... ok
+test review_rebinds_the_wav_to_the_receipt_not_to_cached_claims ... ok
+test roots_real_invalid_receipt_is_retained_and_refused ... ok
+test samples_that_differ_from_the_received_pcm_are_refused ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.63s
+
+     Running tests/relay_hardening.rs (target/debug/deps/relay_hardening-2695af3d5e91045a)
+
+running 7 tests
+test a_clean_session_reports_no_relay_failure ... ok
+test a_closed_runner_transport_stops_the_runtime_and_its_workers ... ok
+test a_cut_off_final_trace_record_is_reported_and_the_digest_covers_the_whole_file ... ok
+test an_early_relay_error_after_the_runtime_exited_still_stops_its_workers ... ok
+test oversized_and_non_utf8_stdout_lines_are_explicit_failures ... ok
+test oversized_or_non_utf8_trace_records_stop_the_trace_explicitly ... ok
+test workers_left_after_a_normal_exit_are_stopped_and_reported ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+
+     Running tests/report_validity.rs (target/debug/deps/report_validity-d850f2dc8ba58652)
+
+running 14 tests
+test a_cancellation_with_no_successor_admission_stays_a_runtime_failure ... ok
+test a_correction_admitted_after_output_started_is_not_a_tested_supersession ... ok
+test a_foreign_boot_or_stale_generation_admission_is_not_the_cause ... ok
+test a_late_successor_admission_does_not_explain_the_cancellation ... ok
+test a_listened_annotation_cannot_certify_a_recording_whose_recorder_exited_early ... ok
+test a_valid_wav_from_a_recorder_that_ended_mid_session_certifies_nothing ... ok
+test a_verified_or_absent_room_recording_keeps_its_own_state ... ok
+test an_earlier_turn_cannot_have_caused_a_later_turns_cancellation ... ok
+test only_the_bound_before_output_correction_supersedes_a_pending_reply ... ok
+test reevaluating_a_retained_run_preserves_the_original_failed_report ... ok
+test the_4ace_conversation_scores_its_planned_yield_and_correction ... ok
+test the_endpoint_boundary_states_the_runtimes_observed_silence_wait ... ok
+test the_fixture_keeps_the_runs_exact_interruption_order ... ok
+test the_invalid_room_terminal_report_is_retained_and_surfaced ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.44s
+
+     Running tests/serve_plan.rs (target/debug/deps/serve_plan-a4607640ea681688)
+
+running 6 tests
+test a_config_policy_lamp_voice_would_refuse_is_refused_on_the_mac ... ok
+test a_correction_must_follow_a_request_and_conversations_stop_at_twenty_turns ... ok
+test the_default_plan_hash_is_unchanged ... ok
+test the_endpoint_trial_config_adds_only_the_endpoint_flag ... ok
+test the_sample_pilot_config_forwards_the_installed_pilot_settings ... ok
+test the_serve_example_is_eight_cached_context_linked_turns ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.85s
+
+     Running tests/serve_relay.rs (target/debug/deps/serve_relay-ed3d5ec4d48a34da)
+
+running 6 tests
+test a_closed_runner_transport_stops_the_runtime_through_the_same_path ... ok
+test a_nonzero_runtime_exit_after_clean_metadata_is_a_relay_error ... ok
+test a_runner_stop_is_one_sigterm_and_a_clean_reaped_end ... ok
+test a_runtime_that_ignores_sigterm_is_force_killed_and_never_clean ... ok
+test the_hard_deadline_stops_the_runtime_and_is_an_error ... ok
+test the_pilot_runtime_settings_reach_the_serve_child_exactly ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.33s
+
+     Running tests/serve_session.rs (target/debug/deps/serve_session-aa6a04d9a8620127)
+
+running 14 tests
+test a_declared_capture_end_before_the_next_prompt_and_its_window_withholds_it ... ok
+test a_late_first_copy_or_failed_player_withholds_every_later_turn ... ok
+test a_nonzero_runtime_exit_never_completes_a_serve_attempt ... ok
+test a_provider_outage_is_waited_out_by_event_and_a_terminal_link_ends_it ... ok
+test a_recorder_that_exits_zero_mid_conversation_withholds_the_rest_and_certifies_nothing ... ok
+test a_room_recording_that_ends_early_withholds_the_rest ... ok
+test a_runtime_stop_mute_or_ignored_sigterm_is_retained_and_reaped ... ok
+test an_extra_candidate_during_the_wait_withholds_the_rest ... ok
+test delayed_readiness_is_awaited_by_event_not_by_completion ... ok
+test normal_eight_turn_conversation_in_one_serve_session ... ok
+test serve_readiness_comes_only_from_the_fresh_cue_never_from_stdout ... ok
+test stale_duplicate_reordered_foreign_and_lost_cues_end_the_conversation ... ok
+test startup_cues_stay_fresh_through_a_slow_transport_and_a_slow_first_preparer ... ok
+test the_runner_forwards_pilot_runtime_settings_through_the_relay ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 390.06s
+
+     Running tests/target_audio.rs (target/debug/deps/target_audio-e04e144c20f521e3)
+
+running 6 tests
+test a_changed_pcm_byte_leaves_only_that_stream_unverified ... ok
+test a_replaced_marker_or_a_duplicate_identity_fails ... ok
+test an_absurd_marker_frame_count_is_unverified_not_a_panic ... ok
+test an_uncertified_or_missing_receipt_is_unverified_not_adapted ... ok
+test pcm_changed_after_verification_is_refused_on_read ... ok
+test real_render_and_capture_streams_verify_with_contiguous_spans ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.11s
+
+   Doc-tests lamp_voice_eval
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

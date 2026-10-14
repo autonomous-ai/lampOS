@@ -1,0 +1,26 @@
+{
+  "tests": {
+    "passed": 960,
+    "failed": 1,
+    "ignored": 6,
+    "harnesses": 11
+  },
+  "voice-isolated": {
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "harnesses": 1
+  },
+  "voice-eval": {
+    "passed": 284,
+    "failed": 0,
+    "ignored": 0,
+    "harnesses": 24
+  },
+  "standalone-controls-tests": {
+    "passed": 144,
+    "failed": 0,
+    "ignored": 0,
+    "harnesses": 11
+  }
+}

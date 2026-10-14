@@ -1,0 +1,33 @@
+[
+  {
+    "check": "standalone-build",
+    "argv": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--workspace"
+    ],
+    "cwd": "/private/tmp/lamp-third-controls-ci-source-20261014",
+    "started_utc": "2026-10-14T10:49:22.937914+00:00",
+    "elapsed_seconds": 82.442267836,
+    "exit_code": 0
+  },
+  {
+    "check": "standalone-controls-tests",
+    "argv": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-controls",
+      "--",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/lamp-third-controls-ci-source-20261014",
+    "started_utc": "2026-10-14T10:50:45.377576+00:00",
+    "elapsed_seconds": 22.718654877000006,
+    "exit_code": 0
+  }
+]

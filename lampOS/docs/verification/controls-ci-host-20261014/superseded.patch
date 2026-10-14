@@ -1,0 +1,69 @@
+diff --git a/lampOS/Cargo.lock b/lampOS/Cargo.lock
+index 57f570d70..a58ef97a0 100644
+--- a/lampOS/Cargo.lock
++++ b/lampOS/Cargo.lock
+@@ -1726,6 +1726,7 @@ dependencies = [
+  "lamp-bus",
+  "lamp-ipc",
+  "lamp-msgs",
++ "rustix",
+  "serde",
+  "serde_json",
+  "signal-hook",
+diff --git a/lampOS/crates/controls/Cargo.toml b/lampOS/crates/controls/Cargo.toml
+index c26b52ed6..c0b02448a 100644
+--- a/lampOS/crates/controls/Cargo.toml
++++ b/lampOS/crates/controls/Cargo.toml
+@@ -13,6 +13,9 @@ lamp-bus = { path = "../bus" }
+ lamp-ipc = { path = "../ipc" }
+ signal-hook = { version = "=0.4.4", default-features = false }
+ 
++[dev-dependencies]
++rustix = { version = "1", features = ["process"] }
++
+ # The board's reader (`src/pins.rs`): the lamp's button and touch lines.
+ [target.'cfg(target_os = "linux")'.dependencies]
+ gpiocdev = "=0.8.0"
+diff --git a/lampOS/crates/controls/tests/program.rs b/lampOS/crates/controls/tests/program.rs
+index 5da610c6a..46a0c5c85 100644
+--- a/lampOS/crates/controls/tests/program.rs
++++ b/lampOS/crates/controls/tests/program.rs
+@@ -333,12 +333,13 @@ fn sigterm_finishes_recording_and_releases_the_actual_serve_owner() {
+     assert_eq!(before.fault, Some(ControlFault::Missing));
+     assert!(Service::new(&bus, Config::default(), MissingPins, CLOCK).is_err());
+ 
+-    let pid = running.0.as_ref().unwrap().id();
+-    let signal = Command::new("/bin/kill")
+-        .args(["-TERM", &pid.to_string()])
+-        .status()
+-        .unwrap();
+-    assert!(signal.success());
++    // A minimal Linux image may omit /bin/kill. Send the real signal through
++    // the same safe syscall wrapper used by the other process tests.
++    rustix::process::kill_process(
++        rustix::process::Pid::from_child(running.0.as_ref().unwrap()),
++        rustix::process::Signal::TERM,
++    )
++    .unwrap();
+     let output = running.finish();
+     assert!(
+         output.status.success(),
+diff --git a/lampOS/docs/controls.md b/lampOS/docs/controls.md
+index e35168641..9c2cf9d5c 100644
+--- a/lampOS/docs/controls.md
++++ b/lampOS/docs/controls.md
+@@ -405,6 +405,14 @@ complete replay. Keep the printed summary with a real recording.
+ 
+ ## Qualification and evidence
+ 
++The CLI shutdown test sends SIGTERM directly with the test-only `rustix`
++process wrapper. It needs no `/bin/kill` utility, which is absent from the
++minimal Debian 12 CI container. It still waits for the real service diagnostic
++before signaling, then requires successful exit, finished recording, no dropped
++rows and release of the service owner. Production dependencies, signal handling
++and timing are unchanged. The portability failure and subsequent checks are
++recorded in Third's log; CI evidence is distinct from lamp qualification.
++
+ The unchanged workspace built on Third's x86_64 development Mac before this
+ task. The new tests exercise pure clocks, historical/written touch masks, local
+ Unix datagrams, source/owner restarts, input loss, private mute files, a real
