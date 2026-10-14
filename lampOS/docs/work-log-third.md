@@ -752,6 +752,114 @@ consumer wiring, one rest author and physical qualification belong to First.
   publication from Voice's 350 ms buffer; this addendum must also work with
   today's short observed intervals, without editing that publisher.
 
+## 2026-10-14 — task 18 playout addendum done
+
+- Task branch: `third/expression-rest-playout`,
+  `584205c9633b7f147d7a33f73213b14ebf57af9a`; based on
+  `origin/lamp-voice` `23843b78e939a41590c6569f7a65e29bc10a6d03`, after the
+  pushed claim `39043ab933cc6779be57e5387e5d6bc7f86d7e9e`. This completes the
+  paragraph First added during the previous task's gate. The earlier
+  `third/expression-rest` checkpoint remains intact.
+- Added `timing.recent_playout_us`, default **0**, with a nonzero range of
+  20,000–200,000 us. The separate `playout-behaviours.json` selects **100,000**
+  with today's original Voice protocol and original clips. The built-in and
+  `rest-behaviours.json` files are unchanged. The option does not enable the
+  planner or any actuator consumer. A custom rest catalogue can explicitly
+  combine the option with the new protocol after First wires that producer.
+- A just-ended piece can be admitted as heard evidence, and a queued piece
+  can become recent when it ends before a tick. Retain one recent level,
+  linearly fading from its immutable end, never from receipt or heartbeat.
+  Current sound including zero wins over recent; committed future sound can
+  still anticipate Body, while reactive fallback samples at real `now`.
+  Recent evidence only modulates an owner already Speaking. Hold/resume,
+  generation/identity changes, phase edges, terminal events, stale Voice and
+  clock faults clear it. All prior ordering, overlap, queue, stamp and header
+  checks remain. There is no historical gesture queue or new first-audio time.
+- Rechecked V1's actual meter and Voice's `Piece`. V1's RMS timestamp is set
+  **before** the write; successful writes have a separate activity timestamp.
+  This corrects the shorthand “post-write level expiry” in the claim. Voice's
+  piece level is the maximum ring level, not an acoustic measurement. First's
+  565 cumulative refusals and separate 353-message/four-answer recording are
+  recorded only as First's results. That recording was not supplied here.
+- Added **46 tests**: five catalogue, 29 engine, eight authored-replay and four
+  transport tests. This includes defaults, exact expiry, missed ticks, current
+  zero, future sound, body lag, immutable deadlines, stale headers/payloads,
+  hold/resume and missed holds, terminal/identity fences, queue bounds, clock
+  failure, shadow mode and local Unix-bus publication. The two fixtures are
+  authored, use `recent-playout-fixture`, and contain no lamp recording.
+- Gate on Third's Intel i7-10700K 3.80 GHz, 64 GiB, macOS 26.6.2 / Darwin
+  25.6.0 x86_64, Rust/Cargo 1.96.0: `cargo fmt --all --check`; strict all-target
+  Clippy and serial tests for `lamp-expression`, `lamp-lean`, `lamp-voice`,
+  `lamp-voice-eval`; `cargo build --workspace`. Cargo used `--offline --locked`.
+  **1,461 passed, zero failed, 7 inherited ignored**.
+  No added test is ignored. The refreshed pre-change workspace build passed
+  in 15.545791 s; this is a host build duration, not runtime latency.
+- A source-only copy at
+  `/private/tmp/lamp-expression-playout-standalone-9k1jxhv4/lampOS` contained
+  927 files at copy time, built all 27 workspace members, and resolved all
+  28 local packages inside the copy. Its Expression gate passed **171 tests,
+  zero failed or ignored**. Runtime hashes matched after the gates and
+  measurement. No Linux/ARM64 or Rust 1.91 run was made by Third.
+- Exact commands, outputs, source hashes, ignored cases and development
+  failures are in [the evidence](verification/expression-playout-host-20261014/results.json)
+  and [failure ledger](verification/expression-playout-host-20261014/failures.md).
+  The before-fix refusal was reproduced with zero passed/one failed, then
+  corrected. An initial transport run had two Unix bind denials in the
+  sandbox; the unchanged four-test suite passed with host permission. No
+  assertion was removed, and no failing test is handed over.
+
+**What was timed, here.** One release invocation of `recent_playout_cost`
+runs a first iteration and 100 warm iterations per mode on the same written
+15-input/21-tick trace. Strict runs first, then the optional window; this is
+one build in two modes, not a historical-binary speed claim. It times the
+catalogue clone, Engine construction, JSONL parse, injected planning and
+serialization to a sink. Catalogue parsing, process startup, bus, disk and
+hardware are outside the boundary. No other Third-owned build or test was
+running; unrelated host load was not controlled. Warm median is the average
+of the two middle samples. All 202 timings are retained.
+
+| Mode | Accepted / refused per run | First iteration | Warm median | Warm maximum |
+|---|---|---|---|---|
+| Strict default | 13 / 2 | 0.151605 ms | 0.0514965 ms | 0.057421 ms |
+| Optional 100 ms | 15 / 0 | 0.056098 ms | 0.0510775 ms | 0.055327 ms |
+
+The first three authored pieces last 20 ms and are published 1.7 ms after
+onset; the two delayed arrivals separately add 20 ms of authored transport.
+Each receipt reaches its next planner tick in **18.3 ms**. The optional plan
+follows the reported level there; strict mode misses the first at its end
+and refuses the two late pieces. This is planned timing on an injected
+clock, not lamp latency. A direct built-CLI replay produced 15 accepted,
+zero refused and 21 ticks through 400,000 us; its output is retained.
+
+**First: what to run.** Build the example with the usual ARM64 environment
+(`cargo build --release --locked -p lamp-expression --example recent_playout_cost`)
+and run **`recent_playout_cost`** once on the lamp. The binary embeds its
+fixture and catalogue, needs no Rust installation/source checkout there,
+and checks the counts above before printing timings. Keep the machine name
+and the raw output. For integration, select `playout-behaviours.json` in the
+existing Expression invocation, keeping its boot clock and bus root. It works
+with today's original Voice topics; do not select the resumable catalogue
+until the corresponding producer is in place. Inspect requested output with
+actuator consumers disabled, then qualify the chosen consumers as usual.
+With the original protocol, terminal cancellation must clear the tail;
+testing resumable hold also needs the custom combined catalogue and new producer.
+
+Record real publication, receipt/planner, ring and sound boundaries separately.
+Expect short valid pieces to stop increasing the refusal count; a current
+zero should stop modulation, and expired/mismatched/retired sound must still
+be refused. Confirm hold/cancellation clears the tail, test a stalled planner,
+and repeat when Voice publishes from its earlier buffer. First owns Voice and
+lamp-4ace integration; Fifth owns Body's physical response. No producer,
+actuator, deployment or other builder's branch was changed here.
+
+**Most likely wrong on the lamp:** the 100 ms recent tail feels visibly late,
+or a ring level is mistaken for acoustic evidence. The window is a bounded
+initial choice, not a measured optimum. First's future publication may allow
+it to be reduced; it must not retime ended sound or weaken cancellation.
+
+Questions blocking independent work: none. Next: fetch the list and own log,
+rebase `lamp-third`, and take the next unclaimed Third task.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
