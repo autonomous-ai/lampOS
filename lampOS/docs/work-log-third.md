@@ -1557,6 +1557,33 @@ preserved; the additional 995 samples and monotonic identities are authored.
 No continuous physical recording, physical latency or applied response has
 been measured by Third.
 
+## 2026-10-14 — Task 33 — Linux compile fix and baseline Records failure
+
+Ready for lamp-voice: no
+
+Native run **38559498265** on `42bdf65a` failed before tests: new Linux-only
+`strip_worker.rs` needed `let result: io::Result<()>` for its child-loop
+closure (E0282). The annotation is fixed locally and will be folded into the
+single task commit. It changes no Mac execution; native compilation must
+confirm it. No task Linux test or binary artifact passed in that run.
+
+**Found, not mine:** First's corrected-runner baseline **38556357172** built
+successfully, then stopped in Records' two JSON atomic-write tests at
+`json_file.rs:255` and `:298`, EPERM for the ordinary user. Those match the
+previously documented O_NOATIME traversal of ancestors the user does not own.
+Counts before stopping: 1,866 passed, two failed, 12 inherited ignored in 126
+completed harnesses; remaining tests were not reached. Neither Records nor
+the workflow is changed here. The routing request is on
+[#711](https://github.com/autonomous-ai/lampOS/issues/711#issuecomment-6167873860),
+with both raw failures in
+[touch-native-20261014](verification/touch-native-20261014/README.md).
+
+The independent source-only Mac build passed and its 405 Controls/Msgs checks
+passed with no failures/ignores; all 33 local packages including the patched
+dependency resolved within that copy. The complete Mac dependent-package
+gate continues. No failing test has been removed or weakened, and the task
+has no ready PR while the native gate is red.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

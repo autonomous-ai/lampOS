@@ -1,0 +1,12 @@
+{
+  "task_run": 38559498265,
+  "task_head": "42bdf65a2144e2168d2643494d8b9e9598404a35",
+  "task_result": "Linux-only E0282 in new strip_worker.rs; explicit io::Result<()> annotation required; tests not reached",
+  "baseline_run": 38556357172,
+  "baseline_result": "build passed; unchanged Records two O_NOATIME/PermissionDenied tests failed as ordinary user",
+  "baseline_completed_suites": 126,
+  "baseline_passed_before_stop": 1866,
+  "baseline_failed": 2,
+  "baseline_ignored_before_stop": 12,
+  "baseline_remaining_tests": "not reached; not a complete pass"
+}
