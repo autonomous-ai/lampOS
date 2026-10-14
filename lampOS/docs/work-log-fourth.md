@@ -1644,6 +1644,44 @@ false facing cues (75 unknown), whereas their README says no face was seen.
 Please identify that cue provenance before using it as face ground truth.
 No row was relabelled or discarded; this question does not block the audit.
 
+## 2026-10-14, 18:13 ICT: task 35, inner state — taken
+
+Ready for lamp-voice: no
+
+Fetched/read Queue #705 and Fourth's issue replies. The new order is #707,
+#713, #698, #700. Rebased Fourth onto
+`f8f0b496cec739c92bfd05386b9470ee5afb766c`. The earlier tasks remain on their
+task branches while the published external gate findings are resolved.
+Claimed [#713](https://github.com/autonomous-ai/lampOS/issues/713), verified
+this session has its first taken comment, and read First's creature design.
+Task branch: `fourth/mood`; new `crates/mood` / `lamp-mood`, its own module
+in `crates/msgs`, and `docs/mood.md`. Workspace registration follows this
+explicit new-crate assignment; no deployment, Voice, Body or other owner code.
+
+Build bounded, deterministic awake/attention/energy/warmth state from current
+bus observations and local time, with an explicit off-unless-set switch.
+Publish about once a second and on meaningful changes; command no actuator.
+Sleep is latched against incidental noise and company, with only the named
+wake causes admitted. Keep no words or face history, and no private restart
+state; familiarity remains an unavailable future slot. Inspect existing
+typed inputs and companion-system evidence before choosing constants.
+
+Latency plan: deterministic state transitions have no I/O or inference; aim
+for under 1 ms p95 per event on this Mac. The live metadata path from accepted
+event receipt to published state targets 50 ms p95, separately measured from
+sensor, physical touch and any consumer's response. Bound polling, event
+work and output admission, test missing/stale/restarted publishers and clock
+changes, and distinguish first/repeated calls and slow dependencies. These
+are host design targets, not lamp performance claims.
+
+Produce a replay curve with complete event provenance. If no suitable
+sanitized recorded day is available in the repository, keep an authored
+24-hour stress replay explicitly synthetic, ask First for the missing
+recorded-day evidence in #713, and continue the implementation and host tests.
+Do not infer thanks/laughter from private words or invent a classifier from
+voice activity. Any unavailable semantic or wake input will be an explicit
+contract question and limitation, not a fabricated live observation.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
