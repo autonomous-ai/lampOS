@@ -607,6 +607,44 @@ collision, friction, compliance, servo tracking, stopping or recovery safety.
 No lamp access, account, key, paid service or deployment was used. No owner
 answer is required; task 17 is next after fetching the list.
 
+## 2026-10-14: task 21, controls-voice — taken
+
+- Task 16 and its handoff were pushed (`075179e26`, implementation
+  `98dccf7fa`). The next fetch found task 21 inserted before task 17; take
+  the new first eligible task, not the previous next-task assumption.
+- Rebased `lamp-fourth` onto fetched `52cc4ec8e4a6e3923eceddb96df36a79cbceb849`.
+  First has integrated task 15 and documented its real-lamp dry run; those
+  are First's measurements. The records implementation dropped out, retaining
+  this log. Cargo/reuse-note conflicts were resolved by preserving First's
+  Controls registration/review and appending only Lean. Lean is now
+  `bbbd82fc9`, handoff `e7ae4f7f0`. The remaining diff against that pinned base
+  is only Lean, workspace registration/reuse notes and this log.
+- The refreshed Lean gate passed again: formatting, strict all-target clippy,
+  63 tests, then workspace build (43.87 seconds). Lease-pushed only
+  `lamp-fourth`. No protected branch or running-list edit.
+- Task branch: `fourth/controls-voice`. Scope: the `controls/state` receiver
+  at Voice's coordinator, its startup/privacy/cancellation support, extensions
+  to `crates/controls` as needed, and `docs/controls.md`. Each new action has
+  its own off-by-default switch. Body/deployment and Second's endpoint work
+  remain outside this task.
+- Read the current Controls/Receiver/MuteRecord contract and Voice's existing
+  physical-privacy and cancellation paths before implementing. Revoke and
+  dispatch local speaker cancellation before any persistence/network work;
+  restore software inhibition before opening any workers. Use an explicit local
+  clear, with the physical slide always authoritative, and retain inhibition
+  through failures/restarts. Report pets without using them as Stop.
+- Target observation-to-speaker-cancel dispatch within one 2 ms coordinator
+  polling interval for an already delivered valid request, measured with an
+  injected clock. Account separately for source acquisition, bus delay,
+  persistence and acoustic silence. Test first/repeated requests, stale and
+  duplicate events, thinking/listening/speaking/idle, control-process loss and
+  recovery, Voice restart while muted, slide cycles and a simultaneous link
+  drop. No device latency is inferred from injected clocks.
+- The handoff will list five exact physical actions and expected behavior.
+  The highest lamp risk remains pad polarity, read only at rest by First;
+  software tests cannot establish touch polarity or physical silence.
+  No question, account, key, paid service or lamp access is needed to start.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
