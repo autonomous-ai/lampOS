@@ -37,5 +37,6 @@ The scratch Python runner is intentionally outside this Rust-only repository.
 It executed the three recorded commands sequentially, recorded UTC start/end
 and monotonic command durations, enforced a 20-minute outer watchdog, retained
 raw output, and checked the frozen source hashes before and after each gate.
-No compiler-load loop was running during this focused validation; host load
-was not recorded, so it is not described as an idle-machine measurement.
+Fourth's compiler-load loop was stopped during this focused validation.
+Other activity on the shared Mac and host load were not recorded, so this
+is not described as an idle-machine measurement.

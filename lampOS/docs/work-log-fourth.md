@@ -3113,8 +3113,10 @@ and the serial endpoint module on Fourth's Intel Mac. The module passed
 17 tests, failed none, and kept its one existing model-dependent ignore;
 970 tests were filtered by this focused command. Test time was 25.16 seconds,
 65.818 seconds including Cargo. All 2,367 source hashes remained unchanged.
-No command failed or was retried. The only panic diagnostic is the expected
-logical-clock guard test. Independent review and a separate root diff review
+No command failed or was retried. Fourth's compiler-load loop was stopped;
+other shared-Mac activity and host load were not measured in this focused run.
+The only panic diagnostic is the expected logical-clock guard test.
+Independent review and a separate root diff review
 found no actionable issues. All 16 original tests and 103 assertions remain;
 two policy/clock regressions make 18 tests and 111 assertions.
 
