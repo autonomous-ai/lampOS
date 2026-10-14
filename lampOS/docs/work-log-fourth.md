@@ -1558,6 +1558,58 @@ ready until the required green run is established. Task 29's full Mac tests
 and ARM64 cross-build continue; Linux strict Clippy is blocked by the Body
 warning recorded above. No lamp action or measurement by Fourth.
 
+## 2026-10-14, 18:05 ICT: gate findings after First's CI repair
+
+Ready for lamp-voice: no
+
+Rebased Fourth onto `de69bac33412026475974c0e5ea39a87881816f0`, including
+First's `f1ff6e857` CI utility fix, and pushed only the allowed branches.
+Records task source and evidence remained byte-identical; its new task head
+is `f2dda11e38838fc17ac39d7feb671f3cac13eb1b`. Run
+[38551654600](https://github.com/autonomous-ai/lampOS/actions/runs/38551654600)
+builds the release workspace and passes Controls, but fails Surround's
+permission fixture at `tests/selection.rs:140`. The container runs as root,
+so the fixture's mode-0500 directory still allows removal. The raw failure
+and a disposable local-root check are retained in
+[the CI evidence](verification/arm64-ci-root-20261014/README.md). Following
+First's reply on #707, report this new workflow finding there. No Surround
+or workflow change, test skip or merge by Fourth; Records remains unready.
+
+Task 29's Memory tests pass, as do Mac formatting and strict Clippy and the
+ARM64 cross-build. The release host timing run passed: with matched synthetic
+Days stores, session-open first/p95/p99 were 73.251/148.211/150.513 ms;
+ranked-search first/p95/p99 were 1.026/0.949/1.106 ms, all within 300/1,500 ms.
+These exclude provider/audio and are not lamp timings. Durable session
+creation is slower than the legacy kept read and is not a 50 ms read claim.
+Full evidence is being assembled on `fourth/memory-voice`.
+
+Two complete affected-crate Mac test runs failed different inherited Voice
+privacy-freshness fixtures: shutdown-during-notice under competing builds,
+then endpoint worker recovery with competing builds stopped. Each Voice
+library run had 830 passes, one failure and six ignored manual tests.
+Ten isolated shutdown repetitions and five isolated recovery repetitions
+passed with unchanged deadlines. The recovery fixture's endpoint, privacy
+and coordinator files match upstream; it uses emulated peers and no Memory
+socket or changed provider-spawn path. Its error occurs before the recovery
+assertions and does not distinguish expired delivery from a gap in privacy
+acquisitions. This is not a proved Memory regression, nor a passing full
+gate. Preserve both failures and ask the Voice owner for bounded diagnostics;
+do not widen or suppress privacy limits. Linux functional verification uses
+the native ALSA image after retaining the earlier cross-image link failure.
+The separate inherited Body strict-Clippy warning is still unresolved.
+
+Task 17's frozen 89-row fit reproduced its weights and report byte for byte
+on the Mac. New production-API audit and capture-contract docs are on
+`fourth/judge-fit`; 144 Policy tests passed, zero failed, two manual timing
+tests ignored; formatting, strict Clippy and workspace build passed. No
+weights, thresholds, labels, default behavior or Voice publisher changed.
+The ARM64 gate and final evidence remain to finish before handoff.
+
+A local command stall around 18:00–18:04 affected even read-only shell
+commands. They subsequently completed; disk inspection showed 52 GiB free.
+Its cause was not established and no latency measurement from that interval
+is claimed. No unfinished runtime piece has been put on `lamp-fourth`.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
