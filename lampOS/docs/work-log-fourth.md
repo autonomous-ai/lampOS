@@ -2669,6 +2669,48 @@ and loaded qualification is running. The Body clock-seam question on #739
 comment 6177081830 is still unanswered. No Body file has been changed.
 
 
+
+## 2026-10-15, 03:32 ICT: task 46, two loaded passes then capture discontinuity
+
+Ready for lamp-voice: no
+
+The v2 source on `f60d6d6f9` completed three full serial Voice runs on
+Fourth's Intel Mac beside nine successful Podman ARM64 cross-build cycles.
+Runs 1 and 2 each passed 1,073 / 0 / 6 ignored across 21 suites, in
+437.603 and 371.372 seconds including Cargo. Run 3 failed: 1,072 / 1 / 6,
+21 suites, 370.901 seconds. The failed case was
+`endpoint_session::hung_worker_never_delays_capture_endpoint_or_session_end`,
+with `capture discontinuity`. The originally reported cases and all motor
+cases passed in all three runs. This is not a ten-run success.
+
+The [complete v2 evidence](verification/voice-fixtures-loaded-v2-20261015/README.md)
+retains unchanged raw output, all source hashes and the source patch,
+commands, load samples and counts. Failed Mac output SHA-256 is
+`57d0e11d32cac4adfae904c22e292bb7a836586ff4cdb312e61fefa03203827b`.
+The run stopped on failure; no unchanged retry replaces it. ARM64 here is
+cross-compilation in the x86_64 VM, not ARM64 execution or a lamp reading.
+
+Source inspection found that the endpoint fixture schedules a continuous
+synthetic 10 ms PCM stream but timestamps overdue blocks when its producer
+thread sends them. A host pause can therefore create a false discontinuity
+without a missing sample. The failed block's actual delay was not recorded;
+this is a source-based explanation, not a measured scheduling gap. The
+fixture correction will retain immutable scheduled acquisition timestamps,
+real envelope/classifier clocks and the existing 100 ms stale-input refusal.
+No receiver restamping, retry or production-bound change is planned.
+
+Independent review retained all original pilot assertions and found no
+production default change. Its wording correction distinguishes logical
+camera protocol teardown from the real shared cleanup deadline. Two new
+focused clock regressions cover callback errors and watchdog expiry before
+and after a peer step: peers remain available for shutdown and logical time
+does not advance on the failed step. All seven clock tests passed on this
+Mac; the initial format-only wrapping failure and corrected output are
+retained in scratch pending the final task evidence. Endpoint correction
+and final-source qualification are still in progress. The Body clock-seam
+question remains unanswered; no Body source has changed.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

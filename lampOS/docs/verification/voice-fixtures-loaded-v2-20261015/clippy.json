@@ -1,0 +1,29 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "clippy",
+    "--workspace",
+    "--all-targets",
+    "--locked",
+    "--offline",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "cwd": "/private/tmp/lamp-fourth-fixtures-source-v2-j_ygfmar",
+  "started_at_utc": "2026-10-14T20:04:23.305686+00:00",
+  "load_at_start": [
+    4.6328125,
+    4.42236328125,
+    4.59814453125
+  ],
+  "exit_code": 0,
+  "finished_at_utc": "2026-10-14T20:05:12.943384+00:00",
+  "elapsed_seconds": 49.63801455497742,
+  "load_at_end": [
+    5.37158203125,
+    4.63720703125,
+    4.6640625
+  ],
+  "raw_sha256": "d108cc14d405a8e0e19958cc420a92e366ee1cccb2bb71d2fe3f69511bd527c1"
+}
