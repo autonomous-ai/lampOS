@@ -1,0 +1,14 @@
+   Compiling v4l2r v0.0.8
+    Checking lamp-body v0.1.0 (/source/crates/body)
+    Checking lamp-memory v0.1.0 (/source/crates/memory)
+error: function `run` is never used
+   --> crates/body/src/inspection.rs:615:15
+    |
+615 | pub(crate) fn run(io: &mut impl PortIo, runtime: &mut impl Runtime) -> InspectionReport {
+    |               ^^^
+    |
+    = note: `-D dead-code` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[expect(dead_code)]` or `#[allow(dead_code)]`
+
+error: could not compile `lamp-body` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

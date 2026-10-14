@@ -1501,6 +1501,27 @@ alone never prove a kernel thread or a safe exit; live uninspectable user
 processes continue to refuse the scan. The code and docs remain on the
 isolated task branch until verified.
 
+## 2026-10-14, 17:27 ICT: task 29 Linux dependency gate finding
+
+Ready for lamp-voice: no
+
+The standalone task 29 Linux strict Clippy gate fails in inherited Body
+code, `crates/body/src/inspection.rs:615` (`run` is unused). Reproduced with
+unchanged Memory, Voice and Body source from Fourth base `3a8d0ffbd`;
+both runs exit 101 at the same diagnostic. The exact command, unedited
+baseline output and Linux x86_64 Debian 12 environment are in
+[the evidence](verification/linux-clippy-baseline-20261014/README.md).
+This is outside task 29's permitted files. Reported once on #698 for its
+owner; no Body change or relaxed warning gate. Task 29's Mac gate continues.
+
+Two task-local verification failures have been fixed and retained for the
+final evidence: Clippy rejected a constant assertion in the new manual
+timing test; the existing executable-doc test expected one conversation-end
+example and now verifies both prepare and submit variants. Neither failed
+stage was presented as ready. Records' final Mac focused gate has 113
+passing tests, zero failures, and one ignored manual measurement; its final
+Linux and workspace checks are underway.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
