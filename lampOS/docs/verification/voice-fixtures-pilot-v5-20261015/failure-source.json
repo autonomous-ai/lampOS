@@ -1,0 +1,8 @@
+{
+  "file": "lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs",
+  "source_before_sha256": "73c3bb9663c1142702d994ddf7e9c7a917088feceb35bf3c51299d6523f23fad",
+  "base": "78b984b69fb58b42448ecb16812bc4cab668f1e5",
+  "failure_raw": "/private/tmp/lamp-fourth-fixtures-loaded-v4/mac-voice-04.txt",
+  "failure_raw_sha256": "f34fc557c9f07308db643fb3a4f1af95e13c8427312717f0ad2b766d8b0d9c70",
+  "frozen_source": "/private/tmp/lamp-fourth-fixtures-source-v4-avkgcvtw"
+}

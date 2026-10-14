@@ -1,0 +1,74 @@
+{
+  "started_utc": "2026-10-14T21:40:45.405381+00:00",
+  "base": "78b984b69fb58b42448ecb16812bc4cab668f1e5",
+  "machine": {
+    "uname": [
+      "Darwin",
+      "m0.local",
+      "25.6.0",
+      "Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:49 PDT 2026; root:xnu-12377.161.14~5/RELEASE_X86_64",
+      "x86_64",
+      "i386"
+    ],
+    "sw_vers": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83\n"
+  },
+  "source_count": 696,
+  "stages": [
+    {
+      "name": "format-check",
+      "command": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "crates/voice/src/coordinator/tests/pilot_faults.rs"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0852643889375031,
+      "raw": "/private/tmp/lamp-fourth-pilot-capture-v5-49ln5r2p/format-check.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "compile-check",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--tests"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS",
+      "exit_code": 0,
+      "elapsed_seconds": 10.044958120211959,
+      "raw": "/private/tmp/lamp-fourth-pilot-capture-v5-49ln5r2p/compile-check.txt",
+      "raw_sha256": "2bc61a6a803f8a39be0465ca182eb1cbd639f336b527ed003b151f92eaa32570"
+    },
+    {
+      "name": "pilot-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "coordinator::tests::pilot_faults",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS",
+      "exit_code": 101,
+      "elapsed_seconds": 27.169867523014545,
+      "raw": "/private/tmp/lamp-fourth-pilot-capture-v5-49ln5r2p/pilot-tests.txt",
+      "raw_sha256": "d533b7fde79986ddbf8813b5bd203c300b7f3bf96aa584d6ea5116144b66853e"
+    }
+  ],
+  "source_changes_during_run": [],
+  "finished_utc": "2026-10-14T21:41:22.865609+00:00",
+  "exit_code": 101
+}

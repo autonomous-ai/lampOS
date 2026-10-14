@@ -1,0 +1,282 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/lamp_voice-798a966b47f6690b)
+
+running 35 tests
+test coordinator::tests::pilot_faults::camera_loss_during_an_answer_revokes_only_sight ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 167.385345ms
+result Err("physical mute observed at 2541575530966 us")
+kinds ["endpoint_policy", "turn_taking_availability", "camera_lifecycle", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_turn_complete", "speech_queue_drained", "camera_unavailable", "speech_queue_drained", "speech_final_sample_retired", "turn_finished(\"audio_written_unscored\")", "physical_mute", "camera_shutdown_receipt"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 245 starts [1] ends [1] chunks 48 accepted 48 fired [(CameraSilent, 2541575076966), (Mute, 2541575524966)] stopped ["camera", "privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::capture_fault_during_output_cancels_the_answer_and_ends_the_run ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 116.175778ms
+result Err("injected capture fault")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "turn_finished(\"runtime_failed\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 200 starts [1] ends [1] chunks 3 accepted 3 fired [(CaptureFault, 2541575263722), (Mute, 2541575265722)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::capture_schedule_tests::a_delivery_pause_keeps_contiguous_original_acquisition_times ... ok
+test coordinator::tests::pilot_faults::capture_schedule_tests::a_dropped_block_or_real_source_gap_still_faults ... ok
+test coordinator::tests::pilot_faults::capture_schedule_tests::late_delivery_cannot_refresh_a_stale_admission_trigger ... ok
+test coordinator::tests::pilot_faults::capture_stall_during_a_question_ends_the_run_without_an_answer ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 42.411362ms
+result Err("accepted capture lineage changed")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "turn_finished(\"runtime_failed\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 60 starts [1] ends [] chunks 0 accepted 0 fired [(CaptureSilent, 2541574001704)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::control_one_question_is_answered_once_then_mute_ends_the_run ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 149.458117ms
+result Err("physical mute observed at 2541575915619 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_turn_complete", "speech_queue_drained", "speech_final_sample_retired", "turn_finished(\"audio_written_unscored\")", "physical_mute"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 245 starts [1] ends [1] chunks 48 accepted 48 fired [(Mute, 2541575909619)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::control_progress_without_settlement_is_bounded_under_v1_baseline ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 135.832574ms
+result Err("speaker write evidence expired")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "provider_turn_complete", "turn_finished(\"runtime_failed\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 220 starts [1] ends [1] chunks 3 accepted 3 fired [(StallSpeakerInstalling, 2541575703373), (Mute, 2541575905373)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+scenario installing stall: speaker write evidence expired; 202 ms
+ok
+test coordinator::tests::pilot_faults::control_progress_without_settlement_is_bounded_under_vad_only ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 108.398887ms
+result Err("speaker acknowledgment expired")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "provider_turn_complete", "turn_finished(\"runtime_failed\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 160 starts [1] ends [1] chunks 3 accepted 3 fired [(StallSpeakerInstalling, 2541575259348), (Mute, 2541575461348)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+scenario installing stall: speaker acknowledgment expired; 202 ms
+ok
+test coordinator::tests::pilot_faults::distinct_rejects_an_item_that_returns_later ... ok
+test coordinator::tests::pilot_faults::duplex_control_answers_once ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 161.334897ms
+result Err("physical mute observed at 2541576441769 us")
+kinds ["endpoint_policy", "duplex_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_turn_complete", "speech_queue_drained", "speech_final_sample_retired", "turn_finished(\"audio_written_unscored\")", "physical_mute"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 245 starts [1] ends [1] chunks 48 accepted 48 fired [(Mute, 2541576435769)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::duplex_stalled_speaker_is_bounded ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 137.124818ms
+result Err("speaker write evidence expired")
+kinds ["endpoint_policy", "duplex_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "provider_turn_complete", "turn_finished(\"runtime_failed\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 220 starts [1] ends [1] chunks 3 accepted 3 fired [(StallSpeakerInstalling, 2541576169691), (Mute, 2541576371691)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+scenario duplex installing stall: speaker write evidence expired; 202 ms
+ok
+test coordinator::tests::pilot_faults::expired_accepted_privacy_rejects_a_fresh_queued_mute_in_stepped_run ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 112.274005ms
+result Err("service privacy freshness lost before next observation")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "turn_finished(\"runtime_failed\")", "worker_shutdown_event"]
+peer privacy gap 50000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 199 starts [1] ends [1] chunks 1 accepted 1 fired [(ExpirePrivacyThenMute, 2541576321045)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::failure_notice_plays_once_keeps_the_failure_and_yields_to_the_next_owner ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 245.174983ms
+result Err("physical mute observed at 2541578697683 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_input_abandoned", "provider_turn_failed", "failure_notice_selected", "failure_notice_attempted", "turn_taking_availability", "failure_notice_first_write", "speech_queue_drained", "failure_notice_final_sample_retired", "turn_finished(\"provider_failed\")", "turn_taking_availability", "input_candidate", "input_admitted(2)", "provider_input_started", "local_endpoint(2)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_turn_complete", "speech_queue_drained", "speech_final_sample_retired", "turn_finished(\"audio_written_unscored\")", "physical_mute"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0), (2, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 424 starts [1, 2] ends [1, 2] chunks 78 accepted 78 fired [(Speak, 2541576453683), (Mute, 2541578693683)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::failure_notice_yields_mid_play_to_a_new_owner_under_vad_only ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 182.314943ms
+result Err("physical mute observed at 2541577762993 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_input_abandoned", "provider_turn_failed", "failure_notice_selected", "failure_notice_attempted", "failure_notice_first_write", "speech_queue_drained", "input_candidate", "turn_finished(\"user_interrupted\")", "input_admitted(2)", "provider_input_started", "speaker_rejected", "local_endpoint(2)", "provider_first_audio", "provider_audio_enqueued", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_turn_complete", "speech_queue_drained", "speech_final_sample_retired", "turn_finished(\"audio_written_unscored\")", "physical_mute"]
+peer privacy gap 6000 us, refused writes 1, end-to-speaker revocation [(1, 0), (2, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 304 starts [1, 2] ends [1, 2] chunks 57 accepted 56 fired [(Speak, 2541576116993), (Mute, 2541577758993)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::mute_while_answer_speech_is_queued_cuts_it_and_never_resumes ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 116.028781ms
+result Err("physical mute observed at 2541576929947 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "physical_mute", "turn_finished(\"privacy_muted\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 200 starts [1] ends [1] chunks 3 accepted 3 fired [(Mute, 2541576925947)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::mute_while_the_failure_notice_plays_cuts_it_and_keeps_the_failure ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 110.24128ms
+result Err("physical mute observed at 2541577066323 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_input_abandoned", "provider_turn_failed", "failure_notice_selected", "failure_notice_attempted", "turn_taking_availability", "failure_notice_first_write", "speech_queue_drained", "physical_mute", "turn_finished(\"privacy_muted\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 200 starts [1] ends [1] chunks 3 accepted 3 fired [(Mute, 2541577062323)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::partial_write_then_stall_is_bounded_under_v1_baseline ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 140.64215ms
+result Err("speaker write evidence expired")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "provider_turn_complete", "turn_finished(\"runtime_failed\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 220 starts [1] ends [1] chunks 4 accepted 4 fired [(StallSpeakerPartial, 2541577192839), (Mute, 2541577394839)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+scenario partial stall: speaker write evidence expired; 202 ms
+ok
+test coordinator::tests::pilot_faults::partial_write_then_stall_is_bounded_under_vad_only ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 105.856495ms
+result Err("speaker acknowledgment expired")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "provider_turn_complete", "turn_finished(\"runtime_failed\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 160 starts [1] ends [1] chunks 4 accepted 4 fired [(StallSpeakerPartial, 2541576753571), (Mute, 2541576955571)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+scenario partial stall: speaker acknowledgment expired; 202 ms
+ok
+test coordinator::tests::pilot_faults::provider_failure_before_output_settles_failed_without_speech ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 110.285786ms
+result Err("physical mute observed at 2541577483225 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_input_abandoned", "provider_turn_failed", "failure_notice_selected", "turn_finished(\"provider_failed\")", "physical_mute"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 200 starts [1] ends [1] chunks 0 accepted 0 fired [(Mute, 2541577475225)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::provider_failure_during_output_never_becomes_a_completed_answer ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 150.158826ms
+result Err("physical mute observed at 2541578062462 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_input_abandoned", "provider_turn_failed", "speech_queue_drained", "speech_final_sample_retired", "failure_notice_selected", "turn_finished(\"provider_failed\")", "physical_mute"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 245 starts [1] ends [1] chunks 48 accepted 48 fired [(Mute, 2541578056462)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::provider_process_lost_before_output_ends_the_run_without_speech ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 108.314907ms
+result Err("provider worker exited: exit status: 0")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "turn_finished(\"runtime_failed\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 200 starts [1] ends [1] chunks 0 accepted 0 fired [(ProviderGone, 2541577771643), (Mute, 2541577779643)] stopped ["privacy", "speaker", "capture"] abandoned ["provider"]
+ok
+test coordinator::tests::pilot_faults::provider_process_lost_during_output_stops_speech_and_fails_the_turn ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 114.918652ms
+result Err("provider worker exited: exit status: 0")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "turn_finished(\"runtime_failed\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 200 starts [1] ends [1] chunks 3 accepted 3 fired [(ProviderGone, 2541577907362), (Mute, 2541577909362)] stopped ["privacy", "speaker", "capture"] abandoned ["provider"]
+ok
+test coordinator::tests::pilot_faults::provider_worker_fault_during_output_fails_the_turn_and_ends_the_run ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 117.743873ms
+result Err("injected provider worker fault")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "turn_finished(\"runtime_failed\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 200 starts [1] ends [1] chunks 3 accepted 3 fired [(ProviderFault, 2541578042041), (Mute, 2541578044041)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::rapid_mute_and_reopen_never_overlaps_workers_or_carries_speech_across ... {"seconds":null,"status":"listening_ready"}
+{"seconds":null,"status":"listening_ready"}
+{"seconds":null,"status":"listening_ready"}
+{"seconds":null,"status":"listening_ready"}
+fixture Threaded, packet and policy clock host, real conversation and cleanup 2.069182915s
+result Err("physical mute observed at 2541578286151 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "physical_mute", "turn_finished(\"privacy_muted\")"]
+peer privacy gap 6638 us, refused writes 0, end-to-speaker revocation [(1, 1917)] us
+capture send-attempt gap 12399 us, oldest source age at send attempt 2403 us (producer; consumption age unmeasured)
+frames 201 starts [1] ends [1] chunks 4 accepted 4 fired [(Mute, 2541578280583)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+fixture Threaded, packet and policy clock host, real conversation and cleanup 2.07053023s
+result Err("physical mute observed at 2541580462918 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "physical_mute", "turn_finished(\"privacy_muted\")"]
+peer privacy gap 6549 us, refused writes 0, end-to-speaker revocation [(1, 1188)] us
+capture send-attempt gap 11669 us, oldest source age at send attempt 1706 us (producer; consumption age unmeasured)
+frames 201 starts [1] ends [1] chunks 4 accepted 4 fired [(Mute, 2541580457559)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+fixture Threaded, packet and policy clock host, real conversation and cleanup 2.068314576s
+result Err("physical mute observed at 2541582642323 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "physical_mute", "turn_finished(\"privacy_muted\")", "worker_shutdown_event"]
+peer privacy gap 6641 us, refused writes 0, end-to-speaker revocation [(1, 2118)] us
+capture send-attempt gap 11156 us, oldest source age at send attempt 1570 us (producer; consumption age unmeasured)
+frames 201 starts [1] ends [1] chunks 4 accepted 4 fired [(Mute, 2541582635144)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+fixture Threaded, packet and policy clock host, real conversation and cleanup 2.05838343s
+result Err("physical mute observed at 2541584815154 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "physical_mute", "turn_finished(\"privacy_muted\")"]
+peer privacy gap 6497 us, refused writes 0, end-to-speaker revocation [(1, 624)] us
+capture send-attempt gap 11331 us, oldest source age at send attempt 1782 us (producer; consumption age unmeasured)
+frames 200 starts [1] ends [1] chunks 3 accepted 3 fired [(Mute, 2541584812856)] stopped ["speaker", "capture", "provider", "privacy"] abandoned []
+reaped-to-next-spawn [99, 104, 108] ms
+ok
+test coordinator::tests::pilot_faults::readiness_publishes_the_link_state_it_was_validated_against ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 148.95379ms
+result Err("physical mute observed at 2541587341043 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_turn_complete", "speech_queue_drained", "speech_final_sample_retired", "turn_finished(\"audio_written_unscored\")", "physical_mute"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 245 starts [1] ends [1] chunks 48 accepted 48 fired [(Mute, 2541587335043)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 201.573576ms
+result Err("physical mute observed at 2541587513649 us")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "ring_requested", "provider_input_started", "ring_feedback", "ring_renewals", "ring_requested", "ring_feedback", "ring_renewals", "ring_requested", "local_endpoint(1)", "ring_requested", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "ring_feedback", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "ring_requested", "speech_queue_drained", "provider_audio_enqueued", "ring_feedback", "speech_queue_drained", "provider_audio_enqueued", "ring_service_fault", "ring_degraded", "provider_audio_enqueued", "ring_degraded_blank", "ring_degraded_exit", "speech_queue_drained", "provider_turn_complete", "speech_queue_drained", "speech_final_sample_retired", "turn_finished(\"audio_written_unscored\")", "physical_mute"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 245 starts [1] ends [1] chunks 48 accepted 48 fired [(RingFault, 2541587059649), (Mute, 2541587507649)] stopped ["ring", "privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::ring_lost_without_blanking_keeps_the_answer_but_cleanup_fails_truthfully ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 201.117103ms
+result Err("physical mute observed at 2541587738582 us; verified cleanup failed: ring shutdown has no verified black-write receipt")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "ring_requested", "provider_input_started", "ring_feedback", "ring_renewals", "ring_requested", "ring_feedback", "ring_renewals", "ring_requested", "local_endpoint(1)", "ring_requested", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "ring_feedback", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "ring_requested", "speech_queue_drained", "provider_audio_enqueued", "ring_feedback", "speech_queue_drained", "provider_audio_enqueued", "ring_degraded", "ring_degraded_exit", "speech_queue_drained", "provider_turn_complete", "speech_queue_drained", "speech_final_sample_retired", "turn_finished(\"audio_written_unscored\")", "physical_mute"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 245 starts [1] ends [1] chunks 48 accepted 48 fired [(RingGone, 2541587284582), (Mute, 2541587732582)] stopped ["privacy", "speaker", "capture", "provider"] abandoned ["ring"]
+ok
+test coordinator::tests::pilot_faults::sigterm_while_answer_speech_is_pending_stops_cleanly ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 114.665672ms
+result Ok(())
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "service_stop_requested", "turn_finished(\"service_stopped\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 200 starts [1] ends [1] chunks 3 accepted 3 fired [(Sigterm, 2541587504859)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::sigterm_while_metadata_storage_is_stalled_stops_cleanly_and_reports_the_loss ... {"seconds":null,"status":"listening_ready"}
+fixture Threaded, packet and policy clock host, real conversation and cleanup 2.128278974s
+result Ok(())
+kinds ["worker_shutdown_event"]
+peer privacy gap 6571 us, refused writes 0, end-to-speaker revocation [] us
+capture send-attempt gap 11527 us, oldest source age at send attempt 1742 us (producer; consumption age unmeasured)
+frames 207 starts [1] ends [1] chunks 10 accepted 10 fired [(Sigterm, 2541587702007)] stopped ["speaker", "capture", "provider", "privacy"] abandoned []
+sigterm to reaped 4 ms; metadata finish 508.333768ms; Report { acknowledged: false, finish_attempted: true, degraded: true, writer_failed: false, initialization_failed: false, dropped_events: 0, oversized_events: 0, written_events: 0, unconfirmed_events: 63, rotations: 0 }
+ok
+test coordinator::tests::pilot_faults::sigterm_while_the_failure_notice_plays_stops_cleanly ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 111.005414ms
+result Ok(())
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_input_abandoned", "provider_turn_failed", "failure_notice_selected", "failure_notice_attempted", "turn_taking_availability", "failure_notice_first_write", "speech_queue_drained", "service_stop_requested", "turn_finished(\"service_stopped\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 200 starts [1] ends [1] chunks 3 accepted 3 fired [(Sigterm, 2541590284082)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+test coordinator::tests::pilot_faults::speaker_progress_is_due_strictly_after_lease_plus_report_age ... ok
+test coordinator::tests::pilot_faults::stalled_speaker_during_output_is_bounded_and_never_completes_the_answer ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 139.482697ms
+result Err("speaker write evidence expired")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "provider_turn_complete", "turn_finished(\"runtime_failed\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 220 starts [1] ends [1] chunks 3 accepted 3 fired [(StallSpeaker, 2541590413337), (Mute, 2541590615337)] stopped ["privacy", "capture", "provider", "speaker"] abandoned []
+scenario stall to turn end 202 ms
+ok
+test coordinator::tests::pilot_faults::stalled_speaker_under_vad_only_is_bounded_too ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 110.035873ms
+result Err("speaker acknowledgment expired")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "provider_turn_complete", "turn_finished(\"runtime_failed\")"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 160 starts [1] ends [1] chunks 3 accepted 3 fired [(StallSpeaker, 2541589973693), (Mute, 2541590175693)] stopped ["privacy", "capture", "provider", "speaker"] abandoned []
+scenario stall to turn end 202 ms
+ok
+test coordinator::tests::pilot_faults::terminal_provider_link_during_output_settles_failed_and_ends_service ... {"seconds":null,"status":"listening_ready"}
+fixture Stepped, packet and policy clock logical, real conversation and cleanup 139.033524ms
+result Err("terminal provider output settled; service stopped without retry")
+kinds ["endpoint_policy", "turn_taking_availability", "capture_started", "provider_link_current", "listening_ready", "input_candidate", "input_admitted(1)", "provider_input_started", "local_endpoint(1)", "provider_first_audio", "provider_audio_enqueued", "turn_taking_availability", "speaker_first_write", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "speech_queue_drained", "provider_audio_enqueued", "provider_terminal", "provider_input_abandoned", "provider_turn_failed", "provider_output_ended", "speech_queue_drained", "speech_final_sample_retired", "failure_notice_selected", "turn_finished(\"provider_failed\")", "service_provider_ended"]
+peer privacy gap 6000 us, refused writes 0, end-to-speaker revocation [(1, 0)] us
+capture send-attempt gap 10000 us, oldest source age at send attempt 0 us (producer; consumption age unmeasured)
+frames 228 starts [1] ends [1] chunks 32 accepted 32 fired [(ProviderTerminal, 2541590704677), (Mute, 2541590990677)] stopped ["privacy", "speaker", "capture", "provider"] abandoned []
+ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 863 filtered out; finished in 15.79s
+

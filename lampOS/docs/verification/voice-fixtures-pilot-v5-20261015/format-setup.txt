@@ -1,0 +1,1 @@
+Initial unqualified rustfmt invocation exited 127: zsh: command not found: rustfmt. Retried formatting once with /Users/autonomous/.cargo/bin/rustfmt --edition 2024 lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs; exit 0. Gate below uses that explicit toolchain PATH.

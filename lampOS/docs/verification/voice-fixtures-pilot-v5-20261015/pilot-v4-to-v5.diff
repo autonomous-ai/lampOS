@@ -1,0 +1,305 @@
+--- pilot-before.rs
++++ lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs
+@@ -229,6 +229,10 @@
+     starts: Vec<u64>,
+     ends: Vec<u64>,
+     capture_frames: u64,
++    /// Producer-side send attempts, not coordinator consumption timestamps.
++    capture_attempt_gap_us: u64,
++    capture_source_age_at_attempt_us: u64,
++    last_capture_attempt_us: Option<u64>,
+     /// When each action fired.
+     fired: Vec<(Act, u64)>,
+     /// Roles that observed priority Stop.
+@@ -344,7 +348,7 @@
+             }
+         }
+         format!(
+-            "fixture {:?}, packet and policy clock {}, real conversation and cleanup {:?}\nresult {:?}\nkinds {kinds:?}\npeer privacy gap {} us, refused writes {}, end-to-speaker revocation {:?} us\nframes {} starts {:?} ends {:?} chunks {} accepted {} fired {:?} stopped {:?} abandoned {:?}",
++            "fixture {:?}, packet and policy clock {}, real conversation and cleanup {:?}\nresult {:?}\nkinds {kinds:?}\npeer privacy gap {} us, refused writes {}, end-to-speaker revocation {:?} us\ncapture send-attempt gap {} us, oldest source age at send attempt {} us (producer; consumption age unmeasured)\nframes {} starts {:?} ends {:?} chunks {} accepted {} fired {:?} stopped {:?} abandoned {:?}",
+             self.fixture,
+             match self.fixture {
+                 Fixture::Threaded => "host",
+@@ -355,6 +359,8 @@
+             self.seen.privacy_gap_us,
+             self.seen.chunks.iter().filter(|c| !c.accepted).count(),
+             self.revocations(),
++            self.seen.capture_attempt_gap_us,
++            self.seen.capture_source_age_at_attempt_us,
+             self.seen.capture_frames,
+             self.seen.starts,
+             self.seen.ends,
+@@ -526,6 +532,33 @@
+     }
+ }
+ 
++/// A continuous synthetic source starts when StartCapture is received. A late
++/// delivery keeps each block's original acquisition time; catching up cannot
++/// create a source gap or make old audio fresh again.
++struct CaptureSchedule {
++    origin_us: u64,
++    next_sequence: u64,
++}
++
++impl CaptureSchedule {
++    fn new(origin_us: u64) -> Self {
++        Self {
++            origin_us,
++            next_sequence: 1,
++        }
++    }
++
++    fn next_due(&mut self, now_us: u64) -> Option<(u64, u64)> {
++        let sequence = self.next_sequence;
++        let acquired_at_us = self.origin_us + 10_000 * (sequence - 1);
++        if acquired_at_us > now_us {
++            return None;
++        }
++        self.next_sequence += 1;
++        Some((sequence, acquired_at_us))
++    }
++}
++
+ /// State owned either by one real-time thread or by the synchronous pump.
+ struct Peers {
+     script: Script,
+@@ -540,7 +573,7 @@
+     /// Shared with the privacy thread, which reports it.
+     muted: Arc<AtomicBool>,
+     fresh_mute_pending: bool,
+-    capture_started: bool,
++    capture: Option<CaptureSchedule>,
+     capture_silent: bool,
+     camera: Option<BootId>,
+     camera_started: bool,
+@@ -549,7 +582,6 @@
+     speaker: SpeakerMode,
+     provider_gone: bool,
+     speech_offset: Option<u64>,
+-    next_capture: Instant,
+     /// The speaker models the PCM sample cadence; this is not an ALSA clock.
+     next_write: Instant,
+     cursor: u64,
+@@ -722,9 +754,9 @@
+                     self.output.grant(through).unwrap()
+                 }
+                 Ok(Some(Control::StartCapture)) if role == "camera" => self.start_camera(index),
+-                Ok(Some(Control::StartCapture)) => {
+-                    self.capture_started = true;
++                Ok(Some(Control::StartCapture)) if role == "capture" && self.capture.is_none() => {
+                     let at = monotonic_us();
++                    self.capture = Some(CaptureSchedule::new(at));
+                     let generation = self.peers[index].snapshot.unwrap().microphone_generation();
+                     self.peers[index]
+                         .channels
+@@ -769,18 +801,29 @@
+             }
+         }
+         match role {
+-            "capture" if self.capture_started && !self.capture_silent => {
++            "capture" if self.capture.is_some() && !self.capture_silent => {
+                 // Frames follow a fixed 10 ms schedule, like a capture device.
+                 for _ in 0..64 {
+-                    if crate::scenario_clock::instant() < self.next_capture {
++                    let attempted_at_us = monotonic_us();
++                    let Some((frame, at)) =
++                        self.capture.as_mut().unwrap().next_due(attempted_at_us)
++                    else {
+                         break;
++                    };
++                    {
++                        let mut seen = self.seen.lock().unwrap();
++                        seen.capture_frames = frame;
++                        if let Some(previous) =
++                            seen.last_capture_attempt_us.replace(attempted_at_us)
++                        {
++                            seen.capture_attempt_gap_us = seen
++                                .capture_attempt_gap_us
++                                .max(attempted_at_us.saturating_sub(previous));
++                        }
++                        seen.capture_source_age_at_attempt_us = seen
++                            .capture_source_age_at_attempt_us
++                            .max(attempted_at_us - at);
+                     }
+-                    let frame = {
+-                        let mut seen = self.seen.lock().unwrap();
+-                        seen.capture_frames += 1;
+-                        seen.capture_frames
+-                    };
+-                    let at = monotonic_us();
+                     let speech = self.speech(frame);
+                     let peer = &mut self.peers[index];
+                     let sent = peer.channels.data.send(MicrophoneFrame {
+@@ -810,7 +853,6 @@
+                             },
+                         },
+                     });
+-                    self.next_capture += Duration::from_millis(10);
+                     if sent.is_err() {
+                         break;
+                     }
+@@ -1314,7 +1356,7 @@
+         pending_failure: None,
+         muted,
+         fresh_mute_pending: false,
+-        capture_started: false,
++        capture: None,
+         capture_silent: false,
+         camera: camera_boot,
+         camera_started: false,
+@@ -1323,7 +1365,6 @@
+         speaker: SpeakerMode::Healthy,
+         provider_gone: false,
+         speech_offset: None,
+-        next_capture: crate::scenario_clock::instant(),
+         next_write: crate::scenario_clock::instant(),
+         cursor: 0,
+         audio_sequence: 0,
+@@ -1371,11 +1412,10 @@
+             let finished = finished.clone();
+             move || {
+                 let mut state = state;
+-                // Preserve the threaded fixture's original schedule origin:
+-                // it begins when this peer thread starts, not at spawn.
++                // Speaker and camera schedules begin with the peer thread.
++                // Capture starts only on the coordinator's StartCapture.
+                 state.guard = BoundaryGuard::new(boot, now());
+                 state.next_camera = Instant::now();
+-                state.next_capture = Instant::now();
+                 state.next_write = Instant::now();
+                 let started = Instant::now();
+                 let mut limit_reported = false;
+@@ -1456,6 +1496,119 @@
+         .as_ref()
+         .err()
+         .is_some_and(|error| error.downcast_ref::<PhysicalMute>().is_some())
++}
++
++mod capture_schedule_tests {
++    use super::*;
++
++    fn observed((sequence, captured_at_us): (u64, u64)) -> ObservedAudio {
++        ObservedAudio {
++            sequence,
++            captured_at_us,
++            samples: [7; 160],
++        }
++    }
++
++    #[test]
++    fn a_delivery_pause_keeps_contiguous_original_acquisition_times() {
++        let origin_us = 1_000_000;
++        let mut schedule = CaptureSchedule::new(origin_us);
++        let mut detector = TurnDetector::v1_baseline();
++        assert!(schedule.next_due(origin_us - 1).is_none());
++        let first = schedule.next_due(origin_us).unwrap();
++        assert_eq!(first, (1, origin_us));
++        assert!(matches!(
++            detector.push(observed(first), 0.0),
++            Activity::Quiet
++        ));
++        assert!(schedule.next_due(origin_us + 9_999).is_none());
++        // The delivery peer was not run for 60 ms. The source still acquired
++        // all six blocks at 10 ms intervals, so the real detector sees no gap.
++        for sequence in 2..=7 {
++            let next = schedule.next_due(origin_us + 60_000).unwrap();
++            assert_eq!(next, (sequence, origin_us + 10_000 * (sequence - 1)));
++            assert!(matches!(
++                detector.push(observed(next), 0.0),
++                Activity::Quiet
++            ));
++        }
++        assert!(schedule.next_due(origin_us + 60_000).is_none());
++    }
++
++    #[test]
++    fn late_delivery_cannot_refresh_a_stale_admission_trigger() {
++        let origin_us = 1_000_000;
++        let mut schedule = CaptureSchedule::new(origin_us);
++        assert_eq!(schedule.next_due(origin_us), Some((1, origin_us)));
++        let delivered_at_us = origin_us + 110_000;
++        let late = schedule.next_due(delivered_at_us).unwrap();
++        assert_eq!(late, (2, origin_us + 10_000));
++        assert_eq!(delivered_at_us - late.1, 100_000);
++
++        let at = MonoTime::from_micros(delivered_at_us - 1);
++        let until = MonoTime::from_micros(delivered_at_us + 100_000);
++        let mut owner = Controller::new(BootId::new([1; 16]).unwrap(), at);
++        owner
++            .set_microphone_permission(at, Permission::Allowed)
++            .unwrap();
++        owner
++            .set_capture(at, CaptureState::RetainingUntil(until))
++            .unwrap();
++        owner
++            .set_admission(at, AdmissionState::OpenUntil(until))
++            .unwrap();
++        let authority = owner.snapshot(at).unwrap();
++        let context = AdmissionContext {
++            capture: CaptureLineage {
++                worker: BootId::new([2; 16]).unwrap(),
++                epoch: 1,
++                dsp_epoch: 1,
++                privacy_generation: authority.microphone_generation(),
++            },
++            authority,
++        };
++        let fresh = InputAdmission::default()
++            .observe(
++                Activity::Start(vec![observed(late)]),
++                context,
++                delivered_at_us - 1,
++            )
++            .unwrap();
++        assert!(matches!(fresh.step, AdmissionStep::Candidate(_)));
++        let stale = InputAdmission::default()
++            .observe(
++                Activity::Start(vec![observed(late)]),
++                context,
++                delivered_at_us,
++            )
++            .unwrap_err();
++        assert_eq!(stale.to_string(), "candidate trigger is stale or future");
++    }
++
++    #[test]
++    fn a_dropped_block_or_real_source_gap_still_faults() {
++        let origin_us = 1_000_000;
++        let mut schedule = CaptureSchedule::new(origin_us);
++        let first = schedule.next_due(origin_us).unwrap();
++        // Deliberately lose block 2; no delivery catch-up can renumber block 3.
++        assert_eq!(
++            schedule.next_due(origin_us + 10_000),
++            Some((2, origin_us + 10_000))
++        );
++        let after_drop = schedule.next_due(origin_us + 20_000).unwrap();
++        assert_eq!(after_drop, (3, origin_us + 20_000));
++        for broken in [after_drop, (2, origin_us + 50_001)] {
++            let mut detector = TurnDetector::v1_baseline();
++            assert!(matches!(
++                detector.push(observed(first), 0.0),
++                Activity::Quiet
++            ));
++            assert!(matches!(
++                detector.push(observed(broken), 0.0),
++                Activity::Fault("capture discontinuity")
++            ));
++        }
++    }
+ }
+ 
+ #[test]
+@@ -1991,6 +2144,13 @@
+                 .err()
+                 .and_then(|e| e.downcast_ref::<PhysicalMute>())
+                 .map(|mute| mute.observed_at_us);
++            if mute.is_none() {
++                eprintln!(
++                    "runtime cycle {} did not end in physical mute:\n{}",
++                    runs.borrow().len() + 1,
++                    run.summary()
++                );
++            }
+             let result = match mute {
+                 Some(observed_at_us) => Err(Box::new(PhysicalMute { observed_at_us }) as _),
+                 None => std::mem::replace(&mut run.result, Ok(())),

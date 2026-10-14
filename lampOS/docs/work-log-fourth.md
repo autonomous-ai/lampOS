@@ -2916,6 +2916,37 @@ mute/reopen, non-overlap, ownership and actual cleanup assertions remain
 required. The Body scope question is still pending; no Body edits.
 
 
+## 2026-10-15, 04:47 ICT: task 46, pilot source timeline corrected and v5 frozen
+
+Ready for lamp-voice: no
+
+[Focused pilot evidence](verification/voice-fixtures-pilot-v5-20261015/README.md)
+retains the initial local-socket permission failure and the unchanged-source
+permitted run: 35 / 0 / 0, 15.79 test seconds, 16.125 seconds including Cargo
+on Fourth's Intel Mac. File formatting and compile checks passed, and all
+696 recorded source hashes stayed unchanged. All 32 original pilot tests and
+163 assertions remain; three deterministic regressions cover delayed delivery,
+exact stale-input refusal and genuine source loss. Independent static review
+found no actionable issue. This is not a loaded-host or lamp result.
+
+Both pilot modes now start the synthetic source at actual `StartCapture`
+and retain each block's immutable 10 ms acquisition timestamp. The 64-block
+step bound, actual privacy peer, 50 ms gate, 100 ms input ceiling, deliberate
+faults and real cleanup/reaping remain. Failure diagnostics now survive the
+rapid-cycle service assertion and label producer attempts separately from
+unmeasured consumption age. The v4 explanation remains inferred from code;
+its failed run is not relabelled as a proven host scheduling measurement.
+
+The half-hour queue/review check still assigns only #739 to Fourth, with no
+new scope answer or open Fourth PR. The task branch is now based on fetched
+`f2261ec48e35a0bcfc1fa6fbd95f8edbc23f6d4d`; all fifteen task files survived
+rebase byte-for-byte. Frozen v5 has 1,678 files and manifest SHA-256
+`ef52b710a28f72c2296cc3cbd37990e09fc13c44abeef8b05a095148c4fe0a73`.
+Its ten full serial suites under Podman ARM64 cross-build load are starting;
+no full-sequence result is yet claimed. V1 through v4 failures remain kept.
+The Body question remains pending and no Body change was made.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

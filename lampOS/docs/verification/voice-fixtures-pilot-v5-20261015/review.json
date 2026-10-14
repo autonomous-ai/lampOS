@@ -1,0 +1,18 @@
+{
+  "source_sha256": "70a6608cf49ad78243dbddd74206fbe3526b59e1ff6a7060358f68846b227ae3",
+  "method": "Independent read-only comparison against frozen v4 plus affected execution paths; root spot-check of the complete diff and raw focused result. No builds or tests run by the reviewer.",
+  "findings": [],
+  "verified": [
+    "Capture origin is set once on actual capture StartCapture.",
+    "Both modes use immutable 10 ms acquisition timestamps and the unchanged 64-block peer-step bound.",
+    "Sequence advances on unsuccessful sends, so a later received block still exposes loss.",
+    "All 32 original tests and 163 assertions remain; 31 original test bodies are byte-identical, and rapid reopen differs only by a pre-failure diagnostic.",
+    "Threaded/Stepped selection, real privacy bound, 100 ms input bound, deliberate faults, exit observation and reaping remain.",
+    "Three new tests exercise the production turn detector and input admission.",
+    "Producer send-attempt gaps/ages are explicitly distinct from coordinator consumption."
+  ],
+  "limitations": [
+    "Static review does not qualify loaded-host stability, arbitrary host starvation or lamp timing.",
+    "The source defect is confirmed; its cause of v4 run 4 is inferred because failed-run capture timing was not recorded."
+  ]
+}

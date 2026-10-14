@@ -1,0 +1,170 @@
+   Compiling lamp-camera v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/camera)
+   Compiling lamp-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 25.95s
+     Running unittests src/lib.rs (target/debug/deps/lamp_voice-798a966b47f6690b)
+
+running 35 tests
+test coordinator::tests::pilot_faults::camera_loss_during_an_answer_revokes_only_sight ... 
+thread 'coordinator::tests::pilot_faults::camera_loss_during_an_answer_revokes_only_sight' (564193340) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test coordinator::tests::pilot_faults::capture_fault_during_output_cancels_the_answer_and_ends_the_run ... 
+thread 'coordinator::tests::pilot_faults::capture_fault_during_output_cancels_the_answer_and_ends_the_run' (564193341) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::capture_schedule_tests::a_delivery_pause_keeps_contiguous_original_acquisition_times ... ok
+test coordinator::tests::pilot_faults::capture_schedule_tests::a_dropped_block_or_real_source_gap_still_faults ... ok
+test coordinator::tests::pilot_faults::capture_schedule_tests::late_delivery_cannot_refresh_a_stale_admission_trigger ... ok
+test coordinator::tests::pilot_faults::capture_stall_during_a_question_ends_the_run_without_an_answer ... 
+thread 'coordinator::tests::pilot_faults::capture_stall_during_a_question_ends_the_run_without_an_answer' (564193345) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::control_one_question_is_answered_once_then_mute_ends_the_run ... 
+thread 'coordinator::tests::pilot_faults::control_one_question_is_answered_once_then_mute_ends_the_run' (564193346) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::control_progress_without_settlement_is_bounded_under_v1_baseline ... 
+thread 'coordinator::tests::pilot_faults::control_progress_without_settlement_is_bounded_under_v1_baseline' (564193347) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::control_progress_without_settlement_is_bounded_under_vad_only ... 
+thread 'coordinator::tests::pilot_faults::control_progress_without_settlement_is_bounded_under_vad_only' (564193348) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::distinct_rejects_an_item_that_returns_later ... ok
+test coordinator::tests::pilot_faults::duplex_control_answers_once ... 
+thread 'coordinator::tests::pilot_faults::duplex_control_answers_once' (564193350) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::duplex_stalled_speaker_is_bounded ... 
+thread 'coordinator::tests::pilot_faults::duplex_stalled_speaker_is_bounded' (564193351) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::expired_accepted_privacy_rejects_a_fresh_queued_mute_in_stepped_run ... 
+thread 'coordinator::tests::pilot_faults::expired_accepted_privacy_rejects_a_fresh_queued_mute_in_stepped_run' (564193352) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::failure_notice_plays_once_keeps_the_failure_and_yields_to_the_next_owner ... 
+thread 'coordinator::tests::pilot_faults::failure_notice_plays_once_keeps_the_failure_and_yields_to_the_next_owner' (564193353) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::failure_notice_yields_mid_play_to_a_new_owner_under_vad_only ... 
+thread 'coordinator::tests::pilot_faults::failure_notice_yields_mid_play_to_a_new_owner_under_vad_only' (564193354) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::mute_while_answer_speech_is_queued_cuts_it_and_never_resumes ... 
+thread 'coordinator::tests::pilot_faults::mute_while_answer_speech_is_queued_cuts_it_and_never_resumes' (564193355) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::mute_while_the_failure_notice_plays_cuts_it_and_keeps_the_failure ... 
+thread 'coordinator::tests::pilot_faults::mute_while_the_failure_notice_plays_cuts_it_and_keeps_the_failure' (564193356) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::partial_write_then_stall_is_bounded_under_v1_baseline ... 
+thread 'coordinator::tests::pilot_faults::partial_write_then_stall_is_bounded_under_v1_baseline' (564193357) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::partial_write_then_stall_is_bounded_under_vad_only ... 
+thread 'coordinator::tests::pilot_faults::partial_write_then_stall_is_bounded_under_vad_only' (564193358) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::provider_failure_before_output_settles_failed_without_speech ... 
+thread 'coordinator::tests::pilot_faults::provider_failure_before_output_settles_failed_without_speech' (564193359) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::provider_failure_during_output_never_becomes_a_completed_answer ... 
+thread 'coordinator::tests::pilot_faults::provider_failure_during_output_never_becomes_a_completed_answer' (564193360) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::provider_process_lost_before_output_ends_the_run_without_speech ... 
+thread 'coordinator::tests::pilot_faults::provider_process_lost_before_output_ends_the_run_without_speech' (564193361) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::provider_process_lost_during_output_stops_speech_and_fails_the_turn ... 
+thread 'coordinator::tests::pilot_faults::provider_process_lost_during_output_stops_speech_and_fails_the_turn' (564193362) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::provider_worker_fault_during_output_fails_the_turn_and_ends_the_run ... 
+thread 'coordinator::tests::pilot_faults::provider_worker_fault_during_output_fails_the_turn_and_ends_the_run' (564193363) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::rapid_mute_and_reopen_never_overlaps_workers_or_carries_speech_across ... 
+thread 'coordinator::tests::pilot_faults::rapid_mute_and_reopen_never_overlaps_workers_or_carries_speech_across' (564193364) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::readiness_publishes_the_link_state_it_was_validated_against ... 
+thread 'coordinator::tests::pilot_faults::readiness_publishes_the_link_state_it_was_validated_against' (564193365) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up ... 
+thread 'coordinator::tests::pilot_faults::ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up' (564193366) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::ring_lost_without_blanking_keeps_the_answer_but_cleanup_fails_truthfully ... 
+thread 'coordinator::tests::pilot_faults::ring_lost_without_blanking_keeps_the_answer_but_cleanup_fails_truthfully' (564193367) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::sigterm_while_answer_speech_is_pending_stops_cleanly ... 
+thread 'coordinator::tests::pilot_faults::sigterm_while_answer_speech_is_pending_stops_cleanly' (564193368) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::sigterm_while_metadata_storage_is_stalled_stops_cleanly_and_reports_the_loss ... 
+thread 'coordinator::tests::pilot_faults::sigterm_while_metadata_storage_is_stalled_stops_cleanly_and_reports_the_loss' (564193369) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::sigterm_while_the_failure_notice_plays_stops_cleanly ... 
+thread 'coordinator::tests::pilot_faults::sigterm_while_the_failure_notice_plays_stops_cleanly' (564193371) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::speaker_progress_is_due_strictly_after_lease_plus_report_age ... ok
+test coordinator::tests::pilot_faults::stalled_speaker_during_output_is_bounded_and_never_completes_the_answer ... 
+thread 'coordinator::tests::pilot_faults::stalled_speaker_during_output_is_bounded_and_never_completes_the_answer' (564193373) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::stalled_speaker_under_vad_only_is_bounded_too ... 
+thread 'coordinator::tests::pilot_faults::stalled_speaker_under_vad_only_is_bounded_too' (564193374) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+test coordinator::tests::pilot_faults::terminal_provider_link_during_output_settles_failed_and_ends_service ... 
+thread 'coordinator::tests::pilot_faults::terminal_provider_link_during_output_settles_failed_and_ends_service' (564193375) panicked at crates/voice/src/process.rs:156:87:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+FAILED
+
+failures:
+
+failures:
+    coordinator::tests::pilot_faults::camera_loss_during_an_answer_revokes_only_sight
+    coordinator::tests::pilot_faults::capture_fault_during_output_cancels_the_answer_and_ends_the_run
+    coordinator::tests::pilot_faults::capture_stall_during_a_question_ends_the_run_without_an_answer
+    coordinator::tests::pilot_faults::control_one_question_is_answered_once_then_mute_ends_the_run
+    coordinator::tests::pilot_faults::control_progress_without_settlement_is_bounded_under_v1_baseline
+    coordinator::tests::pilot_faults::control_progress_without_settlement_is_bounded_under_vad_only
+    coordinator::tests::pilot_faults::duplex_control_answers_once
+    coordinator::tests::pilot_faults::duplex_stalled_speaker_is_bounded
+    coordinator::tests::pilot_faults::expired_accepted_privacy_rejects_a_fresh_queued_mute_in_stepped_run
+    coordinator::tests::pilot_faults::failure_notice_plays_once_keeps_the_failure_and_yields_to_the_next_owner
+    coordinator::tests::pilot_faults::failure_notice_yields_mid_play_to_a_new_owner_under_vad_only
+    coordinator::tests::pilot_faults::mute_while_answer_speech_is_queued_cuts_it_and_never_resumes
+    coordinator::tests::pilot_faults::mute_while_the_failure_notice_plays_cuts_it_and_keeps_the_failure
+    coordinator::tests::pilot_faults::partial_write_then_stall_is_bounded_under_v1_baseline
+    coordinator::tests::pilot_faults::partial_write_then_stall_is_bounded_under_vad_only
+    coordinator::tests::pilot_faults::provider_failure_before_output_settles_failed_without_speech
+    coordinator::tests::pilot_faults::provider_failure_during_output_never_becomes_a_completed_answer
+    coordinator::tests::pilot_faults::provider_process_lost_before_output_ends_the_run_without_speech
+    coordinator::tests::pilot_faults::provider_process_lost_during_output_stops_speech_and_fails_the_turn
+    coordinator::tests::pilot_faults::provider_worker_fault_during_output_fails_the_turn_and_ends_the_run
+    coordinator::tests::pilot_faults::rapid_mute_and_reopen_never_overlaps_workers_or_carries_speech_across
+    coordinator::tests::pilot_faults::readiness_publishes_the_link_state_it_was_validated_against
+    coordinator::tests::pilot_faults::ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up
+    coordinator::tests::pilot_faults::ring_lost_without_blanking_keeps_the_answer_but_cleanup_fails_truthfully
+    coordinator::tests::pilot_faults::sigterm_while_answer_speech_is_pending_stops_cleanly
+    coordinator::tests::pilot_faults::sigterm_while_metadata_storage_is_stalled_stops_cleanly_and_reports_the_loss
+    coordinator::tests::pilot_faults::sigterm_while_the_failure_notice_plays_stops_cleanly
+    coordinator::tests::pilot_faults::stalled_speaker_during_output_is_bounded_and_never_completes_the_answer
+    coordinator::tests::pilot_faults::stalled_speaker_under_vad_only_is_bounded_too
+    coordinator::tests::pilot_faults::terminal_provider_link_during_output_settles_failed_and_ends_service
+
+test result: FAILED. 5 passed; 30 failed; 0 ignored; 0 measured; 863 filtered out; finished in 0.02s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

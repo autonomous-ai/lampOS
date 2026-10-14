@@ -1,0 +1,15 @@
+{
+  "before_sha256": "73c3bb9663c1142702d994ddf7e9c7a917088feceb35bf3c51299d6523f23fad",
+  "after_sha256": "70a6608cf49ad78243dbddd74206fbe3526b59e1ff6a7060358f68846b227ae3",
+  "v4_original_scenario_section_unchanged_except_failure_diagnostic_and_whitespace": true,
+  "original_tests": 32,
+  "new_tests": 35,
+  "missing_original_tests": [],
+  "new_test_names": [
+    "a_delivery_pause_keeps_contiguous_original_acquisition_times",
+    "a_dropped_block_or_real_source_gap_still_faults",
+    "late_delivery_cannot_refresh_a_stale_admission_trigger"
+  ],
+  "before_assertions": 163,
+  "after_assertions": 179
+}

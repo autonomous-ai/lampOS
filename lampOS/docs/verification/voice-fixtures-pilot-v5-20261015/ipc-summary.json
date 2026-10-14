@@ -1,0 +1,36 @@
+{
+  "reason": "Unchanged-source retry with local Unix socket permission after sandbox bind EPERM; the original failed run is retained.",
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "coordinator::tests::pilot_faults",
+    "--",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS",
+  "started_utc": "2026-10-14T21:42:09.367113+00:00",
+  "machine": {
+    "uname": [
+      "Darwin",
+      "m0.local",
+      "25.6.0",
+      "Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:49 PDT 2026; root:xnu-12377.161.14~5/RELEASE_X86_64",
+      "x86_64",
+      "i386"
+    ],
+    "sw_vers": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83\n"
+  },
+  "source_count": 696,
+  "exit_code": 0,
+  "elapsed_seconds": 16.125199389643967,
+  "raw": "/private/tmp/lamp-fourth-pilot-capture-v5-49ln5r2p/pilot-tests-local-ipc.txt",
+  "raw_sha256": "1a69a8a9ec208c19a8f1826f700951435c57c96f457c4a341eac6c48a4997cf2",
+  "finished_utc": "2026-10-14T21:42:25.511441+00:00",
+  "source_changes_during_run": []
+}
