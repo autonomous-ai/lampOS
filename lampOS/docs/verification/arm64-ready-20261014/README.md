@@ -46,8 +46,21 @@ gate passed 1,469 tests, and its rebase including First's installed capture
 passes focused Mac checks and strict Linux lint/cross-build. Its final head
 failed its final native ARM64 run 38582911230 in a Linux-only capture
 fixture's private-socket setup: 3,429 passed, 1 failed, 30 ignored before
-Cargo stopped. Memory is not ready. The complete failure and owner-facing
-diagnosis are in [the capture setup report](../arm64-capture-connect-20261014/).
+Cargo stopped. Memory was not ready at that checkpoint. The complete
+failure and owner-facing diagnosis remain in
+[the capture setup report](../arm64-capture-connect-20261014/).
+First subsequently repaired that fixture in `dd6d512b1` and the Tasks
+preflight fixture in `1a38f2f3e`. The repaired intermediate Memory head
+`56b458966` passed 3,995 / 0 / 32 ignored across 269 suites both on native
+ARM64 CI (38611490112) and ordinary-user local x86_64 Linux. The later
+`375f6f762` head includes upstream Touch/Body/task-news changes; its local
+strict lint and builds passed, and native ARM64 run 38615610362 passed
+4,245 / 0 / 32 ignored across 280 suites. The release build, hashes and
+artifact upload all succeeded for that exact head.
+Current exact-source records are in
+[Memory ARM64 verification](../memory-arm64-20261015/) and
+[Memory Linux verification](../memory-linux-20261015/). Memory is offered
+as non-draft [PR #743](https://github.com/autonomous-ai/lampOS/pull/743).
 Earlier privacy/motor failures remain retained. Green checkpoints do not
 certify later heads or explain prior intermittent failures.
 

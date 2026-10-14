@@ -2508,6 +2508,57 @@ privacy peer's maximum send-side gap does not measure the coordinator's
 consumption age, so those reported gaps alone do not establish a cause.
 
 
+## 2026-10-15, 02:20 ICT: task 29 ready, Voice uses Memory across days
+
+Ready for lamp-voice: yes (#743)
+
+Kind: off unless set. Non-draft PR #743 closes #698, with the qualified
+head `375f6f7625734ed7db80c62b020b6e8e32df7d82` on `d8e9556de`.
+Only exact `LAMP_MEMORY_DAYS=on`, a configured Memory socket and Memory's
+existing `--memory-days` enable the new caller. Real-child tests cover nine
+switch values across six worker roles; only the provider receives the
+valid opt-in. Legacy/default requests remain tested and unchanged.
+
+Native ARM64 run 38615610362 completed at 19:17:02 UTC on 2026-10-14:
+4,245 passed / 0 failed / 32 ignored across 280 suites, including the
+custom harness's 12 passes. Both `cargo build --locked --release
+--workspace --bins --examples` and `cargo test --locked --release
+--workspace -- --test-threads=1` passed, as did hashing and artifact upload.
+This ran as an ordinary user on GitHub's Ubuntu 22.04 ARM64 runner with
+Rust 1.96.0, not on a lamp. Artifact 11921159730 contains the binaries;
+`verification/memory-arm64-20261015/` retains the full unmodified output,
+run metadata, audited counts and Memory/Voice/Tasks SHA-256 values.
+
+The exact head also passed local formatting, strict workspace Clippy,
+native x86_64 Linux workspace build and release ARM64 cross-build as
+UID 1000, offline and without capabilities. The previous complete local
+Linux test run at `56b458966` passed 3,995 / 0 / 32 across 269 suites.
+The failed Mac workspace gate remains failed, with all four failures and
+20 isolated follow-up passes retained; it is not relabelled by the Linux
+successes. No production assertion or deadline was relaxed. All commands,
+environment repairs and raw failures remain in the verification folders.
+
+First: use the existing `~/lamp-voice-data/tools/memory.sh` quiet-room
+workflow, with Voice's switch absent and enabled, for earlier-day recall,
+a preference in a fresh session, at least 45 seconds idle, forgetting with
+fresh provider context, and Memory unavailable. `memory-days.md`, "Played
+scenes for First", gives the expected records. The script is not in this
+checkout, so no invented arguments are supplied. Record the 300 ms note
+and 1.5 s recall client boundaries separately from first audible response,
+first use from repeats, and the exact lamp/build/settings. The likely
+differences are flash sync, scheduler pressure, the serialized Memory socket,
+local-day configuration and already delivered provider context. Disabling
+the Voice switch rolls back the caller, not the migrated store.
+
+Upstream advanced to `1e5beebf4` while the final run was in progress. Its
+additional Body/Tasks/task-news changes do not overlap this task's source
+files. The PR explicitly identifies the qualified base; these results do
+not certify a later integration head. First owns installation and merging.
+No lamp was accessed. The next assigned task is #739, now widened by First
+to include the motor supervisor's loaded-host fixtures as well as the
+three named privacy/endpoint scenarios.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

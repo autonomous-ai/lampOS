@@ -1,0 +1,2830 @@
+{
+  "raw_sha256": "713e9dd4f3e7ca54065ee9e7d47f47db56040e2acd8960bc02e5643dbb842a90",
+  "counts_scope": "standard libtest/doctest plus custom harness result lines",
+  "total": {
+    "suites": 280,
+    "passed": 4245,
+    "failed": 0,
+    "ignored": 32,
+    "measured": 0,
+    "filtered": 0
+  },
+  "standard": {
+    "suites": 279,
+    "passed": 4233,
+    "failed": 0,
+    "ignored": 32,
+    "measured": 0,
+    "filtered": 0
+  },
+  "custom": {
+    "suites": 1,
+    "passed": 12,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered": 0
+  },
+  "suite_results": [
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_actions-40c9ae8db61a15b3)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_actions-071164b941733c2c)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/server.rs (target/release/deps/server-a470c53d93fb6018)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_air-631de677eede4ffc)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_air-631de677eede4ffc)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_audio-0a937ce289c08aa4)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 75,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_audio-35b03e2a53580263)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/cancelled_tail.rs (target/release/deps/cancelled_tail-40e2ea0e5ba0b894)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/capture_linux.rs (target/release/deps/capture_linux-e203c98b6ed87abd)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/dsp.rs (target/release/deps/dsp-f612bb6f9280b853)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/evidence.rs (target/release/deps/evidence-f890970e42d99c2a)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/fixtures.rs (target/release/deps/fixtures-e3db9bf116120593)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/notice.rs (target/release/deps/notice-577872fbdf06e265)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/pcm_linux.rs (target/release/deps/pcm_linux-3b64f6b41aaf018f)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/playout_continuity/main.rs (target/release/deps/playout_continuity-78b31d02c4c413b1)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/playout_current_arrivals.rs (target/release/deps/playout_current_arrivals-ee806bcc1908b6af)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/queued_ownership.rs (target/release/deps/queued_ownership-fe45841d9c70daba)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/replay.rs (target/release/deps/replay-6ffb799e7148c467)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/steady_reference.rs (target/release/deps/steady_reference-3a13f615ace037a9)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_body-ba0a6e0d76140b07)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 141,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/bin/lamp-body.rs (target/release/deps/lamp_body-b7bced56e635d6c3)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/bin/lamp-body-inspect.rs (target/release/deps/lamp_body_inspect-c790d8e71af72f7e)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/bin/lamp-body-worker.rs (target/release/deps/lamp_body_worker-a9d816d5c64f7c51)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/calibration.rs (target/release/deps/calibration-c0f1055fece670da)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/control.rs (target/release/deps/control-e21844b4ef403618)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 48,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/head_qualification.rs (target/release/deps/head_qualification-1f15b13c807b91ae)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/protocol.rs (target/release/deps/protocol-5365415125402da3)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 20,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/readback.rs (target/release/deps/readback-181bc948e289aaf6)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/selection.rs (target/release/deps/selection-bffb3398909dc569)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/worker.rs (target/release/deps/worker-a2953ddd2f7c0cc0)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 20,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/worker_config.rs (target/release/deps/worker_config-bb986d95eee13734)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_bus-f0c3c365afbd8c14)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 19,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/bus.rs (target/release/deps/bus-5b8a0bb835c5f336)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/bus.rs (target/release/deps/bus-5b8a0bb835c5f336)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 32,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/cli.rs (target/release/deps/cli-ad5e8fe466d59998)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_camera-97892c01ec781700)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/frames.rs (target/release/deps/frames-9d87bfac8808fca4)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/lifecycle.rs (target/release/deps/lifecycle-3407fadeca2b7b96)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 42,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/timestamp_diagnostics.rs (target/release/deps/timestamp_diagnostics-9b691e97c75242da)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_controls-d5b22dd615d9d90f)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 17,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_controls-62877620af3e57f3)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/base.rs (target/release/deps/base-44db5e2ca963f06c)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 24,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/engine.rs (target/release/deps/engine-b72da2054123de6b)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 38,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/head_discovery.rs (target/release/deps/head_discovery-78189ff288f71484)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/hold_clear.rs (target/release/deps/hold_clear-7d0b9fde1b3fdb30)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 15,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/mute.rs (target/release/deps/mute-41877b8f2f469278)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 44,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/mute.rs (target/release/deps/mute-41877b8f2f469278)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/program.rs (target/release/deps/program-8aa82a740d1262fa)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/receiver.rs (target/release/deps/receiver-ee4582b7b1b02150)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/replay.rs (target/release/deps/replay-975d39e9fa8ae8b6)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/runtime.rs (target/release/deps/runtime-563709957ec0d693)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/strip.rs (target/release/deps/strip-dbcc63f46dce98e6)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 53,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/strip_worker.rs (target/release/deps/strip_worker-ebbe98c20b34ad82)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/touch.rs (target/release/deps/touch-e5e8f738c017bd3f)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 40,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/touch_pins.rs (target/release/deps/touch_pins-bde7b814f5c83579)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/touch_program.rs (target/release/deps/touch_program-1e8b6e5065ce3d88)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/touch_receiver.rs (target/release/deps/touch_receiver-84bfbbe4e08d8456)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 22,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/touch_runtime.rs (target/release/deps/touch_runtime-83342b79e5bdc2b6)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 17,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/touch_runtime.rs (target/release/deps/touch_runtime-83342b79e5bdc2b6)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_ears-08b8e66b579fa0b1)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_ears-f0905842bcdbb27e)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_environment-eaf29abab746e9ae)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/snapshots.rs (target/release/deps/snapshots-51199e08edaf561a)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_expression-a15acde43e622165)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_expression-df96d5a9e4fcb44d)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/alive_engine.rs (target/release/deps/alive_engine-0a0a19bdd625e44d)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/alive_replay.rs (target/release/deps/alive_replay-bac4f18a01def209)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/catalogue_playout.rs (target/release/deps/catalogue_playout-7caf62406b48da93)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/catalogue_rest.rs (target/release/deps/catalogue_rest-f65158fd271fc6a9)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/engine.rs (target/release/deps/engine-06357b6e67d7c74d)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 33,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/program.rs (target/release/deps/program-9732cfc5c6f536ba)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/recent_playout.rs (target/release/deps/recent_playout-2ff6a9bee7cdd2ad)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 29,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/recent_playout_replay.rs (target/release/deps/recent_playout_replay-17d560fc5200fae5)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/recent_playout_runtime.rs (target/release/deps/recent_playout_runtime-fad5813f356c6ee4)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/replay.rs (target/release/deps/replay-84a51344720708a1)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/rest_engine.rs (target/release/deps/rest_engine-7c8dfa400599bcc6)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 32,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/rest_replay.rs (target/release/deps/rest_replay-cec45c6c5786ebb6)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/runtime.rs (target/release/deps/runtime-2435ac2ce9136296)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/sudden_engine.rs (target/release/deps/sudden_engine-2bec83fb04bee5a9)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_eyes-2913085a9cde810f)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_eyes-ac0705171bcd38e1)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_gemini-d4a89c397f21bf60)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 226,
+      "failed": 0,
+      "ignored": 2,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/comparison_config.rs (target/release/deps/comparison_config-5716cd9498a7b99a)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/review_2026_10_14.rs (target/release/deps/review_2026_10_14-1968a7605c341129)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/wire.rs (target/release/deps/wire-466fde3eb409dafa)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests examples/early_end_probe.rs (target/release/examples/early_end_probe-d439405fa40048be)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_health-9b8ca06c6d97cee7)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 19,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_health-72fc58113ff44813)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/board.rs (target/release/deps/board-69c7355333cde198)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 15,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/program.rs (target/release/deps/program-1a0106b66e44e2e3)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/serve.rs (target/release/deps/serve-9275ba30a39ca53d)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_ipc-d52bc4ca82b39569)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/bin/lamp-ipc-probe.rs (target/release/deps/lamp_ipc_probe-b4cb747e5c35dbc8)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/probe.rs (target/release/deps/probe-f49054189b952c3e)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/sockets.rs (target/release/deps/sockets-8e52c6aff9c65ca4)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_keeper-48b191ffd7fc8266)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 19,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_keeper-e6937e2b77faeaf4)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_lean-525def64d4568518)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/cost.rs (target/release/deps/cost-b8d80789eba805f0)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/cost.rs (target/release/deps/cost-b8d80789eba805f0)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 2,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/paths.rs (target/release/deps/paths-f5999f01ac0b7a38)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/paths.rs (target/release/deps/paths-f5999f01ac0b7a38)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 15,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/poses.rs (target/release/deps/poses-41fab954bb297983)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 30,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_memory-7a64dadba1cadeab)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 69,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_memory-79f5bcf6c01b351c)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/bin/lamp-memory-eval.rs (target/release/deps/lamp_memory_eval-3fcbbd3b3f3f1349)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/binary.rs (target/release/deps/binary-ccdfb7e842ecbed1)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/days.rs (target/release/deps/days-2bb25d36209a5e95)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 31,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/days_timing.rs (target/release/deps/days_timing-832fc824e157e571)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/health.rs (target/release/deps/health-6c00fb7c7a987c47)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/health_timing.rs (target/release/deps/health_timing-e280c072996ad75f)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/retrieval.rs (target/release/deps/retrieval-00f5c0b73ba25371)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/server.rs (target/release/deps/server-b0d3a1931beb4fab)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/timing.rs (target/release/deps/timing-c6a266d3ec71d2c7)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/voice.rs (target/release/deps/voice-9594cb898fb8d8fa)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/voice_submit.rs (target/release/deps/voice_submit-38dc4e692429e702)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/voice_timing.rs (target/release/deps/voice_timing-434ecc0bc587234c)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_mood-45393fba3bc8d60e)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_mood-188944b032f297f0)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/engine.rs (target/release/deps/engine-40e06e81913a678b)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 45,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/input.rs (target/release/deps/input-89e39bdbe9d63ce3)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 31,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/program.rs (target/release/deps/program-82e8b3cc0fbbbc01)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/replay.rs (target/release/deps/replay-c8bd62652bbad604)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/runtime.rs (target/release/deps/runtime-1f28ce6e3f94c478)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/timing.rs (target/release/deps/timing-120166a9c883c7cf)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 2,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_msgs-6a9c85bee7b7dd0a)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 19,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/bus.rs (target/release/deps/bus-9665e2c969db4d6b)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/controls.rs (target/release/deps/controls-00c25ee833bb9d6a)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/expression.rs (target/release/deps/expression-2d08a25022c10401)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/expression_rest.rs (target/release/deps/expression_rest-d4b54a916a5795a3)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/schedule.rs (target/release/deps/schedule-791396b9ae4666fd)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/touch.rs (target/release/deps/touch-fa04725b36f49cbf)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 15,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_name-ac1e18f0906ceda8)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_name-23a75831885cfd56)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/review_2026_10_14.rs (target/release/deps/review_2026_10_14-1f7291a0c93138ad)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_observer-c38b6e396dcc5732)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 45,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_observer-77508c5ebd0b320b)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_policy-036e2a0dc0aa358c)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 76,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_policy-594bb4eca769e1b7)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/bin/lamp-policy-fit.rs (target/release/deps/lamp_policy_fit-0f29645e2b5ff6bb)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/baseline.rs (target/release/deps/baseline-08bfdef92411e604)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/baseline.rs (target/release/deps/baseline-08bfdef92411e604)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/fit_lamp_scenes.rs (target/release/deps/fit_lamp_scenes-713a86a1459b5eba)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/judges.rs (target/release/deps/judges-d67f12f93a812797)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/judges_program.rs (target/release/deps/judges_program-e2cbec2d7426839c)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/local_comparison.rs (target/release/deps/local_comparison-153710b6ad264ebe)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/local_fit.rs (target/release/deps/local_fit-22e09b7a1c8c1c70)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/local_model.rs (target/release/deps/local_model-3776c32d14f88708)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/local_timing.rs (target/release/deps/local_timing-ae005cbee0411412)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/policy.rs (target/release/deps/policy-2b0ebab1603ed0c7)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/program.rs (target/release/deps/program-13437abc4f886860)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_records-1a74e3412dd54698)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 106,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_records-f6defeff50cadb1d)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/records.rs (target/release/deps/records-ba6bd7f5cbd0fb06)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 2,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_ring-ec9361aa7b12ed39)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 22,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_schedule-a46a4a3bc392bbda)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_schedule-7f7c19f21bc81637)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/calendar.rs (target/release/deps/calendar-dc9be705ecab0122)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 37,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/engine.rs (target/release/deps/engine-a9e59ff3fe3ed07c)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 36,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/runtime.rs (target/release/deps/runtime-af9b69176e26e5a9)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/runtime.rs (target/release/deps/runtime-af9b69176e26e5a9)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/runtime_failures.rs (target/release/deps/runtime_failures-4e1f378f7d07dca6)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/storage.rs (target/release/deps/storage-9a98df28ec6d0d59)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests examples/schedule_check.rs (target/release/examples/schedule_check-f4bca0ede36fc5d5)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_sound_fixtures-9fc774d2a1b82dd4)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_sound_fixtures-75d1fc10421055b1)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/cache_and_mix.rs (target/release/deps/cache_and_mix-0a57d121e6bcbbd3)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 15,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_surround-77f02e5931d02f8a)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_surround-6ae92585596f13a9)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/atomic.rs (target/release/deps/atomic-5f6535b960a1650a)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/cli.rs (target/release/deps/cli-41215de9810ad7c4)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/config.rs (target/release/deps/config-9e771ebb5fb36153)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/configuration.rs (target/release/deps/configuration-729e6aef030f90f5)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/http_limit.rs (target/release/deps/http_limit-ab5ac75bbe8a4176)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/network.rs (target/release/deps/network-58df9ac19668f90d)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 22,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/owner.rs (target/release/deps/owner-5210a27cfe6d8aaf)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/owner.rs (target/release/deps/owner-5210a27cfe6d8aaf)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/release.rs (target/release/deps/release-8cd52ab210c2bb0e)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 31,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/reset.rs (target/release/deps/reset-ea45872c1c14af8b)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/runtime.rs (target/release/deps/runtime-81dd5dea7fe6268e)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/selection.rs (target/release/deps/selection-0dfa260652763c64)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/setup.rs (target/release/deps/setup-c986387e463e518d)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 15,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/startup.rs (target/release/deps/startup-386061c13572d713)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 17,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/tls_provider.rs (target/release/deps/tls_provider-c15f21e30a5cac1c)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/update.rs (target/release/deps/update-b971087ddcf342fc)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 30,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/worker.rs (target/release/deps/worker-23e84acb5ee06f87)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_tasks-1f6247b5de3bb1e2)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 48,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_tasks-032bd3b7c819fc43)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/harness.rs (target/release/deps/harness-e4d58c4a8f1fcdb3)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 24,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/runtime.rs (target/release/deps/runtime-dc8096aa15f36623)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/runtime_failures.rs (target/release/deps/runtime_failures-4ac00f37d68e7722)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/store.rs (target/release/deps/store-fea9bebd4318dd38)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 22,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests examples/tasks_check.rs (target/release/examples/tasks_check-5f610159390ff5cf)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_turn_end-f0bb4f041439ac5e)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_turn_end-2146f1607874d6cb)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/fast.rs (target/release/deps/fast-161a00d92d52a30f)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 3,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/parity.rs (target/release/deps/parity-cd4a3e616c917729)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 6,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_turn_end_wire-6c57b7e767b4dc1a)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/process.rs (target/release/deps/process-9c0b3bb1536db9e9)",
+      "format": "custom",
+      "status": "ok",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_turn_owner-405dc59822226cac)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/camera_authority.rs (target/release/deps/camera_authority-69ee4cd0ae74b6da)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/observations.rs (target/release/deps/observations-40e79043d6f869cd)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/zero_authority.rs (target/release/deps/zero_authority-62447fede7310a49)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 26,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/zero_authority.rs (target/release/deps/zero_authority-62447fede7310a49)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_voice-e964db0398f5a783)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 864,
+      "failed": 0,
+      "ignored": 6,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_voice-b34a11694726d185)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/admission.rs (target/release/deps/admission-3d57ef2c2ad07606)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/camera_config.rs (target/release/deps/camera_config-1a526880770716ae)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/camera_runtime.rs (target/release/deps/camera_runtime-e680371a8a3084ea)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 33,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/capture_hold_worker.rs (target/release/deps/capture_hold_worker-f9f47c52468c9192)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/core.rs (target/release/deps/core-8398738f23ec8c55)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/diagnostics.rs (target/release/deps/diagnostics-136ad8c6e842136f)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/end_silence.rs (target/release/deps/end_silence-ca387dc1a01d2404)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/expression_out.rs (target/release/deps/expression_out-e437547e882656bd)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/expression_out.rs (target/release/deps/expression_out-e437547e882656bd)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/fixture_provider.rs (target/release/deps/fixture_provider-80999f62e0bf276e)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/privacy_state.rs (target/release/deps/privacy_state-35785075fee687d0)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/process.rs (target/release/deps/process-880c7960bf3f27db)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/provider_config.rs (target/release/deps/provider_config-cc84f91e79cb80de)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/reference_link.rs (target/release/deps/reference_link-011cf9bbb99259a9)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/reference_prime.rs (target/release/deps/reference_prime-30422c36f795d7b6)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/review_2026_10_14.rs (target/release/deps/review_2026_10_14-6ace7beb2d15a7ec)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/ring_worker.rs (target/release/deps/ring_worker-cda65f883736f405)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 17,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_voice_eval-d23463095dee98e1)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/lib.rs (target/release/deps/lamp_voice_eval-d23463095dee98e1)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 84,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (target/release/deps/lamp_voice_eval-6611b42929e5e457)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/acceptance_boundaries.rs (target/release/deps/acceptance_boundaries-e766e0e4d3b023cd)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/answer_review.rs (target/release/deps/answer_review-766120142cbc199a)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/audit_final_dispatch.rs (target/release/deps/audit_final_dispatch-a65c2eae5d84ee05)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/audit_importer.rs (target/release/deps/audit_importer-ef5f2e54daac6f46)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/audit_runner_dispatch.rs (target/release/deps/audit_runner_dispatch-bea53edae0c4f5b5)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/canary_plan.rs (target/release/deps/canary_plan-ebb4c4ce39951ef0)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/evaluator.rs (target/release/deps/evaluator-288c838638a97bc7)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/fake_runtime.rs (target/release/deps/fake_runtime-f689ca9abdb711a3)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/final_dispatch.rs (target/release/deps/final_dispatch-e288b7049b816d30)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/next_turn_ready.rs (target/release/deps/next_turn_ready-82e6e74e1c5ee0e0)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/physical_loopback.rs (target/release/deps/physical_loopback-509d7c27d9ae062c)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/playback_occurrences.rs (target/release/deps/playback_occurrences-98aa6d0012fd86f8)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/provider_failed.rs (target/release/deps/provider_failed-8a5477fc5ab65559)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/recording_evidence.rs (target/release/deps/recording_evidence-c6ad2abb6608fcc0)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 19,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/recording_import.rs (target/release/deps/recording_import-85f75cad48cded5c)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/relay_hardening.rs (target/release/deps/relay_hardening-17f63e4d2d9b33f0)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/report_validity.rs (target/release/deps/report_validity-00ae263a30465f34)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/serve_plan.rs (target/release/deps/serve_plan-f9f1c4e9c6f14e88)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/serve_relay.rs (target/release/deps/serve_relay-a06a6d1e34426306)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/serve_session.rs (target/release/deps/serve_session-1e211ec7163503ed)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/target_audio.rs (target/release/deps/target_audio-5e4d24842c3e9f2a)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_actions",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_air",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_audio",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_body",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_bus",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_camera",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_controls",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_ears",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_environment",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_expression",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_eyes",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_gemini",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_health",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_ipc",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_keeper",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_lean",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_memory",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_mood",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_msgs",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_name",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_observer",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_policy",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_records",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_ring",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_schedule",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_sound_fixtures",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_surround",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_tasks",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_turn_end",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_turn_end_wire",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_turn_owner",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_voice",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_voice_eval",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    }
+  ]
+}

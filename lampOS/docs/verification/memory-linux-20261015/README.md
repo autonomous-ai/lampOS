@@ -1,6 +1,6 @@
 # Memory verification on ordinary-user native x86_64 Linux
 
-Ready for lamp-voice: no
+Ready for lamp-voice: yes (#743)
 
 Source: `56b458966ffd10a7938d551de0449cf9fbc723bd`, based on First's
 requested Tasks repair `1a38f2f3e6b8afd1e7896761a0da6149a2400f67`.
@@ -114,7 +114,11 @@ and `.json`. The strict lint/native build/ARM64 build reported 35.27 s,
 runtime or lamp latency. The final-head full test suite is
 native ARM64 run 38615610362. The complete local test result above remains
 attributed to 56b458966; it is not relabelled as a run of the final head.
-No final-head ready claim is made yet.
+That exact-head native ARM64 run subsequently passed 4,245 / 0 failed /
+32 ignored across 280 suites, with the release build, hashes and artifact
+upload successful. Its complete evidence is in `../memory-arm64-20261015/`;
+Memory is offered as non-draft PR #743. The older local full-test result
+remains separately attributed to its actual source.
 
 ## Not shown
 
