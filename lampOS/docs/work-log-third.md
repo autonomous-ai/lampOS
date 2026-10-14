@@ -1416,6 +1416,58 @@ team's per-unit wiring/calibration corrections. It is the next task to claim.
 Tasks #695 and #696 are closed as adopted by First. No lamp was accessed, and
 no discarded trial code is marked ready or merged.
 
+## 2026-10-14 — task 33 taken: touch strip and head pads (#711)
+
+Ready for lamp-voice: no
+
+Taking [#711](https://github.com/autonomous-ai/lampOS/issues/711) on
+`third/touch`. The issue is labelled `status:taken`; the first claim comment is
+this session's (`third-20261014-violet4`, no lamp). Integration base:
+`f8f0b496cec739c92bfd05386b9470ee5afb766c`. Read Third's role, the new Queue
+order, the creature design, both issue comments, the hardware wiring and
+lamp-4ace's preserved MPR121 register dump. The superseded CI test change is
+discarded; all runtime source currently matches the integration branch.
+
+Scope: Controls, its message contracts and documents. Add a configurable
+MPR121 path with explicit startup configuration, ordered pad positions and
+bounded failure behavior; preserve unknown/read/over-current faults as unknown.
+Recognize continuous positions, directional slides and strokes, and publish
+the new tap/hold intentions for the actual Voice/Expression owners to apply.
+Keep standard-unit primary/reset/privacy paths distinct and use per-unit head
+discovery/configuration, not two hard-coded pads. Existing lamp behavior must
+remain unchanged without an explicit new switch. No Voice, Expression, Body
+consumer or deployment is being enabled here.
+
+Before implementation: inspect V1's real MPR121/TTP223 configuration and
+failure paths, the chip's primary documentation and maintained Rust options.
+Read the existing Controls engine, reader, recorder/replay and receiver
+contracts. Keep input and stop handling independent of slow I2C; define
+queue/worker bounds and timing targets before choosing the adapter. Tests will
+cover startup-held input, partial/lost samples, read/configuration faults,
+reversed/slow/interrupted slides, per-unit mapping, repeated holds and replay.
+
+**Integration questions/constraints, carried in the issue too:**
+
+- Third's role owns no deploy folder. Provide the exact per-lamp pins/profile
+  candidate and validation command in the handoff; First applies the
+  lamp-4ace deployment correction and performs discovery with a person's hand.
+  Standard line 100 is reset-only and the privacy input stays authoritative.
+- The hardware document describes active-low head pads, while the measured
+  lamp-4ace edges include low-to-high touches. Preserve explicit/detected
+  per-unit polarity evidence; neither description silently becomes a universal
+  hard-coded mapping.
+- The supplied 50 Hz mask log contains only changed rows. Preserve those rows
+  as First's real evidence. Any filled-in constant-mask samples used for
+  deterministic hold/slide tests will be labelled authored reconstruction,
+  not newly observed hardware samples. Full acquisition continuity still
+  needs the recorder on the lamp.
+- Sleep/tap actions must be applied by the current Voice/privacy owner; a
+  Controls publication cannot itself prove microphones are off or listening
+  has begun. The final handoff will state the exact freshness/receipt boundary.
+
+No question blocks the independent reader/state-machine/replay work. No lamp,
+live GPIO, I2C write, microphone, speaker or motor is accessed here.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
