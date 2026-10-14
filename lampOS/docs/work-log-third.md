@@ -2190,6 +2190,64 @@ Unknown-to-Quiet delay, actual ALSA retirement, flash stalls, and the child
 transition from inherited RR20 to `SCHED_OTHER`/nice 19. No lamp, real provider
 or physical audio was used. Build/test times are not lamp interaction latency.
 
+## 2026-10-15 — Task 31 room policy settled; revised native run started
+
+Ready for lamp-voice: no
+
+[First's answer](https://github.com/autonomous-ai/lampOS/issues/709#issuecomment-6176285386)
+settles both questions. Due reminders and timers are requested work: Unknown,
+Busy and Quiet all allow them at the next qualified local silence, with normal
+privacy/readiness and nothing being heard or owed. The revised checkpoint
+[`01192ba0fbfda04afb19e1db63aa86423c21fd6d`](https://github.com/autonomous-ai/lampOS/commit/01192ba0fbfda04afb19e1db63aa86423c21fd6d)
+implements that policy and documents it. It also incorporates First's
+early-end `said_at_us` fix from integration `6573ce6c1b`. Both new Schedule
+switches remain exact `on` and off unless set.
+
+On Third's Intel i7-10700K x86_64 Mac, macOS 26.6.2 / Darwin 25.6.0,
+64 GiB RAM and Rust/Cargo 1.96.0, formatting and strict all-target Clippy
+passed, then **113 test executions / 0 failed / 2 ignored** across the
+reminder, tools, task-news, agent-task and early-end filters; the workspace
+build passed. The reminder filter contributes 74 of those passes and both
+ignored timing probes. New tests use the actual three room classifications,
+attention on/off and room changes during output, retain the reminder tool
+veto and the next ordinary answer's room policy, and prove claim retention
+through live-child TERM refusal and lost wait ownership. All 697 frozen
+Rust/manifest hashes stayed unchanged through the checks and commit.
+[Exact commands, times, original logs and source identity](https://github.com/autonomous-ai/lampOS/tree/01192ba0fbfda04afb19e1db63aa86423c21fd6d/lampOS/docs/verification/schedule-voice-host-20261014/room-policy-6573)
+are on the task branch. Raw-log whitespace is retained; source and authored
+documentation pass their separate whitespace check.
+
+[ARM64 run 38626209078](https://github.com/autonomous-ai/lampOS/actions/runs/38626209078)
+is running for this exact revised commit. The complete affected-package host
+gate is also running; a fresh clean-6573/source-copy comparison is prepared
+and waits for local Cargo to be free. These pending results are not claimed.
+[This qualification record](verification/schedule-voice-qualification-20261015/README.md)
+keeps the initial run identity and will retain terminal evidence separately
+from the frozen runtime checkpoint. No ready pull request is open.
+
+The earlier [native run 38620759412](https://github.com/autonomous-ai/lampOS/actions/runs/38620759412)
+passed at 19:36 UTC for c0, before the room revision: release workspace
+build/tests, **4,334 passed / 0 failed / 33 ignored**, 279 completed harnesses,
+on a GitHub Ubuntu 22.04 ARM64 runner. The task branch retains its original
+log and result. That run does not qualify the revised source or a lamp.
+
+First assigns the unchanged motor startup/reap fixtures to Fourth's widened
+[#739](https://github.com/autonomous-ai/lampOS/issues/739), now claimed by
+Fourth. First permits the PR to list a full-gate failure in an untouched test
+that passes alone, with the raw run and #739 link. Every failed attempt keeps
+its actual counts; the exception does not relabel failures as passes. No
+motor production code, fixture assertion or deadline is changed by this task.
+The latest Queue read adds no Third task; #699 remains after the MVP,
+unclaimed. Touch's enabled lamp/person qualification remains First's.
+
+[First's seven lamp cases](https://github.com/autonomous-ai/lampOS/blob/01192ba0fbfda04afb19e1db63aa86423c21fd6d/lampOS/docs/schedule.md#task-31-lamp-qualification)
+now start with a one-minute timer immediately after restart in Unknown and
+include all room states and mid-answer changes. Most likely wrong on the lamp:
+provider schema/wording, timely local silence in a busy office, ALSA final
+retirement, flash stalls and the child's RR20-to-Other/nice-19 transition.
+No lamp, real provider or physical audio was used. Build/test durations are
+not interaction latency.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

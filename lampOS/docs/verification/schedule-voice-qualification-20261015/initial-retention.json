@@ -1,0 +1,34 @@
+{
+  "originals": [
+    {
+      "original": "/private/tmp/lamp-third-schedule-room-policy-checkpoint-head.json",
+      "retained": "checkpoint.json",
+      "sha256": "a333dedf89a72dbce6cf23c39ec31a5b537caa59a6a9f98cc2c15d304113f442",
+      "bytes": 3709
+    },
+    {
+      "original": "/private/tmp/lamp-third-schedule-room-policy-native-first-runs.json",
+      "retained": "native-first-runs.json",
+      "sha256": "33da6d23ac361cfab0eae10acc68e30b6c872ae5f4c1c27b60144aa7fb9a7db5",
+      "bytes": 264
+    },
+    {
+      "original": "/private/tmp/lamp-third-schedule-native-38626209078-first.json",
+      "retained": "native-first-job.json",
+      "sha256": "834969ee1b67463f22ceca2060052704e8d700f7dfa2c062368b4296815d4ebe",
+      "bytes": 2337
+    },
+    {
+      "original": "/private/tmp/lamp-third-issue-705-20261014T194700Z.json",
+      "retained": "queue-1947.json",
+      "sha256": "7011e3e1fd92fb925458694bce5acae398ecbc8fe62ea32892ccaf81c5343277",
+      "bytes": 9667
+    },
+    {
+      "original": "/private/tmp/lamp-third-issue-739-20261014T194700Z.json",
+      "retained": "fixtures-1947.json",
+      "sha256": "1b603b77dee564afe42d8dc0bf3d690e691d0a837284a74818063fbc79d62b82",
+      "bytes": 4426
+    }
+  ]
+}
