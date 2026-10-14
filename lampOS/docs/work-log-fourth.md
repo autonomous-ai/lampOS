@@ -1469,6 +1469,38 @@ protected live sessions, the full Records gate, standalone verification
 and the newly required Linux ARM64 build if the available toolchain can
 provide it. First runs the finished build on lamp-4ace's timer.
 
+## 2026-10-14, 17:16 ICT: required ARM64 baseline gate failed outside this work
+
+Ready for lamp-voice: no
+
+The new mandatory GitHub ARM64 workflow ran on claim-only commit
+`eb4ae60cce7fb3398fe5d60b95c142fda5fb1554`, before either task 29 or 30
+implementation reached this branch. Run
+[38546842373](https://github.com/autonomous-ai/lampOS/actions/runs/38546842373)
+built the workspace in release, then failed the Controls integration test
+`sigterm_finishes_recording_and_releases_the_actual_serve_owner` at
+`crates/controls/tests/program.rs:340`: spawning `/bin/kill` returned ENOENT.
+Six other tests in that executable passed. The likely missing CI utility
+is outside these tasks. No tests were skipped or changed to turn this green.
+The failed step, warnings and exact environment/command are retained in
+[the evidence](verification/arm64-baseline-20261014/README.md).
+Reported once on #707 for First to resolve; neither runtime piece will be
+marked ready while the required gate fails. Local work and gates continue.
+
+First answered Fourth-Q29 yes in
+[the task's issue](https://github.com/autonomous-ai/lampOS/issues/698#issuecomment-6165838226).
+Only exact `LAMP_MEMORY_DAYS=on` may be forwarded after `env_clear` to the
+provider, absent/invalid values and every other role unchanged. Implemented
+that narrow exception on task 29's branch; the real-child environment test
+passes on the development Mac. Full final gates remain pending.
+
+Correction to task 30's taken wording: the existing scan already excludes
+positively identified kernel threads using Linux's PF_KTHREAD flag. Keep
+that existing exclusion and report its count separately. Empty arguments
+alone never prove a kernel thread or a safe exit; live uninspectable user
+processes continue to refuse the scan. The code and docs remain on the
+isolated task branch until verified.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
