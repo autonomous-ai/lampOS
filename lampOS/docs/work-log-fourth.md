@@ -1402,6 +1402,26 @@ Finish both affected-crate gates and a standalone source check; hand back
 played scenes for First's `~/lamp-voice-data/tools/memory.sh`, expected
 results and the most likely lamp-only failures. No device action here.
 
+### Task 29 question: passing the one opt-in to the provider worker
+
+The allowed files cannot deliver a new environment switch to the real
+Voice provider: `crates/voice/src/process.rs:208` calls `.env_clear()` for
+workers, and the coordinator's existing `tools::arguments_from_environment`
+passes only the Memory socket, not a Days choice. Reading a new variable
+only in `remember.rs` would appear to work in a direct test but stay off
+in the actual lamp service. No path encoding, parent-process environment
+inspection or side file will be used to bypass this boundary.
+
+**Fourth-Q29:** may task 29 also change the provider spawn in `process.rs`
+to pass only a validated `LAMP_MEMORY_DAYS=on` to the `provider` role,
+leaving its absence and all other workers unchanged? The exact proposed
+behavior is one `Command::env` conditional after `env_clear`, with a
+test proving absent/invalid values and other roles get no variable.
+Alternatively, First can add that narrow wiring when taking this task.
+The remembered data, deadlines, opt-in client and real-store tests can be
+built inside the assigned files meanwhile; that work continues. The final
+handoff will distinguish a wired service switch from a direct-client test.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
