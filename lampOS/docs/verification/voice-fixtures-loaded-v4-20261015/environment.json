@@ -1,0 +1,13 @@
+{
+  "host": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "cpu_count": 16,
+  "started_at_utc": "2026-10-14T21:10:01.637779+00:00",
+  "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2\n",
+  "cargo_environment": {
+    "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target",
+    "RUST_TEST_THREADS": "1",
+    "CARGO_BUILD_JOBS": "4"
+  },
+  "load_kind": "Continuous cycles of real release workspace ARM64 cross-builds in the existing ordinary-user x86_64 Linux Podman VM. Each cycle cleans only workspace packages in Fourth own target volume; registry dependency cache retained. This is build load, not ARM64 execution or lamp evidence."
+}

@@ -2883,6 +2883,39 @@ inhibit bound under a sufficiently long host pause; the Body seam question
 remains pending. No Body change or lamp measurement is claimed.
 
 
+
+## 2026-10-15, 04:38 ICT: task 46, fourth loaded qualification stops at rapid reopen
+
+Ready for lamp-voice: no
+
+Frozen v4 at `78b984b69` passed three full serial Mac runs, each
+1,082 / 0 / 6 ignored across 21 suites. Run 4 failed: 1,081 / 1 / 6,
+21 suites, 371.137 seconds including Cargo. The failing case is
+`pilot_faults::rapid_mute_and_reopen_never_overlaps_workers_or_carries_speech_across`,
+with `capture discontinuity`, after four listening-ready records. All four
+named regressions, every EarlyEnd scenario and all motor cases passed all
+four runs. No source changed, and future runs stopped at the first failure.
+
+[Complete v4 evidence](verification/voice-fixtures-loaded-v4-20261015/README.md)
+retains raw runs, source identity, counts, the post-run audit, load samples
+and all eleven successful overlapping ARM64 cross-build cycles. Failed
+raw output SHA-256:
+`f34fc557c9f07308db643fb3a4f1af95e13c8427312717f0ad2b766d8b0d9c70`.
+This is Fourth's Intel Mac and its x86_64 Podman VM, not a lamp or native
+ARM execution. It is not a ten-run success.
+
+The rapid mute/reopen scenario deliberately keeps real peers because it
+exercises the actual service privacy wait and four controller lifetimes.
+Source inspection finds that its synthetic capture source schedules 10 ms
+blocks but stamps overdue blocks at delivery, so a delayed peer can create
+a false source discontinuity. This is the same fixture distinction already
+corrected in endpoint and EarlyEnd. The failed run did not retain exact
+source or consumption ages; the explanation remains inferred from code,
+not a measured scheduling delay in run 4. Original
+mute/reopen, non-overlap, ownership and actual cleanup assertions remain
+required. The Body scope question is still pending; no Body edits.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

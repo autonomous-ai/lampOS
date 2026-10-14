@@ -1,0 +1,173 @@
+{
+  "ten_runs_qualified": false,
+  "runs": [
+    {
+      "run": 1,
+      "counts": {
+        "suites": 21,
+        "passed": 1082,
+        "failed": 0,
+        "ignored": 6,
+        "measured": 0,
+        "filtered": 0
+      },
+      "exit_code": 0,
+      "wall_seconds": 435.6031275149435,
+      "source_unchanged": true,
+      "named_results": {
+        "complete_verdict_ends_early_but_resumed_speech_keeps_the_turn": [
+          "test coordinator::tests::endpoint_session::complete_verdict_ends_early_but_resumed_speech_keeps_the_turn ... ok"
+        ],
+        "ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up": [
+          "test coordinator::tests::pilot_faults::ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up ... ok"
+        ],
+        "sigterm_while_the_failure_notice_plays_stops_cleanly": [
+          "test coordinator::tests::pilot_faults::sigterm_while_the_failure_notice_plays_stops_cleanly ... ok"
+        ],
+        "a_lone_lamp_and_a_pause_and_the_question_go_as_one_request": [
+          "test coordinator::tests::early_end::a_lone_lamp_and_a_pause_and_the_question_go_as_one_request ... ok"
+        ]
+      },
+      "overlapping_compiler_build_cycles": [
+        1,
+        2,
+        3
+      ],
+      "ignored_lines": [
+        "test coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance ... ignored, requires a built lamp-turn-end and the pinned model",
+        "test coordinator::tests::hand_controls::local_hand_stop_dispatch_latency ... ignored, manual local-host speaker-control latency probe; no lamp or acoustic claim",
+        "test provider_worker::tests::sixty_second_answer_follows_output_capacity ... ignored, one minute of real time; run explicitly",
+        "test provider_worker::tests::three_minute_answer_follows_output_capacity ... ignored, three minutes of real time; run explicitly",
+        "test reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift ... ignored",
+        "test reference::tests::four_virtual_hours_capture_clocked ... ignored, four virtual hours; run in release"
+      ]
+    },
+    {
+      "run": 2,
+      "counts": {
+        "suites": 21,
+        "passed": 1082,
+        "failed": 0,
+        "ignored": 6,
+        "measured": 0,
+        "filtered": 0
+      },
+      "exit_code": 0,
+      "wall_seconds": 372.84933286579326,
+      "source_unchanged": true,
+      "named_results": {
+        "complete_verdict_ends_early_but_resumed_speech_keeps_the_turn": [
+          "test coordinator::tests::endpoint_session::complete_verdict_ends_early_but_resumed_speech_keeps_the_turn ... ok"
+        ],
+        "ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up": [
+          "test coordinator::tests::pilot_faults::ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up ... ok"
+        ],
+        "sigterm_while_the_failure_notice_plays_stops_cleanly": [
+          "test coordinator::tests::pilot_faults::sigterm_while_the_failure_notice_plays_stops_cleanly ... ok"
+        ],
+        "a_lone_lamp_and_a_pause_and_the_question_go_as_one_request": [
+          "test coordinator::tests::early_end::a_lone_lamp_and_a_pause_and_the_question_go_as_one_request ... ok"
+        ]
+      },
+      "overlapping_compiler_build_cycles": [
+        3,
+        4,
+        5,
+        6
+      ],
+      "ignored_lines": [
+        "test coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance ... ignored, requires a built lamp-turn-end and the pinned model",
+        "test coordinator::tests::hand_controls::local_hand_stop_dispatch_latency ... ignored, manual local-host speaker-control latency probe; no lamp or acoustic claim",
+        "test provider_worker::tests::sixty_second_answer_follows_output_capacity ... ignored, one minute of real time; run explicitly",
+        "test provider_worker::tests::three_minute_answer_follows_output_capacity ... ignored, three minutes of real time; run explicitly",
+        "test reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift ... ignored",
+        "test reference::tests::four_virtual_hours_capture_clocked ... ignored, four virtual hours; run in release"
+      ]
+    },
+    {
+      "run": 3,
+      "counts": {
+        "suites": 21,
+        "passed": 1082,
+        "failed": 0,
+        "ignored": 6,
+        "measured": 0,
+        "filtered": 0
+      },
+      "exit_code": 0,
+      "wall_seconds": 373.22297282516956,
+      "source_unchanged": true,
+      "named_results": {
+        "complete_verdict_ends_early_but_resumed_speech_keeps_the_turn": [
+          "test coordinator::tests::endpoint_session::complete_verdict_ends_early_but_resumed_speech_keeps_the_turn ... ok"
+        ],
+        "ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up": [
+          "test coordinator::tests::pilot_faults::ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up ... ok"
+        ],
+        "sigterm_while_the_failure_notice_plays_stops_cleanly": [
+          "test coordinator::tests::pilot_faults::sigterm_while_the_failure_notice_plays_stops_cleanly ... ok"
+        ],
+        "a_lone_lamp_and_a_pause_and_the_question_go_as_one_request": [
+          "test coordinator::tests::early_end::a_lone_lamp_and_a_pause_and_the_question_go_as_one_request ... ok"
+        ]
+      },
+      "overlapping_compiler_build_cycles": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "ignored_lines": [
+        "test coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance ... ignored, requires a built lamp-turn-end and the pinned model",
+        "test coordinator::tests::hand_controls::local_hand_stop_dispatch_latency ... ignored, manual local-host speaker-control latency probe; no lamp or acoustic claim",
+        "test provider_worker::tests::sixty_second_answer_follows_output_capacity ... ignored, one minute of real time; run explicitly",
+        "test provider_worker::tests::three_minute_answer_follows_output_capacity ... ignored, three minutes of real time; run explicitly",
+        "test reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift ... ignored",
+        "test reference::tests::four_virtual_hours_capture_clocked ... ignored, four virtual hours; run in release"
+      ]
+    },
+    {
+      "run": 4,
+      "counts": {
+        "suites": 21,
+        "passed": 1081,
+        "failed": 1,
+        "ignored": 6,
+        "measured": 0,
+        "filtered": 0
+      },
+      "exit_code": 101,
+      "wall_seconds": 371.137224834878,
+      "source_unchanged": true,
+      "named_results": {
+        "complete_verdict_ends_early_but_resumed_speech_keeps_the_turn": [
+          "test coordinator::tests::endpoint_session::complete_verdict_ends_early_but_resumed_speech_keeps_the_turn ... ok"
+        ],
+        "ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up": [
+          "test coordinator::tests::pilot_faults::ring_fault_during_an_answer_keeps_the_conversation_and_cleans_up ... ok"
+        ],
+        "sigterm_while_the_failure_notice_plays_stops_cleanly": [
+          "test coordinator::tests::pilot_faults::sigterm_while_the_failure_notice_plays_stops_cleanly ... ok"
+        ],
+        "a_lone_lamp_and_a_pause_and_the_question_go_as_one_request": [
+          "test coordinator::tests::early_end::a_lone_lamp_and_a_pause_and_the_question_go_as_one_request ... ok"
+        ]
+      },
+      "overlapping_compiler_build_cycles": [
+        9,
+        10,
+        11
+      ],
+      "ignored_lines": [
+        "test coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance ... ignored, requires a built lamp-turn-end and the pinned model",
+        "test coordinator::tests::hand_controls::local_hand_stop_dispatch_latency ... ignored, manual local-host speaker-control latency probe; no lamp or acoustic claim",
+        "test provider_worker::tests::sixty_second_answer_follows_output_capacity ... ignored, one minute of real time; run explicitly",
+        "test provider_worker::tests::three_minute_answer_follows_output_capacity ... ignored, three minutes of real time; run explicitly",
+        "test reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift ... ignored",
+        "test reference::tests::four_virtual_hours_capture_clocked ... ignored, four virtual hours; run in release"
+      ]
+    }
+  ],
+  "build_cycles": 11,
+  "note": "Overlap uses actual first Compiling output through completed build command; it is wall overlap, not a CPU-utilization measurement. Failed or partial sequences remain failures."
+}
