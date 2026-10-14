@@ -1369,6 +1369,39 @@ successful write proves that write, not every storage path. No lamp,
 ARM64, physical power-loss, real provider, live unit or deployment was
 used. No unanswered question blocks task 29.
 
+## 2026-10-14, 16:38 ICT: task 29, memory-voice — taken
+
+Fetched and read the list at `ed4bccd6a0dd5c033983c21a2840835451dc5ddb`,
+read this log, rebased Fourth onto that pinned integration and pushed
+with a lease (`7cad55439`). Task 28's implementation is now `a7583dc14`;
+its Memory source is unchanged by the rebase. The explicit next order
+remains 29, then 8. First's 16:04 answer about task 17's labelled rows is
+received; inspect the failed-to-answer fit, the copied busy-room rule
+and the requested `voice_first_output` contract after those tasks, as
+the answer orders. Do not silently treat those new lamp rows as host
+evidence or a qualified model.
+
+Task branch: `fourth/memory-voice`. Allowed implementation scope is
+Memory, `crates/voice/src/remember.rs`, and the session-note call site in
+`crates/voice/src/thread.rs`, with `docs/memory-days.md` and
+`docs/memory.md` updated. No other Voice runtime, deployment or shared
+message change. Inspect the current requests first: the existing recall
+already sends query/day, so establish what actually changes for ranked
+Days retrieval before replacing anything.
+
+One explicit Voice environment switch will opt into frozen session notes
+with provenance and conversation-end submission, retaining the old path
+when absent. Targets: session-note acquisition within 300 ms total, tool
+calls within 1.5 s total; no capture, playout or other foreground path
+waits for Memory. End work is bounded and asynchronous, including when
+Memory has no extraction model. Test the real temporary store, earlier-day
+ranked recall, frozen notes and provenance, conversation-end receipt,
+missing/slow Memory and truthful failure answers. Measure first/repeated
+host latency and deadlines, keeping machine and boundary explicit.
+Finish both affected-crate gates and a standalone source check; hand back
+played scenes for First's `~/lamp-voice-data/tools/memory.sh`, expected
+results and the most likely lamp-only failures. No device action here.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
