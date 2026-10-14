@@ -3139,6 +3139,38 @@ Remaining dependent/workspace gates, exact-head native ARM64 CI and lamp
 qualification are still outstanding. No Body change or lamp access.
 
 
+## 2026-10-15, 06:43 ICT: task 46, v8 loaded checkpoint at three runs
+
+Ready for lamp-voice: no
+
+Three full serial Voice runs have completed on the unchanged v8 snapshot:
+1,173 passed / 0 failed / 8 existing ignored across 21 suites in each run.
+Cargo wall times were 464.047354, 387.770990 and 386.476553 seconds on Fourth's
+Intel Mac. Ten actual ARM64 cross-build cycles have finished successfully;
+the fourth Voice run and compiler-load loop continue. This is a checkpoint
+at three of ten, not completed qualification. Terminal raw output remains
+in the running measurement folder for the final immutable archive.
+
+The first-run audit checked all 101 affected-cohort outcomes, the four named
+regressions and the complete frozen source inventory/hashes. All matched;
+the eight ignores are unchanged from the retained v6 baseline. Separate
+ordinary-library privacy and core targets passed 4 and 10 tests. The auditor
+now binds the exact raw summary and source manifest, records missing/partial
+counts as failed evidence, and keeps hash corruption a rejection. Fifty
+synthetic checks passed, including seven CLI failure-archive checks; none
+counts as a real Voice run. The later-gate script review also corrected source
+binding, image pinning, parsed-failure stops and terminal cleanup reporting.
+Its initial synthetic 32-of-33 result exposed unreadable container-ID handling;
+that failure is retained, and all 41 checks passed after correction. These
+fake-process checks do not establish real container or descendant cleanup.
+
+The 23:42:37 UTC fetch found `origin/lamp-voice` still at
+`cf2f5b43c8113a704324c2743af3cd92bbc4fdda`, unchanged rules/Queue, only #739
+open for Fourth, and no new or edited task answer. The Body scope question
+remains unanswered; no Body change. The remaining local gate and exact-head
+native ARM64 CI have not run for this version. No task PR or lamp access.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
