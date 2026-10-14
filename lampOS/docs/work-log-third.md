@@ -1031,6 +1031,68 @@ integration checks.
 Questions blocking independent work: none. Next: fetch the list and own log,
 rebase `lamp-third`, and take the next unclaimed Third task.
 
+## 2026-10-14 — task 11 taken: Tasks through Harness
+
+- Taking `tasks` on `third/tasks`. Fetched and read `origin/lamp-voice` at
+  `fd6705dd9e107817b33309d777cfa2d5c85e4062` and this log. The new list moves
+  task 8 (`defaults`) to Fourth after tasks 28/29, so Third will not implement
+  it. No defaults source was written. The preparatory finding worth carrying
+  over is that Msgs already depends on Bus: a log helper must not create the
+  reverse dependency, and a part's request loop must not wait on bus fan-out.
+- Rebased `lamp-third` and pushed with the exact previous-head lease. Kept both
+  Keeper and Schedule in the workspace and both append-only reuse reviews.
+  First's adopted Expression changes dropped out. Schedule and Msgs source
+  trees match the gated `third/schedule` checkpoint exactly. The rebased
+  Schedule commit is `9ba3aeab1`; its rebased log head is `dfdee9337`.
+- Read root `docs/harness.md` and brain-build's chosen CLI route and historical
+  Device route. Scope: a new independent Rust `lamp-tasks` process, off unless
+  enabled, a private durable task/delivery ledger and local interface, a bounded
+  client of Harness's existing CLI, scripted-Harness tests, diagnostics and
+  `docs/tasks.md`. No new transport, pairing, account, credentials or raw daemon
+  mutations. No Harness operation will be run against a live account here.
+- Read-only preparation inspected V1's journal/results/permission handling and
+  Harness's public source at `748269145cb76d1a164141f6bc55758e013334b0`; that
+  source is being refreshed before finalizing the adapter. The local Harness
+  checkout was older. Source review is not installed-release interoperability
+  or a real task result. The existing CLI enforces agent-origin policy and
+  offers explicit-target launches and bounded observations. Its initial
+  creation reply can be lost with no caller-supplied idempotency key; `new`
+  will therefore never be automatically retried. Idle state and transcript
+  text will not be advertised as correlated completion.
+- Host work proceeds with scripted subprocesses and injected clocks. The
+  immediate admission/status path must remain responsive while the remote
+  operation is slow. Durable admission, CLI startup/observation and voice
+  delivery are distinct timing boundaries; each host measurement will identify
+  its machine and include retained failures.
+
+**Questions for First / the Harness contract, published here rather than sent
+as messages.** None blocks the independent ledger, process runner or fixture
+work:
+
+1. Which installed CLI/daemon build on the lamp and selected target supports
+   outside-agent identity, explicit `--mode ask`, JSON launch/pending replies
+   and remote-child observation? Source capabilities do not qualify 0.3.94.
+2. The planned caller is a stable `AI_AGENT=lampos` and private-store
+   `HARNESS_AGENT_SESSION`, with unrelated pane/Claude/Codex identity removed
+   from the child environment. Confirm the supported reset/account-change rule
+   and engine settings; `ask` does not override every engine's own settings.
+3. The source reviewed exposes no caller-provided creation key and no
+   request-correlated result identity on the chosen CLI route. Is there a
+   supported newer contract for either? Until demonstrated, a lost launch reply
+   remains uncertain with no automatic resend, and transcript/idle observations
+   never mark task completion or automatic final-result speech.
+4. What supported chosen-route API supplies focused-agent identity/revision,
+   follow-up input, and remote question/permission identity? Until established,
+   use explicit provisioned targets, no follow-up send, and generic needs-
+   attention observations only. Never answer a permission prompt by voice.
+5. How should known pending creations be reconciled after Harness's ledger
+   expires or a remote agent disappears? Missing, gone, or a same-name match
+   will not prove that nothing ran, or bind a different task.
+6. First's Voice adapter must attest the spoken pre-dispatch confirmation and
+   qualified playout identity. Which final receipt will it use? Durable speech
+   claims will survive restart as uncertain; socket or model acceptance cannot
+   mark an answer as spoken. No Voice source is changed in this task.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
