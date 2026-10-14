@@ -715,6 +715,43 @@ independent idle author must be resolved before judging the rest plan.
 Questions blocking further Third work: none. New Voice publishing, final
 consumer wiring, one rest author and physical qualification belong to First.
 
+## 2026-10-14 — expression-rest playout addendum — taken
+
+- The between-task fetch found a new task 18 requirement added by First in
+  `e3d32c89f`, while Third's original task gate was running. First reports
+  565 refused inputs on lamp-4ace and a 353-message recording across four
+  answers: correctly dated approximately 20 ms playout pieces were often
+  already finished when read. First's median publication delay was 1.7 ms;
+  these are First's measurements, not Third's.
+- Complete this added requirement before Schedule: recently finished playout
+  is evidence of heard sound, not a fault; follow its bounded recent level
+  without requiring advance arrival. Preserve session/turn/generation, hold,
+  cancellation, ordering and freshness fences. Any added visible behavior
+  remains behind an explicit default-off catalogue option. Do not manufacture
+  future audio, acoustic onset or a measured hardware delay.
+- Base: `origin/lamp-voice` at
+  `23843b78e939a41590c6569f7a65e29bc10a6d03`. Rebased `lamp-third` cleanly
+  and pushed with the exact lease; First's adopted Surround commit dropped
+  out automatically. Expression/message source hashes still match the
+  completed task. First's new Voice/Audio changes require a fresh baseline
+  build and the applicable final gate for this addendum.
+- Addendum task branch: `third/expression-rest-playout`. Keep the already
+  published `third/expression-rest` checkpoint intact; no task branch is
+  force-pushed. Scope remains Expression, authored replays/tests and English
+  documents. No Voice, Audio, Body or deployment edit.
+- Recheck V1's actual post-write level expiry, today's `Piece` publication
+  and First's new evidence before designing the bounded observation policy.
+  A synthetic 20 ms-piece replay will be labelled authored; no lamp recording
+  has been supplied to Third.
+- The latest list gives Body to Fifth on its own lamp. First still owns
+  lamp-4ace integration; Body changes and the rest/nod qualification now
+  follow that ownership split. Surround's first lamp checks are recorded by
+  First in `work-split.md`, including that its `/tmp` benchmark used memory
+  storage and did not measure flash durability.
+- Questions blocking independent work: none. First plans an earlier sound
+  publication from Voice's 350 ms buffer; this addendum must also work with
+  today's short observed intervals, without editing that publisher.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
