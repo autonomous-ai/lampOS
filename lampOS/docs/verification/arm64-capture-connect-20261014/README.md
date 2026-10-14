@@ -70,8 +70,9 @@ This is outside Fourth's three authorized Memory/Voice files
 (`process.rs`, `remember.rs`, `thread.rs`); Fourth has not edited it.
 The owner should run the complete capture fixture on Linux and the full
 native ARM64 gate after a repair. This proposed fixture ordering does not
-establish that every production reference-channel caller is race-free;
-that wider startup audit belongs to the owner.
+repair production startup ordering; the source audit below establishes a
+separate pre-fix exposure. First subsequently repaired the production
+connection retry at the source, as recorded below.
 
 The fixture, `voice/src/transport.rs`, `voice/src/audio_workers.rs`, and
 `ipc/src/lib.rs` are byte-identical between this failed head and Mood's
@@ -108,7 +109,84 @@ byte-preservation reason as `run.txt`.
 This establishes that the failure can occur without the Memory task's
 changes. It still does not record the refused socket's metadata or prove
 that the bind/chmod window caused either occurrence. The fixture and its
-security checks remain unchanged; the original owner question is pending.
+security checks were unchanged at that checkpoint. First answered the
+owner question at 23:26 ICT with the source repair recorded below.
+
+## Pre-fix production reference startup also lacked a binding acknowledgement
+
+Fourth audited local Memory head
+`2d081316b44f81dfc50589a3e6b554af2c88d993`, based on public upstream
+`d5d765862ab1f73629ee7a2c5a9a8086f0246d11`. The coordinator, audio workers,
+reference transport and IPC source are unchanged by the Memory task. The
+following is a source-proven possible interleaving, not a reproduced
+production failure or a measurement on a lamp:
+
+- `coordinator.rs:1841-1868` spawns capture and then speaker.
+  `process.rs:236-262` waits for each worker's ordinary `{role}.c.w` and
+  `{role}.d.w` sockets to be private, connects them, then waits for
+  `WorkerEvent::Ready`. These are not the `ref.*` sockets.
+- Capture sends `Ready` at `audio_workers.rs:325` and speaker at line 875,
+  before either binds its direct reference sockets.
+- `coordinator.rs:2147-2158` sends `ConnectReference` to capture and then
+  speaker without waiting for a binding acknowledgement. They bind at
+  `audio_workers.rs:354` and line 941. `transport.rs:135-136` binds each
+  pair's control socket before its data socket.
+- Both workers independently call `connect_step` at
+  `audio_workers.rs:374` and line 994. One can finish binding its own pair
+  while the other is between `UnixDatagram::bind` and chmod. If that path
+  still has group/other permission bits, the strict peer check correctly
+  refuses it, and `connect_step` propagates the error.
+
+`CapturePrepared` does not provide a preconnection barrier in production.
+Capture emits it only after its own `connect_step` succeeds (lines 373-385);
+speaker reads the direct `ReferenceControl::CapturePrepared` only after
+its own connection succeeds (lines 994-1006). The coordinator records the
+event at `coordinator.rs:5008-5011`; it does not use it to order reference
+binding. Delaying `StartCapture` alone would not prevent either worker
+from attempting its connection. The fixture proposal above works because
+that fixture fully binds speaker first; that premise is absent here.
+
+Existing deterministic tests at `process.rs:516-552` cover private-mode
+readiness and invalid paths for the ordinary worker sockets. Reference
+tests cover a missing peer followed by a completed bind
+(`tests/reference_link.rs:13-22`) and pairs fully bound before connecting
+(`tests/reference_prime.rs:23-30`). They do not pause a reference peer
+between bind and chmod. These are source coverage observations; Fourth
+did not add or run a reproduction for this outside-scope audit.
+
+The initial mode depends on the process umask, and the interleaving depends
+on scheduling. Neither CI failure captured those socket metadata, and no
+production or lamp failure has been reproduced. A fixture-only change
+would have left this production exposure unresolved. Fourth has not
+changed these files.
+
+## First repaired connection readiness at the source
+
+First
+[answered on #698 at 23:26 ICT](https://github.com/autonomous-ai/lampOS/issues/698#issuecomment-6173108388)
+with commit `dd6d512b1bcaf37bfa0dfa0a305b12268f5b854b`, followed by startup
+documentation at `7fbb03e1f2e61ad6dfaf184cd768bad6524c2d76`. Fourth read the
+answer in the 23:53 queue check and inspected the actual diff. An own-user
+socket with group/other mode bits now returns `WouldBlock`, without
+connecting. Wrong owner or file type still returns `PermissionDenied`.
+`ReferenceChannels::connect_step` retries `WouldBlock` for both control and
+data within its existing deadline. This handles the production sequence
+as well as the fixture without weakening the private-socket requirement.
+The IPC socket test verifies repeated refusal before chmod and successful
+connection afterward.
+
+First reports Mac IPC 17 passed, Voice 1,035 passed, and IPC plus repeated
+capture fixtures under ARM64 emulation. Those are First's reported host
+checks, not Fourth's measurements and not lamp evidence. Fourth will
+rebase Memory and run its gate; the older failures remain retained.
+
+One related caller needs its owner's attention: at the repaired head,
+`ipc/src/bin/lamp-ipc-probe.rs:213-248` still retries only `NotFound`,
+`ConnectionRefused` and `PermissionDenied` during its documented bind/chmod
+window. It now propagates `WouldBlock`, although the helper in
+`ipc/tests/probe.rs` was updated. This is a concrete error-kind mismatch in
+the production probe startup path, not an observed failure. Fourth has
+not edited this outside-scope caller.
 
 ## Limits
 

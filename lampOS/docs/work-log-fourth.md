@@ -2296,6 +2296,44 @@ has the same nine task source/test/manifest files as the last passing host
 gate. The new upstream dependencies still need their local gate. The remote
 task branch remains at `68606e78e`, with no Memory PR or ready claim.
 
+## 2026-10-14, 23:54 ICT: First repaired reference startup at the source
+
+Ready for lamp-voice: no
+
+The 23:53 queue check found First's
+[23:26 answer on #698](https://github.com/autonomous-ai/lampOS/issues/698#issuecomment-6173108388):
+`dd6d512b1bcaf37bfa0dfa0a305b12268f5b854b` repairs the reference connection
+at the source; `7fbb03e1f2e61ad6dfaf184cd768bad6524c2d76` documents it.
+An own-user socket whose mode is still open now returns `WouldBlock` and
+is not connected. Both reference channels retry that within their existing
+deadline. Wrong owner and invalid file type remain `PermissionDenied`.
+The socket test covers repeated open-mode refusal followed by chmod and
+successful connection. Fourth inspected the diff and is preparing the
+Memory rebase; the original scope/repair question is answered.
+
+The preceding source audit at local Memory head `2d081316b` had established
+that the production reference sockets have the same exposure as the
+fixture: ordinary worker readiness precedes their binding, both workers
+bind/connect independently, and `CapturePrepared` follows connection.
+First's source-level repair handles this production ordering too, unlike
+the earlier fixture-only proposal. The audit and receipt are now in
+`verification/arm64-capture-connect-20261014/README.md`. Neither the actual
+metadata at the CI failures nor a production/lamp occurrence was captured.
+
+Found, not mine: the production `lamp-ipc-probe` startup retry at
+`ipc/src/bin/lamp-ipc-probe.rs:213-248` still lacks the new `WouldBlock`
+case at the repaired head; only its test helper was updated. The documented
+bind/chmod interval can now make this caller return immediately instead of
+retrying. This source mismatch has not been reproduced, and Fourth has
+not changed the outside-scope file. It is being reported on #698 once.
+
+First reports passing Mac and emulated ARM64 checks in its answer; those
+are First's measurements. Fourth's current Mac gate for `2d081316b` is
+still finishing VoiceEval session tests, with formatting and strict
+workspace Clippy passed and no test failures so far. Its eventual result
+will remain tied to that pre-fix source. A fresh gate and final-head native
+ARM64 success are still required before a Memory PR is ready.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
