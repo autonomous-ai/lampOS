@@ -1,0 +1,62 @@
+[
+  {
+    "check": "fmt",
+    "argv": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "cwd": "/Users/d/code/autonomous-os/lampOS",
+    "started_utc": "2026-10-14T10:04:21.209761+00:00",
+    "elapsed_seconds": 3.454470167,
+    "exit_code": 0
+  },
+  {
+    "check": "clippy",
+    "argv": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "-p",
+      "lamp-tasks",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "cwd": "/Users/d/code/autonomous-os/lampOS",
+    "started_utc": "2026-10-14T10:04:24.664864+00:00",
+    "elapsed_seconds": 5.958855956000001,
+    "exit_code": 0
+  },
+  {
+    "check": "tests",
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "-p",
+      "lamp-tasks",
+      "--",
+      "--test-threads=1"
+    ],
+    "cwd": "/Users/d/code/autonomous-os/lampOS",
+    "started_utc": "2026-10-14T10:04:30.623950+00:00",
+    "elapsed_seconds": 54.083226479000004,
+    "exit_code": 0
+  },
+  {
+    "check": "workspace-build",
+    "argv": [
+      "cargo",
+      "build",
+      "--locked",
+      "--workspace"
+    ],
+    "cwd": "/Users/d/code/autonomous-os/lampOS",
+    "started_utc": "2026-10-14T10:05:24.705409+00:00",
+    "elapsed_seconds": 28.888195756000002,
+    "exit_code": 0
+  }
+]

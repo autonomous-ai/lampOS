@@ -161,6 +161,25 @@ checked separately. No failing test or ignored new regression is accepted.
 The [development manifest](development-evidence-manifest.json) hashes copied
 raw evidence and records its original temporary paths.
 
+## Rebase onto the new integration and CI rules
+
+After the original handoff, fetched integration head
+`462c18b924cd397f04df45f72503362b6a607b60` and rebased Third. First had already
+adopted Schedule; its duplicate commit was skipped. Kept the newer Ears
+workspace member and Memory reuse review. Tasks' code is byte-identical to
+the original checkpoint: [source identity](rebase-source.json). The original
+16-file hash comparison above describes the pre-rebase gate; the workspace
+manifest/lock now also contain upstream additions.
+
+Repeated the required gate on the same host after rebase, with no other Third
+build/test running concurrently: fmt passed in 3.454 s, strict all-target Tasks
+Clippy in 5.959 s, all **101 tests passed / 0 failed / 0 ignored** in 54.083 s,
+and the full workspace build in 28.888 s. [Commands and exact durations](rebase-results.json),
+[fmt](rebase-fmt.txt), [Clippy](rebase-clippy.txt), [tests](rebase-tests.txt),
+[build](rebase-workspace-build.txt). The newly required native ARM64 CI is a
+separate gate; its eventual run/result belongs in Third's log. It has not yet
+been qualified by these Mac checks.
+
 ## What has not been shown
 
 No lamp, live Harness/account, remote permission state, actual spoken yes or

@@ -1,0 +1,152 @@
+   Compiling lamp-msgs v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/msgs)
+   Compiling lamp-tasks v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/tasks)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.23s
+     Running unittests src/lib.rs (target/debug/deps/lamp_tasks-8bb8be952fe771dc)
+
+running 46 tests
+test engine::tests::attempt_is_durable_before_job_and_is_never_issued_twice ... ok
+test engine::tests::automatic_expiry_preserves_last_mutation_receipt_but_never_requeues_it ... ok
+test engine::tests::boot_restart_preserves_history_but_cannot_fabricate_observation_age ... ok
+test engine::tests::cancellation_is_local_and_only_before_the_attempt ... ok
+test engine::tests::clock_regression_boot_change_and_reused_process_identity_fail_closed ... ok
+test engine::tests::duplicate_observation_after_restart_does_not_rejuvenate_speech_age ... ok
+test engine::tests::duplicate_observation_preserves_identity_first_age_and_speech_state ... ok
+test engine::tests::failed_attempt_commit_releases_no_job_and_latches_failure ... ok
+test engine::tests::failed_prepare_or_observation_commit_is_not_installed_in_memory ... ok
+test engine::tests::final_dispatch_outcomes_never_automatically_resend ... ok
+test engine::tests::guards_refuse_changed_retry_old_revision_and_wrong_store ... ok
+test engine::tests::invalid_or_oversized_transcripts_do_not_enter_the_ledger ... ok
+test engine::tests::jobs_are_serial_and_queued_launches_expire_while_a_read_is_inflight ... ok
+test engine::tests::list_and_diagnostics_are_bounded_metadata_and_get_returns_one_observation ... ok
+test engine::tests::lost_speech_claim_reply_and_voice_only_restart_never_reissue_playback_grant ... ok
+test engine::tests::malformed_launch_reply_is_uncertain_without_leaking_private_text ... ok
+test engine::tests::malformed_snapshots_fail_closed_before_writing ... ok
+test engine::tests::observations_are_explicit_exact_identity_and_current_job_only ... ok
+test engine::tests::pending_creation_is_unresolved_and_cannot_be_observed_by_name ... ok
+test engine::tests::preparation_is_immutable_and_exact_retry_is_a_receipt_not_another_task ... ok
+test engine::tests::prompt_target_speech_and_checked_arithmetic_bounds_are_enforced ... ok
+test engine::tests::qualified_playout_receipt_requires_exact_tuple_digest_and_completed_flag ... ok
+test engine::tests::receipt_revision_must_identify_the_actual_committed_effect ... ok
+test engine::tests::restart_cancels_requested_and_inflight_reads_without_automatic_poll ... ok
+test engine::tests::restart_invalidates_unattempted_work_and_marks_inflight_uncertain ... ok
+test engine::tests::retained_task_and_observation_limits_refuse_without_eviction ... ok
+test engine::tests::reused_remote_agent_and_creation_ids_never_bind_distinct_tasks ... ok
+test engine::tests::speech_requires_trusted_route_and_recent_original_observation ... ok
+test engine::tests::tasks_restart_never_accepts_old_claim_or_playout_acknowledgement ... ok
+test engine::tests::trusted_confirmation_binds_digest_session_and_exact_expiry ... ok
+test engine::tests::uncertain_claim_commit_never_grants_and_recovers_as_uncertain ... ok
+test engine::tests::worst_case_json_escaped_observation_fits_reply_bound ... ok
+test protocol::tests::malformed_duplicate_and_oversized_input_is_refused ... ok
+test protocol::tests::reads_have_no_authority_or_target_override_fields ... ok
+test protocol::tests::trusted_operations_require_explicit_fields_and_a_separate_route ... ok
+test runtime::tests::binding_cleanup_does_not_delete_a_replacement ... ok
+test runtime::tests::binding_preserves_foreign_files_and_live_sockets ... ok
+test runtime::tests::configuration_is_private_bounded_strict_and_has_explicit_targets ... ok
+test runtime::tests::configuration_never_silently_selects_the_last_duplicate_alias ... ok
+test runtime::tests::disabled_service_does_not_read_clock_adapter_or_storage ... ok
+test runtime::tests::fragmented_line_and_absolute_silent_deadline_are_bounded ... ok
+test runtime::tests::line_reader_drains_buffered_bytes_after_peer_close ... ok
+test runtime::tests::newline_and_byte_bounds_precede_parsing ... ok
+test runtime::tests::output_to_a_nonreading_client_has_one_deadline ... ok
+test runtime::tests::request_rejects_oversized_input_before_connecting ... ok
+test store::tests::live_connection_uses_full_sync_delete_journal_and_bounded_pages ... ok
+
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running unittests src/main.rs (target/debug/deps/lamp_tasks-2edac500b4a13e82)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/harness.rs (target/debug/deps/harness-df22d6e64359a8e3)
+
+running 23 tests
+test a_descendant_holding_pipes_is_killed_without_an_unbounded_drain ... ok
+test a_live_descendant_with_closed_pipes_is_still_killed_on_normal_exit ... ok
+test a_machine_list_error_or_timeout_cannot_issue_new ... ok
+test a_missing_working_directory_is_a_proven_preflight_spawn_failure ... ok
+test both_pipe_caps_and_exit_deadline_are_enforced_after_new ... ok
+test cancellation_after_new_and_busy_calls_do_not_start_another_process ... ok
+test cancellation_before_spawn_does_not_run_preflight ... ok
+test cancellation_during_preflight_is_not_sent_and_never_runs_new ... ok
+test changed_executable_after_preflight_proves_new_was_not_spawned ... ok
+test claude_and_explicit_folder_are_preserved_without_shell_expansion ... ok
+test created_requires_every_identity_and_permission_binding ... ok
+test errors_and_malformed_success_after_new_are_never_retried ... ok
+test executable_is_canonicalized_and_replacement_or_unsafe_modes_are_refused ... ok
+test input_limits_and_parser_ambiguity_are_refused_before_any_process ... ok
+test launch_uses_exact_argv_ask_mode_null_stdin_and_stable_generic_identity ... ok
+test machine_change_and_existing_name_heuristic_remain_uncertain ... ok
+test missing_or_competing_environment_and_unsafe_sessions_are_refused ... ok
+test observation_bounds_wrong_identity_and_invented_completion_are_rejected ... ok
+test pending_keeps_creation_identity_without_guessing_an_agent ... ok
+test preflight_requires_exact_unique_full_machine_ids_in_ndjson ... ok
+test read_failure_codes_do_not_echo_private_cli_details ... ok
+test read_timeout_and_output_cap_never_retry_show ... ok
+test show_uses_full_agent_id_and_preserves_observation_only_fields ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.84s
+
+     Running tests/runtime.rs (target/debug/deps/runtime-72a9aa20550d78f3)
+
+running 7 tests
+test a_silent_client_uses_only_one_bounded_worker ... ok
+test a_slow_cli_does_not_block_status_diagnostics_or_bounded_shutdown ... ok
+test command_line_is_off_without_loading_any_provisioned_paths ... ok
+test command_line_rejects_duplicate_fields_before_connecting ... ok
+test expired_and_restarted_preparations_never_reach_harness ... ok
+test model_cannot_confirm_and_restart_keeps_exact_dispatch_without_resending ... ok
+test observed_output_and_reported_playout_remain_separate_and_survive_restart ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.81s
+
+     Running tests/runtime_failures.rs (target/debug/deps/runtime_failures-54cd24a1c80cf3a4)
+
+running 3 tests
+test blocked_owner_expires_queued_preparation_and_withdraws_then_restores_readiness ... ok
+test full_unread_stderr_cannot_block_production_status_or_sigterm_cleanup ... ok
+test full_unread_stderr_cannot_hold_storage_failure_exit_or_socket_cleanup ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.46s
+
+     Running tests/store.rs (target/debug/deps/store-bc76e89452cb7d2c)
+
+running 22 tests
+test a_busy_failed_commit_poisoned_owner_cannot_continue_and_reopen_keeps_previous ... ok
+test a_nonempty_initialization_file_is_preserved_for_explicit_recovery ... ok
+test a_wal_database_without_sidecars_is_rejected_without_converting_it ... ok
+test changed_permissions_after_open_stop_writes_without_repairing_the_path ... ok
+test database_symlinks_hardlinks_directories_and_public_modes_are_refused ... ok
+test empty_store_and_last_committed_opaque_bytes_survive_reopen ... ok
+test even_private_wal_and_shm_sidecars_are_not_silently_converted ... ok
+test exact_byte_bound_works_and_invalid_sizes_preserve_the_previous_value ... ok
+test exclusive_ownership_blocks_another_process_and_is_released_on_drop ... ok
+test existing_empty_or_non_database_files_are_never_reinitialized ... ok
+test interrupted_initialization_recovers_only_an_unpublished_empty_schema ... ok
+test interrupted_transaction_recovers_the_last_committed_snapshot ... ok
+test invalid_singleton_and_unbounded_rows_are_not_returned_as_state ... ok
+test load_bounds_values_even_if_an_external_writer_bypasses_checks_after_open ... ok
+test orphan_journals_never_authorize_a_new_empty_database ... ok
+test oversized_database_and_journal_are_refused_without_truncation ... ok
+test relative_paths_and_linked_or_public_directories_are_refused ... ok
+test replacing_an_open_database_or_directory_never_redirects_the_writer ... ok
+test sqlite_rejects_empty_oversized_and_non_blob_snapshots_without_replacing_state ... ok
+test the_directory_and_all_created_files_are_private ... ok
+test unknown_versions_and_extra_schema_objects_fail_closed ... ok
+test unsafe_journal_wal_and_shm_paths_are_refused_before_sqlite_uses_them ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.50s
+
+     Running unittests examples/tasks_check.rs (target/debug/examples/tasks_check-4aa1857d1423b7b2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lamp_tasks
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

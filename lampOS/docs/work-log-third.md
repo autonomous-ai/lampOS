@@ -1095,6 +1095,11 @@ work:
 
 ## 2026-10-14 — task 11 done: Tasks through Harness
 
+Ready for lamp-voice: no
+
+Kind: off unless set. Host gate complete; the newly required native ARM64 CI
+gate is pending after the 17:00 fetch and rebase described below.
+
 **Checkpoint:** `third/tasks` at
 `3ad6dd152edd3aa453b4f28fc28066e3d9f7471e` (`lampOS: add durable Harness task
 tracking`), pushed, then fast-forwarded onto `lamp-third`. This entry and the
@@ -1268,6 +1273,47 @@ speech was exercised here.
 Questions blocking further independent Task 11 work: none. Next: fetch and read
 the current list and own log, rebase `lamp-third`, and take any new Third task.
 If none is assigned, check again every half hour.
+
+## 2026-10-14, 17:00 — adopt the issue queue and ARM64 gate
+
+Ready for lamp-voice: no
+
+Fetched `origin/lamp-voice` at `462c18b924cd397f04df45f72503362b6a607b60`.
+Read the new [joining rules](joining.md), [Third role](../builders/third.md),
+[Queue #705](https://github.com/autonomous-ai/lampOS/issues/705), and Third's
+issues [#695](https://github.com/autonomous-ai/lampOS/issues/695) and
+[#696](https://github.com/autonomous-ai/lampOS/issues/696), including comments.
+The queue has no new Third task beyond the already-built Schedule and Tasks.
+
+Rebased `lamp-third` onto that integration head. First's adopted Schedule
+source, message module/tests, document and evidence match `third/schedule`
+exactly, so its duplicate commit was skipped. Kept upstream Ears membership,
+message exports and Memory's reuse review. Tasks' rebased implementation is
+`07373490b6662c76c0feac00ea0a62a504d32d8d`; its crate, documents and original
+evidence are byte-identical to `third/tasks`. Workspace membership now also
+contains the upstream Ears crate. No other builder's source was edited.
+
+The previous Tasks push preceded reading the new CI/ready-line rule. It is
+explicitly not ready for adoption until the new Linux ARM64 run is green.
+The rebased push starts that run; its number and result will be recorded here.
+On this same Intel Mac after rebase, the required local gate passed again:
+fmt 3.454 seconds, strict all-target Tasks Clippy 5.959, all 101 Tasks tests
+(zero failed/ignored) 54.083, and the full workspace build 28.888. Exact
+commands and raw output are retained as `rebase-*` in the
+[Tasks evidence](verification/tasks-host-20261014/README.md).
+The supplied checker is built by `--examples`, but the current artifact-copy
+list includes only `schedule_check` and `replay_cost`, not `tasks_check`.
+First will need to include that example in the CI artifact before using it
+on the lamp without rebuilding. No workflow source was changed by Third.
+
+First's #695 comment reports Schedule running on lamp-4ace, and a parallel
+Mac failure of `two_guarded_mutations_from_the_same_snapshot_do_not_both_win`
+(3/4 failed; serial 18/18 passed). Those are First's measurements, not Third's.
+The serial handoff gate passed here; this newly reported parallel failure is
+being inspected separately and is not erased by that earlier result.
+
+No lamp or live Harness was accessed. The next new task will come from Third's
+issue queue; questions stay recorded here and linked from the task issue.
 
 ## Not shown
 
