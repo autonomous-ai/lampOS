@@ -1224,6 +1224,40 @@ required actual-latch snapshot and unfitted-weight limits remain as above.
 Continue fetching and reading the running list every half hour while no
 new Fourth task is assigned.
 
+## 2026-10-14, 15:36 ICT: task 28, memory-health — taken
+
+Taken from the list at `17d312147908c04c97a9d433775844387ff89a5d`, after
+rebasing Fourth and pushing the sync (`6ec55f39d`). First has integrated
+the task 17 sure-name follow-up; no Fourth runtime difference remained at
+this point. The new explicit order is 28, then 29, then task 8 (transferred
+from Third despite its earlier table position).
+
+Task branch: `fourth/memory-health`. Scope is Memory and its tests,
+`docs/memory.md`, `docs/health.md`, and dependency metadata needed to use
+the existing bus/message contracts. No new message type, Health/Actions
+runtime edit or deployment change is planned. Read Actions' current report
+as the established protocol and inspect Memory's actual server/store paths
+before choosing the implementation.
+
+Add an explicit `--bus-root` opt-in for one `memory` Diagnostic per second,
+with actual exchange/kept counts and recent answer cost. Report warnings
+for Memory's own storage failures and the specified note/call budgets
+(300 ms / 1.5 s), not for ordinary empty results or invalid requests.
+Keep bus initialization, publication and retries away from the socket loop,
+with bounded state and one publisher worker. Disabled reporting must retain
+the existing runtime behavior.
+
+Latency target: reporting contributes no wait on bus I/O to an accepted
+socket request; measure first and repeated local response time and the
+health-update overhead separately, with an explicitly held publisher.
+Use 1 ms p99 as the host target for the in-loop health update, not a lamp
+claim. Preserve the Voice-facing 300 ms/1.5 s budgets and identify precisely
+which portion Memory measures. Test real socket/bus reports, counts, errors,
+recovery, opt-in absence, bounded shutdown and a stalled publication without
+a lamp. Finish with the complete affected-crate gate and standalone source
+verification. First's handoff must include `--expect memory` and the exact
+Memory option, with no device action performed here.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
