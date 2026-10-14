@@ -1498,6 +1498,65 @@ deadline and 150 ms later silence deadline; no automatic replacement. Parent
 GPIO sampling continues independently. All new behavior requires `--touch`
 and commands additionally require `--enable`; neither has been enabled here.
 
+## 2026-10-14 — Task 33 — final gate and revised handoff in progress
+
+Ready for lamp-voice: no
+
+First answered the baseline CI question on #711: `91a0fdb3a` runs native
+Ubuntu 22.04 ARM tests as an ordinary user. The earlier Debian-container
+root failure is not a reason to weaken Surround's permission test; it stays
+unchanged. Fetched through `7afa6876f` at 18:43+07 and rebased this log branch.
+The task's code alone is now `third/touch` at
+`42bdf65a2144e2168d2643494d8b9e9598404a35`, based directly on that integration
+head. Under First's newly adopted `fifth-P6`, this branch keeps the log;
+finished code will be offered as one non-draft task PR with green native
+ARM64 CI. No code has been moved onto `lamp-third` or offered ready.
+
+The new path is explicitly `--touch`; enabling requests additionally needs
+`--enable`. It preserves all twelve electrodes, independent GPIO/strip
+acquisition, original times, fault-as-unknown semantics and the installed
+primary protocol. Sleep/Wake are separate alternatives bound by the final
+owner to lifecycle at contact begin, as First requested at 18:25. Primary
+Stop/SoftwareMute and five-second release-only FactoryReset also remain
+explicit while asleep. Neither Controls nor a Wake grants microphone access.
+
+Review fixed a child-device ownership hole across different bus roots, queued
+packets bypassing a deadline, a malformed head observation retaining a new
+primary action, and a strip spawn failure stopping GPIO. A child-held fixed
+device lock survives parent failure until the child actually exits; no
+replacement starts. A GPIO-open failure now also leaves the strip available,
+without a startup stderr write that could block on an unread pipe.
+
+Focused Mac suites passed: 32 coordinator, 22 receiver, 15 message, 38 strip,
+16 replay, eight CLI, 12 wiring, 11 runtime and 32 MPR checks; worker/discovery
+and recorder checks also passed. These overlap the complete gate and must not
+be summed as independent repetitions. The first combined Controls/Msgs run
+stopped at 329 passes and one failure: a runtime test still looked for the
+old `strip_error` diagnostic key after it was clarified to `last_strip_error`.
+The corrected test still requires the actual sanitized startup error and
+working primary Stop; its complete 11-case runtime suite then passed. Raw
+development failures will accompany the final verification folder.
+
+The gate now runs on the rebased source for Controls/Msgs and every dependent
+package (20 total), plus the workspace build. An independent source-only copy
+is building outside the parent repository. Its first extraction helper failed
+before any compile because this Mac's Python lacks `tarfile.extractall(filter)`;
+the host tar utility is used instead, with no runtime/source change. Native
+CI and the complete host/portability gates remain pending, so there is no PR
+or ready line yet. Third still has no lamp and has accessed none.
+
+On the lamp, First must use the exact sequence in `docs/controls.md`, “Run
+without a lamp, then qualify on one”: qualify all twelve electrodes and head
+polarity, start untouched with the explicit per-unit profile, record actual
+samples in shadow on an isolated bus, test holds/slides/faults and only then
+connect owner-side fresh, deduplicated requests. Most likely wrong there are
+the profile/noise margin, baseline absorbing a startup hand, weak E4/E8,
+TTP223 pulses not proving a sustained hand, paused slide speed, shared I²C
+load and service-user lock access. The 57 changed masks supplied by First are
+preserved; the additional 995 samples and monotonic identities are authored.
+No continuous physical recording, physical latency or applied response has
+been measured by Third.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
