@@ -1,0 +1,114 @@
+
+running 28 tests
+test coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914030462333/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914030462333/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914030516763/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914030516763/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914030565433/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914030565433/wait-2.json
+ok
+test coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914030616403/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914030616403/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914031513718/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914031513718/wait-2.json
+ok
+test coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914032160082/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914032160082/wait-2.json
+motor_validated_offer_to_channel_us=84
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914032160082/wait-3.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914032160082/wait-4.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914032160082/wait-5.json
+ok
+test coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914032933437/wait-1.json
+ok
+test coordinator::motor::tests::frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914033631152/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914033631152/wait-2.json
+ok
+test coordinator::motor::tests::idle_ready_never_inspects_moves_or_claims_listening ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914034354147/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914034354147/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914034354147/wait-3.json
+ok
+test coordinator::motor::tests::inert_child ... ok
+test coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914034959337/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914034959337/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914034959337/wait-3.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914034959337/wait-4.json
+ok
+test coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch ... ok
+test coordinator::motor::tests::motor_flags_are_paired_explicit_and_not_accepted_by_fixture_mode ... ok
+test coordinator::motor::tests::native_head::native_head_absence_of_explicit_next_action_never_schedules_return ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914035950015/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914035950015/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914035950015/wait-3.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914035950015/wait-4.json
+ok
+test coordinator::motor::tests::native_head::native_head_binding_changes_only_explicit_camera_boot ... ok
+test coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914036624039/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914036624039/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914036624039/wait-3.json
+ok
+test coordinator::motor::tests::native_head::native_head_initial_privacy_acquisition_is_not_a_revoke_or_grant ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914037451342/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914037451342/wait-2.json
+ok
+test coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914038034775/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914038034775/wait-2.json
+ok
+test coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914038623203/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914038623203/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914038623203/wait-3.json
+ok
+test coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914039226794/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914039226794/wait-2.json
+ok
+test coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914039902559/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914039902559/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914040486603/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914040486603/wait-2.json
+ok
+test coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914041072832/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914041072832/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914041072832/wait-3.json
+ok
+test coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914042053674/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914042053674/wait-2.json
+ok
+test coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914042642018/wait-1.json
+ok
+test coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914042685297/wait-1.json
+motor_local_revocation_us=44
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914042685297/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914042685297/wait-3.json
+ok
+test coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914043272319/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914043272319/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914043272319/wait-3.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914043272319/wait-4.json
+ok
+test coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914043931348/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914043931348/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914043931348/wait-3.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914044524953/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914044524953/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914044524953/wait-3.json
+ok
+test coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914045169705/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914045169705/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914045169705/wait-3.json
+motor_cancel_priority_send_us=29
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914045169705/wait-4.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914045169705/wait-5.json
+ok
+test coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914045831386/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914045831386/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914045831386/wait-3.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914045831386/wait-4.json
+ok
+test coordinator::motor::tests::stale_snapshot_does_not_revoke_newer_idle_authority ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914046487726/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914046487726/wait-2.json
+ok
+test coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914047072288/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914047072288/wait-2.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/mod-3uskl9aa/90198-1914047072288/wait-3.json
+ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 820 filtered out; finished in 17.21s
+

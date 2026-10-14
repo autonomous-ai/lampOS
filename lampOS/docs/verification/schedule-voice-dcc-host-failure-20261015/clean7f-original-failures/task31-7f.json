@@ -1,0 +1,30 @@
+{
+  "base": "7fbb03e1f2e61ad6dfaf184cd768bad6524c2d76",
+  "command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "coordinator::motor::tests::",
+    "--",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "extra_environment": {
+    "RUST_BACKTRACE": "1"
+  },
+  "uptime_before": "23:55  up 22 days,  3:20, 3 users, load averages: 3.26 4.09 4.63",
+  "exit_code": 101,
+  "elapsed_seconds": 70.988669401,
+  "raw": "/private/tmp/lamp-third-schedule-7f-motor-first.txt",
+  "counts": [
+    [
+      "27",
+      "1",
+      "0"
+    ]
+  ]
+}

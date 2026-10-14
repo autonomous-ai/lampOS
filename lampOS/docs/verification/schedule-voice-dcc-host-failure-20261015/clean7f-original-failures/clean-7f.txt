@@ -1,0 +1,115 @@
+   Compiling lamp-bus v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/turn-owner)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/turn-end-wire)
+   Compiling lamp-camera v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/camera)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/gemini)
+   Compiling lamp-ring v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/ring)
+   Compiling lamp-audio v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/audio)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/msgs)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/keeper)
+   Compiling lamp-expression v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/expression)
+   Compiling lamp-controls v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/controls)
+   Compiling lamp-body v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/body)
+   Compiling lamp-voice v0.1.0 (/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 34.28s
+     Running unittests src/lib.rs (/Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-a98444cc1c3f37e5)
+
+running 28 tests
+test coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn ... ok
+test coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup ... 
+thread 'coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup' (113048109) panicked at crates/voice/src/coordinator/motor/tests.rs:441:9:
+owned child timed out: None
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: lamp_voice::coordinator::motor::tests::wait
+             at ./src/coordinator/motor/tests.rs:441:9
+   3: lamp_voice::coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup
+             at ./src/coordinator/motor/tests.rs:645:9
+   4: lamp_voice::coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup::{{closure}}
+             at ./src/coordinator/motor/tests.rs:642:72
+   5: core::ops::function::FnOnce::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+test coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice ... 
+thread 'coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice' (113048342) panicked at crates/voice/src/coordinator/motor/tests.rs:441:9:
+owned child timed out: None
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: lamp_voice::coordinator::motor::tests::wait
+             at ./src/coordinator/motor/tests.rs:441:9
+   3: lamp_voice::coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice
+             at ./src/coordinator/motor/tests.rs:905:5
+   4: lamp_voice::coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice::{{closure}}
+             at ./src/coordinator/motor/tests.rs:903:76
+   5: core::ops::function::FnOnce::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+test coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once ... 
+thread 'coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once' (113048483) panicked at crates/voice/src/coordinator/motor/tests.rs:441:9:
+owned child timed out: None
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/panicking.rs:80:14
+   2: lamp_voice::coordinator::motor::tests::wait
+             at ./src/coordinator/motor/tests.rs:441:9
+   3: lamp_voice::coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once
+             at ./src/coordinator/motor/tests.rs:1001:5
+   4: lamp_voice::coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once::{{closure}}
+             at ./src/coordinator/motor/tests.rs:993:60
+   5: core::ops::function::FnOnce::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+   6: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+FAILED
+test coordinator::motor::tests::frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted ... ok
+test coordinator::motor::tests::idle_ready_never_inspects_moves_or_claims_listening ... ok
+test coordinator::motor::tests::inert_child ... ok
+test coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement ... ok
+test coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch ... ok
+test coordinator::motor::tests::motor_flags_are_paired_explicit_and_not_accepted_by_fixture_mode ... ok
+test coordinator::motor::tests::native_head::native_head_absence_of_explicit_next_action_never_schedules_return ... ok
+test coordinator::motor::tests::native_head::native_head_binding_changes_only_explicit_camera_boot ... ok
+test coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap ... ok
+test coordinator::motor::tests::native_head::native_head_initial_privacy_acquisition_is_not_a_revoke_or_grant ... ok
+test coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants ... ok
+test coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches ... ok
+test coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only ... ok
+test coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal ... ok
+test coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests ... ok
+test coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant ... ok
+test coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority ... ok
+test coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate ... motor_local_revocation_us=43
+ok
+test coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write ... ok
+test coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure ... ok
+test coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue ... motor_cancel_priority_send_us=25
+ok
+test coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write ... ok
+test coordinator::motor::tests::stale_snapshot_does_not_revoke_newer_idle_authority ... ok
+test coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token ... ok
+
+failures:
+
+failures:
+    coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup
+    coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice
+    coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once
+
+test result: FAILED. 25 passed; 3 failed; 0 ignored; 0 measured; 820 filtered out; finished in 41.22s
+
+error: test failed, to rerun pass `-p lamp-voice --lib`

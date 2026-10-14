@@ -1,0 +1,33 @@
+{
+  "base": "7fbb03e1f2e61ad6dfaf184cd768bad6524c2d76",
+  "root": "/private/tmp/lamp-third-schedule-7fbb03e1f-baseline-kg0lzf0c/lampOS",
+  "command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "coordinator::motor::tests::",
+    "--",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "extra_environment": {
+    "RUST_BACKTRACE": "1",
+    "CARGO_TARGET_DIR": "/Users/d/code/autonomous-os/lampOS/target"
+  },
+  "task_source_present": false,
+  "uptime_before": "23:58  up 22 days,  3:23, 3 users, load averages: 2.67 3.52 4.27",
+  "exit_code": 101,
+  "elapsed_seconds": 80.42553354900001,
+  "raw": "/private/tmp/lamp-third-schedule-7f-clean-motor-first.txt",
+  "counts": [
+    [
+      "25",
+      "3",
+      "0"
+    ]
+  ]
+}

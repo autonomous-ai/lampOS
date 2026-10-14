@@ -1,0 +1,12 @@
+
+running 1 test
+test coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/run-pkppz5ov/3/85971-1913864331845/wait-1.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/run-pkppz5ov/3/85971-1913864331845/wait-2.json
+motor_validated_offer_to_channel_us=85
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/run-pkppz5ov/3/85971-1913864331845/wait-3.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/run-pkppz5ov/3/85971-1913864331845/wait-4.json
+motor diagnostic: /private/tmp/lm709-d-bxvzktai/run-pkppz5ov/3/85971-1913864331845/wait-5.json
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 847 filtered out; finished in 0.77s
+

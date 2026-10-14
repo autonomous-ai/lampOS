@@ -1,0 +1,13 @@
+    Checking lamp-ipc v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/ipc)
+    Checking lamp-schedule v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/schedule)
+    Checking lamp-audio v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/audio)
+    Checking lamp-body v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/body)
+    Checking lamp-ring v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/ring)
+    Checking lamp-controls v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/controls)
+    Checking lamp-turn-end-wire v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/turn-end-wire)
+    Checking lamp-observer v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/observer)
+    Checking lamp-expression v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/expression)
+    Checking lamp-actions v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/actions)
+    Checking lamp-voice v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/voice)
+    Checking lamp-voice-eval v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/voice-eval)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 33.88s

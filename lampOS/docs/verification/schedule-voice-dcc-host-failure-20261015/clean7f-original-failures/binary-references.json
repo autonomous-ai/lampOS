@@ -1,0 +1,20 @@
+[
+  {
+    "label": "task7f",
+    "source_log": "lamp-third-schedule-7f-motor-first.txt",
+    "original": "/Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-04f83e70e13d855a",
+    "retained": "/private/tmp/lamp-third-motor-original-binaries/task7f",
+    "bytes": 42455600,
+    "sha256": "6cfb88f4f6d1426deac3d9e053792076996f07c66f6539d7d2508c54d4ff4095",
+    "identity_limit": "hash captured after the failed run; no execution-time binary hash was recorded"
+  },
+  {
+    "label": "clean7f",
+    "source_log": "lamp-third-schedule-7f-clean-motor-first.txt",
+    "original": "/Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-a98444cc1c3f37e5",
+    "retained": "/private/tmp/lamp-third-motor-original-binaries/clean7f",
+    "bytes": 33331312,
+    "sha256": "8167212f2fd1fc0684e5a1fbf9fb8d8f3fecca254fbda6c1364f53c437cc3197",
+    "identity_limit": "hash captured after the failed run; no execution-time binary hash was recorded"
+  }
+]

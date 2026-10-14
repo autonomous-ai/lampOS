@@ -1,0 +1,173 @@
+{
+  "base": "7fbb03e1f2e61ad6dfaf184cd768bad6524c2d76",
+  "task_source_present": false,
+  "source_files": 1436,
+  "changed_source_files": [
+    "crates/voice/src/coordinator/motor/tests.rs"
+  ],
+  "compile": {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--no-run",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/lm709-src-qhqu_pyi/lampOS",
+    "started_utc": "2026-10-14T17:12:38Z",
+    "exit_code": 0,
+    "outer_timeout": false,
+    "elapsed_seconds": 43.334618403,
+    "raw_log": "/private/tmp/lm709-e-y5uq6td4/run-pkppz5ov/compile.txt",
+    "raw_sha256": "cf9805cd40aabdec39d95d9cc9c88023f104dd73074d966303b456468b788d79",
+    "source_unchanged": true
+  },
+  "binary": {
+    "path": "/private/tmp/lm709-src-qhqu_pyi/target/debug/deps/lamp_voice-a98444cc1c3f37e5",
+    "sha256_before_tests": "e0a5caa128cd7912f507a7e716fc24bde94cb8148480a68a28482341b1a77b5a",
+    "bytes": 33316136
+  },
+  "exact_case_explicit_environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/lm709-src-qhqu_pyi/target",
+    "RUSTUP_TOOLCHAIN": "1.96.0",
+    "RUST_BACKTRACE": "full"
+  },
+  "exact_cases": [
+    {
+      "name": "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+      "command": [
+        "/private/tmp/lm709-src-qhqu_pyi/target/debug/deps/lamp_voice-a98444cc1c3f37e5",
+        "--exact",
+        "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "cwd": "/private/tmp/lm709-src-qhqu_pyi/lampOS",
+      "started_utc": "2026-10-14T17:13:21Z",
+      "exit_code": 0,
+      "outer_timeout": false,
+      "elapsed_seconds": 2.2867517930000005,
+      "explicit_environment": {
+        "CARGO_TARGET_DIR": "/private/tmp/lm709-src-qhqu_pyi/target",
+        "RUSTUP_TOOLCHAIN": "1.96.0",
+        "RUST_BACKTRACE": "full",
+        "LAMP_MOTOR_DIAGNOSTICS": "/private/tmp/lm709-d-bxvzktai/run-pkppz5ov/1"
+      },
+      "counts": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "source_unchanged": true,
+      "binary_sha256_before": "e0a5caa128cd7912f507a7e716fc24bde94cb8148480a68a28482341b1a77b5a",
+      "binary_sha256_after": "e0a5caa128cd7912f507a7e716fc24bde94cb8148480a68a28482341b1a77b5a"
+    },
+    {
+      "name": "coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once",
+      "command": [
+        "/private/tmp/lm709-src-qhqu_pyi/target/debug/deps/lamp_voice-a98444cc1c3f37e5",
+        "--exact",
+        "coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "cwd": "/private/tmp/lm709-src-qhqu_pyi/lampOS",
+      "started_utc": "2026-10-14T17:13:24Z",
+      "exit_code": 0,
+      "outer_timeout": false,
+      "elapsed_seconds": 0.7265397789999994,
+      "explicit_environment": {
+        "CARGO_TARGET_DIR": "/private/tmp/lm709-src-qhqu_pyi/target",
+        "RUSTUP_TOOLCHAIN": "1.96.0",
+        "RUST_BACKTRACE": "full",
+        "LAMP_MOTOR_DIAGNOSTICS": "/private/tmp/lm709-d-bxvzktai/run-pkppz5ov/2"
+      },
+      "counts": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "source_unchanged": true,
+      "binary_sha256_before": "e0a5caa128cd7912f507a7e716fc24bde94cb8148480a68a28482341b1a77b5a",
+      "binary_sha256_after": "e0a5caa128cd7912f507a7e716fc24bde94cb8148480a68a28482341b1a77b5a"
+    },
+    {
+      "name": "coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice",
+      "command": [
+        "/private/tmp/lm709-src-qhqu_pyi/target/debug/deps/lamp_voice-a98444cc1c3f37e5",
+        "--exact",
+        "coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "cwd": "/private/tmp/lm709-src-qhqu_pyi/lampOS",
+      "started_utc": "2026-10-14T17:13:25Z",
+      "exit_code": 0,
+      "outer_timeout": false,
+      "elapsed_seconds": 0.7853221310000009,
+      "explicit_environment": {
+        "CARGO_TARGET_DIR": "/private/tmp/lm709-src-qhqu_pyi/target",
+        "RUSTUP_TOOLCHAIN": "1.96.0",
+        "RUST_BACKTRACE": "full",
+        "LAMP_MOTOR_DIAGNOSTICS": "/private/tmp/lm709-d-bxvzktai/run-pkppz5ov/3"
+      },
+      "counts": [
+        [
+          1,
+          0,
+          0
+        ]
+      ],
+      "source_unchanged": true,
+      "binary_sha256_before": "e0a5caa128cd7912f507a7e716fc24bde94cb8148480a68a28482341b1a77b5a",
+      "binary_sha256_after": "e0a5caa128cd7912f507a7e716fc24bde94cb8148480a68a28482341b1a77b5a"
+    }
+  ],
+  "module": {
+    "command": [
+      "/private/tmp/lm709-src-qhqu_pyi/target/debug/deps/lamp_voice-a98444cc1c3f37e5",
+      "coordinator::motor::tests",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "cwd": "/private/tmp/lm709-src-qhqu_pyi/lampOS",
+    "started_utc": "2026-10-14T17:16:12Z",
+    "exit_code": 0,
+    "outer_timeout": false,
+    "elapsed_seconds": 17.261044278,
+    "raw_log": "/private/tmp/lm709-e-y5uq6td4/module-ddbthlnu/tests.txt",
+    "raw_sha256": "b3ab27d6703d742811e39bf751bb45a8d6731049a9e582d42516815bc6def686",
+    "counts": [
+      [
+        28,
+        0,
+        0
+      ]
+    ]
+  },
+  "module_explicit_environment": {
+    "CARGO_TARGET_DIR": "/private/tmp/lm709-src-qhqu_pyi/target",
+    "RUSTUP_TOOLCHAIN": "1.96.0",
+    "RUST_BACKTRACE": "full",
+    "LAMP_MOTOR_DIAGNOSTICS": "/private/tmp/lm709-d-bxvzktai/mod-3uskl9aa"
+  },
+  "module_source_unchanged_before": true,
+  "module_source_unchanged_after": true,
+  "module_binary": {
+    "path": "/private/tmp/lm709-src-qhqu_pyi/target/debug/deps/lamp_voice-a98444cc1c3f37e5",
+    "expected_sha256": "e0a5caa128cd7912f507a7e716fc24bde94cb8148480a68a28482341b1a77b5a",
+    "sha256_before": "e0a5caa128cd7912f507a7e716fc24bde94cb8148480a68a28482341b1a77b5a",
+    "retained_path": "/private/tmp/lm709-e-y5uq6td4/module-ddbthlnu/instrumented-clean7f-test-binary",
+    "retained_sha256": "e0a5caa128cd7912f507a7e716fc24bde94cb8148480a68a28482341b1a77b5a",
+    "sha256_after": "e0a5caa128cd7912f507a7e716fc24bde94cb8148480a68a28482341b1a77b5a"
+  },
+  "interpretation": "Instrumented clean-7f diagnostic passes only; original failures remain failures and their cause is unproven."
+}

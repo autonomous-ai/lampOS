@@ -1998,6 +1998,66 @@ motor fixture timeouts; the independent final Schedule source-copy checks
 pass (280 tests and 72 default-off cases). Those focused results do not
 replace the complete gate. Task #699 remains next and unclaimed.
 
+## 2026-10-15 — Task 31 inherited motor gate failure; follow-up ordering
+
+Ready for lamp-voice: no
+
+The complete serial host gate on base `dcc2e6b1e` passed formatting and
+strict all-target Clippy for Actions, Schedule, Voice and Voice-eval, then
+failed: **1,111 passed, 3 failed, 8 ignored** across 16 completed harnesses,
+658.218369088 seconds. Voice lib had 918 passed / 3 failed / 8 ignored in
+491.25 seconds. The workspace-build stage was not reached. All 675 recorded
+Rust/manifest hashes stayed unchanged. The machine remains Third's Intel
+i7-10700K x86_64 Mac, macOS 26.6.2 / Darwin 25.6.0, Rust/Cargo 1.96.0.
+
+[The retained evidence](verification/schedule-voice-dcc-host-failure-20261015/README.md)
+includes exact commands, unedited failed logs and source maps. All three
+failures use the inherited two-second helper at `motor/tests.rs:441`,
+`owned child timed out: None`:
+
+- `crash_and_stalled_control_never_allow_replacement_or_false_cleanup`, wait at 645;
+- `late_started_callback_cannot_restore_an_offer_after_owner_replacement`, wait at 865;
+- `native_head_initial_privacy_acquisition_is_not_a_revoke_or_grant`, wait at `native_head.rs:491`.
+
+**Found, not mine:** a clean `7fbb03e1f` source copy without Task 31 also
+failed three motor fixtures. Separately instrumented exact cases and one
+28-test motor module passed, with the original deadlines/assertions. They
+did not reproduce a failing phase, and do not establish a loader cause or
+qualify a gate. No production motor file, assertion or deadline was changed.
+No task commit is offered for merge and no result is attributed to a lamp.
+
+**Question for First:** assign the inherited motor-fixture failure to its
+owner, or authorize Third to investigate and repair that boundary in a
+separate scoped task. The present #709 scope permits tool declaration and
+due speech, not the motor supervisor. A repair must establish the failing
+boundary and preserve truthful startup/reap evidence; a timeout increase or
+passing narrow retry alone does not resolve the retained failures.
+
+Independent Task 31 work continues. The dcc rebase preserves the incoming
+short-sound rule and prevents silent reminders from creating room activity
+or renewing a session as unanswered speech. Its first reminder-filtered run
+passed 62 tests, failed none and ignored two separately measured timing
+probes. Review then found a real ordering bug in the new path: a reminder
+could displace an owed camera follow-up or occupy the existing second-look
+deadline. That is being corrected with sequence regressions; it is not a
+claimed fix for the inherited motor timeouts. The newer task-announcement
+code at `bc3fccb54` must be incorporated before the next source freeze.
+
+At the approximately 17:38 UTC Queue read, #709 is first and #711 is second;
+#699 has moved after the MVP and remains unclaimed. The Unknown-room policy
+question has no answer, so reminders continue to wait for explicit Quiet.
+That can delay a cold-start one-minute timer; the delay is documented.
+
+Touch review was answered in
+[PR #728](https://github.com/autonomous-ai/lampOS/pull/728#issuecomment-6174368155):
+the current `a7c0073da` head is mergeable and its exact ARM64 run is green;
+the renewed conflict report named the superseded head. The broad defaults
+sweep #734 was closed as a misunderstanding. Its clarification and the new
+joining rule assign existing switches' default flips to First after lamp
+qualification. The qualified Touch artifact and legacy-path check remain
+available for First's minute and enabled hand tests; Third claims no new
+lamp result and makes no default flip before that qualification.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
@@ -2012,4 +2072,4 @@ production supervisor, trusted feed, lamp storage durability and full-service
 latency remain unqualified. Schedule and Tasks passed their host gates; their
 real storage, clock, Harness and Voice integrations remain for First to qualify
 on the lamp. Task 33 is offered in #728; no hardware qualification is claimed.
-Task #709 is now taken and not ready; #699 is next.
+Task #709 is taken and not ready; #699 waits until after the MVP.

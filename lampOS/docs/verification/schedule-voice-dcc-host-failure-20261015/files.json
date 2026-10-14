@@ -1,0 +1,171 @@
+{
+  "created_at": "2026-10-14T17:40:44.253688+00:00",
+  "scope": "Compact text-only failure checkpoint; exact originals preserved and derived explanatory files identified.",
+  "original_file_count": 25,
+  "files": [
+    {
+      "original_file": "/private/tmp/lamp-third-schedule-voice-dcc-gate-results.json",
+      "retained_file": "gate/results.json",
+      "bytes": 3163,
+      "sha256": "883ce8e587716e3b1b5b494410e3807df115a5a13ceea1f275f0506448a8ffe6"
+    },
+    {
+      "original_file": "/private/tmp/lamp-third-schedule-voice-dcc-gate-source.json",
+      "retained_file": "gate/source.json",
+      "bytes": 73175,
+      "sha256": "23c00be36460d7cb42b48581065613881a5ebd22266cd6314e8eeb047d260291"
+    },
+    {
+      "original_file": "/private/tmp/lamp-third-schedule-voice-dcc-gate-format.txt",
+      "retained_file": "gate/format.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "original_file": "/private/tmp/lamp-third-schedule-voice-dcc-gate-clippy.txt",
+      "retained_file": "gate/clippy.txt",
+      "bytes": 1095,
+      "sha256": "c0cb873048588f63a37ff7ab2889182996d97d4c9f15dddb57d93e978a0acd2a"
+    },
+    {
+      "original_file": "/private/tmp/lamp-third-schedule-voice-dcc-gate-tests.txt",
+      "retained_file": "gate/tests.txt",
+      "bytes": 119460,
+      "sha256": "ebd8d1df7db8992daabd1b6dd026eba1ede14ba794de570a3c67de25f03377ad"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/machine.json",
+      "retained_file": "machine.json",
+      "bytes": 1614,
+      "sha256": "39f34254d1487d2dfa79dec2b752a91b8f4092f9cfdbcaea524af4df63071191"
+    },
+    {
+      "original_file": "/private/tmp/lamp-third-schedule-merge-review-dcc-first.md",
+      "retained_file": "merge-review-dcc.md",
+      "bytes": 2665,
+      "sha256": "a496ae6c242d258157c031e894e3be16804e036622414f2b10e1a9b85cbace43"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/rebase-dcc.json",
+      "retained_file": "rebase-dcc.json",
+      "bytes": 28770,
+      "sha256": "dbd2cd3cfb9aea8a677baf061bd0956e2c78ef9468198bb4314b166dbd605191"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/original-failures/clean-7f.json",
+      "retained_file": "clean7f-original-failures/clean-7f.json",
+      "bytes": 782,
+      "sha256": "7b135c762ac0a247e585abe1716f814f3cd78baaa24a95e67c9f03b235d735b8"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/original-failures/clean-7f.txt",
+      "retained_file": "clean7f-original-failures/clean-7f.txt",
+      "bytes": 9370,
+      "sha256": "5dd3a191a78a42922b3d76c5d5aa29e15d1cb102a851e71eb58088707aa2a721"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/original-failures/task31-7f.json",
+      "retained_file": "clean7f-original-failures/task31-7f.json",
+      "bytes": 589,
+      "sha256": "8c5bb9ceccffdbb62574f84f079602355bd538e16f75637745cfcce09a042b84"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/original-failures/task31-7f.txt",
+      "retained_file": "clean7f-original-failures/task31-7f.txt",
+      "bytes": 5743,
+      "sha256": "e0e35cefe7f3cfaaa7dd2e7688a8be36a42338b65772a68f859d233f128a6ade"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/original-failures/binary-references.json",
+      "retained_file": "clean7f-original-failures/binary-references.json",
+      "bytes": 959,
+      "sha256": "a45bb8730b46bcb16ffc4b8393beae5a2080206c21bd14aee1cbe971ba97d0a3"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/report.md",
+      "retained_file": "clean7f-diagnostics/report.md",
+      "bytes": 8720,
+      "sha256": "dbb21dca07d7d6a989f7efc1de456db509ea1094b40208b788bc6f5cf6bdd72b"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/run-summary.json",
+      "retained_file": "clean7f-diagnostics/run-summary.json",
+      "bytes": 6422,
+      "sha256": "1322c7817d21d148d2b1bd2eabb2c0ab0d9ac07a25ae1ba1cdb516ec9badfa7f"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/analysis.json",
+      "retained_file": "clean7f-diagnostics/analysis.json",
+      "bytes": 62856,
+      "sha256": "8ee5b8a8ede988e46330375c8a0ec1b3054e995c2686411bfd6e1dde09eceeb5"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/exact-cases/results.json",
+      "retained_file": "clean7f-diagnostics/exact-cases/results.json",
+      "bytes": 53081,
+      "sha256": "a141032fff3a72cee3d56786eff303fe57fdd53e8b038cfe3d6afa4e49f4e0c5"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/motor-module/results.json",
+      "retained_file": "clean7f-diagnostics/motor-module/results.json",
+      "bytes": 308664,
+      "sha256": "72180c52af860932e0d35612762748c06e3cb7b2158f1cb339095b72210ddf57"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/source/source-clean.json",
+      "retained_file": "clean7f-diagnostics/source/source-clean.json",
+      "bytes": 261854,
+      "sha256": "2a27add4c1ee1dafa59c91c2aef1fbab1f7ca2bcdec83f4a54e5af932cc40b72"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/source/source-instrumented.json",
+      "retained_file": "clean7f-diagnostics/source/source-instrumented.json",
+      "bytes": 261854,
+      "sha256": "cc03fdbef84fe56e1310e3eb6a57dce4e10630c10bde3ebd5e8fc694e4a3458d"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/source/instrumentation.diff",
+      "retained_file": "clean7f-diagnostics/source/instrumentation.diff",
+      "bytes": 13766,
+      "sha256": "c026e399cf6fc8d19e8ba8caa382f057f60fa82dce9616f5471eac4dffcac7f1"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/exact-cases/case-1.txt",
+      "retained_file": "clean7f-diagnostics/exact-cases/case-1.txt",
+      "bytes": 600,
+      "sha256": "301c1ed8caaf8e860af5d87d6ef12973ff0f6674032911443959ec55d4f9e6d4"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/exact-cases/case-2.txt",
+      "retained_file": "clean7f-diagnostics/exact-cases/case-2.txt",
+      "bytes": 303,
+      "sha256": "782dc34ad80fdf4d2b5cc076e078c94534ffac422536fe6dfe49e261db948cf6"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/exact-cases/case-3.txt",
+      "retained_file": "clean7f-diagnostics/exact-cases/case-3.txt",
+      "bytes": 738,
+      "sha256": "f57c24e268fdf67f51a777daed6dcf08c5adc9bf0d16017ea223a288b472f9b6"
+    },
+    {
+      "original_file": "/Users/d/code/autonomous-os/lampOS/docs/verification/schedule-voice-host-20261014/motor-diagnostics-clean7f/motor-module/tests.txt",
+      "retained_file": "clean7f-diagnostics/motor-module/tests.txt",
+      "bytes": 10422,
+      "sha256": "b3ab27d6703d742811e39bf751bb45a8d6731049a9e582d42516815bc6def686"
+    },
+    {
+      "original_file": null,
+      "retained_file": "README.md",
+      "bytes": 7125,
+      "sha256": "39392dd5067a3560462f8013d81ef22dbc0d1eb68fec0f9a0562c0609a6c8d7b",
+      "kind": "derived_compact_explanation"
+    },
+    {
+      "original_file": null,
+      "retained_file": "omitted-full-diagnostic-files.json",
+      "bytes": 23085,
+      "sha256": "3abbc9464e177396eda00ba940bc0b0207e8166630574795da693357ef856301",
+      "kind": "derived_compact_explanation"
+    }
+  ]
+}

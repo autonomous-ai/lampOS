@@ -1,0 +1,7 @@
+
+running 1 test
+test coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once ... motor diagnostic: /private/tmp/lm709-d-bxvzktai/run-pkppz5ov/2/85870-1913863080182/wait-1.json
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 847 filtered out; finished in 0.70s
+

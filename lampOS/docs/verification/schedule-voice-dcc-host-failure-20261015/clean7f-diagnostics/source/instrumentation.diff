@@ -1,0 +1,317 @@
+--- a/lampOS/crates/voice/src/coordinator/motor/tests.rs
++++ b/lampOS/crates/voice/src/coordinator/motor/tests.rs
+@@ -21,6 +21,163 @@
+     rc::Rc,
+     time::{Duration, Instant},
+ };
++
++// SCRATCH-ONLY diagnostics. No production file or deadline is changed.
++// Enable only with a private, short absolute LAMP_MOTOR_DIAGNOSTICS directory.
++// Child markers are best-effort nonblocking datagrams, never durable evidence.
++struct MotorDiagnostic {
++    directory: PathBuf,
++    socket: std::os::unix::net::UnixDatagram,
++    mode: String,
++    started_us: u64,
++    previous_us: u64,
++    maximum_gap_us: u64,
++    samples: u64,
++    first: Vec<serde_json::Value>,
++    recent: VecDeque<serde_json::Value>,
++    children: Vec<serde_json::Value>,
++    events: Vec<serde_json::Value>,
++    event_count: u64,
++    saves: u64,
++}
++thread_local! {
++    static MOTOR_DIAGNOSTIC: std::cell::RefCell<Option<MotorDiagnostic>> = const {
++        std::cell::RefCell::new(None)
++    };
++}
++fn diagnostic_start(mode: &str) -> Option<PathBuf> {
++    let _ = MOTOR_DIAGNOSTIC.with(|slot| slot.borrow_mut().take());
++    let root = PathBuf::from(std::env::var_os("LAMP_MOTOR_DIAGNOSTICS")?);
++    assert!(root.is_absolute(), "diagnostics directory must be absolute");
++    let metadata = fs::symlink_metadata(&root).expect("diagnostics directory");
++    assert!(metadata.is_dir() && metadata.permissions().mode() & 0o077 == 0);
++    let started_us = monotonic_us();
++    let directory = root.join(format!("{}-{started_us}", std::process::id()));
++    use std::os::unix::fs::DirBuilderExt;
++    fs::DirBuilder::new().mode(0o700).create(&directory).unwrap();
++    let path = directory.join("d");
++    let socket = std::os::unix::net::UnixDatagram::bind(&path).unwrap();
++    fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
++    socket.set_nonblocking(true).unwrap();
++    MOTOR_DIAGNOSTIC.with(|slot| {
++        *slot.borrow_mut() = Some(MotorDiagnostic {
++            directory,
++            socket,
++            mode: mode.to_owned(),
++            started_us,
++            previous_us: started_us,
++            maximum_gap_us: 0,
++            samples: 0,
++            first: Vec::with_capacity(16),
++            recent: VecDeque::with_capacity(256),
++            children: Vec::with_capacity(32),
++            events: Vec::with_capacity(64),
++            event_count: 0,
++            saves: 0,
++        });
++    });
++    Some(path)
++}
++fn diagnostic_child(stage: &'static str) {
++    use std::sync::{OnceLock, atomic::{AtomicUsize, Ordering}};
++    static SOCKET: OnceLock<Option<std::os::unix::net::UnixDatagram>> = OnceLock::new();
++    static COUNT: AtomicUsize = AtomicUsize::new(0);
++    let Some(socket) = SOCKET.get_or_init(|| {
++        let path = std::env::var_os("LAMP_MOTOR_DIAGNOSTIC_SOCKET")?;
++        let socket = std::os::unix::net::UnixDatagram::unbound().ok()?;
++        socket.set_nonblocking(true).ok()?;
++        socket.connect(path).ok()?;
++        Some(socket)
++    }) else { return };
++    let sequence = COUNT.fetch_add(1, Ordering::Relaxed);
++    if sequence >= 32 { return }
++    let marker = serde_json::json!({
++        "sequence": sequence, "stage": stage,
++        "at_us": monotonic_us(), "pid": std::process::id(),
++    });
++    let bytes = serde_json::to_vec(&marker).unwrap();
++    // No retry: missing markers remain unknown, not proof a stage was absent.
++    let _ = socket.send(&bytes);
++}
++fn diagnostic_drain(diagnostic: &mut MotorDiagnostic) {
++    for _ in 0..32 {
++        let mut bytes = [0; 512];
++        let Ok(count) = diagnostic.socket.recv(&mut bytes) else { break };
++        if diagnostic.children.len() < 32 {
++            diagnostic.children.push(serde_json::json!({
++                "received_us": monotonic_us(),
++                "marker": serde_json::from_slice::<serde_json::Value>(&bytes[..count]).ok(),
++            }));
++        }
++    }
++}
++fn diagnostic_parent(stage: &'static str, motor: &OptionalMotor) {
++    MOTOR_DIAGNOSTIC.with(|slot| {
++        let mut slot = slot.borrow_mut();
++        let Some(diagnostic) = slot.as_mut() else { return };
++        let at_us = monotonic_us();
++        let gap_us = at_us.saturating_sub(diagnostic.previous_us);
++        diagnostic.previous_us = at_us;
++        diagnostic.maximum_gap_us = diagnostic.maximum_gap_us.max(gap_us);
++        diagnostic.samples += 1;
++        let child = motor.child.as_ref();
++        let sample = serde_json::json!({
++            "stage": stage, "at_us": at_us, "gap_us": gap_us,
++            "connected": child.is_some_and(Supervisor::connected),
++            "ready": motor.is_ready(), "reaped": motor.reaped(),
++            "adapter_failure": motor.failure(),
++            "child_failure": child.and_then(Supervisor::failure),
++        });
++        if diagnostic.first.len() < 16 { diagnostic.first.push(sample.clone()); }
++        if diagnostic.recent.len() == 256 { let _ = diagnostic.recent.pop_front(); }
++        diagnostic.recent.push_back(sample);
++        diagnostic_drain(diagnostic);
++    });
++}
++fn diagnostic_event(event: &Event) {
++    MOTOR_DIAGNOSTIC.with(|slot| {
++        let mut slot = slot.borrow_mut();
++        let Some(diagnostic) = slot.as_mut() else { return };
++        diagnostic.event_count += 1;
++        let stage = match event {
++            Event::Ready { .. } => "ready",
++            Event::Inhibited { .. } => "inhibited",
++            Event::Stopped { .. } => "stopped",
++            Event::Fault { .. } => "fault",
++            _ => return,
++        };
++        if diagnostic.events.len() < 64 {
++            diagnostic.events.push(serde_json::json!({
++                "stage": stage, "event_us": event.at_us(), "observed_us": monotonic_us(),
++            }));
++        }
++    });
++}
++fn diagnostic_save(outcome: &'static str) {
++    MOTOR_DIAGNOSTIC.with(|slot| {
++        let mut slot = slot.borrow_mut();
++        let Some(diagnostic) = slot.as_mut() else { return };
++        diagnostic_drain(diagnostic);
++        diagnostic.saves += 1;
++        let record = serde_json::json!({
++            "mode": diagnostic.mode, "outcome": outcome,
++            "fixture_started_us": diagnostic.started_us,
++            "recorded_us": monotonic_us(), "sample_count": diagnostic.samples,
++            "maximum_gap_us": diagnostic.maximum_gap_us,
++            "first_samples": diagnostic.first, "recent_samples": diagnostic.recent,
++            "child_markers": diagnostic.children,
++            "event_count": diagnostic.event_count, "events": diagnostic.events,
++        });
++        let bytes = serde_json::to_vec_pretty(&record).unwrap();
++        assert!(bytes.len() <= 262_144, "diagnostic record exceeded fixed bound");
++        let path = diagnostic.directory.join(format!("wait-{}.json", diagnostic.saves));
++        // This write is after success or after the original deadline has expired.
++        // It never runs in the live poll loop and does not fsync.
++        fs::write(&path, bytes).unwrap();
++        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
++        eprintln!("motor diagnostic: {}", path.display());
++    });
++}
+ 
+ fn config() -> Config {
+     Config {
+@@ -268,7 +425,10 @@
+         self.channels.data.receive(n)
+     }
+     fn publish(&mut self, e: &Event, n: MonoTime) -> io::Result<()> {
++        if matches!(e, Event::Ready { .. }) { diagnostic_child("ready_send_enter"); }
+         self.channels.control.send(e, n)?;
++        if matches!(e, Event::Ready { .. }) { diagnostic_child("ready_sent"); }
++        if matches!(e, Event::Stopped { .. }) { diagnostic_child("stopped_sent"); }
+         if matches!(e, Event::Stopped { .. }) && self.mode == "gated_exit_failure" {
+             let until = Instant::now() + Duration::from_secs(2);
+             while !self.directory.join("go").exists() {
+@@ -286,10 +446,14 @@
+         }
+         if matches!(e, Event::Ready { .. }) {
+             match self.mode.as_str() {
+-                "crash" => std::process::exit(7),
+-                "hang" => loop {
+-                    std::thread::park_timeout(Duration::from_secs(1));
+-                },
++                "crash" => {
++                    diagnostic_child("crash_exit_7");
++                    std::process::exit(7)
++                }
++                "hang" => {
++                    diagnostic_child("hang_enter");
++                    loop { std::thread::park_timeout(Duration::from_secs(1)); }
++                }
+                 "gate" => {
+                     let until = Instant::now() + Duration::from_secs(2);
+                     while !self.directory.join("go").exists() {
+@@ -308,24 +472,33 @@
+     let Ok(directory) = std::env::var("LAMP_LIVE_MOTOR_TEST_DIRECTORY") else {
+         return;
+     };
++    diagnostic_child("child_entry");
+     let directory = PathBuf::from(directory);
+     let mode = std::env::var("LAMP_LIVE_MOTOR_TEST_MODE").unwrap();
+     let parent = parse_boot(&std::env::var("LAMP_LIVE_MOTOR_TEST_PARENT").unwrap()).unwrap();
+     let own = parse_boot(&std::env::var("LAMP_LIVE_MOTOR_TEST_WORKER").unwrap()).unwrap();
++    diagnostic_child("config_read_enter");
+     let c = Config::read(Path::new(
+         &std::env::var("LAMP_LIVE_MOTOR_TEST_CONFIG").unwrap(),
+     ))
+     .unwrap();
++    diagnostic_child("config_read_done");
++    diagnostic_child("config_validate_enter");
+     let valid = c.validate().unwrap();
++    diagnostic_child("config_validated");
++    diagnostic_child("channels_bind_enter");
+     let mut channels = Channels::bind(&directory, parent, own, true).unwrap();
++    diagnostic_child("channels_bound");
+     let until = Instant::now() + Duration::from_secs(2);
+     while !channels.connect_step().unwrap() {
+         assert!(Instant::now() < until);
+         std::thread::park_timeout(Duration::from_millis(1));
+     }
++    diagnostic_child("channels_connected");
+     let position_writes = Rc::new(Cell::new(0));
+     let last_positions = Rc::new(Cell::new([2000; 5]));
+     let emitted_mask = Rc::new(Cell::new(0));
++    diagnostic_child("core_new_enter");
+     let mut core = MotorControl::new(
+         Port {
+             rx: VecDeque::new(),
+@@ -344,7 +517,10 @@
+         valid.timing,
+     )
+     .unwrap();
++    diagnostic_child("core_new_done");
++    diagnostic_child("core_qualify_enter");
+     core.qualify(valid.qualification).unwrap();
++    diagnostic_child("core_qualify_done");
+     let backend = InertBackend {
+         core,
+         bad_cleanup: mode == "bad_cleanup",
+@@ -367,7 +543,9 @@
+         mode,
+         directory,
+     };
++    diagnostic_child("worker_run_enter");
+     let result = worker::run(worker, &mut link);
++    diagnostic_child(if result.is_ok() { "worker_run_ok" } else { "worker_run_error" });
+     if result.is_err() {
+         std::process::exit(3);
+     }
+@@ -382,6 +560,7 @@
+     mode: &str,
+     supplied: Option<Controller>,
+ ) -> (crate::process::SessionDirectory, OptionalMotor, Controller) {
++    let diagnostics = diagnostic_start(mode);
+     let dir = crate::process::SessionDirectory::create().unwrap();
+     let mut c = config();
+     if mode == "profile" {
+@@ -400,8 +579,11 @@
+     fs::write(&path, serde_json::to_vec(&c).unwrap()).unwrap();
+     fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+     let executable = dir.path.join("test-worker");
++    let diagnostic_env = diagnostics.as_ref().map(|path| {
++        format!("export LAMP_MOTOR_DIAGNOSTIC_SOCKET={}\n", quoted(path.to_str().unwrap()))
++    }).unwrap_or_default();
+     let script = format!(
+-        "#!/bin/sh\nexport LAMP_LIVE_MOTOR_TEST_CONFIG=\"$2\" LAMP_LIVE_MOTOR_TEST_DIRECTORY=\"$4\" LAMP_LIVE_MOTOR_TEST_PARENT=\"$6\" LAMP_LIVE_MOTOR_TEST_WORKER=\"$8\"\nexport LAMP_LIVE_MOTOR_TEST_MODE={}\nexec {} --exact coordinator::motor::tests::inert_child --nocapture\n",
++        "#!/bin/sh\n{diagnostic_env}export LAMP_LIVE_MOTOR_TEST_CONFIG=\"$2\" LAMP_LIVE_MOTOR_TEST_DIRECTORY=\"$4\" LAMP_LIVE_MOTOR_TEST_PARENT=\"$6\" LAMP_LIVE_MOTOR_TEST_WORKER=\"$8\"\nexport LAMP_LIVE_MOTOR_TEST_MODE={}\nexec {} --exact coordinator::motor::tests::inert_child --nocapture\n",
+         quoted(mode),
+         quoted(std::env::current_exe().unwrap().to_str().unwrap())
+     );
+@@ -425,9 +607,11 @@
+         .set_camera_permission(time(), Permission::Allowed)
+         .unwrap();
+     let mut motor = OptionalMotor::new(parent, Some(prepared));
++    diagnostic_parent("before_start", &motor);
+     if mode != "startup" {
+         motor.start_before_capture(controller.snapshot(time()).unwrap(), false, true);
+     }
++    diagnostic_parent("after_start", &motor);
+     (dir, motor, controller)
+ }
+ fn wait(
+@@ -437,7 +621,10 @@
+ ) {
+     let until = Instant::now() + Duration::from_secs(2);
+     let mut last = 0;
++    diagnostic_parent("wait_enter", motor);
+     while !predicate(motor) {
++        diagnostic_parent("iteration_enter", motor);
++        if Instant::now() >= until { diagnostic_save("deadline_expired"); }
+         assert!(
+             Instant::now() < until,
+             "owned child timed out: {:?}",
+@@ -446,14 +633,18 @@
+         if monotonic_us() - last >= 10_000 {
+             motor.publish(c.snapshot(time()).unwrap());
+             last = monotonic_us();
++            diagnostic_parent("after_publish", motor);
+         }
+-        motor.poll(|_| {});
++        motor.poll(diagnostic_event);
++        diagnostic_parent("after_poll", motor);
+         std::thread::park_timeout(Duration::from_millis(1));
+     }
+     // Read terminal packets that raced the observed child exit.
+     for _ in 0..2 {
+-        motor.poll(|_| {});
+-    }
++        motor.poll(diagnostic_event);
++    }
++    diagnostic_parent("wait_complete", motor);
++    diagnostic_save("predicate_satisfied");
+ }
+ fn cleanup(
+     mut motor: OptionalMotor,
