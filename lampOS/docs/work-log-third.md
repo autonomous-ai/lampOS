@@ -185,10 +185,158 @@ consumer integration, calibration and acceptance on the lamp.
 - Questions: none blocking the independent implementation. Any proposed
   mapping or integration that needs a lamp decision will be written here.
 
+## 2026-10-14 — controls — done, awaiting the lamp
+
+Tested code: `fc6f0c07ba507c214099a04bdc7710475198bf9a`, kept on
+`third/controls` and fast-forwarded onto `lamp-third`. The implementation and
+its docs are one commit. Rebase may change the copy's hash on `lamp-third`;
+the task branch identifies the source that passed this gate.
+
+### Built
+
+- Optional `lamp-controls`, disabled unless `--enable`, with one nonblocking
+  `PinReader` interface. `serve` deliberately ships with `MissingPins`; First
+  replaces that construction with the board reader. Nothing under `deploy/`
+  or in Voice/Body was changed.
+- Injected-clock mechanical tap/double/hold recognition, V1 per-polarity
+  debounce and startup-held suppression; MPR121 qualification/noise cases;
+  explicitly configured TTP223 head-pet grouping. Fresh observed time alone
+  advances hold feedback. Lost, stale, invalid and reordered input cancels
+  recognition and requires a fresh released baseline.
+- Additive `controls/state` and `controls/gesture` types, independent retained
+  Stop/mute identities, bounded publisher/session fences, diagnostics and an
+  owner receiver. Short/repeated taps request Stop; released holds of at least
+  two seconds request one-way software mute. Five seconds still means mute.
+  Head petting is advisory. No gesture opens capture or clears inhibition.
+- An owner-side private, atomically saved boot-scoped mute record and an
+  explicit durable clear transaction; shadow messages cannot act. Physical
+  privacy remains exclusively with Voice. An accepted request is not an
+  applied-state receipt.
+- Bounded acquisition recording, written fixtures, replay without hardware,
+  real CLI/SIGTERM tests and a replay-cost example. Recording loss inserts
+  fault evidence rather than silently joining observations across a gap.
+
+Details, V1 differences, bounds and the consumer contract are in
+[Controls](controls.md). In particular, qualified stationary base release
+uses 30 ms grace instead of Automatic mode's 120 ms; moving input remains
+consumed, with 120 ms grace. First must qualify that choice on real electrodes.
+
+### Evidence on Third's development Mac
+
+Intel Core i7-10700K at 3.80 GHz, 64 GiB RAM, macOS 26.6.2 / Darwin 25.6.0,
+`x86_64-apple-darwin`, Rust 1.96.0. No lamp or Linux/ARM64 build was used.
+The [evidence record](verification/controls-host-20261014/results.json)
+contains source hashes, every final suite summary, the five ignored names,
+the corrected test failure and all 100 benchmark iterations.
+
+The unchanged workspace built before implementation (Cargo reported 7.95 s).
+The final gate ran from `lampOS/`:
+
+```sh
+cargo fmt --all --check
+cargo clippy --offline -p lamp-actions -p lamp-body -p lamp-controls -p lamp-expression -p lamp-eyes -p lamp-health -p lamp-msgs -p lamp-name -p lamp-policy -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings
+cargo test --offline -p lamp-actions -p lamp-body -p lamp-controls -p lamp-expression -p lamp-eyes -p lamp-health -p lamp-msgs -p lamp-name -p lamp-policy -p lamp-voice -p lamp-voice-eval -- --test-threads=1
+cargo build --offline --workspace
+```
+
+All passed. The final test invocation passed **1,839 tests, zero failures,
+five existing ignored tests, across 99 suites**, with no concurrent heavy
+build. Clippy reported 19.78 s; the final incremental build reported 1.26 s.
+These build times are different cache states, not a performance comparison.
+Controls contributes 121 tests; its new message contracts contribute 13.
+
+A source-only copy outside the repository,
+`/private/tmp/lamp-controls-standalone-i4bwde4z/lampOS`, built the whole
+workspace offline with its own target directory (Cargo reported 1m 14s).
+All 24 local packages resolved inside the copy. Controls/message tests there
+passed **159 checks, zero failures or ignored tests, across 15 suites**.
+The 28 Controls/message source files matched the tested checkout byte for
+byte. The copy contained 692 source files and used no parent sources.
+
+One early new-test failure is retained: the nominal polling-phase test
+expected a 1,800 us maximum but its original phases produced 1,001 us. The
+test's phase coverage and expectation were corrected; the engine was not
+changed for that failure. The final 16 first/repeated releases at eight
+phases give 0–1,999 simulated us to recognizer dispatch on a 2 ms schedule.
+Forty accepted written base pulses at 10 ms polling give 32.45–39.95 simulated
+ms from authored release to dispatch, exactly 30 ms after the sampled release.
+Neither measure includes electrical, bus, owner, audio or motor delays.
+
+One release-mode invocation repeated the 901-record written replay 100 times:
+first 3.340848 ms, median 2.975859 ms, worst 3.340848 ms. The timed boundary is
+input parsing, engine construction, injected replay and JSON output to a sink;
+configuration parsing happens before it. Each replay has 900 observations,
+one explicit overflow, 4,601 ticks, six gestures and zero rejected inputs.
+These are host costs, not physical latency, cold startup or an improvement
+over V1.
+
+### Exactly what First runs and wires
+
+From the standalone source root with the built binary on `PATH`, one written
+replay exercises the gestures without a bus or hardware:
+
+```sh
+lamp-controls replay --config crates/controls/fixtures/controls.json --input crates/controls/fixtures/hand-controls.jsonl --clock-id written-controls --enable --output /var/tmp/controls-written-20261014.jsonl
+```
+
+Use a new output filename. Expect six gestures: button Stop at 1,160,000 us,
+double Stop at 1,410,000 us, base Stop at 1,690,000 us, released-hold mute at
+4,000,000 us, head Pet at 5,950,000 us and recovery Stop at 8,580,000 us.
+The hold spanning the 6,800,000 us overflow emits no mute, and the moving
+base contact emits no action. These are authored times.
+
+First's integration, before enabling any owner:
+
+1. Implement `PinReader` using the actual configured lines/electrodes. Preserve
+   acquisition time in `lamp_ipc::monotonic_us()` and the Linux boot ID;
+   use a new reader session after restart, consecutive snapshot sequences,
+   explicit loss/error reports and fresh complete observations under 100 ms.
+   Do not guess fallback pins or read the physical privacy slide here.
+2. Voice and Body subscribe to `controls/state` and use `Receiver` to validate
+   and deduplicate retained requests; optional pet consumers also subscribe
+   to `controls/gesture`. Give each consumer an explicit switch, off by
+   default. Stop reaches local cancellation without waiting on the provider.
+   Mute revokes permissions immediately; persistence and bounded cleanup
+   follow outside the urgent path. Body owns its safe controlled stop.
+3. Restore `MuteRecord` before opening Voice workers. Wire a separate explicit
+   local software-clear operation, using
+   `Receiver::clear_after_explicit_user_request`, and expose its applied-state
+   receipt before enabling the long-hold mapping. A successful clear still
+   needs Voice's fresh physical-privacy and readiness checks. No automatic
+   restart may erase a live inhibit after a persistence failure.
+
+With the adapter installed, record shadow input, retaining the printed counts:
+
+```sh
+lamp-controls serve --config /etc/lampos/controls.json --record /var/tmp/controls-real-20261014.jsonl --seconds 60
+lamp-controls replay --config /etc/lampos/controls.json --input /var/tmp/controls-real-20261014.jsonl --clock-id "$(cat /proc/sys/kernel/random/boot_id)" --enable --output /var/tmp/controls-real-replay-20261014.jsonl
+```
+
+Without First's adapter, that serve command records Missing faults truthfully.
+After reviewing the real replay, explicitly enable Controls and the owners.
+Measure physical observation to owner revocation, then separately to acoustic
+silence and safe motion stop. Exercise first/repeated taps, both hold tiers,
+head pats, untouched motor/speaker activity, held boot, stalled provider,
+overflow/unplug, Controls death/restart, Voice restart while muted, physical
+switch cycles, and explicit clear while the physical switch is closed. No old
+reply or capture may resume. Retain owner acknowledgements and audio/motion
+evidence; bus publication alone proves none of those outcomes.
+
+**Most likely wrong on the lamp:** base qualification/release timing with its
+actual electrode noise and handoffs, then missed GPIO transitions or clock
+conversion. Try these first. Head Pet timing deliberately excludes V1's early
+directional recognition, and requires a consumer's one-per-minute brain limit.
+
+Questions blocking further Third work: none. Physical integration and the
+explicit software-clear owner path are First's prerequisites. A crash before
+an unacknowledged mute is durable is not guaranteed recoverable; physical
+privacy remains the independent control.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
 the lamp; no Linux/ARM64 execution, optical/acoustic latency, safe physical
-trajectory or natural-looking behavior was established by Third. The replay
-fixture is written; a real lamp recording has not been supplied. Remaining
-Third tasks are not yet built.
+trajectory or natural-looking behavior was established by Third. No Controls
+pin reader, owner subscription, applied mute/clear or hand-to-silence timing
+was run on a lamp. Replay fixtures are written; real lamp recordings have not
+been supplied. Remaining Third tasks are not yet built.
