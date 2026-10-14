@@ -1258,6 +1258,117 @@ a lamp. Finish with the complete affected-crate gate and standalone source
 verification. First's handoff must include `--expect memory` and the exact
 Memory option, with no device action performed here.
 
+## 2026-10-14, 16:33 ICT: task 28, memory-health — done
+
+Built on `fourth/memory-health`, implementation
+`11166b396d41ac2931e96ff7d4b3c159357a28c6`, fast-forwarded onto
+`lamp-fourth`. The integration base remains the pinned `17d312147` above.
+Memory now optionally publishes one `memory` Diagnostic per second when
+given `--bus-root ABSOLUTE_DIR`. Without that argument, even an existing
+`LAMP_BUS_ROOT` does not enable reporting or its worker/counters. The
+existing Memory socket and response formats remain unchanged.
+
+The report contains retained exchange/kept counts, their age, total and
+recent answers, recent slowest note/call/answer and any in-flight answer.
+Completed timings cover the current monotonic second and preceding 59;
+an active slow handler also warns. The boundary is the complete request
+entering the handler through its answer being computed, before logging
+and delivery. Notes (`kept` and `session_open`) warn above 300 ms; other
+complete requests above 1500 ms. These are Memory's service budgets, not
+a claim that client queueing or transport fits a Voice deadline.
+Ordinary invalid requests, empty answers and an unconfigured model are
+not storage faults. An observed storage fault stays warned through reads
+and clears after a successful append/remember/append_linked write.
+
+All bus setup, publication, retries, cleanup and legacy file scans stay
+on one worker, with fixed-size state and no event queue. A held publisher
+cannot hold the socket loop. Legacy counts stream bounded lines and
+discard a scan that overlaps any request; Days uses optional TEMP counters
+and transactional triggers on its existing connection, with constant-time
+reads and no durable schema change. Rollback, expiry, kind updates and
+deletion cascades are tested. Shutdown waits at most 100 ms, including
+publisher destruction, without joining a filesystem-blocked worker or
+spawning its replacement. Terminal reporting is best effort; Health must
+still detect a stale or missing process.
+
+**Verification:** on this development Mac (macOS 26.6.2, Intel i7-10700K,
+x86_64, 16 logical CPUs, 64 GiB, Rust/Cargo 1.96.0), from `lampOS/`, in order:
+
+```sh
+cargo fmt --all --check
+cargo clippy -p lamp-memory --all-targets --offline --locked -- -D warnings
+RUST_TEST_THREADS=1 cargo test -p lamp-memory --offline --locked
+cargo build --workspace --offline --locked
+```
+
+All passed: 135 tests, zero failures, four manual timing tests ignored by
+the normal gate. No crate depends on Memory. A standalone source-only
+copy outside the repository, mounted read-only with network disabled,
+also passed strict Memory Clippy, the same 135 tests and the workspace
+build under Linux 6.12.13 x86_64 in the existing six-vCPU/8192-MiB Podman
+VM. Its name `lampos-arm64` does not make these ARM64 tests. The Linux
+workspace build retains Body's unrelated existing `unused_mut` warning;
+Memory's strict Clippy is clean. The two new manual measurements were
+explicitly run in release on the Mac, one pass each:
+
+```sh
+RUST_TEST_THREADS=1 cargo test -p lamp-memory --release --offline --locked --lib health::tests::measure_health_update_and_socket_with_a_held_publisher -- --ignored --exact --nocapture
+RUST_TEST_THREADS=1 cargo test -p lamp-memory --release --offline --locked --test health_timing -- --ignored --nocapture
+```
+
+The two unchanged legacy timing tests were not repeated. Final functional
+tests also cover absent/recovering real bus paths, duplicate JSON operation
+keys, spurious worker wakes, a held real handler, and held publication and
+publisher destruction. No test run failed. Development Clippy and format
+failures, plus a staged whitespace-check failure in captured output, were
+fixed and retained in the evidence.
+
+[Full host evidence](verification/memory-health-host-20261014/README.md)
+contains commands, the immutable Linux image, source hashes, raw output,
+all runs and exact boundaries. On 6000 synthetic exchanges over 30 days
+and 200 kept entries, each off/on socket case had one first request and
+50 repeats. In-loop health bookkeeping p99 was 0.562 µs for JSONL notes,
+4.689 µs for Days notes, and 12.373/15.493 µs for a 60 KiB append on
+JSONL/Days, all below the 1 ms host target. Those exclude the store answer
+and all bus I/O. The full Days append with reporting on took 61.227 ms
+first, 60.199 ms median and 79.706 ms maximum over the repeats, measured
+from connect through full response/close. A separately held publisher
+allowed all 101 empty-store socket requests to finish (0.281 ms first,
+0.036 ms repeated median). None of these numbers describes lamp flash
+or acoustic response time.
+
+**First on the lamp:** build with the usual lamp build flow. Preserve the
+live store's `--memory-days` setting: First reports that store enabled at
+14:50, and removing its flag is not a rollback. First run the new binary
+with the reporting flag absent for the required minute. Then add
+`--bus-root /run/lampos-bus` to Memory's existing command and
+`--expect memory` to Health's existing serve command, retaining its other
+expected parts. Run:
+
+```sh
+lamp-bus --root /run/lampos-bus tap diagnostics --seconds 6
+lamp-health --bus-root /run/lampos-bus --json
+```
+
+Expect about one `memory` report per second, actual retained counts and
+recent timing values (`none` before a relevant answer), with Memory OK
+when healthy. The Health aggregate retains level/message/age, not the
+Diagnostic's values; inspect the tap for counts and timings. Other parts
+can still make the whole lamp warn. For flash timing, the compiled ARM64
+`health_timing` test binary can run with `--ignored --nocapture`; it makes
+its own temporary synthetic store and does not need the live records.
+
+**Most likely wrong on the lamp:** flash contention and scheduling can
+stretch the legacy scan/report cadence and Days transactions. Real Voice
+queueing, transfer and answer delivery remain outside this report's
+handler boundary. Pre-ownership CLI/bind failures cannot publish; an
+open failure after ownership is best effort. Counts assume one writer;
+external edits are outside the contract. Existing internal Days errors
+classified as `bad_request` are not promoted to storage faults. One
+successful write proves that write, not every storage path. No lamp,
+ARM64, physical power-loss, real provider, live unit or deployment was
+used. No unanswered question blocks task 29.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
