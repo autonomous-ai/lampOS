@@ -277,6 +277,31 @@ question blocking completion of this study.
   02:19 UTC (09:19 Asia/Ho_Chi_Minh), then every half hour while no new
   Fourth assignment is available. There is no owner question or blocker.
 
+## 2026-10-14, 02:20 UTC: task 15, records-bound — taken
+
+- The scheduled fetch found tasks 15 and 16 newly assigned to Fourth.
+  Task 14 is already complete here even though the shared list still says
+  taken. Task 15 is next; task 16 follows after it.
+- Rebased cleanly onto `origin/lamp-voice` at `96e5b83a7` and lease-pushed
+  only `lamp-fourth`. Task 13 is now `3971c6742`, task 14 `d4564810d`.
+  On the same development Mac, `cargo fmt --all --check` and
+  `cargo build --workspace` passed on that base before this task.
+- Task branch: `fourth/records-bound`. Build new `crates/records` and
+  `docs/records.md`, with explicit dry-run/apply behavior, typed retention
+  roots, age/size bounds and diagnostics. Memory storage is excluded.
+- Establish which sessions are active from authoritative service state,
+  including restart races and unavailable state; never infer it from age.
+  Protect against links, replaced paths, disappearing entries and full disk.
+  Test on disposable trees with injected clock/sizes and failure conditions.
+- This is background housekeeping, outside the reply path. Measure scanning,
+  planning and removal costs separately on this Mac and state bounded work
+  and the exact lamp dry-run command; no local result will be called a lamp
+  result and no real lamp records will be removed here.
+- The task asks for a service/timer for deployment while the general loop
+  forbids edits under `deploy/`. Deliver their templates with the new crate
+  and exact installation instructions for the first builder, leaving
+  `deploy/` untouched. All acting behavior must remain opt-in.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss
