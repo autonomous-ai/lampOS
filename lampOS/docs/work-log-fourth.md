@@ -2559,6 +2559,44 @@ to include the motor supervisor's loaded-host fixtures as well as the
 three named privacy/endpoint scenarios.
 
 
+## 2026-10-15, 02:22 ICT: take task 46, deterministic Voice fixtures
+
+Ready for lamp-voice: no
+
+Task #739 is taken by Fourth, session
+`01a137d8-27e4-77f1-9505-75010f5dc3ba`, no lamp; the first taken comment
+is 6176429685. Memory has been handed back in non-draft PR #743. The log
+is rebased on `1e5beebf4`; implementation will start on
+`fourth/voice-fixtures` from that integration head after this entry is pushed.
+
+The issue names three endpoint/privacy scenarios and, in First's 02:13
+comment 6176285913, widens the work to the motor supervisor's loaded-host
+fixtures reported on #709. The test design will keep production privacy,
+transport, input and output deadlines unchanged. Read-only preparation
+found that the privacy peer's send-side gap is not the age at which the
+coordinator consumes an observation; it does not establish a complete cause.
+The intended seam is a private test-only clock with bounded synchronous
+fixture steps. Actual process startup, signals, exit and reaping will
+retain real host deadlines and evidence.
+
+Qualification will include the whole `lamp-voice` test suite ten times,
+serially on Fourth's Intel Mac while a Podman ARM64 build runs alongside,
+plus the normal format/lint/build gates and exact-head native ARM64 CI.
+All failures will remain tied to their source and machine. Targeted tests
+will prove clock isolation, deliberate stale-input rejection, cancellation
+and actual child cleanup. These are host scheduling fixtures, not lamp
+privacy or acoustic latency measurements. First's concern that the real
+50 ms privacy bound may also be tight on a loaded, hot lamp remains an
+on-lamp question; Fourth has no measurement of it.
+
+Before claiming, Fourth reclaimed only its inactive generated Judge target
+cache after confirming no open files. Filesystem free space rose from
+50,776,498,176 to 54,856,912,896 bytes (10.1560% to 10.9722%) on this Mac;
+this avoids an already observed unrelated Health low-disk fixture failure.
+Source, prior evidence and other builders' caches were untouched. The exact
+preflight record will accompany the task's verification evidence.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
