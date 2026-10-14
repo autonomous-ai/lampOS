@@ -803,8 +803,13 @@ shadow-records the primary button and each head pad with its current pin files:
 lamp-controls serve --config deploy/lamp-4ace/controls.json --pins deploy/lamp-4ace/controls-pins.json --record NEW_PRIVATE_RECORD
 ```
 
-There is no `--enable` on that first command. Correct polarity from an actual
-touch before enabling actions. For the installed root-owned Voice service,
+There is no `--enable` on that first command. After the rebase onto `1750c3d08`,
+First's installed `lamp-controls` service is already the GPIO owner. Stop it
+before a foreground recording, or add recording to that same service invocation;
+never run two readers. Use its current installed config and pin paths beside
+the build in place of the source-tree paths above, then restore one service
+owner. Correct polarity from an actual touch before enabling actions.
+For the installed root-owned Voice service,
 prepare `/var/lib/lampOS/voice/hand` as root-owned mode 0700 and append
 `--controls-stop --controls-mute /var/lib/lampOS/voice/hand/mute.json` to its
 existing arguments, preserving the same record across restarts. Add
@@ -837,6 +842,56 @@ physical acoustic latency. No lamp access, deployment, account, key or paid
 service was used. No owner answer is required; fetch the list before taking
 the next task.
 
+
+## 2026-10-14: task 21, rebase and verification
+
+Rebased Fourth onto the fetched `origin/lamp-voice` snapshot
+`1750c3d085c048aa56fb49de22ec76848f2671c4`. Git dropped the already integrated
+Lean implementation. The only conflict was the append to `reuse-decisions.md`;
+both Surround's review and task 21's review remain. Task 21's rebased code is
+`61c087911`; the original `ddb2aac30` evidence above remains evidence of that
+original build. The handoff now accounts for First's installed Controls GPIO
+owner: stop that owner before a foreground recording, use its installed pin
+and config files, and restore exactly one owner. No deployment was performed.
+
+On the same development Mac, after the rebase:
+
+```sh
+cargo fmt --all --check
+cargo clippy -p lamp-controls -p lamp-voice -p lamp-voice-eval --all-targets --offline -- -D warnings
+RUST_TEST_THREADS=1 cargo test -p lamp-controls -p lamp-voice -p lamp-voice-eval --offline
+cargo build --workspace --offline
+```
+
+The final gate passed: Controls 144, Voice 983 and Voice-eval 284 tests,
+**1,411 passed, zero failed, six explicitly ignored** as listed in the original
+evidence. Clippy finished in 14.47 seconds and the workspace build in 81 seconds;
+these are Cargo's elapsed times with the existing cache, not cold-build or lamp
+measurements. No Rust source changed during this verification.
+
+Keep the first post-rebase failure: the Voice library run passed 792 tests but
+`coordinator::tests::endpoint_session::a_worker_failure_falls_back_through_recovery_and_then_resumes`
+failed with `capture discontinuity`. That fixture and its detector were unchanged
+from the earlier passing task build, and its controls are disabled. The detector
+rejects skipped sequences, regressed timestamps and capture gaps over 50 ms;
+the emulated capture peer timestamps actual thread execution. The failing run
+retained no adjacent capture timestamps, so its cause is not established.
+Five consecutive isolated exact runs passed, followed by the complete passing
+gate above. Neither a production limit nor a test assertion was relaxed.
+
+Local logs are `/private/tmp/lamp-fourth-controls-rebase-tests.log` (failure),
+`lamp-fourth-controls-rebase-recovery-{1,2,3,4,5}.log` (five passes),
+`lamp-fourth-controls-rebase-tests-2.log` (full pass), and
+`lamp-fourth-controls-rebase-build.log`, under the same directory. Rebase
+verification was on macOS only; the earlier standalone Linux result was not
+rerun for this integration snapshot.
+
+The unchanged Policy baseline also passed, before task 17 implementation:
+`cargo clippy -p lamp-policy --all-targets --offline -- -D warnings` and
+`RUST_TEST_THREADS=1 cargo test -p lamp-policy --offline`: **81 passed, zero
+failed or ignored**. Its logs are `lamp-fourth-policy-baseline-clippy.log` and
+`lamp-fourth-policy-baseline-tests.log` in the same local directory. No service
+was contacted outside the test machine.
 
 ## Not shown
 

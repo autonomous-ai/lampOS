@@ -467,10 +467,10 @@ changes logical polarity; never guess it from a board name.
 `lamp-controls` is an optional process, crate `crates/controls`. It reads
 complete observations through `PinReader`, recognizes gestures on supplied
 monotonic clocks, publishes typed requests and feedback, and reports health.
-There is no GPIO, I²C, capture, speaker, camera, ring or motor owner in it.
-The shipped `serve` command uses `MissingPins` and reports that no adapter is
-installed. First replaces that one construction with its verified reader.
-No service unit or deployment change is included.
+With `--pins`, the `serve` command owns the configured GPIO inputs through
+First's board reader. Without it, `MissingPins` reports that no adapter is
+configured. Controls owns no capture, speaker, camera, ring or motor output.
+First's installed service and the remaining physical checks are described below.
 
 Hand requests and their receivers require explicit enablement. CLI configuration
 cannot turn on a process without `--enable`; the flag overrides the file's
@@ -986,9 +986,13 @@ outside it. Measured results belong in the qualification entry, with their
 machine and exact boundary, not inferred from this target.
 
 Before enabling actions, First shadow-records one button press and both head
-pads with `lamp-controls serve --config deploy/lamp-4ace/controls.json --pins
-deploy/lamp-4ace/controls-pins.json --record NEW_RECORD`, without `--enable`.
-Correct polarity from those traces first. Then use the five operator sequences:
+pads. The installed `lamp-controls` service already owns those GPIO lines:
+stop that owner before a foreground recording, or add recording to that same
+service invocation. Never run two readers together. The foreground command is
+`lamp-controls serve --config CURRENT_CONFIG --pins CURRENT_PINS --record
+NEW_RECORD`, without `--enable`; use the installed files beside its build,
+as described above. Correct polarity from those traces first, then restore
+the single service owner and use the five operator sequences:
 
 | Action at the lamp | Expected result |
 |---|---|
@@ -1022,14 +1026,15 @@ It has a supplied 2 ms clock, at most ten simulated minutes, 32 MiB input,
 100,000 records and 16 KiB per line. It emits changes/gestures and 100 ms
 snapshots. EOF creates no fresh samples; feedback becomes stale.
 
-After First installs its adapter, start with shadow and record real acquisitions:
+For real acquisitions, record through the single GPIO owner as described above.
+Use its installed config and pin files; these placeholders are absolute paths:
 
 ```sh
-lamp-controls serve --config /etc/lampos/controls.json --record /var/tmp/controls-real-20261014.jsonl --seconds 60
-lamp-controls replay --config /etc/lampos/controls.json --input /var/tmp/controls-real-20261014.jsonl --clock-id "$(cat /proc/sys/kernel/random/boot_id)" --enable --output /var/tmp/controls-real-replay-20261014.jsonl
+lamp-controls serve --config CURRENT_CONFIG --pins CURRENT_PINS --record NEW_RECORD --seconds 60
+lamp-controls replay --config CURRENT_CONFIG --input NEW_RECORD --clock-id "$(cat /proc/sys/kernel/random/boot_id)" --enable --output NEW_REPLAY
 ```
 
-Without the adapter, that serve command truthfully records Missing faults.
+Omitting `--pins` truthfully records Missing faults instead of GPIO acquisitions.
 The optional writer has a 32-item queue, creates a new 0600 file, and cannot
 block the reader. It shares replay's size/count/time limits and reserves room
 for an overflow marker. Lost acquisitions interrupt replay recognition; a
