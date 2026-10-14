@@ -549,6 +549,172 @@ not assumptions made by this implementation.
   is how rest looks, and today's Body deliberately ignores expression offsets
   at rest; the handoff will specify that integration without changing Body.
 
+## 2026-10-14 — expression-rest — done on lamp-third
+
+- Task 18; task branch `third/expression-rest`.
+- Tested code and documents: `e656c4d998f9868b15b812e3631b991c8ecb90b7`
+  (`lampOS: add resumable expression and quiet rest`), fast-forwarded onto
+  `lamp-third`. No Voice, Body, other hands-off crate, deployment or task-list
+  change. The original Voice message layouts and event variants are intact.
+- Added optional `VoiceProgress` / `voice/progress` and `VoiceSound` /
+  `voice/sound`. Their positive audio generation and persistent held state
+  fence delayed sound, missed holds and resumed turns. Terminal events and
+  expired Voice still retire the whole turn. Late activity from a held
+  interval cannot reconstruct a nod after resume. This clears planner
+  evidence; **Voice must clear its actual audio queue and pending `Piece`.**
+- Added catalogue-controlled continuation of an already-started Listening
+  pause nod into Thinking, default-false concentration without its old
+  missing-input warning, and finite quiet-only rest. No concentration
+  publisher is required at startup; an explicit true setting stays true until
+  explicitly cleared. Unknown/busy room, stale Voice/joints, input inhibition
+  or concentration cancels rest and requires a new continuous eligible dwell.
+- The built-in catalogue is unchanged: legacy Voice protocol, original nod,
+  no rest. The supplied `rest-behaviours.json` is an explicit `--catalogue`
+  selection, sets `resumable_voice=true`, authors the 1.2-second finishing
+  nod, and permits a four-second pitch-only rest after 45 eligible seconds,
+  followed by 90 seconds after completion/cancellation. All actuator output
+  still requires `serve --enable`; final consumers need their own switches.
+  Live service selection keeps 12 input subscriptions and the existing
+  32-message per-topic drain bound; decoding recognizes both complete pairs.
+- Added eight authored replay fixtures, a cost example, 56 Expression tests
+  and six message tests. The [contract and lamp checklist](expression.md)
+  and [research decisions](reuse-decisions.md#expression-held-turns-and-sparse-rest-2026-10-14)
+  record V1 source, current owners, primary alternatives and exact limits.
+
+### What was run, and where
+
+Third's development Mac: Intel Core i7-10700K @ 3.80 GHz, 64 GiB RAM,
+x86_64-apple-darwin, macOS 26.6.2 / Darwin 25.6.0, Rust/Cargo 1.96.0.
+The pre-task workspace build passed after the rebase. No lamp was accessed.
+The final gate, run serially after the source-copy build, was:
+
+```sh
+cargo fmt --all --check
+cargo clippy --offline --locked -p lamp-actions -p lamp-body -p lamp-controls -p lamp-expression -p lamp-eyes -p lamp-health -p lamp-lean -p lamp-msgs -p lamp-name -p lamp-policy -p lamp-records -p lamp-surround -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings
+cargo test --offline --locked -p lamp-actions -p lamp-body -p lamp-controls -p lamp-expression -p lamp-eyes -p lamp-health -p lamp-lean -p lamp-msgs -p lamp-name -p lamp-policy -p lamp-records -p lamp-surround -p lamp-voice -p lamp-voice-eval -- --test-threads=1
+cargo build --offline --locked --workspace
+```
+
+All passed: **2,353 tests, zero failures, eight inherited ignored cases**
+across 137 suites. Metadata confirmed these are all 14 touched/dependent
+workspace packages. The ignored names are retained in the
+[evidence](verification/expression-rest-host-20261014/results.json): two Lean
+cost runs, the Records cost run, the model-backed endpoint case and four
+long Voice/reference runs. None of the 62 added tests is ignored. Expression
+has 125 passing tests; messages has 44 including its doctest. The serial
+full test command took 1,704.159 s wall time; the workspace build took 17.428 s.
+
+The source-only copy at
+`/private/tmp/lamp-expression-rest-standalone-g9_pn9ed/lampOS` contained 881
+files at copy time, built all 27 workspace members, and resolved all 28
+local packages inside the copy, including vendored Tough. It used a separate
+target directory and two build jobs. `cargo build --offline --locked --workspace`
+passed in 248.258 s; `cargo test --offline --locked -p lamp-expression -p lamp-msgs
+-- --test-threads=1` passed all 169 tests with none ignored. Runtime hashes
+matched after the gates and benchmark. Final documentation/evidence was added
+without changing those sources. No Linux/ARM64 or Rust 1.91 MSRV run is claimed.
+
+The [failure ledger](verification/expression-rest-host-20261014/failures.md)
+keeps two demonstrated bugs and their passing regressions: a missed hold
+observed after resume incorrectly retiring a turn, and delayed held-period
+activity reconstructing a pause. It also retains the initial JSON fixture
+comparison and Clippy failures, sandbox CPU/memory inventory failures,
+terminal whitespace check, and a stopped superseded gate. That first gate
+was stopped during its copied build when the final audit changed two files;
+the entire gate above ran again against the corrected frozen source. Tests
+used local private Unix sockets and scripted processes with host permission.
+No warning suppression, skipped new test or hands-off code change was used.
+All 99 checked local documentation links resolved. A log-preparation
+bookkeeping assertion initially expected 106 links instead of the 99 found;
+the expected count was corrected, with no broken link or runtime change.
+
+One release command ran a first iteration plus 100 warm iterations for each
+scenario, without another Third-owned test or build; unrelated host load was
+not controlled. The timed boundary is Engine construction, authored JSONL
+parsing, injected-clock planning and JSON serialization to a sink. Catalogue
+parsing, process startup, transport, recording and hardware are excluded.
+The warm median is the upper middle sorted sample, index `warm_runs / 2`.
+
+| Scenario | Inputs / deliberately refused / ticks per run | First iteration | Warm upper median | Warm maximum |
+|---|---|---|---|---|
+| Held/resumed, 300 ms authored | 18 / 4 / 16 | 0.172494 ms | 0.059406 ms | 0.124608 ms |
+| Finishing nod, 1.8 s authored | 37 / 0 / 91 | 0.195416 ms | 0.185896 ms | 0.353597 ms |
+
+All 202 iteration times and the earlier exploratory debug run are retained;
+they are not a before/after comparison. Separately, injected arrival→face
+request is **18,999 us** for hold (41,001→60,000 us) and **19,999 us** for
+resume (120,001→140,000 us). Quiet rest starts at 45 s, completes at 49 s
+and starts again at 139 s; busy/focused fixtures have no rest, and expired
+room evidence cancels an active rest at 47 s. These are authored clock facts,
+not measured optical, acoustic or motor response. A direct built-CLI replay
+also returned 18 records, 14 accepted, four intentional refusals and 16 ticks.
+
+### Exactly what First runs and wires
+
+Build the `rest_cost` example in First's usual ARM64 build environment
+(`cargo build --release --locked -p lamp-expression --example rest_cost`,
+with First's target/toolchain settings). With that built example on the
+lamp's `PATH`, the first hardware-free command is:
+
+```sh
+rest_cost 100
+```
+
+Expect exit 0, the two input/refusal/tick counts above, one first and 100
+warm samples each, `physical_or_transport_measurement:false` and
+`body_lag_known:false`. Its numbers will be the lamp's only when run there.
+The example embeds its catalogue and fixtures; it needs no source tree or
+Rust toolchain on the lamp. To inspect requested output with the built
+`lamp-expression` binary on `PATH`, from a copy of the standalone source:
+
+```sh
+lamp-expression replay --input crates/expression/fixtures/held-resumed.jsonl --clock-id expression-rest-fixture --catalogue crates/expression/rest-behaviours.json --enable --until-us 300000
+```
+
+Expect the same 16 ticks and four specifically explained refusals, not zero
+refusals. Compare to the retained `held-resumed-plan.jsonl`; substitute the
+other seven fixtures with their default duration to inspect each case.
+The shipped catalogue still reports unmeasured body lag. A single healthy
+status test supplies an authored zero lag; that is not a physical measurement.
+
+First's producer/consumer work, with its own default-off switches:
+
+1. In Voice, discard old queued audio and unpublished `Piece` before advancing
+   generation for a hold. Keep `held=true`, Listening and that generation in
+   every Latest heartbeat; preserve turn/request and truthful input readiness.
+   Resume with active progress in the same generation before newly committed
+   matching sound. Never restamp or relabel discarded sound. Another hold
+   advances generation again; terminal events stay terminal in heartbeats.
+   The [full contract](expression.md#held-turns-the-protocol-first-must-publish)
+   specifies reordering, expiry and missed-hold behavior. Until wired, keep
+   the built-in catalogue and legacy pair on the lamp.
+2. Record hold→resume and hold→give-up with delayed old sound. Measure hold
+   receipt→face request separately from actual ring change and acoustic
+   silence. Check capture-disabled remains Unavailable, and that a stale
+   face target never causes a guessed look. Body currently ignores Expression
+   gaze and has its own face tracking; verify the reactive look there.
+3. Film the finishing nod with ring, joint feedback and committed audio times.
+   Interrupt it with renewed speech and an earlier audio schedule. The +0.08
+   rad clip is about 52 requested counts **before** composition with base
+   posture/thinking offsets and clamping. First's prior five silent dip trials
+   informed its length; their roughly 0.3 s peak delay is not a universal
+   onset/acoustic lag. `body_lag_us` remains unknown.
+4. Choose exactly one rest author before changing Body's settled-rest rule.
+   Body currently ignores Expression at settled rest and has its own optional
+   idle clip. Compare the new rest against disabled rest during real desk work,
+   with explicit focus, busy/unknown room, input inhibition and expired inputs.
+   Preserve local joint safety, privacy, Actions priority and command expiry;
+   verify fallback when Expression is killed. No speech may wait for a nod.
+
+**Most likely wrong on the lamp:** how rest looks and how much of the small
+slow pitch request survives the servo deadband, followed by composition of
+the longer nod with Body's posture and tracking. Only a camera and actual
+joint feedback can settle those. Today's settled-rest suppression and the
+independent idle author must be resolved before judging the rest plan.
+
+Questions blocking further Third work: none. New Voice publishing, final
+consumer wiring, one rest author and physical qualification belong to First.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
