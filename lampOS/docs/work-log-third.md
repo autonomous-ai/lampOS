@@ -1093,6 +1093,182 @@ work:
    claims will survive restart as uncertain; socket or model acceptance cannot
    mark an answer as spoken. No Voice source is changed in this task.
 
+## 2026-10-14 — task 11 done: Tasks through Harness
+
+**Checkpoint:** `third/tasks` at
+`3ad6dd152edd3aa453b4f28fc28066e3d9f7471e` (`lampOS: add durable Harness task
+tracking`), pushed, then fast-forwarded onto `lamp-third`. This entry and the
+implementation are published together on `lamp-third`. The independent client
+and scripted qualification are complete; real Harness and Voice qualification
+remain First's work. No live task or completed spoken result is claimed.
+
+**Built.** New `crates/tasks` and `lamp-tasks`, disabled unless `--enable` is
+set. No existing crate, Voice tool registration, Actions or deployment changed.
+The process owns a private SQLite ledger, a public request socket, a separate
+trusted Voice socket, bounded workers, and independent health reports. It keeps
+the immutable proposed payload and target, the person's exact confirmation,
+the one launch attempt, observed output and Voice's played receipt across
+restart. Both sockets are private to the service user; another process with
+the same UID is inside that trust boundary.
+
+The model chooses only an operator-provisioned alias and bounded text. Targets
+require full machine IDs, an explicit project and `codex` or `claude`, always
+`--mode ask`. The adapter uses the existing CLI with stable generic caller
+identity, an explicit environment allowlist, direct argv, output limits and
+process-group cleanup. It runs an exact-ID machine preflight, one `new`, then
+only explicitly requested `show` for the accepted agent. It never retries a
+launch, guesses a same-name child, answers permissions, or adds a transport,
+login, polling loop or credential reader. A timed-out or malformed launch
+receipt remains uncertain. Known pending creation IDs remain unresolved where
+the owner's current CLI cannot safely reconcile them.
+
+The ledger records `attempting` before granting the single launch. Restart
+invalidates unlaunched confirmations and retains attempted work as uncertain.
+Every response says completion is unverified: idle state, transcript text and
+CLI success do not establish completion of the requested work. Distinct output
+observations are deduplicated; a speech claim is granted once, within the
+original ten-minute age and Tasks session. A repeated claim cannot replay
+speech, including after a Voice-only restart. Only the exact trusted played
+ack records reported speech; it is an attestation, not acoustic proof.
+
+The store retains at most 16 tasks and four observations per task, refusing
+new work when full instead of evicting uncertain history. It uses private
+ownership/modes, no-follow and single-link checks, a lifetime directory lock,
+strict schema/invariants, bounded SQLite files and full synchronization.
+Uncertain writes poison the owner until reopen. Workers and queues are bounded;
+slow CLI work does not hold the request owner. Missing owner progress makes
+readiness false. Terminal errors and full stderr cannot indefinitely hold exit.
+Exact limits, request shapes, lifecycle and trust boundaries are in
+[Tasks](tasks.md); the source review is in [the contract note](tasks-contract.md)
+and the append-only [reuse review](reuse-decisions.md).
+
+**Tested here.** Intel Core i7-10700K, reported 3.80 GHz, 16 logical CPUs,
+64 GiB RAM; macOS 26.6.2 / Darwin 25.6.0, x86_64. Rust and Cargo 1.96.0 from
+the workspace toolchain. Scratch and workspace were APFS on `/dev/disk1s2`,
+not tmpfs. These are host results, never lamp results. The pre-task workspace
+build passed. Final gate from `lampOS/`:
+
+```sh
+cargo fmt --all --check
+cargo clippy --locked -p lamp-tasks --all-targets -- -D warnings
+cargo test --locked -p lamp-tasks -- --test-threads=1
+cargo build --locked --workspace
+```
+
+All passed: **101 tests, zero failed, zero ignored**. The test command took
+50.677 seconds; formatting 3.405, Clippy 3.014 and the workspace build 4.771.
+Tasks has no reverse dependents, and no existing crate source changed. Tests
+cover confirmation/expiry, CAS/retry behavior, restart uncertainty, once-only
+dispatch and speech, malformed/duplicate JSON, target and executable identity,
+CLI timeouts/output bounds, cancellation, descendants holding or redirecting
+pipes, storage permissions/corruption/limits, stalled owners, blocked stderr
+and socket cleanup. A source-only copy outside the repository built all 30
+workspace packages offline in 83.977 seconds, then passed the same 101 tests
+in 41.929 seconds. All 16 source/manifest hashes match the gated tree.
+
+Failures are retained in the [host evidence ledger](verification/tasks-host-20261014/README.md):
+unfinished parallel compile attempts; sandbox socket denials; a real Darwin
+zombie/process-group `EPERM` case reproduced outside the sandbox; incomplete
+pipe cleanup; partial fixture output; overly short fixture startup budgets;
+and two test helpers missing explicit private directory modes. The final
+tests pass without weakening production permissions or hiding a regression.
+Review also added duplicate-key rejection before CLI connection and a bounded
+terminal error writer. No failing test was fast-forwarded.
+
+**Measured here.** One release invocation of
+`tasks_check --scratch-parent /private/tmp --samples 8`, after all Third builds
+and tests ended, exited 0 in **13.998392566 seconds**. It reported all assertions
+passed and removed its scratch. Eight fresh-store cycles produced 72 durations:
+one first and seven subsequent samples per boundary. Two additional untimed
+scenarios cover malformed scripted JSON and unresolved pending creation across
+restart. Ten scripted launches, sixteen observations and ten machine
+preflights were made against the checker's own executable, never live Harness.
+Unrelated host load was uncontrolled. Each cycle's store is fresh; subsequent
+samples do not claim a warmed database.
+
+| Boundary, milliseconds | First | Subsequent median (7) | Subsequent maximum |
+|---|---:|---:|---:|
+| Fresh service and fixture startup | 220.371124 | 219.478985 | 221.779840 |
+| Prepare to durable receipt | 98.459184 | 86.017812 | 87.837577 |
+| Confirm to durable queued receipt | 132.784766 | 82.716055 | 86.182955 |
+| Confirm to observing stored scripted creation | 309.901767 | 250.180816 | 264.600759 |
+| Observe to observing stored scripted output | 306.758039 | 250.705720 | 275.754903 |
+| Speech claim to durable grant | 78.916394 | 80.827056 | 84.278012 |
+| Authored played ack to durable receipt | 83.405350 | 81.719521 | 84.971112 |
+| Status beside one silent client | 7.562604 | 7.539896 | 11.670755 |
+| Reopened service start to successful Status | 101.304453 | 105.184206 | 112.867036 |
+
+Round trips include local socket/queue/validation/storage/reply work. Creation
+and observation include scripted process execution and polling committed state;
+confirmation returns its queued receipt earlier. Speech rows measure authored
+database attestations, not sound. The evidence ledger retains all samples,
+command boundaries, source/binary hashes and the separate debug preflight.
+
+**First: the first lamp check.** Build in the usual ARM64 environment:
+
+```sh
+cargo build --release --locked -p lamp-tasks --bin lamp-tasks --example tasks_check
+```
+
+Copy through the authorized workflow, choose a short persistent scratch parent,
+then run once (if home is persistent):
+
+```sh
+findmnt -T "$HOME"
+./tasks_check --scratch-parent "$HOME" --samples 8
+```
+
+The checker needs no Rust installation, checkout or fixture files: it launches
+itself as scripted Harness. It uses no account, network, sound, motors or
+production store. Expect exit 0, `all_assertions_passed:true` and
+`scratch_removed:true`. Keep raw output with the lamp name. A failure retains
+private scratch evidence. This check does not establish real task delivery.
+
+Then follow [real Harness and Voice qualification](tasks.md#real-harness-and-voice-qualification-still-required):
+record installed CLI/daemon/engine versions and permission settings, obtain an
+authorized disposable exact target, qualify the resolver limitation below,
+then exercise spoken confirmation, lost/malformed/pending replies with no
+resend, old and changed observations, needs-input, missing agents/ledgers and
+engine restarts. First owns Voice's private confirmation/playout wiring,
+privacy, quiet admission, staleness and interruption checks. Qualify Linux
+cleanup, boot/suspend, real flash sync and reset/account rollover separately.
+
+**Contract questions for First / Harness.** The current owner source is pinned
+at `0e6b16d78fd80697dea252376f19d7acf49d240f`; the relevant CLI files were unchanged
+from the earlier claim review. It does not establish installed 0.3.94 behavior.
+The six claim questions above remain. Two newly verified gaps are material:
+
+1. The machine resolver falls back from an exact ID to labels/prefixes. The
+   `machines --json` preflight and `new` lookup are not atomic; a disappearing
+   full-ID target could resolve to a different matching label. Reply checking
+   can discover that only after a possible launch. Which supported strict-ID
+   route resolves this? Do not enable real delivery until that boundary is
+   resolved; a successful preflight alone does not prove it.
+2. The CLI can move a pending creation to Started before its lookup, while
+   Started lookup does not match the child's creation ID. Which supported
+   reconciliation preserves that identity through the transition? Until one
+   is available, a pending ID stays unresolved without private-ledger reads or
+   guessed name/agent binding.
+
+There is still no caller-provided launch idempotency key or request-correlated
+completion/result identity in this chosen route. No retry, automatic final
+result announcement, focused-agent follow-up or voice permission approval is
+inferred. `ask` preserves the chosen engine's settings; it is not a new
+permission sandbox. These are explicit integration boundaries, not omitted
+host tests.
+
+**Most likely wrong on the lamp:** installed CLI JSON/caller policy and wrapper
+environment, the strict-target/pending-ID contract gaps, Linux process-group
+cleanup, or real flash sync exceeding the 1.1-second receipt deadline. Voice
+must not turn transcript text into completion or a speech claim into proof
+that sound played. No lamp, real Harness, live account, credential, remote
+execution, acoustic latency, actual confirmation, power loss or completed
+speech was exercised here.
+
+Questions blocking further independent Task 11 work: none. Next: fetch and read
+the current list and own log, rebase `lamp-third`, and take any new Third task.
+If none is assigned, check again every half hour.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
@@ -1103,4 +1279,7 @@ was run on a lamp. Replay fixtures are written; real lamp recordings have not
 been supplied. Surround has not changed real Wi-Fi, started physical owners,
 installed a production signed release or erased a real personal store. Its
 production supervisor, trusted feed, lamp storage durability and full-service
-latency remain unqualified. Remaining Third tasks are not yet built.
+latency remain unqualified. Schedule and Tasks passed their host gates; their
+real storage, clock, Harness and Voice integrations remain for First to qualify
+on the lamp. No unclaimed Third task remained in the list read for Task 11;
+the next fetch determines the next assignment.
