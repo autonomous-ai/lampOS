@@ -1,0 +1,15 @@
+{
+  "command": [
+    "python3",
+    "/private/tmp/lamp-third-schedule-1337-standalone-run.py",
+    "--parent-cargo-released"
+  ],
+  "cwd": "/private/tmp",
+  "started_at": "2026-10-14T20:34:49.052807+00:00",
+  "finished_at": "2026-10-14T20:41:31.112127+00:00",
+  "exit_code": 0,
+  "elapsed_seconds": 402.003513369,
+  "log": "/private/tmp/lamp-third-schedule-1337-standalone-run-first.txt",
+  "log_sha256": "f2064150bb2fae97ea3ce62b9bbcb535e5328b77402a5ecfee2e7fd1b170aea0",
+  "execution_permission": "Parent-authorized local IPC outside sandbox; Cargo offline/locked; no live provider/device access; one execution only."
+}

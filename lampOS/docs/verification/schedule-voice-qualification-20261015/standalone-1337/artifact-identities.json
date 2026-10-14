@@ -1,0 +1,100 @@
+{
+  "scope": "Identities only: helper source, archives and executables are deliberately not exported. Source file hashes remain in original reports and the frozen map.",
+  "helpers": [
+    {
+      "copy": "baseline",
+      "path": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-6ba1eoeu/lampOS/crates/actions/examples/schedule_off_actions.rs",
+      "bytes": 179,
+      "sha256": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1"
+    },
+    {
+      "copy": "baseline",
+      "path": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-6ba1eoeu/lampOS/crates/voice/examples/schedule_off_voice.rs",
+      "bytes": 1576,
+      "sha256": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+    },
+    {
+      "copy": "implementation",
+      "path": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/actions/examples/schedule_off_actions.rs",
+      "bytes": 179,
+      "sha256": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1"
+    },
+    {
+      "copy": "implementation",
+      "path": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/voice/examples/schedule_off_voice.rs",
+      "bytes": 1576,
+      "sha256": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+    }
+  ],
+  "archives": [
+    {
+      "copy": "baseline",
+      "path": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline.tar",
+      "sha256": "e8f9d3d96e8e1993b16342bcc5468d9773fafc4876478759c9b17dc564e69d40",
+      "command": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=/private/tmp/lamp-third-schedule-1337e7e1d8-baseline.tar",
+        "1337e7e1d8b88e102ec9fd12f544841569856f75",
+        "lampOS"
+      ],
+      "cwd": "/Users/d/code/autonomous-os",
+      "bytes": 28579840
+    },
+    {
+      "copy": "implementation",
+      "path": "/private/tmp/lamp-third-schedule-1337-standalone-integration-base.tar",
+      "sha256": "e8f9d3d96e8e1993b16342bcc5468d9773fafc4876478759c9b17dc564e69d40",
+      "command": [
+        "git",
+        "archive",
+        "--format=tar",
+        "--output=/private/tmp/lamp-third-schedule-1337-standalone-integration-base.tar",
+        "1337e7e1d8b88e102ec9fd12f544841569856f75",
+        "lampOS"
+      ],
+      "cwd": "/Users/d/code/autonomous-os",
+      "bytes": 28579840
+    }
+  ],
+  "executables": [
+    {
+      "copy": "baseline",
+      "name": "schedule_off_actions",
+      "path": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-6ba1eoeu/lampOS/target/debug/examples/schedule_off_actions",
+      "sha256": "95b84f31cbdb16d97b04485cdfe054ac91f06c0aeca40cb6eedc897f7bdd9b03",
+      "bytes": 800576,
+      "hash_boundary": "After helper build, before that copy\u2019s helper capture; rechecked at export."
+    },
+    {
+      "copy": "baseline",
+      "name": "schedule_off_voice",
+      "path": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-6ba1eoeu/lampOS/target/debug/examples/schedule_off_voice",
+      "sha256": "7d1c85473a30f6767a4ee0b7158451dd6ac4a70701b1c8de2cbe39a2e8a26283",
+      "bytes": 1905400,
+      "hash_boundary": "After helper build, before that copy\u2019s helper capture; rechecked at export."
+    },
+    {
+      "copy": "implementation",
+      "name": "schedule_off_actions",
+      "path": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/target/debug/examples/schedule_off_actions",
+      "sha256": "3ec5601212bd205f0e47c8f0df80edddf85334388004a4b8d98401200f092c10",
+      "bytes": 801768,
+      "hash_boundary": "After helper build, before that copy\u2019s helper capture; rechecked at export."
+    },
+    {
+      "copy": "implementation",
+      "name": "schedule_off_voice",
+      "path": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/target/debug/examples/schedule_off_voice",
+      "sha256": "f1dee14712fe6171593ec05b55aab297b9fcd57e924414af521f9917375ee685",
+      "bytes": 1984096,
+      "hash_boundary": "After helper build, before that copy\u2019s helper capture; rechecked at export."
+    }
+  ],
+  "script_identities": {
+    "/private/tmp/lamp-third-schedule-1337-standalone-prepare.py": "60be7f01f28c68f358dc53a26ee7c5c8dc740574563a0aee4826ad5dc16ae860",
+    "/private/tmp/lamp-third-schedule-1337-standalone-run.py": "296dc6d89bed84faca04cb464332e726a2152601368bde5cf34680e87e5e94ca",
+    "/private/tmp/lamp-third-schedule-1337-standalone-audit.py": "2b2cc41884735cf15a62c005f63fdc8a885e0caf7eb8ebd307df74ae58cfca00"
+  }
+}

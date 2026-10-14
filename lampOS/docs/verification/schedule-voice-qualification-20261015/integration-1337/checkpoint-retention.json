@@ -1,0 +1,14 @@
+[
+  {
+    "original": "/private/tmp/lamp-third-schedule-d794cf-source-identity.json",
+    "retained": "source-d794cf-identity.json",
+    "bytes": 685,
+    "sha256": "632f452f6e625916beaa9c87b72bfd63c7f8b8fdc6b35a0bcfc0e6c60818bad1"
+  },
+  {
+    "original": "/private/tmp/lamp-third-schedule-d794cf-native-first-runs.json",
+    "retained": "native-first-runs.json",
+    "bytes": 1056,
+    "sha256": "12cc950a4c1ad791f3bd53bbb5cd9fd83f21a00aead14f0d5d7cbb59aa2513f7"
+  }
+]

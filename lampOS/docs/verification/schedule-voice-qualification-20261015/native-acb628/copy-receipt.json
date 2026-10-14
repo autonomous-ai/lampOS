@@ -1,0 +1,20 @@
+[
+  {
+    "original": "/private/tmp/lamp-third-schedule-native-38627179829-terminal.json",
+    "retained": "result.json",
+    "bytes": 2560,
+    "sha256": "81d065ce6dc001c9ebc1c484c7f3a52f713b60eb96215118a3ba7c90d6db114e"
+  },
+  {
+    "original": "/private/tmp/lamp-third-schedule-native-38627179829-terminal-log.txt",
+    "retained": "run.txt",
+    "bytes": 1245928,
+    "sha256": "dce920011075da9fbdf318cef823a652d523c88dfa5e61c3c4082d002968eff8"
+  },
+  {
+    "original": "/private/tmp/lamp-third-schedule-native-38627179829-retention.json",
+    "retained": "retention.json",
+    "bytes": 4727,
+    "sha256": "0763ecaac65a6e3dfdecd810dae5bac4ffae3ede7961c8c02ba99b16d0b8ea42"
+  }
+]

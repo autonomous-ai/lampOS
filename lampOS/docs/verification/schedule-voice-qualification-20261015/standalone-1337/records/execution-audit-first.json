@@ -1,0 +1,174 @@
+{
+  "scope": "Filesystem-only exact-byte audit; no Cargo, tests, helpers or device operation.",
+  "audited_at": "2026-10-14T20:41:46.561436+00:00",
+  "report": "/private/tmp/lamp-third-schedule-1337-standalone.json",
+  "report_sha256": "6de6d4fa29777e8f51eccc28cb920427263a100a8b09642b5de5fbda693a80fe",
+  "status": "passed",
+  "base": "1337e7e1d8b88e102ec9fd12f544841569856f75",
+  "observed_copy_head": "d794cf2aca8fd5a7891af6363f2155e9fd3091fe",
+  "frozen_gate_recorded_head": "f959aaa5e8b43b9ddea8d0031d0034272dcaa7af",
+  "gate_paths": 700,
+  "source_files_verified": 1679,
+  "source_file_bytes": 27611889,
+  "baseline_source_files_verified": 1661,
+  "baseline_source_file_bytes": 27159406,
+  "helper_total_bytes_per_copy": 1755,
+  "helpers_verified": {
+    "crates/actions/examples/schedule_off_actions.rs": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1",
+    "crates/voice/examples/schedule_off_voice.rs": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+  },
+  "historical_paths_unchanged": 3649,
+  "mutable_current_evidence_excluded": true,
+  "commands": [
+    {
+      "name": "workspace-build-first",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 83.879675077,
+      "log": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/evidence/workspace-build-first.txt",
+      "stdout_sha256": "d5a8e493e1cae03f5dc9179db4945b5de8f8e19ca4132c4f89e6d0d96de9d0b8"
+    },
+    {
+      "name": "helper-build-first",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-voice",
+        "--example",
+        "schedule_off_actions",
+        "--example",
+        "schedule_off_voice"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 26.817668311999995,
+      "log": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/evidence/helper-build-first.txt",
+      "stdout_sha256": "b8dfe75a030bc724169c684a90575997a5d3a6bd5c57ef297576599a15c360b8"
+    },
+    {
+      "name": "actions-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "--all-targets",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 30.344349327000018,
+      "log": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/evidence/actions-tests-first.txt",
+      "stdout_sha256": "2855d70cf339fb303a7d86118d8a331bf5d245ee833e44a378c21ab2b33fb3c8"
+    },
+    {
+      "name": "schedule-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-schedule",
+        "--all-targets",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 34.69144660699999,
+      "log": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/evidence/schedule-tests-first.txt",
+      "stdout_sha256": "dd6de0ccde645dd6ce765dbddfbf0d3bdf41a71a54d46dadcf9b6d6eddd3f6e7"
+    },
+    {
+      "name": "memory-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-memory",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 167.240647263,
+      "log": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/evidence/memory-tests-first.txt",
+      "stdout_sha256": "c6f6bd8314cea10704e82e399c4574a155726c0c8a259898c053b614d3a279fa"
+    },
+    {
+      "name": "voice-reminder-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "reminder",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 35.288772878999964,
+      "log": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/evidence/voice-reminder-tests-first.txt",
+      "stdout_sha256": "79f595a9afd2b4d9fcb52c7a4010668b1086253bb203f32ad52c6e2dd58d18e4"
+    },
+    {
+      "name": "voice-tools-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "tools",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.00940449899997,
+      "log": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/evidence/voice-tools-tests-first.txt",
+      "stdout_sha256": "2a45c76ce195ce047713ac05a879eda1e031aa63ed13dfd02f179dca0e17e6a0"
+    }
+  ],
+  "test_execution_totals": {
+    "passed": 435,
+    "failed": 0,
+    "ignored": 7
+  },
+  "completed_stdout_comparisons": 144,
+  "corpus": {
+    "baseline_stdout_bytes": 562392,
+    "implementation_stdout_bytes": 562392,
+    "baseline_stderr_count": 144,
+    "implementation_stderr_count": 144
+  },
+  "distinct_stdout_payloads": 3,
+  "distinct_stdout_bytes": 14428,
+  "local_manifests": 34,
+  "skipped_stages": [],
+  "no_complete_gate_or_lamp_claim": true,
+  "new_days_regression_verified": {
+    "test": "remember::tests::kept_out_reminder_is_not_journalled_by_days_but_next_exchange_is",
+    "log": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/evidence/voice-reminder-tests-first.txt",
+    "log_sha256": "79f595a9afd2b4d9fcb52c7a4010668b1086253bb203f32ad52c6e2dd58d18e4",
+    "passed_result_line": "test remember::tests::kept_out_reminder_is_not_journalled_by_days_but_next_exchange_is ... ok"
+  },
+  "memory_test_scope": "Full lamp-memory package default test targets and doc tests; Memory has Voice as a development dependency."
+}

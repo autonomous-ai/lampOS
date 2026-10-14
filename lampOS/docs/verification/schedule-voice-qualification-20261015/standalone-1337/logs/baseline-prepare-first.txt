@@ -1,0 +1,13 @@
+{
+  "report": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline.json",
+  "root": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-6ba1eoeu/lampOS",
+  "source_commit": "1337e7e1d8b88e102ec9fd12f544841569856f75",
+  "source_file_count": 1661,
+  "helper_hashes": {
+    "crates/actions/examples/schedule_off_actions.rs": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1",
+    "crates/voice/examples/schedule_off_voice.rs": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+  },
+  "local_manifests_from_tree": 35,
+  "capture_runner": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-capture.py",
+  "status": "clean archive prepared; no Cargo invoked by preparation"
+}

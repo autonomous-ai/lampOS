@@ -1,0 +1,162 @@
+{
+  "created_at": "2026-10-14T20:34:28.682446+00:00",
+  "scope": "Filesystem-only preparation audit; Cargo was not run by preparation. Parent subsequently released Cargo for exactly one implementation run.",
+  "base": "1337e7e1d8b88e102ec9fd12f544841569856f75",
+  "observed_copy_head": "d794cf2aca8fd5a7891af6363f2155e9fd3091fe",
+  "frozen_gate_recorded_head": "f959aaa5e8b43b9ddea8d0031d0034272dcaa7af",
+  "frozen_gate_sha256": "89adaafcd44a51bbd84233abc575dfdc55987499fcc3f1d427825d4829b885fd",
+  "frozen_gate_path_count": 700,
+  "root": "/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS",
+  "source_file_count": 1679,
+  "source_file_bytes": 27611889,
+  "all_non_evidence_copy_files_match_current_main": true,
+  "helpers": {
+    "crates/actions/examples/schedule_off_actions.rs": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1",
+    "crates/voice/examples/schedule_off_voice.rs": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+  },
+  "helper_total_bytes_per_copy": 1755,
+  "helper_byte_meaning": "179-byte Actions plus 1576-byte Voice helper; 1755 combined bytes per source copy.",
+  "overlay_count": 46,
+  "omitted_verification_file_count": 671,
+  "historical_paths_unchanged": 3649,
+  "prepared_report": "/private/tmp/lamp-third-schedule-1337-standalone-prepared.json",
+  "prepared_report_sha256": "d198baf992ab804562d3f371969bdaee4671353d1543a3ca1278da2e93475461",
+  "baseline_report": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline.json",
+  "baseline_report_sha256": "1dfc963055c2a6d3a4d97bb9209579fc3e130e2436ffb789a17b136717663341",
+  "scripts": {
+    "/private/tmp/lamp-third-schedule-1337-standalone-prepare.py": "60be7f01f28c68f358dc53a26ee7c5c8dc740574563a0aee4826ad5dc16ae860",
+    "/private/tmp/lamp-third-schedule-1337-standalone-run.py": "296dc6d89bed84faca04cb464332e726a2152601368bde5cf34680e87e5e94ca",
+    "/private/tmp/lamp-third-schedule-1337-standalone-audit.py": "2b2cc41884735cf15a62c005f63fdc8a885e0caf7eb8ebd307df74ae58cfca00"
+  },
+  "planned_cargo_stages": [
+    {
+      "stage": "workspace-build-first",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ]
+    },
+    {
+      "stage": "helper-build-first",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-voice",
+        "--example",
+        "schedule_off_actions",
+        "--example",
+        "schedule_off_voice"
+      ]
+    },
+    {
+      "stage": "actions-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "--all-targets",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "stage": "schedule-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-schedule",
+        "--all-targets",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "stage": "memory-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-memory",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "stage": "voice-reminder-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "reminder",
+        "--",
+        "--test-threads=1"
+      ]
+    },
+    {
+      "stage": "voice-tools-tests-first",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "tools",
+        "--",
+        "--test-threads=1"
+      ]
+    }
+  ],
+  "metadata_command": [
+    "cargo",
+    "metadata",
+    "--offline",
+    "--locked",
+    "--format-version",
+    "1"
+  ],
+  "comparison_plan": {
+    "cases": 72,
+    "stdout_byte_comparisons": 144,
+    "profiles": [
+      "ordinary",
+      "tasks"
+    ],
+    "schedule_tools_and_speak_values": [
+      null,
+      "off",
+      "ON",
+      "true",
+      "1",
+      " on "
+    ],
+    "normalization": false,
+    "baseline_stdout_bytes": 562392,
+    "exact_helpers_reused": true
+  },
+  "memory_test_scope": "Full lamp-memory package default test targets and doc tests; Memory has Voice as a development dependency.",
+  "days_regression": "remember::tests::kept_out_reminder_is_not_journalled_by_days_but_next_exchange_is",
+  "stages_already_executed": [],
+  "limits": "Host source copy, package tests, workspace build, and exact small-helper output parity only; no complete gate, format/Clippy, lamp or provider claim. No main/Git mutation. Source, copied final docs and histories must remain byte-identical; changing HEAD alone is allowed."
+}

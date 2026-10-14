@@ -1,0 +1,85 @@
+   Compiling lamp-voice v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 24.25s
+     Running unittests src/lib.rs (target/debug/deps/lamp_voice-a714350f33563503)
+
+running 77 tests
+test admission::outage_drain_tests::prospective_speech_blocks_a_reminder_before_it_owns_a_stream ... ok
+test coordinator::tests::reminder_roundtrip::actual_consumer_ipc_coordinator_and_two_retirements_ack_only_after_whole_completion ... ok
+test coordinator::tests::reminder_roundtrip::completed_real_reply_reopens_before_ack_and_recovers_lost_ack_without_re_speech ... ok
+test coordinator::tests::reminder_roundtrip::interruption_after_final_acceptance_keeps_the_durable_occurrence_pending ... ok
+test coordinator::tests::reminder_roundtrip::microphone_denial_after_final_acceptance_keeps_the_durable_occurrence_pending ... ok
+test coordinator::tests::reminders::interruption_after_first_retirement_never_acknowledges_later_audio ... ok
+test coordinator::tests::reminders::no_audio_or_provider_failure_stays_pending_and_selects_no_failure_recording ... ok
+test coordinator::tests::reminders::only_a_fenced_attempt_without_any_provider_pcm_can_retry ... ok
+test coordinator::tests::reminders::reminder_quiet_uses_current_admission_time_after_new_capture_arrived_in_loop ... ok
+test coordinator::tests::reminders::reminder_waits_for_named_request_second_look_before_its_window_can_expire ... ok
+test coordinator::tests::reminders::reminder_waits_for_promised_look_after_final_pcm_and_delayed_provider_terminal ... ok
+test coordinator::tests::reminders::reset_or_playback_gap_cannot_be_relabeled_whole_reminder_completion ... ok
+test coordinator::tests::reminders::stored_reminder_words_cannot_start_a_camera_followup_even_when_transcript_is_late ... ok
+test coordinator::tests::reminders::whole_reminder_joins_two_real_retirements_and_successful_provider_terminal ... ok
+test fixture_provider::reminder_tests::fixture_refuses_a_reminder_once_without_audio_or_disabling_later_ordinary_input ... ok
+test provider_worker::tests::reminders::a_reminder_does_not_exempt_the_next_ordinary_busy_room_answer ... ok
+test provider_worker::tests::reminders::an_older_reminder_tool_event_cannot_escape_after_a_new_reminder_replaces_it ... ok
+test provider_worker::tests::reminders::disabled_and_invalid_refusals_keep_the_worker_alive_in_every_room_without_submission ... ok
+test provider_worker::tests::reminders::disabled_and_invalid_reminders_never_reach_the_input_sink_in_any_room ... ok
+test provider_worker::tests::reminders::due_reminders_work_in_every_room_with_or_without_attention_and_the_next_turn_works ... ok
+test provider_worker::tests::reminders::ordinary_written_wire_bytes_stay_exact_and_reminder_is_a_separate_variant ... ok
+test provider_worker::tests::reminders::pending_deferral_survives_full_output_and_retirement_without_becoming_completion ... ok
+test provider_worker::tests::reminders::reminder_preserves_authority_and_session_validation_before_policy ... ok
+test provider_worker::tests::reminders::reminder_text_is_quoted_data_and_lateness_is_preserved_with_no_picture ... ok
+test provider_worker::tests::reminders::reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn ... ok
+test provider_worker::tests::reminders::room_changes_during_a_reminder_allow_speech_and_completion_but_never_tools ... ok
+test provider_worker::tests::reminders::unanswered_reminders_and_sounds_are_not_talk_but_speech_and_actual_audio_are ... ok
+test remember::tests::kept_out_reminder_is_not_journalled_by_days_but_next_exchange_is ... ok
+test reminders::consumer::tests::abandon_keeps_pending_and_restart_never_grants_the_uncertain_audio_again ... ok
+test reminders::consumer::tests::an_offer_is_committed_before_handoff_and_fresh_renewals_keep_the_same_token ... ok
+test reminders::consumer::tests::bus_authority_requires_exact_type_source_clock_and_fresh_enabled_payload ... ok
+test reminders::consumer::tests::cancel_snooze_store_switch_and_missing_due_withdraw_existing_offer ... ok
+test reminders::consumer::tests::completed_playout_survives_both_real_store_reopens_then_acks_without_respeech ... ok
+test reminders::consumer::tests::delayed_durable_prepare_cannot_publish_an_already_expired_offer ... ok
+test reminders::consumer::tests::evicted_ack_receipt_resolves_by_current_absence_without_claiming_its_cause ... ok
+test reminders::consumer::tests::full_ledger_refuses_new_admission_without_evicting_any_uncertain_delivery ... ok
+test reminders::consumer::tests::lost_committed_ack_is_recovered_after_restart_without_another_offer ... ok
+test reminders::consumer::tests::offered_tuple_must_match_current_private_get_store_delivery_and_revision ... ok
+test reminders::consumer::tests::old_uncertain_item_does_not_starve_the_next_pending_occurrence ... ok
+test reminders::consumer::tests::only_exact_qualified_completion_can_change_the_durable_prepared_record ... ok
+test reminders::consumer::tests::outgoing_queue_is_bounded_and_replacing_an_offer_never_discards_settlement ... ok
+test reminders::consumer::tests::publisher_restart_retires_the_previous_instance_and_has_a_finite_history ... ok
+test reminders::consumer::tests::qualified_pre_audio_retirement_retries_once_with_a_new_durable_correlation ... ok
+test reminders::consumer::tests::real_bus_requires_one_live_declared_schedule_publisher ... ok
+test reminders::consumer::tests::retained_bus_message_never_renews_age_and_reused_typed_sequence_is_refused ... ok
+test reminders::consumer::tests::slow_get_withdraws_current_authority_without_refreshing_its_observation ... ok
+test reminders::consumer::tests::storage_failure_before_prepare_withholds_the_offer_and_latches_failure ... ok
+test reminders::consumer::tests::uncommitted_lost_ack_at_the_same_revision_keeps_the_exact_attempt_and_recovers ... ok
+test reminders::tests::active_lease_is_exact_and_does_not_revoke_an_unrelated_person_turn ... ok
+test reminders::tests::completion_waits_for_reply_drop_and_durable_worker_settlement ... ok
+test reminders::tests::disabled_switch_never_opens_the_requested_ledger_or_consumer ... ok
+test reminders::tests::failed_worker_invalidates_only_the_due_owner_and_does_not_restart ... ok
+test reminders::tests::offered_lease_is_bounded_and_does_not_gain_age_from_parent_poll ... ok
+test reminders::tests::parent_poll_cost ... ignored, host-only parent polling measurement; run alone with --ignored --exact --nocapture
+test reminders::tests::queued_completion_survives_privacy_cycle_state_dropping_without_new_admission ... ok
+test reminders::tests::withdrawal_before_admission_retires_exact_attempt_and_waits_for_settlement ... ok
+test reminders::transport::tests::child_fixture ... ok
+test reminders::transport::tests::claim_path_traps_are_refused_without_replacing_existing_data ... ok
+test reminders::transport::tests::claim_retention_boundary_fixture ... ok
+test reminders::transport::tests::claim_without_descriptor_and_rights_with_ordinary_json_are_rejected ... ok
+test reminders::transport::tests::duplicate_claim_does_not_replace_or_release_existing_lock ... ok
+test reminders::transport::tests::exact_packet_bound_and_bidirectional_json_roundtrip ... ok
+test reminders::transport::tests::excess_ancillary_descriptors_fault_without_installing_a_claim ... ok
+test reminders::transport::tests::flood_is_backpressured_and_poll_retains_only_one_ordered_packet ... ok
+test reminders::transport::tests::in_process_test_helper_transfers_and_releases_the_real_claim ... ok
+test reminders::transport::tests::lost_wait_ownership_drop_retains_claim_until_fixture_exit ... ok
+test reminders::transport::tests::malformed_or_unknown_json_shape_faults_the_receiver ... ok
+test reminders::transport::tests::messages_before_claim_are_never_delivered ... ok
+test reminders::transport::tests::oversize_preflight_sends_nothing_and_leaves_valid_sender_usable ... ok
+test reminders::transport::tests::oversized_raw_datagram_is_rejected_instead_of_truncated_json ... ok
+test reminders::transport::tests::poll_cost ... ignored, host-only timing probe; run alone with --ignored --exact --nocapture
+test reminders::transport::tests::production_retention_survives_drop_until_the_parent_process_exits ... ok
+test reminders::transport::tests::real_child_exit_does_not_drop_the_parent_claim_or_start_replacement ... ok
+test reminders::transport::tests::releasing_a_claim_preserves_its_inode_and_private_mode ... ok
+test reminders::transport::tests::stop_signals_once_and_actual_child_exit_can_be_polled_without_waiting ... ok
+test reminders::transport::tests::term_resistant_child_drop_retains_claim_until_fixture_exit ... ok
+test reminders::transport::tests::transferred_claim_survives_child_side_close_and_is_cloexec ... ok
+
+test result: ok. 75 passed; 0 failed; 2 ignored; 0 measured; 879 filtered out; finished in 9.81s
+

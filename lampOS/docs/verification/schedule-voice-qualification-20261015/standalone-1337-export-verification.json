@@ -1,0 +1,19 @@
+{
+  "bundle": "/private/tmp/lamp-third-schedule-1337-text-export-pdzp1y85",
+  "files": 38,
+  "bytes": 13674168,
+  "original_paths": 609,
+  "comparison_stdout_originals": 288,
+  "comparison_stderr_originals": 288,
+  "stdout_comparisons": 144,
+  "retention_index_sha256": "8c5069523acd2a23973d7856e8014d1059c6cd7a7399974ae99022a6ea3e56ab",
+  "checksums_sha256": "cc04516352a9e9f20a101d174aeb6cec45f40ee48fc59ccec95f351f766db993",
+  "readme_links_checked": 8,
+  "all_original_bytes_equal": true,
+  "all_text_utf8": true,
+  "no_prohibited_artifacts": true,
+  "historical_source_report_identities_preserved": true,
+  "baseline_report_sha256": "1dfc963055c2a6d3a4d97bb9209579fc3e130e2436ffb789a17b136717663341",
+  "implementation_report_sha256": "6de6d4fa29777e8f51eccc28cb920427263a100a8b09642b5de5fbda693a80fe",
+  "execution_audit_sha256": "ad29b765b56c09be380266a8499976feecceb0d2283e570f47654e1efe8ebc31"
+}

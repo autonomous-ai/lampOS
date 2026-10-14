@@ -1,0 +1,123 @@
+{
+  "scope": "Filesystem-only audit of clean 1337 baseline capture; no Task31 implementation comparison prepared or executed.",
+  "audited_at": "2026-10-14T20:26:36.529709+00:00",
+  "report": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline.json",
+  "report_sha256": "1dfc963055c2a6d3a4d97bb9209579fc3e130e2436ffb789a17b136717663341",
+  "report_bytes": 1154378,
+  "status": "passed",
+  "source_commit": "1337e7e1d8b88e102ec9fd12f544841569856f75",
+  "root": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-6ba1eoeu/lampOS",
+  "source_files": 1661,
+  "source_bytes": 27159406,
+  "helper_total_bytes_per_copy": 1755,
+  "helper_hashes": {
+    "crates/actions/examples/schedule_off_actions.rs": "8fc55e05703d1aa5ca58348132e3f4b0d7eed202e443f608f0d5af562c8f35e1",
+    "crates/voice/examples/schedule_off_voice.rs": "12d36f2d201b1117df21a55574855c8b44bcd2ec06f7b6fa980603e809b41695"
+  },
+  "metadata": {
+    "path": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-6ba1eoeu/evidence/cargo-metadata.json",
+    "sha256": "d94535d80e3aca9436f1ad753efd7a25f4d6fa04ea0f58802eb96c82c25aae23",
+    "bytes": 2126738,
+    "elapsed_seconds": 0.35746089399999903,
+    "local_manifests_inside_copy": 34,
+    "stderr_bytes": 0
+  },
+  "build": {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-actions",
+      "-p",
+      "lamp-voice",
+      "--example",
+      "schedule_off_actions",
+      "--example",
+      "schedule_off_voice"
+    ],
+    "cwd": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-6ba1eoeu/lampOS",
+    "exit_code": 0,
+    "elapsed_seconds": 30.191950346000002,
+    "timeout_seconds": 900,
+    "timed_out": false,
+    "stdout_file": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-build-first.txt",
+    "stdout_sha256": "aff6e548fe28de64202be1b92e1b3b920349604688e009712b057bef28829567",
+    "stderr_file": null,
+    "stderr_sha256": null,
+    "stderr_merged_into_stdout": true,
+    "log": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-build-first.txt",
+    "target_directory": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-6ba1eoeu/lampOS/target"
+  },
+  "case_count": 72,
+  "stdout_count": 144,
+  "stdout_bytes": 562392,
+  "empty_stderr_count": 144,
+  "distinct_stdout_count": 3,
+  "distinct_stdout_bytes": 14428,
+  "profiles_summary": {
+    "ordinary": {
+      "cases": 36,
+      "actions_sha256": "86e2d2bd148df7f1521f2123b59e4566d72948350d2a3cb2f7e3996c5872a2c3",
+      "voice_sha256": "75f2f11a8b2f687198d88d2f0d592d4c6e6365886eeee81b7adffb38ae168c15",
+      "actions_bytes": 1194,
+      "voice_bytes": 5902,
+      "declared_names": [
+        "not_for_me",
+        "the_time",
+        "remember",
+        "recall",
+        "forget",
+        "volume_up",
+        "volume_down",
+        "volume_mute",
+        "volume_unmute",
+        "light_on",
+        "light_off",
+        "light_colour",
+        "light_brighter",
+        "light_dimmer"
+      ]
+    },
+    "tasks": {
+      "cases": 36,
+      "actions_sha256": "86e2d2bd148df7f1521f2123b59e4566d72948350d2a3cb2f7e3996c5872a2c3",
+      "voice_sha256": "6464a3084bf3dafe72754203a0bfee26b7fd231962200213d9509effabb34733",
+      "actions_bytes": 1194,
+      "voice_bytes": 7332,
+      "declared_names": [
+        "not_for_me",
+        "the_time",
+        "remember",
+        "recall",
+        "forget",
+        "start_agent_task",
+        "confirm_agent_task",
+        "check_agent_task",
+        "volume_up",
+        "volume_down",
+        "volume_mute",
+        "volume_unmute",
+        "light_on",
+        "light_off",
+        "light_colour",
+        "light_brighter",
+        "light_dimmer"
+      ]
+    }
+  },
+  "old_evidence_paths_unchanged": 3345,
+  "source_and_helpers_unchanged": true,
+  "invalid_relative_paths_absent": true,
+  "skipped_stages": [],
+  "machine": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "architecture": "x86_64",
+    "processor": "i386",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "measurement_claim": "Local host only; no lamp/provider/network call. Elapsed command time uses monotonic time from before process launch through process exit and log closure; source/evidence audits are outside that interval."
+  },
+  "implementation_comparison": "Pending final source freeze; no cross-copy parity claim yet."
+}

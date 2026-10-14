@@ -1,0 +1,48 @@
+   Compiling serde_core v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling memchr v2.8.3
+   Compiling serde v1.0.229
+   Compiling cc v1.7.0
+   Compiling rustix v1.1.5
+   Compiling syn v3.0.7
+   Compiling subtle v2.6.1
+   Compiling smallvec v1.16.3
+   Compiling futures-sink v0.3.34
+   Compiling futures-core v0.3.34
+   Compiling futures-util v0.3.34
+   Compiling ring v0.17.14
+   Compiling libsqlite3-sys v0.38.2
+   Compiling serde_derive v1.0.229
+   Compiling thiserror-impl v2.0.21
+   Compiling bytemuck_derive v1.12.1
+   Compiling tokio-macros v2.7.2
+   Compiling tokio v1.53.1
+   Compiling bytemuck v1.25.2
+   Compiling thiserror v2.0.21
+   Compiling jiff v0.2.38
+   Compiling lamp-ipc v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/ipc)
+   Compiling tempfile v3.27.0
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/turn-end-wire)
+   Compiling sonora-agc2 v0.2.0
+   Compiling sonora v0.2.0
+   Compiling rusqlite v0.40.2
+   Compiling rustls v0.23.45
+   Compiling lamp-bus v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/turn-owner)
+   Compiling lamp-ring v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/ring)
+   Compiling lamp-camera v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/camera)
+   Compiling lamp-audio v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/audio)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/msgs)
+   Compiling rustls-webpki v0.103.15
+   Compiling lamp-schedule v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/schedule)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/keeper)
+   Compiling lamp-controls v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/controls)
+   Compiling lamp-expression v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/expression)
+   Compiling lamp-body v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/body)
+   Compiling lamp-actions v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/actions)
+   Compiling tungstenite v0.30.0
+   Compiling tokio-rustls v0.26.6
+   Compiling tokio-tungstenite v0.30.0
+   Compiling lamp-gemini v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/gemini)
+   Compiling lamp-voice v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/voice)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 26.73s

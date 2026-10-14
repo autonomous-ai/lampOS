@@ -1,0 +1,11 @@
+{
+  "command": [
+    "python3",
+    "/private/tmp/lamp-third-schedule-1337-standalone-prepare.py",
+    "--parent-source-frozen"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 3.0019349309999996,
+  "log": "/private/tmp/lamp-third-schedule-1337-standalone-prepare-first.txt",
+  "log_sha256": "a33b1bfd3bcfdf56e59899312cf4b6eaf5c5e291d6bf4c274187dd423b1bbab4"
+}

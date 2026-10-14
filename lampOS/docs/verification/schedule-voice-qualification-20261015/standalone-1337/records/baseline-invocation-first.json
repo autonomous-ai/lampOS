@@ -1,0 +1,18 @@
+{
+  "command": [
+    "python3",
+    "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-capture.py",
+    "--parent-cargo-released"
+  ],
+  "source_commit": "1337e7e1d8b88e102ec9fd12f544841569856f75",
+  "started_at": "2026-10-14T20:24:52.525130+00:00",
+  "finished_at": "2026-10-14T20:25:29.224829+00:00",
+  "elapsed_seconds": 36.694507038000005,
+  "exit_code": 0,
+  "first_output": "/private/tmp/lamp-third-schedule-1337e7e1d8-baseline-capture-first.txt",
+  "first_output_sha256": "2f1d038c7c59434cea0812990b0de28c0c1e62b1d628ea912ca3435c58817044",
+  "prepared_report_sha256": "3f2eefeb5fbd906b7e802932ba3594f7ffb05b4286439d484bef75ef07d7aa95",
+  "runner_sha256": "83cadfb79c1edeeb00d7baa38c289836a4567d0ea4df5f8d99aaf9565d576d34",
+  "shared_runner_support_sha256": "464ad53bf43f9bc6d8b9cd30dd37f74f114c20e1dc86cf6a806563cbc6c68a53",
+  "execution_permission": "Parent explicitly released Cargo for clean baseline only; local IPC permitted, offline builds, no provider/device access or implementation preparation."
+}

@@ -1,0 +1,14 @@
+{
+  "created_at": "2026-10-14T20:33:44.819061+00:00",
+  "head": "d794cf2aca8fd5a7891af6363f2155e9fd3091fe",
+  "base": "1337e7e1d8b88e102ec9fd12f544841569856f75",
+  "source_manifest": "/private/tmp/lamp-third-schedule-1337-source-frozen.json",
+  "source_sha256": "89adaafcd44a51bbd84233abc575dfdc55987499fcc3f1d427825d4829b885fd",
+  "all_committed_blobs_match_frozen_source": true,
+  "all_worktree_bytes_match_commit": true,
+  "paths": 700,
+  "worktree_clean": true,
+  "message": "lampOS: add gated Schedule tools and due reminder speech",
+  "focused_report": "/private/tmp/lamp-third-schedule-1337-focused-first.json",
+  "readiness": "no; complete host/copy/native outcomes pending"
+}

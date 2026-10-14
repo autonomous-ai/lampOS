@@ -2312,6 +2312,59 @@ Look. Most likely wrong there: provider schema/wording, timely local silence
 in a busy office, ALSA final retirement, flash stalls and RR20-to-Other/nice-19
 child scheduling. No lamp or real provider was accessed.
 
+
+## 2026-10-15 — Task 31 rebased checkpoint and independent copy passed
+
+Ready for lamp-voice: no
+
+The task checkpoint is
+[`d794cf2aca8fd5a7891af6363f2155e9fd3091fe`](https://github.com/autonomous-ai/lampOS/commit/d794cf2aca8fd5a7891af6363f2155e9fd3091fe),
+based on `1337e7e1d8b88e102ec9fd12f544841569856f75`. Its 700 frozen
+Rust/manifest/toolchain paths match every committed blob and the clean working
+tree. The only added code since the clean rebase is an isolated test for
+Days-mode journal exclusion: a completed kept-out reminder followed by an
+ordinary exchange reaches the real Voice memory FIFO; a conversation-end
+barrier proves only the ordinary exchange was sent, with its snapshot
+provenance. No runtime Memory policy or motor fixture changed.
+
+On Third's Intel i7-10700K x86_64 Mac, macOS 26.6.2 / Darwin 25.6.0,
+64 GiB RAM, Rust/Cargo 1.96.0, formatting, strict all-target Clippy for all
+five affected packages and workspace build passed. Seven Voice filters
+passed **136 test executions / 0 failed / 2 ignored**. The new Days test is
+included in two filters, so these are execution counts, not unique tests.
+[The complete focused record](https://github.com/autonomous-ai/lampOS/blob/d794cf2aca8fd5a7891af6363f2155e9fd3091fe/lampOS/docs/verification/schedule-voice-host-20261014/integration-1337/README.md)
+retains exact commands, raw logs and hashes, including the preliminary runner
+invocation that started before its map existed and ran no Cargo command.
+
+A fresh independent source copy passed once: workspace/helper builds,
+**435 test executions / 0 failed / 7 ignored**, and **72 off-switch cases /
+144 exact stdout comparisons** against a clean `1337` baseline. Counts are
+Actions 33/0/0, Schedule 160/0/0, full Memory 147/0/5, Voice reminder
+75/0/2 and Voice tools 20/0/0. All 34 local manifests resolve inside each
+copy, all 700 source hashes remain exact, and all 3,649 previously retained
+historical originals stayed unchanged. [The verified export](verification/schedule-voice-qualification-20261015/standalone-1337/README.md)
+keeps 609 original-path mappings in 38 UTF-8 files. No Python, binary, archive,
+credential or fixture directory was added to the evidence bundle.
+
+The complete host command for Actions, Schedule, Voice, Voice Eval and Memory
+started around 20:42 UTC and is pending. Exact-head native ARM64 run
+[38633124293](https://github.com/autonomous-ai/lampOS/actions/runs/38633124293)
+is registered behind the preceding run. No ready pull request is offered
+until its result and the remaining gate are known. The preceding `acb628`
+run [38627179829](https://github.com/autonomous-ai/lampOS/actions/runs/38627179829)
+finished successfully: **4,338 / 0 / 33**, 279 harnesses. Its Voice, Actions
+and Schedule checksums equal `01192`, consistent with their verified
+documentation-only difference; it still does not qualify `d794cf2`.
+
+[The qualification index](verification/schedule-voice-qualification-20261015/README.md)
+links the source identity, exact earlier failures and all completed outcomes.
+The source/document handoff review found no missing essential lamp steps.
+First still needs the off-state minute and seven spoken cases in
+[the task runbook](https://github.com/autonomous-ai/lampOS/blob/d794cf2aca8fd5a7891af6363f2155e9fd3091fe/lampOS/docs/schedule.md#task-31-lamp-qualification).
+The same provider wording, busy-office silence, ALSA retirement, flash and
+scheduler-transition limits apply. No lamp or real provider was accessed;
+command durations are not lamp interaction latency.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

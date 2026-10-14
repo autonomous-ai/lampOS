@@ -1,0 +1,228 @@
+   Compiling lamp-schedule v0.1.0 (/private/tmp/lamp-third-schedule-1337-standalone-2xktdq8d/lampOS/crates/schedule)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.05s
+     Running unittests src/lib.rs (target/debug/deps/lamp_schedule-c99a2b2d5bf1f530)
+
+running 1 test
+test store::tests::live_connection_uses_full_sync_delete_journal_and_bounded_pages ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running unittests src/main.rs (target/debug/deps/lamp_schedule-4468f27c34065c34)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/calendar.rs (target/debug/deps/calendar-0afd9a82ddab00bc)
+
+running 37 tests
+test advancement_retains_every_past_occurrence_without_delivery_time_drift ... ok
+test another_boot_waits_for_trusted_wall_time_and_then_reports_lateness ... ok
+test apia_skipped_day_retains_two_distinct_civil_occurrences_at_one_instant ... ok
+test boot_clock_order_is_deliberately_the_owners_responsibility ... ok
+test boot_identity_is_bounded_and_matches_the_bus_alphabet ... ok
+test calendar_creation_and_advancement_fail_closed_at_the_upper_range ... ok
+test calendar_deadlines_require_wall_trust_even_on_the_original_boot ... ok
+test clock_text_is_exact_ascii_hh_mm_for_every_calendar_kind ... ok
+test creation_always_requires_a_trusted_wall_clock ... ok
+test daily_gap_moves_one_occurrence_forward_without_changing_requested_clock ... ok
+test duration_bounds_are_inclusive_and_never_wrap ... ok
+test duration_keeps_milliseconds_and_both_clock_anchors ... ok
+test elapsed_difference_uses_checked_signed_conversion ... ok
+test errors_have_static_messages_without_echoing_supplied_private_text ... ok
+test exact_date_syntax_rejects_bad_dates_and_unrecognized_relative_words ... ok
+test explicit_zone_overrides_the_default_and_recurrence_freezes_its_zone ... ok
+test half_hour_dst_gap_uses_database_rules_without_assuming_one_hour ... ok
+test ho_chi_minh_local_request_resolves_without_model_date_arithmetic ... ok
+test lower_utc_boundary_can_select_next_occurrence_from_a_previous_local_year ... ok
+test next_occurrence_distinguishes_remaining_fold_from_a_wholly_past_fold ... ok
+test next_occurrence_rejects_an_upcoming_gap_but_can_pass_a_past_gap ... ok
+test omitted_and_next_days_are_strictly_future_including_exact_equality ... ok
+test omitted_optionals_and_full_lowercase_weekdays_round_trip ... ok
+test one_off_fold_requires_choice_and_resolves_both_instants ... ok
+test one_off_gap_is_rejected_even_when_a_fold_preference_is_supplied ... ok
+test persisted_deadline_validation_rejects_inconsistent_or_unbounded_descriptors ... ok
+test recurrence_calendar_arithmetic_handles_leap_month_and_year_boundaries ... ok
+test repeating_fold_uses_earlier_instant_once_and_next_creation_skips_spent_fold ... ok
+test same_boot_wall_jumps_neither_end_nor_extend_a_duration_timer ... ok
+test serde_rejects_unknown_fields_wrong_case_and_unrecognized_words ... ok
+test serialized_elapsed_timer_survives_process_restart_without_trusted_wall_time ... ok
+test today_and_explicit_dates_refuse_equal_or_past_requests ... ok
+test tomorrow_uses_local_dates_across_leap_month_and_year_boundaries ... ok
+test utc_limits_match_jiff_and_arithmetic_rejects_the_next_millisecond ... ok
+test weekly_gap_stays_on_the_requested_weekday_and_clock ... ok
+test weekly_initial_selection_covers_all_weekdays_and_exact_time_rollover ... ok
+test zones_must_be_bounded_names_in_the_bundled_database ... ok
+
+test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/client.rs (target/debug/deps/client-2c7be275ab7518c7)
+
+running 7 tests
+test a_second_hop_keeps_the_original_absolute_deadline ... ok
+test absent_reply_after_complete_request_is_uncertain_and_not_retried ... ok
+test closed_truncated_nonobject_and_invalid_replies_are_unknown_after_send ... ok
+test exact_reply_bound_is_accepted_and_one_byte_more_is_rejected ... ok
+test expired_deadline_never_connects_and_missing_socket_is_not_sent ... ok
+test fragmented_reply_and_escaped_content_are_one_bounded_object ... ok
+test validates_path_object_and_size_before_opening_a_socket ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.17s
+
+     Running tests/delivery_ledger.rs (target/debug/deps/delivery_ledger-4b74cdc37acd4372)
+
+running 24 tests
+test all_ack_and_retry_requests_remain_exact_after_reopen ... ok
+test completion_requires_nonzero_actual_receipt_fields_and_exact_correlation ... ok
+test counters_refuse_overflow_without_wrapping_or_writing ... ok
+test duplicate_prepare_never_returns_another_admission_and_completion_is_idempotent ... ok
+test every_durable_transition_poisoned_on_before_or_after_commit_error_recovers_only_from_disk ... ok
+test exact_old_ack_replay_never_consumes_a_later_daily_occurrence ... ok
+test fresh_ledger_initializes_tagged_snapshot_and_reopen_preserves_identity ... ok
+test full_unresolved_ledger_never_evicts_and_only_durable_resolution_frees_capacity ... ok
+test identity_bound_but_equal_revision_absence_cannot_contradict_pending_evidence ... ok
+test initial_commit_failure_never_returns_a_usable_ledger ... ok
+test list_absence_requires_exact_unfiltered_page_and_valid_cursor ... ok
+test lost_ack_reply_survives_server_restart_and_due_revision_change ... ok
+test malformed_or_misbound_get_and_ack_responses_never_create_evidence ... ok
+test never_admitted_and_explicit_owner_fence_retry_are_typed_not_timeouts ... ok
+test overwritten_committed_ack_receipt_resolves_absence_as_gone_not_ack_confirmed ... ok
+test prepare_complete_and_ack_intent_each_commit_before_return_without_text ... ok
+test prepared_restart_is_uncertain_and_retry_requires_retirement_then_new_durable_attempt ... ok
+test reopened_private_sqlite_store_preserves_completion_and_exact_ack_intent ... ok
+test repeated_matching_status_receipt_still_persists_its_newer_revision_fence ... ok
+test snooze_advancement_is_superseded_and_old_completion_cannot_ack_next_token ... ok
+test status_plus_unbound_not_found_never_proves_absence_in_the_original_store ... ok
+test store_switch_and_revision_rollback_preserve_all_existing_evidence ... ok
+test strict_snapshot_rejects_engine_json_unknown_missing_duplicate_and_invalid_fields_without_writes ... ok
+test unrelated_mutation_before_ack_requires_explicit_persisted_rebase_of_same_logical_id ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+
+     Running tests/engine.rs (target/debug/deps/engine-aa208a66ea68504b)
+
+running 36 tests
+test a_bad_default_zone_cannot_create_or_open_a_store ... ok
+test a_commit_error_before_write_stops_the_owner_and_does_not_announce_the_candidate ... ok
+test a_commit_then_sync_error_recovers_the_receipt_without_duplicate_creation ... ok
+test a_lost_create_reply_is_replayed_after_restart_without_a_second_timer ... ok
+test a_lost_recurring_ack_receipt_cannot_ack_the_next_occurrence_after_restart ... ok
+test a_lost_snooze_receipt_does_not_extend_the_timer_after_restart ... ok
+test a_new_boot_waits_for_wall_trust_then_recovers_the_overdue_timer ... ok
+test a_new_store_is_empty_and_identified_before_any_request ... ok
+test absent_voice_neither_consumes_due_nor_rewrites_the_store_on_every_tick ... ok
+test ack_requires_the_current_pending_delivery ... ok
+test an_old_retry_after_another_mutation_cannot_recreate_a_cancelled_timer ... ok
+test automatic_due_updates_preserve_the_last_mutation_receipt ... ok
+test backward_elapsed_clock_or_boot_replacement_is_refused_within_one_owner ... ok
+test cancelling_before_or_after_due_removes_only_the_named_item ... ok
+test capacity_refuses_new_work_without_evicting_a_due_reminder ... ok
+test changing_the_payload_of_a_retried_guard_is_a_conflict ... ok
+test corrupt_persisted_item_ids_deadlines_and_receipts_fail_closed ... ok
+test create_reopen_and_new_ids_preserve_the_committed_timer ... ok
+test due_items_are_oldest_first_and_ack_does_not_consume_its_neighbours ... ok
+test due_storage_failure_never_publishes_an_uncommitted_notice ... ok
+test even_a_one_millisecond_overdue_restart_is_marked_late ... ok
+test exact_due_time_is_pending_without_lateness ... ok
+test long_downtime_retains_each_recurring_occurrence_until_acknowledged ... ok
+test malformed_or_future_state_is_not_replaced_by_an_empty_store ... ok
+test maximum_text_and_repeat_metadata_fit_a_whole_list_reply ... ok
+test ordinary_poll_jitter_is_reported_but_does_not_make_a_spoken_late_claim ... ok
+test paginated_listing_visits_each_item_once_without_mutation ... ok
+test pending_calendar_work_is_not_retracted_by_a_backwards_wall_clock ... ok
+test pending_filter_and_page_bounds_are_explicit ... ok
+test removing_a_timer_frees_capacity_without_reusing_its_id ... ok
+test snooze_requires_a_due_occurrence ... ok
+test snoozing_invalidates_old_delivery_but_does_not_shift_the_repeat_anchor ... ok
+test text_is_unicode_preserving_and_never_silently_truncated ... ok
+test untrusted_wall_time_cannot_create_a_false_reboot_deadline ... ok
+test wall_clock_corrections_do_not_shorten_same_boot_elapsed_timers ... ok
+test wrong_store_or_invalid_request_identity_cannot_mutate ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/protocol.rs (target/debug/deps/protocol-74bd660b47b7bb83)
+
+running 4 tests
+test list_defaults_are_bounded_and_roundtrip_preserves_request_identity ... ok
+test mutations_require_a_complete_caller_guard ... ok
+test one_line_requests_reject_unknown_and_duplicate_fields ... ok
+test request_size_and_utf8_are_checked_without_lossy_conversion ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/runtime.rs (target/debug/deps/runtime-43f4215537e56b35)
+
+running 18 tests
+test a_finite_service_stops_and_releases_its_owner ... ok
+test a_full_client_pool_does_not_stop_due_publication ... ok
+test a_second_owner_cannot_replace_the_live_socket_or_database ... ok
+test a_silent_connection_does_not_hold_due_work_or_other_clients ... ok
+test a_socket_symlink_is_preserved_and_refused ... ok
+test a_trickling_client_has_a_cumulative_read_deadline ... ok
+test bus_recovery_is_from_durable_pending_work_not_just_the_latest_file ... ok
+test cancellation_and_ack_update_the_retained_notice ... ok
+test cli_default_off_does_not_require_a_clock_or_touch_paths ... ok
+test cli_rejects_unknown_and_repeated_options ... ok
+test diagnostics_name_the_owner_and_do_not_include_personal_text ... ok
+test disabled_service_never_reads_clock_or_creates_any_path ... ok
+test host_clock_requires_an_identity_and_reports_explicit_trust ... ok
+test killed_process_reopens_the_same_store_and_recovers_its_stale_socket ... ok
+test malformed_oversized_and_partial_lines_never_mutate_the_store ... ok
+test socket_is_private_and_request_receipt_survives_service_restart ... ok
+test two_guarded_mutations_from_the_same_snapshot_do_not_both_win ... ok
+test unsafe_socket_parent_is_rejected ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.27s
+
+     Running tests/runtime_failures.rs (target/debug/deps/runtime_failures-b1a96065a69a3d5c)
+
+running 2 tests
+test a_blocked_owner_withdraws_due_readiness_then_recovers_the_same_delivery ... ok
+test a_full_stderr_sink_cannot_hold_status_or_sigterm_shutdown ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.23s
+
+     Running tests/storage.rs (target/debug/deps/storage-27295ead5926dca7)
+
+running 21 tests
+test a_busy_failed_commit_poisoned_owner_cannot_continue_and_reopen_keeps_previous ... ok
+test a_nonempty_initialization_file_is_preserved_for_explicit_recovery ... ok
+test a_wal_database_without_sidecars_is_rejected_without_converting_it ... ok
+test changed_permissions_after_open_stop_writes_without_repairing_the_path ... ok
+test database_symlinks_hardlinks_directories_and_public_modes_are_refused ... ok
+test empty_store_and_last_committed_opaque_bytes_survive_reopen ... ok
+test even_private_wal_and_shm_sidecars_are_not_silently_converted ... ok
+test exact_byte_bound_works_and_invalid_sizes_preserve_the_previous_value ... ok
+test exclusive_ownership_blocks_another_process_and_is_released_on_drop ... ok
+test existing_empty_or_non_database_files_are_never_reinitialized ... ok
+test interrupted_initialization_recovers_only_an_unpublished_empty_schema ... ok
+test interrupted_transaction_recovers_the_last_committed_snapshot ... ok
+test invalid_singleton_and_unbounded_rows_are_not_returned_as_state ... ok
+test load_bounds_values_even_if_an_external_writer_bypasses_checks_after_open ... ok
+test orphan_journals_never_authorize_a_new_empty_database ... ok
+test oversized_database_and_journal_are_refused_without_truncation ... ok
+test relative_paths_and_linked_or_public_directories_are_refused ... ok
+test replacing_an_open_database_or_directory_never_redirects_the_writer ... ok
+test the_directory_and_all_created_files_are_private ... ok
+test unknown_versions_and_extra_schema_objects_fail_closed ... ok
+test unsafe_journal_wal_and_shm_paths_are_refused_before_sqlite_uses_them ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.89s
+
+     Running unittests examples/schedule_check.rs (target/debug/examples/schedule_check-df5e1d7c353a982a)
+
+running 10 tests
+test tests::a_buffered_reply_larger_than_one_read_survives_peer_close ... ok
+test tests::a_fragmented_reply_waits_for_the_same_complete_frame ... ok
+test tests::a_reply_at_the_byte_limit_is_accepted ... ok
+test tests::an_oversized_reply_is_rejected_without_waiting_for_eof ... ok
+test tests::an_unread_peer_cannot_extend_the_absolute_write_deadline ... ok
+test tests::bytes_after_the_reply_frame_are_rejected ... ok
+test tests::eof_without_newline_does_not_complete_a_valid_json_value ... ok
+test tests::incoming_fragments_do_not_extend_the_absolute_read_deadline ... ok
+test tests::malformed_json_is_rejected_after_complete_framing ... ok
+test tests::nonblocking_partial_writes_deliver_every_byte ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+

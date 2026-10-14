@@ -1,0 +1,32 @@
+{
+  "head": "d794cf2aca8fd5a7891af6363f2155e9fd3091fe",
+  "base": "1337e7e1d8b88e102ec9fd12f544841569856f75",
+  "source_manifest": "/private/tmp/lamp-third-schedule-1337-source-frozen.json",
+  "source_sha256": "89adaafcd44a51bbd84233abc575dfdc55987499fcc3f1d427825d4829b885fd",
+  "focused": "/private/tmp/lamp-third-schedule-1337-focused-first.json",
+  "native_run": 38633124293,
+  "native_watch_handle": 42889,
+  "complete_gate_command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-actions",
+    "-p",
+    "lamp-schedule",
+    "-p",
+    "lamp-voice",
+    "-p",
+    "lamp-voice-eval",
+    "-p",
+    "lamp-memory",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=1"
+  ],
+  "ordering": "Standalone worker owns local Cargo through its completion. Complete affected-package gate follows once, serially. No runtime source amendments during either run. Native CI executes the same committed source remotely.",
+  "host_timing_probes": "Run the two existing ignored host-only probes once after local build/test jobs are complete, retaining raw samples and boundaries. These are not acoustic or lamp measurements.",
+  "handoff": "Non-draft PR only after exact-head native success and required source/copy results, with any untouched full-gate failure and isolated pass explicitly listed under First's existing #739 exception.",
+  "later_integration": "Scheduled fetches continue during qualification; retain and review incoming changes without mutating an active test source."
+}

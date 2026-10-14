@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "/private/tmp/lamp-third-schedule-1337-standalone-audit.py",
+    "/private/tmp/lamp-third-schedule-1337-standalone.json"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 1.509037946,
+  "stdout": "/private/tmp/lamp-third-schedule-1337-standalone-audit-first.json",
+  "stdout_sha256": "ad29b765b56c09be380266a8499976feecceb0d2283e570f47654e1efe8ebc31",
+  "stderr": "/private/tmp/lamp-third-schedule-1337-standalone-audit-first.stderr",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "completed_at": "2026-10-14T20:41:46.586901+00:00"
+}
