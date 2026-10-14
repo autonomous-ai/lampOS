@@ -1966,6 +1966,30 @@ checks are now running. Its dependency set does not include Eyes. Its earlier
 green ARM64 checkpoint and Mac timing failures remain retained; a current
 full Mac functional run and current-head ARM64 CI are still required.
 
+## 2026-10-14, 20:17 ICT: Mood checkpoint published; Memory compile gates pass
+
+Ready for lamp-voice: no
+
+Pushed task-only `fourth/mood` at
+`9b00b4b7ba23930b7030b4722c244e00ad345cee`, based on `a9a7262a9`.
+The complete engine, metadata adapter, default-off process, tests, authored
+day trace/curve, host timings and retained failures are reviewable there.
+Native ARM64 run 38570324967 has started. No ready PR is open while that run
+and the owner-resolved Linux Eyes lint are outstanding. The Eyes question is
+posted on #713, comment 6169055334. None of Mood's runtime moved to this log
+branch. Its source hashes and documentation links were verified before push.
+
+Memory's current Mac formatting, strict Clippy for Memory/Voice/VoiceEval,
+and workspace build passed, exit 0. The same dependency lint on native
+x86_64 Linux now passes the upstream Body repair; formatting and ARM64
+release cross-build pass too, without warnings. The cross-built binaries
+have SHA-256 `7bfc2e05eff1dba74ca8fbd1700a48e5530f2fd83b678abe31be048820dbed87`
+(Memory) and `f09d9325d1e52d7e72ef1810628b6658a4a19900be4c0e13f12aab0e95c38cad`
+(Voice); they were not executed on ARM64 or a lamp. Full logs are being kept
+with the task evidence. The full current Mac affected-crate test run is
+serial, with other local builds stopped. Earlier privacy-fixture failures
+remain retained, and the current rebased head still needs its own ARM64 CI.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
