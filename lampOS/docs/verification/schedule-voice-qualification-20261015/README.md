@@ -2,8 +2,11 @@
 
 Ready for lamp-voice: yes (#747)
 
-[Pull request #747](https://github.com/autonomous-ai/lampOS/pull/747) is open
-and non-draft. [The registered PR snapshot](pr-747-open.json) verifies its
+[Pull request #747](https://github.com/autonomous-ai/lampOS/pull/747) was opened
+non-draft and merged by First at 21:46:24 UTC on 2026-10-14, as
+`20bf8cabe0bd4ada2521f41daa15b301543fd250`. First reports it is enabled on
+lamp-4ace. [The reported lamp results and relative-time follow-up](../relative-reminders-qualification-20261015/README.md)
+are retained separately; Third did not perform that device run. [The registered PR snapshot](pr-747-open.json) verifies its
 exact head, body and native ARM64 success. The PR-triggered generic CI jobs
 were still pending at that snapshot; no result for them is inferred.
 

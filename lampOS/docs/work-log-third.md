@@ -2480,6 +2480,54 @@ explicitly after MVP. The main task and log working trees are clean after
 publication. Third watches PR/task replies and reads Queue again in half an
 hour; no other builder's task is claimed.
 
+## 2026-10-15 — Task 31 merged and enabled by First
+
+Ready for lamp-voice: yes (#747)
+
+First merged [PR #747](https://github.com/autonomous-ai/lampOS/pull/747) as
+`20bf8cabe0bd4ada2521f41daa15b301543fd250` at 21:46:24 UTC and closed #709.
+[First's lamp-4ace report](https://github.com/autonomous-ai/lampOS/pull/747#issuecomment-6179199142)
+says the off minute had no restarts, and the enabled timer/reminder cases
+worked after First corrected the character's obsolete refusal. First measured
+1.53 seconds from end of speech to timer confirmation, a 42 ms `set_timer`
+call and 60.2 seconds to the one-minute timer announcement; also observed one
+consumer at SCHED_OTHER/priority 0/nice 19 with the parent still RR 20.
+These are First's reported lamp measurements, not Third's measurements.
+The report covers setting, listing, cancelling and due speech; Third does not
+infer that every requested failure case was exercised from this summary.
+
+First also found "in two minutes" firing about 73 seconds after its request:
+the model chose `set_reminder` and rounded to an HH:MM clock time. First put a
+small follow-up first in Third's Queue. [The retained report, merge and Queue](verification/relative-reminders-qualification-20261015/README.md)
+identify the observation and assignment. The original task's raw host failure
+and native successes remain unchanged.
+
+## 2026-10-15 — Relative reminder catalog follow-up taken
+
+Ready for lamp-voice: no
+
+Taken by Third, session `third-20261014-violet4`, no lamp, from First's
+[explicit PR follow-up](https://github.com/autonomous-ai/lampOS/pull/747#issuecomment-6179199142)
+and the 21:49 UTC Queue. Branch: `third/schedule-relative`. Integration base:
+`cf2f5b43c8113a704324c2743af3cd92bbc4fdda`. The log rebased cleanly onto it,
+preserving all 418 previous evidence/log paths. First's character and unit
+changes remain integration-owned.
+
+Scope: clarify the enabled tool descriptions so relative times (including
+"remind me in two minutes") use `set_timer` with the requested label and
+whole seconds; `set_reminder` is for a requested clock time. Add the requested
+host regression over the published catalog and update its English docs. The
+existing exact-on Schedule gates stay in place, with a byte-for-byte disabled
+catalog comparison. No new network, storage or timing work enters the path;
+the existing healthy local tool-call target stays 250 ms. Model tool choice,
+spoken confirmation and actual due timing still need First's lamp replay.
+
+Run formatting, strict affected-package Clippy/tests, workspace build and
+exact-head native ARM64 qualification before another non-draft PR. Record
+any unchanged fixture failure as it occurs. The most likely remaining gap is
+whether the live model follows the clearer relative/clock-time distinction.
+Task #711 still needs physical touch qualification; #699 stays deferred.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
@@ -2495,4 +2543,5 @@ latency remain unqualified. Schedule and Tasks passed their host gates; their
 real storage, clock, Harness and Voice integrations remain for First to qualify
 on the lamp. Task 33 is merged through #728 after First's reported minute
 without `--touch`; enabled qualification still needs First and a person there.
-Task #709 is ready in PR #747 and awaits First; #699 waits until after the MVP.
+Task #709 is merged and enabled by First; its relative-time follow-up is taken
+on `third/schedule-relative`. Task #699 waits until after the MVP.

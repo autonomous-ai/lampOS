@@ -1,0 +1,32 @@
+[
+  {
+    "source": "/private/tmp/lamp-third-watch-747-20261014T214923Z.json",
+    "retained": "first-lamp-report.json",
+    "bytes": 53107,
+    "sha256": "3ae041a3ef3cbb3dc4710815f621442c3b57245522a63704b6f3c6712cee9d18"
+  },
+  {
+    "source": "/private/tmp/lamp-third-queue-20261014T214941Z.json",
+    "retained": "queue-2149.json",
+    "bytes": 9915,
+    "sha256": "a6c5c58815300781a8a2c31bc9d789b6138a6b76d1114027376c68ecb9dbf511"
+  },
+  {
+    "source": "/private/tmp/lamp-third-third-open-20261014T214941Z.json",
+    "retained": "third-open-2149.json",
+    "bytes": 703,
+    "sha256": "91d5cac0b39f9a0748ce5a41d7a21a1e4e54cf8b24776e747f0365428fe3d517"
+  },
+  {
+    "source": "/private/tmp/lamp-third-pr-747-merged-20261014T214941Z.json",
+    "retained": "pr-747-merged.json",
+    "bytes": 4925,
+    "sha256": "7046720a1b387e5f816bd76a444f08560eeea4169519ba7005ba62128d549f8c"
+  },
+  {
+    "source": "/private/tmp/lamp-third-relative-log-rebase.json",
+    "retained": "log-rebase.json",
+    "bytes": 71581,
+    "sha256": "963bc8d54dedd0fdab501426f069dd2489e321e91bffbfa5776c0f089b8b9342"
+  }
+]
