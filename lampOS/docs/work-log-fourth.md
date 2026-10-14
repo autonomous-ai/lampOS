@@ -1189,6 +1189,41 @@ real key, deployment or ARM64 execution occurred.
 The branch is ready for First to read; monitoring continues on the required
 half-hour cycle when the fetched Fourth queue remains empty.
 
+## 2026-10-14, 15:05 ICT: integration synced; no Fourth task left
+
+The task list read at `d96b15f42d798bf833c57b889b007ebd226a8261`
+has no untaken Fourth assignment. It now marks task 17 integrated as a
+played-scene tool, with fitting still waiting for labelled records. First
+also reports memory across days enabled on lamp-4ace at 14:50 after a
+backup; Voice does not yet use its additions. These are First's reported
+lamp actions, not measurements or actions by Fourth.
+
+The tracking ref advanced during the preceding sync. The actual initial
+rebase base was `3ee769e63`, which also includes Keeper and Body/Expression
+work. The original task 17 patch dropped as already integrated upstream
+(`aab4fe1d5`). A final rebase to the explicit `d96b15f42` adds only the
+Expression documentation update. The current sure-name follow-up is
+`2af979f7c92319f24773812cd2550fd9802c9f3c` (the same implementation as
+`39a45c173` above). No runtime code was edited during these rebases.
+
+Policy, its bus/message/IPC sources and the seed are byte-identical to
+the passing follow-up. On the same development Mac, the expanded workspace
+passed `cargo fmt --all --check` and `cargo build --workspace --offline`;
+the build reported 21.60 seconds with the existing cache and no warnings.
+Logs are `/private/tmp/lamp-fourth-empty-integration-{fmt,build}.log`.
+The 143-test and Linux-copy evidence above belongs to its stated integration
+snapshot; it was not rerun to claim testing of the newly integrated Keeper
+or Body. Fourth's only remaining crate difference from this upstream is
+the verified Policy comparison follow-up. Protected files, workspace
+manifests and deployment files match upstream.
+
+For First's evening scenes, the installed tool can sit beside the service's
+binary, but a foreground run must still stop the existing Policy owner:
+both subscribe and publish as `policy`. Restore one owner afterward. The
+required actual-latch snapshot and unfitted-weight limits remain as above.
+Continue fetching and reading the running list every half hour while no
+new Fourth task is assigned.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
