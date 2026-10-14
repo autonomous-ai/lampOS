@@ -1,0 +1,30 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "coordinator::motor::tests::",
+    "--",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS",
+  "machine": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "head": "1e5beebf42910ec043cc6ad76552af51165e5b01",
+  "status_before": " M lampOS/crates/voice/src/coordinator.rs\n M lampOS/crates/voice/src/coordinator/endpoint.rs\n M lampOS/crates/voice/src/coordinator/motor/tests.rs\n M lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs\n M lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs\n M lampOS/crates/voice/src/lib.rs\n M lampOS/crates/voice/src/process.rs\n M lampOS/crates/voice/src/transport.rs\n?? lampOS/crates/voice/src/scenario_clock.rs\n",
+  "started_at_utc": "2026-10-14T19:31:39.770738+00:00",
+  "purpose": "First developmental motor fixture module; Fourth Intel Mac, no lamp. Existing production deadlines and real child assertions retained.",
+  "finished_at_utc": "2026-10-14T19:32:08.632009+00:00",
+  "elapsed_seconds": 28.861509269103408,
+  "exit_code": 0,
+  "outer_timeout": false,
+  "raw_log": "/private/tmp/lamp-fourth-739-motor-first/raw.txt",
+  "raw_sha256": "f08af61995eb22a157c03bafde93548aa45644386bd74d1b375e1760300b5e17",
+  "changed_sources_during_run": [],
+  "binary": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-798a966b47f6690b",
+  "binary_sha256": "bac648d83b0bbc63833a8a56b004cc549982f90e7dc2715ad180035862e115f0"
+}

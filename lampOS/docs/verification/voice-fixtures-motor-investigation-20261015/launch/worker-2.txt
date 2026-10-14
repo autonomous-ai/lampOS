@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d --exact coordinator::motor::tests::inert_child --nocapture

@@ -1,0 +1,78 @@
+{
+  "recorded_at_utc": "2026-10-14T19:26:12.916191+00:00",
+  "machine": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "binary": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d",
+  "binary_sha256": "b2dc0816f07cf7f21d59be69fff78b19705c39292876e6f493a1a2ee4b741efa",
+  "purpose": "Existing previous-source binary, no motor environment set; inert_child returns without device or IPC setup. Describes process/loader/libtest costs only. First invocation is not proof of cold filesystem cache. No production or current-task qualification claim.",
+  "cases": [
+    {
+      "mode": "direct",
+      "repetition": 1,
+      "command": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d",
+        "--exact",
+        "coordinator::motor::tests::inert_child",
+        "--nocapture"
+      ],
+      "elapsed_ns": 91149070,
+      "exit_code": 0,
+      "raw_log": "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/direct-1.txt"
+    },
+    {
+      "mode": "direct",
+      "repetition": 2,
+      "command": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d",
+        "--exact",
+        "coordinator::motor::tests::inert_child",
+        "--nocapture"
+      ],
+      "elapsed_ns": 33004865,
+      "exit_code": 0,
+      "raw_log": "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/direct-2.txt"
+    },
+    {
+      "mode": "direct",
+      "repetition": 3,
+      "command": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d",
+        "--exact",
+        "coordinator::motor::tests::inert_child",
+        "--nocapture"
+      ],
+      "elapsed_ns": 28657137,
+      "exit_code": 0,
+      "raw_log": "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/direct-3.txt"
+    },
+    {
+      "mode": "wrapper",
+      "repetition": 1,
+      "command": [
+        "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/worker-1"
+      ],
+      "elapsed_ns": 675516335,
+      "exit_code": 0,
+      "raw_log": "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/wrapper-1.txt"
+    },
+    {
+      "mode": "wrapper",
+      "repetition": 2,
+      "command": [
+        "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/worker-2"
+      ],
+      "elapsed_ns": 296820870,
+      "exit_code": 0,
+      "raw_log": "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/wrapper-2.txt"
+    },
+    {
+      "mode": "wrapper",
+      "repetition": 3,
+      "command": [
+        "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/worker-3"
+      ],
+      "elapsed_ns": 295996310,
+      "exit_code": 0,
+      "raw_log": "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/wrapper-3.txt"
+    }
+  ]
+}

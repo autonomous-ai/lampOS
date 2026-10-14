@@ -1,0 +1,71 @@
+{
+  "recorded_at_utc": "2026-10-14T19:26:28.787465+00:00",
+  "machine": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "binary": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-7a168ffc1243062d",
+  "purpose": "Factorial follow-up comparing same script inode re-exec and fresh script passed to explicit /bin/sh; no device or IPC setup, no cold-cache claim.",
+  "cases": [
+    {
+      "mode": "same-wrapper",
+      "repetition": 1,
+      "command": [
+        "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/worker-1"
+      ],
+      "elapsed_ns": 33426468,
+      "exit_code": 0,
+      "raw_log": "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/same-wrapper-1.txt"
+    },
+    {
+      "mode": "same-wrapper",
+      "repetition": 2,
+      "command": [
+        "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/worker-1"
+      ],
+      "elapsed_ns": 34284470,
+      "exit_code": 0,
+      "raw_log": "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/same-wrapper-2.txt"
+    },
+    {
+      "mode": "same-wrapper",
+      "repetition": 3,
+      "command": [
+        "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/worker-1"
+      ],
+      "elapsed_ns": 32841379,
+      "exit_code": 0,
+      "raw_log": "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/same-wrapper-3.txt"
+    },
+    {
+      "mode": "explicit-shell-fresh-wrapper",
+      "repetition": 1,
+      "command": [
+        "/bin/sh",
+        "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/shell-worker-1"
+      ],
+      "elapsed_ns": 33412280,
+      "exit_code": 0,
+      "raw_log": "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/explicit-shell-fresh-wrapper-1.txt"
+    },
+    {
+      "mode": "explicit-shell-fresh-wrapper",
+      "repetition": 2,
+      "command": [
+        "/bin/sh",
+        "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/shell-worker-2"
+      ],
+      "elapsed_ns": 32717575,
+      "exit_code": 0,
+      "raw_log": "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/explicit-shell-fresh-wrapper-2.txt"
+    },
+    {
+      "mode": "explicit-shell-fresh-wrapper",
+      "repetition": 3,
+      "command": [
+        "/bin/sh",
+        "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/shell-worker-3"
+      ],
+      "elapsed_ns": 32345647,
+      "exit_code": 0,
+      "raw_log": "/private/tmp/lamp-fourth-motor-launch-7s3e39kj/explicit-shell-fresh-wrapper-3.txt"
+    }
+  ]
+}

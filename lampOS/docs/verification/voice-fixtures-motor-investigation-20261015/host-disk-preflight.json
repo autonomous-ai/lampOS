@@ -1,0 +1,14 @@
+{
+  "at_utc": "2026-10-14T19:02:02.103364+00:00",
+  "machine": "Fourth Intel x86_64 Mac; not lamp",
+  "removed": "inactive generated Cargo target only for completed issue #700",
+  "path": "/private/tmp/lamp-fourth-judge-fit-target",
+  "allocated_bytes_before": 4739756032,
+  "filesystem_total_bytes": 499963174912,
+  "filesystem_free_before": 50776498176,
+  "filesystem_free_after": 54856912896,
+  "free_percent_before": 10.156047629895406,
+  "free_percent_after": 10.972190682974906,
+  "open_file_check": "lsof +D: exit1, empty stdout and stderr",
+  "preserved": "all source, raw logs, verification records, main Memory target and VM caches"
+}

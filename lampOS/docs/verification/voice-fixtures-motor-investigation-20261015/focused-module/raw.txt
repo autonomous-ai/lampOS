@@ -1,0 +1,42 @@
+   Compiling lamp-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.47s
+     Running unittests src/lib.rs (target/debug/deps/lamp_voice-798a966b47f6690b)
+
+running 31 tests
+test coordinator::motor::tests::configured_camera_or_original_permissions_are_required_before_spawn ... ok
+test coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup ... ok
+test coordinator::motor::tests::explicit_current_segment_reaches_inert_counts_without_completing_voice ... motor_validated_offer_to_channel_us=82
+ok
+test coordinator::motor::tests::failed_reap_after_stopped_is_latched_and_reported_once ... ok
+test coordinator::motor::tests::fixture_preflight_marker_without_exit_times_out_and_reaps ... ok
+test coordinator::motor::tests::fixture_preflight_rejects_missing_wrong_and_failed_markers_and_reaps ... ok
+test coordinator::motor::tests::frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted ... ok
+test coordinator::motor::tests::frozen_fixture_preflight_is_not_motor_startup ... ok
+test coordinator::motor::tests::idle_ready_never_inspects_moves_or_claims_listening ... ok
+test coordinator::motor::tests::inert_child ... ok
+test coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement ... ok
+test coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch ... ok
+test coordinator::motor::tests::motor_flags_are_paired_explicit_and_not_accepted_by_fixture_mode ... ok
+test coordinator::motor::tests::native_head::native_head_absence_of_explicit_next_action_never_schedules_return ... ok
+test coordinator::motor::tests::native_head::native_head_binding_changes_only_explicit_camera_boot ... ok
+test coordinator::motor::tests::native_head::native_head_four_explicit_actions_use_original_owner_and_reap ... ok
+test coordinator::motor::tests::native_head::native_head_initial_privacy_acquisition_is_not_a_revoke_or_grant ... ok
+test coordinator::motor::tests::native_head::native_head_no_owner_no_capture_or_no_frame_never_grants ... ok
+test coordinator::motor::tests::native_head::native_head_owner_cancel_between_ticket_and_action_never_dispatches ... ok
+test coordinator::motor::tests::native_head::native_head_privacy_at_dispatch_closes_optional_only ... ok
+test coordinator::motor::tests::native_head::native_head_replayed_receipt_and_changed_camera_grant_are_terminal ... ok
+test coordinator::motor::tests::native_head::native_head_six_explicit_actions_prepare_profile_then_new_requests ... ok
+test coordinator::motor::tests::native_head::native_head_stale_or_foreign_frame_cannot_grant ... ok
+test coordinator::motor::tests::native_head::native_head_startup_announcement_has_no_input_or_motion_authority ... ok
+test coordinator::motor::tests::pending_inspection_is_revoked_before_worker_data_and_release_is_separate ... motor_local_revocation_us=55
+ok
+test coordinator::motor::tests::pending_segment_privacy_revoke_wins_before_any_position_write ... ok
+test coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure ... ok
+test coordinator::motor::tests::readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue ... motor_cancel_priority_send_us=81
+ok
+test coordinator::motor::tests::same_owner_input_end_cancels_queued_gesture_before_inert_bus_write ... ok
+test coordinator::motor::tests::stale_snapshot_does_not_revoke_newer_idle_authority ... ok
+test coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 835 filtered out; finished in 19.17s
+

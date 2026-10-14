@@ -2836,6 +2836,53 @@ was rebased on `78b984b69` with documentation/evidence only; it carries no
 new runtime code. The published failure links retain their original commits.
 
 
+
+## 2026-10-15, 04:20 ICT: Memory adapter documentation merged
+
+Ready for lamp-voice: yes (#746)
+
+PR #746 was merged at 21:07:17 UTC on 2026-10-14 as
+`f2261ec48e35a0bcfc1fa6fbd95f8edbc23f6d4d`. The fetched integration diff
+contains only the intended 21 lines in `memory-days.md`. First's
+[acceptance](https://github.com/autonomous-ai/lampOS/pull/746#issuecomment-6178523621)
+says the paragraph matches lamp-4ace's explicit remember/recall and journal
+behavior, and that this docs-only change needs no lamp minute. Automatic
+extraction remains after the MVP. These lamp observations belong to First;
+Fourth accessed no lamp. The exact submitted-head native ARM64 gate and raw
+evidence are retained in the preceding ready entry.
+
+The half-hour queue still assigns only #739 to Fourth. Its Body ownership
+question has no answer. Frozen v4 remains on `78b984b69` while qualification
+runs; the only newer integration change is this documentation paragraph.
+The first full loaded Mac run passed 1,082 / 0 / 6 ignored, 21 suites,
+435.603 seconds including Cargo, with source hashes unchanged. All four
+named regressions passed. The sequence is still in progress and is not yet
+a ten-run result. The six pre-existing optional tests remain ignored;
+this task adds no ignore or retry.
+
+
+
+## 2026-10-15, 04:35 ICT: task 46, retain the earlier motor investigation
+
+Ready for lamp-voice: no
+
+[The motor investigation](verification/voice-fixtures-motor-investigation-20261015/README.md)
+now retains the exact twelve spawn-to-exit measurements, commands, wrapper
+text and raw output from Fourth's Intel Mac at 19:26 UTC. Fresh executable
+wrappers measured 675.516, 296.821 and 295.996 ms; re-executing the first
+wrapper measured 33.426, 34.284 and 32.841 ms. The same existing test binary
+returned before motor/device/IPC setup. This supports separating fresh-script
+execution from protocol timing; it neither reproduces the historical two-second
+timeout nor establishes its cause or the OS subsystem responsible.
+
+The initial 31 / 0 / 0 focused motor module and its unchanged source hashes
+are retained separately from v4's loaded sequence. Production bounds, the
+original two-second predicates, real Ready/exit/reap checks and original
+assertions remain. A file-gated child can still miss the real 20 ms parent
+inhibit bound under a sufficiently long host pause; the Body seam question
+remains pending. No Body change or lamp measurement is claimed.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
