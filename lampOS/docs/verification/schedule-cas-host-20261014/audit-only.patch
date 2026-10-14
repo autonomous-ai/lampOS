@@ -1,0 +1,121 @@
+--- shared/crates/schedule/tests/runtime.rs
++++ audit-scratch/crates/schedule/tests/runtime.rs
+@@ -295,22 +295,75 @@
+ }
+ #[test]
+ fn two_guarded_mutations_from_the_same_snapshot_do_not_both_win() {
+-    let s = Running::new();
+-    let guard = s.guard();
++    fn captured(result: &io::Result<Value>) -> Value {
++        match result {
++            Ok(reply) => json!({"reply":reply}),
++            Err(error) => {
++                json!({"io_error":{"kind":format!("{:?}",error.kind()),"os_code":error.raw_os_error(),"message":error.to_string()}})
++            }
++        }
++    }
++    let mut s = Running::new();
++    // Same extraction as Running::guard, retaining the response that supplied
++    // its fields so a null/failed guard cannot be mistaken for a CAS failure.
++    let guard_status = s.ask(json!({"op":"status"}));
++    let guard = json!({"store_id":guard_status["store_id"],"revision":guard_status["revision"],"request_id":format!("r{}",guard_status["revision"])});
++    let first_request =
++        json!({"op":"set","guard":guard,"text":"One","when":{"kind":"after","seconds":1}});
++    let second_request =
++        json!({"op":"set","guard":guard,"text":"Two","when":{"kind":"after","seconds":1}});
+     let path = s.config.socket.clone();
+-    let guard2 = guard.clone();
++    let first_sent = first_request.clone();
++    let began = Instant::now();
+     let first = thread::spawn(move || {
+-        ask(
+-            &path,
+-            &json!({"op":"set","guard":guard2,"text":"One","when":{"kind":"after","seconds":1}}),
+-        )
+-        .unwrap()
++        let started = Instant::now();
++        let reply = ask(&path, &first_sent);
++        (reply, started.elapsed().as_micros())
+     });
+-    let second =
+-        s.ask(json!({"op":"set","guard":guard,"text":"Two","when":{"kind":"after","seconds":1}}));
+-    let first = first.join().unwrap();
+-    assert_ne!(first["ok"], second["ok"]);
+-    assert_eq!(s.ask(json!({"op":"status"}))["items"], 1);
++    let second_started = Instant::now();
++    let second = ask(&s.config.socket, &second_request);
++    let second_us = second_started.elapsed().as_micros();
++    let (first, first_us) = first.join().unwrap();
++    let status = ask(&s.config.socket, &json!({"op":"status"}));
++    let list = ask(&s.config.socket, &json!({"op":"list"}));
++    let authored_delay = std::env::var("LAMP_SCHEDULE_CAS_STALL_COMMIT_MS").ok();
++    let reconciliation = if authored_delay.is_some() {
++        // Exact replay only: no fresh guard, request ID, or payload is invented.
++        let first_retry = ask(&s.config.socket, &first_request);
++        let second_retry = ask(&s.config.socket, &second_request);
++        let after = ask(&s.config.socket, &json!({"op":"status"}));
++        s.stop();
++        let reopened = lamp_schedule::store::Store::open(&s.config.dir).unwrap();
++        let durable: Value = serde_json::from_slice(&reopened.load().unwrap().unwrap()).unwrap();
++        json!({"first_exact_replay":captured(&first_retry),"second_exact_replay":captured(&second_retry),
++            "status_after_replay":captured(&after),"reopened_snapshot":durable})
++    } else {
++        Value::Null
++    };
++    let evidence = json!({
++        "fixture":"authored constant clock, real local IPC and SQLite",
++        "authored_commit_delay_ms":authored_delay,"reconciliation":reconciliation,
++        "root":s.root.path(), "guard_status":guard_status,
++        "first_request":first_request,"second_request":second_request,
++        "first":captured(&first),"second":captured(&second),
++        "first_request_wall_us":first_us,"second_request_wall_us":second_us,
++        "status_after":captured(&status),"list_after":captured(&list),
++        "evidence_complete_wall_us":began.elapsed().as_micros(),
++    });
++    eprintln!("CAS_EVIDENCE {evidence}");
++    if let Some(path) = std::env::var_os("LAMP_SCHEDULE_CAS_EVIDENCE") {
++        fs::OpenOptions::new()
++            .write(true)
++            .create_new(true)
++            .open(path)
++            .unwrap()
++            .write_all(serde_json::to_string_pretty(&evidence).unwrap().as_bytes())
++            .unwrap();
++    }
++    let first = first.expect("first transport result; see CAS_EVIDENCE");
++    let second = second.expect("second transport result; see CAS_EVIDENCE");
++    assert_ne!(first["ok"], second["ok"], "CAS_EVIDENCE {evidence}");
++    assert_eq!(status.unwrap()["items"], 1, "CAS_EVIDENCE {evidence}");
+ }
+ #[test]
+ fn a_full_client_pool_does_not_stop_due_publication() {
+--- shared/crates/schedule/src/store.rs
++++ audit-scratch/crates/schedule/src/store.rs
+@@ -354,6 +354,27 @@
+             .transaction_with_behavior(TransactionBehavior::Immediate)
+             .map_err(sql)?;
+         tx.execute("INSERT INTO state(singleton, snapshot) VALUES (1, ?1) ON CONFLICT(singleton) DO UPDATE SET snapshot=excluded.snapshot", params![bytes]).map_err(sql)?;
++        // AUDIT-ONLY authored fault in this private source copy. Never applied
++        // to the shared repository. Delay the first timer's SQLite commit so
++        // the runtime's receipt deadline expires while the owner is working.
++        if std::env::var("LAMP_SCHEDULE_CAS_STALL_COMMIT_MS").as_deref() == Ok("1250")
++            && serde_json::from_slice::<serde_json::Value>(bytes).is_ok_and(|state| {
++                state["revision"] == 1
++                    && state["items"]
++                        .as_array()
++                        .is_some_and(|items| items.len() == 1)
++            })
++        {
++            let began = std::time::Instant::now();
++            std::thread::sleep(std::time::Duration::from_millis(1250));
++            eprintln!(
++                "CAS_AUTHORED_FAULT {}",
++                serde_json::json!({
++                    "phase":"before_sqlite_commit", "authored_delay_ms":1250,
++                    "observed_sleep_us":began.elapsed().as_micros()
++                })
++            );
++        }
+         tx.commit().map_err(sql)?;
+         // FULL synchronizes database/journal contents. DELETE journal mode
+         // additionally needs this directory sync before a durable ack.

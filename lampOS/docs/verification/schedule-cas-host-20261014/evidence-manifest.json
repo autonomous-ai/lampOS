@@ -1,0 +1,44 @@
+[
+  {
+    "file": "audit-only.patch",
+    "source": "/private/tmp/lamp-third-schedule-cas-audit-only.patch",
+    "bytes": 6126,
+    "sha256": "b25d1ba47cfc7c75c3f534c2c9f532ee2b4e756cb402b89a727a29e5592cfc56"
+  },
+  {
+    "file": "parallel-first.txt",
+    "source": "/private/tmp/lamp-third-schedule-cas-parallel-first.txt",
+    "bytes": 3846,
+    "sha256": "20a657244dde1114af47595a8ece203777754e8fe57444ce1c1f9aa5b45b7252"
+  },
+  {
+    "file": "parallel-first.json",
+    "source": "/private/tmp/lamp-third-schedule-cas-parallel-first.json",
+    "bytes": 2689,
+    "sha256": "8575d6714e79e96b04a591dd989295e75729664bcb7f3f34d26acf4fe91aebc4"
+  },
+  {
+    "file": "authored-delay.txt",
+    "source": "/private/tmp/lamp-third-schedule-cas-authored-delay.txt",
+    "bytes": 7882,
+    "sha256": "3d0bc110a300caf6e2581b4e2000f1bdde0d2d8c94012193ea53851784b8c370"
+  },
+  {
+    "file": "authored-delay.json",
+    "source": "/private/tmp/lamp-third-schedule-cas-authored-delay.json",
+    "bytes": 5212,
+    "sha256": "be6dfb2b585ddfdab456e86a2a02347fe1d88886c2bb51fb2279f200e1393a42"
+  },
+  {
+    "file": "audit-summary.json",
+    "source": "/private/tmp/lamp-third-schedule-cas-audit-summary.json",
+    "bytes": 1637,
+    "sha256": "a6462248679e566f1cffec75f9904a140e85ae577fdb5145ce1d6c30c0fafc91"
+  },
+  {
+    "file": "source-compare.json",
+    "source": "/private/tmp/lamp-third-schedule-cas-source-compare.json",
+    "bytes": 6776,
+    "sha256": "485095c93ef9dde6d823cb8b1ce18bbd58da6f7419fc20b7675e7a6202f114e2"
+  }
+]

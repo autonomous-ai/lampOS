@@ -1315,6 +1315,73 @@ being inspected separately and is not erased by that earlier result.
 No lamp or live Harness was accessed. The next new task will come from Third's
 issue queue; questions stay recorded here and linked from the task issue.
 
+### Schedule's reported parallel test failure: audit evidence
+
+Inspected First's #695 report in a private source copy on this Intel Mac.
+All 15 Schedule source/test/manifest files matched the adopted checkout; Bus
+and IPC matched too. The earlier copy's workspace and Msgs lack the later Ears
+additions, recorded in the source comparison. Only that scratch copy received
+instrumentation. No adopted source or runtime deadline was changed.
+
+One full parallel runtime suite passed **18/18**, test harness time 2.30 s.
+Its healthy revision-zero guard produced one success, one conflict and one
+stored item. First's natural failure was not reproduced. Then one authored
+1,250 ms delay immediately before SQLite commit produced two `uncertain`
+client replies after 1,111.921 and 1,111.925 ms. The original assertion that the
+two `ok` booleans differ failed: **0/1**, exit 101. This is a retained diagnostic
+failure in scratch, not a failing test merged into the repository.
+
+Exact replay of the identical requests returned one original success receipt
+and one conflict. After service stop/reopen, SQLite still held exactly one
+item at revision one and `next_id:2`. The compare-and-swap invariant held.
+The artificial sleep actually took 1,258.226 ms; it is not natural storage or
+lamp latency. Neither run saw an invalid/null guard. These two runs distinguish
+an overstrong test assertion from a proven storage race; they do not identify
+the unknown reply bodies in First's original failure.
+
+[The audit](verification/schedule-cas-host-20261014/README.md) retains exact
+commands, full replies, source hashes, both raw runs and the audit-only diff.
+For First's adopted test: assert the Status used for a guard is valid, retain
+both replies, reject two successes, reconcile ambiguous outcomes with bounded
+identical-request retries, then require one success/one conflict and exactly
+one stored item. Do not increase production deadlines, invent a fresh guard,
+or accept two false replies without checking the committed state. First owns
+the amendment to the adopted piece; the audit supplies the narrow correction.
+
+## 2026-10-14 — ARM64 gate result and Controls test portability
+
+Ready for lamp-voice: no
+
+Native GitHub Linux ARM64 / Debian 12 run
+[38547291775](https://github.com/autonomous-ai/lampOS/actions/runs/38547291775)
+tested `5bfab7b17b74fedcd176afc4dd917323ba1826a1`. The full release workspace
+build passed. The serial test command stopped in Controls:
+`sigterm_finishes_recording_and_releases_the_actual_serve_owner` could not
+spawn `/bin/kill` (`ENOENT`, `program.rs:340`). Its binary ran six passing tests
+and this one failure; Tasks tests were not reached. Artifact hashing/upload
+were skipped, so this run produced no qualified binary artifact. Raw failed
+step and run metadata are retained in
+[the ARM64 evidence](verification/tasks-arm64-20261014/README.md).
+
+First's #696 comments say it already adopted Tasks as `189b744fa` (from the
+original `3ad6dd152`), ran the default-off command on lamp-4ace, and found one
+emulated ARM64 adapter expectation differed (`preflight_failed` versus
+`preflight_spawn_failed`). Those are First's results. Native ARM64 Tasks tests
+must still decide that fixture behavior; no expectation was relaxed here.
+The fresh integration head is `7ab11846d81fd4a30971259af3ee2b9b0280ef4e`.
+
+Taking the small test-only Controls portability repair on `third/controls-ci`
+as part of finishing the new gate. Controls is Third-owned; replace only the
+test's external signal utility with the existing Rust syscall wrapper pattern
+already used by Voice, Schedule and Tasks. Keep the actual SIGTERM and shutdown
+assertions, production code and deadlines unchanged. Run the gate for Controls
+and its dependents and retain the native result before calling it ready.
+
+Found outside this repair: `turn-end-wire/tests/process.rs` and Voice's
+`coordinator/tests/endpoint_session.rs` also invoke an external `kill` utility.
+Their owners or First must qualify those against the minimal CI image; Third
+will not edit those crates. The artifact list still omits `tasks_check`.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

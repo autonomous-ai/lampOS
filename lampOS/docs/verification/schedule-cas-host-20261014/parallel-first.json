@@ -1,0 +1,114 @@
+{
+  "evidence_complete_wall_us": 430214,
+  "first": {
+    "reply": {
+      "error": "conflict",
+      "message": "Schedule changed. Read its status and items before choosing another operation.",
+      "ok": false
+    }
+  },
+  "first_request": {
+    "guard": {
+      "request_id": "r0",
+      "revision": 0,
+      "store_id": "d043c38c76c76de323825a7abecda57b"
+    },
+    "op": "set",
+    "text": "One",
+    "when": {
+      "kind": "after",
+      "seconds": 1
+    }
+  },
+  "first_request_wall_us": 285754,
+  "fixture": "authored constant clock, real local IPC and SQLite",
+  "guard_status": {
+    "items": 0,
+    "last_receipt": null,
+    "max_items": 128,
+    "ok": true,
+    "pending": 0,
+    "revision": 0,
+    "store_id": "d043c38c76c76de323825a7abecda57b",
+    "waiting_for_clock": 0,
+    "wall_trusted": true,
+    "zone": "Etc/UTC"
+  },
+  "list_after": {
+    "reply": {
+      "items": [
+        {
+          "delivery": 1,
+          "due_unix_ms": 1791964801000,
+          "id": 1,
+          "late": false,
+          "late_by_ms": null,
+          "local": "2026-10-14T08:00:01+00:00[Etc/UTC]",
+          "original_due_unix_ms": 1791964801000,
+          "remaining_ms": 1000,
+          "repeat": null,
+          "request_id": "r0",
+          "snoozed": false,
+          "state": "scheduled",
+          "text": "Two"
+        }
+      ],
+      "next_after_id": null,
+      "ok": true,
+      "revision": 1,
+      "store_id": "d043c38c76c76de323825a7abecda57b"
+    }
+  },
+  "root": "/private/tmp/sch-Z6G7cQ",
+  "second": {
+    "reply": {
+      "delivery": 1,
+      "due_unix_ms": 1791964801000,
+      "id": 1,
+      "local": "2026-10-14T08:00:01+00:00[Etc/UTC]",
+      "ok": true,
+      "revision": 1,
+      "store_id": "d043c38c76c76de323825a7abecda57b"
+    }
+  },
+  "second_request": {
+    "guard": {
+      "request_id": "r0",
+      "revision": 0,
+      "store_id": "d043c38c76c76de323825a7abecda57b"
+    },
+    "op": "set",
+    "text": "Two",
+    "when": {
+      "kind": "after",
+      "seconds": 1
+    }
+  },
+  "second_request_wall_us": 285641,
+  "status_after": {
+    "reply": {
+      "items": 1,
+      "last_receipt": {
+        "op": "set",
+        "request_id": "r0",
+        "response": {
+          "delivery": 1,
+          "due_unix_ms": 1791964801000,
+          "id": 1,
+          "local": "2026-10-14T08:00:01+00:00[Etc/UTC]",
+          "ok": true,
+          "revision": 1,
+          "store_id": "d043c38c76c76de323825a7abecda57b"
+        }
+      },
+      "max_items": 128,
+      "ok": true,
+      "pending": 0,
+      "revision": 1,
+      "store_id": "d043c38c76c76de323825a7abecda57b",
+      "waiting_for_clock": 0,
+      "wall_trusted": true,
+      "zone": "Etc/UTC"
+    }
+  }
+}

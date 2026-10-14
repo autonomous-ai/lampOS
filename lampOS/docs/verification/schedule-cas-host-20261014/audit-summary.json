@@ -1,0 +1,34 @@
+{
+  "shared_schedule_unchanged": true,
+  "verified_files": 15,
+  "instrumented_files": {
+    "crates/schedule/tests/runtime.rs": "1075359dcf5e61e9cdbb0110f575ad02b8191bae0aead625fafc7afa6947971c",
+    "crates/schedule/src/store.rs": "79e1869a8177496971b59a1ad05ca9079cbb5dbc591a6a3e6a1541d1feb55324"
+  },
+  "host": {
+    "kernel": "Darwin25.6.0",
+    "arch": "x86_64",
+    "logical_cpus": 16,
+    "rustc": "1.96.0 (ac68faa20 2026-05-25)"
+  },
+  "natural_parallel_suite": {
+    "passed": 18,
+    "failed": 0,
+    "test_duration_seconds": 2.3,
+    "command": "CARGO_TARGET_DIR=/private/tmp/lamp-third-tasks-source-20261014/target LAMP_SCHEDULE_CAS_EVIDENCE=/private/tmp/lamp-third-schedule-cas-parallel-first.json cargo test --offline --locked -p lamp-schedule --test runtime -- --nocapture > /private/tmp/lamp-third-schedule-cas-parallel-first.txt 2>&1"
+  },
+  "authored_delay_case": {
+    "passed": 0,
+    "failed": 1,
+    "filtered": 17,
+    "exit": 101,
+    "authored_delay_ms": 1250,
+    "actual_sleep_us": 1258226,
+    "cas_violation": false,
+    "command": "CARGO_TARGET_DIR=/private/tmp/lamp-third-tasks-source-20261014/target LAMP_SCHEDULE_CAS_EVIDENCE=/private/tmp/lamp-third-schedule-cas-authored-delay.json LAMP_SCHEDULE_CAS_STALL_COMMIT_MS=1250 cargo test --offline --locked -p lamp-schedule --test runtime two_guarded_mutations_from_the_same_snapshot_do_not_both_win -- --exact --nocapture > /private/tmp/lamp-third-schedule-cas-authored-delay.txt 2>&1"
+  },
+  "cwd": "/private/tmp/lamp-third-schedule-cas-source-20261014",
+  "first_report_reproduced_naturally": false,
+  "null_guard_seen": false,
+  "further_test_runs": 0
+}

@@ -1,0 +1,227 @@
+[
+  {
+    "file": "crates/schedule/Cargo.toml",
+    "same": true,
+    "sha256": "a4e928f93f986d6d6aa821c7eafa9f1d32ba3cb845f4597570554701b5efc33d"
+  },
+  {
+    "file": "crates/schedule/examples/schedule_check.rs",
+    "same": true,
+    "sha256": "e43db41c6f043d1a2baad9d122749622da477de10c17e745e2b58a250c65aa73"
+  },
+  {
+    "file": "crates/schedule/src/engine.rs",
+    "same": true,
+    "sha256": "9f8018e3fa5f9c17aa9c499e7c1c36184c348f7c95e13b65499c842f4a3be38a"
+  },
+  {
+    "file": "crates/schedule/src/lib.rs",
+    "same": true,
+    "sha256": "9db0d307f9cf6020b4cc67a83eeaa579fce011df19292dc092a7d4c05451bc72"
+  },
+  {
+    "file": "crates/schedule/src/main.rs",
+    "same": true,
+    "sha256": "6dcd506d02e271ecc6b6e547cd4c016c7482342d12e0901765bc45d47eb40abe"
+  },
+  {
+    "file": "crates/schedule/src/protocol.rs",
+    "same": true,
+    "sha256": "1ca1396c74b88926b7f6b13b096df52776cd6cea63094ba79697daf1db4366f1"
+  },
+  {
+    "file": "crates/schedule/src/runtime.rs",
+    "same": true,
+    "sha256": "b6331d983a06b744c3d4bf14b5c0fd3aa7988f3f93a0bec1dd0afa62cc1c5e80"
+  },
+  {
+    "file": "crates/schedule/src/store.rs",
+    "same": true,
+    "sha256": "2b6a2334d4078197496ee15287dab4d8490891b137566a7c2b0f0900c2ed3fb1"
+  },
+  {
+    "file": "crates/schedule/src/time.rs",
+    "same": true,
+    "sha256": "89bf1b03294944fbfc51ef71d9b94c86fa5a149399832075ead0739d8b38959c"
+  },
+  {
+    "file": "crates/schedule/tests/calendar.rs",
+    "same": true,
+    "sha256": "5493ab576a3b4cd790ea82cc1580be7d6d91da8c2e9ade79bd165a3326a73152"
+  },
+  {
+    "file": "crates/schedule/tests/engine.rs",
+    "same": true,
+    "sha256": "d2e33765fb2874a20ebcbdf9ca2de248d21429cdd60f62d379fcfd1551a7f820"
+  },
+  {
+    "file": "crates/schedule/tests/protocol.rs",
+    "same": true,
+    "sha256": "ea4c373f0d700baf4df5daef822f5eabce14efae73317e8d591af80447fcd06a"
+  },
+  {
+    "file": "crates/schedule/tests/runtime.rs",
+    "same": true,
+    "sha256": "35bb97c3d1ccd9a69bc7cf4b728b1e7cf102a3b9785cfb02874167aed1c43f5c"
+  },
+  {
+    "file": "crates/schedule/tests/runtime_failures.rs",
+    "same": true,
+    "sha256": "d833aa0bca5e3ee0c8f9d91ad6498bdb3d1e75be1d68292352a548aaa5b9396c"
+  },
+  {
+    "file": "crates/schedule/tests/storage.rs",
+    "same": true,
+    "sha256": "7665c25a051752708a3604a66db100850834af97d4e95184c6b2ac0c018fa20e"
+  },
+  {
+    "file": "crates/bus/Cargo.toml",
+    "same": true,
+    "sha256": "96afd70eaaaf81e64f8c104f0a4d536d4c6dfc32f6e80cc2cc21c49aa5814f34"
+  },
+  {
+    "file": "crates/bus/src/declare.rs",
+    "same": true,
+    "sha256": "60183bfa717674edc75d709417c7cb4f8366900bb598a8db627240a2a96c5995"
+  },
+  {
+    "file": "crates/bus/src/lib.rs",
+    "same": true,
+    "sha256": "ad8ab404224bbe1a8fc50b3879b7a5e345d3dce37e745ee5692e24a5b1a65f24"
+  },
+  {
+    "file": "crates/bus/src/live.rs",
+    "same": true,
+    "sha256": "b0a04b4b0a58ab8ca01a38de39931bf3657fc985187caee6db43499b2b6b6291"
+  },
+  {
+    "file": "crates/bus/src/main.rs",
+    "same": true,
+    "sha256": "de5331d9405995fe6d772a673e6f477adb6628172f901dcf5a87dbc708ff7f51"
+  },
+  {
+    "file": "crates/bus/src/name.rs",
+    "same": true,
+    "sha256": "828156474deec636dbc8bd2a36821998070e9ecc210702d6fc245d26a827bd31"
+  },
+  {
+    "file": "crates/bus/src/publish.rs",
+    "same": true,
+    "sha256": "309aa82b6fe3fd33b600a3152a828cf4150e01a7904911e92bb87394cfc6ed6d"
+  },
+  {
+    "file": "crates/bus/src/subscribe.rs",
+    "same": true,
+    "sha256": "30f1ef9e2e5ddd732ccb89a746e290b53a52ac7a44ccef488eb43b70c96217c2"
+  },
+  {
+    "file": "crates/bus/src/wire.rs",
+    "same": true,
+    "sha256": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920"
+  },
+  {
+    "file": "crates/bus/tests/bus.rs",
+    "same": true,
+    "sha256": "7040765d6d856c9e228a1211da736b8a891680a5bf90d4b0a3a6ced064a1f76a"
+  },
+  {
+    "file": "crates/bus/tests/cli.rs",
+    "same": true,
+    "sha256": "767a7aebe2458535fcaaf7f4f9addc931a9f37f00b77c180d066e675e3f3ba00"
+  },
+  {
+    "file": "crates/msgs/Cargo.toml",
+    "same": true,
+    "sha256": "4baec082004389cd0a6422e285fe7a8c42ba3bfb936fa531940dee4db5d6d925"
+  },
+  {
+    "file": "crates/msgs/src/controls.rs",
+    "same": true,
+    "sha256": "d37f9945a055aae7d29379571da5b4d8638a145b29499f35306f0607e9554263"
+  },
+  {
+    "file": "crates/msgs/src/ears.rs",
+    "same": false,
+    "sha256": "5b78e519137bac1a5e387a19b1419e1d178c8da5deee1b10bd6b61b19df04290"
+  },
+  {
+    "file": "crates/msgs/src/expression.rs",
+    "same": true,
+    "sha256": "2bad3b9779276ec2b3396d7bbdd503d5b6ceb1e46b992cc8c485cf27536cbce9"
+  },
+  {
+    "file": "crates/msgs/src/lib.rs",
+    "same": false,
+    "sha256": "c798cea9dc69daf345456e6e4f48357d54f9d5a9d71b37522c2be14770a33017"
+  },
+  {
+    "file": "crates/msgs/src/schedule.rs",
+    "same": true,
+    "sha256": "75e57f233884ba7478fb3c917c93baa14b18bf0bf1b4007d542bab9a737a793f"
+  },
+  {
+    "file": "crates/msgs/tests/bus.rs",
+    "same": true,
+    "sha256": "68464bf9055a5d4b9da90aa685adecd75defc0e00ed2b57ea46cac7e06c182e5"
+  },
+  {
+    "file": "crates/msgs/tests/controls.rs",
+    "same": true,
+    "sha256": "b6d2f57b661ddea523c5041b9525f8e184c15273effb3c6c6ee1a0acf433aaaf"
+  },
+  {
+    "file": "crates/msgs/tests/expression.rs",
+    "same": true,
+    "sha256": "3926c6a98e7186556eec208a50e0f55c23441927903827ad0f9a7c7a26eea70c"
+  },
+  {
+    "file": "crates/msgs/tests/expression_rest.rs",
+    "same": true,
+    "sha256": "2a91e975fb4f0072a6e645acbde1ca7190ba9a22d4ddc38fd1e2e6b15688506b"
+  },
+  {
+    "file": "crates/msgs/tests/schedule.rs",
+    "same": true,
+    "sha256": "a1ce35440837caf1ec264239c29f3fac19593842122773cd8dc1c895c655a192"
+  },
+  {
+    "file": "crates/ipc/Cargo.toml",
+    "same": true,
+    "sha256": "285cfa2e1cb593550cad9a6477e3c8613fabdc15a2c3fedbab2c3f036291c205"
+  },
+  {
+    "file": "crates/ipc/src/bin/lamp-ipc-probe.rs",
+    "same": true,
+    "sha256": "53b7a5554b3855bf4be1336d245ac98f344327029dde4f6a77714e5bf96834b3"
+  },
+  {
+    "file": "crates/ipc/src/lib.rs",
+    "same": true,
+    "sha256": "89602fe6f9275fb325990bc37e11d7036a88d6476ec41100dc082a255f70f841"
+  },
+  {
+    "file": "crates/ipc/tests/probe.rs",
+    "same": true,
+    "sha256": "68176f815283d85ddd843d7a022aba03a24ccbf60b63dc675bec077a90d1b8bd"
+  },
+  {
+    "file": "crates/ipc/tests/sockets.rs",
+    "same": true,
+    "sha256": "8d038caae8695004f816b4090c474cfcb63eddd4c6998774c7b3fdb1dda9c4f9"
+  },
+  {
+    "file": "Cargo.toml",
+    "same": false,
+    "sha256": "032a7a65da2a54547d995b9c0fa5cc9684deb9548b2e965dcdeb2d52c209fea6"
+  },
+  {
+    "file": "Cargo.lock",
+    "same": false,
+    "sha256": "659c79638b1e76c6281b5394cbf75df3c44ccd3e97c0c0143d4d34614e87a941"
+  },
+  {
+    "file": "rust-toolchain.toml",
+    "same": true,
+    "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+  }
+]

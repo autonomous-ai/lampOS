@@ -1,0 +1,9 @@
+{
+  "completed_test_harnesses": 44,
+  "passed": 719,
+  "failed": 1,
+  "ignored": 2,
+  "tasks_tests_reached": false,
+  "failed_case": "lamp-controls::program::sigterm_finishes_recording_and_releases_the_actual_serve_owner",
+  "failure": "spawning /bin/kill returned ENOENT at program.rs:340"
+}

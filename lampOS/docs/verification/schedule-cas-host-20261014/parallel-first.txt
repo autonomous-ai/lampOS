@@ -1,0 +1,35 @@
+   Compiling serde_core v1.0.229
+   Compiling rustix v1.1.5
+   Compiling serde_json v1.0.151
+   Compiling serde v1.0.229
+   Compiling jiff v0.2.38
+   Compiling tempfile v3.27.0
+   Compiling lamp-bus v0.1.0 (/private/tmp/lamp-third-schedule-cas-source-20261014/crates/bus)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/lamp-third-schedule-cas-source-20261014/crates/msgs)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/lamp-third-schedule-cas-source-20261014/crates/schedule)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.36s
+     Running tests/runtime.rs (/private/tmp/lamp-third-tasks-source-20261014/target/debug/deps/runtime-43f4215537e56b35)
+
+running 18 tests
+test host_clock_requires_an_identity_and_reports_explicit_trust ... ok
+test disabled_service_never_reads_clock_or_creates_any_path ... ok
+test cli_rejects_unknown_and_repeated_options ... ok
+test cli_default_off_does_not_require_a_clock_or_touch_paths ... ok
+test malformed_oversized_and_partial_lines_never_mutate_the_store ... ok
+test a_second_owner_cannot_replace_the_live_socket_or_database ... ok
+test a_socket_symlink_is_preserved_and_refused ... ok
+CAS_EVIDENCE test unsafe_socket_parent_is_rejected ... {ok
+"evidence_complete_wall_us":430214,"first":{"reply":{"error":"conflict","message":"Schedule changed. Read its status and items before choosing another operation.","ok":false}},"first_request":{"guard"test a_trickling_client_has_a_cumulative_read_deadline ... ok
+:{"request_id":test diagnostics_name_the_owner_and_do_not_include_personal_text ... "okr0",
+"revision":0,"store_id":"d043c38c76c76de323825a7abecda57b"},"op":"set","text":"One","when":{"kind":"after","seconds":1}},"first_request_wall_us":285754,"fixture":"authored constant clock, real local IPC and SQLite","guard_status":{"items":0,"last_receipt":null,"max_items":128,"ok":true,"pending":0,"revision":0,"store_id":"d043c38c76c76de323825a7abecda57b","test a_finite_service_stops_and_releases_its_owner ... okwaiting_for_clock
+"test socket_is_private_and_request_receipt_survives_service_restart ... ok
+test a_silent_connection_does_not_hold_due_work_or_other_clients ... ok
+:0,"wall_trusted":true,"zone":"Etc/UTC"},"list_after":{"reply":{"items":[{"delivery":1,"due_unix_ms":1791964801000,"id":1,"late":false,"late_by_ms":null,"local":"2026-10-14T08:00:01+00:00[Etc/UTC]","original_due_unix_ms":1791964801000,"remaining_ms":1000,"repeat":null,"request_id":"r0","snoozed":false,"state":"scheduled","text":"Two"}],"next_after_id":null,"ok":true,"revision":test a_full_client_pool_does_not_stop_due_publication ... ok
+1,"store_id":"d043c38c76c76de323825a7abecda57b"}},"root":"/private/tmp/sch-Z6G7cQ","second":test killed_process_reopens_the_same_store_and_recovers_its_stale_socket ... ok{
+"reply":{"delivery":1,"due_unix_ms":1791964801000,"id":1,"local":"2026-10-14T08:00:01+00:00[Etc/UTC]","ok":true,"revision":1,"store_id":"d043c38c76c76de323825a7abecda57b"}},"second_request":{"guard":{"request_id":"r0","revision":0,"store_id":"d043c38c76c76de323825a7abecda57b"},"op":"set","text":"Two","when":{"kind":"after","seconds":1}},"second_request_wall_us":285641,"status_after":{"reply":{"items":1,"last_receipt":{"op":"set","request_id":"r0","response":{"delivery":1,"due_unix_ms":1791964801000,"id":1,"local":"2026-10-14T08:00:01+00:00[Etc/UTC]","ok":true,"revision":1,"store_id":"d043c38c76c76de323825a7abecda57b"}},"max_items":128,"ok":true,"pending":0,"revision":1,"store_id":"d043c38c76c76de323825a7abecda57b","waiting_for_clock":0,"wall_trusted":true,"zone":"Etc/UTC"}}}
+test two_guarded_mutations_from_the_same_snapshot_do_not_both_win ... ok
+test bus_recovery_is_from_durable_pending_work_not_just_the_latest_file ... ok
+test cancellation_and_ack_update_the_retained_notice ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.30s
+

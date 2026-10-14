@@ -1,0 +1,207 @@
+{
+  "authored_commit_delay_ms": "1250",
+  "evidence_complete_wall_us": 1407098,
+  "first": {
+    "reply": {
+      "error": "uncertain",
+      "message": "No receipt arrived. Read status and retry only the exact guarded request; it may have committed.",
+      "ok": false
+    }
+  },
+  "first_request": {
+    "guard": {
+      "request_id": "r0",
+      "revision": 0,
+      "store_id": "eb0d1b060690e9965273079978c53de5"
+    },
+    "op": "set",
+    "text": "One",
+    "when": {
+      "kind": "after",
+      "seconds": 1
+    }
+  },
+  "first_request_wall_us": 1111921,
+  "fixture": "authored constant clock, real local IPC and SQLite",
+  "guard_status": {
+    "items": 0,
+    "last_receipt": null,
+    "max_items": 128,
+    "ok": true,
+    "pending": 0,
+    "revision": 0,
+    "store_id": "eb0d1b060690e9965273079978c53de5",
+    "waiting_for_clock": 0,
+    "wall_trusted": true,
+    "zone": "Etc/UTC"
+  },
+  "list_after": {
+    "reply": {
+      "items": [
+        {
+          "delivery": 1,
+          "due_unix_ms": 1791964801000,
+          "id": 1,
+          "late": false,
+          "late_by_ms": null,
+          "local": "2026-10-14T08:00:01+00:00[Etc/UTC]",
+          "original_due_unix_ms": 1791964801000,
+          "remaining_ms": 1000,
+          "repeat": null,
+          "request_id": "r0",
+          "snoozed": false,
+          "state": "scheduled",
+          "text": "Two"
+        }
+      ],
+      "next_after_id": null,
+      "ok": true,
+      "revision": 1,
+      "store_id": "eb0d1b060690e9965273079978c53de5"
+    }
+  },
+  "reconciliation": {
+    "first_exact_replay": {
+      "reply": {
+        "error": "conflict",
+        "message": "Schedule changed. Read its status and items before choosing another operation.",
+        "ok": false
+      }
+    },
+    "reopened_snapshot": {
+      "items": [
+        {
+          "created_unix_ms": 1791964800000,
+          "deadline": {
+            "elapsed": {
+              "at_boot_ms": 1000,
+              "boot_id": "test-boot"
+            },
+            "local": "2026-10-14T08:00:01+00:00[Etc/UTC]",
+            "repeat": null,
+            "unix_ms": 1791964801000
+          },
+          "delivery": 1,
+          "id": 1,
+          "pending": null,
+          "request_id": "r0",
+          "snooze": null,
+          "text": "Two"
+        }
+      ],
+      "last_receipt": {
+        "request": {
+          "guard": {
+            "request_id": "r0",
+            "revision": 0,
+            "store_id": "eb0d1b060690e9965273079978c53de5"
+          },
+          "op": "set",
+          "text": "Two",
+          "when": {
+            "kind": "after",
+            "seconds": 1
+          }
+        },
+        "response": {
+          "delivery": 1,
+          "due_unix_ms": 1791964801000,
+          "id": 1,
+          "local": "2026-10-14T08:00:01+00:00[Etc/UTC]",
+          "ok": true,
+          "revision": 1,
+          "store_id": "eb0d1b060690e9965273079978c53de5"
+        }
+      },
+      "next_id": 2,
+      "revision": 1,
+      "schema": 1,
+      "store_id": "eb0d1b060690e9965273079978c53de5"
+    },
+    "second_exact_replay": {
+      "reply": {
+        "delivery": 1,
+        "due_unix_ms": 1791964801000,
+        "id": 1,
+        "local": "2026-10-14T08:00:01+00:00[Etc/UTC]",
+        "ok": true,
+        "revision": 1,
+        "store_id": "eb0d1b060690e9965273079978c53de5"
+      }
+    },
+    "status_after_replay": {
+      "reply": {
+        "items": 1,
+        "last_receipt": {
+          "op": "set",
+          "request_id": "r0",
+          "response": {
+            "delivery": 1,
+            "due_unix_ms": 1791964801000,
+            "id": 1,
+            "local": "2026-10-14T08:00:01+00:00[Etc/UTC]",
+            "ok": true,
+            "revision": 1,
+            "store_id": "eb0d1b060690e9965273079978c53de5"
+          }
+        },
+        "max_items": 128,
+        "ok": true,
+        "pending": 0,
+        "revision": 1,
+        "store_id": "eb0d1b060690e9965273079978c53de5",
+        "waiting_for_clock": 0,
+        "wall_trusted": true,
+        "zone": "Etc/UTC"
+      }
+    }
+  },
+  "root": "/private/tmp/sch-hnyVYY",
+  "second": {
+    "reply": {
+      "error": "uncertain",
+      "message": "No receipt arrived. Read status and retry only the exact guarded request; it may have committed.",
+      "ok": false
+    }
+  },
+  "second_request": {
+    "guard": {
+      "request_id": "r0",
+      "revision": 0,
+      "store_id": "eb0d1b060690e9965273079978c53de5"
+    },
+    "op": "set",
+    "text": "Two",
+    "when": {
+      "kind": "after",
+      "seconds": 1
+    }
+  },
+  "second_request_wall_us": 1111925,
+  "status_after": {
+    "reply": {
+      "items": 1,
+      "last_receipt": {
+        "op": "set",
+        "request_id": "r0",
+        "response": {
+          "delivery": 1,
+          "due_unix_ms": 1791964801000,
+          "id": 1,
+          "local": "2026-10-14T08:00:01+00:00[Etc/UTC]",
+          "ok": true,
+          "revision": 1,
+          "store_id": "eb0d1b060690e9965273079978c53de5"
+        }
+      },
+      "max_items": 128,
+      "ok": true,
+      "pending": 0,
+      "revision": 1,
+      "store_id": "eb0d1b060690e9965273079978c53de5",
+      "waiting_for_clock": 0,
+      "wall_trusted": true,
+      "zone": "Etc/UTC"
+    }
+  }
+}
