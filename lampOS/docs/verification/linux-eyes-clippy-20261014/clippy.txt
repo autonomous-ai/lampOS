@@ -1,0 +1,184 @@
+    Checking lamp-bus v0.1.0 (/source_mood/crates/bus)
+    Checking lamp-ipc v0.1.0 (/source_mood/crates/ipc)
+    Checking lamp-turn-owner v0.1.0 (/source_mood/crates/turn-owner)
+    Checking lamp-gemini v0.1.0 (/source_mood/crates/gemini)
+   Compiling v4l2r v0.0.8
+    Checking lamp-msgs v0.1.0 (/source_mood/crates/msgs)
+    Checking lamp-audio v0.1.0 (/source_mood/crates/audio)
+   Compiling lamp-camera v0.1.0 (/source_mood/crates/camera)
+    Checking lamp-turn-end-wire v0.1.0 (/source_mood/crates/turn-end-wire)
+    Checking lamp-ring v0.1.0 (/source_mood/crates/ring)
+    Checking tempfile v3.27.0
+    Checking dyn-clone v1.0.20
+    Checking jiff v0.2.38
+    Checking lamp-keeper v0.1.0 (/source_mood/crates/keeper)
+    Checking lamp-body v0.1.0 (/source_mood/crates/body)
+    Checking lamp-controls v0.1.0 (/source_mood/crates/controls)
+    Checking lamp-expression v0.1.0 (/source_mood/crates/expression)
+    Checking same-file v1.0.6
+    Checking zerofrom v0.1.8
+    Checking walkdir v2.5.0
+    Checking stable_deref_trait v1.2.1
+    Checking yoke v0.8.3
+    Checking libsqlite3-sys v0.38.2
+    Checking rusqlite v0.40.2
+    Checking zerovec v0.11.8
+    Checking libm v0.2.16
+    Checking tinystr v0.8.4
+    Checking litemap v0.8.3
+    Checking writeable v0.6.4
+    Checking zerotrie v0.2.5
+    Checking icu_locale_core v2.3.0
+    Checking potential_utf v0.1.6
+    Checking utf8_iter v1.0.4
+    Checking icu_collections v2.3.0
+    Checking lamp-voice v0.1.0 (/source_mood/crates/voice)
+    Checking num-traits v0.2.19
+    Checking http-body v1.1.0
+    Checking percent-encoding v2.3.2
+    Checking icu_provider v2.3.1
+    Checking icu_properties_data v2.3.0
+    Checking icu_normalizer_data v2.3.0
+    Checking tower-service v0.3.3
+    Checking icu_normalizer v2.3.0
+    Checking icu_properties v2.3.0
+    Checking num-integer v0.1.47
+    Checking try-lock v0.2.5
+    Checking lamp-sound-fixtures v0.1.0 (/source_mood/crates/sound-fixtures)
+    Checking want v0.3.2
+    Checking sync_wrapper v1.0.2
+    Checking atomic-waker v1.1.2
+    Checking httpdate v1.0.3
+    Checking tower-layer v0.3.3
+    Checking hyper v1.12.0
+    Checking form_urlencoded v1.2.2
+    Checking lamp-observer v0.1.0 (/source_mood/crates/observer)
+    Checking idna_adapter v1.2.2
+    Checking ipnet v2.12.2
+    Checking idna v1.1.0
+    Checking base64 v0.23.1
+    Checking url v2.5.8
+    Checking tower v0.5.3
+    Checking hyper-util v0.1.21
+    Checking num-complex v0.4.6
+    Checking http-body-util v0.1.5
+    Checking aho-corasick v1.1.5
+    Checking openssl-probe v0.2.1
+    Checking scopeguard v1.2.0
+    Checking regex-syntax v0.8.11
+   Compiling semver v1.0.28
+    Checking rawpointer v0.2.1
+    Checking matrixmultiply v0.3.11
+   Compiling rustc_version v0.4.1
+    Checking regex-automata v0.4.18
+    Checking lock_api v0.4.14
+    Checking rustls-native-certs v0.8.5
+    Checking pin-project v1.1.13
+    Checking zerocopy v0.8.62
+    Checking parking_lot_core v0.9.12
+    Checking aws-lc-sys v0.46.0
+    Checking hashbrown v0.16.1
+    Checking futures-executor v0.3.34
+    Checking tokio-util v0.7.20
+    Checking nom v8.0.0
+    Checking bstr v1.13.1
+    Checking either v1.19.0
+    Checking mime v0.3.17
+    Checking untrusted v0.7.1
+    Checking aws-lc-rs v1.18.2
+    Checking axum-core v0.5.6
+    Checking nom-language v0.1.0
+    Checking half v2.7.1
+    Checking itertools v0.15.0
+    Checking globset v0.4.20
+    Checking futures v0.3.34
+    Checking string-interner v0.20.0
+    Checking parking_lot v0.12.5
+    Checking rustls-platform-verifier v0.7.1
+    Checking snafu v0.8.9
+   Compiling curve25519-dalek v4.1.3
+    Checking ndarray v0.17.2
+    Checking hyper-rustls v0.27.10
+    Checking tower-http v0.6.11
+    Checking olpc-cjson v0.1.4
+    Checking pem v3.0.6
+    Checking serde_plain v1.0.2
+    Checking serde_path_to_error v0.1.20
+    Checking downcast-rs v2.0.2
+    Checking dyn-hash v1.0.0
+    Checking matchit v0.8.4
+    Checking strength_reduce v0.2.4
+    Checking maplit v1.0.2
+    Checking typed-path v0.9.3
+    Checking lazy_static v1.5.1
+    Checking inventory v0.3.25
+    Checking hex v0.4.3
+    Checking axum v0.8.9
+    Checking transpose v0.2.3
+    Checking lamp-voice-eval v0.1.0 (/source_mood/crates/voice-eval)
+    Checking tough v0.24.0 (/source_mood/vendor/tough)
+    Checking tract-data v0.23.8
+    Checking reqwest v0.13.5
+    Checking typeid v1.0.3
+    Checking primal-check v0.3.4
+   Compiling curve25519-dalek-derive v0.1.1
+    Checking signature v2.2.0
+    Checking byteorder v1.5.0
+    Checking bit-vec v0.10.1
+    Checking tract-linalg v0.23.8
+    Checking bit-set v0.11.1
+    Checking ed25519 v2.2.3
+    Checking rustfft v6.4.1
+    Checking erased-serde v0.4.10
+    Checking anymap3 v1.1.0
+    Checking ed25519-dalek v2.2.0
+    Checking lamp-surround v0.1.0 (/source_mood/crates/surround)
+    Checking filetime v0.2.29
+    Checking xattr v1.6.1
+    Checking tar v0.4.46
+    Checking simd-adler32 v0.3.10
+    Checking num-bigint v0.4.8
+    Checking rand_distr v0.6.0
+    Checking prost v0.14.4
+    Checking memmap2 v0.9.11
+    Checking num-rational v0.4.2
+    Checking lamp-policy v0.1.0 (/source_mood/crates/policy)
+    Checking lamp-memory v0.1.0 (/source_mood/crates/memory)
+    Checking tract-core v0.23.8
+    Checking lamp-schedule v0.1.0 (/source_mood/crates/schedule)
+    Checking lamp-tasks v0.1.0 (/source_mood/crates/tasks)
+    Checking lamp-mood v0.1.0 (/source_mood/crates/mood)
+    Checking glam v0.33.12
+    Checking ort-sys v2.0.0-rc.14
+    Checking libloading v0.9.0
+    Checking zune-core v0.4.12
+    Checking ort v2.0.0-rc.14
+    Checking zune-jpeg v0.4.21
+    Checking lamp-health v0.1.0 (/source_mood/crates/health)
+    Checking lamp-records v0.1.0 (/source_mood/crates/records)
+    Checking lamp-lean v0.1.0 (/source_mood/crates/lean)
+    Checking lamp-actions v0.1.0 (/source_mood/crates/actions)
+    Checking lamp-air v0.1.0 (/source_mood/crates/air)
+    Checking lamp-ears v0.1.0 (/source_mood/crates/ears)
+    Checking lamp-environment v0.1.0 (/source_mood/crates/environment)
+    Checking tract-nnef v0.23.8
+    Checking tract-hir v0.23.8
+    Checking tract-extra v0.23.8
+    Checking tract-onnx-opl v0.23.8
+    Checking tract-onnx v0.23.8
+    Checking lamp-turn-end v0.1.0 (/source_mood/crates/turn-end)
+    Checking lamp-name v0.1.0 (/source_mood/crates/name)
+    Checking lamp-eyes v0.1.0 (/source_mood/crates/eyes)
+error: this boolean expression can be simplified
+   --> crates/eyes/src/main.rs:284:12
+    |
+284 |         if !permitted_at.is_some_and(|at| at.elapsed() < PERMIT_STALE) {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `permitted_at.is_none_or(|at| at.elapsed() >= PERMIT_STALE)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#nonminimal_bool
+    = note: `-D clippy::nonminimal-bool` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::nonminimal_bool)]`
+
+error: could not compile `lamp-eyes` (bin "lamp-eyes") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `lamp-eyes` (bin "lamp-eyes" test) due to 1 previous error

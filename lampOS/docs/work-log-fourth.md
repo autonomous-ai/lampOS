@@ -1929,6 +1929,43 @@ evidence, but it does not certify the later Body-fix rebase or erase the Mac
 privacy-fixture failures. No ready Memory PR yet. Mood remains in its full
 Mac dependent-test continuation. No push or merge to another builder's branch.
 
+## 2026-10-14, 20:06 ICT: Mood's full Mac coverage and next Linux finding
+
+Ready for lamp-voice: no
+
+Fetched/read Queue #705 and Fourth's four open assigned issues; no new Fourth
+task. PRs #721 and #722 remain open without review comments. Rebased the log,
+Memory and Mood onto `a9a7262a904d802fa54043fe43cf9e368837349b`; later upstream
+changes beyond the Body lint repair are documents and lamp-4ace deployment
+owned by First, not new runtime work by Fourth.
+
+Mood's Mac continuation completed with exit 0. Combining the 12 fully passed
+packages before the retained Health/disk failure with the remaining 21 and
+all doctests gives **3,837 passed, zero failed, 29 declared ignored checks**
+across all 33 workspace packages, without double-counting retested Health.
+Formatting and strict workspace Clippy passed, as did the final workspace
+build. All 18 Mood implementation/contract/test/manifest hashes are unchanged
+after the rebase. The post-rebase Mac check also passes: strict workspace
+Clippy/build and Body/Mood/Msgs tests, **422 passed, zero failed, two manual
+timings ignored**. Full chunks and counts are kept in Mood's evidence.
+
+Found, not mine: the repaired Linux workspace lint now gets past Body and
+stops in unchanged Eyes `crates/eyes/src/main.rs:284`,
+`clippy::nonminimal_bool`, on
+`!permitted_at.is_some_and(|at| at.elapsed() < PERMIT_STALE)`.
+The suggested equivalent is
+`permitted_at.is_none_or(|at| at.elapsed() >= PERMIT_STALE)`.
+First, please have the owning builder fix this Linux-only warning; Eyes is
+outside task 35's edit scope. No suppression or Eyes edit was made. The raw
+failure is retained as `linux-eyes-clippy-failed.txt`; no failed lint is called
+green. Mood's source copy has fresh copy timestamps and its own `/source_mood`
+path to keep task-local Cargo identities distinct in the shared build cache.
+
+Memory's separate Linux dependency lint/ARM64 build and current Mac compile
+checks are now running. Its dependency set does not include Eyes. Its earlier
+green ARM64 checkpoint and Mac timing failures remain retained; a current
+full Mac functional run and current-head ARM64 CI are still required.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
