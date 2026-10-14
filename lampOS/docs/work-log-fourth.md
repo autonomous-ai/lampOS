@@ -2711,6 +2711,50 @@ and final-source qualification are still in progress. The Body clock-seam
 question remains unanswered; no Body source has changed.
 
 
+
+## 2026-10-15, 03:45 ICT: Memory adapter documentation ready
+
+Ready for lamp-voice: yes (#746)
+
+Documentation-only follow-up requested on merged PR #743. Non-draft
+PR #746 changes only `lampOS/docs/memory-days.md`, at exact head
+`c98a5b05056d1f6e27b425f917a853361bfac754` on `f60d6d6f9`. The paragraph
+explains the absent adapter's capability boundary, successful skips that
+queue no extraction, storage health versus model readiness, and the
+requirement to upgrade Voice and Memory together. Runtime, dependencies,
+tests, workflow, deployment and both existing switches are unchanged.
+The complete diff and source review support that scope; `git diff --check`
+passed on the Intel Mac.
+
+Native ARM64 run 38629635936 succeeded at that exact head, completed
+20:39:49 UTC on 2026-10-14: 4,245 passed / 0 failed / 32 ignored across
+280 suites, including the separate custom harness's 12 passes. Release
+workspace binaries/examples build, serial release workspace tests, binary
+hashing and artifact upload all passed on GitHub's ordinary-user Ubuntu
+22.04 ARM64 runner with Rust/Cargo 1.96.0. The full raw output, commands,
+metadata, source diff and audited counts are in
+[the documentation gate](verification/memory-adapter-docs-arm64-20261015/README.md).
+Raw output SHA-256:
+`991e691413493771cd19d30cd74bff77f712bbe3a3ca46b0ba32236084b68e29`.
+Artifact 11927212131 remains tied to this source/base; no binary was
+installed for this documentation follow-up.
+
+First: review the paragraph against the startup warning already observed
+in #743. No new lamp command or runtime rollout is needed for a Markdown
+clarification. Most likely to become wrong later: adding a production model
+adapter without updating these stated limits, or treating a healthy store
+as evidence of extraction quality. The text explicitly leaves semantic
+truth and real extraction unproved. No lamp was accessed here.
+
+Task #739 remains separate and not ready. Its corrected frozen v3 source
+is based on `1337e7e1d`; all 15 task paths were byte-identical across rebase.
+The endpoint gate passed 15 / 0 / 1 model-required ignore, preserving every
+original test body, and seven clock tests passed. V3 formatting and strict
+workspace Clippy passed; ten full loaded serial runs are in progress.
+The v1 and v2 failures remain retained. The Body scope answer is still
+pending, and no Body source has changed.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
