@@ -2087,6 +2087,35 @@ implementation. Mood's current Mac suite is still running; Memory's full
 Mac motor-fixture failure remains retained. The log branch is rebased onto
 the inspected upstream; no running test's source was changed.
 
+## 2026-10-14, 21:24 ICT: Records closed; final Mood checkpoint pushed
+
+Ready for lamp-voice: no
+
+Fetched and read Queue #705 and Fourth's issue comments again. No new task;
+only #713 Mood and #698 Memory remain open. First closed #707 after the
+21:00 lamp-4ace Records timer run: `Result=success`, exit 0, `apply`, 1.27 GB
+of 2.0 GB used, nothing planned/removed/refused, two zombies, 266 kernel
+threads and `error: null` ([First's receipt](https://github.com/autonomous-ai/lampOS/issues/707#issuecomment-6170178524)).
+Those are First's lamp observations, not Fourth's measurements.
+
+Mood's full current-base Mac closure completed, exit 0: 1,764 passed,
+zero failed, 11 ignored across 85 suites, with other local builds/tests
+stopped. Together with the prior full workspace coverage and passing
+post-rebase Linux strict workspace Clippy, focused tests and cross-build,
+the local gate is green. Task head
+`08c90d6b26ea0ba1b39f52f663b70af0f5a29865` is pushed on `fourth/mood`;
+native ARM64 run 38578348793 is in progress. Its complete host output,
+counts and unchanged 18-file source manifest are on that branch. No ready
+PR until that exact-head run succeeds.
+
+Memory's full serial Mac run is now in Voice Eval; its final exit is pending.
+Earlier motor/privacy fixture failures remain in the record. The tested
+source stays fixed while the run finishes. Before Memory's final binary
+handoff, its Voice source will also incorporate First's installed capture
+changes from fetched `8be0b9dd2`; the final native ARM64 gate will cover
+that rebased head. Mood's standalone binary has no Voice dependency or
+consumer wiring and its checked checkpoint stays fixed for CI.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
