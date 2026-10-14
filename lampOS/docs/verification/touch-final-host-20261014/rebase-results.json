@@ -1,0 +1,166 @@
+{
+  "source_commit": "721d7c0722320281ff02d0b7d97cd91c3c23e730",
+  "base_commit": "c14eab1eeff9d30d23115e8334ef3db383654256",
+  "machine": "Third development Mac; Intel i7-10700K, x86_64 macOS 26.6.2; not a lamp",
+  "reason": "Supplement the complete 20-package gate after rebasing: upstream changes Body, Records and Voice local-time formatting. All affected test targets are compiled by strict Clippy; Body/Records suites and the changed Voice local-time tests run again. Controls/Msgs final source tests run independently in the standalone copy. The Linux annotation also passed cross-target Clippy. Final native CI runs all workspace tests.",
+  "clippy_packages": [
+    "lamp-actions",
+    "lamp-air",
+    "lamp-body",
+    "lamp-controls",
+    "lamp-ears",
+    "lamp-expression",
+    "lamp-eyes",
+    "lamp-health",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-msgs",
+    "lamp-name",
+    "lamp-policy",
+    "lamp-records",
+    "lamp-schedule",
+    "lamp-surround",
+    "lamp-tasks",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "test_packages": [
+    "lamp-body",
+    "lamp-records"
+  ],
+  "steps": [
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.06037519,
+      "log": "/private/tmp/lamp-third-touch-rebase-format.txt"
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-air",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-ears",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-eyes",
+        "-p",
+        "lamp-health",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-msgs",
+        "-p",
+        "lamp-name",
+        "-p",
+        "lamp-policy",
+        "-p",
+        "lamp-records",
+        "-p",
+        "lamp-schedule",
+        "-p",
+        "lamp-surround",
+        "-p",
+        "lamp-tasks",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 79.865933478,
+      "log": "/private/tmp/lamp-third-touch-rebase-clippy.txt"
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-records",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 134.548744911,
+      "log": "/private/tmp/lamp-third-touch-rebase-tests.txt",
+      "counts": {
+        "harnesses": 17,
+        "passed": 364,
+        "failed": 0,
+        "ignored": 1
+      },
+      "ignored": [
+        "test records_cost ... ignored, finite release timing of disposable records; report machine separately"
+      ]
+    },
+    {
+      "name": "voice-time-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "local_time::tests",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 108.23985598599998,
+      "log": "/private/tmp/lamp-third-touch-rebase-voice-time-tests.txt",
+      "counts": {
+        "harnesses": 20,
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0
+      },
+      "ignored": []
+    },
+    {
+      "name": "workspace-build",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 16.647087102,
+      "log": "/private/tmp/lamp-third-touch-rebase-workspace-build.txt"
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+   Compiling lamp-msgs v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/msgs)
+   Compiling lamp-keeper v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/keeper)
+   Compiling lamp-controls v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/controls)
+   Compiling lamp-expression v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/expression)
+   Compiling lamp-body v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/body)
+   Compiling lamp-voice v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 31.70s
+     Running unittests src/lib.rs (target/debug/deps/lamp_voice-798a966b47f6690b)
+
+running 4 tests
+test local_time::tests::a_time_is_said_as_a_person_says_it_with_its_hour ... ok
+test local_time::tests::it_reads_the_offset_now_from_a_zone_file_of_either_kind ... ok
+test local_time::tests::it_tells_the_day_and_the_part_of_it ... ok
+test local_time::tests::the_model_that_asks_is_given_the_minute_and_no_hedge ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 825 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/lamp_voice-3f05ffb36e399d58)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/admission.rs (target/debug/deps/admission-e5e05e1ea9f972ca)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 0.00s
+
+     Running tests/camera_config.rs (target/debug/deps/camera_config-7858be217949d0cd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/camera_runtime.rs (target/debug/deps/camera_runtime-178a107e7f64bb4f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 33 filtered out; finished in 0.00s
+
+     Running tests/capture_hold_worker.rs (target/debug/deps/capture_hold_worker-394fcf0910783d37)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/core.rs (target/debug/deps/core-9db186049873ea78)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/diagnostics.rs (target/debug/deps/diagnostics-217d44ca7e203dcc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 18 filtered out; finished in 0.00s
+
+     Running tests/end_silence.rs (target/debug/deps/end_silence-8fe6f8894b5fbd6b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/endpoint_confirmation.rs (target/debug/deps/endpoint_confirmation-447fe2af3c62166c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.00s
+
+     Running tests/expression_out.rs (target/debug/deps/expression_out-6d82ef09239b9f7c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/fixture_provider.rs (target/debug/deps/fixture_provider-22de33d42bd15efa)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 27 filtered out; finished in 0.00s
+
+     Running tests/privacy_state.rs (target/debug/deps/privacy_state-a5f029eda325a1d0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/process.rs (target/debug/deps/process-7f92594582f8b0cc)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/provider_config.rs (target/debug/deps/provider_config-7f4e6c79ead3e1eb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/reference_link.rs (target/debug/deps/reference_link-f800552ec67a5475)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/reference_prime.rs (target/debug/deps/reference_prime-8bb0d2293b05bb2e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/review_2026_10_14.rs (target/debug/deps/review_2026_10_14-e514b57faea0079b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/ring_worker.rs (target/debug/deps/ring_worker-5ee6952f87dd3894)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
+
+     Running tests/visual_options.rs (target/debug/deps/visual_options-faedeedaa7c65d25)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+

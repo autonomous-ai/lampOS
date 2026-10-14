@@ -1584,17 +1584,66 @@ dependency resolved within that copy. The complete Mac dependent-package
 gate continues. No failing test has been removed or weakened, and the task
 has no ready PR while the native gate is red.
 
+## 2026-10-14 — Task 33 — final host checks passed; native tests running
+
+Ready for lamp-voice: no
+
+Kind: **off unless set**. The one task commit is now
+`721d7c0722320281ff02d0b7d97cd91c3c23e730` on `third/touch`, rebased on
+`c14eab1ee`. The Linux child-loop type fix and all development evidence are
+folded into it. No task code is on this log branch. `--touch` selects the new
+path and `--enable` separately enables requests; the final built binary still
+matches the old binary byte for byte without `--touch`, both shadow and
+legacy-enabled, including stderr. Exact hashes/commands are in
+[touch-final-host-20261014](verification/touch-final-host-20261014/README.md).
+
+The complete Mac gate passed: format, strict all-target Clippy for twenty
+packages, 3,213 tests passed with zero failures and fifteen inherited ignores
+in 203 harnesses, then the workspace build. The ignored-case list is retained;
+it includes timing/extended simulations and one pinned-model case. The run
+compiled the original Mac source before the Linux annotation; the later build
+includes that annotation. Both source manifests and per-stage notes are kept,
+not relabelled as one clean head. ARM64 Linux cross-target Clippy for all
+Controls/Msgs targets then passed with the annotation (compile/lint only on
+the Mac, not ARM64 execution).
+
+On the exact rebased task head, formatting and all twenty packages' strict
+Clippy passed again; Body/Records passed 364 tests (one inherited benchmark
+ignored), and all four changed Voice local-time tests passed. The workspace
+build passed. A fresh source-only copy built the whole workspace and passed
+all 405 Controls/Msgs checks with no failures/ignores; all 33 local manifests
+resolve within it. These overlapping runs are not added together. The same
+Intel i7-10700K x86_64 development Mac ran all of them; none is a lamp result.
+
+Native ARM64 run [38564855931](https://github.com/autonomous-ai/lampOS/actions/runs/38564855931)
+on this exact task head passed its release workspace build; its serial
+workspace tests are still running. First announced its own baseline green
+(38559471390, `21c24fc0a`) at 19:36, resolving the Records/workflow blocker.
+The next periodic fetch reached `5c8e0e6c9`; after the task's base its changes are only
+deployment/documentation, and no runtime source or workflow. The Third queue
+is unchanged: #711, #714, #709, #699. No task PR or ready-yes handoff yet.
+
+The lamp procedure remains `docs/controls.md`, “Run without a lamp, then
+qualify on one”: use the native binary first with no `--touch` for the required
+minute; qualify all twelve electrodes and actual head polarity; then record
+`serve --touch` in shadow on an isolated bus with per-unit files before enabling
+or wiring owner requests. Most likely wrong are the profile/noise margin,
+startup baseline absorbing a hand, pulsed TTP223 holds, pause-dependent slide
+speed, shared I2C load and service-user lock permissions. Physical timing and
+actual acoustic/privacy/motion results remain First's lamp qualification.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
-the lamp; no Linux/ARM64 execution, optical/acoustic latency, safe physical
-trajectory or natural-looking behavior was established by Third. No Controls
+the lamp; no optical/acoustic latency, safe physical trajectory or
+natural-looking behavior was established by Third. Native CI results apply
+only to the explicitly identified runs above. No Controls
 pin reader, owner subscription, applied mute/clear or hand-to-silence timing
-was run on a lamp. Replay fixtures are written; real lamp recordings have not
-been supplied. Surround has not changed real Wi-Fi, started physical owners,
+was run on a lamp. Replay fixtures are written; First supplied 57 changed
+touch masks, not a complete continuous touch recording. Surround has not changed real Wi-Fi, started physical owners,
 installed a production signed release or erased a real personal store. Its
 production supervisor, trusted feed, lamp storage durability and full-service
 latency remain unqualified. Schedule and Tasks passed their host gates; their
 real storage, clock, Harness and Voice integrations remain for First to qualify
-on the lamp. No unclaimed Third task remained in the list read for Task 11;
-the next fetch determines the next assignment.
+on the lamp. The current remaining Third queue is #711, #714, #709 and #699;
+Task 33 remains pending its native gate and PR.

@@ -1,0 +1,476 @@
+   Compiling rustix v1.1.5
+   Compiling lamp-turn-owner v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/turn-owner)
+   Compiling lamp-msgs v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/msgs)
+   Compiling lamp-keeper v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/keeper)
+   Compiling lamp-ipc v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/ipc)
+   Compiling lamp-records v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/records)
+   Compiling lamp-body v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/body)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 32.45s
+     Running unittests src/lib.rs (target/debug/deps/lamp_body-bf2caa971b5025f1)
+
+running 129 tests
+test body::tests::a_base_that_sticks_34_behind_a_slow_goal_is_led_round_and_settles ... ok
+test body::tests::a_base_turned_300_counts_comes_home_without_moving_away_or_faster_than_waking ... ok
+test body::tests::a_flag_that_stays_or_a_missing_home_keeps_it_folded_and_it_runs_as_before ... ok
+test body::tests::a_folded_lamp_listens_thinks_speaks_and_comes_home ... ok
+test body::tests::a_force_limit_is_written_to_the_joints_that_carry_the_lamp_and_read_back ... ok
+test body::tests::a_force_limit_that_is_not_kept_ends_the_run_before_anything_moves ... ok
+test body::tests::a_force_limited_arm_lets_go_at_80_percent_of_its_limit ... ok
+test body::tests::a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not ... ok
+test body::tests::a_head_found_pressed_on_the_base_rises_out_of_it_slowly_and_then_runs ... ok
+test body::tests::a_head_that_cannot_lift_ends_the_wake_held_where_it_is_and_says_how_far_it_got ... ok
+test body::tests::a_head_that_drooped_in_a_power_cut_is_lifted_home_with_lamp_52e6s_options ... ok
+test body::tests::a_head_that_settles_32_short_of_home_wakes_there_and_runs_from_where_it_is ... ok
+test body::tests::a_home_it_is_given_is_reached_slowly_from_where_it_is_found ... ok
+test body::tests::a_joint_at_800_for_a_second_and_a_half_lets_go_of_all_five_and_is_taken_up_again_slowly ... ok
+test body::tests::a_joint_beyond_what_waking_brings_back_is_refused ... ok
+test body::tests::a_joint_found_without_torque_is_given_it_goal_first_and_does_not_move ... ok
+test body::tests::a_joint_pushing_without_moving_is_told_to_stop_after_a_second_and_a_half ... ok
+test body::tests::a_joint_still_loaded_after_it_stopped_pushing_ends_the_run ... ok
+test body::tests::a_joint_that_cannot_keep_up_ends_the_gesture_and_not_the_run ... ok
+test body::tests::a_joint_that_has_arrived_is_not_pushed_at_and_a_small_change_does_not_move_it ... ok
+test body::tests::a_joint_that_meets_resistance_stops_pushing_for_two_seconds_and_then_goes_on ... ok
+test body::tests::a_joint_that_moves_when_its_torque_comes_on_ends_the_run ... ok
+test body::tests::a_listening_lamp_dips_its_head_for_expression_and_comes_back ... ok
+test body::tests::a_load_of_800_for_less_than_a_second_and_a_half_changes_nothing ... ok
+test body::tests::a_load_that_rises_stops_it_where_it_is_and_nothing_is_written_after ... ok
+test body::tests::a_mood_that_stops_arriving_is_rest ... ok
+test body::tests::a_new_flag_a_moved_elbow_or_a_hot_joint_stops_it ... ok
+test body::tests::a_resting_lamp_glances_with_the_switch_and_comes_back_to_rest ... ok
+test body::tests::a_shoulder_left_up_by_a_power_cut_is_lowered_first_and_the_lamp_may_then_stand ... ok
+test body::tests::a_standing_lamp_nods_and_is_left_exactly_where_it_was ... ok
+test body::tests::a_standing_pose_is_taken_only_inside_its_caps ... ok
+test body::tests::a_standing_shoulder_pushing_short_of_its_goal_is_told_to_stop_and_keeps_its_torque ... ok
+test body::tests::a_wider_reach_and_speed_can_be_chosen_only_inside_their_caps ... ok
+test body::tests::a_wire_that_fails_for_a_moment_is_ridden_out ... ok
+test body::tests::a_wire_that_goes_silent_stops_it_after_half_a_second ... ok
+test body::tests::an_arm_found_off_its_way_is_not_lowered_and_the_lamp_runs_folded ... ok
+test body::tests::an_arm_still_strained_two_seconds_on_ends_the_run_where_it_is ... ok
+test body::tests::an_arm_that_strains_goes_back_down_and_stays_down_for_a_while ... ok
+test body::tests::an_arm_that_sways_7_counts_as_the_base_wakes_is_let_and_one_that_moves_20_is_not ... ok
+test body::tests::an_elbow_pushing_under_an_old_overload_is_told_to_stop_and_then_carries_the_lamp ... ok
+test body::tests::at_rest_a_joint_that_stopped_short_is_no_longer_pushed ... ok
+test body::tests::every_step_can_be_watched_with_the_mood_it_acted_on ... ok
+test body::tests::expression_is_held_to_its_own_reach_and_the_joints_and_does_not_stir_a_resting_lamp ... ok
+test body::tests::found_standing_it_is_taken_as_it_is_and_folds_down_when_asked_to_stop ... ok
+test body::tests::it_does_not_start_on_a_lamp_that_is_not_as_expected ... ok
+test body::tests::it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there ... ok
+test body::tests::one_hot_reading_while_it_moves_is_not_heat ... ok
+test body::tests::resistance_for_the_fourth_time_in_a_minute_ends_the_run ... ok
+test body::tests::spoken_to_it_stands_up_and_left_alone_it_folds_down_again ... ok
+test body::tests::standing_with_nothing_to_do_it_shifts_now_and_then_and_stops_when_spoken_to ... ok
+test body::tests::stood_up_the_head_may_look_down_as_far_as_up_and_folded_it_may_not ... ok
+test body::tests::stood_up_the_head_tilts_to_listen_and_folded_it_does_not ... ok
+test body::tests::the_arm_is_taken_hold_of_only_on_a_lamp_that_may_stand ... ok
+test body::tests::the_eyes_take_the_head_further_round_than_any_pose_does ... ok
+test body::tests::the_head_keeps_its_folded_pose_until_the_arm_has_lifted_it_clear ... ok
+test body::tests::the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up ... ok
+test body::tests::the_heads_pitch_never_passes_its_window_however_it_is_found ... ok
+test body::tests::the_three_writes_are_exactly_these_bytes ... ok
+test body::tests::the_two_writes_of_a_lamp_that_stands_are_exactly_these_bytes ... ok
+test body::tests::told_to_stay_a_head_moved_by_hand_stays_and_the_next_mood_is_relative_to_it ... ok
+test body::tests::told_to_stay_a_head_pushed_past_its_reach_is_kept_at_the_edge ... ok
+test body::tests::told_to_stay_a_short_push_still_gives_way_and_comes_back ... ok
+test body::tests::waking_on_a_lamp_found_as_expected_writes_exactly_what_it_did_without ... ok
+test body::tests::with_eyes_the_head_turns_to_the_face_while_it_listens_and_not_beyond_its_reach ... ok
+test body::tests::with_waking_a_head_held_35_short_at_rest_rests_where_it_is ... ok
+test body::tests::without_a_face_or_without_eyes_nothing_is_added_to_what_the_mood_wants ... ok
+test body::tests::without_the_switch_a_resting_lamp_writes_exactly_as_when_nothing_is_asked ... ok
+test bus_out::tests::a_thread_with_no_room_costs_the_loop_a_step_and_never_a_wait ... ok
+test bus_out::tests::how_fast_each_joint_turns_is_worked_out_from_the_step_before ... ok
+test bus_out::tests::steps_offered_reach_the_bus_and_the_last_word_is_why_it_stopped ... ok
+test bus_out::tests::the_body_is_well_unless_a_joint_is_warm_or_one_lately_met_resistance ... ok
+test bus_out::tests::the_joints_are_named_in_servo_order_in_radians_from_the_middle_of_the_turn ... ok
+test bus_out::tests::why_the_body_stopped_is_said_in_words_and_only_being_asked_is_not_a_fault ... ok
+test clips::tests::a_clip_is_read_between_its_frames_and_is_over_at_its_end ... ok
+test clips::tests::every_clip_begins_and_ends_at_nothing_and_stays_inside_its_speed_and_size ... ok
+test expression_in::tests::a_request_that_is_stale_out_of_order_or_not_of_this_machine_is_not_taken ... ok
+test expression_in::tests::stillness_adds_nothing_and_a_request_is_not_applied_before_its_time ... ok
+test expression_in::tests::what_is_asked_counts_until_it_runs_out_and_is_given_in_counts ... ok
+test gaze::stray::one_stray_sight_among_three_moves_nothing ... ok
+test gaze::tests::a_gain_set_too_high_still_settles_and_the_reach_is_never_passed ... ok
+test gaze::tests::it_does_not_correct_from_a_moving_picture_or_while_it_thinks_or_rests ... ok
+test gaze::tests::it_turns_to_a_face_in_a_few_corrections_and_then_keeps_still ... ok
+test gaze::tests::the_datagram_is_the_one_the_eyes_send_and_a_gaze_is_taken_only_inside_its_caps ... ok
+test gaze::tests::with_nobody_there_it_does_nothing_and_after_a_while_lets_go ... ok
+test gesture::tests::every_pose_stays_within_a_few_degrees_of_where_the_head_was_found ... ok
+test gesture::tests::listening_lifts_and_tilts_and_the_side_alternates_between_exchanges ... ok
+test gesture::tests::rest_is_exactly_where_it_was_found ... ok
+test gesture::tests::speaking_nods_on_the_voice_and_settles_when_it_is_steady ... ok
+test gesture::tests::the_look_away_is_a_glance_that_deepens_only_while_the_thinking_goes_on ... ok
+test inspection::tests::a_latched_status_flag_ends_the_plan_at_that_joint_unless_faults_are_reported ... ok
+test inspection::tests::all_partial_write_and_read_sizes_preserve_exact_requests ... ok
+test inspection::tests::bytes_returned_after_deadline_are_counted_but_never_decoded ... ok
+test inspection::tests::cancellation_before_and_during_transaction_stops_all_future_requests ... ok
+test inspection::tests::cancellation_observed_after_write_keeps_accepted_count_but_discards_reply ... ok
+test inspection::tests::checksum_noise_and_missing_joint_are_explicit_failures ... ok
+test inspection::tests::clock_regression_and_failed_cancellation_source_cannot_admit_another_operation ... ok
+test inspection::tests::continuous_initial_traffic_never_reaches_a_request ... ok
+test inspection::tests::duplicate_reply_faults_instead_of_starting_another_request ... ok
+test inspection::tests::finite_plan_sends_only_ten_read_only_requests_and_decodes_30_replies ... ok
+test inspection::tests::initial_stale_bytes_are_counted_not_accepted_as_replies ... ok
+test inspection::tests::operation_budget_terminates_even_if_clock_and_poll_never_advance ... ok
+test inspection::tests::partial_write_cannot_accept_an_early_stale_response ... ok
+test inspection::tests::read_only_profile_window_reports_all_raw_bytes_without_scale_or_write ... ok
+test inspection::tests::telemetry_target_reports_measured_delay_separately_from_fault_deadline ... ok
+test inspection::tests::timed_out_request_is_not_retried_and_late_reply_is_not_reused ... ok
+test inspection::tests::truncated_reply_deadline_keeps_partial_count_and_never_returns_a_snapshot ... ok
+test inspection::tests::unknown_model_stops_before_using_sts_specific_register_decoders ... ok
+test inspection::tests::write_zero_and_busy_writer_are_bounded_not_retried_as_new_transactions ... ok
+test runtime::supervisor::tests::abrupt_parent_channel_loss_expires_authority_in_real_child ... ok
+test runtime::supervisor::tests::actual_child_uses_same_worker_loop_and_stop_reaps_before_clean_replacement ... ok
+test runtime::supervisor::tests::audit_crashed_child_does_not_leak_owned_ipc_directory ... ok
+test runtime::supervisor::tests::audit_failed_privacy_send_inhibits_supervisor_immediately ... ok
+test runtime::supervisor::tests::crashed_child_is_reaped_without_a_successful_shutdown_claim ... ok
+test runtime::supervisor::tests::dropping_reaped_predecessor_does_not_remove_active_successor_sockets ... ok
+test runtime::supervisor::tests::failed_control_before_connection_revokes_admission_and_retains_owned_child ... ok
+test runtime::supervisor::tests::hung_owned_child_is_killed_and_reaped_after_missing_inhibit ... ok
+test runtime::supervisor::tests::identity_and_cleanup_receipts_fail_closed ... ok
+test runtime::supervisor::tests::inert_child ... ok
+test runtime::supervisor::tests::inert_child_stop_timing_samples_are_host_ipc_only ... ok
+test runtime::supervisor::tests::inhibition_measurement_must_be_between_spawn_and_publication ... ok
+test runtime::supervisor::tests::malformed_peer_cannot_bypass_expired_watch_or_keep_child_alive ... ok
+test runtime::supervisor::tests::no_peer_cleanup_before_observed_reap_even_after_owned_kill ... ok
+test runtime::supervisor::tests::partial_child_bind_is_cleaned_after_reap_without_waiting_for_second_socket ... ok
+test runtime::supervisor::tests::qualification_rejects_wrong_supervisor_before_any_channel_dispatch ... ok
+test runtime::supervisor::tests::real_core_fault_receipts_are_accepted_by_supervisor_without_restamping_stop ... ok
+test runtime::supervisor::tests::replacing_directory_does_not_remove_original_or_replacement_contents ... ok
+test runtime::supervisor::tests::serial_cleanup_failure_and_stalled_teardown_never_become_clean_exit ... ok
+test runtime::supervisor::tests::socket_mode_transition_waits_without_accepting_nonprivate_or_wrong_type_peer ... ok
+test runtime::supervisor::tests::socket_replacement_is_retained_and_cleanup_failure_blocks_replacement ... ok
+
+test result: ok. 129 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.24s
+
+     Running unittests src/bin/lamp-body.rs (target/debug/deps/lamp_body-a5156de59f554708)
+
+running 12 tests
+test tests::a_force_limit_is_a_number_in_its_range_and_brings_the_load_bound_under_it ... ok
+test tests::a_gesture_is_asked_for_by_the_name_of_a_clip_and_nothing_else ... ok
+test tests::a_mood_is_one_exact_json_object_and_anything_else_is_ignored ... ok
+test tests::each_step_says_alive_and_the_first_says_ready ... ok
+test tests::every_path_is_explicit_and_nothing_else_is_accepted ... ok
+test tests::eyes_are_a_socket_and_what_the_picture_is_worth_or_nothing ... ok
+test tests::give_way_is_return_or_stay_and_as_before_unless_given ... ok
+test tests::overload_is_release_and_off_unless_given ... ok
+test tests::rest_glance_is_on_or_off_and_off_unless_given ... ok
+test tests::standing_is_a_pose_a_folded_arm_and_a_home_or_nothing ... ok
+test tests::torque_is_on_or_off_and_off_unless_given ... ok
+test tests::wake_is_on_or_off_and_off_unless_given ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/lamp-body-inspect.rs (target/debug/deps/lamp_body_inspect-25b35a65aebdb3e1)
+
+running 2 tests
+test tests::explicit_bounded_arguments_and_help_are_valid_without_any_open ... ok
+test tests::no_implicit_device_or_unit_and_no_unknown_controls ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/lamp-body-worker.rs (target/debug/deps/lamp_body_worker-7587c2587d6d8092)
+
+running 1 test
+test tests::no_implicit_devices_or_motion_commands ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/calibration.rs (target/debug/deps/calibration-ebe5fad8386aac42)
+
+running 11 tests
+test calibration_is_explicitly_bound_to_a_unit_and_five_unique_joints ... ok
+test drive_mode_reverses_the_normalized_sign_in_both_directions ... ok
+test every_homing_value_roundtrips_sign_magnitude_not_twos_complement ... ok
+test full_and_narrow_spans_are_monotonic_and_quantization_is_bounded ... ok
+test identity_sign_offset_and_span_validation_cannot_use_fallbacks ... ok
+test invalid_or_unbounded_unit_identifiers_are_rejected ... ok
+test midpoint_and_endpoints_are_dimensionless_and_do_not_apply_homing_twice ... ok
+test normalized_positions_reject_nonfinite_and_out_of_span_input ... ok
+test observed_counts_outside_calibration_are_faults_not_clipped_endpoints ... ok
+test raw_register_words_do_not_silently_become_single_turn_counts ... ok
+test readback_comparison_checks_joint_mode_span_and_homing_without_writes ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/control.rs (target/debug/deps/control-44df0afa71a6c39b)
+
+running 48 tests
+test admission_requires_rest_and_does_not_queue_a_second_segment ... ok
+test authority_expiry_and_observed_io_overrun_stop_without_fabricated_recovery ... ok
+test camera_close_reopen_cannot_relabel_an_old_placement ... ok
+test cancellation_at_every_local_tick_adds_no_wait_and_no_later_goal ... ok
+test cancellation_discards_partial_packet_once_and_never_sends_its_tail ... ok
+test cancellation_from_completed_occurrence_cannot_stop_new_owner ... ok
+test changed_unit_calibration_and_forged_wider_envelope_are_not_substituted ... ok
+test clock_regression_latches_fault_and_stale_readback_cannot_start ... ok
+test control_loss_and_raii_drop_discard_without_any_park_or_torque_write ... ok
+test cubic_segment_is_monotonic_bounded_and_rest_to_rest ... ok
+test disabled_or_unknown_torque_cannot_admit_a_goal_or_enable_the_device ... ok
+test endpoint_is_quantized_once_not_repeatedly_biased_by_inverse_roundtrip ... ok
+test exported_readback_keeps_original_time_and_never_survives_expiry_or_stop ... ok
+test first_host_command_is_under_twenty_ms_in_two_ms_local_tick_harness ... ok
+test fragmented_read_write_is_bounded_and_corrupt_missing_replies_are_terminal ... ok
+test full_goal_accepted_before_observed_overrun_remains_in_failure_evidence ... ok
+test inactive_zero_profiles_never_allow_all_or_body_position_packets ... ok
+test input_end_or_new_owner_revokes_partial_motion_before_the_next_byte ... ok
+test live_overload_and_bad_status_lock_out_without_torque_release ... ok
+test load_direction_is_not_load_magnitude_but_unknown_bits_fault ... ok
+test no_motion_without_qualification_inspection_and_original_placement_grant ... ok
+test out_of_span_position_and_excess_tracking_error_are_visible_faults ... ok
+test position_bytes_match_the_pinned_sdk_executed_with_an_inert_port ... ok
+test position_packet_covers_all_counts_and_all_five_little_endian_ids ... ok
+test prior_or_trailing_traffic_is_not_relabelled_fresh_by_parser_reset ... ok
+test profile_ack_readback_faults_never_advance_to_acceleration ... ok
+test profile_and_trajectory_reject_unbounded_settings_and_bad_units ... ok
+test profile_mismatch_does_not_write_or_replace_qualified_caps ... ok
+test profile_partial_write_privacy_and_expiry_are_terminal_with_original_byte_evidence ... ok
+test profile_preparation_keeps_exact_inactive_bindings_and_single_attempt ... ok
+test profile_preparation_rejects_wrong_values_and_nonstationary_goal_without_writes ... ok
+test profile_setup_cancel_between_writes_retains_verified_partial_change_without_reset ... ok
+test profile_setup_is_exact_speed_ack_readback_then_acceleration_and_no_position ... ok
+test selected_core_omits_body_ids_and_retains_exact_unselected_read_counts ... ok
+test selected_core_preserves_cancel_boundary_after_partial_request ... ok
+test selected_profile_worker_priority_privacy_and_stop_prevent_queued_register_write ... ok
+test selected_profile_worker_uses_real_channels_original_evidence_and_readback_receipt ... ok
+test shared_normalization_never_widens_separate_eeprom_command_bounds ... ok
+test shutdown_is_terminal_even_if_host_output_flush_fails ... ok
+test stalled_clock_does_not_allow_unbounded_transaction_io_retries ... ok
+test stalled_partial_write_faults_once_without_retry_or_reusing_bus ... ok
+test start_fault_cannot_be_healed_by_requalifying_cached_readback ... ok
+test startup_is_idle_and_success_means_five_checked_readbacks_not_write_ack ... ok
+test successful_writes_without_endpoint_readback_never_report_reached ... ok
+test unqualified_inspection_reports_nonzero_device_status ... ok
+test valid_stale_snapshot_does_not_cancel_new_motion_but_privacy_does ... ok
+test worker_restart_does_not_reuse_old_occurrence_identity ... ok
+test zero_selected_profile_still_rejects_motion_without_preparation ... ok
+
+test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/head_qualification.rs (target/debug/deps/head_qualification-2b5b1ff94dee8ecf)
+
+running 9 tests
+test a_prepared_exact_return_cannot_survive_stop_fault_cancellation_or_privacy ... ok
+test actual_worker_out_and_exact_return_write_only_id5_and_keep_original_readbacks ... ok
+test malformed_or_old_readback_does_not_become_an_exact_return_receipt ... ok
+test old_snapshot_cannot_revoke_newer_qualification_authority ... ok
+test privacy_during_outbound_never_requests_return_and_discards_pending_serial_work ... ok
+test rejected_inspection_phase_cannot_be_retried_as_new_authority ... ok
+test rejected_original_permit_permanently_inhibits_direct_command_construction ... ok
+test wrong_worker_receipt_stops_queued_motion_before_any_position_write ... ok
+test zero_profile_stays_rejected_and_plan_never_invents_envelope ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/protocol.rs (target/debug/deps/protocol-de19d56f3ed2cb3b)
+
+running 20 tests
+test a_tracker_asked_to_report_faults_accepts_a_flagged_reply_with_its_flags ... ok
+test all_nonzero_servo_flags_fail_even_if_error_reply_has_no_read_data ... ok
+test arbitrary_byte_streams_retain_bounded_storage_and_can_be_reset ... ok
+test bytewise_multiservo_replies_complete_in_any_arrival_rotation ... ok
+test concatenated_frames_and_noise_are_not_lost ... ok
+test duplicate_and_unrequested_ids_latch_failure ... ok
+test every_invalid_length_is_rejected_and_parser_resynchronizes ... ok
+test every_partial_prefix_is_reported_and_discarded_at_deadline ... ok
+test every_read_window_is_bounded_without_address_wrap ... ok
+test every_single_bit_payload_corruption_is_detected ... ok
+test false_long_length_requires_deadline_not_guessing_payload_headers ... ok
+test five_joint_identities_are_exact ... ok
+test golden_read_only_packets_match_sts_little_endian_protocol ... ok
+test golden_status_survives_every_split_and_empty_feed ... ok
+test invalid_broadcast_status_and_high_status_bit_are_explicit ... ok
+test maximum_status_survives_all_chunk_sizes_and_wrapping_checksum ... ok
+test parser_truncation_can_latch_an_otherwise_complete_transaction_failed ... ok
+test resynchronization_retains_complete_frame_inside_corrupt_candidate ... ok
+test sync_read_rejects_empty_duplicate_or_excessive_ids ... ok
+test wrong_parameter_count_and_missing_joint_are_not_success ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/readback.rs (target/debug/deps/readback-87bfb2d582c79a50)
+
+running 5 tests
+test homing_register_validates_reserved_bits_and_preserves_mode_for_checking ... ok
+test out_of_range_raw_position_is_kept_for_diagnosis_not_normalized ... ok
+test register_decoding_requires_matching_request_address_not_only_length ... ok
+test signed_velocity_extremes_keep_sign_magnitude_and_negative_zero_semantics ... ok
+test telemetry_fields_use_little_endian_offsets_and_preserve_raw_scales ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/selection.rs (target/debug/deps/selection-934d9231673356b1)
+
+running 3 tests
+test all_nonempty_subsets_have_exact_lengths_sorted_ids_and_checksum ... ok
+test all_selection_preserves_existing_packet_for_every_encoder_count ... ok
+test empty_unknown_or_malformed_selection_never_deserializes ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/worker.rs (target/debug/deps/worker-0fe7b3e14b6cbb60)
+
+running 20 tests
+test audit_fatal_command_emits_monotonic_receipt_times ... ok
+test bus_loss_bad_reply_and_slow_host_write_fault_without_retry ... ok
+test busy_command_is_rejected_without_queuing_or_replacing_original_motion ... ok
+test cancellation_between_data_receive_and_bus_tick_never_writes_stale_segment ... ok
+test data_held_behind_urgent_control_retains_original_age_and_cannot_renew ... ok
+test expired_authority_without_next_frame_and_newer_expired_privacy_both_inhibit ... ok
+test feedback_backpressure_fails_closed_and_cleanup_error_remains_failure ... ok
+test foreign_placement_and_explicit_unqualified_profiles_cannot_start ... ok
+test initial_and_reached_receipts_retain_actual_counts_and_original_read_times ... ok
+test input_end_revokes_an_inflight_motion_without_waiting_for_the_next_segment ... ok
+test malformed_priority_control_inhibits_even_when_valid_segment_waits ... ok
+test partial_bus_reads_and_writes_still_use_exact_core_protocol ... ok
+test partial_position_cancel_discards_once_and_never_sends_tail ... ok
+test selected_command_reaches_actual_core_and_reports_exact_emitted_ids ... ok
+test selected_partial_cancel_never_completes_packet_or_publishes_acceptance ... ok
+test selected_stop_and_privacy_before_first_tick_send_no_position_or_torque ... ok
+test stale_cancel_and_old_snapshot_preserve_successor_but_matching_cancel_is_terminal ... ok
+test startup_idle_then_real_ipc_inspection_and_finite_segment_reaches_checked_readback ... ok
+test startup_without_authority_never_touches_bus ... ok
+test unread_ipc_request_expires_without_renewal ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/worker_config.rs (target/debug/deps/worker_config-0d81c77e66a11ed4)
+
+running 7 tests
+test bounded_private_file_is_required_before_any_device_open ... ok
+test explicit_head_only_policy_binds_inactive_zero_profiles_without_qualifying_them ... ok
+test observed_4ace_shared_normalization_and_eeprom_are_distinct_explicit_inputs ... ok
+test oversized_serialization_does_not_consume_the_next_channel_sequence ... ok
+test provisioning_rejects_hidden_defaults_unqualified_limits_and_narrowing ... ok
+test separate_register_binding_rejects_missing_duplicate_and_invalid_hardware ... ok
+test transport_preserves_original_sequence_age_and_boot ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/debug/deps/lamp_records-c8995892ceaea067)
+
+running 88 tests
+test config::tests::broad_ambiguous_and_overlapping_paths_are_rejected ... ok
+test config::tests::customer_defaults_are_explicit_and_off ... ok
+test config::tests::malformed_service_and_limits_are_rejected ... ok
+test config::tests::unknown_fields_and_kinds_do_not_enable_generic_cleanup ... ok
+test guard::implementation::tests::any_manager_change_or_failure_refuses ... ok
+test guard::implementation::tests::both_process_passes_keep_their_protected_paths ... ok
+test guard::implementation::tests::deadline_and_metadata_limits_refuse ... ok
+test guard::implementation::tests::failed_service_still_protects_an_old_live_coordinator ... ok
+test guard::implementation::tests::fake_manager_success_failure_timeout_and_output_cap ... ok
+test guard::implementation::tests::incomplete_process_evidence_and_unknown_workers_refuse ... ok
+test guard::implementation::tests::main_executable_mismatch_refuses_even_with_the_right_binary_name ... ok
+test guard::implementation::tests::main_process_must_match_the_manager_and_be_present ... ok
+test guard::implementation::tests::manager_identity_and_invocation_are_strict ... ok
+test guard::implementation::tests::pid_reuse_and_parenthesized_comm_do_not_confuse_identity ... ok
+test guard::implementation::tests::pinned_proc_directory_does_not_switch_to_reused_name ... ok
+test guard::implementation::tests::relative_and_alias_outputs_are_resolved ... ok
+test guard::implementation::tests::renamed_manual_binary_uses_direct_root_evidence_without_voice_parsing ... ok
+test guard::implementation::tests::retained_invocation_is_protected_in_all_known_states ... ok
+test guard::implementation::tests::scan_keeps_current_old_survivor_manual_and_diagnostic_child ... ok
+test guard::implementation::tests::the_voices_end_of_turn_worker_is_known_and_its_files_still_checked ... ok
+test guard::implementation::tests::unit_argument_cannot_be_a_pattern_or_option ... ok
+test guard::implementation::tests::unknown_same_cgroup_process_refuses ... ok
+test guard::implementation::tests::unrelated_serve_commands_do_not_use_the_voice_argument_layout ... ok
+test guard::platform_tests::unsupported_platform_never_claims_an_empty_live_set ... ok
+test json_file::tests::atomic_result_replaces_only_known_file_and_cache_detects_change ... ok
+test json_file::tests::one_private_reserved_temporary_is_recovered_after_an_interrupted_write ... ok
+test json_file::tests::result_symlink_and_hardlink_are_refused_without_touching_target ... ok
+test plan::tests::age_is_strict_and_independent_from_size ... ok
+test plan::tests::clock_reversal_preserves_future_records_and_reports_pressure ... ok
+test plan::tests::duplicates_bad_names_and_overflow_are_errors_not_empty_success ... ok
+test plan::tests::live_session_is_kept_even_if_alone_older_and_larger_than_both_limits ... ok
+test plan::tests::recent_quarantine_is_resumed_but_never_while_protected ... ok
+test plan::tests::size_removes_oldest_whole_sessions_until_within_bound ... ok
+test plan::tests::tied_times_use_stable_names_and_both_bounds_apply ... ok
+test report::tests::a_disabled_flag_does_not_hide_a_failure_or_impossible_removal ... ok
+test report::tests::disabled_cleanup_is_visible_without_claiming_a_disk_scan ... ok
+test report::tests::dry_run_never_claims_enforced_retention_or_removals ... ok
+test report::tests::exact_disk_boundaries_do_not_round_a_warning_away ... ok
+test report::tests::healthy_report_identifies_snapshot_age_and_aggregates_without_record_ids ... ok
+test report::tests::invalid_in_memory_reports_never_become_ok_or_publish_unvalidated_counters ... ok
+test report::tests::large_counts_and_private_strings_do_not_overflow_or_expand_the_message ... ok
+test report::tests::missing_zero_or_impossible_disk_values_are_errors ... ok
+test report::tests::no_report_and_an_enabled_empty_report_are_errors ... ok
+test report::tests::refusals_byte_overruns_and_root_failures_remain_visible ... ok
+test report::tests::repeated_reports_do_not_refresh_the_cleanup_timestamp ... ok
+test report::tests::reporter_refuses_a_relative_bus_without_creating_a_directory ... ok
+test report::tests::stale_warning_or_error_is_not_downgraded ... ok
+test report::tests::the_worst_root_disk_is_not_hidden_by_averaging_or_double_counting ... ok
+test report::tests::two_hour_boundary_is_exact_and_large_clock_jumps_do_not_wrap ... ok
+test report::tests::unsupported_schema_invalid_mode_and_clock_rollback_are_errors ... ok
+test run::tests::disabled_apply_does_not_even_open_a_configured_root ... ok
+test run::tests::dry_run_plans_but_never_mutates_and_protects_old_live_session ... ok
+test run::tests::expired_budget_cannot_reach_protection_or_deletion ... ok
+test run::tests::full_disk_is_not_permission_to_bypass_safe_mutation_failures ... ok
+test run::tests::partial_unlinks_are_accounted_without_claiming_complete_session_removal ... ok
+test run::tests::unknown_protection_refuses_entire_root_but_reports_full_disk ... ok
+test store::tests::a_mutated_record_invalidates_the_whole_candidate_before_any_unlink ... ok
+test store::tests::accounting_rejects_overflow_and_snapshots_include_ctime_but_not_atime ... ok
+test store::tests::changed_file_inode_even_with_same_size_and_mtime_is_refused ... ok
+test store::tests::cleaner_lock_is_nonblocking_and_does_not_create_a_file ... ok
+test store::tests::combined_live_and_quarantine_entry_budget_is_enforced_and_clears_prior_authority ... ok
+test store::tests::conflicting_quarantine_id_never_overwrites_and_duplicate_inventory_refuses_both ... ok
+test store::tests::fsync_failures_keep_truthful_counts_and_a_recognizable_remainder ... ok
+test store::tests::full_disk_before_mutation_never_falls_back_to_in_place_deletion ... ok
+test store::tests::interrupted_unlinks_report_actual_progress_and_every_remainder_recovers ... ok
+test store::tests::invalid_quarantine_shares_the_total_entry_budget_and_clears_prior_authority ... ok
+test store::tests::inventory_is_read_only_and_uses_allocated_bytes_and_newest_mtime ... ok
+test store::tests::links_specials_unknown_layouts_and_permissions_are_refused_without_reads ... ok
+test store::tests::moved_or_replaced_root_is_detected_before_mutation ... ok
+test store::tests::partial_start_with_empty_metadata_is_known_but_empty_live_session_is_not ... ok
+test store::tests::public_constructor_accepts_a_private_tree_below_root_owned_sticky_temp ... ok
+test store::tests::public_constructor_rejects_writable_nonsticky_ancestors_open_root_and_symlinks ... ok
+test store::tests::refusal_limit_is_utf8_bytes_including_escaped_name_and_prefix ... ok
+test store::tests::removes_only_inventoried_sessions_and_requires_fresh_inventory_for_retry ... ok
+test store::tests::replaced_session_and_metadata_directory_keep_both_trees_intact ... ok
+test store::tests::sparse_file_allocation_is_not_confused_with_logical_length ... ok
+test store::tests::sticky_exception_requires_root_ownership_and_never_relaxes_final_root ... ok
+test store::tests::traversal_ids_invalid_roots_and_bounded_enumeration_fail_closed ... ok
+test store::tests::unknown_or_linked_quarantine_is_preserved ... ok
+test store::tests::vanished_candidate_is_not_recreated_or_confused_with_a_replacement ... ok
+test tests::fingerprint_is_required_and_exactly_lowercase_sha256_hex ... ok
+test tests::overflow_stops_before_reading_or_allocating_the_extra_value_or_tail ... ok
+test tests::paths_units_and_error_strings_have_byte_limits ... ok
+test tests::record_strings_are_bounded_by_decoded_utf8_bytes ... ok
+test tests::root_and_all_record_arrays_have_exact_count_bounds_even_for_empty_strings ... ok
+test tests::schema_mode_unknown_fields_and_numeric_types_fail_closed ... ok
+test tests::valid_report_round_trips_without_imposing_counter_relationships ... ok
+test tests::values_built_in_memory_follow_the_same_resource_limits ... ok
+
+test result: ok. 88 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.50s
+
+     Running unittests src/main.rs (target/debug/deps/lamp_records-455fe4c112a332dc)
+
+running 5 tests
+test tests::check_defaults_to_dry_and_never_accepts_a_live_override ... ok
+test tests::old_result_does_not_match_a_changed_age_policy_or_enable_switch ... ok
+test tests::output_cannot_overwrite_config_or_an_unrelated_file ... ok
+test tests::oversized_result_leaves_readable_failure_and_next_cleanup_can_replace_it ... {"schema_version":1,"config_fingerprint":"9da4e81a001e0412d2acc5aa8c273ddd175ccb5a20999d1807133040b056b99d","at_unix_s":1791981503,"mode":"apply","enabled":false,"roots":[],"error":null}
+ok
+test tests::reporter_has_explicit_bounded_test_lifetime ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+     Running tests/records.rs (target/debug/deps/records-16c4aab794bf4fb5)
+
+running 5 tests
+test diagnostic_is_delivered_over_the_real_local_bus_without_record_contents ... ok
+test public_tree_pipeline_dry_then_apply_keeps_live_memory_and_outside_link ... ok
+test real_cli_apply_with_unknown_service_cannot_delete_any_fixture_record ... ok
+test real_reporter_reloads_switch_and_policy_and_requires_a_matching_receipt ... ok
+test records_cost ... ignored, finite release timing of disposable records; report machine separately
+
+test result: ok. 4 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 5.81s
+
+   Doc-tests lamp_body
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lamp_records
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -1,0 +1,14 @@
+{
+  "task_head": "721d7c0722320281ff02d0b7d97cd91c3c23e730",
+  "task_base": "c14eab1eeff9d30d23115e8334ef3db383654256",
+  "subsequently_fetched": "5c8e0e6c9",
+  "changed_paths": [
+    "lampOS/deploy/lamp-4ace/lamp-voice.service",
+    "lampOS/docs/duplex-listening.md",
+    "lampOS/docs/steady-reference.md",
+    "lampOS/docs/work-split.md",
+    "robots/lamp/hardware/lamp-4ace.md"
+  ],
+  "runtime_manifest_vendor_or_workflow_changes": false,
+  "note": "Later upstream changes are lamp deployment and documentation only; the running native task gate remains on the exact tested task head."
+}
