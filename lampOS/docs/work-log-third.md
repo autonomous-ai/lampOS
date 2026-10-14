@@ -1842,6 +1842,66 @@ GPIO polarity and final-owner acoustic/privacy/motion latency. Host and native
 software tests establish none of those physical results. Next Third task is
 #709, then #699; #714 remains Second's.
 
+## 2026-10-14 — Task 31 taken — Schedule tools and due speech (#709)
+
+Ready for lamp-voice: no
+
+Taken by Third, session `third-20261014-violet4`, no lamp. The current Queue
+puts #709 next after touch PR #728, then #699. The
+[first claim](https://github.com/autonomous-ai/lampOS/issues/709#issuecomment-6171323467)
+was reread and is this session's. The task branch will be
+`third/schedule-voice`, directly from `origin/lamp-voice` at `34f1319d5`;
+`third/schedule` is the earlier standalone Schedule task and is not reused.
+This claim is pushed before code changes.
+
+Scope is the six Schedule tools in Actions, their declaration/routing in
+Voice only with exact `LAMP_SCHEDULE_TOOLS=on`, and the single durable due
+consumer only with exact `LAMP_SCHEDULE_SPEAK=on`. Both absent/malformed/off
+states must preserve the existing catalog, wire messages and no-consumer
+startup behavior. The task explicitly permits these narrow Actions/Voice
+changes. No Gemini, audio, Body, deployment or unrelated Voice refactor.
+
+Read-only preparation inspected V1's reminder delegation, the existing
+Schedule engine/private protocol/Store, real Voice ownership and final-playout
+paths, and official Gemini function-schema documentation. Reuse the current
+Schedule service and separately tagged Store for a delivery ledger, rather
+than replacing the scheduler or treating a bus heartbeat as a speech command.
+Storage/IPC stays in one supervised optional child for the whole Voice service
+lifetime. The urgent capture/hand/privacy path polls bounded messages without
+waiting for storage or Schedule. Prepared identity must be durable before
+speech, and whole-playout evidence plus the exact Ack request must be durable
+before acknowledgement. Unknown/interrupted outcomes stay pending.
+
+Latency targets to verify on this development Mac: healthy local tool request
+through Actions to a confirmed durable Schedule result within 250 ms; one
+absolute 1,250 ms adapter deadline across all socket hops; no storage/socket
+wait added to the urgent Voice loop, whose bounded optional poll targets 2 ms.
+These exclude model latency, OS scheduling guarantees and physical sound.
+Measure first/repeated local work and stalled dependencies; First qualifies
+real storage, model schema acceptance and acoustic behavior on lamp-4ace.
+
+**Question for First on #709:** `RoomTold` starts Unknown and becomes Quiet
+only after five minutes. Should a due reminder wait for explicit Quiet after
+a provider/privacy restart, or may Unknown allow it after fresh local silence
+and normal readiness, while known Busy always vetoes it? Strict Quiet-only
+would delay a cold-start one-minute timer. Until answered, the dependent
+Unknown-room admission decision remains unqualified; the bounded client,
+Actions tools, ledger and completion/cancellation tests can proceed.
+
+Tests will use a fake Schedule socket through the real Actions/Voice paths,
+real coordinator and provider fixtures for busy room/pending speech/privacy,
+multiple PCM generations, interruptions, cancellation/snooze races, child/disk
+stalls, late callbacks, lost Ack replies and restart. Exact Ack replay includes
+its original revision guard; a new guard is a new persisted CAS attempt after
+same-delivery reconciliation. A Get-not-found without store identity cannot
+prove absence; use an identity-bearing current response. Keep all unresolved
+ledger entries when full and defer new speech rather than evicting evidence.
+
+No implementation, provider request, lamp run or new measurement is claimed
+at this taken checkpoint. Touch PR #728 remains under review; its native and
+ordinary repository CI checks are green, and no review comment was present
+at this queue read.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
@@ -1856,4 +1916,4 @@ production supervisor, trusted feed, lamp storage durability and full-service
 latency remain unqualified. Schedule and Tasks passed their host gates; their
 real storage, clock, Harness and Voice integrations remain for First to qualify
 on the lamp. Task 33 is offered in #728; no hardware qualification is claimed.
-The next Third tasks are #709 and #699.
+Task #709 is now taken and not ready; #699 is next.
