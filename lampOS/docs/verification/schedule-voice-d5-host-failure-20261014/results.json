@@ -1,0 +1,96 @@
+{
+  "machine": "Intel i7-10700K x86_64 Mac; macOS 26.6.2/Darwin 25.6.0; 64 GiB RAM; no lamp or live provider",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+  "touched": [
+    "lamp-actions",
+    "lamp-schedule",
+    "lamp-voice"
+  ],
+  "packages": [
+    "lamp-actions",
+    "lamp-schedule",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "source_manifest": "/private/tmp/lamp-third-schedule-voice-final-gate-source.json",
+  "steps": [
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.9101929440000003,
+      "log": "/private/tmp/lamp-third-schedule-voice-final-gate-format.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-schedule",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 43.095510111,
+      "log": "/private/tmp/lamp-third-schedule-voice-final-gate-clippy.txt",
+      "source_unchanged": true
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-schedule",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 676.8653602019999,
+      "log": "/private/tmp/lamp-third-schedule-voice-final-gate-tests.txt",
+      "counts": {
+        "harnesses": 16,
+        "passed": 1111,
+        "failed": 2,
+        "ignored": 8
+      },
+      "ignored": [
+        "test coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance ... ignored, requires a built lamp-turn-end and the pinned model",
+        "test coordinator::tests::hand_controls::local_hand_stop_dispatch_latency ... ignored, manual local-host speaker-control latency probe; no lamp or acoustic claim",
+        "test provider_worker::tests::sixty_second_answer_follows_output_capacity ... ignored, one minute of real time; run explicitly",
+        "test provider_worker::tests::three_minute_answer_follows_output_capacity ... ignored, three minutes of real time; run explicitly",
+        "test reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift ... ignored",
+        "test reference::tests::four_virtual_hours_capture_clocked ... ignored, four virtual hours; run in release",
+        "test reminders::tests::parent_poll_cost ... ignored, host-only parent polling measurement; run alone with --ignored --exact --nocapture",
+        "test reminders::transport::tests::poll_cost ... ignored, host-only timing probe; run alone with --ignored --exact --nocapture"
+      ],
+      "source_unchanged": true
+    }
+  ]
+}

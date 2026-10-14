@@ -1902,6 +1902,48 @@ at this taken checkpoint. Touch PR #728 remains under review; its native and
 ordinary repository CI checks are green, and no review comment was present
 at this queue read.
 
+
+## 2026-10-14 — Task 31 host gate failures retained; startup rebase
+
+Ready for lamp-voice: no
+
+The complete serial host gate on `3773c1fb` failed with 1,111 passed,
+one failed and eight ignored: the inherited motor
+`frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted`
+waited two seconds for its inert child and timed out. The exact focused test
+and all 28 motor tests then passed unchanged; that did not qualify the full
+gate. Source and raw results remain retained for the task handoff.
+
+The next complete invocation, on `d5d765862`, failed with **1,111 passed,
+two failed and eight ignored**, 16 completed harnesses. The failures are
+`crash_and_stalled_control_never_allow_replacement_or_false_cleanup` and
+`failed_reap_after_stopped_is_latched_and_reported_once`, both the same
+inherited motor helper at line 441, `owned child timed out: None`.
+Formatting and strict all-target Clippy passed; the workspace build was not
+reached. [Unedited evidence](verification/schedule-voice-d5-host-failure-20261014/README.md)
+records exact commands, all 675 source hashes, counts and the development Mac.
+No lamp result is claimed and no task code has been offered as ready.
+
+**Found, not mine:** these motor fixtures and their production path are
+unchanged by Task 31. The cause is not established. No test was weakened or
+filtered from a complete gate. First's newly fetched `7fbb03e1f` fixes an
+own-socket bind/chmod startup race in IPC/Voice transport; the task is now
+rebased onto that integration, preserving every dirty task file byte for byte.
+That is a reason to verify the new source, not evidence that it fixes these
+failures. A clean baseline, diagnostics and a new complete gate are next.
+
+The optional consumer's Linux child now explicitly sets and reads back
+`SCHED_OTHER`, static priority 0 and nice 19 before paths or storage, so it
+cannot silently inherit Voice's audio scheduler. Its exact module and Linux
+test compile and pass strict Clippy for ARM64 from this Mac; Linux execution
+and the lamp's privileged RR20 transition remain unqualified. The parent
+policy remains untouched. Both integration switches remain off unless set.
+
+The queue/issue read at approximately 16:48 UTC is unchanged: #709 remains
+taken by this session; #699 is next and unclaimed. The Unknown-room policy
+question has no answer, so the implementation conservatively waits for
+explicit Quiet. The resulting cold-start timer delay is documented.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

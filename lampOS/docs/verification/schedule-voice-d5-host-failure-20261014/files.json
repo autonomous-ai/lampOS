@@ -1,0 +1,26 @@
+{
+  "machine.json": {
+    "source": "lamp-third-schedule-voice-machine.json",
+    "sha256": "39f34254d1487d2dfa79dec2b752a91b8f4092f9cfdbcaea524af4df63071191"
+  },
+  "source.json": {
+    "source": "lamp-third-schedule-voice-final-gate-source.json",
+    "sha256": "36d1eb028287692cd0880773d1c805e014d504002446b7748fde3d34d5a67fb1"
+  },
+  "results.json": {
+    "source": "lamp-third-schedule-voice-final-gate-results.json",
+    "sha256": "ad07495896a8b621b4810707633c64249f72fd3f43e05b50e3cfdd67888c010d"
+  },
+  "format.txt": {
+    "source": "lamp-third-schedule-voice-final-gate-format.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "clippy.txt": {
+    "source": "lamp-third-schedule-voice-final-gate-clippy.txt",
+    "sha256": "9c4d7970d7178bbe96dc0aa6018fe137a3fc87a05465a961255608177850b0ca"
+  },
+  "tests.txt": {
+    "source": "lamp-third-schedule-voice-final-gate-tests.txt",
+    "sha256": "6891a22b74fc15c22e56402c540511a867ae9798d7ba2c1e8fe7ea7dff4a69a1"
+  }
+}
