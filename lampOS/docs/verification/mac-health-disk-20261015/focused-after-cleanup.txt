@@ -1,0 +1,24 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling libc v0.2.190
+   Compiling rustix v1.1.5
+   Compiling syn v3.0.7
+   Compiling errno v0.3.14
+   Compiling serde_derive v1.0.229
+   Compiling serde v1.0.229
+   Compiling lamp-bus v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/bus)
+   Compiling lamp-msgs v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/msgs)
+   Compiling lamp-health v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/health)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.84s
+     Running tests/program.rs (target/debug/deps/program-bfb0377b72ee13e1)
+
+running 6 tests
+test a_bus_that_cannot_be_subscribed_to_ends_serve_before_it_listens ... ok
+test a_part_that_is_expected_and_silent_or_has_gone_quiet_ends_show_with_3 ... ok
+test between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone ... ok
+test show_says_how_the_lamp_is_and_ends_with_its_level ... ok
+test with_nobody_serving_show_says_so_and_ends_with_3 ... ok
+test wrong_arguments_print_the_usage_and_end_with_2_for_serve_and_64_for_show ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.03s
+

@@ -1,0 +1,15 @@
+{
+  "head": "10e4ba509f2d1cbb97a52979c09deb0d2d1a371e",
+  "base": "7fbb03e1f2e61ad6dfaf184cd768bad6524c2d76",
+  "status": "interrupted; handle absent and no matching process; final exit status unavailable",
+  "completed_suites": 166,
+  "totals": {
+    "passed": 2257,
+    "failed": 1,
+    "ignored": 16
+  },
+  "raw_sha256": "9cd9f998186fe69f05f5a6b12abb500f9eeb018068b7744094f79505023ecc87",
+  "failure": "lamp-health tests/program.rs:536 expected missing-Eyes journal entry; actual board disk warn at 9% free",
+  "last_suite": "lamp-settings tests/release.rs; interrupted after incomplete_binary_staging_preserves_old_set_and_retries_without_replacing_it",
+  "workspace_build": "not reached"
+}

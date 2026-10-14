@@ -1,0 +1,9 @@
+{
+  "removed": "/private/tmp/lamp-fourth-mood/lampOS/target",
+  "contents": "only Fourth Mood build cache; task source, raw evidence and artifacts outside target retained",
+  "before_available_bytes": 44398587904,
+  "after_available_bytes": 62222479360,
+  "reclaimed_bytes": 17823891456,
+  "before_free_fraction": 0.08880371621732885,
+  "after_free_fraction": 0.12445412478819458
+}

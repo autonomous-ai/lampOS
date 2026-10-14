@@ -2334,6 +2334,39 @@ workspace Clippy passed and no test failures so far. Its eventual result
 will remain tied to that pre-fix source. A fresh gate and final-head native
 ARM64 success are still required before a Memory PR is ready.
 
+## 2026-10-15, 00:17 ICT: retain the Mac disk-dependent Health failure
+
+Ready for lamp-voice: no
+
+Memory's source `10e4ba509f2d1cbb97a52979c09deb0d2d1a371e`, rebased on
+First's reference-socket repair, passed strict native x86_64 Linux workspace
+lint, all three capture fixtures and Memory/Voice/Tasks ARM64 cross-build.
+Its full Mac workspace attempt passed formatting/strict lint, then failed
+Health's process fixture: the host's 9% free disk correctly produced a
+board warning, while its final journal assertion expected missing Eyes.
+The run later stopped mid-Settings suite; its handle and process were gone
+when checked, with no final exit status available. Completed suites total
+2,257 passed / 1 failed / 16 ignored, 166 suites; no passing gate is claimed.
+The earlier pre-repair Mac dependency gate remains separately green at
+2,363 / 0 / 15 ignored, 112 suites, source `2d081316b`.
+
+Found, not mine: Health's earlier assertions account for the actual board
+level, but `tests/program.rs:536` does not. Fourth's task changes none of
+the Health source. Exact failure, source proof and unmodified partial log
+are in `verification/mac-health-disk-20261015/`. The full test command also
+reported the inherited Controls/Expression `replay_cost` output-name
+collision; it was retained, not suppressed.
+
+Fourth removed only the inactive Mood target cache, after verifying the
+gate had stopped. This reclaimed 17,823,891,456 bytes and raised filesystem
+free space from 8.8804% to 12.4454%. Without source changes, all six Health
+program tests then passed. This environmental retest does not fix the
+fixture's below-10%-free case; the owner is being told once. The complete
+gate has restarted at local `5fa0f78d67442107bd5b9c000a9ff2e57d7c67d1`,
+based on `dcc2e6b1ee67e11e2de89f893696432e47c4d8c5`, including the new
+short-sound and Tasks changes. All nine task source/test/manifest files
+remain unchanged. No lamp measurement, deployment or new ready claim.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

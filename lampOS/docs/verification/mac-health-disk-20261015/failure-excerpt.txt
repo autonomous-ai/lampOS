@@ -1,0 +1,14 @@
+thread 'a_part_that_is_expected_and_silent_or_has_gone_quiet_ends_show_with_3' (561849740) panicked at crates/health/tests/program.rs:536:5:
+assertion `left == right` failed
+  left: "lamp-health: health warn: board: the disk is filling up: 9% of it is free"
+ right: "lamp-health: health stale: eyes: has never reported"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_part_that_is_expected_and_silent_or_has_gone_quiet_ends_show_with_3
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.99s
+
+error: test failed, to rerun pass `-p lamp-health --test program`
+     
