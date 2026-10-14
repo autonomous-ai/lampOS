@@ -1,0 +1,34 @@
+{
+  "failed_test": "coordinator::tests::pilot_faults::sigterm_while_metadata_storage_is_stalled_stops_cleanly_and_reports_the_loss",
+  "raw_sha256": "311ed3e324e2c0b625ba184e23b127931dde9b8e0bda8f17b2d426ec0495c882",
+  "raw_lines": [
+    993,
+    1006
+  ],
+  "observed": {
+    "fixture": "Threaded",
+    "real_conversation_and_cleanup_ms": 954.02846,
+    "result": "service privacy freshness lost before next observation",
+    "privacy_producer_gap_us": 50902,
+    "refused_privacy_writes": 0,
+    "capture_send_attempt_gap_us": 48507,
+    "oldest_source_age_at_send_attempt_us": 39233,
+    "accepted_speaker_chunks": 0,
+    "fired_actions": [],
+    "stopped_peers": [
+      "privacy",
+      "speaker",
+      "capture",
+      "provider"
+    ],
+    "secondary_failure": "lamp-service-trace panicked at service_trace.rs:338 with RecvError"
+  },
+  "inference": "The real privacy producer gap exceeds the unchanged 50000 us bound and is consistent with the coordinator freshness failure. Exact coordinator consumption age was not recorded. The SIGTERM injection had not fired.",
+  "source_inspection": "The test asserts run success before releasing the stalled writer; unwinding drops its sender and causes the secondary RecvError. The writer thread and finish deadline can stay real while the scenario policy clock is stepped.",
+  "next_work": "Add an actual writer-entered startup barrier, explicit stepped scenario policy, a separate host SIGTERM-to-reap measurement, and release-on-unwind. Keep original functional assertions, real finish/cleanup bounds and normal privacy policy.",
+  "not_qualified": [
+    "ten consecutive full suites",
+    "native ARM64 task-head run",
+    "lamp timing or behavior"
+  ]
+}

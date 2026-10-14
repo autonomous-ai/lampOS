@@ -1,0 +1,28 @@
+{
+  "scope": "Existing integration targets compile lamp_voice as the ordinary non-test library; these test sources were not changed by this task.",
+  "completed_run": 1,
+  "suites": [
+    {
+      "suite": "Running tests/core.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/core-cdf874198e052dc5)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/privacy_state.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/privacy_state-3ad584ded4409f37)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    }
+  ],
+  "raw_sha256": "69392a042fff673fc9e19f50b0763645f260af244c9e5da870ed4c2c77c2ed91",
+  "limitation": "Synthetic policy/wire checks, not lamp timing or a bit-for-bit binary comparison."
+}

@@ -2981,6 +2981,49 @@ is yet claimed. The latest queue still assigns only #739 to Fourth, with
 the Body scope question unanswered. All previous failures remain retained.
 
 
+## 2026-10-15, 05:52 ICT: task 46, v6 stops at the stalled metadata fixture
+
+Ready for lamp-voice: no
+
+[Complete v6 evidence](verification/voice-fixtures-loaded-v6-20261015/README.md)
+retains three full serial Mac passes (1,170 / 0 / 8 existing ignored each,
+21 suites) and the failed fourth run (1,169 / 1 / 8, 386.332 Cargo wall
+seconds). The source at `cf2f5b43c8113a704324c2743af3cd92bbc4fdda` stayed
+unchanged. All twelve actual ARM64 cross-build cycles passed; future test
+runs stopped at the first failure and the active build finished normally.
+The 326 samples recorded one-minute load 4.577–9.165 and minimum available
+space 42,612,764,672 bytes on Fourth's Intel Mac. This is neither native
+ARM execution nor lamp evidence, and it is not a ten-run success.
+
+The failing case is
+`pilot_faults::sigterm_while_metadata_storage_is_stalled_stops_cleanly_and_reports_the_loss`.
+It reported lost privacy freshness, with a measured real producer gap of
+50,902 us against the unchanged 50,000 us bound. Capture's largest
+send-attempt gap was 48,507 us, and its oldest source age at an attempt was
+39,233 us. These are producer observations; coordinator consumption age
+was not measured. The run had accepted no speaker chunk and had not fired
+its scripted SIGTERM. All four named regressions and the other 97 affected
+cohort outcomes matched expectations. Failed raw SHA-256:
+`311ed3e324e2c0b625ba184e23b127931dde9b8e0bda8f17b2d426ec0495c882`.
+
+Source review also found that the assertion unwinds before releasing the
+metadata writer, causing the retained secondary `RecvError` panic. The
+correction will keep the actual writer thread blocked and its finish wait
+real, establish its entered barrier before the scenario, use stepped policy
+time for the synthetic peers, measure actual SIGTERM-to-reap separately,
+and release the writer on failure/unwind. Original functional assertions
+and all production bounds remain required. No new ready claim or code
+commit is made from this failed gate.
+
+The evidence scripts were independently checked with four clearly labelled
+synthetic cases: missing summaries remain archivable and unqualified, and
+an outer timeout rejects even an exit-zero command. Those replay one
+completed run and do not add real qualification runs. The lamp handoff now
+requires the running executable hash to match the exact-head CI artifact.
+The 22:43 UTC queue fetch found the same integration head, only #739 open
+for Fourth, and no answer to the Body scope question; no Body edits.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

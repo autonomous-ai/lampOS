@@ -1,0 +1,27 @@
+{
+  "base": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "manifest_sha256": "4990e9717505ae432d4cd975c38c60e7ad703df0655a3f22cbe54a556977717f",
+  "declared_voice_dependents": [
+    {
+      "crate": "lamp-voice-eval",
+      "kinds": [
+        null
+      ]
+    },
+    {
+      "crate": "lamp-memory",
+      "kinds": [
+        "dev"
+      ]
+    }
+  ],
+  "workspace_packages": 34,
+  "normal_library_time_source": "lamp_ipc::monotonic_us; session_instant returns Instant::now under cfg(not(test))",
+  "normal_privacy_freshness_us": 50000,
+  "normal_reopen_stable_us": 60000,
+  "source_and_channel_age_us": 100000,
+  "test_clock_module_cfg": "cfg(test)",
+  "test_freshness_field_and_constructor_cfg": "cfg(test)",
+  "normal_reminder_state_forwarded": true,
+  "new_runtime_flags": []
+}

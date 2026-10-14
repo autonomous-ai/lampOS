@@ -1,0 +1,57 @@
+{
+  "synthetic": true,
+  "purpose": "SYNTHETIC evidence-script checks only. Ten rows replay ONE completed Mac run, with deliberate metadata mutations. This is not ten real runs, qualification evidence, a Cargo run, a native run, or lamp evidence.",
+  "script_sha256": {
+    "audit": "c054c5c69720c14113b40e35860b7e7ae0a25da6e7778aac4720da18455f6d0d",
+    "collector": "cb1073ed5d7414a3141d6795db23c5054ea74e6d21b0c3f4afb9c7050c84beca"
+  },
+  "selfcheck_sha256": "0e08f23c371ce19d396012cc87d9d878739415f25832954c942dc38389054bd0",
+  "completed_run_1_raw_sha256": "69392a042fff673fc9e19f50b0763645f260af244c9e5da870ed4c2c77c2ed91",
+  "completed_build_1_raw_sha256": "8685299cb02f98cd461b00d346f7b52f6039b25d5b6f4dbcc9d9b165951125df",
+  "results": [
+    {
+      "case": "positive-control",
+      "synthetic": true,
+      "qualified": true,
+      "expected": true,
+      "passed": true,
+      "archive": null
+    },
+    {
+      "case": "missing-counts",
+      "synthetic": true,
+      "qualified": false,
+      "expected": false,
+      "passed": true,
+      "archive": {
+        "folder": "/private/tmp/lamp-fourth-v6-evidence-synthetic-a73z9aih/SYNTHETIC-missing-counts-archive",
+        "qualified": false,
+        "artifact_files": 35
+      }
+    },
+    {
+      "case": "run-timeout-exit-zero",
+      "synthetic": true,
+      "qualified": false,
+      "expected": false,
+      "passed": true,
+      "archive": {
+        "folder": "/private/tmp/lamp-fourth-v6-evidence-synthetic-a73z9aih/SYNTHETIC-run-timeout-exit-zero-archive",
+        "qualified": false,
+        "artifact_files": 35
+      }
+    },
+    {
+      "case": "build-timeout-exit-zero",
+      "synthetic": true,
+      "qualified": false,
+      "expected": false,
+      "passed": true,
+      "archive": {
+        "folder": "/private/tmp/lamp-fourth-v6-evidence-synthetic-a73z9aih/SYNTHETIC-build-timeout-exit-zero-archive",
+        "qualified": false,
+        "artifact_files": 35
+      }
+    }
+  ]
+}

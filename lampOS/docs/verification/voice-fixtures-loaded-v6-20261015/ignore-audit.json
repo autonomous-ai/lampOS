@@ -1,0 +1,31 @@
+{
+  "v6_ignored": [
+    "test coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance ... ignored, requires a built lamp-turn-end and the pinned model",
+    "test coordinator::tests::hand_controls::local_hand_stop_dispatch_latency ... ignored, manual local-host speaker-control latency probe; no lamp or acoustic claim",
+    "test provider_worker::tests::sixty_second_answer_follows_output_capacity ... ignored, one minute of real time; run explicitly",
+    "test provider_worker::tests::three_minute_answer_follows_output_capacity ... ignored, three minutes of real time; run explicitly",
+    "test reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift ... ignored",
+    "test reference::tests::four_virtual_hours_capture_clocked ... ignored, four virtual hours; run in release",
+    "test reminders::tests::parent_poll_cost ... ignored, host-only parent polling measurement; run alone with --ignored --exact --nocapture",
+    "test reminders::transport::tests::poll_cost ... ignored, host-only timing probe; run alone with --ignored --exact --nocapture"
+  ],
+  "v5_ignored": [
+    "test coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance ... ignored, requires a built lamp-turn-end and the pinned model",
+    "test coordinator::tests::hand_controls::local_hand_stop_dispatch_latency ... ignored, manual local-host speaker-control latency probe; no lamp or acoustic claim",
+    "test provider_worker::tests::sixty_second_answer_follows_output_capacity ... ignored, one minute of real time; run explicitly",
+    "test provider_worker::tests::three_minute_answer_follows_output_capacity ... ignored, three minutes of real time; run explicitly",
+    "test reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift ... ignored",
+    "test reference::tests::four_virtual_hours_capture_clocked ... ignored, four virtual hours; run in release"
+  ],
+  "new_upstream_ignored": [
+    "test reminders::tests::parent_poll_cost ... ignored, host-only parent polling measurement; run alone with --ignored --exact --nocapture",
+    "test reminders::transport::tests::poll_cost ... ignored, host-only timing probe; run alone with --ignored --exact --nocapture"
+  ],
+  "raw_sha256": "69392a042fff673fc9e19f50b0763645f260af244c9e5da870ed4c2c77c2ed91",
+  "added_by_task": false,
+  "new_ignores_are_upstream_files_unchanged": {
+    "lampOS/crates/voice/src/reminders/tests.rs": true,
+    "lampOS/crates/voice/src/reminders/transport.rs": true
+  },
+  "upstream_base": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda"
+}
