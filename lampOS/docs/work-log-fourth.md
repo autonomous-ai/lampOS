@@ -2597,6 +2597,45 @@ Source, prior evidence and other builders' caches were untouched. The exact
 preflight record will accompany the task's verification evidence.
 
 
+## 2026-10-15, 02:55 ICT: task 46, first loaded run and scope question
+
+Ready for lamp-voice: no
+
+The first loaded full Voice run failed: 1,051 passed / 2 failed / 6 ignored,
+21 suites, 509.801 seconds including Cargo. The exact source, raw output,
+commands, host samples and both successful overlapping ARM64 cross-builds
+are retained in [the failed qualification](verification/voice-fixtures-loaded-v1-20261015/README.md).
+This was Fourth's Intel Mac plus its x86_64 Podman VM, not a lamp. The
+three originally named cases and all motor cases passed; two adjacent
+scripted endpoint/pilot cases failed privacy freshness. Future runs stopped
+on the failure. The stepped fixture is being extended to those cases,
+with all original assertions and production bounds retained.
+
+First's 02:23 comment 6176474078 adds the early-end lone-name/pause case.
+It uses the actual provider worker and a real Tokio/WebSocket service,
+so partially replacing its clock would mix domains. Its proposed fixture
+uses an explicit, per-instance, test-only 100 ms privacy age bound,
+matching the existing IPC ceiling, and a 12 s host watchdog; normal and
+unrelated test gates remain at 50 ms. This is bounded scheduling tolerance
+for an ordering integration test, not proof of arbitrary-load determinism
+or the lamp's 50 ms responsiveness. It preserves source timestamps,
+transport bounds, 60 ms reopening and shared 300 ms child cleanup.
+
+Question for First on #739: may Fourth add a narrow injected-clock seam
+in `crates/body/src/runtime/supervisor.rs` for the assigned motor fixtures?
+The proposed `Supervisor<C = SystemClock>` keeps every existing production
+constructor on `SystemClock`, adds an explicit clock constructor, and
+changes no safety or process bound. The real child Worker and motor core
+already accept a clock. A private Step/Ack fixture can then share one
+logical domain through parent, child and actual Unix channels, retaining
+FIFO, original timestamps, real startup/exit watchdogs and reap proof.
+This removes the current file gate that blocks child control handling
+while the parent's real 20 ms inhibit deadline is running. Passing this
+one loaded run does not remove that race. Body is Fifth's under the
+ownership rules; no Body source is changed pending this scope answer.
+Voice-only work continues. No user response or lamp access is needed.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

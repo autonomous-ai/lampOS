@@ -1,0 +1,130 @@
+{
+  "runs": [
+    {
+      "command": [
+        "/Users/autonomous/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "cwd": "/private/tmp/lamp-fourth-fixtures-source-v1-b9kzth7j",
+      "started_at_utc": "2026-10-14T19:43:09.328242+00:00",
+      "load_at_start": [
+        5.02783203125,
+        3.8857421875,
+        3.361328125
+      ],
+      "exit_code": 101,
+      "finished_at_utc": "2026-10-14T19:51:39.157238+00:00",
+      "elapsed_seconds": 509.80104338983074,
+      "load_at_end": [
+        8.71435546875,
+        7.56787109375,
+        5.67578125
+      ],
+      "raw_sha256": "c15a4224b958fc82eb087a5cc040167fd16cb5f71fa57f9adb42e8a632c60333",
+      "changed_source_files": [],
+      "counts": {
+        "suites": 21,
+        "passed": 1051,
+        "failed": 2,
+        "ignored": 6,
+        "measured": 0,
+        "filtered": 0
+      },
+      "build_errors_at_end": []
+    }
+  ],
+  "builds": [
+    {
+      "cycle": 1,
+      "started_at_utc": "2026-10-14T19:43:06.731667+00:00",
+      "command": [
+        "podman",
+        "run",
+        "--rm",
+        "--name",
+        "lamp-fourth-fixture-load-v1-1",
+        "--network",
+        "none",
+        "--cap-drop=ALL",
+        "--tmpfs",
+        "/cargo:rw,mode=1777",
+        "-v",
+        "/private/tmp/lamp-fourth-fixtures-source-v1-b9kzth7j:/source_fixtures:ro",
+        "-v",
+        "/Users/autonomous/.cargo/registry:/cargo/registry:ro",
+        "-v",
+        "/Users/autonomous/.cargo/git:/cargo/git:ro",
+        "-v",
+        "lamp-fourth-controls-target:/target",
+        "-e",
+        "CARGO_BUILD_JOBS=4",
+        "-e",
+        "CARGO_TARGET_DIR=/target",
+        "-w",
+        "/source_fixtures",
+        "localhost/lampos-fourth-native-user-check:latest",
+        "bash",
+        "-c",
+        "set -euo pipefail\nid\nuname -smr\nnproc\nrustc -Vv\ncargo --version\nset -euo pipefail\ncargo clean --offline --locked --release --target aarch64-unknown-linux-gnu -p lamp-actions -p lamp-air -p lamp-audio -p lamp-body -p lamp-bus -p lamp-camera -p lamp-controls -p lamp-ears -p lamp-environment -p lamp-expression -p lamp-eyes -p lamp-gemini -p lamp-health -p lamp-ipc -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-mood -p lamp-msgs -p lamp-name -p lamp-observer -p lamp-policy -p lamp-records -p lamp-ring -p lamp-schedule -p lamp-sound-fixtures -p lamp-surround -p lamp-tasks -p lamp-turn-end -p lamp-turn-end-wire -p lamp-turn-owner -p lamp-voice -p lamp-voice-eval\ncargo build --offline --locked --release --workspace --bins --examples --target aarch64-unknown-linux-gnu\n"
+      ],
+      "image_sha256": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+      "compilation_seen": true,
+      "first_compiling_at_utc": "2026-10-14T19:43:09.328075+00:00",
+      "exit_code": 0,
+      "finished_at_utc": "2026-10-14T19:49:09.245973+00:00",
+      "elapsed_seconds": 362.4859293391928,
+      "raw_sha256": "aba5c7609daa1e732915b3c724b39c13aadefe26a145b2245e30bad87c6eaae2"
+    },
+    {
+      "cycle": 2,
+      "started_at_utc": "2026-10-14T19:49:09.246665+00:00",
+      "command": [
+        "podman",
+        "run",
+        "--rm",
+        "--name",
+        "lamp-fourth-fixture-load-v1-2",
+        "--network",
+        "none",
+        "--cap-drop=ALL",
+        "--tmpfs",
+        "/cargo:rw,mode=1777",
+        "-v",
+        "/private/tmp/lamp-fourth-fixtures-source-v1-b9kzth7j:/source_fixtures:ro",
+        "-v",
+        "/Users/autonomous/.cargo/registry:/cargo/registry:ro",
+        "-v",
+        "/Users/autonomous/.cargo/git:/cargo/git:ro",
+        "-v",
+        "lamp-fourth-controls-target:/target",
+        "-e",
+        "CARGO_BUILD_JOBS=4",
+        "-e",
+        "CARGO_TARGET_DIR=/target",
+        "-w",
+        "/source_fixtures",
+        "localhost/lampos-fourth-native-user-check:latest",
+        "bash",
+        "-c",
+        "set -euo pipefail\ncargo clean --offline --locked --release --target aarch64-unknown-linux-gnu -p lamp-actions -p lamp-air -p lamp-audio -p lamp-body -p lamp-bus -p lamp-camera -p lamp-controls -p lamp-ears -p lamp-environment -p lamp-expression -p lamp-eyes -p lamp-gemini -p lamp-health -p lamp-ipc -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-mood -p lamp-msgs -p lamp-name -p lamp-observer -p lamp-policy -p lamp-records -p lamp-ring -p lamp-schedule -p lamp-sound-fixtures -p lamp-surround -p lamp-tasks -p lamp-turn-end -p lamp-turn-end-wire -p lamp-turn-owner -p lamp-voice -p lamp-voice-eval\ncargo build --offline --locked --release --workspace --bins --examples --target aarch64-unknown-linux-gnu\n"
+      ],
+      "image_sha256": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+      "compilation_seen": true,
+      "first_compiling_at_utc": "2026-10-14T19:49:11.696178+00:00",
+      "exit_code": 0,
+      "finished_at_utc": "2026-10-14T19:51:40.093903+00:00",
+      "elapsed_seconds": 150.84774603089318,
+      "raw_sha256": "43b34e7afeef613082fe1cb1fcf1654fb802feb9eeea91e5d5b89ff8a35e5ff3"
+    }
+  ],
+  "build_errors": [],
+  "finished_at_utc": "2026-10-14T19:51:40.094534+00:00",
+  "changed_source_files": []
+}

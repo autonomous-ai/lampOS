@@ -1,0 +1,254 @@
+uid=1000(1000) gid=1000(1000) groups=1000(1000)
+Linux 6.12.13-200.fc41.x86_64 x86_64
+6
+rustc 1.96.0 (ac68faa20 2026-05-25)
+binary: rustc
+commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96
+commit-date: 2026-05-25
+host: x86_64-unknown-linux-gnu
+release: 1.96.0
+LLVM version: 22.1.2
+cargo 1.96.0 (30a34c682 2026-05-25)
+     Removed 164 files, 159.6MiB total
+warning: output filename collision at /target/aarch64-unknown-linux-gnu/release/examples/replay_cost
+  |
+  = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/source_fixtures/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/source_fixtures/crates/controls)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+warning: output filename collision at /target/aarch64-unknown-linux-gnu/release/examples/replay_cost.dwp
+  |
+  = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/source_fixtures/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/source_fixtures/crates/controls)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+   Compiling memchr v2.8.3
+   Compiling serde_core v1.0.229
+   Compiling syn v3.0.7
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.151
+   Compiling libc v0.2.190
+   Compiling rustix v1.1.5
+   Compiling jobserver v0.1.35
+   Compiling cc v1.7.0
+   Compiling smallvec v1.16.3
+   Compiling autocfg v1.5.1
+   Compiling futures-core v0.3.34
+   Compiling libm v0.2.16
+   Compiling ring v0.17.14
+   Compiling serde_derive v1.0.229
+   Compiling subtle v2.6.1
+   Compiling futures-sink v0.3.34
+   Compiling tokio-macros v2.7.2
+   Compiling lamp-ipc v0.1.0 (/source_fixtures/crates/ipc)
+   Compiling tokio v1.53.1
+   Compiling lamp-bus v0.1.0 (/source_fixtures/crates/bus)
+   Compiling lamp-msgs v0.1.0 (/source_fixtures/crates/msgs)
+   Compiling rustls v0.23.45
+   Compiling futures-channel v0.3.34
+   Compiling futures-macro v0.3.34
+   Compiling rustls-webpki v0.103.15
+   Compiling num-traits v0.2.19
+   Compiling futures-io v0.3.34
+   Compiling futures-util v0.3.34
+   Compiling lamp-turn-owner v0.1.0 (/source_fixtures/crates/turn-owner)
+   Compiling either v1.19.0
+   Compiling itertools v0.13.0
+   Compiling thiserror-impl v2.0.21
+   Compiling synstructure v0.14.0
+   Compiling thiserror v2.0.21
+   Compiling zerocopy v0.8.62
+   Compiling zerofrom-derive v0.1.8
+   Compiling num-integer v0.1.47
+   Compiling zerocopy-derive v0.8.62
+   Compiling yoke-derive v0.8.4
+   Compiling zerofrom v0.1.8
+   Compiling stable_deref_trait v1.2.1
+   Compiling dyn-clone v1.0.20
+   Compiling tokio-rustls v0.26.6
+   Compiling yoke v0.8.3
+   Compiling zerovec-derive v0.11.6
+   Compiling matrixmultiply v0.3.11
+   Compiling parking_lot_core v0.9.12
+   Compiling tungstenite v0.30.0
+   Compiling clang-sys v1.9.1
+   Compiling zerovec v0.11.8
+   Compiling num-complex v0.4.6
+   Compiling displaydoc v0.2.7
+   Compiling memo-map v0.3.4
+   Compiling scopeguard v1.2.0
+   Compiling same-file v1.0.6
+   Compiling rawpointer v0.2.1
+   Compiling bindgen v0.72.1
+   Compiling walkdir v2.5.0
+   Compiling half v2.7.1
+   Compiling lock_api v0.4.14
+   Compiling minijinja v2.24.0
+   Compiling tokio-tungstenite v0.30.0
+   Compiling lamp-keeper v0.1.0 (/source_fixtures/crates/keeper)
+   Compiling hashbrown v0.16.1
+   Compiling alsa-sys v0.6.1
+   Compiling nom v8.0.0
+   Compiling typeid v1.0.3
+   Compiling itertools v0.15.0
+   Compiling tract-linalg v0.23.8
+   Compiling string-interner v0.20.0
+   Compiling parking_lot v0.12.5
+   Compiling v4l2r v0.0.8
+   Compiling lamp-gemini v0.1.0 (/source_fixtures/crates/gemini)
+   Compiling ndarray v0.17.2
+   Compiling strength_reduce v0.2.4
+   Compiling lazy_static v1.5.1
+   Compiling erased-serde v0.4.10
+   Compiling maplit v1.0.2
+   Compiling dyn-hash v1.0.0
+   Compiling inventory v0.3.25
+   Compiling downcast-rs v2.0.2
+   Compiling transpose v0.2.3
+   Compiling nom-language v0.1.0
+   Compiling lamp-camera v0.1.0 (/source_fixtures/crates/camera)
+   Compiling lamp-body v0.1.0 (/source_fixtures/crates/body)
+   Compiling tract-data v0.23.8
+   Compiling tinystr v0.8.4
+   Compiling primal-check v0.3.4
+   Compiling bytemuck_derive v1.12.1
+   Compiling derive-new v0.7.0
+   Compiling bit-vec v0.10.1
+   Compiling litemap v0.8.3
+   Compiling writeable v0.6.4
+   Compiling libsqlite3-sys v0.38.2
+   Compiling gpiocdev-uapi v0.7.0
+   Compiling icu_locale_core v2.3.0
+   Compiling bit-set v0.11.1
+   Compiling bytemuck v1.25.2
+   Compiling rustfft v6.4.1
+   Compiling alsa v0.12.1
+   Compiling zerotrie v0.2.5
+   Compiling potential_utf v0.1.6
+   Compiling icu_properties_data v2.3.0
+   Compiling utf8_iter v1.0.4
+   Compiling icu_normalizer_data v2.3.0
+   Compiling anymap3 v1.1.0
+   Compiling tract-core v0.23.8
+   Compiling icu_collections v2.3.0
+   Compiling icu_provider v2.3.1
+   Compiling sonora-agc2 v0.2.0
+   Compiling gpiocdev v0.8.0
+   Compiling http-body v1.1.0
+   Compiling xattr v1.6.1
+   Compiling filetime v0.2.29
+   Compiling jiff-core v0.1.1
+   Compiling jiff-tzdb v0.1.9
+   Compiling percent-encoding v2.3.2
+   Compiling jiff v0.2.38
+   Compiling tar v0.4.46
+   Compiling sonora v0.2.0
+   Compiling lamp-controls v0.1.0 (/source_fixtures/crates/controls)
+   Compiling lamp-turn-end-wire v0.1.0 (/source_fixtures/crates/turn-end-wire)
+   Compiling anyhow v1.0.104
+   Compiling tower-service v0.3.3
+   Compiling simd-adler32 v0.3.10
+   Compiling tract-nnef v0.23.8
+   Compiling lamp-ring v0.1.0 (/source_fixtures/crates/ring)
+   Compiling icu_normalizer v2.3.0
+   Compiling icu_properties v2.3.0
+   Compiling lamp-audio v0.1.0 (/source_fixtures/crates/audio)
+   Compiling lamp-expression v0.1.0 (/source_fixtures/crates/expression)
+   Compiling cmake v0.1.58
+   Compiling dunce v1.0.5
+   Compiling try-lock v0.2.5
+   Compiling fs_extra v1.3.0
+   Compiling want v0.3.2
+   Compiling idna_adapter v1.2.2
+   Compiling prost-derive v0.14.4
+   Compiling aws-lc-sys v0.46.0
+   Compiling tract-extra v0.23.8
+   Compiling num-bigint v0.4.8
+   Compiling rusqlite v0.40.2
+   Compiling rand_distr v0.6.0
+   Compiling sync_wrapper v1.0.2
+   Compiling httpdate v1.0.3
+   Compiling tower-layer v0.3.3
+   Compiling atomic-waker v1.1.2
+   Compiling fastrand v2.5.0
+   Compiling tempfile v3.27.0
+   Compiling hyper v1.12.0
+   Compiling tract-onnx-opl v0.23.8
+   Compiling num-rational v0.4.2
+   Compiling prost v0.14.4
+   Compiling idna v1.1.0
+   Compiling lamp-voice v0.1.0 (/source_fixtures/crates/voice)
+   Compiling tract-hir v0.23.8
+   Compiling form_urlencoded v1.2.2
+   Compiling memmap2 v0.9.11
+   Compiling ipnet v2.12.2
+   Compiling base64 v0.23.1
+   Compiling hyper-util v0.1.21
+   Compiling tract-onnx v0.23.8
+   Compiling url v2.5.8
+   Compiling tower v0.5.3
+   Compiling http-body-util v0.1.5
+   Compiling pin-project-internal v1.1.13
+   Compiling aho-corasick v1.1.5
+   Compiling heck v0.5.0
+   Compiling semver v1.0.28
+   Compiling aws-lc-rs v1.18.2
+   Compiling regex-syntax v0.8.11
+   Compiling openssl-probe v0.2.1
+   Compiling rustls-native-certs v0.8.5
+   Compiling regex-automata v0.4.18
+   Compiling rustc_version v0.4.1
+   Compiling snafu-derive v0.8.9
+   Compiling pin-project v1.1.13
+   Compiling futures-executor v0.3.34
+   Compiling tokio-util v0.7.20
+   Compiling bstr v1.13.1
+   Compiling mime v0.3.17
+   Compiling untrusted v0.7.1
+   Compiling axum-core v0.5.6
+   Compiling globset v0.4.20
+   Compiling futures v0.3.34
+   Compiling snafu v0.8.9
+   Compiling curve25519-dalek v4.1.3
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling tower-http v0.6.11
+   Compiling hyper-rustls v0.27.10
+   Compiling olpc-cjson v0.1.4
+   Compiling pem v3.0.6
+   Compiling serde_plain v1.0.2
+   Compiling async-recursion v1.2.0
+   Compiling async-trait v0.1.92
+   Compiling serde_path_to_error v0.1.20
+   Compiling typed-path v0.9.3
+   Compiling ort-sys v2.0.0-rc.14
+   Compiling matchit v0.8.4
+   Compiling hex v0.4.3
+   Compiling axum v0.8.9
+   Compiling tough v0.24.0 (/source_fixtures/vendor/tough)
+   Compiling reqwest v0.13.5
+   Compiling signature v2.2.0
+   Compiling zune-core v0.4.12
+   Compiling zune-jpeg v0.4.21
+   Compiling ed25519 v2.2.3
+   Compiling lamp-surround v0.1.0 (/source_fixtures/crates/surround)
+   Compiling lamp-tasks v0.1.0 (/source_fixtures/crates/tasks)
+   Compiling lamp-observer v0.1.0 (/source_fixtures/crates/observer)
+   Compiling lamp-sound-fixtures v0.1.0 (/source_fixtures/crates/sound-fixtures)
+   Compiling lamp-policy v0.1.0 (/source_fixtures/crates/policy)
+   Compiling libloading v0.9.0
+   Compiling ort v2.0.0-rc.14
+   Compiling ed25519-dalek v2.2.0
+   Compiling lamp-eyes v0.1.0 (/source_fixtures/crates/eyes)
+   Compiling lamp-memory v0.1.0 (/source_fixtures/crates/memory)
+   Compiling lamp-schedule v0.1.0 (/source_fixtures/crates/schedule)
+   Compiling lamp-mood v0.1.0 (/source_fixtures/crates/mood)
+   Compiling glam v0.33.12
+   Compiling lamp-lean v0.1.0 (/source_fixtures/crates/lean)
+   Compiling lamp-turn-end v0.1.0 (/source_fixtures/crates/turn-end)
+   Compiling lamp-voice-eval v0.1.0 (/source_fixtures/crates/voice-eval)
+   Compiling lamp-name v0.1.0 (/source_fixtures/crates/name)
+   Compiling lamp-ears v0.1.0 (/source_fixtures/crates/ears)
+   Compiling lamp-environment v0.1.0 (/source_fixtures/crates/environment)
+   Compiling lamp-health v0.1.0 (/source_fixtures/crates/health)
+   Compiling lamp-air v0.1.0 (/source_fixtures/crates/air)
+   Compiling lamp-actions v0.1.0 (/source_fixtures/crates/actions)
+   Compiling lamp-records v0.1.0 (/source_fixtures/crates/records)
+    Finished `release` profile [optimized] target(s) in 6m 01s
