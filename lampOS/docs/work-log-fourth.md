@@ -2038,6 +2038,31 @@ the terminal exit and full retained output supersede that inference. No
 ready line or PR was issued for it. Mood's repaired Linux gate is now running
 while I retain and report this failure and continue independent checks.
 
+## 2026-10-14, 20:49 ICT: Mood native ARM64 checkpoint passes
+
+Ready for lamp-voice: no
+
+Native ARM64 run 38570324967 completed successfully on Mood checkpoint
+`9b00b4b7ba23930b7030b4722c244e00ad345cee`: release workspace build,
+3,880 passed tests, zero failed, 31 declared ignored checks across 261
+suites, followed by successful hash/artifact upload. Full output is in
+`verification/arm64-ready-20261014/mood-38570324967.txt`. Uploaded Mood SHA-256:
+`4b5b2b681aab0a33a0de7b14daefb68a21d5f422aca4c85a4ba4ad59aa9fa114`.
+This is a GitHub Ubuntu 22.04 ARM64 runner, not a lamp, and it predates the
+latest upstream rebase.
+
+On `a9992f272`, Mood now passes native x86_64 Linux whole-workspace strict
+Clippy, 155 focused tests (zero failures, two manual checks ignored), and
+the ARM64 release cross-build. Both Mood and Memory pass their current Mac
+formatting/strict Clippy/workspace builds. Memory's current Linux dependency
+lint and ARM64 cross-build pass too. These results are retained with each
+task. Mood's new Mac run covers the changed upstream crate closure plus
+Mood/Msgs, serially with other local builds stopped. Its terminal outcome
+is still pending. Memory's preceding full failure remains a failed gate;
+five isolated repetitions of that motor fixture passed, without identifying
+the cause. The finding is on #698, comment 6169724864. No task is newly ready,
+and the eventual heads still need their own green ARM64 runs.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

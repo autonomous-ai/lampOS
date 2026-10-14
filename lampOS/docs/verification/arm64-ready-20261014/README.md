@@ -11,10 +11,11 @@ serially, prints binary SHA-256 and uploads the artifact for seven days.
 | Records #707 | `abc5d134ffb50b7cca0c78ab975528a40cee0096` | [38561266393](https://github.com/autonomous-ai/lampOS/actions/runs/38561266393) | 3,802 / 0 / 29 |
 | Judge audit #700 | `800ce47a5230d6b99f44dbcb92e56180646c6efc` | [38561284576](https://github.com/autonomous-ai/lampOS/actions/runs/38561284576) | 3,786 / 0 / 29 |
 | Memory checkpoint #698 | `fed759ee7557243802b704e296e1cbef11c82071` | [38561301420](https://github.com/autonomous-ai/lampOS/actions/runs/38561301420) | 3,811 / 0 / 30 |
+| Mood checkpoint #713 | `9b00b4b7ba23930b7030b4722c244e00ad345cee` | [38570324967](https://github.com/autonomous-ai/lampOS/actions/runs/38570324967) | 3,880 / 0 / 31 |
 
 Counts sum Cargo's final successful test-result lines, including doctests:
-252, 253 and 255 suites respectively. Ignored manual/device tests were not
-executed. All three runs completed with conclusion `success`, including
+252, 253, 255 and 261 suites respectively. Ignored manual/device tests were not
+executed. All four runs completed with conclusion `success`, including
 release build, serial tests, binary hash and artifact-upload steps.
 
 Records' uploaded `lamp-records` SHA-256 is
@@ -22,12 +23,20 @@ Records' uploaded `lamp-records` SHA-256 is
 Use the corresponding artifact for that task; binary identity is not a lamp
 deployment claim.
 
-Ready handoffs: [Records #721](https://github.com/autonomous-ai/lampOS/pull/721)
-and [judge audit #722](https://github.com/autonomous-ai/lampOS/pull/722), both
-non-draft on the exact heads above. Memory is **not ready**: its branch has
-subsequently rebased for the inherited Body lint repair, and the current
-head's gates plus the retained Mac failures still need resolution. The green
-checkpoint does not certify the later head or erase prior failures.
+Completed handoffs: First merged
+[Records #721](https://github.com/autonomous-ai/lampOS/pull/721) and
+[judge audit #722](https://github.com/autonomous-ai/lampOS/pull/722), both
+offered non-draft on the exact heads above. Memory and Mood are **not ready**:
+both have subsequently rebased onto `a9992f272`, including Eyes' lint repair
+and First's eye behavior. Their current heads need their own green CI, and
+the Mac gates are incomplete. Memory's newest full run failed an inherited
+motor fixture; its raw output remains in the adjacent verification folder.
+The green checkpoints do not certify later heads or erase prior failures.
+
+Mood's uploaded `lamp-mood` SHA-256 is
+`4b5b2b681aab0a33a0de7b14daefb68a21d5f422aca4c85a4ba4ad59aa9fa114`.
+That native build differs from the local x86_64-to-ARM64 cross-build; these
+are separately identified artifacts, neither installed by Fourth.
 
 ## Not shown
 
