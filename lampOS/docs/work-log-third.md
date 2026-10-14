@@ -166,6 +166,25 @@ setting a guessed value would only hide that missing measurement.
 Questions blocking further Third work: none. First owns the producer and
 consumer integration, calibration and acceptance on the lamp.
 
+## 2026-10-14 — controls — taken
+
+- Task: 7, the button and the touch pad; next in Third's fetched order.
+- Base: `origin/lamp-voice` at `8335dfbce6a461963e25695d11cb1f1be792c1a6`,
+  after rebasing `lamp-third` and pushing it with a lease.
+- Branch: `third/controls`, based on `lamp-third` after this claim.
+- Scope: new `crates/controls`, a small pin-reading trait and stand-in,
+  injected-clock gesture recognition, additive message contracts, bounded
+  process/replay tests and `docs/controls.md`. First owns the actual GPIO
+  adapter and Voice/Body consumers; this task touches neither owner.
+- Research starts with V1 button/touch code and tests, the controls verdicts,
+  maintained input interfaces, and `docs/service-privacy.md`. Physical privacy
+  remains authoritative. A gesture must never grant capture permission or
+  clear a privacy fault. Optional behavior requires explicit enablement.
+- Machine: the same x86_64 development Mac described above; no lamp access.
+  All timing tests here will identify their simulated or host boundaries.
+- Questions: none blocking the independent implementation. Any proposed
+  mapping or integration that needs a lamp decision will be written here.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
