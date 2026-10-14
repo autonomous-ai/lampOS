@@ -5,6 +5,9 @@ output is retained beside this file. These are GitHub-hosted Ubuntu 22.04
 ARM64 ordinary-user runners, Rust 1.96.0, release mode; no lamp was used.
 The workflow builds all workspace binaries/examples, runs workspace tests
 serially, prints binary SHA-256 and uploads the artifact for seven days.
+The raw GitHub logs retain their timestamp/tab prefixes on blank lines and
+package-manager progress whitespace. They are excluded from documentation
+whitespace checks so that the downloaded evidence remains byte-identical.
 
 | Task | Exact tested head | Run | Passed / failed / ignored |
 |---|---|---|---|
@@ -12,10 +15,11 @@ serially, prints binary SHA-256 and uploads the artifact for seven days.
 | Judge audit #700 | `800ce47a5230d6b99f44dbcb92e56180646c6efc` | [38561284576](https://github.com/autonomous-ai/lampOS/actions/runs/38561284576) | 3,786 / 0 / 29 |
 | Memory checkpoint #698 | `fed759ee7557243802b704e296e1cbef11c82071` | [38561301420](https://github.com/autonomous-ai/lampOS/actions/runs/38561301420) | 3,811 / 0 / 30 |
 | Mood checkpoint #713 | `9b00b4b7ba23930b7030b4722c244e00ad345cee` | [38570324967](https://github.com/autonomous-ai/lampOS/actions/runs/38570324967) | 3,880 / 0 / 31 |
+| Mood ready #713 | `08c90d6b26ea0ba1b39f52f663b70af0f5a29865` | [38578348793](https://github.com/autonomous-ai/lampOS/actions/runs/38578348793) | 3,906 / 0 / 31 |
 
 Counts sum Cargo's final successful test-result lines, including doctests:
-252, 253, 255 and 261 suites respectively. Ignored manual/device tests were not
-executed. All four runs completed with conclusion `success`, including
+252, 253, 255, 261 and 262 suites respectively. Ignored manual/device tests were not
+executed. All five runs completed with conclusion `success`, including
 release build, serial tests, binary hash and artifact-upload steps.
 
 Records' uploaded `lamp-records` SHA-256 is
@@ -26,12 +30,15 @@ deployment claim.
 Completed handoffs: First merged
 [Records #721](https://github.com/autonomous-ai/lampOS/pull/721) and
 [judge audit #722](https://github.com/autonomous-ai/lampOS/pull/722), both
-offered non-draft on the exact heads above. Memory and Mood are **not ready**:
-both have subsequently rebased onto `a9992f272`, including Eyes' lint repair
-and First's eye behavior. Their current heads need their own green CI, and
-the Mac gates are incomplete. Memory's newest full run failed an inherited
-motor fixture; its raw output remains in the adjacent verification folder.
-The green checkpoints do not certify later heads or erase prior failures.
+offered non-draft on the exact heads above. Mood is ready in non-draft
+[PR #727](https://github.com/autonomous-ai/lampOS/pull/727), with its latest
+head and green native run in the last row. Its local Mac/Linux gates also
+pass, including 1,764 current-base Mac tests. Memory's subsequent full Mac
+gate passed 1,469 tests, and its rebase including First's installed capture
+passes focused Mac checks and strict Linux lint/cross-build. Its final head
+still needs its own native ARM64 run; Memory is not ready yet. Earlier
+privacy/motor failures remain retained. Green checkpoints do not certify
+later heads or explain prior intermittent failures.
 
 Mood's uploaded `lamp-mood` SHA-256 is
 `4b5b2b681aab0a33a0de7b14daefb68a21d5f422aca4c85a4ba4ad59aa9fa114`.

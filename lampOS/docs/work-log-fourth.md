@@ -2116,6 +2116,77 @@ changes from fetched `8be0b9dd2`; the final native ARM64 gate will cover
 that rebased head. Mood's standalone binary has no Voice dependency or
 consumer wiring and its checked checkpoint stays fixed for CI.
 
+## 2026-10-14, 21:44 ICT: task 35 Mood is ready in PR #727
+
+Ready for lamp-voice: yes (#727)
+
+Kind: off unless set. [PR #727](https://github.com/autonomous-ai/lampOS/pull/727)
+is non-draft, from `fourth/mood` into `lamp-voice`, exact head
+`08c90d6b26ea0ba1b39f52f663b70af0f5a29865`. `lamp-mood serve` exits
+disabled before clock/timezone/bus/worker setup; its regression verifies
+no bus files even with unusable enabled-only settings. Only `--enable`
+with an explicit IANA zone starts it. No deployment or actuator consumer is
+wired. Restart retains no private state; familiarity remains unknown.
+
+Built the pure inner-state engine, bounded metadata adapter and independent
+process publishing `mood/state`: awake, one expiring attention target,
+energy, warmth and sleep. Sleep wakes only for a fresh name, touch or user
+reminder. Stop/Pet are advisory live cues; explicit Sleep/Wake awaits #711.
+Thanks/laughter are typed engine/replay events only, as First agreed.
+
+Gate: Mac formatting, strict workspace Clippy and workspace build passed;
+full earlier-base coverage passed 3,837 / 0 / 29 ignored, Body-fix checks
+422 / 0 / 2, and the final changed upstream closure plus Mood/Msgs
+1,764 / 0 / 11 across 85 suites. Native x86_64 Linux strict workspace
+Clippy, focused 155 / 0 / 2 and ARM64 cross-build passed. Final native
+Ubuntu 22.04 ARM64 [run 38578348793](https://github.com/autonomous-ai/lampOS/actions/runs/38578348793)
+passed its release workspace build, **3,906 / 0 / 31 ignored** across
+262 suites, and artifact upload on the exact PR head. Full CI output and
+metadata are in `verification/arm64-ready-20261014/mood-38578348793.*`.
+Use that run's `lamp-mood`, SHA-256
+`4b5b2b681aab0a33a0de7b14daefb68a21d5f422aca4c85a4ba4ad59aa9fa114`.
+Ignored manual/device checks were not counted as executed. The two manual
+Mood release timing fixtures were separately run and passed on the Mac.
+
+The task verification folder contains the explicitly authored 24-hour
+JSONL/SVG, 1,441 minute samples and 29,364 inputs. Mac measurement: 101
+alternating name/touch cues, before publication to validated subscriber
+receipt, p95 29.580 ms; one process spawn to first state 308.050 ms.
+The reducer cases each have 2,000 samples, p95 below 0.4 microseconds.
+These are host software boundaries, not sensor, durability or lamp latency.
+Earlier Health/disk and inherited Linux lint failures remain retained.
+
+First: after installing the CI artifact, run `lamp-mood serve` with no
+switch; then a one-minute metadata trial:
+`lamp-mood serve --enable --zone Asia/Ho_Chi_Minh --bus-root /run/lampos-bus --run-for-ms 60000`.
+Observe concurrently with
+`lamp-bus --root /run/lampos-bus tap mood/state --seconds 60`.
+Expect advancing same-session sequences, bounded scalars, unknown familiarity,
+and asleep implying awake zero/no attention. Most likely on-lamp problems:
+company holding awake too steadily, the 15/60-minute quiet thresholds and
+the 0.05 warmth nudge/20-minute decay feeling flat. Check controls heartbeat
+and delayed Pet freshness first. No lamp access, physical behavior or real
+24-hour day was qualified by Fourth; First's metadata day is due tomorrow.
+
+## 2026-10-14, 21:44 ICT: Memory's final native gate is running
+
+Ready for lamp-voice: no
+
+Memory's complete serial Mac run finished: exit 0, 1,469 passed, zero failed,
+11 ignored across 60 suites. All three earlier failing privacy/motor cases
+passed; no test or deadline changed, and their intermittent causes remain
+unexplained. The raw failed and passing runs are retained. The task was then
+rebased onto `724541a957e5e66bb4c0f4a8de537466c8a9fe55`, including First's
+installed first-output capture/background-hashing repair and time-tool wording.
+All nine task source/test/manifest hashes and the inherited lockfile stayed
+unchanged. The post-rebase Mac formatting/strict Clippy/workspace build and
+167 focused tests passed (two existing manual real-time cases ignored).
+Strict native x86_64 Linux dependency lint and Memory/Voice ARM64 cross-build
+also passed, from a fresh standalone source copy. The entire workspace is
+now tested natively by ARM64 run 38582911230 on final task head
+`68606e78e75369393168f184ae00ae210ecd80de`. Its result is pending; no Memory
+PR has been opened. All new host evidence is on `fourth/memory-voice`.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

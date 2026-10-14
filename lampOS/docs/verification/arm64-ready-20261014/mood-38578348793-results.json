@@ -1,0 +1,67 @@
+{
+  "head": "08c90d6b26ea0ba1b39f52f663b70af0f5a29865",
+  "conclusion": "success",
+  "suites": 262,
+  "passed": 3906,
+  "failed": 0,
+  "ignored": 31,
+  "suite_results": [
+    "ok"
+  ],
+  "jobs": [
+    {
+      "name": "lampOS \u2014 build and test on Linux ARM64",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "system packages",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Rust 1.96.0",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/cache@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "build (release, the lamps' binaries)",
+          "conclusion": "success"
+        },
+        {
+          "name": "test (one test at a time, as on a lamp's few cores)",
+          "conclusion": "success"
+        },
+        {
+          "name": "SHA-256 of each binary",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/cache@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ]
+}
