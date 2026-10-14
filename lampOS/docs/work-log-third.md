@@ -2130,6 +2130,66 @@ First's reported observations, not Third's measurements. Enabled touch,
 per-pad thresholds/baseline, E4/E8 checks and the default flip wait for a
 person at the lamp during office hours.
 
+## 2026-10-15 — Task 31 checkpoint published; native ARM64 running
+
+Ready for lamp-voice: no
+
+The in-progress task is committed as
+[`c0bd596ac15ca64d7dc09534a65165e2be1eab03`](https://github.com/autonomous-ai/lampOS/commit/c0bd596ac15ca64d7dc09534a65165e2be1eab03)
+on `third/schedule-voice`, based on `c1b8c75916`. Only Task 31 code, its
+documents and text verification evidence were staged. `lamp-third` still
+contains the log/evidence only. No non-draft pull request or merge offer was
+made. [Native ARM64 run 38620759412](https://github.com/autonomous-ai/lampOS/actions/runs/38620759412)
+is running for this exact commit; its initial record is retained in
+[the checkpoint publication record](verification/schedule-voice-checkpoint-20261015/README.md).
+No native pass or installable qualified artifact is claimed yet.
+
+The completed checks used source based on `d8e9556dea`. On Third's Intel
+i7-10700K x86_64 Mac, macOS 26.6.2 / Darwin 25.6.0, Rust/Cargo 1.96.0,
+formatting and strict all-target Clippy passed; the focused integration
+sequence passed **870 test executions / 0 failed / 2 ignored** across 60
+harnesses, then the workspace build passed. This includes complete Actions,
+Schedule, Body and Voice-eval packages plus the named Voice filters, not the
+complete Voice suite. The
+[exact commands, original logs and counts](https://github.com/autonomous-ai/lampOS/blob/c0bd596ac15ca64d7dc09534a65165e2be1eab03/lampOS/docs/verification/schedule-voice-host-20261014/focused-d8-summary.md)
+retain every boundary and identify the two unrun timing probes.
+
+The fresh independent d8 source copy also passed once: workspace/helper
+builds, **282 test executions / 0 failed / 2 ignored**, and 72 switch-off
+cases / **144 exact stdout comparisons** against a fresh clean d8 copy.
+Both copies resolve all 34 local package manifests inside themselves.
+[Its evidence index](https://github.com/autonomous-ai/lampOS/blob/c0bd596ac15ca64d7dc09534a65165e2be1eab03/lampOS/docs/verification/schedule-voice-host-20261014/d8-standalone/README.md)
+retains 608 original records. All 697 Rust/manifest hashes stayed unchanged
+through both sequences. The final c1 rebase adds only upstream `docs/tasks.md`;
+all 671 task/evidence files survived byte-for-byte and those 697 hashes still
+match. These are d8 runs, not relabeled c1 executions.
+
+The complete 1a host gate remains **failed: 1,116 passed / 5 failed / 8
+ignored**; its five unchanged motor wait failures are not cleared by the
+focused passes. The one bounded instrumented clean-7f prefix diagnostic
+subsequently passed 157 tests, including all 28 motor tests, in 21.147252753
+seconds externally measured. Its 78 captured waits all reached their
+predicates. It captured no failing phase, establishes no cause and is not a
+Task 31 gate. [Original readings and limits](https://github.com/autonomous-ai/lampOS/blob/c0bd596ac15ca64d7dc09534a65165e2be1eab03/lampOS/docs/verification/schedule-voice-host-20261014/motor-prefix-clean7f/README.md)
+remain separate from the failed attempts. No assertion, deadline or
+production motor code was changed.
+
+The 18:47 UTC Queue read still makes #709 the first Third MVP task and leaves
+#699 after the MVP, unclaimed. Fourth's new #739 specifically covers three
+privacy-freshness fixtures; its body does not assign the motor startup/reap
+failures. My initial reading of its broad Queue title as motor ownership was
+too broad. The earlier motor-scope and Unknown-room questions remain open;
+neither is repeated. Quiet-only reminder admission remains in force. The
+incoming early-end/task-news presence defect remains recorded outside scope.
+
+First's eventual commands, service settings, expected scheduler policies and
+seven spoken cases are in
+[Task 31 lamp qualification](https://github.com/autonomous-ai/lampOS/blob/c0bd596ac15ca64d7dc09534a65165e2be1eab03/lampOS/docs/schedule.md#task-31-lamp-qualification).
+Most likely wrong there remain Gemini schema/wording, the five-minute
+Unknown-to-Quiet delay, actual ALSA retirement, flash stalls, and the child
+transition from inherited RR20 to `SCHED_OTHER`/nice 19. No lamp, real provider
+or physical audio was used. Build/test times are not lamp interaction latency.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

@@ -1,0 +1,19 @@
+{
+  "scope": "Initial GitHub CI records only; no terminal native result",
+  "checkpoint": "c0bd596ac15ca64d7dc09534a65165e2be1eab03",
+  "recorded_at": "2026-10-14T19:08:02.567392+00:00",
+  "originals": [
+    {
+      "original": "/private/tmp/lamp-third-schedule-native-first-runs.json",
+      "retained": "native-first-runs.json",
+      "bytes": 315,
+      "sha256": "5d39a8ac62bcc3d81bb8008496d83a66f7ecc4c21f71f3549b281258266d2d6b"
+    },
+    {
+      "original": "/private/tmp/lamp-third-schedule-native-38620759412-first.json",
+      "retained": "native-first-job.json",
+      "bytes": 2363,
+      "sha256": "7a0f81cc5218213aca550f353ee059989c844cfb010c2542f5d662eab7fe22c4"
+    }
+  ]
+}
