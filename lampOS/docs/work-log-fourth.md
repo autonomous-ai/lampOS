@@ -1743,9 +1743,45 @@ remain engine/replay-only. No state across Mood restart is agreed. Until
 Third's #711 supplies separate Sleep/Wake intents, current Stop/Pet are advisory
 touch and live sleep-by-touch stays absent. Microphone mute remains Voice's.
 
+## 2026-10-14, 19:01 ICT: task-only pull requests and another CI repair
+
+Ready for lamp-voice: no
+
+Fetched/read Queue #705, the current joining rules and Fourth's issue replies.
+First changed handoff to one non-draft pull request per finished task, with a
+green native ARM64 run on its head; the log branch keeps the log. Rebased on
+`1733307d7672ad302154984952a77772f8ebd6e5` and removed the log ancestry from
+the unfinished Records, judge, Memory and Mood task branches. None is ready
+or merged. The queue remains #707, #713, #698, #700, all already claimed here.
+
+After the ordinary-user runner repair, Judge run 38557228565 and Records run
+38557569694 passed their release builds but both failed the two Records JSON
+file tests at `json_file.rs:255,298`, EPERM. Raw failed steps and their exact
+heads/counts are retained in `verification/arm64-nonroot-20261014/`. First had
+already independently found and fixed root-owned ancestor `O_NOATIME` opens
+in `21c24fc0a`. The new base includes that fix; host gates are running again.
+These are GitHub ARM64 runner results, not results on a lamp.
+
+Memory checkpoint `aae385f6cc0d152a7d84037a59dc1edee76da74a` was pushed only
+to `fourth/memory-voice` for review, with 1,459 passing native x86_64 Linux
+tests and the earlier Mac privacy-fixture and Linux Body lint failures kept.
+Its ARM64 run 38558922911 is still pending at this entry. Rebasing changes the
+commit identity; the checkpoint remains unready, with no gate waived.
+
+Mood now has its pure reducer, bounded metadata adapter, off-by-default
+process, contract tests and authored 24-hour replay. The initial Mac formatting,
+workspace strict Clippy, Mood/Msgs tests and workspace build passed. Review
+found the current Pet producer publishes about 1.4 seconds after release:
+the adapter now separately bounds publication to 500 ms and Pet acquisition
+to two seconds, retaining release time for the sleep fence. Three regressions
+cover normal recognition delay, strict expiry/deduplication and a pre-sleep
+release that must not wake after delayed recognition. The same scoped gate
+passes again. Whole dependent tests, quiet host timings, Linux/ARM64 checks
+and the replay evidence remain in progress; no physical touch latency claimed.
+
 ## Not shown
 
-No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
+No lamp access or deployment, physical power-loss test,
 real extraction model, speaker recognition, natural multi-day spoken test,
 provider-context deletion, or end-to-end lamp latency. Memory remains behind
 `--memory-days`; record deletion requires explicit apply and its disabled-by-
@@ -1754,5 +1790,6 @@ geometry remains synthetic. Hand Stop and software mute are off unless their
 independent Voice flags are supplied; no physical hand-to-silence or Body stop
 was qualified. The local judge remains shadow-only behind `--local-judge`,
 with unfitted weights and no proof that it improves the busy-room floor.
+Native Linux ARM64 execution so far is on GitHub runners, not on a lamp.
 The log contains no unanswered question requiring
 the owner to relay a message.
