@@ -172,6 +172,91 @@ lamp work as the task requires; the protocol and test double are complete.
   observations. No new lamp performance will be claimed. Questions, if any,
   will be written here without stopping unrelated work.
 
+## 2026-10-14: task 14, said-to-whom — done on Fourth's branch
+
+**Built:** a research document only,
+[said-to-whom.md](said-to-whom.md), from `fourth/said-to-whom` based on
+`8335dfbce` plus Fourth's memory work. No crate, model, runtime default or
+deployment file changed. The study distinguishes wake-word detection,
+false-trigger mitigation, follow-up/open-room directedness, human addressee
+selection and the recipient of a robot's own reply. Primary sources cover
+acoustic streaming, ASR uncertainty, context, missing modalities, distillation,
+multimodal LLMs, shipped assistants, robot studies and public recordings.
+
+The recommendation is a local, turn-bound shadow decision using real existing
+cues, with timely text as additional evidence. First establish IDs for all
+speech candidates, including rejected ones; separate source and delivery time,
+then evaluate real labels before fitting new weights. The hardware record
+has three capsules but two mono USB streams, not a verified synchronized
+array. Face orientation is not eye gaze or proof that the facing person spoke.
+The proposed latency targets are explicitly targets, not measurements.
+
+**Verified on the development Mac:** macOS 26.6.2 (25G83), Intel Core
+i7-10700K at 3.80 GHz, 16 logical CPUs, 64 GiB RAM; Rust/Cargo 1.96.0,
+`x86_64-apple-darwin`. From `lampOS/`, using
+`/Users/autonomous/.cargo/bin/cargo`:
+
+- `cargo fmt --all --check` — pass after the document was written.
+- `cargo build --workspace` — pass; the same updated base also built before
+  this documentation change.
+- No crate was touched, so there is no affected-crate clippy/test command
+  under this task's gate. Task 13's tests remain reported above. No Go or
+  web source changed.
+- An inline Python document check verified ten relative links/anchors,
+  balanced code fences, no trailing whitespace and the final limitations
+  section. The proposed shell snippet was extracted to
+  `/private/tmp/lamp-fourth-addressee-pilot.sh`; `bash -n` passed. The snippet
+  was **not executed**, locally or on a lamp.
+- Source review checked table/operating-point distinctions and current
+  support pages, rather than treating abstract gains or historical product
+  announcements as current guarantees. Separate review corrected the
+  ResLSTM comparison's aggregation, the smartphone timing's single-utterance
+  scope, rejected-candidate attribution and the recorder's missing receipt
+  timestamps.
+
+**What was actually measured:** no DDSD model accuracy, runtime or lamp
+latency. All classifier/product figures in the study are published, and the
+lamp observations are the first builder's existing records. One bounded AMI
+HTTP-range audit on this Mac read 612,715 archive response-body bytes for
+metadata and four small XML entries, excluding network headers. Three sampled
+dialogue-act files contained 142,
+217 and 156 addressee attributes. An audio URL returned HTTP 200 to a header
+request; no waveform was downloaded or listened to. This is an access/schema
+check, not a benchmark or a whole-corpus coverage count. The XML buffers were
+not retained; source URLs and sampled filenames are in the study.
+
+**Limits and failed access kept:** some web PDF screenshot requests returned
+cache errors; the papers' text/tables were checked separately. Vernissage's
+original HTTP pages were reachable, while HTTPS certificate validation failed;
+it was not bypassed. The original data still require a request and their
+commercial rights remain unresolved. Ego4D requires agreements and credentials,
+not obtained. Noncommercial or request-only corpora were not downloaded,
+licensed, trained on or presented as ready commercial training data. No key,
+account, payment, owner message or lamp access was used.
+
+**What the first builder must do on the lamp:** no installation is needed
+for this research task. If conducting a consented staged timing observation,
+run the exact finite `lamp-bus record` block in
+[the first lamp observation](said-to-whom.md#a-bounded-first-lamp-observation)
+with the existing publishers running. It creates a private new directory,
+records seven existing metadata topics for ten minutes, and caps each file
+at 16 MiB. Spoken text is included; PCM and images are not. Pair it with
+independent intended-addressee/utterance observations and state clock alignment.
+Expect declared topic records and identifiable missing/stale cues; this
+capture alone cannot measure subscriber delivery delay or qualify a new
+detector. The matched English/Vietnamese, near-name, overlap, off-camera,
+look-away and stop scenes and required counts are specified in the document.
+
+**Most likely to be wrong on the lamp:** binding a delayed transcript/name or
+a facing bystander to the wrong speaker/turn; transferring private-English,
+wearer-view or staged robot results to direct Vietnamese office speech;
+assuming USB direction information or a cloud decision arrives before sound;
+and measuring fewer unwanted answers while silently losing calls or stops.
+AMI is usable for annotation tooling under its stated licence, but supplies
+no robot-directed positives. A real consented lamp-view evaluation remains
+necessary before any acting switch is enabled. There is no unanswered owner
+question blocking completion of this study.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss
