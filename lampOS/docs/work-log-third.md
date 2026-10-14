@@ -2636,6 +2636,27 @@ with no open Fourth PR. Its Body clock-seam ownership question remains pending
 with First. Third will follow that work and requalify after an accepted fixture
 fix; the existing failure is not bypassed by repeated attempts.
 
+## 2026-10-15 — Relative reminder follow-up registered as draft #748
+
+Ready for lamp-voice: no
+
+[Draft PR #748](https://github.com/autonomous-ai/lampOS/pull/748) targets
+`lamp-voice` from `third/schedule-relative`, exact head
+`365e36dbcd78ff247adf30b2d18afd4d9d6f1065`. It makes the completed description
+change and its host fixture blocker reviewable; it is not offered for merge.
+The [registration snapshot and body check](verification/relative-reminders-qualification-20261015/pr-748-registration.json)
+confirm draft state, correct branches/head, mergeability and exact equality
+to the reviewed body. Native ARM64 is green; new generic PR checks were
+running at registration. The failed complete Mac gate and failed single
+isolated crash/stalled-control run remain explicit in the body.
+
+All terminal evidence was pushed first in log commit
+`412a46e571f38d7b8e5bd35fa5f4677fb22af650`. Third will report the draft and
+blocker on #747, watch replies and #739, and requalify when an accepted fix is
+available. No test/source/deadline change or new attempt was made to obtain a
+passing isolated result. No lamp, live provider or other builder's branch was
+touched. Touch #711 still needs First and a person; #699 remains deferred.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

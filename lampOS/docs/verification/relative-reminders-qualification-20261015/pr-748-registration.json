@@ -1,0 +1,87 @@
+{
+  "observed_at": "2026-10-14T22:39:35.312251+00:00",
+  "pr_number": 748,
+  "url": "https://github.com/autonomous-ai/lampOS/pull/748",
+  "draft": true,
+  "state": "OPEN",
+  "head": "365e36dbcd78ff247adf30b2d18afd4d9d6f1065",
+  "base": "lamp-voice",
+  "body_matches_reviewed_file_exactly": true,
+  "body_sha256": "e343321c42abb119a7e96f331c1c116fb858684cfff4bddff0c101890b5a5c83",
+  "snapshot_sha256": "28db68e4e12ab8349c1bd5a659b1e5925cdd072461c306e064f2a4aa3c61e8d5",
+  "mergeable": "MERGEABLE",
+  "checks": [
+    {
+      "__typename": "CheckRun",
+      "completedAt": "0001-01-01T00:00:00Z",
+      "conclusion": "",
+      "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/38649101194/job/116143200087",
+      "name": "Go (system) \u2014 build \u00b7 vet \u00b7 test",
+      "startedAt": "2026-10-14T22:39:17Z",
+      "status": "IN_PROGRESS",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-14T22:02:09Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/38644608706/job/116128262039",
+      "name": "Go (system) \u2014 build \u00b7 vet \u00b7 test",
+      "startedAt": "2026-10-14T22:01:03Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-14T22:32:38Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/38644608947/job/116128262102",
+      "name": "lampOS \u2014 build and test on Linux ARM64",
+      "startedAt": "2026-10-14T22:01:07Z",
+      "status": "COMPLETED",
+      "workflowName": "lampOS on ARM64"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "0001-01-01T00:00:00Z",
+      "conclusion": "",
+      "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/38649101194/job/116143200504",
+      "name": "Web (system/web) \u2014 typecheck \u00b7 build \u00b7 lint",
+      "startedAt": "2026-10-14T22:39:17Z",
+      "status": "IN_PROGRESS",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-14T22:01:41Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/38644608706/job/116128261853",
+      "name": "Web (system/web) \u2014 typecheck \u00b7 build \u00b7 lint",
+      "startedAt": "2026-10-14T22:01:03Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "0001-01-01T00:00:00Z",
+      "conclusion": "",
+      "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/38649101194/job/116143200583",
+      "name": "Python (hal) \u2014 unit tests \u00b7 syntax",
+      "startedAt": "2026-10-14T22:39:18Z",
+      "status": "IN_PROGRESS",
+      "workflowName": "CI"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-10-14T22:01:23Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/autonomous-ai/lampOS/actions/runs/38644608706/job/116128261700",
+      "name": "Python (hal) \u2014 unit tests \u00b7 syntax",
+      "startedAt": "2026-10-14T22:01:03Z",
+      "status": "COMPLETED",
+      "workflowName": "CI"
+    }
+  ],
+  "ready": false,
+  "reason": "Complete Mac gate failed; one unchanged motor fixture also failed once alone, so the existing handoff condition is unmet."
+}

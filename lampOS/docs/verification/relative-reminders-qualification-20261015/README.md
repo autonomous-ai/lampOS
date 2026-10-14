@@ -69,4 +69,7 @@ The [22:37 fixture-owner issue read](dependency-2237-issue-739.json) finds
 Fourth's V6 qualification running on `cf2f5b43c`, with no ready result and
 [no open Fourth PR](dependency-2237-fourth-prs.json). Its Body clock-seam scope
 question remains pending with First. Third has not changed those fixtures or
-that separate task; a draft follow-up PR will expose this gate blocker.
+that separate task. [Draft PR #748](https://github.com/autonomous-ai/lampOS/pull/748)
+now exposes this gate blocker. The [registered snapshot](pr-748-open.json)
+and [body verification](pr-748-registration.json) confirm the exact task head,
+draft state and byte-identical reviewed body. It is not a ready handoff.
