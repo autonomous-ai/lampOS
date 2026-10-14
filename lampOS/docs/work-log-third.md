@@ -332,6 +332,33 @@ explicit software-clear owner path are First's prerequisites. A crash before
 an unacknowledged mute is durable is not guaranteed recoverable; physical
 privacy remains the independent control.
 
+## 2026-10-14 — surround — taken
+
+- Task: 12, starting, setting up and updating a lamp; next in Third's
+  fetched priority table (which takes precedence over the older "last"
+  sentence in the task body).
+- Base: `origin/lamp-voice` at `7d3371dd34a4f67480c44f054cc43890322211ab`,
+  after rebasing `lamp-third` and pushing it with a lease. First's Expression
+  adoption and interruption-transition fix are now inherited.
+- Branch: `third/surround`, from `lamp-third` after this claim.
+- Scope: study V1 startup/setup/network/update/recovery/reset and maintained
+  alternatives, then implement the independent Rust Surround work that needs
+  no lamp, with deterministic clocks, durable operation records, fault tests
+  and `docs/surround.md`. No legacy runtime dependency, no deployment edits,
+  and no changes to hands-off hardware owners. Changes require explicit
+  enablement; owner readiness and safe handover must never be inferred from
+  a live PID or a successful command alone.
+- Machine: the same x86_64 development Mac; no lamp, credentials, account,
+  remote device or production update feed will be used.
+- Integration questions for First, not blockers for the independent build:
+  which network manager/interface actually owns this lamp's Wi-Fi, and what
+  trusted release root/feed will be provisioned? V1 image scripts disagree
+  about the network manager. The current owners also need explicit quiet,
+  stopped-at-rest and per-store reset acknowledgements before a live update
+  or complete reset can be enabled. The document will specify these contracts
+  and exercise them with scripted owners; missing evidence must refuse an
+  operation, not be replaced with a guess.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
