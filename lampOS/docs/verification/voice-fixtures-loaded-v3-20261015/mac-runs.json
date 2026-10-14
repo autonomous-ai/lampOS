@@ -1,0 +1,80 @@
+[
+  {
+    "command": [
+      "/Users/autonomous/.cargo/bin/cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "lamp-voice",
+      "--no-fail-fast",
+      "--",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/lamp-fourth-fixtures-source-v3-j70luqy6",
+    "started_at_utc": "2026-10-14T20:40:25.473988+00:00",
+    "load_at_start": [
+      6.638671875,
+      4.0068359375,
+      4.4931640625
+    ],
+    "exit_code": 0,
+    "finished_at_utc": "2026-10-14T20:47:38.924612+00:00",
+    "elapsed_seconds": 433.4624689272605,
+    "load_at_end": [
+      6.1962890625,
+      5.8935546875,
+      5.33203125
+    ],
+    "raw_sha256": "64f1014d4aaab25335b95f3ed7173439139f6adbe05a9f74f33cd56d1eb87376",
+    "changed_source_files": [],
+    "counts": {
+      "suites": 21,
+      "passed": 1077,
+      "failed": 0,
+      "ignored": 6,
+      "measured": 0,
+      "filtered": 0
+    },
+    "build_errors_at_end": []
+  },
+  {
+    "command": [
+      "/Users/autonomous/.cargo/bin/cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "lamp-voice",
+      "--no-fail-fast",
+      "--",
+      "--test-threads=1"
+    ],
+    "cwd": "/private/tmp/lamp-fourth-fixtures-source-v3-j70luqy6",
+    "started_at_utc": "2026-10-14T20:47:39.204499+00:00",
+    "load_at_start": [
+      6.1962890625,
+      5.8935546875,
+      5.33203125
+    ],
+    "exit_code": 101,
+    "finished_at_utc": "2026-10-14T20:53:49.219054+00:00",
+    "elapsed_seconds": 369.99352362798527,
+    "load_at_end": [
+      6.0908203125,
+      6.1279296875,
+      5.65478515625
+    ],
+    "raw_sha256": "716586b18c9044467ecbd5d01833d8b16640978923e9baf0864c8c0b9d044436",
+    "changed_source_files": [],
+    "counts": {
+      "suites": 21,
+      "passed": 1076,
+      "failed": 1,
+      "ignored": 6,
+      "measured": 0,
+      "filtered": 0
+    },
+    "build_errors_at_end": []
+  }
+]

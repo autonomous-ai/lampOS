@@ -2755,6 +2755,49 @@ The v1 and v2 failures remain retained. The Body scope answer is still
 pending, and no Body source has changed.
 
 
+
+## 2026-10-15, 03:57 ICT: task 46, another real-provider fixture misses freshness
+
+Ready for lamp-voice: no
+
+Frozen v3 on `1337e7e1d` passed its first complete serial loaded Voice
+run: 1,077 / 0 / 6 ignored, 21 suites, 433.462 seconds including Cargo.
+Run 2 failed: 1,076 / 1 / 6, 21 suites, 369.994 seconds. The failed case
+was `early_end::an_answer_with_nothing_said_before_the_lamp_is_sure_is_never_played`,
+with `physical privacy closed or lost freshness`. It still used the
+ordinary 50 ms fixture gate. The previously selected 100 ms lone-name case,
+all endpoint cases and all motor cases passed in both full runs.
+
+[The complete v3 evidence](verification/voice-fixtures-loaded-v3-20261015/README.md)
+retains source identity, both raw runs, all six successful overlapping
+ARM64 cross-build cycles, commands, counts and load samples. Failed raw
+output SHA-256:
+`716586b18c9044467ecbd5d01833d8b16640978923e9baf0864c8c0b9d044436`.
+This is the Intel Mac and its x86_64 Podman VM. No source changed during
+the runs; future runs stopped at the first failure. It is not a ten-run
+success. No exact privacy-consumption age is inferred from this error.
+
+The shared real-provider EarlyEnd fixture is being made consistent:
+each ordering scenario explicitly selects its own validated, test-only
+100 ms gate, starts peripheral producers after actual provider Ready,
+and keeps the real 12-second conversation watchdog. This extends the
+existing named-case fixture setting, without changing production or
+unrelated tests' 50 ms gate. Actual provider/Tokio/envelope clocks remain
+real, original assertions remain, and a scoped-clock guard will reject
+accidental mixed domains before starting resources. The synthetic capture
+source is also being corrected to retain original scheduled 10 ms sample
+times, never freshening old source audio at delivery. The existing 100 ms
+source-age refusal and shared 300 ms cleanup remain.
+
+The checked-in lamp-4ace unit requests round-robin scheduling at priority 20;
+its installed settings and actual load/temperature were not read from a
+lamp. The Mac's ordinary scheduling and these ordering fixtures cannot
+qualify the lamp's real 50 ms privacy response. First still owns that check.
+The Body clock-seam question remains unanswered, with no Body edits.
+PR #746 is separately ready and awaiting review; no new Fourth task was
+assigned at the 03:50 queue poll.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
