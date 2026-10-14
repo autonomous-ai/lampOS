@@ -1,0 +1,836 @@
+lampOS/docs/verification/touch-host-20261014/development/asleep-core.txt:68: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/asleep-msgs.txt:23: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/core-final.txt:66: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/core-third.txt:66: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:60: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:100: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:151: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:162: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:188: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:228: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:235: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:271: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:306: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:334: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:364: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:444: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:464: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:521: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:542: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:629: trailing whitespace.
++ 
+lampOS/docs/verification/touch-host-20261014/development/format-first.txt:629: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/mpr121-tests-second.txt:49: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/mpr121-unit.txt:18: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/msgs-final.txt:22: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/msgs-first.txt:21: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/msgs-validated.txt:22: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/msgs-wake.txt:21: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/program-first.txt:18: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/receiver-first.txt:26: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/runtime-diagnostic-fixed.txt:19: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/runtime-pins-first.txt:38: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/strip-replay-eighth.txt:69: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/strip-replay-final.txt:69: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/strip-replay-sixth.txt:65: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/development/worker-second.txt:49: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/gate-tests.txt:4479: new blank line at EOF.
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:22: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:34:17.5420733Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:59: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:37:04.7048911Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:70: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:29.9848733Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:86: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:30.6540455Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:88: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:30.6541268Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:90: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:30.6552875Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:93: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:30.6557031Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:96: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:30.6558025Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:97: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:30.6565848Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:104: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.3152773Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:106: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.3153547Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:107: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.3162682Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:113: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.3167468Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:115: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.3168009Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:117: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.3177192Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:120: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.3178255Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:122: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.3178810Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:124: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.3297195Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:201: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.8172463Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:203: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.8173453Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:205: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.8185742Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:207: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.8185962Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:209: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.8186561Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:211: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.8197516Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:222: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.8205783Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:224: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.8206333Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:226: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:36.8218262Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:235: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:37.0837072Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:237: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:37.0837645Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:239: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:37.0851597Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:249: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:37.5349444Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:251: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:37.5350037Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:253: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:37.5367276Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:264: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:38.8259172Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:266: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:38.8259731Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:268: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:38.8276259Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:280: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:39.6019938Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:282: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:39.6020500Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:284: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:39.6038749Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:293: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:39.6515644Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:295: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:39.6516208Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:297: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:39.6531125Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:306: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:39.6545035Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:308: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:39.6545764Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:310: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:39.6557051Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:323: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:40.6895029Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:325: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:40.6895636Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:327: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:40.6909788Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:330: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:40.6912668Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:332: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:40.6913320Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:334: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:40.6923902Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:353: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:40.6937756Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:355: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:40.6938305Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:356: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:40.6948717Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:376: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:41.4377652Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:378: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:41.4378222Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:380: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:41.4392620Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:385: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.5697510Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:387: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.5698249Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:389: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.5711741Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:523: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8821472Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:526: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8826816Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:527: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8835951Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:540: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8846140Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:542: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8846711Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:544: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8857523Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:548: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8861215Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:550: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8861839Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:552: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8871283Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:555: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8872733Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:557: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8873483Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:559: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8884171Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:572: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8894775Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:574: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8895323Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:576: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8906138Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:626: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8978188Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:628: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8978907Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:630: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.8988206Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:641: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9088782Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:643: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9089337Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:645: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9098971Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:667: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9132464Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:669: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9133199Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:671: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9143157Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:678: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9148852Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:681: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9150055Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:682: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9158592Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:687: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9163755Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:689: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9164343Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:691: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9175272Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:713: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9250125Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:715: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9250693Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:717: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9260802Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:726: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9275609Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:728: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9276400Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:730: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9287421Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:751: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9338981Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:753: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9339539Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:755: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9347616Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:759: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9356348Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:761: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9356903Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:763: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:46.9367187Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:797: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:50.7627648Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:799: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:50.7628210Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:801: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:50.7641150Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:813: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.0200240Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:815: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.0200802Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:817: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.0211487Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:844: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.0230056Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:847: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.0231060Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:848: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.0238819Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:862: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2186293Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:864: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2186884Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:866: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2201887Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:910: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2231687Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:912: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2232238Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:914: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2241506Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:920: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2247794Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:922: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2248342Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:923: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2255618Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:938: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2313285Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:940: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2313998Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:942: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2322375Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:946: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2326384Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:948: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2326926Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:950: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2334902Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:976: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2352384Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:978: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2352933Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:980: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2360868Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1020: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2405414Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1022: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2405979Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1024: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2415840Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1041: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2440843Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1043: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2441398Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1045: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2449781Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1056: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2529817Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1058: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2530360Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1060: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2539825Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1069: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2881635Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1071: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2882196Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1073: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2891219Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1089: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2918323Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1092: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2919862Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1093: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.2926872Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1105: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.3714668Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1107: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.3715215Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1109: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:57.3727632Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1123: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4485656Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1125: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4486209Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1127: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4498855Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1137: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4538399Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1139: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4539421Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1141: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4548764Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1145: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4551994Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1147: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4552544Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1149: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4560089Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1151: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4560372Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1153: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4561280Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1155: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4569365Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1169: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4578667Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1172: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4579757Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1173: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4587315Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1175: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4587553Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1177: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4588121Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1179: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4596570Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1183: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4600118Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1185: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4600652Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1187: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4608593Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1194: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4617095Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1196: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4617893Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1198: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4625758Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1206: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4634241Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1208: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4634793Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1210: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4642489Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1245: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4674248Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1248: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4675412Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1249: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4683290Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1254: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4963321Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1256: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4963886Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1258: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4972861Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1289: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4997458Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1292: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.4999111Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1293: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.5006230Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1303: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.5065979Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1305: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.5066867Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1307: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.5076415Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1313: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.5222302Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1315: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.5222869Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1317: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.5232551Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1340: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.6356866Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1342: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.6357459Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1344: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.6372196Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1378: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.6532441Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1380: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.6533105Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1382: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:58.6542906Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1402: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.1867406Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1404: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.1868423Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1406: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.1884320Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1418: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.2030052Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1420: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.2030637Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1422: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.2041853Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1434: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.2055658Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1436: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.2056463Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1437: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.2068139Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1460: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.2627588Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1462: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.2628140Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1464: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.2643908Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1468: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.2646825Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1470: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.2647383Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1472: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:38:59.2659121Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1702: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:17.1345994Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1704: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:17.1346571Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1706: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:17.1366656Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1718: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:17.1378952Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1721: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:17.1380268Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1722: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:17.1388260Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1727: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8492856Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1729: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8493548Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1730: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8504203Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1744: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8528067Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1746: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8528651Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1748: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8539762Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1769: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8556350Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1771: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8556898Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1773: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8565934Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1778: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8570755Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1780: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8571309Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1782: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8579748Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1799: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8812504Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1801: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8813961Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1803: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:18.8823509Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1811: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:25.6914430Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1813: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:25.6915031Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1815: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:25.6925725Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1829: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8175440Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1831: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8176040Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1833: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8187872Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1835: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8188144Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1837: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8188696Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1839: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8197674Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1841: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8198084Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1843: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8198648Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1845: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8206929Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1850: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8329760Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1852: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8330681Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1854: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8339492Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1869: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8419395Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1871: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8419958Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1873: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8428354Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1894: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8456592Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1896: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8457270Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1898: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8466506Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1900: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8467017Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1902: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8467572Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1904: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8476724Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1916: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8486270Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1918: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8486827Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1920: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8495548Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1925: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8521020Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1927: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8521571Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1929: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8529484Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1933: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8531060Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1935: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8531606Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1937: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8539437Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1943: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8544886Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1945: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8545773Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1946: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8553397Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1963: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8927305Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1965: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8927856Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1967: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8938028Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:1999: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8970652Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2001: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8971218Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2003: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:32.8983972Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2075: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:35.4849013Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2077: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:35.4849752Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2079: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:35.4863256Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2084: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:35.4867264Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2086: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:35.4867824Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2088: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:35.4877927Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2098: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:35.4887703Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2100: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:35.4888256Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2102: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:35.4896950Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2108: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:35.5997576Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2110: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:35.5998143Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2112: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:35.6009425Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2145: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:36.9802561Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2147: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:36.9803226Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2149: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:36.9817754Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2152: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:36.9818788Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2154: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:36.9819361Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2156: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:39:36.9828403Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2165: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:12.9865190Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2167: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:12.9865752Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2169: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:12.9878735Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2173: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:12.9880909Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2175: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:12.9881574Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2176: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:12.9889840Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2188: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.0034776Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2190: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.0035697Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2192: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.0046337Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2197: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8777826Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2199: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8778378Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2201: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8791143Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2204: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8792046Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2206: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8792593Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2208: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8801498Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2229: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8817419Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2231: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8817979Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2233: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8827752Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2236: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8863885Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2238: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8864746Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2240: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8874350Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2255: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8885629Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2257: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8886182Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2259: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8894530Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2269: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8901097Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2271: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8901719Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2273: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8910925Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2281: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8918631Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2283: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8919192Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2285: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8927137Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2299: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8938268Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2301: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8938826Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2303: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8950859Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2309: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8955109Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2311: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8955659Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2313: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8968557Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2318: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8971540Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2320: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8972088Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2322: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8986138Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2326: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8990901Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2328: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8991446Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2330: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.8999714Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2377: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.9185830Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2379: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.9186386Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2381: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.9194734Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2385: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.9198929Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2387: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.9199490Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2388: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:13.9207865Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2466: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0744875Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2468: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0745725Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2470: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0759272Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2474: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0763632Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2476: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0764182Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2478: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0771842Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2480: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0772167Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2482: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0772724Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2484: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0781586Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2490: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0786644Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2492: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0787403Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2493: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0795222Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2511: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0808306Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2514: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0809329Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2515: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:17.0817950Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2525: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:24.3567912Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2527: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:24.3568475Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2529: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:24.3581177Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2534: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.3786978Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2536: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.3787534Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2538: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.3799601Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2541: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.3803655Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2543: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.3804211Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2545: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.3814649Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2554: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.4399533Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2556: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.4400078Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2558: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.4412403Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2567: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.4451440Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2569: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.4451990Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2571: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.4461168Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2574: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.4462544Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2576: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.4463232Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2578: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:26.4472270Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2598: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.1996292Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2600: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.1996876Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2602: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.2010743Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2607: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.7556827Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2609: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.7557420Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2611: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.7569951Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2702: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.9299003Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2705: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.9299922Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2707: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.9300570Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2711: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.9302677Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2713: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.9303510Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2716: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.9305202Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2717: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.9305206Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2721: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.9306446Z 
+lampOS/docs/verification/touch-host-20261014/native-baseline-first.txt:2723: trailing whitespace.
++lampOS — build and test on Linux ARM64	test (one test at a time, as on a lamp's few cores)	2026-10-14T11:40:45.9307034Z 
+lampOS/docs/verification/touch-host-20261014/native-first.txt:512: trailing whitespace.
++lampOS — build and test on Linux ARM64	build (release, the lamps' binaries)	2026-10-14T11:52:41.9772812Z 
+lampOS/docs/verification/touch-host-20261014/native-first.txt:564: trailing whitespace.
++lampOS — build and test on Linux ARM64	build (release, the lamps' binaries)	2026-10-14T11:53:13.9862065Z 
+lampOS/docs/verification/touch-output-host-20261014/focused.txt:41: new blank line at EOF.
+lampOS/docs/verification/touch-working-host-20261014/coordinator-second.txt:70: new blank line at EOF.
+lampOS/docs/verification/touch-working-host-20261014/mpr-unit.txt:9: new blank line at EOF.
+lampOS/docs/verification/touch-working-host-20261014/mpr.txt:51: new blank line at EOF.
+lampOS/docs/verification/touch-working-host-20261014/replays.txt:40: new blank line at EOF.
+lampOS/docs/verification/touch-working-host-20261014/strip.txt:80: new blank line at EOF.

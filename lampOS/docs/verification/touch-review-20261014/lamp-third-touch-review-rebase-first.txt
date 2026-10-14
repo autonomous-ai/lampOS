@@ -1,0 +1,10 @@
+Rebasing (1/1)Auto-merging lampOS/Cargo.lock
+Auto-merging lampOS/crates/msgs/src/lib.rs
+Auto-merging lampOS/docs/reuse-decisions.md
+CONFLICT (content): Merge conflict in lampOS/docs/reuse-decisions.md
+error: could not apply 08a32c9d8... lampOS: add opt-in touch strip and head gestures
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+Could not apply 08a32c9d8... lampOS: add opt-in touch strip and head gestures

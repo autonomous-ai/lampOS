@@ -1,0 +1,113 @@
+{
+  "standard_counts": {
+    "passed": 4192,
+    "failed": 0,
+    "ignored": 31,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "standard_harnesses": 276,
+  "matches_collector": true,
+  "custom_harnesses": [
+    {
+      "raw_line": 4446,
+      "passed": 12,
+      "failed": 0,
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.3206116Z      Running tests/process.rs (target/release/deps/process-9c0b3bb1536db9e9)",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:13.7525844Z test result: 12 passed; 0 failed",
+      "source": "lampOS/crates/turn-end-wire/tests/process.rs (harness=false)"
+    }
+  ],
+  "new_upstream_ignored_case_names": [
+    "authored_bus_cues_to_observed_state_first_and_repeated",
+    "reducer_first_use_repeated_actions_and_long_gap"
+  ],
+  "removed_ignored_case_names": [],
+  "steps": [
+    {
+      "name": "build (release, the lamps' binaries)",
+      "start_utc": "2026-10-14T16:35:48Z",
+      "end_utc": "2026-10-14T16:37:59Z",
+      "elapsed_seconds": 131.0,
+      "conclusion": "success"
+    },
+    {
+      "name": "test (one test at a time, as on a lamp's few cores)",
+      "start_utc": "2026-10-14T16:37:59Z",
+      "end_utc": "2026-10-14T17:01:29Z",
+      "elapsed_seconds": 1410.0,
+      "conclusion": "success"
+    }
+  ],
+  "source_remains_at": "a7c0073da9b2314ba123efee8a25bc80ce01b211",
+  "warning_headers": [
+    {
+      "raw_line": 239,
+      "stage": "Rust 1.96.0",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\tRust 1.96.0\t2026-10-14T16:35:30.7237627Z warn: it looks like you have an existing rustup settings file at:"
+    },
+    {
+      "raw_line": 240,
+      "stage": "Rust 1.96.0",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\tRust 1.96.0\t2026-10-14T16:35:30.7238169Z warn: /home/runner/.rustup/settings.toml"
+    },
+    {
+      "raw_line": 295,
+      "stage": "Run actions/cache@v4",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\tRun actions/cache@v4\t2026-10-14T16:35:36.7110713Z (node:2750) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+    },
+    {
+      "raw_line": 298,
+      "stage": "Run actions/cache@v4",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\tRun actions/cache@v4\t2026-10-14T16:35:36.9474674Z (node:2750) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+    },
+    {
+      "raw_line": 313,
+      "stage": "build (release, the lamps' binaries)",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\tbuild (release, the lamps' binaries)\t2026-10-14T16:35:49.6899558Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+    },
+    {
+      "raw_line": 318,
+      "stage": "build (release, the lamps' binaries)",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\tbuild (release, the lamps' binaries)\t2026-10-14T16:35:49.6905411Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+    },
+    {
+      "raw_line": 363,
+      "stage": "test (one test at a time, as on a lamp's few cores)",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:37:59.3798830Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+    },
+    {
+      "raw_line": 368,
+      "stage": "test (one test at a time, as on a lamp's few cores)",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:37:59.3803628Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+    },
+    {
+      "raw_line": 6357,
+      "stage": "Run actions/upload-artifact@v4",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\tRun actions/upload-artifact@v4\t2026-10-14T17:01:30.6456761Z (node:20041) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+    },
+    {
+      "raw_line": 6363,
+      "stage": "Run actions/upload-artifact@v4",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\tRun actions/upload-artifact@v4\t2026-10-14T17:01:31.4786523Z (node:20041) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+    },
+    {
+      "raw_line": 6378,
+      "stage": "Post Run actions/cache@v4",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\tPost Run actions/cache@v4\t2026-10-14T17:01:34.7775119Z (node:20065) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead."
+    },
+    {
+      "raw_line": 6381,
+      "stage": "Post Run actions/cache@v4",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\tPost Run actions/cache@v4\t2026-10-14T17:01:38.6494498Z (node:20065) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities."
+    }
+  ],
+  "warning_counts": {
+    "cargo_output_collision_build": 2,
+    "cargo_output_collision_test": 2,
+    "rust_source_diagnostics": 0,
+    "rustup_setup_warn_lines": 2,
+    "actions_node_deprecations": 6
+  },
+  "native_clippy_run": false
+}

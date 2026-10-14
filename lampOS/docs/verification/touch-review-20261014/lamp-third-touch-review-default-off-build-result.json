@@ -1,0 +1,17 @@
+{
+  "command": [
+    "cargo",
+    "build",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-controls",
+    "--bin",
+    "lamp-controls",
+    "--message-format=json-render-diagnostics"
+  ],
+  "cwd": "/private/tmp/lamp-third-touch-review/lampOS",
+  "CARGO_TARGET_DIR": "/Users/d/code/autonomous-os/lampOS/target",
+  "exit_code": 0,
+  "elapsed_seconds": 0.34458240399999995
+}

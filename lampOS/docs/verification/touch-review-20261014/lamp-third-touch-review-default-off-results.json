@@ -1,0 +1,195 @@
+{
+  "head": "a7c0073da9b2314ba123efee8a25bc80ce01b211",
+  "baseline_commit": "d672844cceaa9ff5488c0c0a42c8fcbdc0df4478",
+  "historical_final_commit": "08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca",
+  "baseline_evidence": "/private/tmp/lamp-third-touch-log/lampOS/docs/verification/touch-complete-host-20261014/default-off.json",
+  "baseline_equivalence": "Archived old-head raw stdout/stderr were verified identical to the pre-task baseline; their recorded hashes and exact bytes are validated before this new-head comparison.",
+  "input_identity": [
+    {
+      "path": "lampOS/crates/controls/fixtures/controls.json",
+      "old_blob": "a38b7c122c2b1a7cdf648ab269a59ac938eb2a23",
+      "new_blob": "a38b7c122c2b1a7cdf648ab269a59ac938eb2a23",
+      "sha256": "d78221c884206e5117d7a5e43a833d86553c32f7f2595d671e50fb41c8cc88c8",
+      "snapshot": "/private/tmp/lamp-third-touch-review-default-off-input-controls.json"
+    },
+    {
+      "path": "lampOS/crates/controls/fixtures/hand-controls.jsonl",
+      "old_blob": "c364c8ab3b7fac50be21c66642a7f60d8facc34e",
+      "new_blob": "c364c8ab3b7fac50be21c66642a7f60d8facc34e",
+      "sha256": "0bbd2359f3c5a7e9c50d4d06a2be5fbbf5d888552ad76f09351bcf76e4339254",
+      "snapshot": "/private/tmp/lamp-third-touch-review-default-off-input-hand-controls.jsonl"
+    }
+  ],
+  "cases": [
+    {
+      "mode": "shadow",
+      "enabled": false,
+      "arguments": [
+        "replay",
+        "--config",
+        "crates/controls/fixtures/controls.json",
+        "--input",
+        "crates/controls/fixtures/hand-controls.jsonl",
+        "--clock-id",
+        "written-controls",
+        "--until-us",
+        "10200000"
+      ],
+      "stdout": {
+        "file": "/private/tmp/lamp-third-touch-review-default-off-baseline-shadow-stdout.jsonl",
+        "sha256": "331908be6e45b1269d7cff2da19d71eeb1c7b2519ad2499ab3f19cec2f759ab3",
+        "bytes": 76658
+      },
+      "stderr": {
+        "file": "/private/tmp/lamp-third-touch-review-default-off-baseline-shadow-stderr.jsonl",
+        "sha256": "ed808724d00c1ebfb73cf18b8f04a781bb30d2d93ccccaf462d637f966de78f8",
+        "bytes": 134
+      }
+    },
+    {
+      "mode": "enabled",
+      "enabled": true,
+      "arguments": [
+        "replay",
+        "--config",
+        "crates/controls/fixtures/controls.json",
+        "--input",
+        "crates/controls/fixtures/hand-controls.jsonl",
+        "--clock-id",
+        "written-controls",
+        "--until-us",
+        "10200000",
+        "--enable"
+      ],
+      "stdout": {
+        "file": "/private/tmp/lamp-third-touch-review-default-off-baseline-enabled-stdout.jsonl",
+        "sha256": "4fd775b956d28cae2c7d33027d41a5b4ac62e900a00907fc2274833ed04f38cc",
+        "bytes": 76392
+      },
+      "stderr": {
+        "file": "/private/tmp/lamp-third-touch-review-default-off-baseline-enabled-stderr.jsonl",
+        "sha256": "ed808724d00c1ebfb73cf18b8f04a781bb30d2d93ccccaf462d637f966de78f8",
+        "bytes": 134
+      }
+    }
+  ],
+  "cwd": "/private/tmp/lamp-third-touch-review/lampOS",
+  "CARGO_TARGET_DIR": "/Users/d/code/autonomous-os/lampOS/target",
+  "compiler": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2",
+  "build": {
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-controls",
+      "--bin",
+      "lamp-controls",
+      "--message-format=json-render-diagnostics"
+    ],
+    "cwd": "/private/tmp/lamp-third-touch-review/lampOS",
+    "CARGO_TARGET_DIR": "/Users/d/code/autonomous-os/lampOS/target",
+    "exit_code": 0,
+    "elapsed_seconds": 0.34458240399999995
+  },
+  "built_artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/lamp-third-touch-review/lampOS/crates/controls#lamp-controls@0.1.0",
+    "manifest_path": "/private/tmp/lamp-third-touch-review/lampOS/crates/controls/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-controls",
+      "src_path": "/private/tmp/lamp-third-touch-review/lampOS/crates/controls/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/Users/d/code/autonomous-os/lampOS/target/debug/lamp-controls"
+    ],
+    "executable": "/Users/d/code/autonomous-os/lampOS/target/debug/lamp-controls",
+    "fresh": true
+  },
+  "binary": {
+    "path": "/private/tmp/lamp-third-touch-review-default-off-binary/lamp-controls",
+    "sha256": "0292b61a46df9f73ba7203725be84ea8ffd5ff3d2d2c1f74e54f9bf1d6ab8db0"
+  },
+  "results": [
+    {
+      "mode": "shadow",
+      "arguments": [
+        "/private/tmp/lamp-third-touch-review-default-off-binary/lamp-controls",
+        "replay",
+        "--config",
+        "crates/controls/fixtures/controls.json",
+        "--input",
+        "crates/controls/fixtures/hand-controls.jsonl",
+        "--clock-id",
+        "written-controls",
+        "--until-us",
+        "10200000"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.766211517,
+      "stdout": {
+        "file": "/private/tmp/lamp-third-touch-review-default-off-shadow-stdout.jsonl",
+        "bytes": 76658,
+        "sha256": "331908be6e45b1269d7cff2da19d71eeb1c7b2519ad2499ab3f19cec2f759ab3",
+        "identical": true
+      },
+      "stderr": {
+        "file": "/private/tmp/lamp-third-touch-review-default-off-shadow-stderr.jsonl",
+        "bytes": 134,
+        "sha256": "ed808724d00c1ebfb73cf18b8f04a781bb30d2d93ccccaf462d637f966de78f8",
+        "identical": true
+      }
+    },
+    {
+      "mode": "enabled",
+      "arguments": [
+        "/private/tmp/lamp-third-touch-review-default-off-binary/lamp-controls",
+        "replay",
+        "--config",
+        "crates/controls/fixtures/controls.json",
+        "--input",
+        "crates/controls/fixtures/hand-controls.jsonl",
+        "--clock-id",
+        "written-controls",
+        "--until-us",
+        "10200000",
+        "--enable"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.04029719999999992,
+      "stdout": {
+        "file": "/private/tmp/lamp-third-touch-review-default-off-enabled-stdout.jsonl",
+        "bytes": 76392,
+        "sha256": "4fd775b956d28cae2c7d33027d41a5b4ac62e900a00907fc2274833ed04f38cc",
+        "identical": true
+      },
+      "stderr": {
+        "file": "/private/tmp/lamp-third-touch-review-default-off-enabled-stderr.jsonl",
+        "bytes": 134,
+        "sha256": "ed808724d00c1ebfb73cf18b8f04a781bb30d2d93ccccaf462d637f966de78f8",
+        "identical": true
+      }
+    }
+  ],
+  "source_unchanged": true,
+  "all_streams_identical": true
+}

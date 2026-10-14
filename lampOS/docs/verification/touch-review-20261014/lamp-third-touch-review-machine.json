@@ -1,0 +1,36 @@
+{
+  "source": {
+    "head": "a7c0073da9b2314ba123efee8a25bc80ce01b211",
+    "status": ""
+  },
+  "cwd": "/private/tmp/lamp-third-touch-review/lampOS",
+  "CARGO_TARGET_DIR": "/Users/d/code/autonomous-os/lampOS/target",
+  "utc_started": "2026-10-14T16:28:12.165680+00:00",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2",
+  "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)\nrelease: 1.96.0\ncommit-hash: 30a34c6821b57de0aaec83a901aca39f88f6778c\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.7.1 (sys:0.4.87+curl-8.19.0 system ssl:(SecureTransport) LibreSSL/3.3.6)\nssl: OpenSSL 3.5.4 30 Sep 2025\nos: Mac OS 26.6.2 [64-bit]",
+  "machine": "Darwin violet4.local 25.6.0 Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:49 PDT 2026; root:xnu-12377.161.14~5/RELEASE_X86_64 x86_64",
+  "packages": [
+    "lamp-actions",
+    "lamp-air",
+    "lamp-body",
+    "lamp-controls",
+    "lamp-ears",
+    "lamp-expression",
+    "lamp-eyes",
+    "lamp-health",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-mood",
+    "lamp-msgs",
+    "lamp-name",
+    "lamp-policy",
+    "lamp-records",
+    "lamp-schedule",
+    "lamp-surround",
+    "lamp-tasks",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "test_scope": "Host Controls and Msgs only; complete reverse-dependency tests are delegated to native whole-workspace serial release CI on the exact pushed head."
+}

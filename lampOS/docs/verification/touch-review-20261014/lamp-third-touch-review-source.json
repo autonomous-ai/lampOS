@@ -1,0 +1,290 @@
+{
+  "old_head": "08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca",
+  "new_head": "a7c0073da9b2314ba123efee8a25bc80ce01b211",
+  "base": "d5d765862ab1f73629ee7a2c5a9a8086f0246d11",
+  "cwd": "/private/tmp/lamp-third-touch-review/lampOS",
+  "shared_target_dir": "/Users/d/code/autonomous-os/lampOS/target",
+  "manual_conflict_files": [
+    "lampOS/docs/reuse-decisions.md"
+  ],
+  "touch_files": [
+    {
+      "path": "lampOS/crates/controls/Cargo.toml",
+      "old_blob": "7fc6f2df90a763ba4c78e5d902d386bf5677bae7",
+      "new_blob": "7fc6f2df90a763ba4c78e5d902d386bf5677bae7",
+      "unchanged": true,
+      "sha256": "e99a07bc0b7e2c3ec58a432f48ab0df2e7fff5a8388faa5840727caea5b3cfbe"
+    },
+    {
+      "path": "lampOS/crates/controls/fixtures/strip-711-README.md",
+      "old_blob": "a618a0ed996a53699814522020b399414789f708",
+      "new_blob": "a618a0ed996a53699814522020b399414789f708",
+      "unchanged": true,
+      "sha256": "50a63571cd0b4f5cb69bba1a62db8c898c2219a68cafdad79d4eb4d67b0d2e00"
+    },
+    {
+      "path": "lampOS/crates/controls/fixtures/strip-711-changes.jsonl",
+      "old_blob": "983224f0abacbd4460c4daf764d4cd8aa895a02c",
+      "new_blob": "983224f0abacbd4460c4daf764d4cd8aa895a02c",
+      "unchanged": true,
+      "sha256": "b6e2f56c070a31fed0cb0f03d05dd3c2e469e0ff7ebdcde35ab535a04bc1820a"
+    },
+    {
+      "path": "lampOS/crates/controls/fixtures/strip-711-controls.json",
+      "old_blob": "b0d1a80dab0569e7a5b04a760ed438f20deacc3d",
+      "new_blob": "b0d1a80dab0569e7a5b04a760ed438f20deacc3d",
+      "unchanged": true,
+      "sha256": "580e2b0bf2dba5e0586c64e91eb1e405eb7da30c4a9a296c0cea3254cd4bc210"
+    },
+    {
+      "path": "lampOS/crates/controls/fixtures/strip-711-pins-example.json",
+      "old_blob": "cb4ca11667e47e897f8ccd6199da12781458d2bb",
+      "new_blob": "cb4ca11667e47e897f8ccd6199da12781458d2bb",
+      "unchanged": true,
+      "sha256": "a1fd41e1c03f62fe4992d0c4368d57d2e3d9232c8a3c8acb8e74413b0b02ceba"
+    },
+    {
+      "path": "lampOS/crates/controls/fixtures/strip-711-reconstruction.jsonl",
+      "old_blob": "30345abda4eaa80fad0671c91e46ffd1ea2729e7",
+      "new_blob": "30345abda4eaa80fad0671c91e46ffd1ea2729e7",
+      "unchanged": true,
+      "sha256": "924c5bd7576966f434bbc568ffc67acc9f6a9310e0b08159737c0a1e4dd892d9"
+    },
+    {
+      "path": "lampOS/crates/controls/fixtures/strip-711-replay.jsonl",
+      "old_blob": "fe2afb522c51fd8807ae95cc5679ae55f8cc9fa3",
+      "new_blob": "fe2afb522c51fd8807ae95cc5679ae55f8cc9fa3",
+      "unchanged": true,
+      "sha256": "d37dcd9e123727865a954fbc5630fe68a4650496d29972500cae3fa139d431d1"
+    },
+    {
+      "path": "lampOS/crates/controls/fixtures/strip-711-working-controls.json",
+      "old_blob": "1e756c731d8ba6ea6f10e5f43da55a2152bf8a79",
+      "new_blob": "1e756c731d8ba6ea6f10e5f43da55a2152bf8a79",
+      "unchanged": true,
+      "sha256": "669df3db5ab4719f8f9c4c1c16a9ccdbf931ea1ea4e9b8dbefe592b7f783fbaf"
+    },
+    {
+      "path": "lampOS/crates/controls/fixtures/strip-711-working-pins-example.json",
+      "old_blob": "4b2ee9105fb34ee42e10c7f36885fe05152ee4a1",
+      "new_blob": "4b2ee9105fb34ee42e10c7f36885fe05152ee4a1",
+      "unchanged": true,
+      "sha256": "552f9983e9f889ab19325aac8ac021da3f0cbd3836f59d6400dde9bfb5470403"
+    },
+    {
+      "path": "lampOS/crates/controls/src/base.rs",
+      "old_blob": "1804eef0156ca1773785682c09b7d05dcfdb77f9",
+      "new_blob": "1804eef0156ca1773785682c09b7d05dcfdb77f9",
+      "unchanged": true,
+      "sha256": "c8e4ce72ab412fe72ec2ec5f9186072269c186d50ac52319516c4e5db7e56765"
+    },
+    {
+      "path": "lampOS/crates/controls/src/base/strip.rs",
+      "old_blob": "d1879010dfc0817c83ae4423885bf4bafa9a09bf",
+      "new_blob": "d1879010dfc0817c83ae4423885bf4bafa9a09bf",
+      "unchanged": true,
+      "sha256": "9d8d9e8857cd577fdbcc70726dc5b35e276dc7a9ecc42b4a01625845d2f63e27"
+    },
+    {
+      "path": "lampOS/crates/controls/src/head_discovery.rs",
+      "old_blob": "f42e89eed27156d2ff26ab10de49c87961cff02a",
+      "new_blob": "f42e89eed27156d2ff26ab10de49c87961cff02a",
+      "unchanged": true,
+      "sha256": "611296aa1b99ef87dd44ed9c5a14525b2a87d2d5498367dce19a8f65f3a1c619"
+    },
+    {
+      "path": "lampOS/crates/controls/src/lib.rs",
+      "old_blob": "dc9faf1885257ef215fc1d493675f568a7c805c3",
+      "new_blob": "dc9faf1885257ef215fc1d493675f568a7c805c3",
+      "unchanged": true,
+      "sha256": "5c1dae9b95cc6abe3fa60fd50a757f7b47ec222e936fb71b82036d8142bca273"
+    },
+    {
+      "path": "lampOS/crates/controls/src/main.rs",
+      "old_blob": "f1d0c64e531af092824adbb683729a7b699dbdbe",
+      "new_blob": "f1d0c64e531af092824adbb683729a7b699dbdbe",
+      "unchanged": true,
+      "sha256": "bad22c51fbad709e0ab31b27ddb345cd31a5036ed74797d8321754c86bd7b121"
+    },
+    {
+      "path": "lampOS/crates/controls/src/mpr121.rs",
+      "old_blob": "7f6d603c8344af632b733c1ae0dd3b4648790e7d",
+      "new_blob": "7f6d603c8344af632b733c1ae0dd3b4648790e7d",
+      "unchanged": true,
+      "sha256": "5ae06169231defbef37f4cb6700e6a92ffeb8e3541ae136ede0d6aa77dc9e776"
+    },
+    {
+      "path": "lampOS/crates/controls/src/record.rs",
+      "old_blob": "7eae29df55efb5ca782ffd706b3ea785c7a882aa",
+      "new_blob": "7eae29df55efb5ca782ffd706b3ea785c7a882aa",
+      "unchanged": true,
+      "sha256": "32a0bc71aa5fc29284deb33801eadaf3f6c29737a4ac228df403a99229af8867"
+    },
+    {
+      "path": "lampOS/crates/controls/src/runtime.rs",
+      "old_blob": "d1e32596cdecee6e8330acea1170d64c745e570a",
+      "new_blob": "d1e32596cdecee6e8330acea1170d64c745e570a",
+      "unchanged": true,
+      "sha256": "6c71be31a47d902937c5ca70df6f7d38d9b56cac18039cfd8ad97c19461f40b3"
+    },
+    {
+      "path": "lampOS/crates/controls/src/strip_worker.rs",
+      "old_blob": "0870b0d8b050319f8809fe10eb97c1fe6d68f0a7",
+      "new_blob": "0870b0d8b050319f8809fe10eb97c1fe6d68f0a7",
+      "unchanged": true,
+      "sha256": "e27695eadf86513890836ab915ae868d617ee44b8ff60c5471f628a254ac600b"
+    },
+    {
+      "path": "lampOS/crates/controls/src/touch.rs",
+      "old_blob": "3e8b4468e6dd835e4b17321734489d1869b69a10",
+      "new_blob": "3e8b4468e6dd835e4b17321734489d1869b69a10",
+      "unchanged": true,
+      "sha256": "cb32471321f1a70d2ac6ad1ade9ea31b6dc4928e68babebbb9f4248d3b15d866"
+    },
+    {
+      "path": "lampOS/crates/controls/src/touch_pins.rs",
+      "old_blob": "76eccb783f41e069c5262e44890fdc0f8c5948a1",
+      "new_blob": "76eccb783f41e069c5262e44890fdc0f8c5948a1",
+      "unchanged": true,
+      "sha256": "dbcdb1eb999d9ce5f9a9d7fc133964f24984061935f72932be58e8ce51fcb98e"
+    },
+    {
+      "path": "lampOS/crates/controls/src/touch_receiver.rs",
+      "old_blob": "f40329b42b20219c3d55062042e3c4bdb963e89a",
+      "new_blob": "f40329b42b20219c3d55062042e3c4bdb963e89a",
+      "unchanged": true,
+      "sha256": "1b06f1afa4f00cc4c07b5666d7434533cef9629dd82227307f7c619fe5c0638c"
+    },
+    {
+      "path": "lampOS/crates/controls/src/touch_replay.rs",
+      "old_blob": "603b4c9304396731b2af4cd12eb92597713050cf",
+      "new_blob": "603b4c9304396731b2af4cd12eb92597713050cf",
+      "unchanged": true,
+      "sha256": "c814c93b8014f279f83cabd409302e52d265405c272c9e2771c78b48a473974c"
+    },
+    {
+      "path": "lampOS/crates/controls/src/touch_runtime.rs",
+      "old_blob": "244fbc54b411414742f779f660b2eef135c0c4d9",
+      "new_blob": "244fbc54b411414742f779f660b2eef135c0c4d9",
+      "unchanged": true,
+      "sha256": "276d08a291239a5cbd1e6b554b65d2673bc8733e4fc79ebbf287d087e4bc39ac"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/head_discovery.rs",
+      "old_blob": "46dffad7dc2b7d19a85a0f9ca4cacd9bba63ba15",
+      "new_blob": "46dffad7dc2b7d19a85a0f9ca4cacd9bba63ba15",
+      "unchanged": true,
+      "sha256": "eb317c207f2d81f8900c8ec48930a4cd549a40e0eb99123c60ee29a7d8e936a6"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/mpr121.rs",
+      "old_blob": "b1e72510933635707759f3fd2628666697827502",
+      "new_blob": "b1e72510933635707759f3fd2628666697827502",
+      "unchanged": true,
+      "sha256": "4cf572c2cc19f17da271d296e1115df8d97ed0d0e56a9efd962fcd2c53c91b13"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/strip.rs",
+      "old_blob": "56d136491ce697b9e4c3c7e8b3467927408108b1",
+      "new_blob": "56d136491ce697b9e4c3c7e8b3467927408108b1",
+      "unchanged": true,
+      "sha256": "30b8370126e233886fddc3b31e03557cedaba464b64332a8d8e7473de9022621"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/strip_worker.rs",
+      "old_blob": "f889ed8eabbe75d2b2733052947d64433e42daba",
+      "new_blob": "f889ed8eabbe75d2b2733052947d64433e42daba",
+      "unchanged": true,
+      "sha256": "36e5b4c7e076134c86fb841309bb39fca0b5eb133b92dac7ef34dbbf1a8552ce"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/touch.rs",
+      "old_blob": "498ce0a957da8f9e71523a8c5adcd7118e09a605",
+      "new_blob": "498ce0a957da8f9e71523a8c5adcd7118e09a605",
+      "unchanged": true,
+      "sha256": "57f5078e7cd7260df5aa28a4c819db8a7c3f85f83f2f3ad96479048f50629e1e"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/touch_pins.rs",
+      "old_blob": "c77cee93d081119b271236895e5ed464e6b4cb15",
+      "new_blob": "c77cee93d081119b271236895e5ed464e6b4cb15",
+      "unchanged": true,
+      "sha256": "bdc278e44ceefe420a650777c948b640c2ea5258380d40bb9a2e9eb61d96f55b"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/touch_program.rs",
+      "old_blob": "88dc671d70354a8e59e98969ec318fd801f097cf",
+      "new_blob": "88dc671d70354a8e59e98969ec318fd801f097cf",
+      "unchanged": true,
+      "sha256": "4b35a318ff20d287d918b422413fd457c62bd949ed7e65b5eef04c0f65ae79af"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/touch_receiver.rs",
+      "old_blob": "d0ccb1dc53840eb59744f3597eba5bb3a90e6102",
+      "new_blob": "d0ccb1dc53840eb59744f3597eba5bb3a90e6102",
+      "unchanged": true,
+      "sha256": "e164748ead121840794d8017de7a03869f8fc7c414073a0767ddfab1df864354"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/touch_replay.rs",
+      "old_blob": "d2db2db7fed1d04fa7743abc636c3d9063cc8621",
+      "new_blob": "d2db2db7fed1d04fa7743abc636c3d9063cc8621",
+      "unchanged": true,
+      "sha256": "92e7d41a925f6194786fdbe9d5513073cf62dd0bc28b062b2897d9d499b995cd"
+    },
+    {
+      "path": "lampOS/crates/controls/tests/touch_runtime.rs",
+      "old_blob": "c0f86b1bec6fe965adfd32f996e37b73354896c1",
+      "new_blob": "c0f86b1bec6fe965adfd32f996e37b73354896c1",
+      "unchanged": true,
+      "sha256": "828e86705654cac2ba7d664fd17fb82be1fe4726fe7031d55e13e9c48e85ec3c"
+    },
+    {
+      "path": "lampOS/crates/msgs/src/controls.rs",
+      "old_blob": "c3b8648d347e02d769fc75e034b7761381516da7",
+      "new_blob": "c3b8648d347e02d769fc75e034b7761381516da7",
+      "unchanged": true,
+      "sha256": "2c8c2644141d1beb01c0f9c70817afbf09327c5eb736704856a13d632196e3f1"
+    },
+    {
+      "path": "lampOS/crates/msgs/src/lib.rs",
+      "old_blob": "0df054e3da573e4394f3d1fdcdcb757862ed30b7",
+      "new_blob": "41cd14e481fae99a336c8f86ad93a17c00a5f054",
+      "unchanged": false,
+      "sha256": "2f0d4cd4cf170669f4ed1d05d4629f487e10dbbd2d10f9d35c7c65ecce5eb661"
+    },
+    {
+      "path": "lampOS/crates/msgs/tests/touch.rs",
+      "old_blob": "d7f52a9a8fac20193723d0d769dd39387e87733f",
+      "new_blob": "d7f52a9a8fac20193723d0d769dd39387e87733f",
+      "unchanged": true,
+      "sha256": "7c2c94c6a0ff682f4576fa1530f3279bbb0c2a32ae18bae147632af6f93c0729"
+    }
+  ],
+  "controls_old_tree": "efb3d04f4129f7f11a292995ec8d2bb1fb7f653d",
+  "controls_new_tree": "efb3d04f4129f7f11a292995ec8d2bb1fb7f653d",
+  "reverse_dependents_including_touched": [
+    "lamp-actions",
+    "lamp-air",
+    "lamp-body",
+    "lamp-controls",
+    "lamp-ears",
+    "lamp-expression",
+    "lamp-eyes",
+    "lamp-health",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-mood",
+    "lamp-msgs",
+    "lamp-name",
+    "lamp-policy",
+    "lamp-records",
+    "lamp-schedule",
+    "lamp-surround",
+    "lamp-tasks",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "dependency_scope": "Transitive manifest dependencies including dev, build and target-specific dependency tables; optional dependencies conservatively included. Cargo execution uses default features."
+}

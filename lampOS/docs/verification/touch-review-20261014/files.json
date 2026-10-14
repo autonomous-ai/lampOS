@@ -1,0 +1,272 @@
+[
+  {
+    "path": "lamp-third-touch-review-all-source-sha256.json",
+    "source": "/private/tmp/lamp-third-touch-review-all-source-sha256.json",
+    "bytes": 91526,
+    "sha256": "b702af2625abb2305f1ef1937333605e778646263995666f73b0a1cd3bd3b027"
+  },
+  {
+    "path": "lamp-third-touch-review-arm64-SHA256SUMS",
+    "source": "/private/tmp/lamp-third-touch-review-arm64-SHA256SUMS",
+    "bytes": 2631,
+    "sha256": "3b0d0446d91f6067bf3d7adf3893c9b4e6d7ab4729abfc7c861ff6f4d5a0024e"
+  },
+  {
+    "path": "lamp-third-touch-review-arm64-artifacts.json",
+    "source": "/private/tmp/lamp-third-touch-review-arm64-artifacts.json",
+    "bytes": 762,
+    "sha256": "628194978eb670d56c05e2b09a867311b0b56de7d2ff1a400963b67d25da1867"
+  },
+  {
+    "path": "lamp-third-touch-review-arm64-commands.json",
+    "source": "/private/tmp/lamp-third-touch-review-arm64-commands.json",
+    "bytes": 1024,
+    "sha256": "3667be2235ad2cf98c30f1776e20263fbf3e97cc5d6a7e4ed54466fabc5c73d8"
+  },
+  {
+    "path": "lamp-third-touch-review-arm64-count-check.json",
+    "source": "/private/tmp/lamp-third-touch-review-arm64-count-check.json",
+    "bytes": 5815,
+    "sha256": "7ccb3f9093e7c9ba4bf2cee124ab94fffeb2f3d20a790f237b27cb99b396fe21"
+  },
+  {
+    "path": "lamp-third-touch-review-arm64-full.txt",
+    "source": "/private/tmp/lamp-third-touch-review-arm64-full.txt",
+    "bytes": 1214705,
+    "sha256": "47b274221fda6b6c11915a19da4377a2f5a86a1d62c3043cb329274e7fb539e3"
+  },
+  {
+    "path": "lamp-third-touch-review-arm64-harnesses.json",
+    "source": "/private/tmp/lamp-third-touch-review-arm64-harnesses.json",
+    "bytes": 166403,
+    "sha256": "2b9ae9b478d41d353f8e1ec6c92fb7276b3a6f01c2afd10d4a48fc2b63cb2d56"
+  },
+  {
+    "path": "lamp-third-touch-review-arm64-results.json",
+    "source": "/private/tmp/lamp-third-touch-review-arm64-results.json",
+    "bytes": 18865,
+    "sha256": "3d4696eaa6f3898017a68b22e5d7f13b676ac460b726c96d8304924c2b637d6e"
+  },
+  {
+    "path": "lamp-third-touch-review-arm64-run.json",
+    "source": "/private/tmp/lamp-third-touch-review-arm64-run.json",
+    "bytes": 12650,
+    "sha256": "6d1d785340231ccff68950255eba8fefb09e2c40d044e08ad80e66c672fd683b"
+  },
+  {
+    "path": "lamp-third-touch-review-arm64-status-final.json",
+    "source": "/private/tmp/lamp-third-touch-review-arm64-status-final.json",
+    "bytes": 2559,
+    "sha256": "08f920bc56c29f4241e9ed264a95373f807493f4eceb0935c7a924576a8ba056"
+  },
+  {
+    "path": "lamp-third-touch-review-arm64-status-first.json",
+    "source": "/private/tmp/lamp-third-touch-review-arm64-status-first.json",
+    "bytes": 2356,
+    "sha256": "cc6e6110212dd4b37832a9ef939e1db0737b426144e3ea1035e40ee4d9a2274c"
+  },
+  {
+    "path": "lamp-third-touch-review-arm64-warnings.txt",
+    "source": "/private/tmp/lamp-third-touch-review-arm64-warnings.txt",
+    "bytes": 2810,
+    "sha256": "e0c33bc3636ebb16aafe1a676877605f500e7108a1029f16207512a18e556f0c"
+  },
+  {
+    "path": "lamp-third-touch-review-arm64-watch.txt",
+    "source": "/private/tmp/lamp-third-touch-review-arm64-watch.txt",
+    "bytes": 9011,
+    "sha256": "fadfaf735e837ed9bb04e32b9d9610384ded7037ce018ce8a461c4a289820d56"
+  },
+  {
+    "path": "lamp-third-touch-review-clippy.txt",
+    "source": "/private/tmp/lamp-third-touch-review-clippy.txt",
+    "bytes": 3029,
+    "sha256": "3105f82e2c5272a26586c1329f4af7bfe16687ba523fc5bf4eb709ad710391dc"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-baseline-enabled-stderr.jsonl",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-baseline-enabled-stderr.jsonl",
+    "bytes": 134,
+    "sha256": "ed808724d00c1ebfb73cf18b8f04a781bb30d2d93ccccaf462d637f966de78f8"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-baseline-enabled-stdout.jsonl",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-baseline-enabled-stdout.jsonl",
+    "bytes": 76392,
+    "sha256": "4fd775b956d28cae2c7d33027d41a5b4ac62e900a00907fc2274833ed04f38cc"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-baseline-shadow-stderr.jsonl",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-baseline-shadow-stderr.jsonl",
+    "bytes": 134,
+    "sha256": "ed808724d00c1ebfb73cf18b8f04a781bb30d2d93ccccaf462d637f966de78f8"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-baseline-shadow-stdout.jsonl",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-baseline-shadow-stdout.jsonl",
+    "bytes": 76658,
+    "sha256": "331908be6e45b1269d7cff2da19d71eeb1c7b2519ad2499ab3f19cec2f759ab3"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-build-result.json",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-build-result.json",
+    "bytes": 377,
+    "sha256": "daf9b68e7e76f1d517e9c642e3af200bf52f6d0de2f350daf91793dbd8a6ef6e"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-build-stderr.txt",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-build-stderr.txt",
+    "bytes": 72,
+    "sha256": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-build.jsonl",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-build.jsonl",
+    "bytes": 26688,
+    "sha256": "44bbc6fd67657c0a87a4a200e6d6d666688ba9627fea88046c21dba39e875d6b"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-enabled-stderr.jsonl",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-enabled-stderr.jsonl",
+    "bytes": 134,
+    "sha256": "ed808724d00c1ebfb73cf18b8f04a781bb30d2d93ccccaf462d637f966de78f8"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-enabled-stdout.jsonl",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-enabled-stdout.jsonl",
+    "bytes": 76392,
+    "sha256": "4fd775b956d28cae2c7d33027d41a5b4ac62e900a00907fc2274833ed04f38cc"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-input-controls.json",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-input-controls.json",
+    "bytes": 125,
+    "sha256": "d78221c884206e5117d7a5e43a833d86553c32f7f2595d671e50fb41c8cc88c8"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-input-hand-controls.jsonl",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-input-hand-controls.jsonl",
+    "bytes": 220919,
+    "sha256": "0bbd2359f3c5a7e9c50d4d06a2be5fbbf5d888552ad76f09351bcf76e4339254"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-preparation.json",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-preparation.json",
+    "bytes": 2965,
+    "sha256": "836cfe627e8cc2b918fc559fc227d6170e7dc6fcd1ee34bde73e71a5d8c6a11a"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-results.json",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-results.json",
+    "bytes": 6900,
+    "sha256": "dda01336bb1275a54af5e17b0417cc968fdc9e05dd8fa3b86f7c79386fece7fd"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-run.txt",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-run.txt",
+    "bytes": 1719,
+    "sha256": "d52c970ef676156399f8c8967f4ec0bb91eb4fa986f5213b88425728dde7fa97"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-shadow-stderr.jsonl",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-shadow-stderr.jsonl",
+    "bytes": 134,
+    "sha256": "ed808724d00c1ebfb73cf18b8f04a781bb30d2d93ccccaf462d637f966de78f8"
+  },
+  {
+    "path": "lamp-third-touch-review-default-off-shadow-stdout.jsonl",
+    "source": "/private/tmp/lamp-third-touch-review-default-off-shadow-stdout.jsonl",
+    "bytes": 76658,
+    "sha256": "331908be6e45b1269d7cff2da19d71eeb1c7b2519ad2499ab3f19cec2f759ab3"
+  },
+  {
+    "path": "lamp-third-touch-review-diff-check-raw.txt",
+    "source": "/private/tmp/lamp-third-touch-review-diff-check-raw.txt",
+    "bytes": 90418,
+    "sha256": "9c6f53ec246681916b69db2b3999ad4bde0fa7cca347390b3c32d1d478366e2a"
+  },
+  {
+    "path": "lamp-third-touch-review-diff-check-source.txt",
+    "source": "/private/tmp/lamp-third-touch-review-diff-check-source.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "lamp-third-touch-review-doc-preservation.json",
+    "source": "/private/tmp/lamp-third-touch-review-doc-preservation.json",
+    "bytes": 178,
+    "sha256": "1ef9355148d2a6c33ba199df033005a56ff346e42e343fe8da2b1fe862cb8648"
+  },
+  {
+    "path": "lamp-third-touch-review-final-source.json",
+    "source": "/private/tmp/lamp-third-touch-review-final-source.json",
+    "bytes": 126,
+    "sha256": "862f3311da47801d4d15638739de9c3be5fe9ce7e45f660101a066c50a0622f6"
+  },
+  {
+    "path": "lamp-third-touch-review-format.txt",
+    "source": "/private/tmp/lamp-third-touch-review-format.txt",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "lamp-third-touch-review-machine.json",
+    "source": "/private/tmp/lamp-third-touch-review-machine.json",
+    "bytes": 1571,
+    "sha256": "921fe81af566fe66d31168ba574e39539eca5223634765d6239d405264bcb004"
+  },
+  {
+    "path": "lamp-third-touch-review-packages.json",
+    "source": "/private/tmp/lamp-third-touch-review-packages.json",
+    "bytes": 357,
+    "sha256": "309b6479d84b1f4e8b028d0ca45367f0bb065fd6553078ca28cc48cd34b6b3e9"
+  },
+  {
+    "path": "lamp-third-touch-review-range-diff.txt",
+    "source": "/private/tmp/lamp-third-touch-review-range-diff.txt",
+    "bytes": 1327,
+    "sha256": "71d4c76308b4deef275ec972feb4bf9b0f823dd1abb4bb6d6eb77c5907a1a757"
+  },
+  {
+    "path": "lamp-third-touch-review-rebase-continue.txt",
+    "source": "/private/tmp/lamp-third-touch-review-rebase-continue.txt",
+    "bytes": 13693,
+    "sha256": "7661358e031cd123a877f5eddf45a00bb91ed62f31536446f73147b799602380"
+  },
+  {
+    "path": "lamp-third-touch-review-rebase-first.txt",
+    "source": "/private/tmp/lamp-third-touch-review-rebase-first.txt",
+    "bytes": 656,
+    "sha256": "b45296a67cd875a4c68cc9c4b683d15f55bf9858831e07fd7264bd8aff488b69"
+  },
+  {
+    "path": "lamp-third-touch-review-report.md",
+    "source": "/private/tmp/lamp-third-touch-review-report.md",
+    "bytes": 4827,
+    "sha256": "e65351f4a22758bb53c3ec332d9c7a25a27c97532176cb15f583cba870165f2c"
+  },
+  {
+    "path": "lamp-third-touch-review-results.json",
+    "source": "/private/tmp/lamp-third-touch-review-results.json",
+    "bytes": 2545,
+    "sha256": "9b5140a0b2b72a9a46fdf6480fd6e4d8f56bd09f42b71fc81e66a4c0f16c4fe9"
+  },
+  {
+    "path": "lamp-third-touch-review-source.json",
+    "source": "/private/tmp/lamp-third-touch-review-source.json",
+    "bytes": 12201,
+    "sha256": "18d5b7bcea070c9a5eb10a73ed3839f5791ceeb45e42c678b06b24242804e717"
+  },
+  {
+    "path": "lamp-third-touch-review-tests.txt",
+    "source": "/private/tmp/lamp-third-touch-review-tests.txt",
+    "bytes": 41185,
+    "sha256": "a4453f1527cc87e52595059aac6172841df90034e73cfbd0adf680ca9e3c6dfb"
+  },
+  {
+    "path": "lamp-third-touch-review-workspace-build.txt",
+    "source": "/private/tmp/lamp-third-touch-review-workspace-build.txt",
+    "bytes": 3227,
+    "sha256": "3026348cdcbfcfb4eae1199d7d99b14b4524356b0b99e9e1b60015f32254fed1"
+  }
+]

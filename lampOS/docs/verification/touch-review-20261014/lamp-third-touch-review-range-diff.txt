@@ -1,0 +1,22 @@
+1:  08a32c9d8 ! 1:  a7c0073da lampOS: add opt-in touch strip and head gestures
+    @@ lampOS/docs/reuse-decisions.md
+      Review date: 2026-10-10. This is a source-based decision record, not a performance
+      comparison. V1 means main commit `d5efe9d7b73cc529b34cd4abe97624682a82ca94`.
+      The current Rust checkpoint is `64529dee4d1228dd9373298a807d506f94421dca`.
+    -@@ lampOS/docs/reuse-decisions.md: audible delivery or end-to-end latency. Storage test evidence and runtime
+    - limits are reported separately in [tasks.md](tasks.md); V1 tests cited here
+    +@@ lampOS/docs/reuse-decisions.md: limits are reported separately in [tasks.md](tasks.md); V1 tests cited here
+      were inspected as cases, not rerun. No permission, completion or successful
+      speech is inferred from a process exit or observed transcript.
+    -+
+    + 
+     +The Task 33 touch review also supplies no lamp calibration, physical contact
+     +latency, electrical contention result or owner-applied Sleep/Wake/Stop. Its
+     +host fixtures and native build gate do not establish a physical response.
+    ++
+    + ## Mood: bounded inner state (task 35, 2026-10-14)
+    + 
+    + This review starts from `79c98be3b67015f9e305f1a4dcea4040191895f0` and
+     
+      ## lampOS/docs/verification/touch-host-20261014/README.md (new) ##
+     @@

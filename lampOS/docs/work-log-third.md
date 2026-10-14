@@ -1944,6 +1944,60 @@ taken by this session; #699 is next and unclaimed. The Unknown-room policy
 question has no answer, so the implementation conservatively waits for
 explicit Quiet. The resulting cold-start timer delay is documented.
 
+
+## 2026-10-15 — Task 33 rebased and ready again (#728)
+
+Ready for lamp-voice: yes (#728)
+
+The requested rebase is complete: `third/touch` now holds
+`a7c0073da9b2314ba123efee8a25bc80ce01b211`, based on `d5d765862`.
+The only manual conflict was the appended reuse notes; both Touch and Mood
+sections survive. Controls source is byte-identical to the previous task
+head; Msgs adds the upstream Mood module and registration. Kind remains
+**off unless set**: `--touch` selects the new path, with requests separately
+requiring `--enable`. No deployment or device access by Third.
+
+[The new evidence](verification/touch-review-20261014/README.md) preserves
+exact commands, source hashes and unedited output. On the development Intel
+x86_64 Mac with Rust/Cargo 1.96.0, format, strict all-target Clippy for all
+21 affected/dependent packages, 446 Controls/Msgs tests (zero failed or
+ignored, 29 harnesses), and the workspace build pass. The new binary's whole
+legacy replay stdout and stderr match the preserved pre-task bytes in both
+shadow and legacy-enabled modes; the legacy input blobs also match.
+
+The exact-head native ARM64 [run 38599296426](https://github.com/autonomous-ai/lampOS/actions/runs/38599296426)
+is green: Ubuntu 22.04 ARM64, ordinary user, Rust 1.96.0; release workspace
+binaries/examples build and serial workspace tests. Standard summaries report
+**4,192 passed, zero failed and 31 ignored across 276 harnesses**, plus
+**12 passed, zero failed** in the separate turn-end-wire process runner.
+The native workspace run supplies all dependent-crate tests; the host and
+native counts overlap. The native workflow does not run Clippy. It reports
+two inherited Cargo `replay_cost` output-name collisions in build, repeated
+in tests, and no Rust source diagnostic warning. Raw warnings are retained.
+
+**First's artifact:** `lampos-arm64-a7c0073da9b2314ba123efee8a25bc80ce01b211`,
+ID `11914551344`, expires **2026-10-21 17:01:30 UTC**. Install only its
+Controls binary, keeping the newer Voice. Controls SHA-256:
+`8c7b8a1a6c3437853d616ae01244042057800a5a6bbc540006d78ce730b56ceb`.
+The evidence README gives the hash check and minute without `--touch`, using
+verified legacy configuration/pins and the installed legacy enable choice.
+Then follow `docs/controls.md` for per-pad qualification and hand tests.
+
+First's earlier lamp-4ace minute, reported in the PR, applies to old Git head
+`08a32c9d8` and old Controls binary SHA `37924f2bfea364a...`; it is not a
+measurement of the new artifact. First found base E4/E8 faulty and requires
+per-pad thresholds. Tap, hold, slide and enabled final-owner behavior still
+need hands at the lamp. Most likely wrong there remain per-pad noise and
+startup baseline, global chip faults from excluded pads, pulsed head holds,
+blind strip positions, I2C contention/lock permissions, and actual Stop,
+Sleep/Wake, privacy and physical response latency.
+
+Task 31 remains taken and not ready while its complete host gate is being
+diagnosed. The clean integration checkout also reproduces its inherited
+motor fixture timeouts; the independent final Schedule source-copy checks
+pass (280 tests and 72 default-off cases). Those focused results do not
+replace the complete gate. Task #699 remains next and unclaimed.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

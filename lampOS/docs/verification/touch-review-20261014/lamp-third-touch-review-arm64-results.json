@@ -1,0 +1,209 @@
+{
+  "run_id": 38599296426,
+  "head_sha": "a7c0073da9b2314ba123efee8a25bc80ce01b211",
+  "status": "completed",
+  "conclusion": "success",
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/38599296426",
+  "utc_collected": "2026-10-14T17:02:48.485429+00:00",
+  "counts": {
+    "passed": 4192,
+    "failed": 0,
+    "ignored": 31,
+    "measured": 0,
+    "filtered_out": 0,
+    "harnesses": 276,
+    "failed_harnesses": 0
+  },
+  "ignored_cases": [
+    {
+      "raw_line": 655,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:42:38.2833013Z test cost_of_the_gate ... ignored, prints a timing",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:42:37.8192397Z      Running tests/playout_continuity/main.rs (target/release/deps/playout_continuity-78b31d02c4c413b1)"
+    },
+    {
+      "raw_line": 721,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:42:42.1035322Z test steady_reference_measures ... ignored, about a minute of simulated sound per scene; run with --release",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:42:39.5815699Z      Running tests/steady_reference.rs (target/release/deps/steady_reference-3a13f615ace037a9)"
+    },
+    {
+      "raw_line": 2211,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:43:00.7635652Z test recovery::tests::soak::prolonged_adversarial_recoveries_account_for_every_request ... ignored, several hundred turns per seed and interface; run explicitly",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:42:59.1739766Z      Running unittests src/lib.rs (target/release/deps/lamp_gemini-d4a89c397f21bf60)"
+    },
+    {
+      "raw_line": 2212,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:43:00.7636712Z test recovery::tests::soak::prolonged_conversations_with_injected_failures_keep_every_request_accounted_for ... ignored, several hundred turns per seed; run explicitly",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:42:59.1739766Z      Running unittests src/lib.rs (target/release/deps/lamp_gemini-d4a89c397f21bf60)"
+    },
+    {
+      "raw_line": 2609,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:43:32.7851543Z test arithmetic_cost ... ignored, finite release timing; host measurements are not lamp measurements",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:43:32.7842727Z      Running tests/cost.rs (target/release/deps/cost-b8d80789eba805f0)"
+    },
+    {
+      "raw_line": 2610,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:43:32.7852215Z test inconclusive_cost ... ignored, finite worst-work release timing; host measurements are not lamp measurements",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:43:32.7842727Z      Running tests/cost.rs (target/release/deps/cost-b8d80789eba805f0)"
+    },
+    {
+      "raw_line": 2696,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:43:35.1216591Z test health::tests::measure_health_update_and_socket_with_a_held_publisher ... ignored, host timing measurement; run in release with --ignored --nocapture",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:43:32.8286528Z      Running unittests src/lib.rs (target/release/deps/lamp_memory-296c39d180fe58ef)"
+    },
+    {
+      "raw_line": 2829,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:43:36.4836493Z test file_and_ranked_reads_have_the_same_socket_boundary_and_corpus ... ignored, local measurement; does not qualify a lamp",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:43:36.4825418Z      Running tests/days_timing.rs (target/release/deps/days_timing-6fd79e77903f3b89)"
+    },
+    {
+      "raw_line": 2849,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:12.4548143Z test health_costs_and_socket_requests_with_identical_synthetic_stores ... ignored, release host measurement; does not qualify a lamp",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:12.4535552Z      Running tests/health_timing.rs (target/release/deps/health_timing-ab58d1fa8428e6e8)"
+    },
+    {
+      "raw_line": 2881,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:13.3389571Z test how_long_each_request_takes_with_a_month_of_talk_behind_it ... ignored, a measurement, not a check",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:13.3378213Z      Running tests/timing.rs (target/release/deps/timing-26a005bf9aec5202)"
+    },
+    {
+      "raw_line": 3025,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:14.6317235Z test authored_bus_cues_to_observed_state_first_and_repeated ... ignored, manual local-process bus timing; run alone with Unix sockets allowed",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:14.6303465Z      Running tests/timing.rs (target/release/deps/timing-120166a9c883c7cf)"
+    },
+    {
+      "raw_line": 3026,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:14.6318148Z test reducer_first_use_repeated_actions_and_long_gap ... ignored, manual release-mode host timing; run alone and preserve raw output",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:14.6303465Z      Running tests/timing.rs (target/release/deps/timing-120166a9c883c7cf)"
+    },
+    {
+      "raw_line": 3372,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:21.9789956Z test measure_shadow_choices_while_slow_is_held ... ignored, host measurement: run alone with --release --ignored --nocapture",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:17.8436119Z      Running tests/judges.rs (target/release/deps/judges-d67f12f93a812797)"
+    },
+    {
+      "raw_line": 3424,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:27.1695435Z test measure_local_first_and_repeated ... ignored, host measurement: run alone with --release --ignored --nocapture",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:27.1686479Z      Running tests/local_timing.rs (target/release/deps/local_timing-ae005cbee0411412)"
+    },
+    {
+      "raw_line": 3588,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:46.7030904Z test bind_mounts_are_refused_even_on_the_same_filesystem ... ignored, requires an isolated disposable Linux container with CAP_SYS_ADMIN",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:46.7029464Z      Running tests/records.rs (target/release/deps/records-ba6bd7f5cbd0fb06)"
+    },
+    {
+      "raw_line": 3593,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:51.7060501Z test records_cost ... ignored, finite release timing of disposable records; report machine separately",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:44:46.7029464Z      Running tests/records.rs (target/release/deps/records-ba6bd7f5cbd0fb06)"
+    },
+    {
+      "raw_line": 4397,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2637946Z test a_fast_worker_without_its_library_fails_once_and_is_not_restarted ... ignored, requires the pinned model; see docs/endpoint-pilot.md",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2624057Z      Running tests/fast.rs (target/release/deps/fast-161a00d92d52a30f)"
+    },
+    {
+      "raw_line": 4399,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2644208Z test fast_model_gives_its_recorded_probability_close_to_the_exact_one ... ignored, requires the pinned model and ONNX Runtime; see docs/endpoint-pilot.md",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2624057Z      Running tests/fast.rs (target/release/deps/fast-161a00d92d52a30f)"
+    },
+    {
+      "raw_line": 4400,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2645149Z test fast_worker_answers_is_bounded_and_idles_without_spinning ... ignored, requires the pinned model and ONNX Runtime; see docs/endpoint-pilot.md",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2624057Z      Running tests/fast.rs (target/release/deps/fast-161a00d92d52a30f)"
+    },
+    {
+      "raw_line": 4407,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2657844Z test check_model_verifies_the_installed_model_and_refuses_damaged_copies ... ignored, requires the pinned model; see docs/endpoint-detection.md",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2646413Z      Running tests/parity.rs (target/release/deps/parity-cd4a3e616c917729)"
+    },
+    {
+      "raw_line": 4410,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2858272Z test inherited_lower_address_space_limits_are_kept ... ignored, requires the pinned model; see docs/endpoint-detection.md",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2646413Z      Running tests/parity.rs (target/release/deps/parity-cd4a3e616c917729)"
+    },
+    {
+      "raw_line": 4413,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2876015Z test tract_probability_matches_onnx_runtime_reference ... ignored, requires the pinned model; see docs/endpoint-detection.md",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2646413Z      Running tests/parity.rs (target/release/deps/parity-cd4a3e616c917729)"
+    },
+    {
+      "raw_line": 4414,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2876837Z test worker_process_matches_reference_and_reports_stage_costs ... ignored, requires the pinned model; see docs/endpoint-detection.md",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2646413Z      Running tests/parity.rs (target/release/deps/parity-cd4a3e616c917729)"
+    },
+    {
+      "raw_line": 4416,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.3181793Z test worker_process_refuses_truncated_and_corrupt_models_once ... ignored, requires the pinned model; see docs/endpoint-detection.md",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2646413Z      Running tests/parity.rs (target/release/deps/parity-cd4a3e616c917729)"
+    },
+    {
+      "raw_line": 4417,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.3182679Z test worker_process_stays_ready_and_bounded_across_idle_and_repeated_checks ... ignored, requires the pinned model; see docs/endpoint-detection.md",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.2646413Z      Running tests/parity.rs (target/release/deps/parity-cd4a3e616c917729)"
+    },
+    {
+      "raw_line": 4778,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:47:14.0690711Z test coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance ... ignored, requires a built lamp-turn-end and the pinned model",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:13.7615150Z      Running unittests src/lib.rs (target/release/deps/lamp_voice-e964db0398f5a783)"
+    },
+    {
+      "raw_line": 4798,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:47:20.9612576Z test coordinator::tests::hand_controls::local_hand_stop_dispatch_latency ... ignored, manual local-host speaker-control latency probe; no lamp or acoustic claim",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:13.7615150Z      Running unittests src/lib.rs (target/release/deps/lamp_voice-e964db0398f5a783)"
+    },
+    {
+      "raw_line": 5159,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:49:28.7634373Z test provider_worker::tests::sixty_second_answer_follows_output_capacity ... ignored, one minute of real time; run explicitly",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:13.7615150Z      Running unittests src/lib.rs (target/release/deps/lamp_voice-e964db0398f5a783)"
+    },
+    {
+      "raw_line": 5164,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:49:29.1949401Z test provider_worker::tests::three_minute_answer_follows_output_capacity ... ignored, three minutes of real time; run explicitly",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:13.7615150Z      Running unittests src/lib.rs (target/release/deps/lamp_voice-e964db0398f5a783)"
+    },
+    {
+      "raw_line": 5197,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:49:55.9037481Z test reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift ... ignored",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:13.7615150Z      Running unittests src/lib.rs (target/release/deps/lamp_voice-e964db0398f5a783)"
+    },
+    {
+      "raw_line": 5219,
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:49:57.7373387Z test reference::tests::four_virtual_hours_capture_clocked ... ignored, four virtual hours; run in release",
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:13.7615150Z      Running unittests src/lib.rs (target/release/deps/lamp_voice-e964db0398f5a783)"
+    }
+  ],
+  "count_boundary": "Standard Rust libtest summaries only; additional custom harness=false process checks are recorded separately. Host/prior-run counts overlap and are not added.",
+  "binary_sha_manifest_source": "Exact SHA-256 of each binary CI log step; artifact archives/executables were not downloaded.",
+  "binary_sha_manifest": "/private/tmp/lamp-third-touch-review-arm64-SHA256SUMS",
+  "binary_manifest_entries": 33,
+  "controls_binary_sha256": "8c7b8a1a6c3437853d616ae01244042057800a5a6bbc540006d78ce730b56ceb",
+  "artifacts": [
+    {
+      "id": 11914551344,
+      "name": "lampos-arm64-a7c0073da9b2314ba123efee8a25bc80ce01b211",
+      "size_in_bytes": 56705466,
+      "digest": "sha256:d6c8da10177859085d20ba92cb43f1afba7e894666a8924693e42e75d0c44229",
+      "expired": false,
+      "workflow_run_head": "a7c0073da9b2314ba123efee8a25bc80ce01b211",
+      "expires_at": "2026-10-21T17:01:30Z"
+    }
+  ],
+  "raw_log_sha256": "47b274221fda6b6c11915a19da4377a2f5a86a1d62c3043cb329274e7fb539e3",
+  "custom_harnesses": [
+    {
+      "raw_line": 4446,
+      "passed": 12,
+      "failed": 0,
+      "harness": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:09.3206116Z      Running tests/process.rs (target/release/deps/process-9c0b3bb1536db9e9)",
+      "raw": "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T16:45:13.7525844Z test result: 12 passed; 0 failed",
+      "source": "lampOS/crates/turn-end-wire/tests/process.rs (harness=false)"
+    }
+  ],
+  "warning_counts": {
+    "cargo_output_collision_build": 2,
+    "cargo_output_collision_test": 2,
+    "rust_source_diagnostics": 0,
+    "rustup_setup_warn_lines": 2,
+    "actions_node_deprecations": 6
+  },
+  "native_clippy_run": false
+}

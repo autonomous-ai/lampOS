@@ -1,0 +1,10 @@
+{
+  "enabled": false,
+  "buttons": [
+    "primary"
+  ],
+  "head_pads": [
+    "head-left"
+  ],
+  "base_selected_mask": 4095
+}
