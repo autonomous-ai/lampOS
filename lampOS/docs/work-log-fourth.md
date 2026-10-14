@@ -1522,6 +1522,42 @@ stage was presented as ready. Records' final Mac focused gate has 113
 passing tests, zero failures, and one ignored manual measurement; its final
 Linux and workspace checks are underway.
 
+## 2026-10-14, 17:33 ICT: task 17 fitting follow-up — taken
+
+Ready for lamp-voice: no
+
+Fetched and read Queue #705 and comments. Task 8 (#699) was returned to
+Third at 17:10; Fourth does not claim or change it. Fourth's remaining order
+is #707, #698, #700. The first two implementations remain on their task
+branches while the reported external CI/Clippy repairs are pending. Following
+the rule to continue independent work after a pushed question, claimed
+[#700](https://github.com/autonomous-ai/lampOS/issues/700) with `status:taken`
+and this session's comment, then verified it is the first taken comment.
+
+Rebased the log-only Fourth branch onto fetched
+`b0630f4a01ea786283e0861019b037fa3d6eeb63`; no runtime source is carried on
+this integration branch ahead of upstream. Task branch `fourth/judge-fit`.
+Reproduce First's 89-row fit and splits without touching the held-out labels
+or using test rows to choose thresholds. Answer why the fitted judge holds
+all eight test calls, whether direct-call evidence warrants a separate rule,
+and what the same-snapshot comparison does and does not establish. Trace
+Voice's actual first-output boundary and specify its `voice_first_output`
+snapshot for First to publish. Scope is the existing local judge/fitter's
+own files and `docs/policy.md`, `docs/said-to-whom.md`, plus evidence; no
+Voice wiring or default behavior change. Any candidate remains explicitly
+opted in and shadow-only until measured and accepted on a lamp.
+
+Task 30 local results are complete: 113 Mac tests and 115 Linux x86_64 tests
+passed, no failures; required formatting, strict Clippy, workspace build and
+ARM64 release cross-build passed. The two existing manual Linux tests were
+not run. Code/evidence commit `a39be42d1` is pushed only to
+`fourth/records-exit`; native ARM64 run
+[38549971718](https://github.com/autonomous-ai/lampOS/actions/runs/38549971718)
+is in progress. It has not been fast-forwarded to `lamp-fourth`, and is not
+ready until the required green run is established. Task 29's full Mac tests
+and ARM64 cross-build continue; Linux strict Clippy is blocked by the Body
+warning recorded above. No lamp action or measurement by Fourth.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
