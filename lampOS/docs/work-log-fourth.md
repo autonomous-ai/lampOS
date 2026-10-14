@@ -2798,6 +2798,44 @@ PR #746 is separately ready and awaiting review; no new Fourth task was
 assigned at the 03:50 queue poll.
 
 
+
+## 2026-10-15, 04:12 ICT: task 46, checked EarlyEnd teardown and frozen v4
+
+Ready for lamp-voice: no
+
+[Focused EarlyEnd evidence](verification/voice-fixtures-early-end-v4-20261015/README.md)
+retains both Mac runs. The first passed 13 / 0 / 0 but exposed a background
+`AlreadyClosed` service-send panic that the old fixture ignored. The fix
+cancels only the scripted answer task before provider Stop, keeps the other
+peers and shared 300 ms cleanup, joins both Tokio tasks, and propagates
+unexpected panics. The corrected module passed 16 / 0 / 0 in 61.53 seconds
+(71.882 seconds including Cargo); file formatting and compile checks passed.
+No background integration panic appeared in that run. All eleven original
+tests and 86 assertions remain, with five added fixture-policy checks.
+
+The shared real-provider cohort now explicitly uses a bounded per-instance
+100 ms privacy gate, actual provider Ready before producers, a real 12-second
+conversation watchdog, and immutable 10 ms source timestamps. The direct
+Tokio supervisor name-note case retains its original flow and real clock.
+Production and unrelated tests retain 50 ms. Real source-age refusal remains
+100 ms; no delivery timestamp refreshes old audio.
+
+V4 is frozen outside the parent repository on `78b984b69`, including the
+newly integrated updater crate: 1,678 files, 27,460,419 bytes. All fifteen
+task paths were byte-identical across rebase. Manifest SHA-256:
+`5a0a82a8d391fdb4b3edf2900bf3af2284222c92d3e40773052320dbb6582292`.
+Formatting and strict workspace Clippy passed. Actual ARM64 compilation
+started by 21:10:59 UTC on 2026-10-14, then the ten full serial Voice sequence
+began beside it. This is Fourth's Intel Mac and x86_64 Podman cross-build VM,
+not native ARM execution or a lamp. No result of that full sequence is yet
+claimed. V1, v2 and v3 failures remain retained.
+
+First's Body clock-seam answer remains pending; no Body source changed.
+PR #746 remains ready, open and unreviewed at the latest check. The log branch
+was rebased on `78b984b69` with documentation/evidence only; it carries no
+new runtime code. The published failure links retain their original commits.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

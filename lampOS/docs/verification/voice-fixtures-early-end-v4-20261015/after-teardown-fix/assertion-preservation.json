@@ -1,0 +1,10 @@
+{
+  "previous_test_count": 13,
+  "new_test_count": 16,
+  "changed_existing_test_bodies": [],
+  "added_tests": [
+    "requested_task_cancellation_is_accepted_and_normal_results_survive",
+    "task_panic_payload_propagates_even_when_cancellation_was_requested",
+    "unrequested_task_cancellation_is_rejected"
+  ]
+}

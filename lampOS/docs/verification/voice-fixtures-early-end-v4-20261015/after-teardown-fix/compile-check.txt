@@ -1,0 +1,2 @@
+    Checking lamp-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/voice)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.80s

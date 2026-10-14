@@ -1,0 +1,12 @@
+{
+  "source_hashes_unchanged": true,
+  "source_file_count": 667,
+  "early_end_sha256": "e4d70c867d7531a5e19ea50f09a4be1581e26879872eae95ef13c9cc19af7fcf",
+  "already_closed_count": 0,
+  "panic_diagnostic_threads": [
+    "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup",
+    "coordinator::tests::early_end::fixture_policy_tests::task_panic_payload_propagates_even_when_cancellation_was_requested",
+    "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected"
+  ],
+  "source_changes_during_run": []
+}

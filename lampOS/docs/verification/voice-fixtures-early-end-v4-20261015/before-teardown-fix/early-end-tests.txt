@@ -1,0 +1,57 @@
+   Compiling lamp-camera v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/camera)
+   Compiling lamp-voice v0.1.0 (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 24.62s
+     Running unittests src/lib.rs (target/debug/deps/lamp_voice-798a966b47f6690b)
+
+running 13 tests
+test coordinator::tests::early_end::a_lone_lamp_and_a_pause_and_the_question_go_as_one_request ... {"seconds":5,"status":"listening_ready"}
+a lone Lamp, a pause and the question: connections 1; activityStart 1, audio blocks 215, activityEnd 1, other 0; requests given up 0; answers begun 1, blocks played 48; last sound to first block handed to the speaker Some(1275) ms
+ok
+test coordinator::tests::early_end::a_name_note_told_with_a_request_ended_early_does_not_survive_it ... ok
+test coordinator::tests::early_end::an_answer_that_arrives_after_the_lamp_is_sure_begins_400_ms_sooner_than_without ... {"seconds":5,"status":"listening_ready"}
+{"seconds":5,"status":"listening_ready"}
+an answer after the lamp is sure, with the option: connections 1; activityStart 1, audio blocks 145, activityEnd 1, other 0; requests given up 0; answers begun 1, blocks played 48; last sound to first block handed to the speaker Some(1269) ms
+an answer after the lamp is sure, without it: connections 1; activityStart 1, audio blocks 185, activityEnd 1, other 0; requests given up 0; answers begun 1, blocks played 48; last sound to first block handed to the speaker Some(1673) ms
+last sound to the end sent: off 606 ms, on 201 ms; to the first block handed to the speaker: off 1673 ms, on 1269 ms
+ok
+test coordinator::tests::early_end::an_answer_that_arrives_before_the_lamp_is_sure_begins_at_that_moment ... {"seconds":4,"status":"listening_ready"}
+an answer before the lamp is sure: connections 1; activityStart 1, audio blocks 145, activityEnd 1, other 0; requests given up 0; answers begun 1, blocks played 16; last sound to first block handed to the speaker Some(605) ms
+ok
+test coordinator::tests::early_end::an_answer_with_nothing_said_before_the_lamp_is_sure_is_never_played ... {"seconds":4,"status":"listening_ready"}
+lamp-voice provider: barrier Settled: superseded=Some(1) successor=None waited_ms=0 quiet_ms=0 successor_input_open=false end_withheld_ms=None withheld audio_frames=0 text_frames=0 generation_complete=0 interrupted=1 completions_not_idle=0 start_held_ms=None start_released_by=None retained_samples=0 waiting_for_input=0 resumable_updates=0 unresumable_updates=0
+nothing said before the lamp is sure: connections 1; activityStart 2, audio blocks 145, activityEnd 1, other 0; requests given up 0; answers begun 1, blocks played 0; last sound to first block handed to the speaker None ms
+ok
+test coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup - should panic ... 
+thread 'coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup' (563843065) panicked at crates/voice/src/coordinator/tests/early_end.rs:541:5:
+real-provider fixture requires the host clock
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ok
+test coordinator::tests::early_end::fixture_policy_tests::delayed_capture_keeps_continuity_and_cannot_refresh_stale_audio ... ok
+test coordinator::tests::early_end::lamp_stop_over_an_answer_stops_it_and_only_the_answer_to_the_whole_is_played ... {"seconds":5,"status":"listening_ready"}
+lamp-voice provider: barrier Settled: superseded=Some(1) successor=Some(2) waited_ms=1 quiet_ms=0 successor_input_open=true end_withheld_ms=None withheld audio_frames=0 text_frames=0 generation_complete=0 interrupted=1 completions_not_idle=0 start_held_ms=None start_released_by=None retained_samples=0 waiting_for_input=0 resumable_updates=0 unresumable_updates=0
+lamp-voice provider: barrier Settled: superseded=Some(2) successor=Some(3) waited_ms=1 quiet_ms=0 successor_input_open=true end_withheld_ms=None withheld audio_frames=0 text_frames=0 generation_complete=0 interrupted=1 completions_not_idle=0 start_held_ms=None start_released_by=None retained_samples=0 waiting_for_input=0 resumable_updates=0 unresumable_updates=0
+
+thread '<unnamed>' (563843142) panicked at crates/gemini/src/testing.rs:81:14:
+scripted server send: AlreadyClosed
+Lamp, stop. over an answer: connections 1; activityStart 3, audio blocks 270, activityEnd 3, other 0; requests given up 1; answers begun 3, blocks played 158; last sound to first block handed to the speaker Some(604) ms
+ok
+test coordinator::tests::early_end::quiet_to_the_end_the_answer_starts_when_the_lamp_is_sure_and_not_before ... {"seconds":4,"status":"listening_ready"}
+quiet to the end: connections 1; activityStart 1, audio blocks 145, activityEnd 1, other 0; requests given up 0; answers begun 1, blocks played 48; last sound to first block handed to the speaker Some(604) ms
+ok
+test coordinator::tests::early_end::speech_resumed_at_three_tenths_nothing_of_the_first_answer_is_played_and_one_turn_is_heard ... {"seconds":6,"status":"listening_ready"}
+lamp-voice provider: barrier Settled: superseded=Some(1) successor=Some(2) waited_ms=748 quiet_ms=0 successor_input_open=true end_withheld_ms=None withheld audio_frames=1 text_frames=0 generation_complete=0 interrupted=1 completions_not_idle=0 start_held_ms=Some(740) start_released_by=Some(FirstOutput) retained_samples=14240 waiting_for_input=0 resumable_updates=0 unresumable_updates=0
+speech resumed at 0.3 s, vad-only: connections 1; activityStart 2, audio blocks 235, activityEnd 2, other 0; requests given up 1; answers begun 2, blocks played 48; last sound to first block handed to the speaker Some(1275) ms
+ok
+test coordinator::tests::early_end::speech_resumed_at_three_tenths_under_the_lamps_duplex_policy ... {"seconds":6,"status":"listening_ready"}
+lamp-voice provider: barrier Settled: superseded=Some(1) successor=Some(2) waited_ms=749 quiet_ms=0 successor_input_open=true end_withheld_ms=None withheld audio_frames=1 text_frames=0 generation_complete=0 interrupted=1 completions_not_idle=0 start_held_ms=Some(741) start_released_by=Some(FirstOutput) retained_samples=14240 waiting_for_input=0 resumable_updates=0 unresumable_updates=0
+speech resumed at 0.3 s, duplex 600 ms: connections 1; activityStart 2, audio blocks 235, activityEnd 2, other 0; requests given up 1; answers begun 2, blocks played 48; last sound to first block handed to the speaker Some(1269) ms
+ok
+test coordinator::tests::early_end::the_link_dropping_in_between_fails_the_request_unheard_and_the_next_is_answered ... {"seconds":6,"status":"listening_ready"}
+the link dropping in between: connections 2; activityStart 2, audio blocks 290, activityEnd 2, other 0; requests given up 0; answers begun 1, blocks played 48; last sound to first block handed to the speaker Some(604) ms
+ok
+test coordinator::tests::early_end::without_the_option_every_message_and_record_is_what_it_was ... {"seconds":6,"status":"listening_ready"}
+without the option: Hey Lamp, 0.3 s, the question: connections 1; activityStart 1, audio blocks 275, activityEnd 1, other 0; requests given up 0; answers begun 1, blocks played 48; last sound to first block handed to the speaker Some(926) ms
+ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 879 filtered out; finished in 61.52s
+

@@ -1,0 +1,121 @@
+--- early_end-before.rs
++++ lampOS/crates/voice/src/coordinator/tests/early_end.rs
+@@ -544,6 +544,20 @@
+     );
+ }
+ 
++/// Cancellation is expected only after this fixture requests it. A task panic
++/// must still fail the test, including one that happened before cleanup began.
++fn fixture_task_result<T>(
++    result: std::result::Result<T, tokio::task::JoinError>,
++    cancellation_requested: bool,
++) -> Option<T> {
++    match result {
++        Ok(value) => Some(value),
++        Err(error) if error.is_panic() => std::panic::resume_unwind(error.into_panic()),
++        Err(error) if error.is_cancelled() && cancellation_requested => None,
++        Err(error) => panic!("fixture task cancelled without a fixture request: {error}"),
++    }
++}
++
+ impl Setup {
+     /// Today's lamp, but `vad-only`, whose own wait is the lamp's 600 ms
+     /// and which leaves the lamp's own playback unmasked, so that a person
+@@ -582,6 +596,7 @@
+             privacy_peer_channels,
+             speaker_peer_channels,
+         ];
++        let (answering_abort_tx, answering_abort_rx) = std::sync::mpsc::sync_channel(1);
+         let mut peers = Vec::with_capacity(4);
+         peers.push(
+             // The real provider worker and session, and the scripted service.
+@@ -621,16 +636,23 @@
+                         ));
+                         let answering =
+                             tokio::spawn(serve_dials(dials, service, seen.clone(), stop.clone()));
++                        // Publish before the current-thread runtime first yields.
++                        // The one-slot channel cannot wait for a consumer here.
++                        answering_abort_tx.send(answering.abort_handle()).unwrap();
+                         while !stop.load(Ordering::SeqCst) {
+                             tokio::time::sleep(Duration::from_millis(5)).await;
+                         }
+                         worker.abort();
+                         answering.abort();
++                        // Join both before propagating either panic, so no task
++                        // is left running when this provider thread unwinds.
++                        let worker_result = worker.await;
++                        let answering_result = answering.await;
+                         // A worker that ended by itself says why.
+-                        if let Ok(Err(error)) = worker.await {
++                        if let Some(Err(error)) = fixture_task_result(worker_result, true) {
+                             seen.lock().unwrap().worker = Some(error.to_string());
+                         }
+-                        let _ = answering.await;
++                        let _ = fixture_task_result(answering_result, true);
+                     });
+                 }
+             }),
+@@ -657,6 +679,9 @@
+         };
+         // The worker says it is ready before anything else.
+         let deadline = Instant::now() + Duration::from_secs(3);
++        let answering_abort = answering_abort_rx
++            .recv_timeout(deadline.saturating_duration_since(Instant::now()))
++            .expect("the provider did not publish its scripted-service task in time");
+         loop {
+             match rig
+                 .provider
+@@ -700,10 +725,16 @@
+             fixture_privacy,
+             Instant::now() + FIXTURE_CONVERSATION_WATCHDOG,
+         );
++        // Stop future service sends before provider Stop can close its socket.
++        // Both tasks share one current-thread runtime; the provider and every
++        // peripheral peer remain active through the ordinary shared cleanup.
++        answering_abort.abort();
+         let _ = rig.shutdown(&mut trace);
+         stop.store(true, Ordering::SeqCst);
+         for peer in peers {
+-            peer.join().unwrap();
++            if let Err(panic) = peer.join() {
++                std::panic::resume_unwind(panic);
++            }
+         }
+         let seen = std::mem::take(&mut *seen.lock().unwrap());
+         Session {
+@@ -716,6 +747,35 @@
+ 
+ mod fixture_policy_tests {
+     use super::*;
++
++    #[tokio::test]
++    async fn requested_task_cancellation_is_accepted_and_normal_results_survive() {
++        let pending = tokio::spawn(std::future::pending::<()>());
++        pending.abort();
++        assert!(fixture_task_result(pending.await, true).is_none());
++        let completed = tokio::spawn(async { 7u8 });
++        assert_eq!(fixture_task_result(completed.await, false), Some(7));
++    }
++
++    #[tokio::test]
++    async fn task_panic_payload_propagates_even_when_cancellation_was_requested() {
++        struct TaskPanic;
++        let panicking: tokio::task::JoinHandle<()> =
++            tokio::spawn(async { std::panic::panic_any(TaskPanic) });
++        let result = panicking.await;
++        let propagated = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++            fixture_task_result(result, true)
++        }));
++        assert!(propagated.unwrap_err().is::<TaskPanic>());
++    }
++
++    #[tokio::test]
++    #[should_panic(expected = "fixture task cancelled without a fixture request")]
++    async fn unrequested_task_cancellation_is_rejected() {
++        let pending = tokio::spawn(std::future::pending::<()>());
++        pending.abort();
++        let _ = fixture_task_result(pending.await, false);
++    }
+ 
+     #[test]
+     #[should_panic(expected = "real-provider fixture requires the host clock")]

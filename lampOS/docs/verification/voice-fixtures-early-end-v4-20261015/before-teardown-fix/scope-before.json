@@ -1,0 +1,31 @@
+{
+  "artifact_directory": "/private/tmp/lamp-fourth-early-end-recovery-v4-t_qibf24",
+  "source_test_functions": [
+    "quiet_to_the_end_the_answer_starts_when_the_lamp_is_sure_and_not_before",
+    "speech_resumed_at_three_tenths_nothing_of_the_first_answer_is_played_and_one_turn_is_heard",
+    "speech_resumed_at_three_tenths_under_the_lamps_duplex_policy",
+    "an_answer_that_arrives_before_the_lamp_is_sure_begins_at_that_moment",
+    "an_answer_with_nothing_said_before_the_lamp_is_sure_is_never_played",
+    "an_answer_that_arrives_after_the_lamp_is_sure_begins_400_ms_sooner_than_without",
+    "the_link_dropping_in_between_fails_the_request_unheard_and_the_next_is_answered",
+    "lamp_stop_over_an_answer_stops_it_and_only_the_answer_to_the_whole_is_played",
+    "a_lone_lamp_and_a_pause_and_the_question_go_as_one_request",
+    "without_the_option_every_message_and_record_is_what_it_was"
+  ],
+  "source_test_count": 10,
+  "v3_raw_test_functions": [
+    "a_lone_lamp_and_a_pause_and_the_question_go_as_one_request",
+    "a_name_note_told_with_a_request_ended_early_does_not_survive_it",
+    "an_answer_that_arrives_after_the_lamp_is_sure_begins_400_ms_sooner_than_without",
+    "an_answer_that_arrives_before_the_lamp_is_sure_begins_at_that_moment",
+    "an_answer_with_nothing_said_before_the_lamp_is_sure_is_never_played",
+    "lamp_stop_over_an_answer_stops_it_and_only_the_answer_to_the_whole_is_played",
+    "quiet_to_the_end_the_answer_starts_when_the_lamp_is_sure_and_not_before",
+    "speech_resumed_at_three_tenths_nothing_of_the_first_answer_is_played_and_one_turn_is_heard",
+    "speech_resumed_at_three_tenths_under_the_lamps_duplex_policy",
+    "the_link_dropping_in_between_fails_the_request_unheard_and_the_next_is_answered",
+    "without_the_option_every_message_and_record_is_what_it_was"
+  ],
+  "v3_raw_test_count": 11,
+  "source_sha256": "134a9495500bddf491a61eeefe5d251cefb04cadf6eddb7eb674b083c174a74a"
+}

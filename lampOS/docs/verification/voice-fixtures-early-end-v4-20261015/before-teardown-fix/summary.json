@@ -1,0 +1,62 @@
+{
+  "artifact_directory": "/private/tmp/lamp-fourth-early-end-recovery-v4-t_qibf24",
+  "machine": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "architecture": "x86_64",
+  "started_utc": "2026-10-14T20:59:48.646675+00:00",
+  "runs": [
+    {
+      "name": "format-check",
+      "command": [
+        "/Users/autonomous/.rustup/toolchains/1.96.0-x86_64-apple-darwin/bin/rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/voice/src/coordinator/tests/early_end.rs"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS",
+      "exit_code": 0,
+      "elapsed_seconds": 0.037747154012322426,
+      "test_results": []
+    },
+    {
+      "name": "compile-check",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--tests"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS",
+      "exit_code": 0,
+      "elapsed_seconds": 10.237754352856427,
+      "test_results": []
+    },
+    {
+      "name": "early-end-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "coordinator::tests::early_end::",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS",
+      "exit_code": 0,
+      "elapsed_seconds": 87.23375510470942,
+      "test_results": [
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 879 filtered out; finished in 61.52s"
+      ]
+    }
+  ],
+  "source_changes_during_run": [],
+  "finished_utc": "2026-10-14T21:01:26.239934+00:00"
+}

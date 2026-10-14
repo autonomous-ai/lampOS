@@ -1,0 +1,25 @@
+{
+  "original_test_count": 11,
+  "original_test_names": [
+    "quiet_to_the_end_the_answer_starts_when_the_lamp_is_sure_and_not_before",
+    "speech_resumed_at_three_tenths_nothing_of_the_first_answer_is_played_and_one_turn_is_heard",
+    "speech_resumed_at_three_tenths_under_the_lamps_duplex_policy",
+    "an_answer_that_arrives_before_the_lamp_is_sure_begins_at_that_moment",
+    "an_answer_with_nothing_said_before_the_lamp_is_sure_is_never_played",
+    "an_answer_that_arrives_after_the_lamp_is_sure_begins_400_ms_sooner_than_without",
+    "the_link_dropping_in_between_fails_the_request_unheard_and_the_next_is_answered",
+    "lamp_stop_over_an_answer_stops_it_and_only_the_answer_to_the_whole_is_played",
+    "a_lone_lamp_and_a_pause_and_the_question_go_as_one_request",
+    "without_the_option_every_message_and_record_is_what_it_was",
+    "a_name_note_told_with_a_request_ended_early_does_not_survive_it"
+  ],
+  "changed_original_test_bodies_except_explicit_runner_name_clock_guard_and_formatting": [],
+  "shared_resumed_assertions_unchanged": true,
+  "original_coordinator_tests": 10,
+  "setup_conversations": 11,
+  "direct_tokio_tests": 1,
+  "new_nested_unit_tests": 2,
+  "expected_total_tests": 13,
+  "explicit_runner_call_sites": 11,
+  "remaining_implicit_run_calls": 0
+}
