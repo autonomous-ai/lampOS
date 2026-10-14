@@ -7,6 +7,11 @@ and non-draft. [The registered PR snapshot](pr-747-open.json) verifies its
 exact head, body and native ARM64 success. The PR-triggered generic CI jobs
 were still pending at that snapshot; no result for them is inferred.
 
+[The subsequent 21:29 PR check](watch-2129-pr-747.json) found every registered
+check green. The PR-triggered [generic CI run](watch-2129-ci-38640455489.json)
+completed successfully at the same task head, with Go, Web and HAL jobs green.
+This is separate from the native Rust qualification and the failed Mac gate.
+
 Current task head:
 [`d794cf2aca8fd5a7891af6363f2155e9fd3091fe`](https://github.com/autonomous-ai/lampOS/commit/d794cf2aca8fd5a7891af6363f2155e9fd3091fe),
 based on integration `1337e7e1d8b88e102ec9fd12f544841569856f75`. All

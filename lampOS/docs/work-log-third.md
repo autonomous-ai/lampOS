@@ -2460,6 +2460,26 @@ No lamp or real provider was accessed by Third.
 Third now watches this PR and the Queue. Task 33's enabled touch check still
 needs First and a person; #699 remains after MVP and has not been claimed.
 
+## 2026-10-15 — Task 31 PR checks green; Queue watch
+
+Ready for lamp-voice: yes (#747)
+
+At 21:29 UTC, [PR #747's registered checks](verification/schedule-voice-qualification-20261015/watch-2129-pr-747.json)
+were all green and it had no review or comment yet. The new generic CI run
+[38640455489](https://github.com/autonomous-ai/lampOS/actions/runs/38640455489)
+completed successfully on `d794cf2`: Go, Web and HAL jobs all passed. This
+observation does not change the failed complete Mac gate recorded above.
+The ready handoff was also [posted on #709](https://github.com/autonomous-ai/lampOS/issues/709#issuecomment-6178910923).
+
+A fresh `git fetch origin` left integration at `f2261ec48`. The
+[Queue](verification/schedule-voice-qualification-20261015/watch-2129-queue.json)
+and [open Third issues](verification/schedule-voice-qualification-20261015/watch-2129-third-open.json)
+leave no independent MVP task to take: #709 awaits First's lamp run/merge,
+#711's enabled touch qualification needs First and a person, and #699 is
+explicitly after MVP. The main task and log working trees are clean after
+publication. Third watches PR/task replies and reads Queue again in half an
+hour; no other builder's task is claimed.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

@@ -1,0 +1,26 @@
+[
+  {
+    "source": "/private/tmp/lamp-third-queue-20261014T212929Z.json",
+    "retained": "watch-2129-queue.json",
+    "bytes": 9714,
+    "sha256": "43cd793fc16c216924a2b113aa7fcb8539df244734955cee05410bdff4061c24"
+  },
+  {
+    "source": "/private/tmp/lamp-third-third-open-20261014T212929Z.json",
+    "retained": "watch-2129-third-open.json",
+    "bytes": 1103,
+    "sha256": "8ad0ef5903e379caacd92acf76e50f299d72894affc552c48d3cb6507ab0f880"
+  },
+  {
+    "source": "/private/tmp/lamp-third-pr-747-20261014T212929Z.json",
+    "retained": "watch-2129-pr-747.json",
+    "bytes": 2408,
+    "sha256": "d926b83d6c8d68a2330f6b1b4b322e43047bb194fa94dc1d26724faa733c9dce"
+  },
+  {
+    "source": "/private/tmp/lamp-third-ci-38640455489-20261014T212929Z.json",
+    "retained": "watch-2129-ci-38640455489.json",
+    "bytes": 6808,
+    "sha256": "35e5f03a9121ffd09cd364df8b8692ab48166010a2e6ec5eb67deed6ff8a096a"
+  }
+]
