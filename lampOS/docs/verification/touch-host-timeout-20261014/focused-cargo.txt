@@ -1,0 +1,14 @@
+   Compiling lamp-msgs v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/msgs)
+   Compiling lamp-keeper v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/keeper)
+   Compiling lamp-controls v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/controls)
+   Compiling lamp-expression v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/expression)
+   Compiling lamp-body v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/body)
+   Compiling lamp-voice v0.1.0 (/Users/d/code/autonomous-os/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.35s
+     Running unittests src/lib.rs (target/debug/deps/lamp_voice-798a966b47f6690b)
+
+running 1 test
+test coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 836 filtered out; finished in 3.69s
+

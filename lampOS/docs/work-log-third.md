@@ -1711,6 +1711,46 @@ with no claim or source changes. The remaining Third queue is #711, #709,
 #699. Read-only Schedule integration preparation continues while touch gates
 run. No lamp, provider account or actuator was accessed.
 
+## 2026-10-14 — Task 33 — final native green; inherited host timeout retained
+
+Ready for lamp-voice: no
+
+The exact task head remains `08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca`.
+Native ARM64 [run 38573575450](https://github.com/autonomous-ai/lampOS/actions/runs/38573575450)
+passed: release workspace build, 4,054 tests passed, zero failed and 29
+inherited ignored in 264 harnesses. The Controls binary SHA-256 is
+`37924f2bfea364a214243e7b935a85ca1e8302167393c34590530a2908fc18f1`.
+This was GitHub's Ubuntu 22.04 ARM64 runner with Rust 1.96.0, not a lamp.
+
+**Found, not mine:** the full serial development-Mac gate stopped in the
+unchanged Voice motor cleanup test at `coordinator/motor/tests.rs:441`,
+`owned child timed out: None`: 2,804 passed, one failed, fifteen inherited
+ignored in 142 harnesses, 1,819.333908 seconds. All completed earlier harnesses passed;
+later harnesses and the workspace build were not reached. The complete raw
+failure and diagnostic reruns are in
+[touch-host-timeout-20261014](verification/touch-host-timeout-20261014/README.md).
+
+The test has a two-second wait while production startup permits three seconds.
+That is a possible timing sensitivity, not an established cause: the failure
+has no child-mode/startup trace. A focused unchanged Cargo rerun passed, then
+three serial runs of the exact failed library binary all passed, without
+source/deadline/assertion changes. No leftover matching test process was seen
+in the subsequent process check. The full twenty-package serial test command
+is running once more on the same unchanged source; no task PR until it and
+the workspace build pass. The earlier failure will remain in the handoff.
+
+The fresh source-only workspace build and all 446 Controls/Msgs checks passed,
+zero failed/ignored. Its final binary is still byte-identical to the original
+legacy replay without `--touch`, in shadow and enabled modes. Per-unit pad
+qualification, physical timing and applied Voice/privacy remain First's tests.
+
+The 21:04 queue read is unchanged for Third: #711, #709, #699; #714 belongs
+to Second. Fetched integration `8be0b9dd2` adds opt-in Voice first-output
+logging, with no Controls/Msgs, dependency or workflow change. This log branch
+is rebased on it. The tested task head stays fixed; its handoff installs only
+the Controls artifact, not an older Voice. Schedule preparation remains
+read-only and unclaimed. No lamp or provider account was accessed.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

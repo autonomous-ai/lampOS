@@ -1,0 +1,6 @@
+
+running 1 test
+test coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 836 filtered out; finished in 2.63s
+

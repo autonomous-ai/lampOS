@@ -1,0 +1,30 @@
+{
+  "binary": "target/debug/deps/lamp_voice-b15efe69bd87193c",
+  "sha256": "de05a4465230f41753ce3285ee20536c1c9681e5c2ea3605142c7734160d0ced",
+  "command": [
+    "target/debug/deps/lamp_voice-b15efe69bd87193c",
+    "--exact",
+    "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "machine": "Intel i7-10700K x86_64 development Mac, macOS 26.6.2, Rust 1.96.0; no lamp",
+  "note": "Unchanged exact test binary from the failed full host gate; repeated solely to investigate the timeout, not as a replacement full gate.",
+  "runs": [
+    {
+      "run": 1,
+      "exit_code": 0,
+      "elapsed_seconds": 4.084655972
+    },
+    {
+      "run": 2,
+      "exit_code": 0,
+      "elapsed_seconds": 3.5822383220000003
+    },
+    {
+      "run": 3,
+      "exit_code": 0,
+      "elapsed_seconds": 3.5636158479999995
+    }
+  ]
+}

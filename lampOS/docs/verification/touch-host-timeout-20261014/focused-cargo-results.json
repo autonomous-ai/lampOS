@@ -1,0 +1,21 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup",
+    "--",
+    "--exact",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 30.729180364,
+  "source_commit": "08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca",
+  "machine": "Intel i7-10700K x86_64 development Mac, macOS 26.6.2, Rust 1.96.0; not a lamp",
+  "scope": "Focused unchanged inherited test after complete gate failed; not a replacement full gate."
+}
