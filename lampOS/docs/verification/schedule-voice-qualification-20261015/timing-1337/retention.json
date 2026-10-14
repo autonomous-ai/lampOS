@@ -1,0 +1,20 @@
+[
+  {
+    "original": "/private/tmp/lamp-third-schedule-1337-probes-first.json",
+    "retained": "probes.json",
+    "bytes": 21515,
+    "sha256": "b8b308bc193220aa11abe3ff6134f563c92ddb02b2f569532c2c012a897eb8d7"
+  },
+  {
+    "original": "/private/tmp/lamp-third-schedule-1337-probes-first-parent.txt",
+    "retained": "parent.txt",
+    "bytes": 2843,
+    "sha256": "70d889a8d670a6b7bfffac09b5bc8c2fd053706c912a9ec3f5813e6ea3dc3fd5"
+  },
+  {
+    "original": "/private/tmp/lamp-third-schedule-1337-probes-first-transport.txt",
+    "retained": "transport.txt",
+    "bytes": 4994,
+    "sha256": "e7f8f3762cdfbc0b33ffe3292a36bc1c95ebe15d4b324e67d78a70c73d69b0c9"
+  }
+]

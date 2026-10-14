@@ -1,0 +1,204 @@
+{
+  "checked_at": "2026-10-14T20:50:49.332256+00:00",
+  "head": "d794cf2aca8fd5a7891af6363f2155e9fd3091fe",
+  "documents": [
+    "docs/schedule.md",
+    "docs/actions.md",
+    "docs/tools.md",
+    "docs/verification/schedule-voice-host-20261014/integration-1337/README.md"
+  ],
+  "local_path_links": [
+    {
+      "document": "docs/schedule.md",
+      "target": "v1-verdicts.md",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "../crates/schedule/src/time.rs",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "../crates/schedule/src/engine.rs",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "../crates/schedule/src/store.rs",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "../crates/schedule/src/protocol.rs",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "../crates/schedule/src/runtime.rs",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "../crates/msgs/src/schedule.rs",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "../crates/actions/src/schedule.rs",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "verification/schedule-host-20261014/machine.json",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "verification/schedule-host-20261014/ignored.json",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "verification/schedule-host-20261014/results.json",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "verification/schedule-host-20261014/failures.md",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "verification/schedule-host-20261014/supplement-results.json",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "verification/schedule-host-20261014/qualification.json",
+      "exists": true
+    },
+    {
+      "document": "docs/schedule.md",
+      "target": "verification/schedule-host-20261014/measurement.json",
+      "exists": true
+    },
+    {
+      "document": "docs/actions.md",
+      "target": "brain-build.md",
+      "exists": true
+    },
+    {
+      "document": "docs/actions.md",
+      "target": "tools.md",
+      "exists": true
+    },
+    {
+      "document": "docs/actions.md",
+      "target": "schedule.md",
+      "exists": true
+    },
+    {
+      "document": "docs/actions.md",
+      "target": "ring-choreography.md",
+      "exists": true
+    },
+    {
+      "document": "docs/actions.md",
+      "target": "tools.md",
+      "exists": true
+    },
+    {
+      "document": "docs/actions.md",
+      "target": "ring-choreography.md",
+      "exists": true
+    },
+    {
+      "document": "docs/tools.md",
+      "target": "gemini-session-reliability.md",
+      "exists": true
+    },
+    {
+      "document": "docs/tools.md",
+      "target": "brain-build.md",
+      "exists": true
+    },
+    {
+      "document": "docs/tools.md",
+      "target": "ring-choreography.md",
+      "exists": true
+    },
+    {
+      "document": "docs/tools.md",
+      "target": "actions.md",
+      "exists": true
+    },
+    {
+      "document": "docs/tools.md",
+      "target": "schedule.md#proposed-model-tools",
+      "exists": true
+    },
+    {
+      "document": "docs/tools.md",
+      "target": "actions.md",
+      "exists": true
+    },
+    {
+      "document": "docs/tools.md",
+      "target": "schedule.md#optional-voice-consumer",
+      "exists": true
+    },
+    {
+      "document": "docs/tools.md",
+      "target": "attention.md",
+      "exists": true
+    },
+    {
+      "document": "docs/tools.md",
+      "target": "memory.md",
+      "exists": true
+    },
+    {
+      "document": "docs/tools.md",
+      "target": "schedule.md#task-31-lamp-qualification",
+      "exists": true
+    },
+    {
+      "document": "docs/tools.md",
+      "target": "memory.md",
+      "exists": true
+    },
+    {
+      "document": "docs/verification/schedule-voice-host-20261014/integration-1337/README.md",
+      "target": "rebase.json",
+      "exists": true
+    },
+    {
+      "document": "docs/verification/schedule-voice-host-20261014/integration-1337/README.md",
+      "target": "review.md",
+      "exists": true
+    },
+    {
+      "document": "docs/verification/schedule-voice-host-20261014/integration-1337/README.md",
+      "target": "source-frozen.json",
+      "exists": true
+    },
+    {
+      "document": "docs/verification/schedule-voice-host-20261014/integration-1337/README.md",
+      "target": "focused.json",
+      "exists": true
+    },
+    {
+      "document": "docs/verification/schedule-voice-host-20261014/integration-1337/README.md",
+      "target": "retention.json",
+      "exists": true
+    },
+    {
+      "document": "docs/verification/schedule-voice-host-20261014/integration-1337/README.md",
+      "target": "prelaunch-error.json",
+      "exists": true
+    }
+  ],
+  "missing": [],
+  "limits": "Checks local path existence only; URL reachability, heading fragments and historical evidence documents are outside this check."
+}

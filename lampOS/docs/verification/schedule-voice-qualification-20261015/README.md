@@ -1,6 +1,6 @@
 # Schedule Voice qualification and integration records
 
-Ready for lamp-voice: no
+Ready for lamp-voice: no (terminal evidence complete; PR registration pending)
 
 Current task head:
 [`d794cf2aca8fd5a7891af6363f2155e9fd3091fe`](https://github.com/autonomous-ai/lampOS/commit/d794cf2aca8fd5a7891af6363f2155e9fd3091fe),
@@ -21,13 +21,48 @@ and [copy receipt](standalone-1337-copy-receipt.json). The [handoff audit](integ
 found no incorrect claim or missing essential enable/disable step in its scope;
 it is a source/document review, not execution evidence.
 
-The complete five-package host gate started around 20:42 UTC on this frozen
-source and is pending. Exact-head native ARM64 run
+The complete five-package host gate **failed: 1,764 passed / 1 failed /
+13 ignored**, 77 harnesses, exit 101 after 2,013.072357316 seconds. Its sole
+failure was the unchanged motor test
+`crash_and_stalled_control_never_allow_replacement_or_false_cleanup`, waiting
+for `OptionalMotor::reaped` at line 645 through the line-441 wait assertion.
+The exact compiled test passed once alone, **1 / 0 / 0**, in 5.000996141
+seconds. The binary hash matches the observation before the complete run;
+the whole fixture file matches integration. [Both raw outcomes](full-host-1337/README.md)
+remain separate. First's existing #739 handoff condition is met; the complete
+gate remains failed and no cause is inferred.
+
+Exact-head native ARM64 run
 [38633124293](https://github.com/autonomous-ai/lampOS/actions/runs/38633124293)
-is registered; [its initial observation](integration-1337/native-first-runs.json)
-was pending behind the preceding checkpoint. [The qualification plan](integration-1337/qualification-plan.json)
-keeps the source fixed while those runs complete. No terminal success for
-either is claimed yet.
+passed: **4,365 / 0 / 34**, 282 harnesses, release workspace build/tests and
+artifact upload. [Terminal evidence and binary checksums](native-d794cf/README.md)
+identify the exact artifact. The initial observation and qualification plan
+remain as recorded before completion.
+
+The two existing host-only timing probes then ran once each, with no other
+local task build/test job active: **2 / 0 / 0** and 606 retained poll samples.
+Every observed poll was below the 2 ms reference. Parent poll maximum was
+0.325789 ms; transport poll maximum was 0.063886 ms. [Exact boundaries and
+raw samples](timing-1337/README.md) exclude providers, storage and hardware;
+these observations are not a hard OS guarantee or a lamp latency claim.
+
+Integration advanced during qualification to `f2261ec48e35a0bcfc1fa6fbd95f8edbc23f6d4d`.
+The incoming changes add the separate Update component, a lamp-owned Voice
+unit snapshot and a Memory documentation clarification. Existing affected
+package, Bus and Msgs sources and wire types are unchanged. The
+[read-only merge preview](integration-1337/incoming-f226.json) is clean;
+[the integration review](integration-1337/incoming-update-review.md) found no
+new reminder conflict. Qualification remains attached to the exact `d794cf2`
+head and its `1337` base. The incoming Update crate and combined tree were
+not built or tested by Third.
+
+First should install only the qualified Actions, Schedule and Voice binaries,
+retain installed Update and preserve current lamp-owned unit settings,
+including `LAMP_MEMORY_DAYS=on`. Repoint the affected executable paths and
+apply the Schedule drop-ins in the runbook; do not overwrite the current
+Voice service with the older checked-in task-head snapshot. Reminder-owned
+Voice states and `voice/said` remain visible to Update's observational quiet
+gate; no atomic admission guarantee is claimed.
 
 First settled-policy runtime checkpoint:
 [`01192ba0fbfda04afb19e1db63aa86423c21fd6d`](https://github.com/autonomous-ai/lampOS/commit/01192ba0fbfda04afb19e1db63aa86423c21fd6d),
@@ -89,19 +124,24 @@ and verifies the resulting tree against the read-only merge preview.
 conflict. `lamp-memory` now depends on Voice and joins the affected-package
 gate. The added isolated regression covers Days journalling with a kept-out
 reminder followed by an ordinary exchange. The completed focused/copy stages
-and pending complete/native stages above identify the new source; none of
+and completed full/native stages above identify the new source; none of
 the older runs is relabelled as a run on this rebase.
 
-The [latest Queue snapshot](queue-1947.json) adds no Third task; the
+The [19:47 Queue snapshot](queue-1947.json) added no Third task; the
 [#739 snapshot](fixtures-1947.json) records Fourth's claim and First's
 additional fixture report. [Initial retention](initial-retention.json) maps
 the five original records and their hashes. This log branch contains no Task
 31 runtime changes.
 
+Publication checks parsed every new JSON file, verified retained raw-byte
+hashes and local Markdown targets, and found no whitespace diagnostic in
+authored prose or structured evidence. Original captured stdout retains its
+trailing spaces and final blank lines; those raw files are not normalized.
+
 ## Not shown
 
-No passing complete host gate or qualified `1337`-based task head is claimed
-at this checkpoint. No lamp, provider, physical audio, motion or power-cut
+The complete host gate remains failed under the explicitly documented
+handoff condition. No lamp, provider, physical audio, motion or power-cut
 behavior was measured by Third. Command durations measure process launch
 through exit/log closure on the named host, not lamp interaction latency.
 First's runbook remains in

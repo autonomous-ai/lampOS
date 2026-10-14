@@ -2365,6 +2365,64 @@ The same provider wording, busy-office silence, ALSA retirement, flash and
 scheduler-transition limits apply. No lamp or real provider was accessed;
 command durations are not lamp interaction latency.
 
+
+## 2026-10-15 — Task 31 terminal qualification retained
+
+Ready for lamp-voice: no (qualified evidence complete; PR registration next)
+
+Exact task head `d794cf2aca8fd5a7891af6363f2155e9fd3091fe` passed native
+ARM64 run [38633124293](https://github.com/autonomous-ai/lampOS/actions/runs/38633124293):
+**4,365 passed / 0 failed / 34 ignored**, 282 harnesses, on GitHub Ubuntu
+22.04 ARM64, Rust 1.96.0. Release workspace build/tests, checksum generation
+and artifact upload all succeeded. [The terminal log and binary checksums](verification/schedule-voice-qualification-20261015/native-d794cf/README.md)
+identify the installable Actions, Schedule and Voice binaries. The four
+inherited `replay_cost` output-name warnings remain recorded.
+
+The full five-package Mac gate **failed: 1,764 passed / 1 failed / 13 ignored**,
+77 harnesses, exit 101, 2,013.072357316 seconds. The sole failure was
+`crash_and_stalled_control_never_allow_replacement_or_false_cleanup`, waiting
+for `OptionalMotor::reaped` at `motor/tests.rs:645`; the line-441 wait reported
+`owned child timed out: None`. It was a reap wait, not a readiness predicate.
+The `crash`/`hang` iteration was not recorded, and no cause is established.
+The exact compiled test then passed **once alone: 1 / 0 / 0**, 5.000996141
+seconds. Its whole source file matches integration; binary SHA-256
+`7759d868c24c2f83ea512b3eabcfd2bcd0dba94e98f9a32a27e77bc82fbd550f`
+was identical before the full run and before/after isolation. No fixture,
+assertion or deadline changed. [Both exact runs](verification/schedule-voice-qualification-20261015/full-host-1337/README.md)
+fulfil First's existing [#709 handoff condition](https://github.com/autonomous-ai/lampOS/issues/709#issuecomment-6176285386)
+with [#739](https://github.com/autonomous-ai/lampOS/issues/739); the complete
+run remains failed. Earlier source failures are retained separately.
+
+Both existing host timing probes ran once after local task build/test work
+ended: **2 / 0 / 0**, 606 raw poll samples. Maximum observed parent poll was
+0.325789 ms; transport poll was 0.063886 ms, below the 2 ms reference in these
+measurements. [Raw samples and precise boundaries](verification/schedule-voice-qualification-20261015/timing-1337/README.md)
+exclude startup, storage, providers and hardware. No hard scheduler guarantee,
+before/after speed improvement or lamp latency is inferred. The host remains
+Third's Intel i7-10700K x86_64 Mac, macOS 26.6.2 / Darwin 25.6.0, 64 GiB RAM,
+Rust/Cargo 1.96.0. All 700 frozen source hashes stayed unchanged.
+
+The already retained independent copy passed **435 / 0 / 7**, workspace
+build and all 144 exact off-switch comparisons; focused checks passed
+**136 / 0 / 2**, formatting, strict all-target Clippy and workspace build.
+[The qualification index](verification/schedule-voice-qualification-20261015/README.md)
+links every command, source identity and result. First's seven lamp cases and
+likely provider, busy-office silence, ALSA, flash and scheduler-transition
+limits remain in the task runbook. No lamp or real provider was accessed.
+
+Integration reached `f2261ec48` during qualification. [The incoming source
+review](verification/schedule-voice-qualification-20261015/integration-1337/incoming-update-review.md)
+and [clean read-only merge preview](verification/schedule-voice-qualification-20261015/integration-1337/incoming-f226.json)
+found no changed affected-package source or new reminder conflict. The exact
+qualified `d794cf2` artifact remains the proposed installation source. It does
+not contain or qualify the incoming Update component. Install only Actions,
+Schedule and Voice; retain installed Update and current unit settings,
+especially `LAMP_MEMORY_DAYS=on`, while repointing executable paths and applying
+Schedule drop-ins. Do not restore the task head's older Voice service snapshot.
+The [21:17 Queue read](verification/schedule-voice-qualification-20261015/integration-1337/issue-705-2117.json)
+adds no Third task. Touch's enabled qualification still requires First and a
+person beside lamp-4ace; #699 remains after MVP and unclaimed.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on

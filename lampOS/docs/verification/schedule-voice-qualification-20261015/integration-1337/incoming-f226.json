@@ -1,0 +1,36 @@
+{
+  "task_head": "d794cf2aca8fd5a7891af6363f2155e9fd3091fe",
+  "tested_base": "1337e7e1d8b88e102ec9fd12f544841569856f75",
+  "fetched_integration_head": "f2261ec48e35a0bcfc1fa6fbd95f8edbc23f6d4d",
+  "incoming_paths": [
+    "lampOS/Cargo.lock",
+    "lampOS/Cargo.toml",
+    "lampOS/crates/update/Cargo.toml",
+    "lampOS/crates/update/src/fetch.rs",
+    "lampOS/crates/update/src/judge.rs",
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/main.rs",
+    "lampOS/crates/update/src/manifest.rs",
+    "lampOS/crates/update/src/publish.rs",
+    "lampOS/crates/update/src/quiet.rs",
+    "lampOS/crates/update/src/records.rs",
+    "lampOS/crates/update/src/round.rs",
+    "lampOS/crates/update/src/unit.rs",
+    "lampOS/crates/update/src/world.rs",
+    "lampOS/crates/update/tests/round.rs",
+    "lampOS/deploy/lamp-4ace/lamp-voice.service",
+    "lampOS/deploy/units/README.md",
+    "lampOS/deploy/units/lamp-update.service",
+    "lampOS/docs/memory-days.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/v1-verdicts.md"
+  ],
+  "overlapping_paths": [
+    "lampOS/Cargo.lock"
+  ],
+  "merge_preview_tree": "acc3574141168fe7e94df931f4d474cb901f51bb",
+  "merge_preview_exit": 0,
+  "branch_index_and_worktree_mutated": false,
+  "affected_package_or_bus_msgs_source_changed": false,
+  "limits": "No execution on the preview tree or build of the new Update crate is claimed by Third. The qualified task artifact remains at d794cf; integration ownership and device installation remain with First."
+}

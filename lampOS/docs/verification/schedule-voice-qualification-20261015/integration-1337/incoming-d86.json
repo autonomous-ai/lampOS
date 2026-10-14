@@ -1,0 +1,14 @@
+{
+  "observed_at": "2026-10-14T20:47:32.811860+00:00",
+  "task_head": "d794cf2aca8fd5a7891af6363f2155e9fd3091fe",
+  "qualified_base": "1337e7e1d8b88e102ec9fd12f544841569856f75",
+  "fetched_integration_head": "d86c790dc4da74229d642788ba210d106806f625",
+  "incoming_paths": [
+    "lampOS/deploy/lamp-4ace/lamp-voice.service"
+  ],
+  "incoming_overlaps_task_paths": false,
+  "incoming_runtime_source_changes": 0,
+  "all_700_task_source_hashes_unchanged": true,
+  "review": "First updates only lamp-4ace's installed Voice binary path and adds LAMP_MEMORY_DAYS=on. The task already integrates the Days code and tests that combination. The current lamp unit stays First-owned; the runbook retains existing provider/service settings and does not install a deployment file.",
+  "decision": "Keep the active host/native source fixed. The deployment-only incoming commit does not alter the tested runtime or overlap Task31 files; record it explicitly for the handoff."
+}

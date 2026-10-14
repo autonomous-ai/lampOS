@@ -1,0 +1,51 @@
+{
+  "purpose": "Complete affected-package serial test attempt after Memory/Tasks integration. Memory is now reverse-dependent on Voice and included. --no-fail-fast collects every target without converting failures into passes.",
+  "command": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-actions",
+    "-p",
+    "lamp-schedule",
+    "-p",
+    "lamp-voice",
+    "-p",
+    "lamp-voice-eval",
+    "-p",
+    "lamp-memory",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/Users/d/code/autonomous-os/lampOS",
+  "started_at": "2026-10-14T20:42:01.057799+00:00",
+  "finished_at": "2026-10-14T21:15:34.194745+00:00",
+  "elapsed_seconds": 2013.072357316,
+  "exit_code": 101,
+  "machine": "Third Intel i7-10700K x86_64 Mac; macOS 26.6.2/Darwin 25.6.0; 64 GiB RAM; Rust/Cargo 1.96.0; no lamp or live provider",
+  "extra_environment": {
+    "RUST_BACKTRACE": "1"
+  },
+  "observed_git_head": "d794cf2aca8fd5a7891af6363f2155e9fd3091fe",
+  "source_manifest": "/private/tmp/lamp-third-schedule-1337-source-frozen.json",
+  "source_sha256": "89adaafcd44a51bbd84233abc575dfdc55987499fcc3f1d427825d4829b885fd",
+  "source_unchanged": true,
+  "preceding_focused_report": "/private/tmp/lamp-third-schedule-1337-focused-first.json",
+  "preceding_focused_sha256": "9edf0adc12fad308abe8655f192b3e21fcd0f3a5041d3177f7dd7dd7b3e036d7",
+  "log": "/private/tmp/lamp-third-schedule-1337-full-first-tests.txt",
+  "log_bytes": 181396,
+  "log_sha256": "29a3c752ff346ac8a54f229560619dda31021053ba5dc887e48e9769172c57de",
+  "counts": {
+    "harnesses": 77,
+    "passed": 1764,
+    "failed": 1,
+    "ignored": 13
+  },
+  "failed_tests": [
+    "coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup"
+  ],
+  "scope_answer": "https://github.com/autonomous-ai/lampOS/issues/709#issuecomment-6176285386",
+  "limits": "Host process/test durations only. No lamp or real provider. Actual exit/counts remain unchanged; no isolated pass, waiver qualification or native pass is inferred."
+}

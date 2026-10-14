@@ -1,0 +1,29 @@
+{
+  "observed_at": "2026-10-14T21:15:37.845688+00:00",
+  "purpose": "Single phase inspection after exceeding the preceding gate plus isolated Memory duration; not a terminal result.",
+  "raw_log_bytes_at_observation": 181396,
+  "last_target": "   Doc-tests lamp_voice_eval",
+  "completed_harnesses": 77,
+  "counts_so_far": {
+    "passed": 1764,
+    "failed": 1,
+    "ignored": 13
+  },
+  "last_lines": [
+    "   Doc-tests lamp_voice",
+    "",
+    "running 0 tests",
+    "",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "",
+    "   Doc-tests lamp_voice_eval",
+    "",
+    "running 0 tests",
+    "",
+    "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+    "",
+    "error: 1 target failed:",
+    "    `-p lamp-voice --lib`"
+  ],
+  "terminal_result_exists": true
+}

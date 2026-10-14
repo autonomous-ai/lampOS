@@ -1,0 +1,7 @@
+{
+  "recorded_at": "2026-10-14T20:41:59.046867+00:00",
+  "path": "/Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-a714350f33563503",
+  "bytes": 43522696,
+  "sha256": "7759d868c24c2f83ea512b3eabcfd2bcd0dba94e98f9a32a27e77bc82fbd550f",
+  "boundary": "Existing main-checkout Voice test binary immediately before the complete affected-package command. That command may rebuild; its actual path and terminal digest must be checked before relating this to the executed fixture."
+}

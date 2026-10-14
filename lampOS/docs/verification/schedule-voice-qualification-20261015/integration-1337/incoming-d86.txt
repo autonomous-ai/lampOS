@@ -1,0 +1,22 @@
+diff --git a/lampOS/deploy/lamp-4ace/lamp-voice.service b/lampOS/deploy/lamp-4ace/lamp-voice.service
+index f2e9361ce..33ab4f4ab 100644
+--- a/lampOS/deploy/lamp-4ace/lamp-voice.service
++++ b/lampOS/deploy/lamp-4ace/lamp-voice.service
+@@ -21,7 +21,7 @@ Group=root
+ Slice=system.slice
+ WorkingDirectory=/
+ UMask=0077
+-ExecStart=/opt/lampOS/releases/1ac05e8f23d0fcba366efae2e4e538c65f358f19ddb813d82a4fa8f611259166/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery off --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast
++ExecStart=/opt/lampOS/releases/cc7557416fdcda5d5a82d4648b0bb29df0afa805e80dca6862a26b2fddfb2ef3/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery off --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast
+ # The microphone and speaker workers may not wait behind other work on the lamp: a read held up
+ # for 10 ms, or a reference 20 ms late, ends the service (by design: the echo canceller's timing
+ # is then unknown). With every core busy for 40 s (2026-10-13, twelve busy loops) the service
+@@ -75,6 +75,8 @@ Environment=LAMP_NAME_NOTE_BUSY=face
+ Environment=LAMP_EXPRESSION_OUT=on
+ Environment=LAMP_ACTIONS_DIR=/run/lampos-actions
+ Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock
++# The voice uses what memory across days adds (#698, #743).
++Environment=LAMP_MEMORY_DAYS=on
+ Environment=LAMP_FAINT_HOLD_MS=400
+ Environment=LAMP_BUS=on
+ # What the microphone hears also goes on the bus (mic2/audio), for the part that hears the lamp's name

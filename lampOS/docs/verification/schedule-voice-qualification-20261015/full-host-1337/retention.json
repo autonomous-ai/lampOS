@@ -1,0 +1,38 @@
+[
+  {
+    "original": "/private/tmp/lamp-third-schedule-1337-full-first.json",
+    "retained": "full.json",
+    "bytes": 2037,
+    "sha256": "6173af9226e435753a881345b9fd8d7435167c20bd0ed793edadf8183ac85882"
+  },
+  {
+    "original": "/private/tmp/lamp-third-schedule-1337-full-first-tests.txt",
+    "retained": "full-tests.txt",
+    "bytes": 181396,
+    "sha256": "29a3c752ff346ac8a54f229560619dda31021053ba5dc887e48e9769172c57de"
+  },
+  {
+    "original": "/private/tmp/lamp-third-schedule-1337-isolated-first.json",
+    "retained": "isolated.json",
+    "bytes": 2037,
+    "sha256": "858a4598078421a93d0e70f4340d9bf875c2f8775a0baa2dd8cf97f09dc41c49"
+  },
+  {
+    "original": "/private/tmp/lamp-third-schedule-1337-isolated-first.txt",
+    "retained": "isolated-test.txt",
+    "bytes": 220,
+    "sha256": "9daa7aa5684cc978b4e9018eadcb29a2ba6b4dccfa7d69db168962a088744d5f"
+  },
+  {
+    "original": "/private/tmp/lamp-third-schedule-1337-test-binary-before-full.json",
+    "retained": "binary-before-full.json",
+    "bytes": 491,
+    "sha256": "232a32b03df90a0d95884cc0a407cd3a561bab9c4e7df426d7927fd858f9d2b9"
+  },
+  {
+    "original": "/private/tmp/lamp-third-schedule-1337-full-phase-observation.json",
+    "retained": "phase-observation.json",
+    "bytes": 869,
+    "sha256": "204dc98371fc5449751396633e203705657e7ef653a13b9fb43e3cb5b062308d"
+  }
+]
