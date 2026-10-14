@@ -1,0 +1,13 @@
+{
+  "run": 38552800341,
+  "head": "a2b5e127600fd202d823becaf82c96b6ab9e02b2",
+  "platform": "GitHub native ubuntu-24.04-arm runner in debian:12 container, Rust 1.96.0",
+  "build": "release workspace bins/examples passed",
+  "test": "failed before remaining workspace harnesses; no touch implementation in this revision",
+  "completed_harnesses": 155,
+  "partial_passed": 2214,
+  "partial_failed": 1,
+  "partial_ignored": 14,
+  "failure": "lamp-surround selection::interrupted_collection_leaves_only_unaccepted_files_and_retry_removes_them at selection.rs:140",
+  "not_shown": "full workspace success, Tasks tests and lamp execution"
+}

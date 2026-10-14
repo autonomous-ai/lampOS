@@ -1468,6 +1468,36 @@ reversed/slow/interrupted slides, per-unit mapping, repeated holds and replay.
 No question blocks the independent reader/state-machine/replay work. No lamp,
 live GPIO, I2C write, microphone, speaker or motor is accessed here.
 
+## 2026-10-14 — native baseline fails before touch implementation
+
+Ready for lamp-voice: no
+
+Found while Task 33 is being built: native ARM64 run `38552800341`, on
+`a2b5e127600fd202d823becaf82c96b6ab9e02b2`, built all release binaries/examples
+but failed in unchanged Surround's
+`interrupted_collection_leaves_only_unaccepted_files_and_retry_removes_them`
+at `selection.rs:140`. The test makes a directory mode 0500, then collection
+unexpectedly succeeds. CI's default-root Debian container can bypass that
+permission; this is the source-based explanation, not a measured UID dump.
+[The raw failed step and counts](verification/touch-baseline-arm64-20261014/)
+are retained. Task 33 had no source in this run. No test was skipped, weakened,
+or merged as passing; later workspace tests did not run.
+
+Question for First, copied to #711: please qualify the CI test process as an
+unprivileged user, or choose a deterministic interruption fixture that remains
+strict under root. The workflow is outside Third's ownership. The original
+Surround test has not been changed. Continue the independent touch build on
+`third/touch`; this is a known baseline gate failure, not a ready handoff.
+
+The task's new software path targets GPIO qualification after 20 ms of known
+contact, base acquisitions every configured 5–50 ms, and position publication
+at most every 20 ms or an actual event. These are authored software budgets;
+MPR filtering, calibration, scheduling and Voice/application latency remain
+unmeasured. I2C initialization/read runs in one child, with a 7 s initial
+deadline and 150 ms later silence deadline; no automatic replacement. Parent
+GPIO sampling continues independently. All new behavior requires `--touch`
+and commands additionally require `--enable`; neither has been enabled here.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
