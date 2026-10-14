@@ -257,6 +257,26 @@ no robot-directed positives. A real consented lamp-view evaluation remains
 necessary before any acting switch is enabled. There is no unanswered owner
 question blocking completion of this study.
 
+## 2026-10-14, 01:49 UTC: queue and integration check
+
+- Fetched `origin` and reread the full list on `origin/lamp-voice`, now
+  `a3e36ce93`. Tasks 13 and 14 remain Fourth's only assignments; both are
+  done in this log. No new task was taken and the list was not edited.
+- Rebased `lamp-fourth` cleanly onto that head. Memory is now `d5d20548f`
+  and the addressee study `993df3d22`. A content diff confirms the memory
+  crate, its manifests/lockfile/docs and the study are unchanged by rebase.
+- The new upstream commits contain the first builder's mends to the
+  second builder's voice review. In particular, the name/note/second-look
+  paths now restrict evidence to the request it belongs to. The study's
+  local-evidence section explicitly remains a historical reading of
+  `8335dfbce`; it does not claim those earlier paths are still unfixed.
+- On the same development Mac, `cargo fmt --all --check` and
+  `cargo build --workspace` both passed after rebase. No memory code or
+  dependency changed, so the passed memory suite was not repeated.
+- Only `lamp-fourth` is lease-pushed. Next fetch/list check is due at
+  02:19 UTC (09:19 Asia/Ho_Chi_Minh), then every half hour while no new
+  Fourth assignment is available. There is no owner question or blocker.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss
