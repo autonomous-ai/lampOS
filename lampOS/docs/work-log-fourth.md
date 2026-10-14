@@ -645,6 +645,199 @@ answer is required; task 17 is next after fetching the list.
   software tests cannot establish touch polarity or physical silence.
   No question, account, key, paid service or lamp access is needed to start.
 
+## 2026-10-14: task 21, controls-voice — done on Fourth's branch
+
+**Built:** implementation `ddb2aac304545c6fd392fdabd57ca0131187541f`,
+fast-forwarded from `fourth/controls-voice`, from claim `0aed5103e` and fetched base
+`52cc4ec8e`. Voice consumes typed `controls/state` through the Controls
+Receiver. `--controls-stop` and `--controls-mute ABS_PRIVATE_RECORD` are
+independent, off by default. `--controls-bus-root ABS_PATH` only selects the
+bus; it enables neither action. A producer still needs its own `--enable`.
+Neither action requires a provider round trip. No deployment or message type
+was changed. Voice now depends on Controls; Voice-eval is its only workspace
+dependent, and both were included in the gate.
+
+Stop revokes the owned turn and sends the local speaker its new authority
+before provider traffic, diagnostics, persistence or presentation. Pending PCM
+and input commands are discarded, and an abandoned utterance drains through
+its endpoint instead of becoming another question. Old output cannot revive
+the answer or schedule a look. Tests cover speaking, thinking, listening,
+idle, repeated/stale Stop, pending and accepted speech under playback
+suppression, classifier cancellation and silence fallback, and a real
+coordinator tick with Stop and a provider fault queued together.
+
+Software mute revokes microphone/camera/output authority. Its record is
+restored before any worker, including metadata and GPIO, and survives service
+and machine restart. A fresh second released hold can clear only after a new
+press beyond the current start/publisher/fault/gap fence. The physical slide
+still requires its own fresh stable opening; opening it cannot clear software
+mute. A new runtime follows only verified old-worker destruction. Head pats
+are metadata only, including while software-muted. One bounded bus pump
+survives service cycles; missing, stale, malformed, overflowing or restarted
+Controls never clears the latch or terminates healthy unmuted Voice.
+
+Persistence deliberately favors silence: before audio opens, a durable muted
+recovery record is armed without changing the live preference. A crash,
+provider fault or failed cleanup therefore requires a fresh local hold after
+restart, even if no hand mute had been requested. Clean verified shutdown can
+disarm it. Saves keep interrupted-write evidence; either `.pending` or
+`.replacement` refuses later startup and requires explicit operator recovery.
+The active guard already stores muted before a hand request; its newer request
+watermark is saved in the next quiescent poll, or on terminal service exit.
+File/directory sync is outside the urgent audio path, with no hard userspace
+bound. Tests inject failure before and after replacement. They are not a
+physical power-loss qualification.
+
+**Gate on Fourth's Mac:** macOS 26.6.2 (25G83), x86_64 Intel Core i7-10700K
+3.80 GHz, 16 logical CPUs, 64 GiB; Rust/Cargo 1.96.0. Commands ran from
+`lampOS/`, using `/Users/autonomous/.cargo/bin/cargo`:
+
+```sh
+cargo fmt --all --check
+cargo clippy -p lamp-controls -p lamp-voice -p lamp-voice-eval --all-targets --offline -- -D warnings
+RUST_TEST_THREADS=1 cargo test -p lamp-controls -p lamp-voice -p lamp-voice-eval --offline
+cargo build --workspace --offline
+```
+
+All four stages passed. Final totals: Controls **142 passed**, Voice **973
+passed / six ignored**, Voice-eval **284 passed**: **1,399 passed**, no failed
+tests. The six ignored entries are opt-in probes; the newly added latency probe
+was run explicitly below. Strict Clippy finished in 11.65 seconds and the final
+workspace build in 17.41 seconds as reported by Cargo. These builds reused
+Cargo caches and incremental outputs; no clean-build performance is claimed.
+The workspace also
+built earlier in this task (24.99 seconds). No source or manifest changed after
+this final test compilation; subsequent edits are documentation/evidence only.
+
+**Standalone Linux copy:** 764 tracked/nonignored source files, without the
+parent repository, Git metadata, credentials or a target tree, copied to
+`/private/tmp/lamp-fourth-controls-final-s2r9nzee`. Podman VM `lampos-arm64`
+actually runs **x86_64**, Linux 6.12.13-200.fc41.x86_64, six vCPUs, 8 GiB,
+on the same Mac. The name is not evidence of ARM execution. The task-only
+image `localhost/lampos-fourth-native-check:latest` adds native ALSA/udev
+development packages and `procps` (`/bin/kill`) to the existing cross image.
+Tests ran with network disabled, read-only source and Cargo caches, and the
+task-owned target volume. Inside `/source`:
+
+```sh
+CARGO_TARGET_DIR=/target CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=1 cargo test -p lamp-controls -p lamp-voice -p lamp-voice-eval --offline --locked --target x86_64-unknown-linux-gnu
+CARGO_TARGET_DIR=/target CARGO_BUILD_JOBS=4 cargo build --workspace --offline --locked --target x86_64-unknown-linux-gnu
+```
+
+Final complete rerun, with no other build/test from this session: Controls
+**142 passed**, Voice **977 passed / six ignored**, Voice-eval **284 passed**:
+**1,403 passed**, no failed tests. Workspace build passed in 19.18 seconds
+as reported by Cargo. It still warns about two inherited Body items: unused
+`inspection::run` and unnecessary `mut` on the `eyes` closure in the Body
+binary. Neither was edited. The source-only build uses its own cached target
+volume; it is a portability check, not a cold-build benchmark.
+
+[Machine-readable evidence](verification/controls-voice-host-20261014/results.json)
+keeps commands, totals, code hashes, timing workload, earlier failed test names
+and the additional checks below.
+
+An additional ARM64 strict all-target Clippy attempt failed on the inherited,
+hands-off `lamp-body/src/inspection.rs:615` unused `run` function. It is
+unchanged at the pinned base. The same command with `--no-deps` passed for
+Controls, Voice and Voice-eval in 20.02 seconds, retaining that dependency
+warning. This is cross-target source checking, **not** a clean strict
+dependency gate, an ARM link or ARM execution. The required native strict
+Clippy gate above passed without exclusions.
+
+**Failures retained:** intermediate native Clippy caught an unnecessary unwrap,
+which was replaced by an `if let` before the final gate. A check during active
+implementation saw the test module before that file had been written; the
+final gate includes it. An initial Cargo command used the wrong working
+directory and was rerun from `lampOS`. These are not counted as passes.
+The first parallel Mac library run had 751 passes,
+24 failures and five ignored tests. One was our real regression: treating all
+admission drains like hand-abandoned input changed an existing privacy-loss
+case. The bypass now belongs only to explicit hand Stop, with hard capture
+authority still checked. The other failures reported local socket ENOBUFS or
+synthetic worker startup timeouts; the complete serial gate passes them without
+changing their assertions. An initial Linux attempt lacked native ALSA build
+metadata and another lacked `/bin/kill`; the isolated image was corrected.
+Linux also exposed an inherited test-only `capture_on` call missing the newer
+reference argument; supplying `Reference::AsGiven` preserves its old default.
+ARM checking exposed an unnecessary `mut` in Controls' existing Linux probe;
+that one-token warning fix is included.
+
+The first Linux serial library run had 778 passes, three failures and six
+ignored tests. The new bus-restart test found a real connection bug:
+`voice-hand` is not an allowed subscriber name. It is now `voice_hand`, with
+a portable regression that opens both actual typed subscriptions on macOS as
+well. The two older failures were the dense ring trace's 100 ms real transport
+envelope and the rapid-mute fixture's 50 ms privacy freshness check while a
+separate container build ran. Scheduling pressure is consistent with those
+errors; exact ages were not recorded. Without that build, all three cases
+passed three consecutive exact runs (nine passes), with production limits and
+test timeouts unchanged. The next full Linux run passed 783 library tests but
+failed the older single-question privacy fixture with a recorded 57,167 µs
+peer observation gap, beyond its unchanged 50 ms limit. Ten exact runs of
+that case on the untouched pinned base passed; that narrow comparison does
+not reproduce the full-suite failure or prove its cause. Final review also
+caught pats discarded during the
+quiet wait; their accepted metadata now reaches the same reporting helper,
+with a duplicate-pat regression.
+
+**Latency:** the injected-clock cases assert actual speaker send before the
+receipt sample at authored intervals 0, 700, 1,500 and 2,000 µs. Separately,
+one release-mode invocation on this Mac measured 100 fresh cancellation
+fixtures: first 41 µs; next 99 median 6 µs, nearest-rank p95 9 µs, worst
+16 µs; worst overall 41 µs. Timing starts immediately before `hand::cancel`
+and ends at `lamp_ipc::monotonic_us` sampled after the successful speaker
+Authority datagram send. Setup/allocation/verification/teardown are excluded. Each fixture holds 480
+queued PCM samples, one pending speaker receipt and two provider input commands;
+this is not a worst-case backlog measurement. Other local tests were running; this is no cold-boot or cold-cache claim.
+It excludes button recognition, bus delivery, speaker scheduling, playback
+and acoustic silence. Reproduce with:
+
+```sh
+cargo test -p lamp-voice --release --lib coordinator::tests::hand_controls::local_hand_stop_dispatch_latency --offline -- --exact --ignored --nocapture --test-threads=1
+```
+
+**First on the lamp:** cross-build Voice and Controls from this task. First
+shadow-records the primary button and each head pad with its current pin files:
+
+```sh
+lamp-controls serve --config deploy/lamp-4ace/controls.json --pins deploy/lamp-4ace/controls-pins.json --record NEW_PRIVATE_RECORD
+```
+
+There is no `--enable` on that first command. Correct polarity from an actual
+touch before enabling actions. For the installed root-owned Voice service,
+prepare `/var/lib/lampOS/voice/hand` as root-owned mode 0700 and append
+`--controls-stop --controls-mute /var/lib/lampOS/voice/hand/mute.json` to its
+existing arguments, preserving the same record across restarts. Add
+`--controls-bus-root` only if using a nondefault bus root, and run Controls
+with `--enable` after the shadow check. Do not run a second Voice alongside
+the installed owner. These are instructions for First, not actions performed
+by Fourth.
+
+| Five physical sequences | Expected result |
+|---|---|
+| Tap/release the primary button during an audible answer; repeat rapidly. | The old answer is cut off locally. Duplicate delivery cannot restore it; a tap cannot unmute or start an answer. |
+| Tap while waiting for an answer, then while listening/idle. | Pending/late output is abandoned. Idle Stop makes no spoken acknowledgement or new turn. |
+| Hold at least two seconds, release, then restart Voice after the mute save succeeds. | Action is on release. Capture remains closed across restart using the same file/flag. |
+| While software-muted, close/open the physical slide; make a fresh second hold, and separately clear with the slide closed. | Slide opening alone never clears mute. A software clear through a closed slide cannot open capture; new audio still needs normal fresh physical permission/readiness. |
+| Pat each head pad, including while muted. | `hand_pat_observed`, `action: none`; no Stop, speech, mic opening or clear. |
+
+Read `hand_control_cancel` in the invocation's `metadata/events-*.jsonl` for
+the coordinator-observation and speaker-send
+timestamps; measure physical release-to-silence separately. Repeat under a
+provider/network stall and with Controls killed/restarted. Confirm neither an
+old answer nor held input resumes. A successful local send is not an acoustic
+acknowledgement.
+
+**Most likely wrong on the lamp:** head-pad polarity. First observed resting
+levels only: button 99 high, pads 37/96 low, with active-high touch inferred.
+Fourth has no physical touch evidence. Next are actual bus/scheduling delay,
+speaker buffer retirement, and private-storage sync/marker recovery on the
+lamp's filesystem. The change establishes neither Body's independent stop nor
+physical acoustic latency. No lamp access, deployment, account, key or paid
+service was used. No owner answer is required; fetch the list before taking
+the next task.
+
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
@@ -652,5 +845,7 @@ real extraction model, speaker recognition, natural multi-day spoken test,
 provider-context deletion, or end-to-end lamp latency. Memory remains behind
 `--memory-days`; record deletion requires explicit apply and its disabled-by-
 default configuration switch. Lean is not wired to Body and all supplied
-geometry remains synthetic. The log contains no unanswered question requiring
+geometry remains synthetic. Hand Stop and software mute are off unless their
+independent Voice flags are supplied; no physical hand-to-silence or Body stop
+was qualified. The log contains no unanswered question requiring
 the owner to relay a message.
