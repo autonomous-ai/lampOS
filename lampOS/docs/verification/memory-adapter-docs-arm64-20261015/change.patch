@@ -1,0 +1,32 @@
+diff --git a/lampOS/docs/memory-days.md b/lampOS/docs/memory-days.md
+index 60d0cabb7..7b1d9e2e5 100644
+--- a/lampOS/docs/memory-days.md
++++ b/lampOS/docs/memory-days.md
+@@ -37,6 +37,27 @@ the existing JSONL implementation is used. No deployment or voice setting
+ is changed. The opt-in binary never calls a model, starts a model worker,
+ or makes a network request. It logs that the model adapter is unconfigured.
+ 
++The message `the model adapter is not configured` means this build does not
++automatically extract promises, threads or preferences from conversations,
++or infer that a correction should replace an earlier observation. The
++successful no-model skip does not queue extraction for later. Explicit
++remember, raw and linked journalling, ranked search, frozen notes from
++existing facts and observations, provenance-aware forgetting and normal
++expiry still work. Expiry runs at startup and during request maintenance,
++independently of a model; explicit kept facts do not expire.
++
++A separate caller can still prepare input (`submit` absent or false) and
++send a proposal to `tidy_apply`. This binary supplies no production adapter
++or setting that enables inference. Apply checks bounds, provenance and
++supersession rules; it cannot prove that a proposed fact or correction is
++true. Contradictory raw exchanges remain until ordinary forgetting or
++retention removes them.
++
++`ready` and optional Memory health reports describe storage and request
++handling, not model readiness or successful extraction. Upgrade Voice and
++Memory together before enabling the Days client: this Voice sends
++`conversation_end` with `submit:true`, which the server must understand.
++
+ The legacy Voice path has a 300 ms initial kept-note budget and a 1.5 s
+ tool budget. The opt-in client below gives each new session a 300 ms note
+ acquisition budget and each explicit call 1.5 s. The original store's

@@ -1,0 +1,9 @@
+{
+  "base": "f60d6d6f9c7895c84e127cb6c1172eef46148992",
+  "head": "c98a5b05056d1f6e27b425f917a853361bfac754",
+  "changed_paths": [
+    "lampOS/docs/memory-days.md"
+  ],
+  "document_sha256": "87cc5a3fa51e6320f8d787ab9e96efe040fc838a8eea82b274e227a74d04b8f5",
+  "validation": "Only this Markdown file differs; no runtime, dependency, workflow, test or deployment change. Source review used the matching Memory/Voice protocol, store and health implementations."
+}
