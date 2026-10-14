@@ -154,6 +154,24 @@ There are no remaining failing tests or owner questions. The real-model
 adapter and voice integration are explicitly left for the first builder's
 lamp work as the task requires; the protocol and test double are complete.
 
+## 2026-10-14: task 14, said-to-whom — taken
+
+- Fetched the list again after publishing task 13. Rebased `lamp-fourth`
+  onto `origin/lamp-voice` at `8335dfbce`; the memory implementation is now
+  commit `b70c200c5`. The integration changes are outside memory and did
+  not conflict. Only `lamp-fourth` was updated, with a lease.
+- Next task branch: `fourth/said-to-whom`.
+- Scope: `docs/said-to-whom.md` and this log. Research only; no runtime,
+  model, data download requiring an account, device change or deployment.
+- Read the latest attention, policy, group-talk and name documents, then
+  study primary research and shipped-assistant/robot documentation for
+  device-directed speech and addressee detection. Compare cues, published
+  metrics and evaluation conditions, public recordings and reuse limits,
+  then propose what this lamp can use and what it would need to measure.
+- Published figures will be distinguished from the first builder's lamp
+  observations. No new lamp performance will be claimed. Questions, if any,
+  will be written here without stopping unrelated work.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss
