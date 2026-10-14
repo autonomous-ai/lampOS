@@ -2063,6 +2063,30 @@ five isolated repetitions of that motor fixture passed, without identifying
 the cause. The finding is on #698, comment 6169724864. No task is newly ready,
 and the eventual heads still need their own green ARM64 runs.
 
+## 2026-10-14, 21:08 ICT: first-output export answer for First
+
+Ready for lamp-voice: no
+
+Answered the follow-up on closed #700 after inspecting the new logger and
+its call sites at `8be0b9dd2a4e4b665303c4c2f1b800124cbb8500` on this Mac.
+The [handoff contract](verification/first-output-export-20261014/README.md)
+asks for a reviewed manifest, decision projection and optional independent
+labels/joins, with raw speech and original identifiers kept on the lamp.
+The projection is explicitly not a seven-field baseline or fitter row.
+The current near-mode opening lacks captured inputs and must be separated
+from the older exact strict-rule comparison. Request outcomes, together
+with admitted-request starts/inventory, are the next useful increment.
+The existing footer's pre-drain counters cannot establish lossless capture;
+the proposed final receipt must also preserve bounded teardown.
+
+This is a source-backed documentation answer, not new Voice code or a new
+ready task. Relative links and whitespace pass; an independent read-only
+source/contract review found no corrections. No runtime test or lamp
+measurement was made for this answer. First owns the export and any Voice
+implementation. Mood's current Mac suite is still running; Memory's full
+Mac motor-fixture failure remains retained. The log branch is rebased onto
+the inspected upstream; no running test's source was changed.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
