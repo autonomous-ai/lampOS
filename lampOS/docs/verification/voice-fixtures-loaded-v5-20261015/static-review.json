@@ -1,0 +1,28 @@
+{
+  "base": "f2261ec48e35a0bcfc1fa6fbd95f8edbc23f6d4d",
+  "reviewed_files": [
+    "crates/voice/src/coordinator.rs",
+    "crates/voice/src/coordinator/endpoint.rs",
+    "crates/voice/src/privacy.rs",
+    "crates/voice/src/transport.rs",
+    "crates/voice/src/process.rs",
+    "crates/voice/src/lib.rs",
+    "crates/voice/src/scenario_clock.rs"
+  ],
+  "source_copy": "/private/tmp/lamp-fourth-fixtures-source-v5-nnl_8y5c",
+  "findings": [],
+  "method": "Independent read-only comparison against integration base and the frozen source. All seven reviewed files matched frozen V5 byte-for-byte. No edits or Cargo commands.",
+  "observations": [
+    "Normal builds retain real clocks and PrivacyGate::default().",
+    "Privacy remains 50000 us, stable reopening 60000 us and IPC freshness 100000 us.",
+    "Overrides, fixture entrypoints and scoped clock require cfg(test); privacy tolerance is per instance.",
+    "Clock advancement checks overflow before assignment; callback errors retain cleanup pump and panic clears only the matching scope.",
+    "Existing new tests cover watchdog expiry and callback-error cleanup.",
+    "waitid with WNOWAIT observes exact child exit without reaping; the supervisor retains reap/status checks and the shared real cleanup deadline.",
+    "Fixture startup failures attempt both kill and wait."
+  ],
+  "limitations": [
+    "Source inspection only; this is not a dynamic qualification result.",
+    "Loaded host execution and lamp behavior require separate evidence."
+  ]
+}

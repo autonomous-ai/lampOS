@@ -1,0 +1,62 @@
+{
+  "scope": "Existing integration targets compile lamp_voice as the ordinary non-test library; these test sources were not changed by this task.",
+  "targets": [
+    "crates/voice/tests/privacy_state.rs",
+    "crates/voice/tests/core.rs"
+  ],
+  "measurements": [
+    {
+      "completed_run": 1,
+      "suites": [
+        {
+          "suite": "Running tests/core.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/core-9db186049873ea78)",
+          "format": "standard",
+          "status": "ok",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "suite": "Running tests/privacy_state.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/privacy_state-a5f029eda325a1d0)",
+          "format": "standard",
+          "status": "ok",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "raw_sha256": "5d2b34caa1799d668ca9107526b392218189dcc82c0e70af15dc099eab85b5a3"
+    },
+    {
+      "completed_run": 2,
+      "suites": [
+        {
+          "suite": "Running tests/core.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/core-9db186049873ea78)",
+          "format": "standard",
+          "status": "ok",
+          "passed": 10,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        },
+        {
+          "suite": "Running tests/privacy_state.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/privacy_state-a5f029eda325a1d0)",
+          "format": "standard",
+          "status": "ok",
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered": 0
+        }
+      ],
+      "raw_sha256": "183066c35de791de51a5a295bd98cd5247d72dc3c4d1a98038811d7c14302073"
+    }
+  ],
+  "limitation": "These are synthetic policy/wire checks, not a lamp timing measurement or bit-for-bit binary comparison."
+}

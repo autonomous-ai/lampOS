@@ -1,0 +1,7 @@
+{
+  "package": "thread-priority",
+  "version": "3.1.1",
+  "sha256": "8d2e834949be5111506bb252643498af1514f600d9e1dceedaa42afae155b67f",
+  "matches_upstream_cargo_lock": true,
+  "archive_not_committed": true
+}

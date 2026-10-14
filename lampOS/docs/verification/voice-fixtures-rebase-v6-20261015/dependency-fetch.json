@@ -1,0 +1,19 @@
+{
+  "started_utc": "2026-10-14T22:20:13.370129+00:00",
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "fetch",
+    "--locked",
+    "--target",
+    "aarch64-unknown-linux-gnu",
+    "--target",
+    "x86_64-apple-darwin"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS",
+  "before_lock_sha256": "4b0d2f940b822daf282229fc6ac76eb88366cc534a7b716700de99f7d3a8efdd",
+  "exit_code": 0,
+  "finished_utc": "2026-10-14T22:20:14.254946+00:00",
+  "elapsed_seconds": 0.8846670491620898,
+  "after_lock_sha256": "4b0d2f940b822daf282229fc6ac76eb88366cc534a7b716700de99f7d3a8efdd",
+  "raw_sha256": "bc1dd7182ad5776b2db2d693dcf2162d5dea05a47960e76ff7a61b2ac14a5407"
+}

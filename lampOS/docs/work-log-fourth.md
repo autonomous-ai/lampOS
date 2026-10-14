@@ -2947,6 +2947,40 @@ no full-sequence result is yet claimed. V1 through v4 failures remain kept.
 The Body question remains pending and no Body change was made.
 
 
+## 2026-10-15, 05:23 ICT: task 46, five clean suites retained; rebase for integrated reminders
+
+Ready for lamp-voice: no
+
+[V5's complete raw evidence](verification/voice-fixtures-loaded-v5-20261015/README.md)
+contains five full serial Mac suites, each 1,085 passed / 0 failed / 6
+existing ignored across 21 suites. Cargo wall times were 437.745, 372.530,
+373.109, 374.362 and 373.972 seconds. All source hashes stayed unchanged;
+the audit checks all 98 affected-cohort outcomes, raw hashes and compiler
+phase overlap. Fourteen release ARM64 cross-build cycles passed. The 387
+host samples recorded one-minute load 4.153–10.814 and minimum available
+space 44,494,864,384 bytes on Fourth's Intel Mac. This is not native ARM
+execution or lamp evidence.
+
+This sequence was deliberately stopped before run 6 after the scheduled
+fetch found newly integrated Schedule/Voice runtime changes, including the
+coordinator and fixture match arms. The active suite and compiler finished
+normally; no failure was hidden. Five passing runs are not the ten-run gate.
+[The rebase record](verification/voice-fixtures-rebase-v6-20261015/README.md)
+retains the before/after hashes, upstream changes, three-line helper argument
+integration and independent review. Eleven task paths remained identical.
+The normal coordinator preserves upstream reminder handling; explicit None
+is confined to test helpers. No Body edit was made.
+
+The task and log branches now use fetched integration
+`cf2f5b43c8113a704324c2743af3cd92bbc4fdda`. The new pinned upstream Linux
+crate was fetched with Cargo.lock unchanged and its checksum verified.
+V6 is frozen outside the repository: 2,367 files, manifest SHA-256
+`4990e9717505ae432d4cd975c38c60e7ad703df0655a3f22cbe54a556977717f`.
+Its fresh qualification has started; no ten-run or native task-head result
+is yet claimed. The latest queue still assigns only #739 to Fourth, with
+the Body scope question unanswered. All previous failures remain retained.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

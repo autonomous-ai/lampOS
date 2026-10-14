@@ -1,0 +1,3 @@
+    Updating crates.io index
+ Downloading crates ...
+  Downloaded thread-priority v3.1.1

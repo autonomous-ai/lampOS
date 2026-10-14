@@ -1,0 +1,32 @@
+{
+  "after_head": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "changed_task_files": [
+    "lampOS/crates/voice/src/coordinator.rs",
+    "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+    "lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs",
+    "lampOS/crates/voice/src/lib.rs"
+  ],
+  "unchanged_task_files": 11,
+  "files": {
+    "lampOS/crates/voice/src/coordinator.rs": "5707b88df4f624a33bb54d3a7bfda65fece5355187b044dcac171e183be3b0ea",
+    "lampOS/crates/voice/src/coordinator/endpoint.rs": "117016f2f139da9daca2567e5fd4e804d6448e99d6806995d06913ce9d34ffd8",
+    "lampOS/crates/voice/src/coordinator/motor/tests.rs": "9d2a40f46093c7603c907f7d1cf7a88f05e9b311581c3d79f75560a275b3d7f3",
+    "lampOS/crates/voice/src/coordinator/tests/early_end.rs": "e4d70c867d7531a5e19ea50f09a4be1581e26879872eae95ef13c9cc19af7fcf",
+    "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs": "a2ab919c4dfaf127ab0a68222ca900415656b3fa87c198dbf80b85f73969768f",
+    "lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs": "63cd1b3c0f6fa6bc53a631d4156b9942158238177c84e8d6d8c62b6913a10876",
+    "lampOS/crates/voice/src/lib.rs": "438d63ed83baccf3b22f1076fbc1ddcc3327745815f677dc89025305a966f107",
+    "lampOS/crates/voice/src/privacy.rs": "09db2bf98464fb1fcfd3486f7ed6a4150ef83bc819a11b50def4bf5b38541d65",
+    "lampOS/crates/voice/src/process.rs": "44992ad3334f39f4c9d1c8d3cead13d0da39ea2da3ba0da68779e048bc09adb7",
+    "lampOS/crates/voice/src/scenario_clock.rs": "1d437ad7210c351b711bb3d0a21a90063c00af2fcf5b4fef5ed6f13dd0fe9e5f",
+    "lampOS/crates/voice/src/transport.rs": "12a55a96fab0c0a7ce9b73b1f855d605c01c52772ac358ab2c60cdb2af30b4c4",
+    "lampOS/docs/endpoint-detection.md": "60875da43d437c7ad2ee891a32b569e0cc756961b4f2e3cb18eb0e816c08d8a6",
+    "lampOS/docs/live-motor-integration.md": "1f35c1c3d9be892fd73efff65fa69008b9d8d1a4c75f07058d50845dd18497ef",
+    "lampOS/docs/pilot-faults.md": "f2a7faf16df957b24bb3659ae521cee317eea246794a18c159930e322c4e49ab",
+    "lampOS/docs/voice-test-fixtures.md": "d2c53e111dc882851d0042fde3a6cbe8dab9db05541839de43ba77c45e86454b"
+  },
+  "wrapper_integration": {
+    "note": "After clean text rebase, root forwards the new reminders argument from the normal wrapper into conversation_with_gate, adds its inner parameter, and supplies None only in the test-only EarlyEnd helper. No other source edit.",
+    "file": "lampOS/crates/voice/src/coordinator.rs",
+    "after_sha256": "c49047b9c4361fb04416fc025ecf3f0b8f3facf41d91439c75eba0f5d0e99399"
+  }
+}

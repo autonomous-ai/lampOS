@@ -1,0 +1,22 @@
+{
+  "before_head": "f2261ec48e35a0bcfc1fa6fbd95f8edbc23f6d4d",
+  "target": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "utc": "2026-10-14T22:16:25.501119+00:00",
+  "files": {
+    "lampOS/crates/voice/src/coordinator.rs": "1ab387c326cb759ee93ec66f90a9a6152d3d6bd450f4a4c04798893c309cb573",
+    "lampOS/crates/voice/src/coordinator/endpoint.rs": "117016f2f139da9daca2567e5fd4e804d6448e99d6806995d06913ce9d34ffd8",
+    "lampOS/crates/voice/src/coordinator/motor/tests.rs": "9d2a40f46093c7603c907f7d1cf7a88f05e9b311581c3d79f75560a275b3d7f3",
+    "lampOS/crates/voice/src/coordinator/tests/early_end.rs": "e4d70c867d7531a5e19ea50f09a4be1581e26879872eae95ef13c9cc19af7fcf",
+    "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs": "bc8d269d47049032f8c72c68fe2d3fa8f8c422d09fec9d22e04ea4433f02edcb",
+    "lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs": "70a6608cf49ad78243dbddd74206fbe3526b59e1ff6a7060358f68846b227ae3",
+    "lampOS/crates/voice/src/lib.rs": "fa00c6085aefe7891239c8892315e9f49e161cc91acf5f103599a278dcab532d",
+    "lampOS/crates/voice/src/privacy.rs": "09db2bf98464fb1fcfd3486f7ed6a4150ef83bc819a11b50def4bf5b38541d65",
+    "lampOS/crates/voice/src/process.rs": "44992ad3334f39f4c9d1c8d3cead13d0da39ea2da3ba0da68779e048bc09adb7",
+    "lampOS/crates/voice/src/scenario_clock.rs": "1d437ad7210c351b711bb3d0a21a90063c00af2fcf5b4fef5ed6f13dd0fe9e5f",
+    "lampOS/crates/voice/src/transport.rs": "12a55a96fab0c0a7ce9b73b1f855d605c01c52772ac358ab2c60cdb2af30b4c4",
+    "lampOS/docs/endpoint-detection.md": "60875da43d437c7ad2ee891a32b569e0cc756961b4f2e3cb18eb0e816c08d8a6",
+    "lampOS/docs/live-motor-integration.md": "1f35c1c3d9be892fd73efff65fa69008b9d8d1a4c75f07058d50845dd18497ef",
+    "lampOS/docs/pilot-faults.md": "f2a7faf16df957b24bb3659ae521cee317eea246794a18c159930e322c4e49ab",
+    "lampOS/docs/voice-test-fixtures.md": "d2c53e111dc882851d0042fde3a6cbe8dab9db05541839de43ba77c45e86454b"
+  }
+}

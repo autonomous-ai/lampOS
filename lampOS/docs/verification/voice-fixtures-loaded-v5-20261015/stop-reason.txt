@@ -1,0 +1,1 @@
+Scheduled fetch at 22:14:54 UTC found integration cf2f5b43c8113a704324c2743af3cd92bbc4fdda with merged Schedule/Voice runtime changes (20bf8cabe). Finish the current full run and active ARM build, retain this sequence as incomplete, then rebase and qualify the combined source. This is an explicit integration stop, not a passed ten-run gate.
