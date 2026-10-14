@@ -359,6 +359,165 @@ privacy remains the independent control.
   and exercise them with scripted owners; missing evidence must refuse an
   operation, not be replaced with a guess.
 
+## 2026-10-14 — surround — done, awaiting the lamp
+
+Tested code: `4086c0300fa146a7e61f70473a864017a10b22c7`, kept on
+`third/surround` and fast-forwarded onto `lamp-third`. The task's source,
+documents, dependency provenance and evidence are in that commit. Rebase may
+change the copy's hash on `lamp-third`; the task branch retains the tested
+source. No hands-off owner, deployment file or task list was changed.
+
+### Built
+
+- Independent `lamp-surround`: strict private configuration, read-only doctor
+  and startup planner, authenticated bounded local operator page, a dedicated
+  maintenance worker and durable operation records. Maintenance requires both
+  configuration `enabled: true` and `serve --enable`. Default operation cannot
+  change Wi-Fi, configuration, software, owners or personal records.
+- Whole-generation provider configuration, a selected-interface network
+  boundary with an optional Linux NetworkManager adapter, fresh setup/runtime
+  status and explicit uncertain network commits. The adapter needs its own
+  switch and Cargo feature; no network manager or interface is guessed.
+- TUF-authenticated complete Voice/Body/Eyes releases, bounded private staging,
+  signed metadata/root/time floors, fenced whole-set selection, retained
+  previous-set recovery and collection preserving referenced sets. The
+  source-pinned Tough library has unchanged runtime source and a documented
+  manifest-only TLS feature correction, preserving Voice's Ring provider.
+- Journaled update and reset coordinators with injected clocks and private
+  owner RPCs. Update requires 45 seconds of quiet, Voice admission closure and
+  worker exit, Body rest before exit, fenced selection and fresh capabilities.
+  Reset freezes every named store before erasure, preserves privacy inhibits
+  and requires explicit resume after interruption. First supplies the actual
+  qualified supervisor and store owners; a live PID is never their substitute.
+- Self-contained browser assets, signed release fixtures, five installation
+  replays and an operator/persistence benchmark. V1 keep/change decisions,
+  contracts, bounds and primary sources are in [Surround](surround.md) and
+  [reuse decisions](reuse-decisions.md).
+
+### Evidence on Third's development Mac
+
+Intel Core i7-10700K at 3.80 GHz, 64 GiB RAM, macOS 26.6.2 / Darwin 25.6.0,
+`x86_64-apple-darwin`, Rust/Cargo 1.96.0 and Node 26.7.0. The unchanged workspace
+built before implementation (Cargo reported 15.67 s). All following commands
+ran from `lampOS/`; these are host results, not lamp results:
+
+```sh
+cargo fmt --all --check
+cargo clippy --offline --locked -p lamp-surround --all-targets -- -D warnings
+cargo clippy --offline --locked -p lamp-surround --all-features --all-targets -- -D warnings
+cargo test --offline --locked -p lamp-surround
+cargo test --offline --locked -p lamp-surround --all-features -- --test-threads=1
+cargo test --offline --locked -p lamp-gemini -- --test-threads=1
+cargo build --offline --locked --workspace
+node --check crates/surround/web/app.js
+node --test crates/surround/web/app.test.cjs
+```
+
+All passed: **260 default-feature and 263 all-feature Surround tests**, with
+zero failures or ignored tests; **250 Gemini tests**, zero failures and two
+pre-existing ignored long recovery soaks; **nine browser-script tests**.
+The additional Gemini run checks the shared TLS dependency change. The whole
+workspace built; the whole workspace test suite was not rerun for this new
+crate, which has no dependents. Required touched-crate gates passed.
+
+A source-only copy at
+`/private/tmp/lamp-surround-standalone-aue7a241/lampOS` built the workspace
+with a separate target directory and passed all 263 feature-enabled tests
+and nine browser-script tests. It contained 785 source files when copied;
+all 26 local packages, including vendored Tough, resolved inside it. Runtime
+source hashes matched this checkout. The cold copied build took 303.624 s
+wall time with two build jobs. No parent source was used. Local private-socket
+tests needed host permission outside the default sandbox; no lamp permission
+was used. Linux/ARM64 and Rust 1.91 MSRV were not tested. The pinned non-FIPS
+AWS-LC signature dependency requires the target C/C++ compiler; ARM build and
+binary size remain First's checks.
+
+The [evidence record](verification/surround-host-20261014/results.json) contains
+commands, outputs, hashes, host facts and measurements. The
+[failure ledger](verification/surround-host-20261014/failures.md) retains
+initial private-directory fixture errors, actual TLS provider and root-rotation
+recovery failures, strict-JSON and periodic-freshness bugs, sandbox failures,
+review findings and corrected fixture assertions. All final gates are green.
+The update/reset suites exercise 66/28 authored power-cut positions; these
+are persisted-state replays, not physical power-loss measurements.
+
+Two operator benchmark executions used the real HTTP router and atomic
+file/directory sync with a fixture worker. Final first status: 0.114197 ms;
+100 warm status calls: median 0.079708 ms, maximum 0.146823 ms. First durable
+admission: 41.014442 ms; 100 warm admissions: median 39.003407 ms, maximum
+76.701022 ms. During an authored 500 ms minimum dependency delay, 100 status
+calls had median 0.092662 ms and maximum 0.241976 ms; the observed delay was
+509.585420 ms. All 102 journal readbacks were redacted. This excludes sockets,
+browser, actual adapters, supervisor and hardware.
+
+The actual worker has a different measurement boundary, channel send to
+durable admission: 331.266 ms in the final focused test, 330.900 ms in an
+earlier isolated run and 1605.898 ms under concurrent fsync load. **The
+provisional 100 ms complete-service admission target is not established.**
+The test proves that stalled idle network probes do not block command handling;
+its functional timeout is not a latency claim. HTTP admission uncertainty is
+reported after two seconds, while status handling remains independent.
+
+Local Chrome checks passed at desktop and 390×844: login, truthful Unknown
+readiness, default-off controls, readable update state and logout. A discovered
+`[object Object]` state rendering bug was fixed and regression-tested. This
+preview used disposable local configuration, no provider/network/owner and
+no production TLS proxy; the tab was closed afterward.
+
+### Exactly what First runs and wires
+
+From the standalone source root, these commands need no provider or hardware:
+
+```sh
+cargo run --locked -p lamp-surround --example update_replay
+cargo run --locked -p lamp-surround --example operator_bench
+```
+
+The replay must report five passing authored scenarios: happy installation,
+failed-candidate recovery, missing Body rest refusal, disabled operation and
+post-switch power-cut recovery. The benchmark reports its own machine and
+boundary; run it on the lamp before attributing any result to that machine.
+
+First provisions the service UID and 0700 roots/0600 files, unique setup code,
+canonical TLS origin, real network manager/interface/recovery profile,
+qualified provider defaults, independent component units, TUF root/feed and
+trusted-time source. The supervisor must implement the exact owner protocol
+in [Surround](surround.md), including fenced selection and every personal
+store's reset barrier. The release manifest input is a plain filename such
+as `stable.json`, never a path. Build the optional adapter with
+`--features network-manager`. With the built binary on `PATH`, inspect the
+provisioned configuration and run the disabled service first:
+
+```sh
+lamp-surround doctor --config /etc/lampos/surround.json
+lamp-surround serve --config /etc/lampos/surround.json
+```
+
+Check physical privacy in both positions and the absence of invented Listening.
+Only qualified integrations get their switches enabled; live maintenance then
+requires both configuration enablement and `serve --enable`.
+
+On disposable lamp data, measure page status and admission on first use and
+100 repeated operations, separately from completion, with a slow provider
+and concurrent release download. Record network path, hashes and percentiles.
+Exercise wrong Wi-Fi credentials, lost DHCP/AP/page, retained Ethernet,
+NetworkManager restart between profile save and checkpoint completion,
+full disk, corrupt staging, expired metadata and stale UTC. Speaking must
+restart the 45-second quiet window; no old Voice worker may survive handover;
+Body must reach rest before exit. Verify whole-set rollback, failed rollback,
+stale capability refusal, duplicate commands, every durable boundary after
+power loss and partial reset/resume with software privacy still inhibited.
+
+**Most likely wrong on the lamp:** actual NetworkManager/checkpoint ownership
+and AP reachability, then the supervisor's worker-exit, servo-rest and fenced
+selection proofs. Try these first. macOS tests and successful D-Bus returns
+do not qualify those physical facts. Root/feed provisioning, real AP behavior,
+supervisor/store integrations and flash durability remain First's work.
+
+Questions blocking further Third work: none. The manager/interface and trusted
+release root/feed questions from the claim remain integration prerequisites,
+not assumptions made by this implementation.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
@@ -366,4 +525,7 @@ the lamp; no Linux/ARM64 execution, optical/acoustic latency, safe physical
 trajectory or natural-looking behavior was established by Third. No Controls
 pin reader, owner subscription, applied mute/clear or hand-to-silence timing
 was run on a lamp. Replay fixtures are written; real lamp recordings have not
-been supplied. Remaining Third tasks are not yet built.
+been supplied. Surround has not changed real Wi-Fi, started physical owners,
+installed a production signed release or erased a real personal store. Its
+production supervisor, trusted feed, lamp storage durability and full-service
+latency remain unqualified. Remaining Third tasks are not yet built.
