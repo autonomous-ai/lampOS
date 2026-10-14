@@ -1,0 +1,217 @@
+--- pilot-before.rs
++++ lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs
+@@ -130,8 +130,8 @@
+ 
+ /// Single-cycle policy scenarios use synchronous steps and scoped time without
+ /// changing production freshness limits or the real process cleanup deadline.
+-/// Cross-cycle privacy waits and the stalled metadata writer exercise real
+-/// asynchronous dependencies, so those scenarios explicitly keep peer threads.
++/// Cross-cycle privacy waits keep peer threads. A stalled metadata writer can
++/// remain a real blocked thread while its independent policy peers are stepped.
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ enum Fixture {
+     Threaded,
+@@ -254,6 +254,8 @@
+     privacy_expiry_jump: Option<(u64, u64)>,
+     /// A successful send on the real privacy channel, after the expiry jump.
+     fresh_mute_queued_at_us: Option<u64>,
++    /// Actual host time immediately before sending SIGTERM, never policy time.
++    sigterm_sent_at: Option<Instant>,
+ }
+ 
+ /// Packet, privacy and policy timestamps use the selected fixture clock.
+@@ -275,6 +277,8 @@
+     /// Stepped runs use scenario time after startup, never elapsed host time.
+     started_us: u64,
+     finished_us: u64,
++    /// Actual host time after every real child exit/reap check.
++    reaped_at: Instant,
+ }
+ 
+ impl Run {
+@@ -629,6 +633,7 @@
+             Act::StallSpeakerInstalling => self.speaker = SpeakerMode::Installing,
+             Act::StallSpeakerPartial => self.speaker = SpeakerMode::Partial,
+             Act::Sigterm => {
++                self.seen.lock().unwrap().sigterm_sent_at = Some(Instant::now());
+                 rustix::process::kill_process(
+                     rustix::process::getpid(),
+                     rustix::process::Signal::TERM,
+@@ -1404,9 +1409,8 @@
+             .unwrap();
+         None
+     } else {
+-        // Real-dependency scenarios retain their independent privacy thread:
+-        // mute/reopen crosses host-clock waits, and the metadata case measures
+-        // a real asynchronous writer's shutdown/finish behavior.
++        // Cross-cycle mute/reopen retains its independent privacy thread and
++        // crosses the production service's host-clock privacy waits.
+         let privacy = thread::spawn({
+             let finished = finished.clone();
+             move || privacy.run(finished)
+@@ -1471,6 +1475,7 @@
+     if let Some(camera) = rig.camera.as_mut() {
+         exits.push(("camera", matches!(camera.worker.try_exit(), Ok(Some(_)))));
+     }
++    let reaped_at = Instant::now();
+     let finished_us = monotonic_us();
+     finished.store(true, Ordering::SeqCst);
+     if let Some((worker, privacy)) = threads {
+@@ -1487,6 +1492,7 @@
+         boot,
+         started_us,
+         finished_us,
++        reaped_at,
+         seen,
+         elapsed,
+         exits,
+@@ -2202,37 +2208,136 @@
+     eprintln!("reaped-to-next-spawn {reopen_ms:?} ms");
+ }
+ 
++/// The release token must survive every assertion until it is sent. Dropping a
++/// sender without sending would make the real stalled writer panic on recv.
++struct MetadataRelease(Option<std::sync::mpsc::Sender<()>>);
++
++impl MetadataRelease {
++    fn release(&mut self) -> io::Result<()> {
++        self.0
++            .take()
++            .ok_or_else(|| io::Error::other("metadata writer already released"))?
++            .send(())
++            .map_err(io::Error::other)
++    }
++}
++
++impl Drop for MetadataRelease {
++    fn drop(&mut self) {
++        if let Some(release) = self.0.take() {
++            // This unbounded-channel send cannot wait. Do not replace an
++            // existing test failure with a second panic during unwinding.
++            let _ = release.send(());
++        }
++    }
++}
++
++struct StalledMetadata {
++    trace: SessionState,
++    entered: std::sync::mpsc::Receiver<()>,
++    release: MetadataRelease,
++}
++
++impl StalledMetadata {
++    fn new() -> Self {
++        let deadline = Instant::now() + Duration::from_secs(2);
++        let (writer, entered, release) = crate::service_trace::ServiceTrace::stalled();
++        let mut fixture = Self {
++            trace: SessionState::with_writer(writer),
++            entered,
++            release: MetadataRelease(Some(release)),
++        };
++        // Prime the production submission path before any child or policy
++        // clock starts. The writer cannot complete this first event until the
++        // release token is sent, including throughout the later audio run.
++        fixture
++            .trace
++            .record(json!({"kind":"fixture_metadata_stall","at_us":monotonic_us()}))
++            .unwrap();
++        fixture.trace.flush(&mut None, monotonic_us());
++        fixture
++            .entered
++            .recv_timeout(deadline.saturating_duration_since(Instant::now()))
++            .expect("metadata writer never stalled");
++        fixture
++    }
++
++    fn release_and_finish(&mut self) -> crate::service_trace::Report {
++        self.release.release().expect("metadata writer disappeared");
++        self.trace
++            .finish_logging()
++            .expect("metadata writer cleanup report")
++    }
++}
++
++impl Drop for StalledMetadata {
++    fn drop(&mut self) {
++        if self.release.0.is_some() {
++            let _ = self.release.release();
++            // Preserve the original assertion failure while attempting bounded
++            // real cleanup. Keep the entered receiver alive during this wait.
++            // Successful scenarios check this receipt explicitly instead.
++            let _ = self.trace.finish_logging();
++        }
++    }
++}
++
++#[test]
++fn metadata_release_on_unwind_unblocks_the_real_writer_and_keeps_the_panic() {
++    use crate::service_trace::{FINISH_WAIT, ServiceTrace};
++    struct ScenarioFailure;
++
++    let (mut writer, entered, release) = ServiceTrace::stalled();
++    let release = MetadataRelease(Some(release));
++    writer.submit(&json!({"kind":"fixture_metadata_stall"}));
++    entered.recv_timeout(Duration::from_secs(2)).unwrap();
++    let failed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
++        let _release_on_unwind = release;
++        std::panic::panic_any(ScenarioFailure);
++    }));
++    assert!(failed.unwrap_err().is::<ScenarioFailure>());
++    let report = writer.finish(FINISH_WAIT);
++    assert!(report.acknowledged, "{report:?}");
++    assert!(!report.writer_failed, "{report:?}");
++    assert_eq!(report.written_events, 1);
++}
++
+ /// Metadata storage stalls from the first event (a stuck disk). Answer audio
+ /// must keep flowing, a real SIGTERM must still stop the runtime cleanly, and
+ /// the unacknowledged metadata must be reported within the finish bound
+ /// rather than hidden or waited on.
+ #[test]
+ fn sigterm_while_metadata_storage_is_stalled_stops_cleanly_and_reports_the_loss() {
+-    use crate::service_trace::{FINISH_WAIT, ServiceTrace};
+-    let _one = one_session();
+-    let (writer, entered, release) = ServiceTrace::stalled();
+-    let mut trace = SessionState::with_writer(writer);
++    use crate::service_trace::FINISH_WAIT;
++    let _one = one_session();
++    let mut metadata = StalledMetadata::new();
+     let run = run_in(
+         Script {
+             actions: vec![(When::Accepted(10), Act::Sigterm)],
+             signals: true,
+-            ..Script::question(Fixture::Threaded, Answer::Hold(40))
++            ..Script::question(Fixture::Stepped, Answer::Hold(40))
+         },
+-        &mut trace,
++        &mut metadata.trace,
+     );
+-    // The writer really was stalled during the run.
+-    entered.try_recv().expect("metadata writer never stalled");
++    // The real writer entered its blocked first event before this run began.
+     run.assert_invariants();
+     assert!(run.result.is_ok(), "{:?}", run.result);
+     // Ten chunks were accepted while every metadata write was blocked.
+     assert!(run.seen.chunks.iter().filter(|c| c.accepted).count() >= 10);
+-    let stopped = run.fired_at(Act::Sigterm);
+-    let shutdown_ms = (run.finished_us - stopped) / 1_000;
++    let stopped = run.seen.sigterm_sent_at.expect("SIGTERM was sent");
++    let shutdown_ms = run.reaped_at.duration_since(stopped).as_millis();
+     let finishing = Instant::now();
+-    let report = trace.finish_logging().expect("service metadata report");
++    let report = metadata
++        .trace
++        .finish_logging()
++        .expect("service metadata report");
+     let finish_wait = finishing.elapsed();
+-    release.send(()).unwrap();
+-    eprintln!("sigterm to reaped {shutdown_ms} ms; metadata finish {finish_wait:?}; {report:?}");
++    let cleanup = metadata.release_and_finish();
++    assert!(cleanup.acknowledged, "{cleanup:?}");
++    assert_eq!(report.written_events, 0, "metadata was blocked throughout");
++    eprintln!(
++        "real SIGTERM-send to all children reaped {shutdown_ms} ms; real metadata finish {finish_wait:?}; {report:?}"
++    );
+     assert!(
+         !report.acknowledged && report.finish_attempted,
+         "{report:?}"

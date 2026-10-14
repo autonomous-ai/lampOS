@@ -1,0 +1,21 @@
+    Checking serde_core v1.0.229
+   Compiling lamp-camera v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/camera)
+    Checking serde_json v1.0.151
+    Checking serde v1.0.229
+    Checking jiff v0.2.38
+    Checking lamp-turn-owner v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/turn-owner)
+    Checking lamp-ipc v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/ipc)
+    Checking lamp-bus v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/bus)
+    Checking lamp-gemini v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/gemini)
+    Checking lamp-turn-end-wire v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/turn-end-wire)
+    Checking lamp-audio v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/audio)
+    Checking lamp-ring v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/ring)
+    Checking lamp-msgs v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/msgs)
+    Checking lamp-keeper v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/keeper)
+    Checking lamp-schedule v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/schedule)
+    Checking lamp-controls v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/controls)
+    Checking lamp-expression v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/expression)
+    Checking lamp-body v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/body)
+    Checking lamp-actions v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/actions)
+    Checking lamp-voice v0.1.0 (/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS/crates/voice)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.08s

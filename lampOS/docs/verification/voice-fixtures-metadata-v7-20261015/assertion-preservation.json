@@ -1,0 +1,18 @@
+{
+  "before_sha256": "63cd1b3c0f6fa6bc53a631d4156b9942158238177c84e8d6d8c62b6913a10876",
+  "after_sha256": "38826ab14ec9ce55ef4c1fe867fb7c1b9ca7ff653fa53baf73dc7bfc3bf43606",
+  "original_tests": 35,
+  "current_tests": 36,
+  "missing_original_tests": [],
+  "new_tests": [
+    "metadata_release_on_unwind_unblocks_the_real_writer_and_keeps_the_panic"
+  ],
+  "original_assertions": 179,
+  "current_assertions": 185,
+  "all_original_assertions_preserved_in_order": true,
+  "missing_original_assertions": [],
+  "fixture_calls": {
+    "Stepped": 29,
+    "Threaded": 1
+  }
+}

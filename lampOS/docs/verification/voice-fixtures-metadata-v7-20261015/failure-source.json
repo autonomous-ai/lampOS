@@ -1,0 +1,6 @@
+{
+  "base": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "source_before_sha256": "63cd1b3c0f6fa6bc53a631d4156b9942158238177c84e8d6d8c62b6913a10876",
+  "failure_raw": "/private/tmp/lamp-fourth-fixtures-loaded-v6/mac-voice-04.txt",
+  "failure_sha256": "311ed3e324e2c0b625ba184e23b127931dde9b8e0bda8f17b2d426ec0495c882"
+}

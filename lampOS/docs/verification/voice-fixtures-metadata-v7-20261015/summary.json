@@ -1,0 +1,77 @@
+{
+  "started_utc": "2026-10-14T22:55:10.701474+00:00",
+  "base": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "snapshot": "/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source",
+  "target_dir": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target",
+  "machine": {
+    "uname": [
+      "Darwin",
+      "m0.local",
+      "25.6.0",
+      "Darwin Kernel Version 25.6.0: Fri Jul 31 19:11:49 PDT 2026; root:xnu-12377.161.14~5/RELEASE_X86_64",
+      "x86_64",
+      "i386"
+    ],
+    "sw_vers": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.2\nBuildVersion:\t\t25G83\n"
+  },
+  "source_count": 2367,
+  "stages": [
+    {
+      "name": "format-check",
+      "command": [
+        "rustfmt",
+        "--check",
+        "--edition",
+        "2024",
+        "crates/voice/src/coordinator/tests/pilot_faults.rs"
+      ],
+      "cwd": "/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS",
+      "exit_code": 0,
+      "elapsed_seconds": 0.30698245018720627,
+      "raw": "/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/format-check.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "compile-check",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--tests"
+      ],
+      "cwd": "/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS",
+      "exit_code": 0,
+      "elapsed_seconds": 22.198688597418368,
+      "raw": "/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/compile-check.txt",
+      "raw_sha256": "aa5af7dc7557b08deecfa0ed198454709be4ef125295c9bf42e83725ce5e0981"
+    },
+    {
+      "name": "pilot-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "coordinator::tests::pilot_faults",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "cwd": "/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/source/lampOS",
+      "exit_code": 0,
+      "elapsed_seconds": 44.21154072973877,
+      "raw": "/private/tmp/lamp-fourth-pilot-metadata-v7-ia_sajqj/pilot-tests.txt",
+      "raw_sha256": "da8b96702691404d0556edf814ee289a6f1f5717a7a6609bed4648ee22fb6a29"
+    }
+  ],
+  "frozen_source_changes_during_run": [],
+  "main_changes_since_freeze": [],
+  "finished_utc": "2026-10-14T22:56:18.850046+00:00",
+  "exit_code": 0
+}

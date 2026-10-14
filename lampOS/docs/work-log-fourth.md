@@ -3024,6 +3024,44 @@ The 22:43 UTC queue fetch found the same integration head, only #739 open
 for Fourth, and no answer to the Body scope question; no Body edits.
 
 
+## 2026-10-15, 06:00 ICT: task 46, stalled metadata fixture corrected; v7 started
+
+Ready for lamp-voice: no
+
+[Focused v7 evidence](verification/voice-fixtures-metadata-v7-20261015/README.md)
+retains file formatting, compile check and the serial pilot module:
+36 passed / 0 failed / 0 ignored, 950 filtered out, 13.79 test seconds,
+44.212 seconds including Cargo. This is a focused module result on Fourth's
+Intel Mac, not a full suite or lamp run. There was no retry or permission
+failure in this invocation. All 2,367 recorded source hashes stayed unchanged.
+Independent review found no actionable findings. All 35 original pilot tests
+and 179 assertions remain; 34 bodies are unchanged and one added unwind
+regression makes 36 tests and 185 assertions.
+
+The actual writer enters its blocked first event before child startup or
+scenario time, under a real two-second barrier. Synthetic peers step while
+the writer, actual SIGTERM and cleanup remain real. Host instants separately
+measured SIGTERM send to verified child reap at 6 ms and logging finish at
+506.854938 ms in the focused run. The original less-than-one-second and
+500 ms plus 250 ms assertion limits remain. Its immutable original report
+was unacknowledged/degraded, with zero written and 65 unconfirmed events;
+checked release obtained a later real finish acknowledgement. The regression
+preserved a typed panic while releasing the entered writer, with no unexpected
+background panic. No production freshness bound was widened. Rapid service
+mute/reopen remains threaded; the separate Body question remains unanswered.
+
+The pre-freeze fetch found integration unchanged at
+`cf2f5b43c8113a704324c2743af3cd92bbc4fdda`. Only the pilot test file and its
+two docs differ from frozen v6; 2,364 files match. Fresh v7 is frozen with
+manifest SHA-256
+`ca1134be293b53de76ff744ea74fb38bad259e82d11638bdb77141869d81a039`.
+Formatting and strict workspace Clippy passed. Actual ARM64 compilation
+began at 22:58:57.787111 UTC and the first full serial Voice run followed.
+No earlier pass counts toward its ten-run requirement; the complete v6
+failure is retained in the preceding entry. Remaining local/dependent gates
+and exact-head native ARM64 CI have not yet run for this version.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
