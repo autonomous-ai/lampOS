@@ -934,6 +934,171 @@ are different inputs. The precise JSONL schema will accompany the fitter.
 Implementation and synthetic checks continue without these records. Most likely
 wrong on the lamp: the initial weights and receipt-time association of cues.
 
+## 2026-10-14: task 17, local-judge — done on Fourth
+
+Implementation: `96b0c3c7c80945d80d230a10d2fb44f362e778e5`, built on
+`fourth/local-judge` and fast-forwarded onto `lamp-fourth`. This is a
+completed shadow implementation and host handoff, not a qualified lamp
+classifier. The independently labelled played-scene records requested in
+the claim above were not available; the shipped seed is explicitly unfitted.
+
+**Built:** a second `Decider` answering the same seven typed questions from
+nullable cues, one authored weights file, a separate local probability
+head, and an offline fitter with session-disjoint train/calibration/test
+partitions. Unknown cues contribute zero evidence; unsupported semantic
+heads remain priors. The model is 3,078 bytes, ours under Apache-2.0, with
+reproduction and SHA-256 in [its source record](../models/policy/SOURCE.md).
+The [Policy document](policy.md#the-local-second-judge-task-17) specifies
+every JSONL fitting field, bound and failure case.
+
+The new `lamp-policy-judges` binary requires `--local-judge` and always
+publishes `shadow: true`. The existing executable remains unchanged. It
+takes the local answer immediately, accepts a slow answer only when both
+completed and observed strictly before the fixed eligibility deadline,
+and publishes one choice. One outstanding slow request cannot hold later
+local decisions; a late reply is logged against its original run/number
+and cannot revise a choice. With no timely slow answer and no call evidence,
+the choice is `look_up`, including in a quiet room. A failed judge leaves
+the valid judge's probability standing. New judge/outcome logging uses one
+bounded worker; queue admission, completed append, drops and abandonment
+are reported separately. Append is not a durability guarantee, and bounded
+queue memory does not bound the daily files' disk use.
+
+No existing main/lib file, manifest, message type, Voice code, Body code,
+deployment file or work list changed. New modules and tests are inside
+Policy; existing `policy.rs` only connects the optional path. V1 review,
+reuse decisions and the exact busy-floor snapshot distinction are documented.
+
+**Gate and machines:** final source passed on the development Mac and a
+source-only Linux copy: **142 tests passed, zero failed, two manual timing
+tests ignored by the normal gate in each environment**. Both measurement
+tests were separately executed in release mode on the Mac. The earlier
+81-test Policy suite remains included and unchanged. No workspace crate
+depends on Policy. The [verification record](verification/local-judge-host-20261014/README.md)
+retains source hashes, machine-readable counts, commands, timing boundaries
+and failures; all 32 manifest entries matched both tested source trees.
+
+Mac: macOS 26.6.2 (25G83), x86_64 Intel Core i7-10700K at 3.80 GHz,
+16 logical CPUs, 64 GiB RAM; Rust/Cargo 1.96.0, rustc commit
+`ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96`, LLVM 22.1.2. From `lampOS/`,
+sequentially:
+
+```sh
+cargo fmt --all --check
+cargo clippy -p lamp-policy --all-targets --offline -- -D warnings
+RUST_TEST_THREADS=1 cargo test -p lamp-policy --offline
+cargo build --workspace --offline
+```
+
+Linux: the same Mac's existing Podman VM, named `lampos-arm64` but actually
+**x86_64**, Linux 6.12.13-200.fc41.x86_64, six vCPUs, 8192 MiB RAM, same
+Rust version. A read-only standalone copy with no parent sources, Git,
+credentials or target artifacts ran with external networking disabled;
+container-local HTTP/Unix-socket fixtures remained available. With
+`CARGO_BUILD_JOBS=4`, `RUST_TEST_THREADS=1`, `CARGO_TARGET_DIR=/target`:
+
+```sh
+cargo clean -p lamp-policy --target x86_64-unknown-linux-gnu
+cargo clippy -p lamp-policy --all-targets --offline --locked --target x86_64-unknown-linux-gnu -- -D warnings
+cargo test -p lamp-policy --offline --locked --target x86_64-unknown-linux-gnu
+cargo build --workspace --offline --locked --target x86_64-unknown-linux-gnu
+```
+
+Final Mac Clippy/build elapsed times were 2.54/2.17 seconds; the final
+Linux workspace build was 4.22 seconds, with existing caches. These are
+Cargo elapsed times, not interaction or lamp measurements. Linux retained
+two inherited Body build warnings (`inspection.rs:615`, `lamp-body.rs:592`);
+Policy's strict lint was clean. Body remains Fifth's.
+
+**Keep the failures:** early formatting/Clippy mistakes were corrected
+without suppression. One Linux gate then failed the unchanged legacy
+name-joining test: its fourth utterance had `name_heard: 0.97`, expected
+`0.0`. One isolated task-source run and five untouched-baseline runs passed.
+A separate diagnostic copy of baseline `574c2e5ed`, with only a 40 ms test
+delay between the third `Thinking` state and transcript, reproduced the
+same failure with unchanged production code. The source's 80/300 ms gather
+wait depends on receipt order; this can leave an earlier name inside the
+next utterance's one-second pre-roll. The original failure had no adjacent
+timestamps, so the reproduced trigger does not prove its exact schedule.
+No assertion, timeout, test inclusion, name window or gather behavior was
+changed. The final complete gate passed after investigation. Switching
+baseline/task copies at the same `/source` mount also exposed stale Cargo
+artifacts; the explicit Policy-only clean above resolved missing-module
+compiler errors without a source change. Both failures are retained.
+
+**For First:** the legacy fixture's scheduling sensitivity and possible
+cross-utterance name association remain. Establish that a later utterance
+is actually outside the pre-roll before asserting no name; inspect source
+timing/turn attribution on the lamp. Task 17 does not claim to fix that
+existing path. The exact diagnostic patch and output are in
+[the investigation](verification/local-judge-host-20261014/name-fixture-investigation.txt).
+
+**Measured latency on this Mac only:** one fresh release test process,
+OS cache not cleared, measured local `Decider::ask` (cue parsing and seven
+answers included): first 9.072 µs; next 1,000 median 1.434 µs, p95 1.453 µs,
+p99 1.466 µs, worst 2.379 µs. Weights loading separately took 124.678 µs.
+This excludes cue gathering, combination, logs, bus delivery and sound.
+The controlled internal shadow-choice fixture held one slow request and
+measured eligibility to final internal choice just before publication.
+Before capping its final wait by the remaining budget, the first choice
+took 104.080 ms; after, 100.223 ms. The next 100 local-only choices while
+that request remained held had median/p95/p99/max 16/19/29/36 µs before
+and 16/23/37/47 µs after. Both runs were alone, with no concurrent build.
+The after run still exceeds the nominal 100 ms completion target by
+0.223 ms; strict slow-answer admission does not promise hard real-time
+completion. This is one controlled pair, not lamp statistics. Reproduce:
+
+```sh
+cargo test -p lamp-policy --release --test local_timing --offline -- --ignored --nocapture
+RUST_TEST_THREADS=1 cargo test -p lamp-policy --release --test judges --offline -- --ignored --nocapture
+```
+
+**Comparison:** eight authored snapshots, zero real lamp recordings and
+zero captured Voice first-output snapshots. Five speech permissions differ:
+against four authored negative and four positive intentions, the busy floor
+permits two negatives and misses no calls; the guarded local seed permits
+no negatives but misses three calls. This **does not beat the floor** and
+is not a fitted accuracy claim. Policy's completed text/20-second context/
+near-face receipt view cannot reproduce Voice's first-output prefix/
+45-second conversation/any-face view without those actual snapshots.
+
+**First on the lamp:** cross-build the Policy binaries, then stop the
+existing Policy owner before this foreground run and restore exactly one
+owner afterward. Use the lamp's existing decisions key and an absolute
+private log directory; Fourth created neither. From the build directory:
+
+```sh
+./target/release/lamp-policy-judges --local-judge --show-judges \
+  --key-file /ABSOLUTE/EXISTING/DECISIONS_KEY \
+  --log-dir /ABSOLUTE/PRIVATE/JUDGE_LOG \
+  --bus-root /run/lampos-bus --deadline-ms 100 --request-ms 3000 --seconds 60
+```
+
+Play a quiet short scrap with no call, busy talk containing the name, an
+explicit call, a follow-up, and known-away/unknown/facing observations. The
+terminal should show seven numeric probabilities from each completed judge,
+one shadow choice per utterance, and late replies retaining the older number.
+The quiet scrap with no timely slow answer must be `look_up`. Nothing acts
+on these choices. The command exits after 60 seconds; check final log write,
+drop, abandonment and unobserved-slow counts. Repeat with a slow/offline
+service and check that local choices continue. Measure these same boundaries
+on the lamp separately; the Mac numbers do not qualify it.
+
+Keep independent directed labels, nullable seven-question labels, lawful
+source/rights and session identities; capture the actual Voice first-output
+snapshot for a real comparison. Run `lamp-policy-fit INPUT.jsonl
+NEW-WEIGHTS.json NEW-REPORT.json` using the documented schema and fresh
+output paths. Its held-out report evaluates the fitted local probability,
+not fused runtime accuracy. Fit and compare held-out lamp sessions before
+considering any action wiring.
+
+**Most likely wrong on the lamp:** the unfitted weights, then name/face
+association from receipt times rather than a stable speaker/turn identity.
+Speech duration is unknown in live Policy input; ASR receipt span is not
+substituted for it. No lamp access, deployment, paid service, account,
+real key, ARM64 execution or real-service performance was used here.
+Fetch the running list again for the next task.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
@@ -943,5 +1108,7 @@ provider-context deletion, or end-to-end lamp latency. Memory remains behind
 default configuration switch. Lean is not wired to Body and all supplied
 geometry remains synthetic. Hand Stop and software mute are off unless their
 independent Voice flags are supplied; no physical hand-to-silence or Body stop
-was qualified. The log contains no unanswered question requiring
+was qualified. The local judge remains shadow-only behind `--local-judge`,
+with unfitted weights and no proof that it improves the busy-room floor.
+The log contains no unanswered question requiring
 the owner to relay a message.
