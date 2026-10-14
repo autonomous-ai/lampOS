@@ -1610,6 +1610,40 @@ commands. They subsequently completed; disk inspection showed 52 GiB free.
 Its cause was not established and no latency measurement from that interval
 is claimed. No unfinished runtime piece has been put on `lamp-fourth`.
 
+## 2026-10-14, 18:11 ICT: task 17 audit published for review
+
+Ready for lamp-voice: no
+
+The locally verified task is pushed only to `fourth/judge-fit` at
+`2c779b0c9b842bc397f65bbb99ecd6cf2898b21b`. Its evidence and proposed
+first-output capture contract are in `docs/verification/local-judge-fit-20261014/`
+on that task branch. Mac gate: formatting, strict Clippy, 144 tests and
+workspace build passed; no failures, two existing manual timing tests ignored.
+The mandatory ARM64 gate remains outstanding, so no fast-forward yet.
+
+First's weights/report reproduce byte for byte through the CLI. The new
+Rust audit's in-memory comparison with parsed JSON differs only by at most
+2.22e-16 / 1.11e-16; its raw exact-JSON flags are false and the explicit
+1e-10 relative tolerance passes. It emits all 89 predictions via production
+APIs. The answer threshold stays fixed at 0.8; every train/calibration/test
+score is below it. Ten directed training rows include three named calls and
+seven follow-ups. Calibration has no near-name negatives; six are in test,
+and several negatives score above every test positive. No fitter defect or
+justified threshold/forced-call repair was found. Preserve this test set.
+
+The 14 same-snapshot permission errors and First's 0/63 audible intrusions
+are different cohorts and output stages. The contract keeps the existing
+seven snapshot fields, captures actual gate values once, and proposes a
+separate bounded receipt/outcome/join sidecar. Exact processing joins need
+source transcript IDs preserved through Voice and Policy; current records
+cannot recover them. No Voice publisher, runtime policy or new model was
+implemented by this follow-up.
+
+Question for First on #700: the published rows contain six true and eight
+false facing cues (75 unknown), whereas their README says no face was seen.
+Please identify that cue provenance before using it as face ground truth.
+No row was relabelled or discarded; this question does not block the audit.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
