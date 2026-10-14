@@ -1,0 +1,29 @@
+{
+  "source_commit": "56b458966ffd10a7938d551de0449cf9fbc723bd",
+  "base_commit": "1a38f2f3e6b8afd1e7896761a0da6149a2400f67",
+  "exit_code": 0,
+  "raw_sha256": "d94c58f65a57abfb1101993426016874bae37f9316963ac25962c36b5a5d26b2",
+  "counts": {
+    "suites": 269,
+    "passed": 3995,
+    "failed": 0,
+    "ignored": 32,
+    "measured": 0,
+    "filtered": 0
+  },
+  "fmt": "passed",
+  "strict_workspace_clippy": "passed",
+  "workspace_tests": "passed",
+  "workspace_build": "passed",
+  "memory_voice_tasks_arm64_cross_build": "passed",
+  "execution": "native x86_64 Linux VM, UID/GID 1000, on Fourth Intel Mac; no ARM64 execution and no lamp",
+  "binary_sha256": {
+    "lamp-memory": "8efde3826406cda308b8dce1de00ad8798ee6c06cc1197710cec6cc281396e4e",
+    "lamp-voice": "ae631e666b6fa6c0f97ab2179d7e0e3bd5da79b46b0f0d85e4badb5e5873641b",
+    "lamp-tasks": "4f4ac480d6f26c882c098c61ecbb81292527903306ed5e4a616f69fe61e33e53"
+  },
+  "profile_overrides": {
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  }
+}

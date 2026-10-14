@@ -1,0 +1,22 @@
+0	/target/debug/examples
+922M	/target/debug/deps
+2.7M	/target/debug/.fingerprint
+0	/target/debug/incremental
+537M	/target/debug/build
+1.5G	/target/debug
+26G	/target/x86_64-unknown-linux-gnu/debug
+0	/target/x86_64-unknown-linux-gnu/tmp
+26G	/target/x86_64-unknown-linux-gnu
+87M	/target/aarch64-unknown-linux-gnu/debug
+0	/target/aarch64-unknown-linux-gnu/tmp
+523M	/target/aarch64-unknown-linux-gnu/release
+609M	/target/aarch64-unknown-linux-gnu
+0	/target/release/examples
+156M	/target/release/deps
+1.5M	/target/release/.fingerprint
+0	/target/release/incremental
+35M	/target/release/build
+192M	/target/release
+28G	/target
+Filesystem       1B-blocks        Used Available Use% Mounted on
+/dev/vda4      42096545792 41942687744 153858048 100% /target

@@ -1,0 +1,12 @@
+{
+  "source": "56b458966ffd10a7938d551de0449cf9fbc723bd",
+  "exit_code": 101,
+  "format": "passed",
+  "strict_workspace_clippy": "passed",
+  "test_execution": "not reached; build failed with ENOSPC and linker bus errors",
+  "workspace_build": "not reached",
+  "arm64_cross_build": "not reached",
+  "raw_sha256": "e6a1b3367b0f0e32bd6f145edf72fa56d1d2c07c708980d931b4ae7202586fff",
+  "raw_bytes": 39103,
+  "environment_repair": "remove Fourth native debug cache only; CARGO_PROFILE_DEV_DEBUG=0 and CARGO_PROFILE_TEST_DEBUG=0 for the fresh full gate; source, assertions, optimization settings unchanged"
+}

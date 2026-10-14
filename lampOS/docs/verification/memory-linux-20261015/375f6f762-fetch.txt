@@ -1,0 +1,4 @@
+    Updating crates.io index
+ Downloading crates ...
+  Downloaded i2cdev v0.6.2
+  Downloaded nix v0.26.4

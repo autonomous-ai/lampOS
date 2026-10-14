@@ -1,0 +1,642 @@
+uid=1000(1000) gid=1000(1000) groups=1000(1000)
+rustc 1.96.0 (ac68faa20 2026-05-25)
+cargo 1.96.0 (30a34c682 2026-05-25)
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+    Checking memchr v2.8.3
+   Compiling serde_core v1.0.229
+    Checking itoa v1.0.18
+   Compiling serde v1.0.229
+   Compiling zmij v1.0.23
+   Compiling serde_json v1.0.151
+    Checking bitflags v2.13.2
+   Compiling libc v0.2.190
+   Compiling syn v3.0.7
+   Compiling rustix v1.1.5
+    Checking linux-raw-sys v0.12.1
+    Checking cfg-if v1.0.5
+   Compiling find-msvc-tools v0.1.14
+   Compiling shlex v2.0.1
+    Checking once_cell v1.21.4
+   Compiling syn v2.0.119
+   Compiling jobserver v0.1.35
+   Compiling cc v1.7.0
+    Checking lamp-ipc v0.1.0 (/source_memory_repaired/crates/ipc)
+    Checking typenum v1.20.1
+   Compiling version_check v0.9.5
+   Compiling serde_derive v1.0.229
+   Compiling generic-array v0.14.7
+    Checking errno v0.3.14
+    Checking signal-hook-registry v1.4.8
+   Compiling getrandom v0.4.3
+    Checking rand_core v0.10.1
+   Compiling pkg-config v0.3.34
+    Checking crypto-common v0.1.7
+    Checking block-buffer v0.10.4
+    Checking digest v0.10.7
+    Checking cpufeatures v0.2.17
+    Checking cpufeatures v0.3.1
+    Checking sha2 v0.10.9
+    Checking pin-project-lite v0.2.17
+    Checking bytes v1.12.1
+    Checking log v0.4.34
+    Checking zeroize v1.9.1
+   Compiling ring v0.17.14
+    Checking rustls-pki-types v1.15.1
+    Checking base64 v0.22.1
+    Checking getrandom v0.2.17
+    Checking untrusted v0.9.0
+    Checking subtle v2.6.1
+   Compiling httparse v1.10.1
+   Compiling rustls v0.23.45
+    Checking chacha20 v0.10.2
+    Checking rand v0.10.3
+    Checking webpki-roots v1.0.9
+   Compiling thiserror v2.0.21
+   Compiling thiserror-impl v2.0.21
+   Compiling signal-hook v0.4.4
+    Checking futures-core v0.3.34
+   Compiling tracing-attributes v0.1.31
+    Checking lamp-bus v0.1.0 (/source_memory_repaired/crates/bus)
+    Checking lamp-msgs v0.1.0 (/source_memory_repaired/crates/msgs)
+    Checking lamp-turn-owner v0.1.0 (/source_memory_repaired/crates/turn-owner)
+    Checking tracing-core v0.1.36
+    Checking futures-sink v0.3.34
+   Compiling tokio-macros v2.7.2
+    Checking tracing v0.1.44
+    Checking mio v1.2.4
+    Checking socket2 v0.6.5
+    Checking futures-channel v0.3.34
+    Checking tokio v1.53.1
+    Checking http v1.5.0
+    Checking rustls-webpki v0.103.15
+   Compiling futures-macro v0.3.34
+    Checking futures-io v0.3.34
+    Checking futures-task v0.3.34
+    Checking slab v0.4.12
+    Checking hybrid-array v0.4.15
+    Checking futures-util v0.3.34
+    Checking smallvec v1.16.3
+   Compiling anyhow v1.0.104
+    Checking crypto-common v0.2.2
+    Checking block-buffer v0.12.1
+    Checking const-oid v0.10.2
+    Checking hound v3.5.1
+    Checking digest v0.11.3
+    Checking sha1 v0.11.0
+    Checking data-encoding v2.11.1
+    Checking webpki-roots v0.26.11
+    Checking tungstenite v0.30.0
+   Compiling either v1.19.0
+   Compiling pastey v0.2.3
+   Compiling itertools v0.13.0
+   Compiling cfg_aliases v0.2.2
+   Compiling nix v0.29.0
+    Checking tokio-rustls v0.26.6
+   Compiling alsa-sys v0.6.1
+    Checking tokio-tungstenite v0.30.0
+   Compiling unicode-xid v0.2.6
+   Compiling derive_more-impl v2.1.1
+    Checking lamp-gemini v0.1.0 (/source_memory_repaired/crates/gemini)
+    Checking alsa v0.12.1
+    Checking lamp-keeper v0.1.0 (/source_memory_repaired/crates/keeper)
+    Checking sonora-simd v0.2.0
+    Checking sonora-fft v0.2.0
+   Compiling bytemuck_derive v1.12.1
+   Compiling glob v0.3.4
+    Checking sonora-ns v0.2.0
+    Checking derive_more v2.1.1
+    Checking sonora-common-audio v0.2.0
+   Compiling prettyplease v0.2.37
+    Checking sonora-aec3 v0.2.0
+   Compiling clang-sys v1.9.1
+    Checking lamp-body v0.1.0 (/source_memory_repaired/crates/body)
+   Compiling minimal-lexical v0.2.1
+    Checking bytemuck v1.25.2
+    Checking sonora-agc2 v0.2.0
+   Compiling regex-syntax v0.8.11
+    Checking sonora v0.2.0
+   Compiling nom v7.1.3
+   Compiling libloading v0.8.9
+    Checking ioctl-sys v0.8.0
+   Compiling regex-automata v0.4.18
+   Compiling bindgen v0.72.1
+   Compiling cexpr v0.6.0
+    Checking gpiocdev-uapi v0.7.0
+   Compiling regex v1.13.1
+    Checking lamp-audio v0.1.0 (/source_memory_repaired/crates/audio)
+   Compiling rustc-hash v2.1.3
+   Compiling cfg_aliases v0.1.1
+   Compiling shlex v1.3.0
+   Compiling nix v0.28.0
+    Checking gpiocdev v0.8.0
+   Compiling thiserror v1.0.69
+   Compiling thiserror-impl v1.0.69
+   Compiling lamp-camera v0.1.0 (/source_memory_repaired/crates/camera)
+    Checking lamp-controls v0.1.0 (/source_memory_repaired/crates/controls)
+   Compiling enumn v0.1.14
+    Checking lamp-turn-end-wire v0.1.0 (/source_memory_repaired/crates/turn-end-wire)
+    Checking rtrb v0.4.0
+    Checking spidev v0.7.1
+    Checking foldhash v0.2.0
+    Checking fastrand v2.5.0
+    Checking lamp-ring v0.1.0 (/source_memory_repaired/crates/ring)
+    Checking lamp-expression v0.1.0 (/source_memory_repaired/crates/expression)
+    Checking tempfile v3.27.0
+    Checking dyn-clone v1.0.20
+    Checking jiff-tzdb v0.1.9
+    Checking jiff-core v0.1.1
+   Compiling autocfg v1.5.1
+    Checking same-file v1.0.6
+    Checking walkdir v2.5.0
+   Compiling vcpkg v0.2.15
+    Checking jiff v0.2.38
+    Checking tinyvec v1.13.3
+   Compiling libsqlite3-sys v0.38.2
+   Compiling libm v0.2.16
+    Checking unicode-normalization v0.1.25
+    Checking hashbrown v0.17.1
+   Compiling synstructure v0.14.0
+    Checking hashlink v0.12.2
+    Checking fallible-iterator v0.3.0
+    Checking fallible-streaming-iterator v0.1.9
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling v4l2r v0.0.8
+    Checking stable_deref_trait v1.2.1
+   Compiling zerovec-derive v0.11.6
+    Checking zerofrom v0.1.8
+    Checking yoke v0.8.3
+   Compiling num-traits v0.2.19
+   Compiling displaydoc v0.2.7
+    Checking zerovec v0.11.8
+    Checking tinystr v0.8.4
+    Checking litemap v0.8.3
+    Checking writeable v0.6.4
+    Checking icu_locale_core v2.3.0
+    Checking potential_utf v0.1.6
+    Checking zerotrie v0.2.5
+   Compiling zerocopy v0.8.62
+    Checking utf8_iter v1.0.4
+   Compiling icu_normalizer_data v2.3.0
+   Compiling icu_properties_data v2.3.0
+    Checking icu_collections v2.3.0
+    Checking icu_provider v2.3.1
+    Checking http-body v1.1.0
+    Checking percent-encoding v2.3.2
+    Checking num-integer v0.1.47
+   Compiling zerocopy-derive v0.8.62
+    Checking tower-service v0.3.3
+    Checking icu_properties v2.3.0
+    Checking lamp-voice v0.1.0 (/source_memory_repaired/crates/voice)
+    Checking icu_normalizer v2.3.0
+   Compiling cmake v0.1.58
+    Checking rusqlite v0.40.2
+   Compiling dunce v1.0.5
+   Compiling fs_extra v1.3.0
+    Checking try-lock v0.2.5
+   Compiling aws-lc-sys v0.46.0
+    Checking want v0.3.2
+    Checking idna_adapter v1.2.2
+    Checking lamp-sound-fixtures v0.1.0 (/source_memory_repaired/crates/sound-fixtures)
+    Checking sync_wrapper v1.0.2
+    Checking atomic-waker v1.1.2
+    Checking httpdate v1.0.3
+    Checking tower-layer v0.3.3
+    Checking hyper v1.12.0
+    Checking idna v1.1.0
+    Checking form_urlencoded v1.2.2
+   Compiling matrixmultiply v0.3.11
+    Checking lamp-observer v0.1.0 (/source_memory_repaired/crates/observer)
+    Checking base64 v0.23.1
+    Checking ipnet v2.12.2
+   Compiling parking_lot_core v0.9.12
+    Checking hyper-util v0.1.21
+    Checking url v2.5.8
+    Checking tower v0.5.3
+    Checking http-body-util v0.1.5
+    Checking num-complex v0.4.6
+   Compiling pin-project-internal v1.1.13
+    Checking aho-corasick v1.1.5
+    Checking scopeguard v1.2.0
+   Compiling heck v0.5.0
+   Compiling memo-map v0.3.4
+    Checking openssl-probe v0.2.1
+   Compiling semver v1.0.28
+   Compiling aws-lc-rs v1.18.2
+    Checking rawpointer v0.2.1
+   Compiling rustc_version v0.4.1
+    Checking rustls-native-certs v0.8.5
+   Compiling minijinja v2.24.0
+   Compiling snafu-derive v0.8.9
+   Compiling half v2.7.1
+    Checking lock_api v0.4.14
+    Checking pin-project v1.1.13
+    Checking hashbrown v0.16.1
+    Checking tokio-util v0.7.20
+    Checking futures-executor v0.3.34
+    Checking bstr v1.13.1
+    Checking nom v8.0.0
+    Checking mime v0.3.17
+    Checking untrusted v0.7.1
+   Compiling typeid v1.0.3
+    Checking itertools v0.15.0
+    Checking nom-language v0.1.0
+    Checking axum-core v0.5.6
+    Checking globset v0.4.20
+    Checking futures v0.3.34
+    Checking string-interner v0.20.0
+    Checking parking_lot v0.12.5
+    Checking snafu v0.8.9
+    Checking rustls-platform-verifier v0.7.1
+   Compiling curve25519-dalek v4.1.3
+    Checking ndarray v0.17.2
+    Checking tower-http v0.6.11
+    Checking hyper-rustls v0.27.10
+    Checking olpc-cjson v0.1.4
+    Checking serde_plain v1.0.2
+    Checking pem v3.0.6
+   Compiling async-trait v0.1.92
+   Compiling tract-linalg v0.23.8
+   Compiling async-recursion v1.2.0
+    Checking serde_path_to_error v0.1.20
+    Checking lazy_static v1.5.1
+   Compiling erased-serde v0.4.10
+    Checking maplit v1.0.2
+    Checking downcast-rs v2.0.2
+    Checking hex v0.4.3
+    Checking dyn-hash v1.0.0
+    Checking strength_reduce v0.2.4
+    Checking matchit v0.8.4
+    Checking typed-path v0.9.3
+    Checking inventory v0.3.25
+    Checking axum v0.8.9
+    Checking tract-data v0.23.8
+    Checking transpose v0.2.3
+    Checking reqwest v0.13.5
+    Checking lamp-voice-eval v0.1.0 (/source_memory_repaired/crates/voice-eval)
+    Checking primal-check v0.3.4
+   Compiling derive-new v0.7.0
+   Compiling curve25519-dalek-derive v0.1.1
+    Checking signature v2.2.0
+    Checking byteorder v1.5.0
+    Checking bit-vec v0.10.1
+    Checking bit-set v0.11.1
+    Checking ed25519 v2.2.3
+    Checking rustfft v6.4.1
+    Checking anymap3 v1.1.0
+    Checking ed25519-dalek v2.2.0
+    Checking xattr v1.6.1
+    Checking filetime v0.2.29
+    Checking tar v0.4.46
+    Checking simd-adler32 v0.3.10
+    Checking num-bigint v0.4.8
+   Compiling prost-derive v0.14.4
+    Checking tract-core v0.23.8
+    Checking rand_distr v0.6.0
+    Checking num-rational v0.4.2
+    Checking memmap2 v0.9.11
+    Checking lamp-policy v0.1.0 (/source_memory_repaired/crates/policy)
+    Checking prost v0.14.4
+    Checking lamp-memory v0.1.0 (/source_memory_repaired/crates/memory)
+    Checking lamp-schedule v0.1.0 (/source_memory_repaired/crates/schedule)
+    Checking lamp-tasks v0.1.0 (/source_memory_repaired/crates/tasks)
+    Checking lamp-mood v0.1.0 (/source_memory_repaired/crates/mood)
+   Compiling ort-sys v2.0.0-rc.14
+    Checking glam v0.33.12
+    Checking libloading v0.9.0
+    Checking ort v2.0.0-rc.14
+    Checking lamp-lean v0.1.0 (/source_memory_repaired/crates/lean)
+    Checking zune-core v0.4.12
+    Checking zune-jpeg v0.4.21
+    Checking lamp-health v0.1.0 (/source_memory_repaired/crates/health)
+    Checking lamp-records v0.1.0 (/source_memory_repaired/crates/records)
+    Checking lamp-actions v0.1.0 (/source_memory_repaired/crates/actions)
+    Checking lamp-ears v0.1.0 (/source_memory_repaired/crates/ears)
+    Checking lamp-air v0.1.0 (/source_memory_repaired/crates/air)
+    Checking lamp-environment v0.1.0 (/source_memory_repaired/crates/environment)
+    Checking tract-nnef v0.23.8
+    Checking tract-hir v0.23.8
+    Checking tract-extra v0.23.8
+    Checking tract-onnx-opl v0.23.8
+    Checking tract-onnx v0.23.8
+    Checking lamp-turn-end v0.1.0 (/source_memory_repaired/crates/turn-end)
+    Checking lamp-eyes v0.1.0 (/source_memory_repaired/crates/eyes)
+    Checking lamp-name v0.1.0 (/source_memory_repaired/crates/name)
+    Checking tough v0.24.0 (/source_memory_repaired/vendor/tough)
+    Checking lamp-surround v0.1.0 (/source_memory_repaired/crates/surround)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 12s
+warning: output filename collision at /target/x86_64-unknown-linux-gnu/debug/examples/replay_cost
+  |
+  = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/source_memory_repaired/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/source_memory_repaired/crates/controls)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+warning: output filename collision at /target/x86_64-unknown-linux-gnu/debug/examples/replay_cost.dwp
+  |
+  = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/source_memory_repaired/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/source_memory_repaired/crates/controls)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling bitflags v2.13.2
+   Compiling linux-raw-sys v0.12.1
+   Compiling libc v0.2.190
+   Compiling cfg-if v1.0.5
+   Compiling once_cell v1.21.4
+   Compiling typenum v1.20.1
+   Compiling rustix v1.1.5
+   Compiling errno v0.3.14
+   Compiling signal-hook-registry v1.4.8
+   Compiling rand_core v0.10.1
+   Compiling getrandom v0.4.3
+   Compiling serde_json v1.0.151
+   Compiling serde v1.0.229
+   Compiling generic-array v0.14.7
+   Compiling cpufeatures v0.2.17
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling cpufeatures v0.3.1
+   Compiling digest v0.10.7
+   Compiling log v0.4.34
+   Compiling lamp-bus v0.1.0 (/source_memory_repaired/crates/bus)
+   Compiling sha2 v0.10.9
+   Compiling lamp-msgs v0.1.0 (/source_memory_repaired/crates/msgs)
+   Compiling bytes v1.12.1
+   Compiling pin-project-lite v0.2.17
+   Compiling zeroize v1.9.1
+   Compiling base64 v0.22.1
+   Compiling rustls-pki-types v1.15.1
+   Compiling lamp-turn-owner v0.1.0 (/source_memory_repaired/crates/turn-owner)
+   Compiling getrandom v0.2.17
+   Compiling untrusted v0.9.0
+   Compiling subtle v2.6.1
+   Compiling ring v0.17.14
+   Compiling httparse v1.10.1
+   Compiling chacha20 v0.10.2
+   Compiling rand v0.10.3
+   Compiling webpki-roots v1.0.9
+   Compiling lamp-ipc v0.1.0 (/source_memory_repaired/crates/ipc)
+   Compiling thiserror v2.0.21
+   Compiling futures-core v0.3.34
+   Compiling signal-hook v0.4.4
+   Compiling tracing-core v0.1.36
+   Compiling rustls-webpki v0.103.15
+   Compiling tracing v0.1.44
+   Compiling futures-sink v0.3.34
+   Compiling mio v1.2.4
+   Compiling rustls v0.23.45
+   Compiling socket2 v0.6.5
+   Compiling futures-channel v0.3.34
+   Compiling http v1.5.0
+   Compiling slab v0.4.12
+   Compiling tokio v1.53.1
+   Compiling futures-io v0.3.34
+   Compiling futures-task v0.3.34
+   Compiling futures-util v0.3.34
+   Compiling hybrid-array v0.4.15
+   Compiling hound v3.5.1
+   Compiling smallvec v1.16.3
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling const-oid v0.10.2
+   Compiling digest v0.11.3
+   Compiling sha1 v0.11.0
+   Compiling data-encoding v2.11.1
+   Compiling anyhow v1.0.104
+   Compiling tungstenite v0.30.0
+   Compiling webpki-roots v0.26.11
+   Compiling nix v0.29.0
+   Compiling tokio-rustls v0.26.6
+   Compiling alsa-sys v0.6.1
+   Compiling tokio-tungstenite v0.30.0
+   Compiling lamp-gemini v0.1.0 (/source_memory_repaired/crates/gemini)
+   Compiling alsa v0.12.1
+   Compiling derive_more v2.1.1
+   Compiling lamp-keeper v0.1.0 (/source_memory_repaired/crates/keeper)
+   Compiling sonora-simd v0.2.0
+   Compiling sonora-fft v0.2.0
+   Compiling sonora-common-audio v0.2.0
+   Compiling bytemuck v1.25.2
+   Compiling lamp-body v0.1.0 (/source_memory_repaired/crates/body)
+   Compiling sonora-agc2 v0.2.0
+   Compiling sonora-ns v0.2.0
+   Compiling sonora-aec3 v0.2.0
+   Compiling ioctl-sys v0.8.0
+   Compiling gpiocdev-uapi v0.7.0
+   Compiling gpiocdev v0.8.0
+   Compiling sonora v0.2.0
+   Compiling thiserror v1.0.69
+   Compiling nix v0.28.0
+   Compiling lamp-camera v0.1.0 (/source_memory_repaired/crates/camera)
+   Compiling lamp-controls v0.1.0 (/source_memory_repaired/crates/controls)
+   Compiling lamp-audio v0.1.0 (/source_memory_repaired/crates/audio)
+   Compiling v4l2r v0.0.8
+   Compiling lamp-turn-end-wire v0.1.0 (/source_memory_repaired/crates/turn-end-wire)
+   Compiling spidev v0.7.1
+   Compiling rtrb v0.4.0
+   Compiling foldhash v0.2.0
+   Compiling lamp-ring v0.1.0 (/source_memory_repaired/crates/ring)
+   Compiling lamp-expression v0.1.0 (/source_memory_repaired/crates/expression)
+   Compiling fastrand v2.5.0
+   Compiling tempfile v3.27.0
+   Compiling dyn-clone v1.0.20
+   Compiling jiff-core v0.1.1
+   Compiling jiff-tzdb v0.1.9
+   Compiling jiff v0.2.38
+   Compiling same-file v1.0.6
+   Compiling lamp-voice v0.1.0 (/source_memory_repaired/crates/voice)
+   Compiling walkdir v2.5.0
+   Compiling tinyvec v1.13.3
+   Compiling unicode-normalization v0.1.25
+   Compiling hashbrown v0.17.1
+   Compiling libsqlite3-sys v0.38.2
+   Compiling fallible-iterator v0.3.0
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling hashlink v0.12.2
+   Compiling zerofrom v0.1.8
+   Compiling stable_deref_trait v1.2.1
+   Compiling yoke v0.8.3
+   Compiling rusqlite v0.40.2
+   Compiling zerovec v0.11.8
+   Compiling libm v0.2.16
+   Compiling tinystr v0.8.4
+   Compiling litemap v0.8.3
+   Compiling num-traits v0.2.19
+   Compiling writeable v0.6.4
+   Compiling icu_locale_core v2.3.0
+   Compiling zerotrie v0.2.5
+   Compiling potential_utf v0.1.6
+   Compiling utf8_iter v1.0.4
+   Compiling num-integer v0.1.47
+   Compiling icu_collections v2.3.0
+   Compiling http-body v1.1.0
+   Compiling percent-encoding v2.3.2
+   Compiling icu_properties_data v2.3.0
+   Compiling icu_normalizer_data v2.3.0
+   Compiling tower-service v0.3.3
+   Compiling icu_provider v2.3.1
+   Compiling lamp-sound-fixtures v0.1.0 (/source_memory_repaired/crates/sound-fixtures)
+   Compiling icu_normalizer v2.3.0
+   Compiling icu_properties v2.3.0
+   Compiling try-lock v0.2.5
+   Compiling want v0.3.2
+   Compiling sync_wrapper v1.0.2
+   Compiling tower-layer v0.3.3
+   Compiling httpdate v1.0.3
+   Compiling atomic-waker v1.1.2
+   Compiling form_urlencoded v1.2.2
+   Compiling idna_adapter v1.2.2
+   Compiling hyper v1.12.0
+   Compiling idna v1.1.0
+   Compiling num-complex v0.4.6
+   Compiling lamp-observer v0.1.0 (/source_memory_repaired/crates/observer)
+   Compiling ipnet v2.12.2
+   Compiling rawpointer v0.2.1
+   Compiling base64 v0.23.1
+   Compiling scopeguard v1.2.0
+   Compiling matrixmultiply v0.3.11
+   Compiling lock_api v0.4.14
+   Compiling hyper-util v0.1.21
+   Compiling zerocopy v0.8.62
+   Compiling url v2.5.8
+   Compiling parking_lot_core v0.9.12
+   Compiling tower v0.5.3
+   Compiling http-body-util v0.1.5
+   Compiling hashbrown v0.16.1
+   Compiling aho-corasick v1.1.5
+   Compiling nom v8.0.0
+   Compiling either v1.19.0
+   Compiling regex-syntax v0.8.11
+   Compiling openssl-probe v0.2.1
+   Compiling rustls-native-certs v0.8.5
+   Compiling nom-language v0.1.0
+   Compiling itertools v0.15.0
+   Compiling half v2.7.1
+   Compiling regex-automata v0.4.18
+   Compiling string-interner v0.20.0
+   Compiling pin-project v1.1.13
+   Compiling parking_lot v0.12.5
+   Compiling ndarray v0.17.2
+   Compiling aws-lc-sys v0.46.0
+   Compiling tokio-util v0.7.20
+   Compiling futures-executor v0.3.34
+   Compiling bstr v1.13.1
+   Compiling lazy_static v1.5.1
+   Compiling dyn-hash v1.0.0
+   Compiling mime v0.3.17
+   Compiling strength_reduce v0.2.4
+   Compiling untrusted v0.7.1
+   Compiling maplit v1.0.2
+   Compiling inventory v0.3.25
+   Compiling downcast-rs v2.0.2
+   Compiling aws-lc-rs v1.18.2
+   Compiling transpose v0.2.3
+   Compiling axum-core v0.5.6
+   Compiling globset v0.4.20
+   Compiling tract-data v0.23.8
+   Compiling futures v0.3.34
+   Compiling snafu v0.8.9
+   Compiling typeid v1.0.3
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling tower-http v0.6.11
+   Compiling hyper-rustls v0.27.10
+   Compiling primal-check v0.3.4
+   Compiling olpc-cjson v0.1.4
+   Compiling pem v3.0.6
+   Compiling serde_plain v1.0.2
+   Compiling serde_path_to_error v0.1.20
+   Compiling bit-vec v0.10.1
+   Compiling hex v0.4.3
+   Compiling byteorder v1.5.0
+   Compiling typed-path v0.9.3
+   Compiling matchit v0.8.4
+   Compiling bit-set v0.11.1
+   Compiling reqwest v0.13.5
+   Compiling tract-linalg v0.23.8
+   Compiling tough v0.24.0 (/source_memory_repaired/vendor/tough)
+   Compiling axum v0.8.9
+   Compiling rustfft v6.4.1
+   Compiling erased-serde v0.4.10
+   Compiling lamp-voice-eval v0.1.0 (/source_memory_repaired/crates/voice-eval)
+   Compiling signature v2.2.0
+   Compiling anymap3 v1.1.0
+   Compiling ed25519 v2.2.3
+   Compiling curve25519-dalek v4.1.3
+   Compiling xattr v1.6.1
+   Compiling filetime v0.2.29
+   Compiling tar v0.4.46
+   Compiling ed25519-dalek v2.2.0
+   Compiling lamp-surround v0.1.0 (/source_memory_repaired/crates/surround)
+   Compiling simd-adler32 v0.3.10
+   Compiling num-bigint v0.4.8
+   Compiling tract-core v0.23.8
+   Compiling rand_distr v0.6.0
+   Compiling num-rational v0.4.2
+   Compiling prost v0.14.4
+   Compiling memmap2 v0.9.11
+   Compiling lamp-policy v0.1.0 (/source_memory_repaired/crates/policy)
+   Compiling lamp-memory v0.1.0 (/source_memory_repaired/crates/memory)
+   Compiling lamp-schedule v0.1.0 (/source_memory_repaired/crates/schedule)
+   Compiling lamp-mood v0.1.0 (/source_memory_repaired/crates/mood)
+   Compiling lamp-tasks v0.1.0 (/source_memory_repaired/crates/tasks)
+   Compiling glam v0.33.12
+   Compiling ort-sys v2.0.0-rc.14
+   Compiling libloading v0.9.0
+   Compiling lamp-lean v0.1.0 (/source_memory_repaired/crates/lean)
+   Compiling ort v2.0.0-rc.14
+   Compiling lamp-health v0.1.0 (/source_memory_repaired/crates/health)
+   Compiling zune-core v0.4.12
+   Compiling zune-jpeg v0.4.21
+   Compiling lamp-actions v0.1.0 (/source_memory_repaired/crates/actions)
+   Compiling lamp-records v0.1.0 (/source_memory_repaired/crates/records)
+   Compiling lamp-environment v0.1.0 (/source_memory_repaired/crates/environment)
+   Compiling lamp-ears v0.1.0 (/source_memory_repaired/crates/ears)
+   Compiling lamp-air v0.1.0 (/source_memory_repaired/crates/air)
+   Compiling tract-nnef v0.23.8
+   Compiling tract-hir v0.23.8
+   Compiling tract-extra v0.23.8
+   Compiling tract-onnx-opl v0.23.8
+   Compiling tract-onnx v0.23.8
+   Compiling lamp-turn-end v0.1.0 (/source_memory_repaired/crates/turn-end)
+   Compiling lamp-name v0.1.0 (/source_memory_repaired/crates/name)
+   Compiling lamp-eyes v0.1.0 (/source_memory_repaired/crates/eyes)
+rustc-LLVM ERROR: IO failure on output stream: No space left on device
+error: could not compile `lamp-voice` (bin "lamp-voice")
+
+Caused by:
+  failed to create file `/target/x86_64-unknown-linux-gnu/debug/.fingerprint/lamp-voice-0c8b8d4ddf2f65cb/output-bin-lamp-voice`
+
+Caused by:
+  failed to parse process output: `rustc --crate-name lamp_voice --edition=2024 crates/voice/src/main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --deny=unsafe_code '--warn=clippy::all' --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=048b1aa35ecd0bf8 -C extra-filename=-0c8b8d4ddf2f65cb --out-dir /target/x86_64-unknown-linux-gnu/debug/deps --target x86_64-unknown-linux-gnu -L dependency=/target/x86_64-unknown-linux-gnu/debug/deps -L dependency=/target/debug/deps --extern gpiocdev=/target/x86_64-unknown-linux-gnu/debug/deps/libgpiocdev-c1852f64c2e726b6.rlib --extern hound=/target/x86_64-unknown-linux-gnu/debug/deps/libhound-844f311c6b126f72.rlib --extern lamp_audio=/target/x86_64-unknown-linux-gnu/debug/deps/liblamp_audio-dc20ce0afe5f3174.rlib --extern lamp_body=/target/x86_64-unknown-linux-gnu/debug/deps/liblamp_body-3360e5ac984e3578.rlib --extern lamp_bus=/target/x86_64-unknown-linux-gnu/debug/deps/liblamp_bus-670ea5fdda77e8da.rlib --extern lamp_camera=/target/x86_64-unknown-linux-gnu/debug/deps/liblamp_camera-9f1b8a5692fb0b82.rlib --extern lamp_controls=/target/x86_64-unknown-linux-gnu/debug/deps/liblamp_controls-3d943c3ae4e71204.rlib --extern lamp_gemini=/target/x86_64-unknown-linux-gnu/debug/deps/liblamp_gemini-d2ed9761d3f52ad6.rlib --extern lamp_ipc=/target/x86_64-unknown-linux-gnu/debug/deps/liblamp_ipc-819d5b9396cf7af9.rlib --extern lamp_msgs=/target/x86_64-unknown-linux-gnu/debug/deps/liblamp_msgs-89b4549cd924a482.rlib --extern lamp_ring=/target/x86_64-unknown-linux-gnu/debug/deps/liblamp_ring-c5e165ccfc7662b6.rlib --extern lamp_turn_end_wire=/target/x86_64-unknown-linux-gnu/debug/deps/liblamp_turn_end_wire-db56a377af23beab.rlib --extern lamp_turn_owner=/target/x86_64-unknown-linux-gnu/debug/deps/liblamp_turn_owner-7b75e88e9f1e81a1.rlib --extern lamp_voice=/target/x86_64-unknown-linux-gnu/debug/deps/liblamp_voice-eb9d196d98666195.rlib --extern rtrb=/target/x86_64-unknown-linux-gnu/debug/deps/librtrb-8caafb18509c12f7.rlib --extern rustix=/target/x86_64-unknown-linux-gnu/debug/deps/librustix-9489183e3db5e8fa.rlib --extern serde=/target/x86_64-unknown-linux-gnu/debug/deps/libserde-36d5979dcab6b635.rlib --extern serde_json=/target/x86_64-unknown-linux-gnu/debug/deps/libserde_json-ee541ce3baaa7523.rlib --extern sha2=/target/x86_64-unknown-linux-gnu/debug/deps/libsha2-7ebb69bff1c008f9.rlib --extern signal_hook=/target/x86_64-unknown-linux-gnu/debug/deps/libsignal_hook-8e1fda3f920e458f.rlib --extern sonora_agc2=/target/x86_64-unknown-linux-gnu/debug/deps/libsonora_agc2-6d7585d3794a56b3.rlib --extern sonora_simd=/target/x86_64-unknown-linux-gnu/debug/deps/libsonora_simd-264f572c902eeaa4.rlib --extern tokio=/target/x86_64-unknown-linux-gnu/debug/deps/libtokio-2f13a9e128d2c0b7.rlib -L native=/target/x86_64-unknown-linux-gnu/debug/build/ring-73501bb6459f1a17/out -L native=/usr/lib/x86_64-linux-gnu` (exit status: 101)
+warning: build failed, waiting for other jobs to finish...
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "-m64" "/target/x86_64-unknown-linux-gnu/debug/deps/rustcJtJ5il/symbols.o" "<2 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libtest-*,libgetopts-*,librustc_std_workspace_std-*}.rlib" "/target/x86_64-unknown-linux-gnu/debug/deps/{liblamp_voice-eb9d196d98666195,libsignal_hook-8e1fda3f920e458f,liblamp_body-3360e5ac984e3578,liblamp_keeper-8b9f241b70dc2f83,liblamp_controls-3d943c3ae4e71204,libgpiocdev-c1852f64c2e726b6,libgpiocdev_uapi-86ba4ec636d0f402,libioctl_sys-6b7deb943b0afba5,librtrb-8caafb18509c12f7,liblamp_ring-c5e165ccfc7662b6,libspidev-f359670276d41ab8,libnix-dac8058449bdc97c,liblamp_camera-9f1b8a5692fb0b82,libv4l2r-16321f75b8299972,libanyhow-e3919787cdca1f1c,libnix-8b7f1548ff539e79,libthiserror-2c0fe9bf1906eb7b,liblamp_msgs-89b4549cd924a482,liblamp_bus-670ea5fdda77e8da,liblamp_gemini-d2ed9761d3f52ad6,libbase64-52431ebb9b7088bf,libtokio_tungstenite-11a08f261f60703d,libwebpki_roots-2fbf155cf550b383,libwebpki_roots-8345e74eae0202da,libtokio_rustls-ed0288fa37904438,libtokio-2f13a9e128d2c0b7,libsignal_hook_registry-5922ad6542aba82f,liberrno-e827d76564e28fff,libsocket2-89ba20d240b24b47,libmio-93b6545e8660f642,libfutures_util-81cc55caca2a1a41,libfutures_io-47d8c8be69dc92af,libslab-c6788d3d11294e22,libfutures_channel-225f33ba77f003bf,libfutures_sink-47eea3b17f060860,libfutures_task-5c74a426457f1fd3,libfutures_core-587d892520fc87b5,libtungstenite-c088f3dbe8b6e80f,libdata_encoding-b025b11da969afab,librand-237bab04a738b84e,libgetrandom-e1ea228921d1dd47,libchacha20-113e8298e4b304da,librand_core-a29403e1ce16f059,librustls-79fc28891fb9e817,libsubtle-3971e8e69d407204,libwebpki-47ac12eea7c50dfc,libring-301871b26af7235c,libgetrandom-2bd12b6a3759326f,libuntrusted-b320a8b791cebcac,librustls_pki_types-2cf51cec140892aa,libzeroize-ea40a54612f79d1c,libsha1-8052fd51cd4b4b0a,libdigest-8e3e1acfb094c5b5,libconst_oid-25795056f28f2351,libcrypto_common-1227820b4c2e8ee0,libblock_buffer-b745b39976a72d3e,libhybrid_array-0338bfbb0c93af38,libhttparse-fcffdd63231a3d02,libthiserror-c9264c966f625b54,liblog-95c6ddfe8593814a,libhttp-04df42025aa1a6f8,libbytes-d0eff2652b2e650e,liblamp_turn_end_wire-db56a377af23beab,liblamp_audio-dc20ce0afe5f3174,libhound-844f311c6b126f72,libserde_json-ee541ce3baaa7523,libmemchr-724f15f15a97fb5f,libitoa-b0a54630e16710a0,libzmij-f002e988c1f2fce2,libsha2-7ebb69bff1c008f9,libcpufeatures-7335c0cdb40c796e,libdigest-0585c7d71ec987fa,libblock_buffer-911d9919bb8775d4,libcrypto_common-5c186002748ede4c,libgeneric_array-8e97e6caded5d331,libtypenum-f37357c9811a3f0a,liblamp_turn_owner-7b75e88e9f1e81a1,libserde-36d5979dcab6b635,libserde_core-47a7518ff92b749f,liblamp_ipc-819d5b9396cf7af9,librustix-9489183e3db5e8fa,liblinux_raw_sys-a839fb7e2fa3eeb4,libalsa-81df1aa307cd38a4,libcfg_if-dc4d548fc2364ee0,libbitflags-8a6f2fc95610896a,libalsa_sys-64444f13518fb84d,liblibc-f3b8c05a60f810ea,libsonora-943923c1089d0e18,libsonora_agc2-6d7585d3794a56b3,libbytemuck-d22c7ee9f82cf49f,libtracing-f5678069c8a2e023,libpin_project_lite-56e5ca3a95572b4c,libtracing_core-aa5b071a2662a8b8,libonce_cell-9faeec59d6031061,libsonora_ns-9836c160feba0556,libsonora_aec3-3a933143a69d250a,libsonora_fft-3f56e52d7905ae82,libsonora_common_audio-20111e0b42f294c7,libsonora_simd-264f572c902eeaa4,libcpufeatures-986b3820555a6a9f,libderive_more-56b76bf362156973}.rlib" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lasound" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "/target/x86_64-unknown-linux-gnu/debug/deps/rustcJtJ5il/raw-dylibs" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "/target/x86_64-unknown-linux-gnu/debug/build/ring-73501bb6459f1a17/out" "-L" "/usr/lib/x86_64-linux-gnu" "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "/target/x86_64-unknown-linux-gnu/debug/deps/reference_link-0de4d112e1d19ca2" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: rust-lld: error: cannot open output file /target/x86_64-unknown-linux-gnu/debug/deps/reference_link-0de4d112e1d19ca2: No space left on device
+          collect2: error: ld returned 1 exit status
+          
+
+error: could not compile `lamp-voice` (test "reference_link") due to 1 previous error
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "-m64" "/target/x86_64-unknown-linux-gnu/debug/examples/rustc9yi1GZ/symbols.o" "<3 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "/target/x86_64-unknown-linux-gnu/debug/deps/{liblamp_voice-eb9d196d98666195,libsignal_hook-8e1fda3f920e458f,liblamp_body-3360e5ac984e3578,liblamp_keeper-8b9f241b70dc2f83,liblamp_controls-3d943c3ae4e71204,libgpiocdev-c1852f64c2e726b6,libgpiocdev_uapi-86ba4ec636d0f402,libioctl_sys-6b7deb943b0afba5,librtrb-8caafb18509c12f7,liblamp_ring-c5e165ccfc7662b6,libspidev-f359670276d41ab8,libnix-dac8058449bdc97c,liblamp_camera-9f1b8a5692fb0b82,libv4l2r-16321f75b8299972,libanyhow-e3919787cdca1f1c,libnix-8b7f1548ff539e79,libthiserror-2c0fe9bf1906eb7b,liblamp_msgs-89b4549cd924a482,liblamp_bus-670ea5fdda77e8da,liblamp_gemini-d2ed9761d3f52ad6,libbase64-52431ebb9b7088bf,libtokio_tungstenite-11a08f261f60703d,libwebpki_roots-2fbf155cf550b383,libwebpki_roots-8345e74eae0202da,libtokio_rustls-ed0288fa37904438,libtokio-2f13a9e128d2c0b7,libsignal_hook_registry-5922ad6542aba82f,liberrno-e827d76564e28fff,libsocket2-89ba20d240b24b47,libmio-93b6545e8660f642,libfutures_util-81cc55caca2a1a41,libfutures_io-47d8c8be69dc92af,libslab-c6788d3d11294e22,libfutures_channel-225f33ba77f003bf,libfutures_sink-47eea3b17f060860,libfutures_task-5c74a426457f1fd3,libfutures_core-587d892520fc87b5,libtungstenite-c088f3dbe8b6e80f,libdata_encoding-b025b11da969afab,librand-237bab04a738b84e,libgetrandom-e1ea228921d1dd47,libchacha20-113e8298e4b304da,librand_core-a29403e1ce16f059,librustls-79fc28891fb9e817,libsubtle-3971e8e69d407204,libwebpki-47ac12eea7c50dfc,libring-301871b26af7235c,libgetrandom-2bd12b6a3759326f,libuntrusted-b320a8b791cebcac,librustls_pki_types-2cf51cec140892aa,libzeroize-ea40a54612f79d1c,libsha1-8052fd51cd4b4b0a,libdigest-8e3e1acfb094c5b5,libconst_oid-25795056f28f2351,libcrypto_common-1227820b4c2e8ee0,libblock_buffer-b745b39976a72d3e,libhybrid_array-0338bfbb0c93af38,libhttparse-fcffdd63231a3d02,libthiserror-c9264c966f625b54,liblog-95c6ddfe8593814a,libhttp-04df42025aa1a6f8,libbytes-d0eff2652b2e650e,liblamp_turn_end_wire-db56a377af23beab,liblamp_audio-dc20ce0afe5f3174,libhound-844f311c6b126f72,libserde_json-ee541ce3baaa7523,libmemchr-724f15f15a97fb5f,libitoa-b0a54630e16710a0,libzmij-f002e988c1f2fce2,libsha2-7ebb69bff1c008f9,libcpufeatures-7335c0cdb40c796e,libdigest-0585c7d71ec987fa,libblock_buffer-911d9919bb8775d4,libcrypto_common-5c186002748ede4c,libgeneric_array-8e97e6caded5d331,libtypenum-f37357c9811a3f0a,liblamp_turn_owner-7b75e88e9f1e81a1,libserde-36d5979dcab6b635,libserde_core-47a7518ff92b749f,liblamp_ipc-819d5b9396cf7af9,librustix-9489183e3db5e8fa,liblinux_raw_sys-a839fb7e2fa3eeb4,libalsa-81df1aa307cd38a4,libcfg_if-dc4d548fc2364ee0,libbitflags-8a6f2fc95610896a,libalsa_sys-64444f13518fb84d,liblibc-f3b8c05a60f810ea,libsonora-943923c1089d0e18,libsonora_agc2-6d7585d3794a56b3,libbytemuck-d22c7ee9f82cf49f,libtracing-f5678069c8a2e023,libpin_project_lite-56e5ca3a95572b4c,libtracing_core-aa5b071a2662a8b8,libonce_cell-9faeec59d6031061,libsonora_ns-9836c160feba0556,libsonora_aec3-3a933143a69d250a,libsonora_fft-3f56e52d7905ae82,libsonora_common_audio-20111e0b42f294c7,libsonora_simd-264f572c902eeaa4,libcpufeatures-986b3820555a6a9f,libderive_more-56b76bf362156973}.rlib" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lasound" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "/target/x86_64-unknown-linux-gnu/debug/examples/rustc9yi1GZ/raw-dylibs" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "/target/x86_64-unknown-linux-gnu/debug/build/ring-73501bb6459f1a17/out" "-L" "/usr/lib/x86_64-linux-gnu" "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "/target/x86_64-unknown-linux-gnu/debug/examples/reference_pace-bea14e74e2d36c79" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace and instructions to reproduce the bug.
+          collect2: fatal error: ld terminated with signal 7 [Bus error], core dumped
+          compilation terminated.
+          
+
+error: could not compile `lamp-voice` (example "reference_pace") due to 1 previous error
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "-m64" "/target/x86_64-unknown-linux-gnu/debug/deps/rustcqgcb2j/symbols.o" "<2 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libtest-*,libgetopts-*,librustc_std_workspace_std-*}.rlib" "/target/x86_64-unknown-linux-gnu/debug/deps/{liblamp_name-5a320d21ba08a710,liblamp_msgs-89b4549cd924a482,liblamp_bus-670ea5fdda77e8da,libtract_onnx-71eb6f10eace3c71,libmemmap2-abbfe65171f466fb,libtract_onnx_opl-119eb6104868aba1,librand_distr-811c6c9a943400e1,librand-237bab04a738b84e,libgetrandom-e1ea228921d1dd47,libchacha20-113e8298e4b304da,libcpufeatures-986b3820555a6a9f,librand_core-a29403e1ce16f059,libtract_nnef-c0b81aabd30a2d9e,libserde_json-ee541ce3baaa7523,libitoa-b0a54630e16710a0,libzmij-f002e988c1f2fce2,libwalkdir-3d7c756ffbac8d36,libsame_file-d80134b94f13d0ba,libtar-9662abed0e4f06ad,libxattr-b9c15cb163e0bb26,librustix-9489183e3db5e8fa,libbitflags-8a6f2fc95610896a,liblinux_raw_sys-a839fb7e2fa3eeb4,libfiletime-f8ac2e1692a0b10b,libprost-2031f2b26d049229,libbytes-d0eff2652b2e650e,libnum_rational-1c8a8ca276891a2b,libnum_bigint-8fa91a03b1a19671,libtract_hir-551f0442c0e6f7d5,libtract_core-d3d8366eee4ba7f2,libanymap3-02be754a439b7b99,liberased_serde-12618421dd86cfa5,libtypeid-cb9a133dd4def941,librustfft-baa44446370b1043,libprimal_check-28e4db2aa4cca694,libtranspose-babe95c6fa28887d,libstrength_reduce-afab4c6fee017c9d,libtract_linalg-0254428b414d5549,libbyteorder-6573a33cf5933d8f,liblazy_static-20e17fba9613437f,libtract_data-cabafdbbe1ca44de,libdyn_clone-1dd95096649fd8f5,libmaplit-f83c849f1a85d8b2,libdyn_hash-ff075b006294c2b6,libstring_interner-bb12e3aeb8103df9,libhashbrown-25f9c532643acd8d,libfoldhash-8340a96ef8fd0d9b,libserde-36d5979dcab6b635,libserde_core-47a7518ff92b749f,libnom_language-2c1c41d258281b59,libnom-290a5a1c929ee02f,libmemchr-724f15f15a97fb5f,libinventory-9d4e8aaa8e3bacef,libparking_lot-073baf032a7d7845,libparking_lot_core-dc81412ca01a4801,liblibc-f3b8c05a60f810ea,liblock_api-db8b049cffc7adc1,libscopeguard-c8a159aa36eb891a,libsmallvec-b7d153dfa54e5800,libanyhow-e3919787cdca1f1c,libhalf-f6767f35becc9201,libcfg_if-dc4d548fc2364ee0,libzerocopy-a2729d7e5f6315c3,libitertools-ad185469542c72b1,libeither-e0ea2c2bb606ebe8,libndarray-776c4286a5acc647,libmatrixmultiply-ac567e0c3bbc6f54,libnum_complex-22ae61c405c4582d,librawpointer-7d04baa4fe7fd10e,libdowncast_rs-485022f37ec2e491,libbit_set-52d6dc99a548b989,libbit_vec-cc30f0acefd80a6d,libnum_integer-5451ee201b29736c,libnum_traits-6790c0da3dee91c4,liblog-95c6ddfe8593814a}.rlib" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "/target/x86_64-unknown-linux-gnu/debug/deps/rustcqgcb2j/raw-dylibs" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "/target/x86_64-unknown-linux-gnu/debug/build/tract-linalg-4bd218a3136c6182/out" "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "/target/x86_64-unknown-linux-gnu/debug/deps/review_2026_10_14-25377776a4682629" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: collect2: fatal error: ld terminated with signal 7 [Bus error], core dumped
+          compilation terminated.
+          
+
+error: could not compile `lamp-name` (test "review_2026_10_14") due to 1 previous error

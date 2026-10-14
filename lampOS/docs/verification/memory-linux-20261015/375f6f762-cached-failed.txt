@@ -1,0 +1,177 @@
+uid=1000(1000) gid=1000(1000) groups=1000(1000)
+rustc 1.96.0 (ac68faa20 2026-05-25)
+cargo 1.96.0 (30a34c682 2026-05-25)
+    Checking lamp-bus v0.1.0 (/source_memory_touch/crates/bus)
+    Checking lamp-ipc v0.1.0 (/source_memory_touch/crates/ipc)
+    Checking lamp-turn-owner v0.1.0 (/source_memory_touch/crates/turn-owner)
+    Checking lamp-gemini v0.1.0 (/source_memory_touch/crates/gemini)
+    Checking bitflags v1.3.2
+    Checking nix v0.26.4
+    Checking i2cdev v0.6.2
+    Checking lamp-msgs v0.1.0 (/source_memory_touch/crates/msgs)
+    Checking lamp-audio v0.1.0 (/source_memory_touch/crates/audio)
+   Compiling v4l2r v0.0.8
+   Compiling lamp-camera v0.1.0 (/source_memory_touch/crates/camera)
+    Checking lamp-turn-end-wire v0.1.0 (/source_memory_touch/crates/turn-end-wire)
+    Checking lamp-ring v0.1.0 (/source_memory_touch/crates/ring)
+    Checking lamp-sound-fixtures v0.1.0 (/source_memory_touch/crates/sound-fixtures)
+    Checking lamp-observer v0.1.0 (/source_memory_touch/crates/observer)
+    Checking tough v0.24.0 (/source_memory_touch/vendor/tough)
+    Checking lamp-controls v0.1.0 (/source_memory_touch/crates/controls)
+    Checking lamp-keeper v0.1.0 (/source_memory_touch/crates/keeper)
+    Checking lamp-body v0.1.0 (/source_memory_touch/crates/body)
+    Checking lamp-expression v0.1.0 (/source_memory_touch/crates/expression)
+    Checking lamp-surround v0.1.0 (/source_memory_touch/crates/surround)
+    Checking lamp-policy v0.1.0 (/source_memory_touch/crates/policy)
+    Checking lamp-memory v0.1.0 (/source_memory_touch/crates/memory)
+    Checking lamp-voice v0.1.0 (/source_memory_touch/crates/voice)
+    Checking lamp-schedule v0.1.0 (/source_memory_touch/crates/schedule)
+    Checking lamp-mood v0.1.0 (/source_memory_touch/crates/mood)
+    Checking lamp-tasks v0.1.0 (/source_memory_touch/crates/tasks)
+    Checking lamp-lean v0.1.0 (/source_memory_touch/crates/lean)
+    Checking lamp-health v0.1.0 (/source_memory_touch/crates/health)
+    Checking lamp-turn-end v0.1.0 (/source_memory_touch/crates/turn-end)
+    Checking lamp-eyes v0.1.0 (/source_memory_touch/crates/eyes)
+    Checking lamp-name v0.1.0 (/source_memory_touch/crates/name)
+    Checking lamp-actions v0.1.0 (/source_memory_touch/crates/actions)
+    Checking lamp-records v0.1.0 (/source_memory_touch/crates/records)
+    Checking lamp-air v0.1.0 (/source_memory_touch/crates/air)
+    Checking lamp-ears v0.1.0 (/source_memory_touch/crates/ears)
+    Checking lamp-environment v0.1.0 (/source_memory_touch/crates/environment)
+    Checking lamp-voice-eval v0.1.0 (/source_memory_touch/crates/voice-eval)
+    Finished `dev` profile [unoptimized] target(s) in 36.65s
+   Compiling lamp-bus v0.1.0 (/source_memory_touch/crates/bus)
+   Compiling lamp-ipc v0.1.0 (/source_memory_touch/crates/ipc)
+   Compiling lamp-turn-owner v0.1.0 (/source_memory_touch/crates/turn-owner)
+   Compiling lamp-camera v0.1.0 (/source_memory_touch/crates/camera)
+   Compiling bitflags v1.3.2
+   Compiling nix v0.26.4
+   Compiling v4l2r v0.0.8
+   Compiling i2cdev v0.6.2
+   Compiling lamp-msgs v0.1.0 (/source_memory_touch/crates/msgs)
+   Compiling lamp-turn-end-wire v0.1.0 (/source_memory_touch/crates/turn-end-wire)
+   Compiling lamp-audio v0.1.0 (/source_memory_touch/crates/audio)
+   Compiling lamp-ring v0.1.0 (/source_memory_touch/crates/ring)
+   Compiling lamp-observer v0.1.0 (/source_memory_touch/crates/observer)
+   Compiling lamp-sound-fixtures v0.1.0 (/source_memory_touch/crates/sound-fixtures)
+   Compiling lamp-keeper v0.1.0 (/source_memory_touch/crates/keeper)
+   Compiling lamp-body v0.1.0 (/source_memory_touch/crates/body)
+   Compiling lamp-controls v0.1.0 (/source_memory_touch/crates/controls)
+   Compiling lamp-policy v0.1.0 (/source_memory_touch/crates/policy)
+   Compiling lamp-tasks v0.1.0 (/source_memory_touch/crates/tasks)
+   Compiling lamp-memory v0.1.0 (/source_memory_touch/crates/memory)
+   Compiling lamp-voice v0.1.0 (/source_memory_touch/crates/voice)
+   Compiling lamp-surround v0.1.0 (/source_memory_touch/crates/surround)
+   Compiling lamp-turn-end v0.1.0 (/source_memory_touch/crates/turn-end)
+   Compiling lamp-eyes v0.1.0 (/source_memory_touch/crates/eyes)
+   Compiling lamp-name v0.1.0 (/source_memory_touch/crates/name)
+   Compiling lamp-actions v0.1.0 (/source_memory_touch/crates/actions)
+   Compiling lamp-records v0.1.0 (/source_memory_touch/crates/records)
+   Compiling lamp-air v0.1.0 (/source_memory_touch/crates/air)
+   Compiling lamp-schedule v0.1.0 (/source_memory_touch/crates/schedule)
+   Compiling lamp-ears v0.1.0 (/source_memory_touch/crates/ears)
+   Compiling lamp-expression v0.1.0 (/source_memory_touch/crates/expression)
+   Compiling lamp-health v0.1.0 (/source_memory_touch/crates/health)
+   Compiling lamp-mood v0.1.0 (/source_memory_touch/crates/mood)
+   Compiling lamp-lean v0.1.0 (/source_memory_touch/crates/lean)
+   Compiling lamp-voice-eval v0.1.0 (/source_memory_touch/crates/voice-eval)
+   Compiling lamp-environment v0.1.0 (/source_memory_touch/crates/environment)
+    Finished `dev` profile [unoptimized] target(s) in 20.86s
+   Compiling bitflags v1.3.2
+   Compiling v4l2r v0.0.8
+   Compiling byteorder v1.5.0
+   Compiling lamp-camera v0.1.0 (/source_memory_touch/crates/camera)
+   Compiling nix v0.26.4
+   Compiling i2cdev v0.6.2
+   Compiling lamp-controls v0.1.0 (/source_memory_touch/crates/controls)
+error[E0432]: unresolved imports `lamp_msgs::TOUCH_INPUT_TTL_US`, `lamp_msgs::TouchEvent`, `lamp_msgs::TouchGesture`, `lamp_msgs::TouchIntent`, `lamp_msgs::TouchSource`, `lamp_msgs::TouchSourceState`, `lamp_msgs::TouchState`
+  --> crates/controls/src/touch.rs:15:31
+   |
+15 |     ClockStamp, ControlFault, TOUCH_INPUT_TTL_US, TouchEvent, TouchGesture, TouchIntent,
+   |                               ^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^^  ^^^^^^^^^^^ no `TouchIntent` in the root
+   |                               |                   |           |
+   |                               |                   |           no `TouchGesture` in the root
+   |                               |                   no `TouchEvent` in the root
+   |                               no `TOUCH_INPUT_TTL_US` in the root
+16 |     TouchSource, TouchSourceState, TouchState,
+   |     ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^  ^^^^^^^^^^ no `TouchState` in the root
+   |     |            |
+   |     |            no `TouchSourceState` in the root
+   |     no `TouchSource` in the root
+   |
+help: a similar name exists in the module
+   |
+15 -     ClockStamp, ControlFault, TOUCH_INPUT_TTL_US, TouchEvent, TouchGesture, TouchIntent,
+15 +     ClockStamp, ControlFault, TOUCH_INPUT_TTL_US, VoiceEvent, TouchGesture, TouchIntent,
+   |
+help: a similar name exists in the module
+   |
+16 -     TouchSource, TouchSourceState, TouchState,
+16 +     TouchSource, TouchSourceState, VoiceState,
+   |
+
+error[E0432]: unresolved imports `lamp_msgs::TOUCH_INPUT_TTL_US`, `lamp_msgs::TOUCH_STATE_TTL_US`, `lamp_msgs::TouchEvent`, `lamp_msgs::TouchIntent`, `lamp_msgs::TouchSource`, `lamp_msgs::TouchSourceState`, `lamp_msgs::TouchState`
+  --> crates/controls/src/touch_receiver.rs:17:26
+   |
+17 |     ClockStamp, Invalid, TOUCH_INPUT_TTL_US, TOUCH_STATE_TTL_US, TouchEvent, TouchIntent,
+   |                          ^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^ no `TouchIntent` in the root
+   |                          |                   |                   |
+   |                          |                   |                   no `TouchEvent` in the root
+   |                          |                   no `TOUCH_STATE_TTL_US` in the root
+   |                          no `TOUCH_INPUT_TTL_US` in the root
+18 |     TouchSource, TouchSourceState, TouchState,
+   |     ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^  ^^^^^^^^^^ no `TouchState` in the root
+   |     |            |
+   |     |            no `TouchSourceState` in the root
+   |     no `TouchSource` in the root
+   |
+help: a similar name exists in the module
+   |
+17 -     ClockStamp, Invalid, TOUCH_INPUT_TTL_US, TOUCH_STATE_TTL_US, TouchEvent, TouchIntent,
+17 +     ClockStamp, Invalid, TOUCH_INPUT_TTL_US, MOOD_STATE_TTL_US, TouchEvent, TouchIntent,
+   |
+help: a similar name exists in the module
+   |
+17 -     ClockStamp, Invalid, TOUCH_INPUT_TTL_US, TOUCH_STATE_TTL_US, TouchEvent, TouchIntent,
+17 +     ClockStamp, Invalid, TOUCH_INPUT_TTL_US, TOUCH_STATE_TTL_US, VoiceEvent, TouchIntent,
+   |
+help: a similar name exists in the module
+   |
+18 -     TouchSource, TouchSourceState, TouchState,
+18 +     TouchSource, TouchSourceState, VoiceState,
+   |
+
+error[E0432]: unresolved import `lamp_msgs::TouchState`
+ --> crates/controls/src/touch_replay.rs:7:31
+  |
+7 | use lamp_msgs::{ControlFault, TouchState};
+  |                               ^^^^^^^^^^ no `TouchState` in the root
+  |
+help: a similar name exists in the module
+  |
+7 - use lamp_msgs::{ControlFault, TouchState};
+7 + use lamp_msgs::{ControlFault, VoiceState};
+  |
+
+error[E0432]: unresolved imports `lamp_msgs::TouchEvent`, `lamp_msgs::TouchState`
+  --> crates/controls/src/touch_runtime.rs:14:69
+   |
+14 |     ControlFault, ControlGesture, ControlsState, Diagnostic, Level, TouchEvent, TouchState,
+   |                                                                     ^^^^^^^^^^  ^^^^^^^^^^ no `TouchState` in the root
+   |                                                                     |
+   |                                                                     no `TouchEvent` in the root
+   |
+help: a similar name exists in the module
+   |
+14 -     ControlFault, ControlGesture, ControlsState, Diagnostic, Level, TouchEvent, TouchState,
+14 +     ControlFault, ControlGesture, ControlsState, Diagnostic, Level, VoiceEvent, TouchState,
+   |
+help: a similar name exists in the module
+   |
+14 -     ControlFault, ControlGesture, ControlsState, Diagnostic, Level, TouchEvent, TouchState,
+14 +     ControlFault, ControlGesture, ControlsState, Diagnostic, Level, TouchEvent, VoiceState,
+   |
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `lamp-controls` (lib) due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...

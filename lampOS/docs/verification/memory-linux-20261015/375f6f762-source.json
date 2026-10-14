@@ -1,0 +1,78 @@
+{
+  "head": "375f6f7625734ed7db80c62b020b6e8e32df7d82",
+  "base": "d8e9556dea3f1867a5af5297d1ebddbd165d9102",
+  "source_path": "/private/tmp/lamp-fourth-memory-touch-source-dw1bsfb_",
+  "copy": "git archive of HEAD:lampOS; fresh modification times; read-only container mount",
+  "tracked_files": 1654,
+  "task_files": [
+    {
+      "path": "lampOS/crates/memory/Cargo.toml",
+      "sha256": "8a14da8d037b12ee3ed0e576aed815a4252f6c93b9c625daf2ac5f2457910c35",
+      "unchanged_from_56b458966": true
+    },
+    {
+      "path": "lampOS/crates/memory/src/days.rs",
+      "sha256": "00bcf92d70ba5592ee834a6624de8f300a27cee821de4e93df13ef05ce2d7f49",
+      "unchanged_from_56b458966": true
+    },
+    {
+      "path": "lampOS/crates/memory/src/days_protocol.rs",
+      "sha256": "9937c26e1bfc7a6ab38af6b9d84d4a016fb53227bf6fbc83bbfc8a9892ebc65e",
+      "unchanged_from_56b458966": true
+    },
+    {
+      "path": "lampOS/crates/memory/tests/voice.rs",
+      "sha256": "ad9818b86cce3c6bfd2dae4dba23270e0bf796aa2ad7fa02f1fb0a3711c3932f",
+      "unchanged_from_56b458966": true
+    },
+    {
+      "path": "lampOS/crates/memory/tests/voice_submit.rs",
+      "sha256": "a6d3fe993d9d4dd5359b50df9c8993ccaf55039e2cb086a11ea6caec0fd83c56",
+      "unchanged_from_56b458966": true
+    },
+    {
+      "path": "lampOS/crates/memory/tests/voice_timing.rs",
+      "sha256": "3d0c8f431f1a3165737b37ec8d444ceaa3e698aeeee76df1d98dfe408db28ad4",
+      "unchanged_from_56b458966": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/process.rs",
+      "sha256": "c5a495318f3444a013b6e7d03f69ea99613f688ba5707be06f466db1c3939a73",
+      "unchanged_from_56b458966": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/remember.rs",
+      "sha256": "f71495174e33048e2ea66b4d669d1be9e3a6473fd5c6d1a182f839c4d7c66390",
+      "unchanged_from_56b458966": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/thread.rs",
+      "sha256": "4e417f4b4449e824193dcf8a1cacc2612502ffb8792bf6403a633f458ae10646",
+      "unchanged_from_56b458966": true
+    }
+  ],
+  "lockfile_sha256": "3f4fb5080d8e609682b490835ebc8a857a1d68cd813de062804c2538d4d70a27",
+  "image_sha256": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "uid": 1000,
+  "gid": 1000,
+  "linux_machine": {
+    "architecture": "x86_64",
+    "vm": "lampos-arm64 (the name is historical; execution is x86_64)",
+    "vcpus": 6,
+    "memory_mib": 8192,
+    "rustc": "1.96.0 (ac68faa20 2026-05-25)",
+    "cargo": "1.96.0 (30a34c682 2026-05-25)",
+    "network": "none",
+    "capabilities": "none",
+    "cargo_home": "temporary /cargo, mode 1777",
+    "source_mount": "read-only",
+    "cargo_registry_mount": "read-only",
+    "target_volume": "lamp-fourth-controls-target (Fourth only)",
+    "build_jobs": 4,
+    "test_threads": 1
+  },
+  "profile_overrides": {
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0"
+  }
+}

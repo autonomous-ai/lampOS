@@ -1,0 +1,18 @@
+{
+  "source_commit": "375f6f7625734ed7db80c62b020b6e8e32df7d82",
+  "base_commit": "d8e9556dea3f1867a5af5297d1ebddbd165d9102",
+  "exit_code": 0,
+  "raw_sha256": "446637caedf5daaa64a6dcba39d2178e662949c8ca00f7ee9f8e281e1ad57849",
+  "formatting": "passed",
+  "strict_workspace_clippy": "passed",
+  "native_workspace_build": "passed",
+  "memory_voice_tasks_arm64_cross_build": "passed",
+  "tests": "not run in this compile gate; final-head full tests belong to native ARM64 CI 38615610362",
+  "execution": "native x86_64 Linux ordinary-user build/checks with ARM64 cross-compilation; no ARM64 execution or lamp",
+  "cache_repair": "cargo clean only 33 workspace packages in native target and ARM64 release target; removed 4708 files/3.2GiB and 296 files/252.6MiB; third-party caches preserved",
+  "binary_sha256": {
+    "lamp-memory": "03fb4bce60c0578cb4b3612e5b4813e361220a45ce184068a32e01580cfa83df",
+    "lamp-voice": "9b2c5aa9d79070682bf8a167008beaa08d96b984b8e389c093704214e8adcc43",
+    "lamp-tasks": "fd53990ac9fe8024318d58bf5e5b67f66143b304d14042eca09d6f048bfeedc9"
+  }
+}

@@ -2439,6 +2439,75 @@ and write Fourth's own target cache. No project source was changed for it.
 No Memory PR or readiness claim yet; final-head native ARM64 success is
 still required.
 
+
+## 2026-10-15, 01:08 ICT: repair the Linux gate's local disk exhaustion
+
+Ready for lamp-voice: no
+
+Rebased Memory head `56b458966` is pushed and native ARM64 run 38611490112
+is queued. The first full native x86_64 Linux attempt as UID 1000 passed
+formatting/strict workspace lint but exhausted the VM disk during the test
+build: ENOSPC, followed by linker bus errors, exit 101. No tests ran and
+the workspace/cross-build steps were not reached. Raw output and measured
+disk/memory conditions are in `verification/memory-linux-20261015/`.
+
+Only Fourth's inactive native debug target cache was removed. VM free space
+rose from 153,845,760 to 26,684,542,976 bytes. The complete gate restarted
+with identical source, using dev/test debug-symbol level zero to fit in
+the 40 GiB filesystem; assertions and optimization settings are unchanged.
+The readonly source, offline registry, numeric user and no-network/no-
+capabilities boundaries remain. No lamp or other builder's files were used.
+
+First received the complete Mac failure evidence and 20 isolated passes in
+#698 comment 6174931620. The outside-scope Voice fixtures were not mended
+by Fourth. The new Linux run and exact-head ARM64 outcome remain pending.
+
+
+## 2026-10-15, 01:42 ICT: Linux passes; qualify the current integration base
+
+Ready for lamp-voice: no
+
+The repaired ordinary-user native x86_64 Linux gate at `56b458966` ended
+with exit 0: 3,995 passed / 0 failed / 32 ignored across 269 suites.
+Formatting, strict workspace Clippy, workspace build and the
+Memory/Voice/Tasks release ARM64 cross-build all passed. The unchanged
+Voice library passed 863 / 0 / 6 ignored in 400.63 seconds, including the
+three cases from the failed Mac gate; the previously failing Tasks case
+also passed. No lamp behavior or Mac failure cause is inferred. Raw output,
+counts, exact environment and binary hashes are in
+`verification/memory-linux-20261015/`. The inherited example filename
+collision warnings remain visible.
+
+Previous native ARM64 run 38610164757 at `f411ad600` also succeeded:
+3,988 / 0 / 32 ignored, 269 suites, build and artifact upload complete.
+Run 38611490112 belongs to the subsequent `56b458966` checkpoint. Both
+remain tied to their actual source, with full raw logs and count JSONs in
+`verification/memory-arm64-20261015/` as each finishes.
+
+At the 01:26 queue poll, upstream had merged corrected task-news handling,
+Body call response and Touch. Fourth rebased to `375f6f762` on `d8e9556de`
+so the handed-back Voice binary includes those changes. All nine task
+source/test/manifest files are byte-identical. The final source's full
+native ARM64 run is 38615610362; local formatting, strict workspace lint,
+workspace build and the three release cross-builds are also being checked.
+The first local cross-build found an older-source `lamp-msgs` cache entry
+newer than the final source archive and failed on Touch imports. That
+failure is retained; only Fourth's workspace package artifacts were
+cleaned, preserving third-party caches, before rebuilding identical source.
+The rebuilt final-head formatting, strict lint, native workspace build and
+ARM64 release cross-build all passed, exit 0, confirming the stale-cache
+failure. All three binary hashes and complete command output are retained.
+No production code, timeout, assertion or test expectation changed.
+
+The queue now assigns #739 after #698: make the Voice timed process tests
+deterministic without loosening production bounds. Its required evidence
+is ten full serial Mac runs with a Podman ARM64 build alongside, plus green
+native ARM64 CI. Only read-only preparation has begun; the issue is not
+claimed and no implementation has started before Memory's handoff. The
+privacy peer's maximum send-side gap does not measure the coordinator's
+consumption age, so those reported gaps alone do not establish a cause.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

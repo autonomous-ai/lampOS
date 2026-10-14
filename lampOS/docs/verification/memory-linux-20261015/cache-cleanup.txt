@@ -1,0 +1,6 @@
+Filesystem       1B-blocks        Used Available Use% Mounted on
+/dev/vda4      42096545792 41942700032 153845760 100% /target
+26871489020	/target/x86_64-unknown-linux-gnu/debug
+Filesystem       1B-blocks        Used   Available Use% Mounted on
+/dev/vda4      42096545792 15412002816 26684542976  37% /target
+2358486765	/target

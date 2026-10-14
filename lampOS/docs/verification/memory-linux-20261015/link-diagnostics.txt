@@ -1,0 +1,67 @@
+uid=1000(1000) gid=1000(1000) groups=1000(1000)
+Linux 31d82ed6c4a1 6.12.13-200.fc41.x86_64 #1 SMP PREEMPT_DYNAMIC Sat Feb  8 20:05:26 UTC 2025 x86_64 GNU/Linux
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda4        40G   40G  147M 100% /target
+overlay          40G   40G  147M 100% /
+Filesystem     Inodes  IUsed  IFree IUse% Mounted on
+/dev/vda4      432168 130561 301607   31% /target
+609M	/target/aarch64-unknown-linux-gnu
+1.5G	/target/debug
+192M	/target/release
+26G	/target/x86_64-unknown-linux-gnu
+MemTotal:        8118200 kB
+MemFree:         1059492 kB
+MemAvailable:    7424452 kB
+Buffers:             120 kB
+Cached:          6448440 kB
+SwapCached:            0 kB
+Active:          3778940 kB
+Inactive:        2761448 kB
+Active(anon):      68812 kB
+Inactive(anon):    23832 kB
+Active(file):    3710128 kB
+Inactive(file):  2737616 kB
+Unevictable:           0 kB
+Mlocked:               0 kB
+SwapTotal:             0 kB
+SwapFree:              0 kB
+Zswap:                 0 kB
+Zswapped:              0 kB
+Dirty:              3936 kB
+Writeback:             0 kB
+AnonPages:         92016 kB
+Mapped:            71728 kB
+Shmem:               920 kB
+KReclaimable:     226700 kB
+Slab:             385632 kB
+SReclaimable:     226700 kB
+SUnreclaim:       158932 kB
+KernelStack:        3424 kB
+PageTables:         3736 kB
+SecPageTables:         0 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:     4059100 kB
+Committed_AS:     421052 kB
+VmallocTotal:   34359738367 kB
+VmallocUsed:       21700 kB
+VmallocChunk:          0 kB
+Percpu:             7840 kB
+HardwareCorrupted:     0 kB
+AnonHugePages:         0 kB
+ShmemHugePages:        0 kB
+ShmemPmdMapped:        0 kB
+FileHugePages:    161792 kB
+FilePmdMapped:         0 kB
+CmaTotal:              0 kB
+CmaFree:               0 kB
+Unaccepted:            0 kB
+HugePages_Total:       0
+HugePages_Free:        0
+HugePages_Rsvd:        0
+HugePages_Surp:        0
+Hugepagesize:       2048 kB
+Hugetlb:               0 kB
+DirectMap4k:      147424 kB
+DirectMap2M:     8239104 kB
