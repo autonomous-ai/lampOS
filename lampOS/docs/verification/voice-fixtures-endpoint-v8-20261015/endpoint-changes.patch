@@ -1,0 +1,381 @@
+diff --git a/private/tmp/lamp-fourth-endpoint-privacy-v8-7tcje90t/endpoint-before.rs b/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs
+index f13b6d3dc..380042b42 100644
+--- a/private/tmp/lamp-fourth-endpoint-privacy-v8-7tcje90t/endpoint-before.rs
++++ b/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs
+@@ -24,10 +24,16 @@ use std::{
+ 
+ const SPEECH: f32 = 0.95;
+ const QUIET: f32 = 0.05;
+-
+-/// Emulated sessions keep the production freshness bounds (50 ms for
+-/// privacy). Real process scenarios poll peers every millisecond; the explicit
+-/// stepped scenarios complete every peer step before advancing their clock.
++// Real-worker ordering tests accept bounded host scheduling delay. This does
++// not measure the lamp's 50 ms privacy response; input and IPC still expire at
++// 100 ms, and classifier startup/result/cleanup clocks remain real.
++const PROCESS_FIXTURE_PRIVACY_FRESH_US: u64 = 100_000;
++const PROCESS_FIXTURE_WATCHDOG: Duration = Duration::from_secs(12);
++
++/// Stepped and mute/cleanup sessions retain the default 50 ms privacy bound.
++/// Finite real-worker ordering sessions explicitly select the 100 ms fixture
++/// policy and poll peers every millisecond. Stepped sessions complete every
++/// peer step before advancing their clock.
+ /// A test takes this slot before starting the endpoint worker whose timing it
+ /// asserts, so other tests here cannot compete for the same scheduler slot.
+ static ONE_SESSION: Mutex<()> = Mutex::new(());
+@@ -51,6 +57,7 @@ struct Seen {
+     /// When the capture peer sent its first frame.
+     capture_started: Option<Instant>,
+     capture_delivery: CaptureDelivery,
++    privacy_delivery: PrivacyDelivery,
+ }
+ 
+ /// Bounded source/delivery diagnostics. Delivery is observed immediately after
+@@ -83,6 +90,36 @@ impl CaptureDelivery {
+     }
+ }
+ 
++/// Bounded privacy producer observations, never coordinator consumption age.
++/// The acquisition timestamp is captured before send and is never refreshed.
++#[derive(Debug, Default)]
++struct PrivacyDelivery {
++    observations: u64,
++    /// Last (acquired_at_us, after_send_at_us), on the selected clock.
++    last: Option<(u64, u64)>,
++    max_acquisition_gap_us: u64,
++    max_after_send_gap_us: u64,
++    max_after_send_age_us: u64,
++}
++
++impl PrivacyDelivery {
++    fn sent(&mut self, acquired_at_us: u64, after_send_at_us: u64) {
++        if let Some((acquired, sent)) = self.last {
++            self.max_acquisition_gap_us = self
++                .max_acquisition_gap_us
++                .max(acquired_at_us.saturating_sub(acquired));
++            self.max_after_send_gap_us = self
++                .max_after_send_gap_us
++                .max(after_send_at_us.saturating_sub(sent));
++        }
++        self.max_after_send_age_us = self
++            .max_after_send_age_us
++            .max(after_send_at_us.saturating_sub(acquired_at_us));
++        self.observations += 1;
++        self.last = Some((acquired_at_us, after_send_at_us));
++    }
++}
++
+ #[derive(Clone, Debug)]
+ struct SeenRequest {
+     request: u64,
+@@ -434,10 +471,16 @@ fn privacy_peer(
+                     _ => false,
+                 }
+             };
++            let acquired_at_us = monotonic_us();
+             channels.control.send(WorkerEvent::Privacy {
+-                acquired_at_us: monotonic_us(),
++                acquired_at_us,
+                 muted,
+             })?;
++            let after_send_at_us = monotonic_us();
++            seen.lock()
++                .unwrap()
++                .privacy_delivery
++                .sent(acquired_at_us, after_send_at_us);
+             *next += Duration::from_millis(10);
+         }
+         Ok(true)
+@@ -633,61 +676,99 @@ impl Session {
+     }
+ }
+ 
+-fn run(seconds: u64, script: Script, endpoint: EndpointRig) -> Session {
+-    run_with(seconds, script, endpoint, None)
+-}
+-
+-fn run_with(
++fn run_process_with_privacy_tolerance(
+     seconds: u64,
+     script: Script,
+     endpoint: EndpointRig,
+-    reply: Option<ProviderReply>,
+ ) -> Session {
+-    run_muting(seconds, script, endpoint, reply, None)
++    run_process_policy_with_privacy_tolerance(TurnTaking::V1Baseline, seconds, script, endpoint)
+ }
+ 
+-fn run_muting(
+-    seconds: u64,
+-    script: Script,
+-    endpoint: EndpointRig,
+-    reply: Option<ProviderReply>,
+-    mute_at: Option<u64>,
+-) -> Session {
+-    run_policy(
+-        TurnTaking::V1Baseline,
+-        seconds,
+-        script,
+-        endpoint,
+-        reply,
+-        mute_at,
+-    )
+-}
+-
+-fn run_policy(
++fn run_process_policy_with_privacy_tolerance(
+     turn_taking: TurnTaking,
+     seconds: u64,
+     script: Script,
+     endpoint: EndpointRig,
+-    reply: Option<ProviderReply>,
+-    mute_at: Option<u64>,
+ ) -> Session {
+     run_policy_with_peers(
+         turn_taking,
+         seconds,
+         script,
+         endpoint,
+-        reply,
+-        mute_at,
+-        PeerMode::Threaded,
++        None,
++        None,
++        PeerMode::RealProcessWithPrivacyTolerance,
+     )
+ }
+ 
+ #[derive(Clone, Copy)]
+ enum PeerMode {
+-    Threaded,
++    RealProcessWithPrivacyTolerance,
+     Stepped,
+ }
+ 
++impl PeerMode {
++    fn fixture_privacy(self) -> Option<PrivacyGate> {
++        match self {
++            Self::RealProcessWithPrivacyTolerance => {
++                Some(PrivacyGate::with_fixture_freshness(PROCESS_FIXTURE_PRIVACY_FRESH_US).unwrap())
++            }
++            Self::Stepped => None,
++        }
++    }
++}
++
++fn require_real_process_clock() {
++    assert!(
++        !scenario_clock::is_active(),
++        "real endpoint worker fixture requires the host clock"
++    );
++}
++
++mod fixture_policy_tests {
++    use super::*;
++
++    #[test]
++    fn only_real_process_ordering_tolerates_a_gap_beyond_fifty_milliseconds() {
++        assert!(PeerMode::Stepped.fixture_privacy().is_none());
++        let mut stepped = PeerMode::Stepped.fixture_privacy().unwrap_or_default();
++        let mut process = PeerMode::RealProcessWithPrivacyTolerance
++            .fixture_privacy()
++            .unwrap();
++        let mut unrelated = PrivacyGate::default();
++        for (index, acquired) in (10_000..=70_000).step_by(10_000).enumerate() {
++            for gate in [&mut stepped, &mut process, &mut unrelated] {
++                gate.observe(
++                    index as u64 + 1,
++                    MonoTime::from_micros(acquired),
++                    MonoTime::from_micros(acquired),
++                    false,
++                );
++            }
++        }
++        let after_gap = MonoTime::from_micros(145_000);
++        assert_eq!(stepped.state(after_gap), PrivacyState::Unavailable);
++        assert_eq!(unrelated.state(after_gap), PrivacyState::Unavailable);
++        assert_eq!(process.state(after_gap), PrivacyState::Allowed);
++        assert_eq!(
++            process.state(MonoTime::from_micros(169_999)),
++            PrivacyState::Allowed
++        );
++        assert_eq!(
++            process.state(MonoTime::from_micros(170_000)),
++            PrivacyState::Unavailable
++        );
++        assert_eq!(PrivacyGate::default().freshness_us(), 50_000);
++    }
++
++    #[test]
++    #[should_panic(expected = "real endpoint worker fixture requires the host clock")]
++    fn a_logical_clock_is_rejected_before_the_process_constructor() {
++        let _scope = scenario_clock::Scope::enter(Duration::from_secs(12)).unwrap();
++        let _endpoint = scripted_process(&[], "exit 0", Limits::default());
++    }
++}
++
+ /// Only an in-process classifier can use the logical scenario clock. Real
+ /// ProcessClassifier readiness, deadlines and teardown stay on the host clock.
+ fn run_scenario(seconds: u64, script: Script, classifier: Box<dyn Classifier>) -> Session {
+@@ -730,6 +811,10 @@ fn run_policy_with_peers(
+     mute_at: Option<u64>,
+     mode: PeerMode,
+ ) -> Session {
++    let fixture_privacy = mode.fixture_privacy();
++    if fixture_privacy.is_some() {
++        require_real_process_clock();
++    }
+     let dir = SessionDirectory::create().unwrap();
+     let (capture, capture_peer_channels) = Worker::sleeping_fixture(&dir.path, "capture");
+     let (speaker, speaker_peer_channels) = Worker::sleeping_fixture(&dir.path, "speaker");
+@@ -738,7 +823,7 @@ fn run_policy_with_peers(
+     // Starting children is real OS work. Enter only after their startup barriers
+     // and keep the scope through shutdown and collection of scenario timestamps.
+     let mut scope = match mode {
+-        PeerMode::Threaded => None,
++        PeerMode::RealProcessWithPrivacyTolerance => None,
+         PeerMode::Stepped => Some(scenario_clock::Scope::enter(Duration::from_secs(12)).unwrap()),
+     };
+     let stop = Arc::new(AtomicBool::new(false));
+@@ -794,17 +879,33 @@ fn run_policy_with_peers(
+     let mut trace = SessionState::finite();
+     let mut reply = None;
+     let started = Instant::now();
+-    let result = conversation(
+-        &mut rig,
+-        &mut owner,
+-        Lifetime::Finite(seconds),
+-        &mut trace,
+-        StartupEvents::default(),
+-        &mut reply,
+-        &mut None,
+-        &Termination::inactive(),
+-        &FailureNotices::none(),
+-    );
++    let result = if let Some(gate) = fixture_privacy {
++        conversation_with_fixture_privacy(
++            &mut rig,
++            &mut owner,
++            Lifetime::Finite(seconds),
++            &mut trace,
++            StartupEvents::default(),
++            &mut reply,
++            &mut None,
++            &Termination::inactive(),
++            &FailureNotices::none(),
++            gate,
++            started + PROCESS_FIXTURE_WATCHDOG,
++        )
++    } else {
++        conversation(
++            &mut rig,
++            &mut owner,
++            Lifetime::Finite(seconds),
++            &mut trace,
++            StartupEvents::default(),
++            &mut reply,
++            &mut None,
++            &Termination::inactive(),
++            &FailureNotices::none(),
++        )
++    };
+     let elapsed = started.elapsed();
+     // Sleeping fixtures need forced reaping; only the endpoint record matters.
+     let _ = rig.shutdown(&mut trace);
+@@ -815,12 +916,12 @@ fn run_policy_with_peers(
+     let seen = std::mem::take(&mut *seen.lock().unwrap());
+     if let Err(error) = &result {
+         let clock = match mode {
+-            PeerMode::Threaded => "host",
++            PeerMode::RealProcessWithPrivacyTolerance => "host, explicit 100 ms privacy fixture",
+             PeerMode::Stepped => "logical",
+         };
+         eprintln!(
+-            "endpoint fixture failed: {error}; packet/source clock {clock}; real conversation {elapsed:?}; capture after-send observations {:?}",
+-            seen.capture_delivery
++            "endpoint fixture failed: {error}; packet/source clock {clock}; real conversation {elapsed:?}; capture after-send observations {:?}; privacy producer observations (not consumption) {:?}",
++            seen.capture_delivery, seen.privacy_delivery
+         );
+     }
+     drop(scope);
+@@ -835,6 +936,7 @@ fn run_policy_with_peers(
+ /// A real child process that replays fixed answer bytes and then sleeps or
+ /// exits, written with POSIX `printf` octal escapes.
+ fn scripted_process(responses: &[Response], then: &str, limits: Limits) -> EndpointRig {
++    require_real_process_clock();
+     let bytes: String = responses
+         .iter()
+         .flat_map(Response::encode)
+@@ -881,7 +983,7 @@ fn missing_model_session_ends_on_the_unchanged_silence_fallback() {
+         request: 0,
+         reason: "model /lamp/smart-turn-v3.2-gpu.onnx: No such file or directory".into(),
+     };
+-    let session = run(
++    let session = run_process_with_privacy_tolerance(
+         4,
+         one_question,
+         scripted_process(&[missing], "exit 2", Limits::default()),
+@@ -948,12 +1050,13 @@ fn hung_worker_never_delays_capture_endpoint_or_session_end() {
+             QUIET
+         }
+     }
+-    let session = run(
++    let session = run_process_with_privacy_tolerance(
+         6,
+         two_questions,
+         scripted_process(&[ready()], "exec sleep 60", limits),
+     );
+-    // A stalled loop would have failed the 100 ms capture and privacy leases.
++    // A stalled loop still fails the unchanged 100 ms capture lease and this
++    // explicit 100 ms integration privacy bound, not the lamp's 50 ms bound.
+     session.result.as_ref().unwrap();
+     assert!(
+         session.elapsed < Duration::from_secs(8),
+@@ -1075,13 +1178,14 @@ fn complete_verdict_ends_early_but_resumed_speech_keeps_the_turn() {
+ #[ignore = "requires a built lamp-turn-end and the pinned model"]
+ fn real_worker_session_records_verdict_provenance() {
+     let _one = one_session();
++    require_real_process_clock();
+     let worker = std::env::var_os("LAMP_ENDPOINT_WORKER").expect("LAMP_ENDPOINT_WORKER");
+     let model = std::env::var_os("LAMP_SMART_TURN_MODEL").expect("LAMP_SMART_TURN_MODEL");
+     let endpoint = EndpointRig::process(
+         WorkerCommand::smart_turn(worker.into(), model.into()),
+         Limits::default(),
+     );
+-    let session = run(4, one_question, endpoint);
++    let session = run_process_with_privacy_tolerance(4, one_question, endpoint);
+     session.result.as_ref().unwrap();
+     for row in session.events("endpoint_worker") {
+         eprintln!("{row}");
+@@ -1109,6 +1213,7 @@ fn real_worker_session_records_verdict_provenance() {
+ /// endpoint worker's teardown can fail the cleanup.
+ fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
+     use crate::service_privacy::PhysicalMute;
++    require_real_process_clock();
+     let directory = SessionDirectory::create().unwrap();
+     let (speaker, speaker_peer, speaker_input) =
+         Worker::cooperative_fixture(&directory.path, "speaker");
+@@ -1305,7 +1410,7 @@ fn a_worker_still_loading_leaves_the_baseline_window() {
+     let _one = one_session();
+     // Ready only after 6 s: the whole session runs while it loads.
+     let endpoint = scripted_process(&[], "sleep 6; exit 0", Limits::default());
+-    let session = run(4, one_question, endpoint);
++    let session = run_process_with_privacy_tolerance(4, one_question, endpoint);
+     session.result.as_ref().unwrap();
+     assert_eq!(
+         bases(&session),
+@@ -1550,13 +1655,11 @@ fn duplex_missing_model_session_ends_on_the_unchanged_silence_fallback() {
+         request: 0,
+         reason: "model /lamp/smart-turn-v3.2-gpu.onnx: No such file or directory".into(),
+     };
+-    let session = run_policy(
++    let session = run_process_policy_with_privacy_tolerance(
+         TurnTaking::Duplex,
+         4,
+         one_question,
+         scripted_process(&[missing], "exit 2", Limits::default()),
+-        None,
+-        None,
+     );
+     session.result.as_ref().unwrap();
+     let endpoints = endpoint_rows(&session);

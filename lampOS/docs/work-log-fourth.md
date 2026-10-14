@@ -3103,6 +3103,42 @@ and no Body change is made. This version is not ready and no failed gate is
 being offered as a PR.
 
 
+## 2026-10-15, 06:18 ICT: task 46, explicit real-worker endpoint tolerance verified
+
+Ready for lamp-voice: no
+
+[Focused v8 evidence](verification/voice-fixtures-endpoint-v8-20261015/README.md)
+retains file formatting, `cargo check --locked --offline -p lamp-voice --tests`,
+and the serial endpoint module on Fourth's Intel Mac. The module passed
+17 tests, failed none, and kept its one existing model-dependent ignore;
+970 tests were filtered by this focused command. Test time was 25.16 seconds,
+65.818 seconds including Cargo. All 2,367 source hashes remained unchanged.
+No command failed or was retried. The only panic diagnostic is the expected
+logical-clock guard test. Independent review and a separate root diff review
+found no actionable issues. All 16 original tests and 103 assertions remain;
+two policy/clock regressions make 18 tests and 111 assertions.
+
+The four finite real-worker ordering scenarios and ignored provenance case
+explicitly choose the existing per-instance 100,000 us test privacy policy.
+Six stepped scenarios and three mute/cleanup scenarios keep the default
+50,000 us. A real 12-second conversation watchdog excludes setup and cleanup;
+worker timing, the hung-worker less-than-eight-second assertion, immutable
+capture source time, 100 ms channel/input refusal and 60 ms reopening remain.
+Logical time is refused before child construction. No Ready wait hides loading
+or missing-worker behavior. New bounded privacy producer diagnostics do not
+measure coordinator consumption. Production still uses its 50 ms gate.
+
+The previous loaded failure stays in the preceding entry; its exact scheduling
+cause remains unproved. This focused pass does not count toward ten loaded
+suites. A fresh source-only v8 snapshot contains 2,367 files, based on
+`cf2f5b43c8113a704324c2743af3cd92bbc4fdda`, with manifest SHA-256
+`3bc32852dc8eacebde04547e0c3a50051dad5a2257193f79d8980fb064a5bf01`.
+Its formatting, Clippy and loaded sequence have started; no earlier passes
+are credited toward it.
+Remaining dependent/workspace gates, exact-head native ARM64 CI and lamp
+qualification are still outstanding. No Body change or lamp access.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

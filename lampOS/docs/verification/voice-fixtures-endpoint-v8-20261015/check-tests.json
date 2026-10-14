@@ -1,0 +1,26 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "check",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--tests"
+  ],
+  "cwd": "/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68",
+  "started_at_utc": "2026-10-14T23:12:32.496755+00:00",
+  "host": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "cpu_count": 16,
+  "environment": {
+    "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_TEST_THREADS": "1"
+  },
+  "outer_watchdog_seconds": 1200,
+  "exit_code": 0,
+  "finished_at_utc": "2026-10-14T23:12:51.136550+00:00",
+  "elapsed_seconds": 18.62462101969868,
+  "raw_sha256": "f9fb3d69272bb9043b1d43c8e7d65acd6fe9d427a440b6eead59b4ee998bc149",
+  "changed_source_files": []
+}

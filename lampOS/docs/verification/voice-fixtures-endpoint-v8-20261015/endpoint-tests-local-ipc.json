@@ -1,0 +1,39 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "coordinator::tests::endpoint_session::",
+    "--",
+    "--test-threads=1",
+    "--nocapture"
+  ],
+  "cwd": "/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68",
+  "started_at_utc": "2026-10-14T23:13:15.057355+00:00",
+  "host": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+  "cpu_count": 16,
+  "environment": {
+    "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target",
+    "CARGO_BUILD_JOBS": "4",
+    "RUST_TEST_THREADS": "1"
+  },
+  "outer_watchdog_seconds": 1200,
+  "exit_code": 0,
+  "finished_at_utc": "2026-10-14T23:14:20.890774+00:00",
+  "elapsed_seconds": 65.81802795594558,
+  "raw_sha256": "b1755534e52388c3399fc4c081fe4b73ec51bc377f4c7037daa30ca157d4dd20",
+  "changed_source_files": [],
+  "counts_parser_exit_code": 0,
+  "counts": {
+    "suites": 1,
+    "passed": 17,
+    "failed": 0,
+    "ignored": 1,
+    "measured": 0,
+    "filtered": 970
+  }
+}

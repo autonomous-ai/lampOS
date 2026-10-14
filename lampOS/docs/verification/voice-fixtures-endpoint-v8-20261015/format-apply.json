@@ -1,0 +1,14 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/rustfmt",
+    "--edition",
+    "2024",
+    "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs"
+  ],
+  "cwd": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord",
+  "started_at_utc": "2026-10-14T23:11:05.648065+00:00",
+  "finished_at_utc": "2026-10-14T23:11:05.859484+00:00",
+  "elapsed_seconds": 0.21133150113746524,
+  "exit_code": 0,
+  "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

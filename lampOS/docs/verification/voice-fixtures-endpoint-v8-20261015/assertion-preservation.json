@@ -1,0 +1,9 @@
+{
+  "source_sha256": "8c4fb3a4447b14a5282cb3b90fb73dddbd0b1d06ff9a88795af3bdf0aad1ec66",
+  "original_tests": 16,
+  "current_tests": 18,
+  "original_assertions": 103,
+  "current_assertions": 111,
+  "missing_original_assertions": [],
+  "scope": "Every original assert/assert_eq/assert_ne macro expression preserved verbatim; fixture runner calls and comments changed explicitly."
+}

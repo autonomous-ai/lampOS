@@ -1,0 +1,117 @@
+{
+  "source_directory": "/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68",
+  "source_base_commit": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "endpoint_sha256": "8c4fb3a4447b14a5282cb3b90fb73dddbd0b1d06ff9a88795af3bdf0aad1ec66",
+  "host": "Fourth Intel development Mac, macOS 26.6.2 x86_64; not a lamp",
+  "gates": {
+    "format-check": {
+      "command": [
+        "/Users/autonomous/.cargo/bin/rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "crates/voice/src/coordinator/tests/endpoint_session.rs"
+      ],
+      "cwd": "/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68",
+      "started_at_utc": "2026-10-14T23:12:29.033889+00:00",
+      "host": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+      "cpu_count": 16,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_TEST_THREADS": "1"
+      },
+      "outer_watchdog_seconds": 1200,
+      "exit_code": 0,
+      "finished_at_utc": "2026-10-14T23:12:29.191107+00:00",
+      "elapsed_seconds": 0.13601033110171556,
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "changed_source_files": []
+    },
+    "check-tests": {
+      "command": [
+        "/Users/autonomous/.cargo/bin/cargo",
+        "check",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--tests"
+      ],
+      "cwd": "/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68",
+      "started_at_utc": "2026-10-14T23:12:32.496755+00:00",
+      "host": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+      "cpu_count": 16,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_TEST_THREADS": "1"
+      },
+      "outer_watchdog_seconds": 1200,
+      "exit_code": 0,
+      "finished_at_utc": "2026-10-14T23:12:51.136550+00:00",
+      "elapsed_seconds": 18.62462101969868,
+      "raw_sha256": "f9fb3d69272bb9043b1d43c8e7d65acd6fe9d427a440b6eead59b4ee998bc149",
+      "changed_source_files": []
+    },
+    "endpoint-tests-local-ipc": {
+      "command": [
+        "/Users/autonomous/.cargo/bin/cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "coordinator::tests::endpoint_session::",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "cwd": "/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68",
+      "started_at_utc": "2026-10-14T23:13:15.057355+00:00",
+      "host": "macOS-26.6.2-x86_64-i386-64bit-Mach-O",
+      "cpu_count": 16,
+      "environment": {
+        "CARGO_TARGET_DIR": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target",
+        "CARGO_BUILD_JOBS": "4",
+        "RUST_TEST_THREADS": "1"
+      },
+      "outer_watchdog_seconds": 1200,
+      "exit_code": 0,
+      "finished_at_utc": "2026-10-14T23:14:20.890774+00:00",
+      "elapsed_seconds": 65.81802795594558,
+      "raw_sha256": "b1755534e52388c3399fc4c081fe4b73ec51bc377f4c7037daa30ca157d4dd20",
+      "changed_source_files": [],
+      "counts_parser_exit_code": 0,
+      "counts": {
+        "suites": 1,
+        "passed": 17,
+        "failed": 0,
+        "ignored": 1,
+        "measured": 0,
+        "filtered": 970
+      }
+    }
+  },
+  "test_runtime_seconds": 25.16,
+  "counts": {
+    "suites": 1,
+    "passed": 17,
+    "failed": 0,
+    "ignored": 1,
+    "measured": 0,
+    "filtered": 970
+  },
+  "source_files_checked": 2367,
+  "all_source_hashes_unchanged": true,
+  "expected_panic_diagnostic": "The named should_panic guard regression rejects a logical clock before the ProcessClassifier constructor. No other panic or endpoint failure diagnostic was found.",
+  "earlier_failure_retained": "Parent retains the loaded V7 run1 privacy closure; this focused pass does not erase it or prove its precise scheduling cause.",
+  "limitations": [
+    "Focused endpoint module only; full loaded qualification, workspace/dependent gates and native ARM64 qualification belong to parent.",
+    "The optional real-model provenance test remains ignored because no model or worker was supplied.",
+    "Explicit 100000 us privacy tolerance is per-instance and cfg(test), not lamp privacy latency or arbitrary-load determinism.",
+    "Privacy diagnostics measure producer acquisition/after-send observations, not coordinator consumption."
+  ],
+  "independent_review": "fixture_pilot read-only review: no actionable findings at the recorded source hash."
+}

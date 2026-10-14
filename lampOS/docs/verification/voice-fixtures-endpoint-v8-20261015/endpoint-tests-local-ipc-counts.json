@@ -1,0 +1,40 @@
+{
+  "raw_sha256": "b1755534e52388c3399fc4c081fe4b73ec51bc377f4c7037daa30ca157d4dd20",
+  "counts_scope": "standard libtest/doctest plus custom harness result lines",
+  "total": {
+    "suites": 1,
+    "passed": 17,
+    "failed": 0,
+    "ignored": 1,
+    "measured": 0,
+    "filtered": 970
+  },
+  "standard": {
+    "suites": 1,
+    "passed": 17,
+    "failed": 0,
+    "ignored": 1,
+    "measured": 0,
+    "filtered": 970
+  },
+  "custom": {
+    "suites": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered": 0
+  },
+  "suite_results": [
+    {
+      "suite": "Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-a714350f33563503)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 17,
+      "failed": 0,
+      "ignored": 1,
+      "measured": 0,
+      "filtered": 970
+    }
+  ]
+}

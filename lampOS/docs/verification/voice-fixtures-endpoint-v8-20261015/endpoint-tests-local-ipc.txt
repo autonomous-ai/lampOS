@@ -1,0 +1,55 @@
+   Compiling lamp-ipc v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/bus)
+   Compiling lamp-turn-owner v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/turn-owner)
+   Compiling lamp-camera v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/camera)
+   Compiling lamp-gemini v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/gemini)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/msgs)
+   Compiling lamp-audio v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/audio)
+   Compiling lamp-keeper v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/keeper)
+   Compiling lamp-schedule v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/schedule)
+   Compiling lamp-body v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/body)
+   Compiling lamp-actions v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/actions)
+   Compiling lamp-controls v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/controls)
+   Compiling lamp-expression v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/expression)
+   Compiling lamp-ring v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/ring)
+   Compiling lamp-turn-end-wire v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/turn-end-wire)
+   Compiling lamp-voice v0.1.0 (/private/tmp/lamp-fourth-endpoint-privacy-source-v8-mrgwyh68/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 38.65s
+     Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-a714350f33563503)
+
+running 18 tests
+test coordinator::tests::endpoint_session::a_complete_verdict_ends_at_one_second_and_its_answer_plays ... {"seconds":5,"status":"listening_ready"}
+ok
+test coordinator::tests::endpoint_session::a_worker_failure_falls_back_through_recovery_and_then_resumes ... {"seconds":9,"status":"listening_ready"}
+ok
+test coordinator::tests::endpoint_session::a_worker_still_loading_leaves_the_baseline_window ... {"seconds":4,"status":"listening_ready"}
+ok
+test coordinator::tests::endpoint_session::capture_timeline::a_fresh_envelope_does_not_refresh_a_stale_source_sample ... ok
+test coordinator::tests::endpoint_session::capture_timeline::delayed_delivery_preserves_contiguous_ten_millisecond_samples ... ok
+test coordinator::tests::endpoint_session::complete_verdict_ends_early_but_resumed_speech_keeps_the_turn ... {"seconds":4,"status":"listening_ready"}
+ok
+test coordinator::tests::endpoint_session::confirmed_endpoint_exit_keeps_the_restartable_mute ... ok
+test coordinator::tests::endpoint_session::duplex_complete_verdict_ends_at_one_second_and_its_answer_plays ... {"seconds":5,"status":"listening_ready"}
+ok
+test coordinator::tests::endpoint_session::duplex_missing_model_session_ends_on_the_unchanged_silence_fallback ... {"seconds":4,"status":"listening_ready"}
+ok
+test coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor - should panic ... 
+thread 'coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor' (564954043) panicked at crates/voice/src/coordinator/tests/endpoint_session.rs:722:5:
+real endpoint worker fixture requires the host clock
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ok
+test coordinator::tests::endpoint_session::fixture_policy_tests::only_real_process_ordering_tolerates_a_gap_beyond_fifty_milliseconds ... ok
+test coordinator::tests::endpoint_session::hung_worker_never_delays_capture_endpoint_or_session_end ... {"seconds":6,"status":"listening_ready"}
+ok
+test coordinator::tests::endpoint_session::missing_model_session_ends_on_the_unchanged_silence_fallback ... {"seconds":4,"status":"listening_ready"}
+ok
+test coordinator::tests::endpoint_session::mute_then_reopen_never_overlaps_endpoint_workers ... ok
+test coordinator::tests::endpoint_session::rapid_resumes_never_end_the_turn_early ... {"seconds":5,"status":"listening_ready"}
+ok
+test coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance ... ignored, requires a built lamp-turn-end and the pinned model
+test coordinator::tests::endpoint_session::unconfirmed_endpoint_exit_fails_mute_cleanup_and_never_reopens_service ... ok
+test coordinator::tests::endpoint_session::verdicts_after_the_result_timeout_fall_back_on_every_turn ... {"seconds":6,"status":"listening_ready"}
+ok
+
+test result: ok. 17 passed; 0 failed; 1 ignored; 0 measured; 970 filtered out; finished in 25.16s
+

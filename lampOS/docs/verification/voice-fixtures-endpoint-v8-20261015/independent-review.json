@@ -1,0 +1,19 @@
+{
+  "reviewer": "fixture_pilot",
+  "scope": "Read-only comparison of endpoint_session.rs against endpoint-before.rs; related privacy/coordinator/ProcessClassifier code and root docs read for boundary verification. No edits, tests or Cargo by reviewer.",
+  "source_sha256": "8c4fb3a4447b14a5282cb3b90fb73dddbd0b1d06ff9a88795af3bdf0aad1ec66",
+  "findings": [],
+  "verified": [
+    "Explicit real-process mode uses per-instance cfg(test) privacy bound at most 100000 us.",
+    "Six stepped scenarios and three mute/cleanup scenarios retain default 50000 us gates.",
+    "Clock guards precede scripted/direct endpoint constructors and mute fixture peripherals.",
+    "Real 12-second conversation watchdog excludes startup and cleanup; classifier deadlines and original hung-worker less-than-8-second assertion remain unchanged.",
+    "All 103 original assertions preserved in order; 16 original tests retained, 18 tests and 111 assertions after two additions.",
+    "Acquisition/envelope behavior unchanged; bounded privacy diagnostics describe producer observations, not coordinator consumption.",
+    "Root docs match final helper boundaries."
+  ],
+  "limitations": [
+    "V7 exact scheduling cause was not measured.",
+    "Bounded fixture tolerance does not establish arbitrary-load determinism or lamp privacy latency."
+  ]
+}
