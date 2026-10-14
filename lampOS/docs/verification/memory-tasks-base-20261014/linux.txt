@@ -1,0 +1,45 @@
+   Compiling rustix v1.1.5
+    Checking lamp-bus v0.1.0 (/source_memory_tasks/crates/bus)
+    Checking lamp-turn-owner v0.1.0 (/source_memory_tasks/crates/turn-owner)
+   Compiling v4l2r v0.0.8
+    Checking lamp-msgs v0.1.0 (/source_memory_tasks/crates/msgs)
+   Compiling lamp-camera v0.1.0 (/source_memory_tasks/crates/camera)
+    Checking lamp-gemini v0.1.0 (/source_memory_tasks/crates/gemini)
+    Checking lamp-keeper v0.1.0 (/source_memory_tasks/crates/keeper)
+    Checking lamp-sound-fixtures v0.1.0 (/source_memory_tasks/crates/sound-fixtures)
+    Checking lamp-ipc v0.1.0 (/source_memory_tasks/crates/ipc)
+    Checking lamp-tasks v0.1.0 (/source_memory_tasks/crates/tasks)
+    Checking tempfile v3.27.0
+    Checking lamp-body v0.1.0 (/source_memory_tasks/crates/body)
+    Checking lamp-ring v0.1.0 (/source_memory_tasks/crates/ring)
+    Checking lamp-turn-end-wire v0.1.0 (/source_memory_tasks/crates/turn-end-wire)
+    Checking lamp-audio v0.1.0 (/source_memory_tasks/crates/audio)
+    Checking lamp-controls v0.1.0 (/source_memory_tasks/crates/controls)
+    Checking lamp-observer v0.1.0 (/source_memory_tasks/crates/observer)
+    Checking lamp-expression v0.1.0 (/source_memory_tasks/crates/expression)
+    Checking lamp-memory v0.1.0 (/source_memory_tasks/crates/memory)
+    Checking lamp-voice v0.1.0 (/source_memory_tasks/crates/voice)
+    Checking lamp-voice-eval v0.1.0 (/source_memory_tasks/crates/voice-eval)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.11s
+   Compiling rustix v1.1.5
+   Compiling lamp-bus v0.1.0 (/source_memory_tasks/crates/bus)
+   Compiling signal-hook v0.4.4
+   Compiling lamp-turn-owner v0.1.0 (/source_memory_tasks/crates/turn-owner)
+   Compiling v4l2r v0.0.8
+   Compiling lamp-msgs v0.1.0 (/source_memory_tasks/crates/msgs)
+   Compiling lamp-camera v0.1.0 (/source_memory_tasks/crates/camera)
+   Compiling lamp-keeper v0.1.0 (/source_memory_tasks/crates/keeper)
+   Compiling lamp-gemini v0.1.0 (/source_memory_tasks/crates/gemini)
+   Compiling lamp-ipc v0.1.0 (/source_memory_tasks/crates/ipc)
+   Compiling lamp-memory v0.1.0 (/source_memory_tasks/crates/memory)
+   Compiling lamp-controls v0.1.0 (/source_memory_tasks/crates/controls)
+   Compiling lamp-audio v0.1.0 (/source_memory_tasks/crates/audio)
+   Compiling lamp-body v0.1.0 (/source_memory_tasks/crates/body)
+   Compiling lamp-turn-end-wire v0.1.0 (/source_memory_tasks/crates/turn-end-wire)
+   Compiling lamp-ring v0.1.0 (/source_memory_tasks/crates/ring)
+   Compiling lamp-tasks v0.1.0 (/source_memory_tasks/crates/tasks)
+   Compiling lamp-voice v0.1.0 (/source_memory_tasks/crates/voice)
+    Finished `release` profile [optimized] target(s) in 55.44s
+63ac25d663b539645781a526e5600ae49c74fe81997e66ddc2f76b32106993c5  /target/aarch64-unknown-linux-gnu/release/lamp-memory
+715fc2aa5886bc999fd3db89691c3b08ec501e3c1cb2ace3b60831e7404e1cdf  /target/aarch64-unknown-linux-gnu/release/lamp-voice
+d97ee80e3d0fa7a842ac46a568f827c2aab44a182466bc47483812a405d39aaa  /target/aarch64-unknown-linux-gnu/release/lamp-tasks

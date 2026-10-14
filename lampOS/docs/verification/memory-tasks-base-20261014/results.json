@@ -1,0 +1,11 @@
+{
+  "head": "52c1f698319460c4079715ba4ddf0811e804cd1a",
+  "base": "c2ac775f5062fb082fefb562361d75d15cadd6d0",
+  "machine": "macOS 26.6.2 x86_64, Intel i7-10700K, 16 logical CPUs, 64 GiB RAM",
+  "exit_code": 0,
+  "suites_completed": 68,
+  "passed": 1581,
+  "failed": 0,
+  "ignored": 11,
+  "raw_sha256": "1f718df259c726e86c1d7da960cb45587ea3051d0faa8cf175b3f218d562c865"
+}

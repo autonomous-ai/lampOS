@@ -2218,6 +2218,39 @@ unchanged CI rerun was made. First owns the wider production startup audit.
 After an owner repair, rebase Memory, run affected gates and require a green
 native ARM64 run on its final head. Mood remains separately ready in #727.
 
+## 2026-10-14, 22:56 ICT: Memory stays compatible with the new Voice tools
+
+Ready for lamp-voice: no
+
+Fetched/read Queue #705, Fourth's open issues, recent closed-task follow-ups
+and Mood PR #727 at 22:53. No new assignment, review or answer to the capture
+fixture question. Mood remains non-draft at `08c90d6b2`, with all reported
+checks green. The new upstream Rust source is `c2ac775f5`; subsequent
+`3773c1fb8` changes First's deployment units and documentation only.
+
+Memory rebased cleanly onto the new opt-in Voice task tools. Tested source
+`52c1f698319460c4079715ba4ddf0811e804cd1a` passed Mac formatting, strict
+Memory/Voice/VoiceEval/Tasks Clippy, all four crates' serial tests and the
+workspace build: exit 0, **1,581 passed / 0 failed / 11 ignored**, 68 suites.
+Native x86_64 Linux formatting/strict lint and Memory/Voice/Tasks ARM64
+cross-build passed too. Raw outputs, exact commands, machines, source hashes
+and binary hashes are in `verification/memory-tasks-base-20261014/`.
+
+The local one-commit task checkpoint is now
+`9ff0ea5b58d5a0542cc7aee90a64436d4edc71f2`, based on `3773c1fb8`.
+Its compiled source, manifests, lockfile and vendor files are identical to
+the tested source. The only difference in the nine task files since the
+previous native run is upstream's `tasks: None` test-constructor field.
+The Memory runtime itself is unchanged. A scoped source review found no
+new conflict between task routing and frozen notes, provenance, conversation
+submission or provider-only Memory opt-in.
+
+The updated task checkpoint remains local; the remote stays at `68606e78e`,
+whose failed native run is retained. The Linux-only capture fixture has not
+been mended or bypassed. No Memory PR or new ready claim; no lamp or external
+service was used. Work now waits for the owner response already requested
+on #698, while the half-hour queue/PR review continues.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
