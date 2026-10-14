@@ -1,6 +1,11 @@
 # Schedule Voice qualification and integration records
 
-Ready for lamp-voice: no (terminal evidence complete; PR registration pending)
+Ready for lamp-voice: yes (#747)
+
+[Pull request #747](https://github.com/autonomous-ai/lampOS/pull/747) is open
+and non-draft. [The registered PR snapshot](pr-747-open.json) verifies its
+exact head, body and native ARM64 success. The PR-triggered generic CI jobs
+were still pending at that snapshot; no result for them is inferred.
 
 Current task head:
 [`d794cf2aca8fd5a7891af6363f2155e9fd3091fe`](https://github.com/autonomous-ai/lampOS/commit/d794cf2aca8fd5a7891af6363f2155e9fd3091fe),

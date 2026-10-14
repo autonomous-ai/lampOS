@@ -2423,6 +2423,43 @@ The [21:17 Queue read](verification/schedule-voice-qualification-20261015/integr
 adds no Third task. Touch's enabled qualification still requires First and a
 person beside lamp-4ace; #699 remains after MVP and unclaimed.
 
+## 2026-10-15 — Task 31 ready in pull request #747
+
+Ready for lamp-voice: yes (#747)
+
+Kind: off unless set. The non-draft [PR #747](https://github.com/autonomous-ai/lampOS/pull/747)
+targets `lamp-voice` from `third/schedule-voice`, exact head
+`d794cf2aca8fd5a7891af6363f2155e9fd3091fe`. No integration branch was pushed
+and no PR was merged by Third. The registered PR is mergeable; at registration
+its new generic CI jobs were pending, while native ARM64 run
+[38633124293](https://github.com/autonomous-ai/lampOS/actions/runs/38633124293)
+was green with **4,365 / 0 / 34**. The reviewed body matches the published
+body byte for byte. [The exact PR snapshot](verification/schedule-voice-qualification-20261015/pr-747-open.json)
+records that observation.
+
+The PR names both exact-on switches, the 72-case / 144-comparison default-off
+proof, all gate counts and raw evidence, installation checksums, First's
+seven lamp cases and the incoming Update installation boundary. Terminal
+evidence was pushed first in log commit `506e9e519883191dda8db565e2e3e5283c635331`.
+The complete Mac gate remains **failed: 1,764 / 1 / 13**; its untouched motor
+test passed **once alone: 1 / 0 / 0**, with matching pre-run binary identity.
+First's [documented handoff condition](https://github.com/autonomous-ai/lampOS/issues/709#issuecomment-6176285386)
+and [#739](https://github.com/autonomous-ai/lampOS/issues/739) are explicit in
+the PR. No failure is relabelled as a pass.
+
+For First: use the three named CI binaries, preserve installed Update and
+current lamp-owned unit settings including Days mode, then follow the
+[off-minute and enable/disable runbook](https://github.com/autonomous-ai/lampOS/blob/d794cf2aca8fd5a7891af6363f2155e9fd3091fe/lampOS/docs/schedule.md#task-31-lamp-qualification).
+The requested spoken cases cover one-minute/repeated reminders, list/cancel/
+snooze, all room states plus privacy/input, interruption across generations,
+restart/reply-loss/recurrence, storage or Schedule failure/tool injection, and
+owed camera/Second Look work. Provider wording, busy-office silence, ALSA
+retirement, flash stalls and RR20-to-Other/nice-19 are the likely lamp limits.
+No lamp or real provider was accessed by Third.
+
+Third now watches this PR and the Queue. Task 33's enabled touch check still
+needs First and a person; #699 remains after MVP and has not been claimed.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
@@ -2438,4 +2475,4 @@ latency remain unqualified. Schedule and Tasks passed their host gates; their
 real storage, clock, Harness and Voice integrations remain for First to qualify
 on the lamp. Task 33 is merged through #728 after First's reported minute
 without `--touch`; enabled qualification still needs First and a person there.
-Task #709 is taken and not ready; #699 waits until after the MVP.
+Task #709 is ready in PR #747 and awaits First; #699 waits until after the MVP.
