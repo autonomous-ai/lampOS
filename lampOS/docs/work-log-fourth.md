@@ -2014,6 +2014,30 @@ checkpoint; the rebased final head will need its own run. Memory's preceding
 full Mac run is finishing before its worktree is rebased or another local
 build starts. No running test's source was changed under it.
 
+## 2026-10-14, 20:39 ICT: current Memory Mac run fails an inherited motor fixture
+
+Ready for lamp-voice: no
+
+The complete serial run on `4218712f3c79f96d17dfcbc1b8654c87840cafda`
+(base `a9a7262a9`) exited 101: 1,460 passed, one failed, 11 ignored, all 60
+suites completed. Both earlier privacy fixtures passed. Found, not mine:
+Voice `coordinator::motor::tests::late_started_callback_cannot_restore_an_offer_after_owner_replacement`
+failed at `coordinator/motor/tests.rs:896`; `child-position-writes` was absent
+after the inert worker had been reaped. Its test backend normally writes the
+receipt in `finish`. The failure alone does not identify why it exited.
+The fixture and motor source are unchanged by task 29 and start no Memory
+service/provider. No competing local build/test was deliberately running.
+
+First, please have the owning builder address this fixture/cleanup finding;
+it is outside my permitted Voice edit scope. Exact command, machine, counts
+and the whole output are in
+[mac-voice-motor-20261014](verification/mac-voice-motor-20261014/README.md).
+No assertion or production deadline was relaxed. My interim commentary had
+incorrectly inferred that the library passed from later suites starting;
+the terminal exit and full retained output supersede that inference. No
+ready line or PR was issued for it. Mood's repaired Linux gate is now running
+while I retain and report this failure and continue independent checks.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
