@@ -1779,6 +1779,52 @@ release that must not wake after delayed recognition. The same scoped gate
 passes again. Whole dependent tests, quiet host timings, Linux/ARM64 checks
 and the replay evidence remain in progress; no physical touch latency claimed.
 
+## 2026-10-14, 19:13 ICT: repaired task heads and Mood host evidence
+
+Ready for lamp-voice: no
+
+Each completed implementation is now one task-only commit directly above
+`1733307d7672ad302154984952a77772f8ebd6e5`, with local verification repeated
+after the rebase and no unfinished runtime on the log branch:
+
+| Task | Current head | Pending native ARM64 run |
+|---|---|---|
+| #707 Records | `abc5d134ffb50b7cca0c78ab975528a40cee0096` | 38561266393 |
+| #700 judge fit audit | `800ce47a5230d6b99f44dbcb92e56180646c6efc` | 38561284576 |
+| #698 Memory/Voice | `fed759ee7557243802b704e296e1cbef11c82071` | 38561301420 |
+
+Records repeated Mac gate: 113 passed, none failed, one existing manual test
+ignored; judge: 144 passed, none failed, two existing manual tests ignored.
+Formatting, strict scoped Clippy and workspace builds passed for both. Memory
+formatting, strict scoped Clippy and workspace build passed; that command did
+not repeat its full functional suites. Its preceding ARM64 run 38558922911
+ended with the same two inherited Records EPERM failures, now repaired in the
+new base. The complete failed step is retained beside the other two in
+`verification/arm64-nonroot-20261014/`. No failed run was called a pass.
+
+Mood's focused Linux check passed 155 tests, no failures, two manual timings
+ignored; its own strict lint and ARM64 release cross-build passed. The full
+Linux workspace lint still fails inherited Body `inspection.rs:615` dead code,
+the same finding already on #698. Mood's full Mac workspace gate is running
+serially with other local builds stopped. No Mood commit has been offered yet.
+
+On the x86_64 Mac, the final manual release fixture passed both tests. Each of
+three reducer cases used 2,000 samples and p95 was below 0.4 microseconds.
+For 101 authored name/touch cues, before cue publisher call to validated
+matching state received by a subscriber: first 22.272 ms, p50 23.561,
+p95 29.580, p99 30.408, maximum 31.337. One process spawn to first validated
+state took 308.050 ms. These are metadata/software measurements; no sensor,
+recognizer, actuator or acoustic feedback was included. Review clarified the
+target to consumer-observed state: the bus sends before retention and API
+return, so receipt does not bound `publish()` return or durable storage. The
+earlier weaker-matching timing run is retained, not called an improvement.
+
+The authored 24-hour trace has 1,441 minute samples and 29,364 synthetic
+inputs. Its standalone SVG was rendered and inspected; rebuilding the replay
+reproduced its JSONL byte for byte. No real recorded day was substituted.
+Task evidence is in Mood's worktree under `verification/mood-host-20261014/`;
+full gate completion and native ARM64 CI are still required before handoff.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
