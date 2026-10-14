@@ -1751,6 +1751,97 @@ is rebased on it. The tested task head stays fixed; its handoff installs only
 the Controls artifact, not an older Voice. Schedule preparation remains
 read-only and unclaimed. No lamp or provider account was accessed.
 
+## 2026-10-14 — Task 33 ready — touch strip and head pads (#728)
+
+Ready for lamp-voice: yes (#728)
+
+Pull request: [#728](https://github.com/autonomous-ai/lampOS/pull/728), one task commit
+`08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca`, based on `a9992f272`. Kind: **off unless set**.
+The task branch is `third/touch`; this branch contains only the log/evidence.
+The tested task head stayed fixed while later unrelated Voice changes arrived.
+The log is rebased on `34f1319d5`; install only this task's Controls binary,
+keeping the newer Voice. No deployment file or physical device was changed.
+
+The selected `--touch` path independently reads configured head/button GPIO
+and a supervised MPR121 child, initializes the chip, qualifies touch/hold/slide
+gestures, and publishes fresh typed evidence and separate Sleep/Wake choices.
+Requests also require `--enable`. The final owner selects the action from the
+contact-start lifecycle and its current speech/privacy state; publication is
+not an acknowledgement that capture, sound, light or movement changed.
+Working-electrode lists preserve the physical strip span, per-pad thresholds
+are explicit, and excluded levels cannot prolong a contact. Whole-chip,
+selected-pad, timing and I/O faults invalidate the strip. The fixed device
+claim remains held until the old child actually exits. Head discovery and
+bounded private record/replay tools are included. Standard primary/reset paths
+remain configurable; First removes the absent primary in lamp-4ace's profile.
+
+**Gate on the development Mac:** Intel i7-10700K at 3.80 GHz, 64 GiB,
+x86_64 macOS 26.6.2 / Darwin 25.6.0, Rust/Cargo 1.96.0. Workspace formatting,
+strict all-target Clippy for all twenty touched/dependent packages, their
+complete serial tests, and the workspace build passed: **3,283
+passed, zero failed, 15 inherited ignored in
+204 harnesses**. Exact commands, source hashes, elapsed times,
+ignored cases and unedited output are in
+[the final host evidence](verification/touch-complete-host-20261014/README.md).
+Formatting/Clippy passed in the earlier invocation; tests/build are the later
+complete unchanged rerun. They are not described as one invocation.
+
+The earlier Mac invocation failed an inherited Voice motor cleanup timeout
+after 2,804 passed, one failed and fifteen ignored. Its cause was not established.
+One unchanged focused Cargo rerun and three executions of the exact failed
+binary passed, then the complete rerun above passed. The failure, diagnostic
+reruns and source review remain retained. No Voice/Body source, assertion,
+deadline or filter was changed. The earlier fresh-copy replay-file timeout is
+also retained with its corrected buffered-output rerun; no failure was hidden.
+
+The final source-only copy built the workspace with all 33 local manifests
+inside the copy and passed all **446 Controls/Msgs checks**, zero failed or
+ignored, 29 harnesses. Registry/git caches were reused. The final binary's
+legacy replay stdout and stderr are byte-identical to the pre-task binary
+without `--touch`, in shadow and legacy-enabled modes. Strict ARM64 Linux
+cross-target Clippy also passed on the Mac; this was compilation/lint only.
+
+**Native gate:** [38573575450](https://github.com/autonomous-ai/lampOS/actions/runs/38573575450),
+exact task head, GitHub Ubuntu 22.04 ARM64, Rust 1.96.0, ordinary user, **not a
+lamp**. Release workspace build and **4,054 passed, zero failed, 29 inherited
+ignored, 264 harnesses**. Counts overlap host checks and are not added.
+[Raw native evidence](verification/touch-complete-arm64-20261014/README.md)
+also preserves the obsolete cancelled run as cancelled, not passing.
+
+**First's lamp sequence:** download artifact
+`lampos-arm64-08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca` from run 38573575450 (artifact ID 11900607240,
+expires 2026-10-21 14:05:30 UTC). The `lamp-controls` SHA-256 is
+`37924f2bfea364a214243e7b935a85ca1e8302167393c34590530a2908fc18f1`.
+Keep rollback and run that binary for the required minute without `--touch`.
+Then use `docs/controls.md`, “Run without a lamp, then qualify on one”:
+
+1. Stop the previous GPIO/I2C owner, establish the unit's working electrodes,
+   and calibrate every working pad's touch/release thresholds through the
+   assembled shell. The ten-pad example thresholds are authored, not calibration.
+   Check that excluded pads do not cause global auto-configuration faults.
+2. Start hands-away with `lamp-controls discover-head --seconds 20`; touch and
+   release each physical pad twice. Use the observed candidates/polarity and
+   omit lamp-4ace's absent primary in the unit profile.
+3. Run `lamp-controls serve --touch --config <unit-controls.json> --pins
+   <unit-touch-pins.json> --bus-root <isolated-bus> --seconds 60 --record
+   <new-touch.jsonl>` first in shadow, then with `--enable` on that isolated bus.
+   Check recording/child-cleanup counters. Use a new record path each time.
+4. Tap, hold, slide both ways, reverse, pause, lift, hover, cross the missing
+   electrodes and start with a hand present. Check missing-chip, lock and stale
+   acquisition behavior while GPIO remains usable. Replay the complete record
+   with its recorded clock ID and exact configuration. Measure first/repeated
+   physical contact-to-response using a separate physical reference.
+5. Wire the final consumers and qualify actual Stop, microphone closure,
+   asleep touch Wake, and no Sleep from the same still-held waking hand. Keep
+   physical privacy authoritative; qualify light and motor response separately.
+
+**Most likely wrong there:** threshold/near-hand margins, startup baseline,
+excluded-pad global chip faults, an unobserved narrow finger over a dead pad,
+pulsed head holds, slide speed around pauses, I2C contention, lock permissions,
+GPIO polarity and final-owner acoustic/privacy/motion latency. Host and native
+software tests establish none of those physical results. Next Third task is
+#709, then #699; #714 remains Second's.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
@@ -1764,5 +1855,5 @@ installed a production signed release or erased a real personal store. Its
 production supervisor, trusted feed, lamp storage durability and full-service
 latency remain unqualified. Schedule and Tasks passed their host gates; their
 real storage, clock, Harness and Voice integrations remain for First to qualify
-on the lamp. The current remaining Third queue is #711, #709 and #699;
-Task 33 remains pending its final corrected-source gates and PR.
+on the lamp. Task 33 is offered in #728; no hardware qualification is claimed.
+The next Third tasks are #709 and #699.
