@@ -1,0 +1,17 @@
+[
+  "test arithmetic_cost ... ignored, finite release timing; host measurements are not lamp measurements",
+  "test inconclusive_cost ... ignored, finite worst-work release timing; host measurements are not lamp measurements",
+  "test health::tests::measure_health_update_and_socket_with_a_held_publisher ... ignored, host timing measurement; run in release with --ignored --nocapture",
+  "test file_and_ranked_reads_have_the_same_socket_boundary_and_corpus ... ignored, local measurement; does not qualify a lamp",
+  "test health_costs_and_socket_requests_with_identical_synthetic_stores ... ignored, release host measurement; does not qualify a lamp",
+  "test how_long_each_request_takes_with_a_month_of_talk_behind_it ... ignored, a measurement, not a check",
+  "test measure_shadow_choices_while_slow_is_held ... ignored, host measurement: run alone with --release --ignored --nocapture",
+  "test measure_local_first_and_repeated ... ignored, host measurement: run alone with --release --ignored --nocapture",
+  "test records_cost ... ignored, finite release timing of disposable records; report machine separately",
+  "test coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance ... ignored, requires a built lamp-turn-end and the pinned model",
+  "test coordinator::tests::hand_controls::local_hand_stop_dispatch_latency ... ignored, manual local-host speaker-control latency probe; no lamp or acoustic claim",
+  "test provider_worker::tests::sixty_second_answer_follows_output_capacity ... ignored, one minute of real time; run explicitly",
+  "test provider_worker::tests::three_minute_answer_follows_output_capacity ... ignored, three minutes of real time; run explicitly",
+  "test reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift ... ignored",
+  "test reference::tests::four_virtual_hours_capture_clocked ... ignored, four virtual hours; run in release"
+]

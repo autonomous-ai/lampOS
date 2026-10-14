@@ -1,0 +1,58 @@
+{
+  "run": "38573575450",
+  "head": "08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca",
+  "branch": "third/touch",
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/38573575450",
+  "status": "completed",
+  "conclusion": "success",
+  "machine": "GitHub Actions ubuntu-22.04-arm native Linux ARM64 runner; Rust 1.96.0; no lamp",
+  "commands": [
+    "cargo build --locked --release --workspace --bins --examples",
+    "cargo test --locked --release --workspace -- --test-threads=1"
+  ],
+  "completed_test_harnesses": 264,
+  "tests": {
+    "passed": 4054,
+    "failed": 0,
+    "ignored": 29,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "ignored_cases_raw": [
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:46:41.8051364Z test cost_of_the_gate ... ignored, prints a timing",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:46:45.6546662Z test steady_reference_measures ... ignored, about a minute of simulated sound per scene; run with --release",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:47:02.9380975Z test recovery::tests::soak::prolonged_adversarial_recoveries_account_for_every_request ... ignored, several hundred turns per seed and interface; run explicitly",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:47:02.9382041Z test recovery::tests::soak::prolonged_conversations_with_injected_failures_keep_every_request_accounted_for ... ignored, several hundred turns per seed; run explicitly",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:47:34.9561597Z test arithmetic_cost ... ignored, finite release timing; host measurements are not lamp measurements",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:47:34.9562259Z test inconclusive_cost ... ignored, finite worst-work release timing; host measurements are not lamp measurements",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:47:37.2906901Z test health::tests::measure_health_update_and_socket_with_a_held_publisher ... ignored, host timing measurement; run in release with --ignored --nocapture",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:47:38.8320355Z test file_and_ranked_reads_have_the_same_socket_boundary_and_corpus ... ignored, local measurement; does not qualify a lamp",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:48:13.7994407Z test health_costs_and_socket_requests_with_identical_synthetic_stores ... ignored, release host measurement; does not qualify a lamp",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:48:14.6849562Z test how_long_each_request_takes_with_a_month_of_talk_behind_it ... ignored, a measurement, not a check",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:48:22.0535662Z test measure_shadow_choices_while_slow_is_held ... ignored, host measurement: run alone with --release --ignored --nocapture",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:48:27.2459607Z test measure_local_first_and_repeated ... ignored, host measurement: run alone with --release --ignored --nocapture",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:48:46.7591185Z test bind_mounts_are_refused_even_on_the_same_filesystem ... ignored, requires an isolated disposable Linux container with CAP_SYS_ADMIN",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:48:51.7689552Z test records_cost ... ignored, finite release timing of disposable records; report machine separately",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:49:09.3738393Z test a_fast_worker_without_its_library_fails_once_and_is_not_restarted ... ignored, requires the pinned model; see docs/endpoint-pilot.md",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:49:09.3743324Z test fast_model_gives_its_recorded_probability_close_to_the_exact_one ... ignored, requires the pinned model and ONNX Runtime; see docs/endpoint-pilot.md",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:49:09.3744283Z test fast_worker_answers_is_bounded_and_idles_without_spinning ... ignored, requires the pinned model and ONNX Runtime; see docs/endpoint-pilot.md",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:49:09.3755926Z test check_model_verifies_the_installed_model_and_refuses_damaged_copies ... ignored, requires the pinned model; see docs/endpoint-detection.md",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:49:09.3953961Z test inherited_lower_address_space_limits_are_kept ... ignored, requires the pinned model; see docs/endpoint-detection.md",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:49:09.3969387Z test tract_probability_matches_onnx_runtime_reference ... ignored, requires the pinned model; see docs/endpoint-detection.md",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:49:09.3970206Z test worker_process_matches_reference_and_reports_stage_costs ... ignored, requires the pinned model; see docs/endpoint-detection.md",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:49:09.4275993Z test worker_process_refuses_truncated_and_corrupt_models_once ... ignored, requires the pinned model; see docs/endpoint-detection.md",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:49:09.4277221Z test worker_process_stays_ready_and_bounded_across_idle_and_repeated_checks ... ignored, requires the pinned model; see docs/endpoint-detection.md",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:51:14.1851409Z test coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance ... ignored, requires a built lamp-turn-end and the pinned model",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:51:21.0770879Z test coordinator::tests::hand_controls::local_hand_stop_dispatch_latency ... ignored, manual local-host speaker-control latency probe; no lamp or acoustic claim",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:53:28.7833014Z test provider_worker::tests::sixty_second_answer_follows_output_capacity ... ignored, one minute of real time; run explicitly",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:53:29.2148647Z test provider_worker::tests::three_minute_answer_follows_output_capacity ... ignored, three minutes of real time; run explicitly",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:53:55.9291795Z test reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift ... ignored",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:53:57.7621813Z test reference::tests::four_virtual_hours_capture_clocked ... ignored, four virtual hours; run in release"
+  ],
+  "lamp_controls_sha256": [
+    "37924f2bfea364a214243e7b935a85ca1e8302167393c34590530a2908fc18f1"
+  ],
+  "raw_log_sha256": "d836e007c1ca5bd862e314a8be007073967b095711bf991e98fcce87a4f7f718",
+  "retrieved_at": "2026-10-14T14:08:43.223417+00:00",
+  "scope": "Software build/tests on a native ARM64 CI runner, not on lamp hardware. Counts are not added to overlapping host runs."
+}

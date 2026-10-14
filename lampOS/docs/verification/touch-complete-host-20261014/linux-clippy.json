@@ -1,0 +1,27 @@
+{
+  "source_manifest": "buffered-source.json",
+  "machine": "Intel i7-10700K x86_64 development Mac, macOS 26.6.2 / Darwin 25.6; not a lamp",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "kind": "cross-target compile and strict lint only; no ARM64 binary executed",
+  "command": [
+    "cargo",
+    "clippy",
+    "--offline",
+    "--locked",
+    "--target",
+    "aarch64-unknown-linux-gnu",
+    "-p",
+    "lamp-controls",
+    "-p",
+    "lamp-msgs",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "target_directory": "/private/tmp/lamp-third-touch-linux-check-target",
+  "exit_code": 0,
+  "elapsed_seconds": 3.748537181,
+  "log": "/private/tmp/lamp-third-touch-buffered-linux-clippy.txt",
+  "source_unchanged": true
+}

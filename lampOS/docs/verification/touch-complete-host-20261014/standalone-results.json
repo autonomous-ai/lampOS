@@ -1,0 +1,181 @@
+{
+  "source_commit": "08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca",
+  "root": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e",
+  "machine": "Third x86_64 development Mac, Rust 1.96.0; not a lamp",
+  "local_packages": [
+    {
+      "name": "lamp-actions",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/actions/Cargo.toml"
+    },
+    {
+      "name": "lamp-air",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/air/Cargo.toml"
+    },
+    {
+      "name": "lamp-audio",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/audio/Cargo.toml"
+    },
+    {
+      "name": "lamp-body",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/body/Cargo.toml"
+    },
+    {
+      "name": "lamp-bus",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/bus/Cargo.toml"
+    },
+    {
+      "name": "lamp-camera",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/camera/Cargo.toml"
+    },
+    {
+      "name": "lamp-controls",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/controls/Cargo.toml"
+    },
+    {
+      "name": "lamp-ears",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/ears/Cargo.toml"
+    },
+    {
+      "name": "lamp-environment",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/environment/Cargo.toml"
+    },
+    {
+      "name": "lamp-expression",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/expression/Cargo.toml"
+    },
+    {
+      "name": "lamp-eyes",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/eyes/Cargo.toml"
+    },
+    {
+      "name": "lamp-gemini",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/gemini/Cargo.toml"
+    },
+    {
+      "name": "lamp-health",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/health/Cargo.toml"
+    },
+    {
+      "name": "lamp-ipc",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/ipc/Cargo.toml"
+    },
+    {
+      "name": "lamp-keeper",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/keeper/Cargo.toml"
+    },
+    {
+      "name": "lamp-lean",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/lean/Cargo.toml"
+    },
+    {
+      "name": "lamp-memory",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/memory/Cargo.toml"
+    },
+    {
+      "name": "lamp-msgs",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/msgs/Cargo.toml"
+    },
+    {
+      "name": "lamp-name",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/name/Cargo.toml"
+    },
+    {
+      "name": "lamp-observer",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/observer/Cargo.toml"
+    },
+    {
+      "name": "lamp-policy",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/policy/Cargo.toml"
+    },
+    {
+      "name": "lamp-records",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/records/Cargo.toml"
+    },
+    {
+      "name": "lamp-ring",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/ring/Cargo.toml"
+    },
+    {
+      "name": "lamp-schedule",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/schedule/Cargo.toml"
+    },
+    {
+      "name": "lamp-sound-fixtures",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/sound-fixtures/Cargo.toml"
+    },
+    {
+      "name": "lamp-surround",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/surround/Cargo.toml"
+    },
+    {
+      "name": "lamp-tasks",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/tasks/Cargo.toml"
+    },
+    {
+      "name": "lamp-turn-end",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/turn-end/Cargo.toml"
+    },
+    {
+      "name": "lamp-turn-end-wire",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/turn-end-wire/Cargo.toml"
+    },
+    {
+      "name": "lamp-turn-owner",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/turn-owner/Cargo.toml"
+    },
+    {
+      "name": "lamp-voice",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/voice/Cargo.toml"
+    },
+    {
+      "name": "lamp-voice-eval",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/voice-eval/Cargo.toml"
+    },
+    {
+      "name": "tough",
+      "manifest": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/vendor/tough/Cargo.toml"
+    }
+  ],
+  "all_local_sources_inside_copy": true,
+  "implementation_matches_buffered_manifest": true,
+  "target_directory": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/target",
+  "steps": [
+    {
+      "name": "build",
+      "command": [
+        "cargo",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 139.16188792600002,
+      "log": "/private/tmp/lamp-third-touch-standalone-buffered-final-build.txt"
+    },
+    {
+      "name": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-msgs",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 46.898640211000014,
+      "log": "/private/tmp/lamp-third-touch-standalone-buffered-final-tests.txt",
+      "counts": {
+        "harnesses": 29,
+        "passed": 446,
+        "failed": 0,
+        "ignored": 0
+      }
+    }
+  ]
+}

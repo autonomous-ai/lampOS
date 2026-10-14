@@ -1,0 +1,94 @@
+{
+  "baseline_commit": "d672844cceaa9ff5488c0c0a42c8fcbdc0df4478",
+  "final_commit": "08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca",
+  "machine": "Third Intel i7-10700K development Mac, x86_64 macOS 26.6.2, Rust 1.96.0; no lamp",
+  "working_directory": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e",
+  "source_manifest": "final-buffered-source.json",
+  "binaries": {
+    "baseline": {
+      "path": "/private/tmp/lamp-third-touch-log/lampOS/target/debug/lamp-controls",
+      "sha256": "116fd81818dc1dbcebfbbe18f3944c295f1a858d7d4683cb1dab1a7c56b0b244"
+    },
+    "final": {
+      "path": "/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/target/debug/lamp-controls",
+      "sha256": "229e4a9cb32df14f8f96783e31053f5a7b6b0850d2731c965140e47b763812ae"
+    }
+  },
+  "cases": [
+    {
+      "enabled": false,
+      "arguments": [
+        "replay",
+        "--config",
+        "crates/controls/fixtures/controls.json",
+        "--input",
+        "crates/controls/fixtures/hand-controls.jsonl",
+        "--clock-id",
+        "written-controls",
+        "--until-us",
+        "10200000"
+      ],
+      "exit_codes": [
+        0,
+        0
+      ],
+      "stdout_identical": true,
+      "stdout_bytes": 76658,
+      "stdout_sha256": "331908be6e45b1269d7cff2da19d71eeb1c7b2519ad2499ab3f19cec2f759ab3",
+      "stdout_file": "/private/tmp/lamp-third-touch-final-buffered-legacy-shadow-stdout.jsonl",
+      "stderr_identical": true,
+      "stderr_bytes": 134,
+      "stderr_sha256": "ed808724d00c1ebfb73cf18b8f04a781bb30d2d93ccccaf462d637f966de78f8",
+      "stderr_file": "/private/tmp/lamp-third-touch-final-buffered-legacy-shadow-stderr.jsonl",
+      "summary": {
+        "records": 901,
+        "observations": 900,
+        "rejected": 0,
+        "faults": 1,
+        "gestures": 6,
+        "ticks": 4601,
+        "frames": 98,
+        "start_us": 1000000,
+        "end_us": 10200000
+      }
+    },
+    {
+      "enabled": true,
+      "arguments": [
+        "replay",
+        "--config",
+        "crates/controls/fixtures/controls.json",
+        "--input",
+        "crates/controls/fixtures/hand-controls.jsonl",
+        "--clock-id",
+        "written-controls",
+        "--until-us",
+        "10200000",
+        "--enable"
+      ],
+      "exit_codes": [
+        0,
+        0
+      ],
+      "stdout_identical": true,
+      "stdout_bytes": 76392,
+      "stdout_sha256": "4fd775b956d28cae2c7d33027d41a5b4ac62e900a00907fc2274833ed04f38cc",
+      "stdout_file": "/private/tmp/lamp-third-touch-final-buffered-legacy-enabled-stdout.jsonl",
+      "stderr_identical": true,
+      "stderr_bytes": 134,
+      "stderr_sha256": "ed808724d00c1ebfb73cf18b8f04a781bb30d2d93ccccaf462d637f966de78f8",
+      "stderr_file": "/private/tmp/lamp-third-touch-final-buffered-legacy-enabled-stderr.jsonl",
+      "summary": {
+        "records": 901,
+        "observations": 900,
+        "rejected": 0,
+        "faults": 1,
+        "gestures": 6,
+        "ticks": 4601,
+        "frames": 98,
+        "start_us": 1000000,
+        "end_us": 10200000
+      }
+    }
+  ]
+}

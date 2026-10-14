@@ -1,0 +1,25 @@
+{
+  "total_count": 1,
+  "artifacts": [
+    {
+      "id": 11900607240,
+      "node_id": "MDg6QXJ0aWZhY3QxMTkwMDYwNzI0MA==",
+      "name": "lampos-arm64-08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca",
+      "size_in_bytes": 55888115,
+      "url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/artifacts/11900607240",
+      "archive_download_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/artifacts/11900607240/zip",
+      "expired": false,
+      "digest": "sha256:811415d314def0966e46837ee9bfc355e19a35f66687a7efbdb0d86ac96eb800",
+      "created_at": "2026-10-14T14:05:34Z",
+      "updated_at": "2026-10-14T14:05:34Z",
+      "expires_at": "2026-10-21T14:05:30Z",
+      "workflow_run": {
+        "id": 38573575450,
+        "repository_id": 1259624583,
+        "head_repository_id": 1259624583,
+        "head_branch": "third/touch",
+        "head_sha": "08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca"
+      }
+    }
+  ]
+}

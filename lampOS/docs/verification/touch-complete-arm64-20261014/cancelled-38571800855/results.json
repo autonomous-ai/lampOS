@@ -1,0 +1,35 @@
+{
+  "run": "38571800855",
+  "head": "1ce4f987303013631fefd3b0f1b1fe64767144f6",
+  "branch": "third/touch",
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/38571800855",
+  "status": "completed",
+  "conclusion": "cancelled",
+  "machine": "GitHub Actions ubuntu-22.04-arm native Linux ARM64 runner; Rust 1.96.0; no lamp",
+  "commands": [
+    "cargo build --locked --release --workspace --bins --examples",
+    "cargo test --locked --release --workspace -- --test-threads=1"
+  ],
+  "completed_test_harnesses": 106,
+  "tests": {
+    "passed": 1733,
+    "failed": 0,
+    "ignored": 8,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "ignored_cases_raw": [
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:34:32.4589085Z test cost_of_the_gate ... ignored, prints a timing",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:34:36.2992633Z test steady_reference_measures ... ignored, about a minute of simulated sound per scene; run with --release",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:34:53.9159713Z test recovery::tests::soak::prolonged_adversarial_recoveries_account_for_every_request ... ignored, several hundred turns per seed and interface; run explicitly",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:34:53.9160766Z test recovery::tests::soak::prolonged_conversations_with_injected_failures_keep_every_request_accounted_for ... ignored, several hundred turns per seed; run explicitly",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:35:25.9482562Z test arithmetic_cost ... ignored, finite release timing; host measurements are not lamp measurements",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:35:25.9483271Z test inconclusive_cost ... ignored, finite worst-work release timing; host measurements are not lamp measurements",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:35:28.2901063Z test health::tests::measure_health_update_and_socket_with_a_held_publisher ... ignored, host timing measurement; run in release with --ignored --nocapture",
+    "lampOS \u2014 build and test on Linux ARM64\ttest (one test at a time, as on a lamp's few cores)\t2026-10-14T13:35:29.8375027Z test file_and_ranked_reads_have_the_same_socket_boundary_and_corpus ... ignored, local measurement; does not qualify a lamp"
+  ],
+  "lamp_controls_sha256": [],
+  "raw_log_sha256": "9639d3bf950fb606d5f0fd40366e08024a9b3565af59b085503cfe0de3506dcf",
+  "retrieved_at": "2026-10-14T13:42:49.954031+00:00",
+  "scope": "Software build/tests on a native ARM64 CI runner, not on lamp hardware. Counts are not added to overlapping host runs."
+}

@@ -1,0 +1,19 @@
+{
+  "checked_at": "2026-10-14T14:55:36.965494+00:00",
+  "tested_task_head": "08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca",
+  "tested_base": "a9992f272",
+  "later_integration_head": "34f1319d5842fc587edd4527a69cc90f3d016c47",
+  "later_commits": [
+    "34f1319d5 lampOS: record that the noise gate drops most short words and that no count of speech blocks separates them from tonal sounds",
+    "645b7013f lampOS: record that lamp-tasks reached Harness and was refused until the owner lets agents start agents",
+    "78a07d75d lampOS: record the first real Harness check from lamp-4ace: starting works, reading back from another machine does not",
+    "724541a95 lampOS: say in the brain's design how the Policy's judges are asked and where its one decision goes",
+    "b9eadf847 lampOS: tell the model never to say the time unless asked, after it told the time on good night",
+    "8be0b9dd2 lampOS: put the first-output record on lamp-4ace and say what its first lines showed",
+    "bf01f7e6d lampOS: hash the voice program on the first-output record's own thread, which held the provider worker at start on lamp-4ace",
+    "8ae7b8868 lampOS: record what the voice's rule saw and decided for each first output, behind LAMP_FIRST_OUTPUT, for fitting the judges (#700)"
+  ],
+  "later_runtime_diff": "lampOS/crates/voice/src/attention.rs       |  28 ++\n lampOS/crates/voice/src/coordinator.rs     |   1 +\n lampOS/crates/voice/src/first_output.rs    | 435 +++++++++++++++++++++++++++++\n lampOS/crates/voice/src/lib.rs             |   1 +\n lampOS/crates/voice/src/main.rs            |   3 +-\n lampOS/crates/voice/src/provider_worker.rs |  54 +++-\n lampOS/crates/voice/src/tools.rs           |   3 +-\n 7 files changed, 522 insertions(+), 3 deletions(-)\n",
+  "coordination_diff": "",
+  "decision": "The final touch head stayed fixed throughout its gates. Later integration changes add opt-in Voice first-output logging, adjust a Voice prompt and record other builders\u2019 results/designs. No Controls/Msgs, dependency, workflow or coordination-rule changes were fetched. First installs only the exact Controls artifact; later Voice code is not covered by the touch gate."
+}

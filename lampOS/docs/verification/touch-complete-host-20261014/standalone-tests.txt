@@ -1,0 +1,636 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling serde_json v1.0.151
+   Compiling memchr v2.8.3
+   Compiling serde v1.0.229
+   Compiling rustix v1.1.5
+   Compiling signal-hook v0.4.4
+   Compiling serde_core v1.0.229
+   Compiling syn v3.0.7
+   Compiling serde_derive v1.0.229
+   Compiling lamp-ipc v0.1.0 (/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/ipc)
+   Compiling lamp-bus v0.1.0 (/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/bus)
+   Compiling lamp-msgs v0.1.0 (/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/msgs)
+   Compiling lamp-controls v0.1.0 (/private/tmp/lamp-third-touch-standalone-buffered-final-jrv1f76e/crates/controls)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 18.85s
+     Running unittests src/lib.rs (target/debug/deps/lamp_controls-38271a24f50d9567)
+
+running 17 tests
+test mpr121::tests::transport_requires_exact_message_count ... ok
+test mute::tests::failure_before_or_after_replacement_keeps_recovery_evidence ... ok
+test pins::tests::a_line_that_cannot_be_read_is_missing_input_and_not_a_release ... ok
+test pins::tests::the_lines_are_read_together_at_their_pace_and_given_as_pressed_or_not ... ok
+test pins::tests::the_wiring_must_name_the_controls_inputs_and_no_line_twice ... ok
+test record::tests::a_final_full_queue_drop_cancels_a_pet_pending_in_the_recorded_tail ... ok
+test record::tests::a_final_touch_recording_drop_is_an_overflow_at_the_last_saved_time ... ok
+test record::tests::a_partial_writer_failure_is_reported_even_if_no_terminal_fault_can_be_saved ... ok
+test record::tests::a_recovered_queue_gap_precedes_the_next_sample_without_a_spurious_tail_fault ... ok
+test record::tests::backwards_receipt_time_ends_at_the_previous_time_with_a_fault ... ok
+test record::tests::recording_formats_cannot_be_mixed_silently ... ok
+test record::tests::sixteen_kib_json_lines_are_accepted_but_one_more_byte_ends_the_clip ... ok
+test record::tests::structurally_invalid_samples_become_small_invalid_records_before_queueing ... ok
+test record::tests::the_hundred_thousandth_record_is_reserved_for_the_terminal_fault ... ok
+test record::tests::the_ten_minute_boundary_is_inclusive_and_overrun_does_not_extend_the_log ... ok
+test record::tests::the_thirty_two_mib_limit_keeps_a_hundred_twenty_eight_byte_fault_reserve ... ok
+test record::tests::touch_recording_queue_loss_marks_both_sources_instead_of_splicing_a_hold ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+     Running unittests src/main.rs (target/debug/deps/lamp_controls-cf0a6ed31ddfa805)
+
+running 2 tests
+test hand_log_tests::a_flapping_line_is_held_to_twenty_lines_in_ten_seconds_and_counted ... ok
+test hand_log_tests::only_changes_are_written ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/base.rs (target/debug/deps/base-aceeabd8c505d81b)
+
+running 24 tests
+test a_boot_held_contact_is_ignored_until_full_stable_release ... ok
+test a_gap_over_one_hundred_ms_discards_the_contact_and_recovers_only_from_release ... ok
+test a_hold_consumes_any_previous_tap_pair ... ok
+test a_new_touch_on_the_release_deadline_does_not_swallow_the_completed_tap ... ok
+test a_two_second_hold_has_no_action_until_release_and_never_becomes_a_tap ... ok
+test arrival_delay_is_visible_without_becoming_hold_duration ... ok
+test brief_full_release_bounce_keeps_one_contact_and_its_original_hold_start ... ok
+test explicit_reset_cancels_contacts_and_tap_history_without_rolling_back_clocks ... ok
+test first_and_repeated_short_pulses_at_four_poll_phases_have_bounded_sampled_latency ... ok
+test first_tap_is_immediate_second_tap_has_an_exact_raw_edge_window ... ok
+test hold_feedback_uses_acquisition_time_and_does_not_advance_on_later_ticks ... ok
+test inherited_recorded_mask_traces_keep_stationary_taps_and_consume_travel ... ok
+test irregular_falling_edge_closes_the_qualifying_interval_before_resetting_it ... ok
+test moving_and_reversing_contacts_are_consumed_without_any_swipe_or_hold_action ... ok
+test one_or_two_pads_and_brief_third_pad_spikes_never_qualify ... ok
+test only_selected_electrodes_count_and_upper_status_bits_are_not_touch_bits ... ok
+test qualification_does_not_leak_to_a_following_small_contact ... ok
+test qualified_contact_survives_staggered_lift_and_growth_is_not_a_swipe ... ok
+test release_filter_and_grace_cannot_promote_a_short_hold_over_two_seconds ... ok
+test separated_short_qualification_intervals_do_not_add_up ... ok
+test stale_future_duplicate_and_backward_time_disarm_without_any_release ... ok
+test three_filtered_pads_commit_once_after_full_release_without_waiting_for_double_tap ... ok
+test triples_and_repeated_taps_only_produce_pairs_of_safe_classifications ... ok
+test unavailable_or_invalid_masks_are_faults_and_never_synthetic_releases ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/engine.rs (target/debug/deps/engine-4448de3006bdf533)
+
+running 38 tests
+test a_long_head_contact_is_never_a_button_hold_or_an_early_action ... ok
+test a_missing_input_cancels_a_pending_pet_decision ... ok
+test a_suppressed_release_still_clears_held_feedback ... ok
+test backwards_arrival_clock_latches_failure_until_new_engine ... ok
+test base_hold_feedback_uses_observations_and_waits_for_release_to_request_mute ... ok
+test base_tap_and_hold_share_safe_intents_but_not_gpio_timing ... ok
+test bounded_output_queue_fails_closed_instead_of_dropping_transitions_silently ... ok
+test buttons_keep_independent_debounce_and_hold_state ... ok
+test config_and_input_storage_limits_are_checked_without_pin_guessing ... ok
+test default_and_explicit_shadow_never_produce_enabled_requests ... ok
+test delayed_base_sample_and_ticks_cannot_cross_a_hold_tier_without_acquisition ... ok
+test doubles_and_multiple_taps_have_only_the_stop_intent ... ok
+test each_head_session_rearms_decision_and_release_is_not_another_pet ... ok
+test exactly_one_hundred_millisecond_input_gap_disarms_before_processing_release ... ok
+test fault_reset_requires_a_new_released_baseline_and_keeps_latched_requests ... ok
+test future_wrong_boot_and_out_of_order_observations_cancel_pending_edges ... ok
+test head_cooldown_is_extended_by_swallowed_session_and_accepts_exact_expiry ... ok
+test incomplete_or_invalid_base_snapshot_disarms_every_input ... ok
+test initial_held_button_and_orphan_release_do_not_act ... ok
+test known_head_pads_accept_a_short_pulse_without_fabricating_a_hold ... ok
+test later_petting_does_not_overwrite_stop_or_mute_recovery_records ... ok
+test lost_release_and_repress_cannot_extend_a_hold_into_software_mute ... ok
+test mechanical_double_window_uses_release_edges_with_an_inclusive_boundary ... ok
+test missing_extra_duplicate_and_unknown_levels_are_faults ... ok
+test near_overflow_clock_is_a_fault_not_a_wrapped_timer ... ok
+test one_millisecond_tap_stops_at_release_without_double_click_wait ... ok
+test opposite_polarity_is_independent_but_same_polarity_bounce_does_not_retrigger ... ok
+test output_is_deterministic_for_identical_complete_acquisitions ... ok
+test reader_restart_and_late_old_reader_cannot_join_a_hold ... ok
+test reader_session_storage_is_bounded_and_never_reaccepts_a_retired_reader ... ok
+test release_edge_not_receipt_time_sets_the_two_second_boundary ... ok
+test scripted_reader_preserves_acquisition_time_and_none_is_not_a_heartbeat ... ok
+test scripted_reader_rejects_unbounded_disordered_or_clock_reset_streams ... ok
+test stale_queued_release_is_rejected_and_cannot_be_retimestamped ... ok
+test startup_pad_contact_requires_settle_and_released_baseline ... ok
+test synthetic_first_and_repeated_taps_meet_the_two_millisecond_dispatch_budget ... ok
+test ticking_never_fabricates_fresh_holding_or_a_long_release ... ok
+test two_and_five_second_tiers_are_feedback_until_genuine_release ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/head_discovery.rs (target/debug/deps/head_discovery-5aa15fd23cb287cb)
+
+running 3 tests
+test driven_high_and_low_candidates_need_two_complete_pulses_and_do_not_install_wiring ... ok
+test missing_samples_cannot_extend_a_pulse_and_recovery_needs_idle_again ... ok
+test startup_held_floating_chatter_and_unreleased_contact_do_not_qualify ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/hold_clear.rs (target/debug/deps/hold_clear-dee3e1f6f16e1e01)
+
+running 15 tests
+test a_coalesced_fresh_stop_does_not_hide_a_later_clear_hold ... ok
+test a_fresh_retained_hold_in_the_first_state_cannot_clear_a_restored_mute ... ok
+test a_hold_started_before_receiver_restart_cannot_clear ... ok
+test a_prepared_clear_belongs_only_to_its_original_receiver ... ok
+test duplicate_identity_or_reflected_old_release_cannot_clear ... ok
+test expired_or_failed_persistence_never_releases_the_live_latch ... ok
+test fresh_hold_must_start_strictly_after_owner_fence_and_mute_watermark ... ok
+test later_stop_cancels_pending_clear_but_older_retained_stop_does_not ... ok
+test legacy_receiver_and_independent_stop_effect_remain_one_way ... ok
+test newer_owner_fence_stop_mute_fault_or_session_invalidates_prepared_clear ... ok
+test only_second_fresh_hold_proposes_clear_and_persistence_precedes_live_change ... ok
+test original_release_must_be_fresh_even_when_publication_is_fresh ... ok
+test publisher_restart_fault_or_observation_gap_fences_a_hold_in_progress ... ok
+test receiver_refuses_a_start_before_its_saved_watermark ... ok
+test rejected_state_cancels_pending_clear_without_changing_mute ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/mpr121.rs (target/debug/deps/mpr121-50e5bec91db2c728)
+
+running 43 tests
+test acknowledged_but_ignored_profile_writes_are_detected_before_run ... ok
+test active_overcurrent_is_not_cleared_by_reset ... ok
+test all_addresses_poll_boundaries_and_all12_ecr_encodings_are_valid ... ok
+test all_ecr_values_are_checked_without_reinterpreting_software_selection ... ok
+test any_runtime_transfer_failure_is_terminal_and_not_retried ... ok
+test auto_adjusted_charge_registers_are_not_compared_to_initial_values ... ok
+test brownout_defaults_cannot_be_mistaken_for_zero_touch ... ok
+test every_initialization_transfer_error_stops_without_retry ... ok
+test excluded_channel_static_configuration_is_still_verified ... ok
+test excluded_electrode_oor_alone_does_not_mask_or_rewrite_raw_touch_bits ... ok
+test excluded_thresholds_are_still_required_and_validated ... ok
+test explicit_afe_charge_and_debounce_fields_keep_exact_register_bit_positions ... ok
+test explicit_profile_roundtrips_without_hidden_defaults ... ok
+test fault_during_static_readback_is_checked_before_returning_mask ... ok
+test faults_after_entering_run_prevent_initialization_success ... ok
+test gpio_data_aliases_are_not_mistaken_for_static_configuration ... ok
+test ignored_reset_cannot_pass_with_one_expected_default ... ok
+test ignored_run_never_returns_a_released_sensor ... ok
+test individual_fault_bits_are_not_hidden_by_touch_masking ... ok
+test invalid_settings_are_rejected_before_any_io_or_delay ... ok
+test invalid_working_sets_fail_before_any_io_or_delay ... ok
+test io_error_display_does_not_copy_arbitrary_transport_text ... ok
+test malformed_numeric_enum_array_and_missing_fields_are_rejected ... ok
+test manual_charge_drift_is_detected ... ok
+test mask_comes_from_the_final_fault_checked_status_snapshot ... ok
+test no_threshold_or_baseline_value_is_silently_replaced ... ok
+test reset_between_static_and_status_reads_is_caught_by_final_ecr ... ok
+test reset_stop_profile_readback_then_run_and_settle_are_ordered ... ok
+test returns_every_electrode_bit_including_unit_specific_missing_pads ... ok
+test selected_electrode_oor_is_terminal_even_beside_excluded_oor_bits ... ok
+test sensing_wait_over_five_seconds_is_rejected_before_io ... ok
+test settle_uses_filter_scan_debounce_and_auto_search_bounds ... ok
+test skipped_charge_time_search_keeps_cdt_static_but_not_cdc ... ok
+test sparse_oor_policy_is_rechecked_after_the_static_configuration_read ... ok
+test sparse_selection_does_not_change_electrical_scan_or_startup_wait ... ok
+test sparse_selection_never_excuses_global_proximity_or_reserved_faults ... ok
+test sparse_thresholds_stay_indexed_by_electrode_including_excluded_channels ... ok
+test startup_touch_is_not_rewritten_as_release ... ok
+test static_drift_is_checked_on_every_read ... ok
+test steady_state_work_is_fixed_size_without_delay_or_writes ... ok
+test unexpected_proximity_or_reserved_status_is_not_a_release ... ok
+test unknown_fields_at_every_configuration_layer_are_rejected ... ok
+test working_sets_accept_three_through_twelve_with_shared_geometry_validation ... ok
+
+test result: ok. 43 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/mute.rs (target/debug/deps/mute-a20e6a5fdaf96a3f)
+
+running 9 tests
+test a_new_machine_boot_preserves_mute_and_rebases_only_the_request_clock ... ok
+test an_incomplete_other_write_is_not_overwritten ... ok
+test completed_replacements_leave_only_a_private_record ... ok
+test explicit_clear_survives_owner_restart_and_ignores_retained_mute ... ok
+test exposed_or_symlink_state_and_nonprivate_directory_are_refused ... ok
+test malformed_future_or_oversized_state_is_not_unmuted ... ok
+test orphan_replacement_is_refused_even_without_a_pending_marker_or_main_file ... ok
+test owner_restart_restores_mute_before_any_permission_is_considered ... ok
+test stale_clear_and_unknown_record_versions_are_refused ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+     Running tests/program.rs (target/debug/deps/program-eeb363b9fe983133)
+
+running 7 tests
+test clock_command_reports_the_requested_identity_and_a_monotonic_value ... ok
+test existing_acquisition_record_is_refused_without_truncation ... ok
+test invalid_arguments_fail_before_any_bus_or_record_is_created ... ok
+test invalid_config_or_replay_is_rejected_before_creating_output ... ok
+test replay_ignores_config_enable_without_the_explicit_flag ... ok
+test replay_output_is_jsonl_and_an_existing_file_is_never_overwritten ... ok
+test sigterm_finishes_recording_and_releases_the_actual_serve_owner ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+
+     Running tests/receiver.rs (target/debug/deps/receiver-8bf72c49e47f251a)
+
+running 14 tests
+test clock_reset_does_not_revive_old_requests ... ok
+test delayed_publication_of_a_hold_released_before_clear_cannot_remute ... ok
+test delayed_stop_expires_but_a_retained_mute_can_still_close_input ... ok
+test explicit_clear_commits_private_state_before_changing_the_live_latch ... ok
+test failed_explicit_clear_keeps_the_live_inhibit ... ok
+test fault_and_restart_never_mean_unmute ... ok
+test identity_tracking_is_bounded_and_fails_closed_at_exhaustion ... ok
+test malformed_or_backward_events_do_not_advance_a_valid_watermark ... ok
+test older_cross_session_state_cannot_retire_the_current_owner ... ok
+test pet_needs_current_owner_and_is_deduplicated_without_ever_stopping ... ok
+test retained_stop_covers_lost_event_and_does_not_repeat_on_heartbeats ... ok
+test stop_alone_cannot_clear_the_owners_existing_mute ... ok
+test the_previous_controls_process_cannot_return_after_a_replacement ... ok
+test unknown_stale_future_wrong_clock_and_shadow_states_cannot_act ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/replay.rs (target/debug/deps/replay-612338e2f68debb8)
+
+running 10 tests
+test a_full_ten_minute_clip_does_not_need_an_explicit_end_override ... ok
+test a_terminal_fault_cancels_a_pending_pet_instead_of_fabricating_it_in_the_tail ... ok
+test byte_line_record_and_duration_limits_are_enforced_before_running ... ok
+test end_bounds_cannot_truncate_inputs_or_overflow_tick_time ... ok
+test invalid_acquisition_stamps_are_preserved_as_rejected_evidence ... ok
+test malformed_records_empty_input_and_mixed_fault_acquisition_are_refused ... ok
+test output_failure_is_returned_instead_of_reporting_a_complete_replay ... ok
+test replay_is_byte_identical_for_the_same_inputs_and_has_no_clock_sleep ... ok
+test shadow_reports_never_contain_an_enabled_request ... ok
+test written_controls_scenario_has_six_requests_and_no_false_hold_after_lost_input ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+     Running tests/runtime.rs (target/debug/deps/runtime-49fed5a1c0df2085)
+
+running 12 tests
+test a_short_head_pulse_is_published_on_both_edges_between_heartbeats ... ok
+test acquisition_recording_preserves_receipt_and_edge_times_and_replays ... ok
+test an_unbounded_adapter_is_drained_at_most_64_times_then_faults ... ok
+test base_hold_tier_is_published_between_heartbeats_without_committing_an_action ... ok
+test missing_reader_publishes_an_error_without_claiming_hardware_readiness ... ok
+test owner_lock_prevents_a_second_service_and_restart_changes_session ... ok
+test owner_lock_refuses_a_symlink_without_modifying_its_target ... ok
+test quiet_event_publisher_renews_liveness_without_inventing_a_gesture ... ok
+test shadow_gestures_remain_observable_but_cannot_become_owner_commands ... ok
+test silence_from_a_reader_is_not_a_fresh_released_level ... ok
+test time_spent_inside_read_is_counted_before_input_freshness_is_checked ... ok
+test typed_tap_event_has_a_matching_retained_stop_for_a_late_owner ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.15s
+
+     Running tests/strip.rs (target/debug/deps/strip-819089b3d725904b)
+
+running 53 tests
+test authored_twenty_millisecond_sampling_bounds_position_and_touch_dispatch ... ok
+test brief_qualified_touch_on_zero_has_explicit_release_and_no_current_position ... ok
+test delayed_receipt_and_ticks_cannot_advance_observed_hold ... ok
+test direction_hysteresis_ignores_sub_half_rank_retreat_without_losing_position ... ok
+test disjoint_second_finger_invalidates_geometry_until_whole_release ... ok
+test distance_and_speed_are_normalized_sampled_units_not_electrodes_or_millimetres ... ok
+test each_fault_disarms_without_a_release_sleep_or_new_contact ... ok
+test exact_release_grace_then_press_is_a_new_contact ... ok
+test excluded_electrode_noise_cannot_change_selected_geometry_events_or_readiness ... ok
+test excluded_only_input_releases_without_current_presence_or_extending_a_hold ... ok
+test freshness_and_gap_use_the_same_exclusive_hundred_millisecond_boundary ... ok
+test implausibly_fast_sampled_motion_faults_instead_of_publishing_unbounded_speed ... ok
+test initial_long_hold_is_excluded_from_stroke_speed_and_pause_alone_cannot_stroke ... ok
+test irregular_brief_disjoint_footprint_does_not_become_touch_on_release ... ok
+test irregular_release_can_first_prove_both_contact_and_chord_debounce ... ok
+test issue711_authored_reconstruction_is_one_hold_with_reversing_slides_not_multiple_taps ... ok
+test issue711_changed_rows_alone_cannot_prove_continuous_touch_hold_or_slide ... ok
+test issue711_reconstruction_has_identical_geometry_and_effects_with_explicit_working_pads ... ok
+test issue711_reconstruction_preserves_every_original_row_and_labels_all_fill_frames ... ok
+test known_hole_does_not_bridge_zero_acquisitions_past_the_existing_release_grace ... ok
+test long_reversing_contact_faults_at_bounded_distance_instead_of_saturating_silently ... ok
+test missing_electrode_crossings_keep_one_contact_and_physical_distance_without_taps ... ok
+test missing_four_and_eight_remain_physical_holes_without_invalidating_trace_chord ... ok
+test one_and_two_pads_have_position_but_cannot_touch_or_sleep ... ok
+test order_is_a_complete_permutation_and_preserves_weak_electrode_positions ... ok
+test qualification_closes_before_an_irregular_falling_edge ... ok
+test qualified_chord_crosses_known_missing_pads_without_retouch_release_or_sleep ... ok
+test qualified_contact_emits_touch_once_and_nothing_new_on_release ... ok
+test qualifying_handoff_does_not_fabricate_a_zero_mask_touch_without_real_release ... ok
+test raw_movement_at_sleep_boundary_suppresses_sleep_before_new_pad_filter_settles ... ok
+test recruitment_then_original_departure_does_not_slide_but_consumes_sleep ... ok
+test release_grace_cannot_promote_a_short_hold_into_sleep ... ok
+test reset_keeps_timestamp_high_water_and_requires_release_before_another_sleep ... ok
+test reversal_changes_direction_without_new_contact_and_pause_keeps_consumption ... ok
+test reversed_and_non_numeric_orders_change_position_and_direction ... ok
+test reversed_sparse_order_retains_missing_widths_and_reverses_slide_direction ... ok
+test sampled_short_pulse_matrix_rejects_noise_and_does_not_delay_first_touch_for_a_double ... ok
+test selected_held_at_startup_stays_unarmed_until_selected_release_despite_excluded_noise ... ok
+test separated_short_third_pad_spikes_do_not_accumulate ... ok
+test short_zero_chatter_keeps_one_contact_and_cannot_rearm_sleep ... ok
+test single_pad_travel_produces_continuous_positions_without_tap_or_sleep ... ok
+test sleep_emits_at_exact_observed_two_seconds_once_until_verified_repress ... ok
+test slow_sampled_travel_keeps_position_and_emits_one_stroke_after_motion_span ... ok
+test sparse_authored_first_and_repeated_touch_keep_the_existing_sampling_bounds ... ok
+test sparse_coordinates_preserve_full_strip_slots_and_do_not_rescale_the_selected_extent ... ok
+test sparse_layout_rejects_unknown_spacing_duplicate_ids_and_invalid_bounds ... ok
+test sparse_raw_status_faults_and_unknown_acquisitions_disarm_instead_of_becoming_release ... ok
+test sparse_topology_skips_exclusions_but_inactive_working_electrodes_are_ambiguous ... ok
+test staggered_lift_and_palm_growth_do_not_create_slide_or_new_touch ... ok
+test startup_held_requires_full_release_before_any_contact_or_action ... ok
+test subthreshold_travel_cannot_creep_into_sleep ... ok
+test three_pad_sparse_set_qualifies_only_all_three_selected_electrodes ... ok
+test working_sets_accept_three_through_twelve_unique_electrodes_in_both_directions ... ok
+
+test result: ok. 53 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/strip_worker.rs (target/debug/deps/strip_worker-0005e96b892164a5)
+
+running 9 tests
+test acquisition_keeps_worker_time_and_sequence_then_child_is_reaped ... ok
+test an_existing_socket_path_is_never_unlinked_by_a_second_worker ... ok
+test device_claim_is_exclusive_until_the_child_really_exits ... ok
+test device_claim_refuses_symlinks_hardlinks_and_shared_mode ... ok
+test failed_spawn_cleans_only_its_socket_and_does_not_remove_foreign_files ... ok
+test malformed_faulted_or_mismatched_workers_never_become_releases ... ok
+test queued_fresh_packets_cannot_rescue_expired_startup_or_silence ... ok
+test silent_worker_has_bounded_startup_and_never_restarts ... ok
+test worker_fixture ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s
+
+     Running tests/touch.rs (target/debug/deps/touch-12d7add8f7ee7150)
+
+running 40 tests
+test acquisition_gap_disarms_hold_and_later_released_sample_recovers ... ok
+test authored_head_qualification_target_covers_first_and_repeated_sample_phases ... ok
+test backwards_clock_is_terminal_and_near_max_timestamps_do_not_wrap ... ok
+test configuration_is_bounded_unique_explicit_and_strict ... ok
+test configured_head_order_controls_mask_and_active_names_not_input_vector_order ... ok
+test default_disabled_reports_shadow_without_eligible_events ... ok
+test excluded_electrodes_cannot_complete_the_three_working_pad_chord ... ok
+test excluded_only_acquisitions_never_become_active_or_lifecycle_requests ... ok
+test excluded_only_bits_release_a_working_contact_before_its_sleep_deadline ... ok
+test excluded_pad_noise_does_not_cancel_a_working_stationary_hold ... ok
+test fast_mode_pulses_never_fabricate_a_resting_hand ... ok
+test gpio_and_strip_faults_do_not_withdraw_the_other_group ... ok
+test gpio_fault_preserves_independent_strip_request_identity ... ok
+test head_needs_startup_settle_and_a_released_baseline ... ok
+test head_qualification_uses_acquisition_time_not_receipt_or_ticks ... ok
+test invalid_head_snapshot_cannot_omit_or_duplicate_configured_inputs ... ok
+test lost_acquisition_cannot_turn_hidden_release_repress_into_mute ... ok
+test malformed_future_duplicate_and_wrong_clock_inputs_clear_pending ... ok
+test missing_working_electrodes_are_not_artificial_gaps_during_a_slide ... ok
+test out_of_range_raw_bits_are_faults_even_when_no_working_electrode_is_active ... ok
+test output_queue_is_bounded_and_overflow_withdraws_undelivered_group ... ok
+test pending_event_and_feedback_do_not_gain_new_age_on_heartbeat ... ok
+test physical_button_events_preserve_stop_mute_and_reset_asleep ... ok
+test primary_hold_never_commits_before_release_and_never_factory_resets ... ok
+test primary_short_release_is_immediate_stop_with_no_double_tap_wait ... ok
+test qualified_head_touch_offers_wake_without_changing_awake_pair ... ok
+test reader_restart_consumes_first_sample_then_requires_release_and_rejects_old_reader ... ok
+test reader_session_retirement_is_bounded_and_never_reopens_old_identity ... ok
+test reset_short_release_does_nothing_and_exact_five_seconds_is_reset_only ... ok
+test reversed_strip_order_names_actual_destination_electrode ... ok
+test same_polarity_button_debounce_cancels_bounce_hold_evidence ... ok
+test source_ttl_withdraws_feedback_at_exact_boundary_without_synthetic_release ... ok
+test startup_held_buttons_and_orphan_release_cannot_act ... ok
+test stationary_head_stroke_occurs_once_at_actual_half_second ... ok
+test strip_brief_qualified_release_and_reversed_mapping_are_preserved ... ok
+test strip_raw_handoff_is_active_even_while_filtered_geometry_is_empty ... ok
+test strip_restart_and_expiry_cannot_reuse_old_hold ... ok
+test strip_stationary_hold_requests_sleep_once_and_raw_release_is_not_a_tap ... ok
+test working_electrodes_accept_bounded_ordered_subsets_without_changing_full_layouts ... ok
+test working_subset_faults_remain_unknown_until_a_verified_release_baseline ... ok
+
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/touch_pins.rs (target/debug/deps/touch_pins-ca746424f0b583c4)
+
+running 16 tests
+test all_four_head_candidates_require_explicit_name_order_and_polarity ... ok
+test base_only_configuration_does_not_invent_gpio_or_released_pads ... ok
+test complete_gpio_conversion_preserves_stamp_session_and_independent_roles ... ok
+test duplicated_names_lines_and_unmatched_configured_inputs_are_rejected ... ok
+test empty_configuration_does_not_claim_a_functional_touch_source ... ok
+test explicit_roles_keep_reset_separate_and_strip_out_of_gpio_snapshots ... ok
+test file_size_bound_accepts_exact_limit_and_refuses_over_limit_or_corrupt_input ... ok
+test gpio_and_strip_poll_bounds_are_checked_independently ... ok
+test new_wiring_rejects_unknown_fields_and_does_not_relax_legacy_schema ... ok
+test partial_or_foreign_gpio_observations_are_not_filled_with_false_levels ... ok
+test privacy_chip_and_wrong_primary_reset_or_head_lines_are_rejected ... ok
+test sparse_base_remains_optional_and_does_not_enable_shadow_or_gpio ... ok
+test sparse_invalid_or_ambiguous_orders_are_refused_before_wiring_is_accepted ... ok
+test sparse_working_configuration_preserves_all_physical_threshold_indices ... ok
+test sparse_working_electrodes_require_the_exact_configured_mask ... ok
+test strip_presence_working_mask_geometry_and_profile_must_agree ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/touch_program.rs (target/debug/deps/touch_program-5f8e336211d9e50b)
+
+running 9 tests
+test enable_flag_changes_only_event_and_state_authority_fields ... ok
+test invalid_and_duplicate_cli_options_are_rejected_before_replay_or_output_creation ... ok
+test malformed_or_unknown_schema_fields_are_rejected_before_creating_output ... ok
+test new_records_and_new_pins_schema_require_the_explicit_touch_selector ... ok
+test output_is_private_jsonl_and_existing_evidence_is_never_overwritten ... ok
+test real_cli_defaults_to_shadow_even_when_config_says_enabled_and_reports_exact_fixture_counts ... ok
+test replay_succeeds_with_a_nonexistent_i2c_adapter_and_an_unopenable_bus_root ... ok
+test working_pad_cli_profile_preserves_the_trace_with_individual_threshold_settings ... ok
+test wrong_boot_clock_is_visible_in_summary_and_never_becomes_ready_or_actionable ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.32s
+
+     Running tests/touch_receiver.rs (target/debug/deps/touch_receiver-f2e22c23d04bf3cc)
+
+running 22 tests
+test advisory_event_is_not_lost_to_state_cumulative_watermark ... ok
+test backwards_receipt_clock_latches_closed ... ok
+test changed_controls_session_retires_old_payload_and_resets_lifecycle_baseline ... ok
+test changed_source_reader_is_fenced_and_cannot_replay_held_sleep ... ok
+test delayed_older_hold_cannot_follow_newer_touch_of_same_source ... ok
+test event_before_qualifying_state_is_refused_without_consuming_it ... ok
+test fresh_whole_five_second_reset_is_available_to_asleep_owner ... ok
+test lifecycle_contact_binding_keeps_waking_hold_from_sleeping_again ... ok
+test original_event_acquisition_expires_even_with_fresh_state_and_republication ... ok
+test out_of_order_state_cannot_erase_high_water_even_after_refusal ... ok
+test repeated_state_identity_with_changed_content_is_refused ... ok
+test retained_primary_stop_and_one_way_mute_are_not_lifecycle_replay ... ok
+test retained_touch_sleep_and_reset_do_not_replay_on_subscribe ... ok
+test session_fences_are_bounded_without_evicting_old_owners ... ok
+test source_configuration_is_immutable_within_controls_session ... ok
+test source_fault_withdraws_held_lifecycle_eligibility_even_after_fresh_recovery ... ok
+test stale_current_acquisition_cannot_be_renewed_by_fresh_state_heartbeat ... ok
+test stale_retained_hold_does_not_keep_advancing_new_contact_fence ... ok
+test stalled_state_stream_suppresses_hold_that_crossed_unknown_lifecycle_interval ... ok
+test state_then_event_deduplicates_exact_identity_without_replaying ... ok
+test whole_new_hold_qualifies_after_bootstrap_and_is_only_delivered_once ... ok
+test wrong_clock_and_disabled_cannot_establish_owner ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/touch_replay.rs (target/debug/deps/touch_replay-6d694e5ce27516cf)
+
+running 17 tests
+test all_fault_cancels_both_sources_without_fabricating_released_levels ... ok
+test between_tick_inputs_keep_exact_receipt_and_emit_at_next_two_millisecond_tick ... ok
+test blocked_or_faulted_strip_does_not_refresh_or_cancel_independent_gpio ... ok
+test byte_line_record_and_duration_bounds_match_the_legacy_recorder_limits ... ok
+test cli_ready_replay_is_the_exact_labelled_reconstruction_with_authored_clock_and_sequence ... ok
+test duplicate_future_wrong_clock_and_lost_sequence_are_retained_as_rejection_evidence ... ok
+test end_cannot_truncate_inputs_exceed_ten_minutes_or_overflow_tick_clock ... ok
+test equal_receipt_fault_after_acquisition_cancels_unpublished_action_before_tick ... ok
+test full_ten_minute_authored_horizon_is_bounded_and_has_no_implicit_input ... ok
+test gpio_fault_record_cannot_erase_a_healthy_strip_or_forge_its_baseline ... ok
+test issue711_changed_only_adaptation_has_explicit_stale_faults_and_no_actions ... ok
+test issue711_reconstructed_continuity_has_one_contact_and_no_slide_end_tap ... ok
+test issue711_working_set_keeps_the_reconstructed_trace_and_full_span_coordinates ... ok
+test parser_rejects_missing_input_unknown_fields_invalid_shapes_and_backwards_receipts ... ok
+test replay_is_byte_identical_and_shadow_requests_remain_disabled ... ok
+test strip_hold_is_one_touch_one_sleep_and_tail_expiry_is_unknown_not_release ... ok
+test writer_and_flush_failures_are_returned_without_a_success_summary ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.98s
+
+     Running tests/touch_runtime.rs (target/debug/deps/touch_runtime-6344eeaf91fa084e)
+
+running 11 tests
+test a_second_touch_owner_cannot_publish_into_the_same_bus_root ... ok
+test draining_a_source_is_bounded_and_overflow_faults_only_that_source ... ok
+test gpio_reader_failure_does_not_cancel_fresh_strip_touch ... ok
+test head_and_reset_roles_never_enter_legacy_primary_retention ... ok
+test missing_all_inputs_never_advertises_a_released_or_ready_hand ... ok
+test one_source_never_renews_the_other_sources_acquisition_time ... ok
+test rejected_complete_gpio_cannot_retain_a_primary_stop_or_long_hold_mute ... ok
+test shadow_state_and_events_are_observable_but_both_receivers_refuse_authority ... ok
+test stale_arrival_never_makes_a_fresh_source_fail_or_restamps_old_data ... ok
+test strip_reader_failure_withdraws_strip_contact_without_losing_primary ... ok
+test strip_startup_failure_leaves_primary_gpio_and_legacy_stop_working ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+     Running unittests src/lib.rs (target/debug/deps/lamp_msgs-1da7f47a1b5b65d5)
+
+running 19 tests
+test air::tests::stuffiness_follows_carbon_dioxide ... ok
+test air::tests::the_air_is_its_readings_and_how_it_feels ... ok
+test ears::tests::a_sudden_sound_is_how_loud_out_of_what_quiet_and_for_how_long ... ok
+test ears::tests::the_room_level_is_two_levels_and_whether_the_lamp_was_speaking ... ok
+test tests::a_decision_says_what_was_chosen_how_likely_by_whom_and_from_which_answers ... ok
+test tests::a_diagnostic_is_a_level_a_name_a_message_and_a_few_facts ... ok
+test tests::a_joint_state_has_ros_lists_and_what_was_commanded ... ok
+test tests::a_light_is_on_or_off_in_one_of_ten_colours_at_one_of_five_levels ... ok
+test tests::an_image_reference_names_a_file_every_process_can_find ... ok
+test tests::audio_is_a_header_line_and_then_the_samples_as_they_are ... ok
+test tests::every_first_topic_is_declared_as_the_table_of_first_topics_has_it ... ok
+test tests::faces_are_a_list_of_boxes_in_fractions_of_the_picture ... ok
+test tests::speech_is_text_that_is_finished_or_still_coming ... ok
+test tests::the_board_says_numbers_and_leaves_out_what_it_cannot_measure ... ok
+test tests::the_lamps_health_is_its_parts_worst_first_and_the_worst_is_its_level ... ok
+test tests::the_link_is_ready_or_says_why_it_is_not ... ok
+test tests::the_name_heard_is_a_score_and_how_long_ago_it_began ... ok
+test tests::the_room_is_unknown_quiet_or_busy ... ok
+test tests::the_voice_says_which_of_four_things_it_is_doing ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/bus.rs (target/debug/deps/bus-c04905e405b5bcf3)
+
+running 1 test
+test every_first_topic_is_declared_on_the_bus_and_carries_its_type ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/controls.rs (target/debug/deps/controls-c2493db4ba57ed10)
+
+running 13 tests
+test an_old_one_way_mute_can_be_retained_during_input_fault ... ok
+test base_feedback_needs_ready_observed_contact_and_matching_hold_tier ... ok
+test controls_contracts_roundtrip_with_future_fields_without_privacy_grants ... ok
+test controls_topics_are_additive_with_bounded_event_and_status_freshness ... ok
+test fault_status_cannot_claim_ready_or_retain_active_hold_feedback ... ok
+test future_zero_identity_and_impossible_edge_durations_are_rejected ... ok
+test held_feedback_requires_fresh_armed_press_and_matching_tier ... ok
+test intentional_pet_decision_delay_does_not_make_a_new_pet_event_stale ... ok
+test retained_requests_cannot_change_session_boot_intent_time_or_enabled_state ... ok
+test safe_source_gesture_intent_combinations_are_the_only_accepted_actions ... ok
+test status_arrays_and_names_are_bounded_and_unknown_action_names_fail ... ok
+test stop_cannot_refresh_itself_by_republishing_an_old_release ... ok
+test tap_and_hold_intents_enforce_the_release_duration_boundary ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/expression.rs (target/debug/deps/expression-c584f5133abc109a)
+
+running 8 tests
+test every_new_wire_type_round_trips_and_ignores_future_fields ... ok
+test finite_si_offsets_and_normalized_gaze_are_checked_at_the_boundary ... ok
+test invalid_playout_levels_intervals_and_identity_are_refused ... ok
+test lease_expiry_is_half_open_and_cannot_be_extended_by_apply_time ... ok
+test off_setting_stays_off_and_shadow_reports_cannot_claim_outputs ... ok
+test optional_expression_topics_have_own_types_and_do_not_replace_light_setting ... ok
+test required_identity_is_not_guessed_and_unknown_states_are_errors ... ok
+test schedules_require_a_future_device_clock_time_and_terminal_states_are_explicit ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/expression_rest.rs (target/debug/deps/expression_rest-317dd70a182271ea)
+
+running 6 tests
+test additive_wire_is_flat_and_future_fields_remain_compatible ... ok
+test duplicate_generation_or_nested_identity_cannot_override_an_earlier_field ... ok
+test generation_fences_do_not_relax_schedules_intervals_or_identity_validation ... ok
+test held_progress_is_listening_but_readiness_remains_the_owners_fact ... ok
+test new_topics_have_distinct_types_and_original_contracts_are_unchanged ... ok
+test required_fences_are_never_inferred_from_legacy_messages ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/schedule.rs (target/debug/deps/schedule-dd7b5cb5d3c2b9e6)
+
+running 12 tests
+test all_nonoptional_fields_are_required_including_nested_clock_and_notice ... ok
+test clock_shape_uses_the_existing_contract_without_inventing_a_clock_or_sequence ... ok
+test counts_share_one_bound_and_extreme_unsigned_values_cannot_overflow_the_check ... ok
+test discovery_is_additive_and_declares_one_latest_topic_with_a_three_second_lifespan ... ok
+test due_round_trip_carries_metadata_and_ignores_additive_fields_at_every_level ... ok
+test malformed_numeric_or_enum_like_boolean_values_are_not_guessed ... ok
+test missing_optional_notice_still_fails_validation_when_due_work_is_offered ... ok
+test notice_ids_are_positive_and_due_dates_have_explicit_inclusive_bounds ... ok
+test oldest_is_present_if_and_only_if_enabled_ready_and_pending ... ok
+test optional_unknown_lateness_and_withdrawn_notice_are_omitted_and_round_trip ... ok
+test store_identity_is_exact_lowercase_hex_not_an_arbitrary_identifier ... ok
+test unknown_lateness_is_not_converted_to_an_on_time_claim ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/touch.rs (target/debug/deps/touch-0fe57c48390c69b6)
+
+running 15 tests
+test brief_qualified_strip_release_has_no_invented_current_position ... ok
+test contextual_intent_is_chosen_by_owner_and_contains_no_readiness ... ok
+test head_names_mask_and_source_geometry_are_exact ... ok
+test head_qualifies_actual_continuous_observations_only ... ok
+test invalid_identities_and_temporal_order_are_refused ... ok
+test original_acquisition_and_publication_both_expire_exactly ... ok
+test primary_and_reset_keep_their_exact_one_way_intent_while_asleep ... ok
+test primary_preserves_stop_and_software_mute_release_tiers ... ok
+test reset_is_a_distinct_five_second_release_only_request ... ok
+test retained_events_cannot_change_session_time_or_overwrite_motion ... ok
+test roundtrip_new_contract_and_reject_unknown_actions_fields ... ok
+test sleep_and_wake_are_distinct_fixed_alternatives_not_toggle_or_mic_grants ... ok
+test slides_require_finite_normalized_geometry_and_explicit_destination ... ok
+test state_requires_current_acquisition_and_unknown_withdraws_contact ... ok
+test touch_topics_are_explicit_and_leave_v1_inventory_unchanged ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lamp_controls
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests lamp_msgs
+
+running 1 test
+test crates/msgs/src/lib.rs - (line 24) - compile ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 0.89s; merged doctests compilation took 0.35s

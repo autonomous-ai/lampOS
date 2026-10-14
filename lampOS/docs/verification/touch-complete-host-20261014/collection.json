@@ -1,0 +1,8 @@
+{
+  "source_commit": "08a32c9d8e9fbab643b6442e6e3e7a37736ca9ca",
+  "working_tree_clean": true,
+  "all_manifest_files_match": true,
+  "machine": "Intel i7-10700K x86_64 development Mac, macOS 26.6.2 / Darwin 25.6; not a lamp",
+  "source_manifest": "final-buffered-source.json",
+  "note": "The task head stayed fixed throughout the final full host and native gates. Evidence is added only to lamp-third."
+}
