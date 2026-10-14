@@ -893,6 +893,47 @@ failed or ignored**. Its logs are `lamp-fourth-policy-baseline-clippy.log` and
 `lamp-fourth-policy-baseline-tests.log` in the same local directory. No service
 was contacted outside the test machine.
 
+## 2026-10-14: task 17, local-judge — taken
+
+- Taken from the running list read for this cycle at `1750c3d08`; task 21 is
+  complete on Fourth. The later list visible at `23843b78e` leaves task 17
+  unchanged and open. Fourth's verified base is `7a4eded41`.
+- Task branch: `fourth/local-judge`. Scope: new files in `crates/policy`,
+  `policy.rs` only for asking and combining the second judge, the part's
+  English docs, and the new model's data/provenance. No changes to existing
+  `main.rs`, `lib.rs`, Cargo manifests, message types, Voice, Body or deployment.
+- Implement the same seven typed questions from explicit nullable local cues,
+  with one weights file. Preserve the existing Jev state and calibration.
+  Keep unknown orientation distinct from observed-away; current transcript
+  receipt times cannot supply acoustic speech duration.
+- Add an explicitly enabled, shadow-only entry point. Take the local answer
+  immediately and publish one final choice under a short deadline. Keep a
+  single slow request outstanding, log late answers against their original
+  decision, and keep later local decisions independent of a slow service.
+  With no timely slow answer and no call evidence, choose `look_up` rather
+  than answer. Compare against the busy-room rule using declared snapshots.
+- Fit question heads, local combination and evaluation on separate session
+  partitions. Synthetic fixtures test the machinery; seed weights will be
+  marked unfitted. No paid service, account, key or lamp access is needed.
+- Latency target: local `Decider::ask`, including input parsing, p95 at most
+  20 ms and p99 at most 50 ms; measure first use separately. Target a final
+  internal shadow choice within a 100 ms decision budget, excluding existing
+  transcript gathering, ASR, bus scheduling and acoustic response. Keep
+  network and disk work off the new decision arithmetic path.
+- The existing Policy baseline passed all 81 tests and strict Clippy on the
+  development Mac, as recorded above. Finish with the full required gate and
+  a standalone source-copy check, keeping failures and exact machine details.
+
+**For First, in this log:** the labelled played-scene records are not present
+in this checkout. Please supply the independent directed/not-directed label,
+nullable labels for the seven questions, session/group identity and rights to
+use the records. To reproduce Voice's actual busy-room gate, also keep the
+text prefix, 45-second conversation state, own-turn flag and facing result
+available at its first output; Policy's completed text and 20-second context
+are different inputs. The precise JSONL schema will accompany the fitter.
+Implementation and synthetic checks continue without these records. Most likely
+wrong on the lamp: the initial weights and receipt-time association of cues.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
