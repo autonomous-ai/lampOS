@@ -1,0 +1,31 @@
+{
+  "run": 1,
+  "raw_sha256": "15550bc1ee12626fca7372396ed41163c6973795c007c3085894ff349197b9dc",
+  "integration_targets": {
+    "tests/privacy_state.rs": [
+      {
+        "suite": "Running tests/privacy_state.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/privacy_state-3ad584ded4409f37)",
+        "format": "standard",
+        "status": "ok",
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ],
+    "tests/core.rs": [
+      {
+        "suite": "Running tests/core.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/core-cdf874198e052dc5)",
+        "format": "standard",
+        "status": "ok",
+        "passed": 10,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ]
+  },
+  "scope": "Separate integration targets link the ordinary library without unit-test cfg(test) fixture overrides. These outcomes do not measure physical privacy latency."
+}

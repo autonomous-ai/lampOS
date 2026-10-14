@@ -1,0 +1,25 @@
+{
+  "source_sha256": "38826ab14ec9ce55ef4c1fe867fb7c1b9ca7ff653fa53baf73dc7bfc3bf43606",
+  "source_path": "crates/voice/src/coordinator/tests/pilot_faults.rs",
+  "base_commit": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "method": "Independent read-only comparison with the frozen V6 pilot file; no edits, Cargo or lamp access by reviewer. Root separately read the complete incremental diff.",
+  "findings": [],
+  "original_tests_retained": 35,
+  "original_test_bodies_unchanged": 34,
+  "original_assertions_retained": true,
+  "current_tests": 36,
+  "current_assertion_macros": 185,
+  "observations": [
+    "Real writer enters its blocked first event before children or scoped time.",
+    "Only the metadata scenario switches to Stepped; rapid mute/reopen remains Threaded.",
+    "Actual host instants bracket SIGTERM send and verified child exit/reap; existing less-than-one-second limit remains.",
+    "Logging finish uses the unchanged real 500 ms wait and 250 ms host assertion margin.",
+    "Original unacknowledged report is preserved; zero written events proves the write remained blocked.",
+    "Normal release is checked and requires a later real finish receipt.",
+    "RAII release and bounded unwind cleanup keep the real writer channel alive; a typed-panic regression preserves the original failure."
+  ],
+  "limitations": [
+    "Source review is not a loaded-host, native ARM64 or lamp result.",
+    "Real scheduling limits remain; no arbitrary-starvation claim."
+  ]
+}

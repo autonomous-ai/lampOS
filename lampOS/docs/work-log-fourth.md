@@ -3062,6 +3062,47 @@ failure is retained in the preceding entry. Remaining local/dependent gates
 and exact-head native ARM64 CI have not yet run for this version.
 
 
+## 2026-10-15, 06:12 ICT: task 46, v7 stops at the real endpoint-worker fixture
+
+Ready for lamp-voice: no
+
+[Complete v7 evidence](verification/voice-fixtures-loaded-v7-20261015/README.md)
+retains the first full run: 1,170 passed / 1 failed / 8 existing ignored,
+21 suites, 453.303 seconds including Cargo. Four actual ARM64 cross-build
+cycles passed. Source hashes stayed unchanged; the sequence stopped before
+run 2 and allowed the active build to finish. The 92 samples recorded
+one-minute load 4.181–9.181 and minimum available space 40,765,296,640 bytes
+on Fourth's Intel Mac. These are host tests and cross-compilation, not
+native ARM execution or lamp measurements.
+
+The failing case is
+`endpoint_session::hung_worker_never_delays_capture_endpoint_or_session_end`.
+It returned `physical privacy closed or lost freshness` after 4.240981188
+real seconds of its requested six-second session. Capture's immutable
+source gap stayed 10,000 us; its maximum after-send delivery gap and source
+age were 48,361 us and 39,164 us. Privacy producer timing and coordinator
+consumption age were not recorded. The capture figures do not identify the
+privacy cause. Failed raw SHA-256:
+`15550bc1ee12626fca7372396ed41163c6973795c007c3085894ff349197b9dc`.
+All four named regressions, all pilot/EarlyEnd/motor cases and the other
+98 affected-cohort outcomes matched expectations; the corrected metadata
+scenario and its new unwind regression passed.
+
+The task explicitly permits a test-only freshness bound passed in. The
+finite real-worker ordering fixture will select the existing per-instance
+100,000 us allowance, capped at the unchanged IPC ceiling, with a real
+12-second conversation watchdog. This covers four active ordering cases
+and the already-ignored real-model provenance case. Six stepped scenarios
+and all three endpoint mute/cleanup cases retain the default 50,000 us
+policy. Actual classifier startup, result, hang/recovery, cleanup and all
+original assertions stay unchanged. A guard will reject logical time before
+child construction; no new Ready wait will hide intentional loading or
+missing-model behavior. Bounded producer diagnostics will remain explicitly
+separate from unmeasured consumption age. Production privacy stays 50 ms,
+and no Body change is made. This version is not ready and no failed gate is
+being offered as a PR.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,

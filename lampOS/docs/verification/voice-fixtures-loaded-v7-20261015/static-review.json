@@ -1,0 +1,112 @@
+{
+  "base": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "method": "Compose independent V6 review of unchanged task source with independent V7 pilot metadata review; only that test file and its two docs changed from frozen V6.",
+  "findings": [],
+  "changed_since_v6": [
+    "crates/voice/src/coordinator/tests/pilot_faults.rs",
+    "docs/pilot-faults.md",
+    "docs/voice-test-fixtures.md"
+  ],
+  "unchanged_source_files": 2364,
+  "prior_review": {
+    "base": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+    "method": "Compose the prior independent non-test-boundary review with a new independent four-file integration review; prove the other five reviewed files are byte-identical to v5. No new runtime result implied.",
+    "findings": [],
+    "unchanged_reviewed_files": [
+      "crates/voice/src/coordinator/endpoint.rs",
+      "crates/voice/src/privacy.rs",
+      "crates/voice/src/transport.rs",
+      "crates/voice/src/process.rs",
+      "crates/voice/src/scenario_clock.rs"
+    ],
+    "reviewed_after_integration": {
+      "base": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+      "source_hashes": {
+        "coordinator.rs": "c49047b9c4361fb04416fc025ecf3f0b8f3facf41d91439c75eba0f5d0e99399",
+        "coordinator/tests/endpoint_session.rs": "a2ab919c4dfaf127ab0a68222ca900415656b3fa87c198dbf80b85f73969768f",
+        "coordinator/tests/pilot_faults.rs": "63cd1b3c0f6fa6bc53a631d4156b9942158238177c84e8d6d8c62b6913a10876",
+        "lib.rs": "438d63ed83baccf3b22f1076fbc1ddcc3327745815f677dc89025305a966f107"
+      },
+      "method": "Independent read-only review of the task diff against the new integration head and the saved autostash. No edits, Cargo commands or target access.",
+      "findings": [],
+      "observations": [
+        "Reminder propagation remains intact through run_inner, conversation_with_controls and conversation_with_gate.",
+        "Explicit None remains confined to test helpers.",
+        "Endpoint and pilot fixtures reject unexpected Reminder input.",
+        "The three forwarding lines are the only changes since automatic autostash application; the other three files match its hashes."
+      ],
+      "limitations": [
+        "Source review only; no compilation or runtime/lamp qualification claimed."
+      ]
+    },
+    "prior_review": {
+      "base": "f2261ec48e35a0bcfc1fa6fbd95f8edbc23f6d4d",
+      "reviewed_files": [
+        "crates/voice/src/coordinator.rs",
+        "crates/voice/src/coordinator/endpoint.rs",
+        "crates/voice/src/privacy.rs",
+        "crates/voice/src/transport.rs",
+        "crates/voice/src/process.rs",
+        "crates/voice/src/lib.rs",
+        "crates/voice/src/scenario_clock.rs"
+      ],
+      "source_copy": "/private/tmp/lamp-fourth-fixtures-source-v5-nnl_8y5c",
+      "findings": [],
+      "method": "Independent read-only comparison against integration base and the frozen source. All seven reviewed files matched frozen V5 byte-for-byte. No edits or Cargo commands.",
+      "observations": [
+        "Normal builds retain real clocks and PrivacyGate::default().",
+        "Privacy remains 50000 us, stable reopening 60000 us and IPC freshness 100000 us.",
+        "Overrides, fixture entrypoints and scoped clock require cfg(test); privacy tolerance is per instance.",
+        "Clock advancement checks overflow before assignment; callback errors retain cleanup pump and panic clears only the matching scope.",
+        "Existing new tests cover watchdog expiry and callback-error cleanup.",
+        "waitid with WNOWAIT observes exact child exit without reaping; the supervisor retains reap/status checks and the shared real cleanup deadline.",
+        "Fixture startup failures attempt both kill and wait."
+      ],
+      "limitations": [
+        "Source inspection only; this is not a dynamic qualification result.",
+        "Loaded host execution and lamp behavior require separate evidence."
+      ]
+    },
+    "frozen_hashes": {
+      "crates/voice/src/coordinator.rs": "c49047b9c4361fb04416fc025ecf3f0b8f3facf41d91439c75eba0f5d0e99399",
+      "crates/voice/src/coordinator/endpoint.rs": "117016f2f139da9daca2567e5fd4e804d6448e99d6806995d06913ce9d34ffd8",
+      "crates/voice/src/privacy.rs": "09db2bf98464fb1fcfd3486f7ed6a4150ef83bc819a11b50def4bf5b38541d65",
+      "crates/voice/src/transport.rs": "12a55a96fab0c0a7ce9b73b1f855d605c01c52772ac358ab2c60cdb2af30b4c4",
+      "crates/voice/src/process.rs": "44992ad3334f39f4c9d1c8d3cead13d0da39ea2da3ba0da68779e048bc09adb7",
+      "crates/voice/src/lib.rs": "438d63ed83baccf3b22f1076fbc1ddcc3327745815f677dc89025305a966f107",
+      "crates/voice/src/scenario_clock.rs": "1d437ad7210c351b711bb3d0a21a90063c00af2fcf5b4fef5ed6f13dd0fe9e5f"
+    },
+    "limitations": [
+      "Source review only; loaded host and native ARM64 results are separate.",
+      "No lamp access or arbitrary-starvation qualification."
+    ]
+  },
+  "metadata_review": {
+    "source_sha256": "38826ab14ec9ce55ef4c1fe867fb7c1b9ca7ff653fa53baf73dc7bfc3bf43606",
+    "source_path": "crates/voice/src/coordinator/tests/pilot_faults.rs",
+    "base_commit": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+    "method": "Independent read-only comparison with the frozen V6 pilot file; no edits, Cargo or lamp access by reviewer. Root separately read the complete incremental diff.",
+    "findings": [],
+    "original_tests_retained": 35,
+    "original_test_bodies_unchanged": 34,
+    "original_assertions_retained": true,
+    "current_tests": 36,
+    "current_assertion_macros": 185,
+    "observations": [
+      "Real writer enters its blocked first event before children or scoped time.",
+      "Only the metadata scenario switches to Stepped; rapid mute/reopen remains Threaded.",
+      "Actual host instants bracket SIGTERM send and verified child exit/reap; existing less-than-one-second limit remains.",
+      "Logging finish uses the unchanged real 500 ms wait and 250 ms host assertion margin.",
+      "Original unacknowledged report is preserved; zero written events proves the write remained blocked.",
+      "Normal release is checked and requires a later real finish receipt.",
+      "RAII release and bounded unwind cleanup keep the real writer channel alive; a typed-panic regression preserves the original failure."
+    ],
+    "limitations": [
+      "Source review is not a loaded-host, native ARM64 or lamp result.",
+      "Real scheduling limits remain; no arbitrary-starvation claim."
+    ]
+  },
+  "limitations": [
+    "Static review is separate from loaded host/native ARM64/lamp qualification."
+  ]
+}

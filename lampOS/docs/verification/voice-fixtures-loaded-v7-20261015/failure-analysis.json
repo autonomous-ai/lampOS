@@ -1,0 +1,31 @@
+{
+  "failed_test": "coordinator::tests::endpoint_session::hung_worker_never_delays_capture_endpoint_or_session_end",
+  "raw_sha256": "15550bc1ee12626fca7372396ed41163c6973795c007c3085894ff349197b9dc",
+  "raw_lines": [
+    1010,
+    1015
+  ],
+  "observed": {
+    "packet_and_source_clock": "host",
+    "real_conversation_seconds": 4.240981188,
+    "requested_session_seconds": 6,
+    "result": "physical privacy closed or lost freshness",
+    "capture_frames": 418,
+    "maximum_capture_source_gap_us": 10000,
+    "maximum_capture_delivery_gap_us": 48361,
+    "maximum_capture_source_age_after_send_us": 39164
+  },
+  "not_recorded": [
+    "privacy producer gap",
+    "privacy observation continuity gap",
+    "privacy observation age at coordinator consumption",
+    "coordinator scheduling gap"
+  ],
+  "interpretation": "The error establishes privacy closure in the real-worker ordering fixture. The capture producer measurements do not identify the privacy timing cause.",
+  "next_work": "Explicit per-instance <=100000 us test privacy tolerance for finite real-worker ordering cases, with real watchdog and unchanged classifier clocks; keep all stepped/mute-cleanup cases default50000us. Add before-child host-clock guard and bounded privacy producer diagnostics.",
+  "not_qualified": [
+    "ten consecutive full runs",
+    "native ARM64 task-head run",
+    "lamp privacy response"
+  ]
+}
