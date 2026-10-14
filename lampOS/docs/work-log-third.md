@@ -518,6 +518,37 @@ Questions blocking further Third work: none. The manager/interface and trusted
 release root/feed questions from the claim remain integration prerequisites,
 not assumptions made by this implementation.
 
+## 2026-10-14 — expression-rest — taken
+
+- Task: 18, holding back for someone and a lamp at rest; now the first open
+  Third assignment in the freshly fetched priority table.
+- Base: `origin/lamp-voice` at `d83834cb2a96f8db72e84e3bbee7c4c6a0de4422`.
+  Rebased `lamp-third` and pushed with an explicit lease. First's Controls
+  adoption dropped out automatically. Workspace/lock/research additions were
+  combined without removing or upgrading any locked package identity;
+  Surround runtime/vendor sources remain identical to the tested task branch.
+- Post-rebase checks on the same development Mac: workspace build passed
+  (Cargo 29.10 s), formatting passed, and the TLS-provider regression passed.
+  Offline metadata first lacked newly added `ort`; after fetching the pinned
+  public crates, Cargo normalized ordering and one dependency disambiguation.
+  No lamp or production service was accessed.
+- Branch: `third/expression-rest`, from `lamp-third` after this claim.
+- Scope: `crates/expression`, additive `crates/msgs` contracts, replay fixtures
+  and English documents. No Voice/Body implementation or deployment changes.
+  Study V1's real pause/idle paths, current Voice/Body integration and maintained
+  motion/turn-taking sources before extending the catalogue and engine.
+- Build explicit held/resumed audio generations, a finish-of-turn nod that may
+  continue into thinking, a default non-concentrating state, and bounded quiet
+  rest behavior. New motion remains optional and catalogue-controlled; no
+  missing or busy room evidence may authorize it. Retired sound stays retired.
+  Face response is tested against the 100 ms target using an injected clock;
+  First owns actual audio disposal, motor timing and camera judgement.
+- First's measured head delay/amplitude in `docs/body.md` informs the written
+  nod; it is First's lamp evidence, never a measurement by this machine.
+- Questions blocking independent work: none. The most likely lamp limitation
+  is how rest looks, and today's Body deliberately ignores expression offsets
+  at rest; the handoff will specify that integration without changing Body.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
