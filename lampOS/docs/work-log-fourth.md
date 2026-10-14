@@ -441,6 +441,35 @@ First must assign their stable roots and closure contract before such adapters
 can be safe. This does not block the voice-root handback or task 16. No account,
 key, paid service, owner relay, lamp access or deployment was used.
 
+## 2026-10-14: task 16, lean-check — taken
+
+- Task 15 was fast-forwarded and pushed, then the latest list was fetched.
+  First has integrated tasks 13 and 14 and added task 17 after this one.
+  Rebased `lamp-fourth` onto `6a1d2745c`; task 15 is now `eb57fa71f`.
+  The memory-document add/add conflict was resolved by keeping First's
+  newer document and lamp measurements verbatim. The memory code was already
+  integrated; the remaining memory/addressee commits retain this log only.
+- Lease-pushed only `lamp-fourth`. The records crate and its bus/message
+  dependencies are unchanged by rebase. The base at `702cab8ed` passed
+  formatting and workspace build; the two subsequent end-of-turn commits
+  are being checked before implementation.
+- Task branch: `fourth/lean-check`. Scope is the new `crates/lean` library,
+  one clearly marked stand-in geometry file, `docs/lean.md`, reuse notes
+  and workspace registration. Body, Expression, deployment and the shared
+  list remain untouched. No call is wired to real movement.
+- Read V1's actual `recording_stability.py` and tests, the fall verdict,
+  current joint units/calibration and Expression's offset semantics before
+  choosing the model. Use explicit SI units and validate every pose. Measure
+  the centre of mass against the footprint with an explicit inward margin.
+- Supply pose, complete planned-step and composed clip checks, with worked
+  arithmetic and rejection tests. Document exactly how First measures masses,
+  centres, axes, lengths and the contact footprint, and where Body calls the
+  library later. Static balance cannot establish dynamic tipping safety.
+- This future gate belongs before output; target under 1 ms per pose and
+  under 10 ms for 1,000 checked poses on this development Mac, measured in
+  release mode with first/repeated boundaries stated. These are targets,
+  not lamp results. No hardware access or owner answer is needed to start.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
