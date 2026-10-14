@@ -1682,6 +1682,36 @@ Do not infer thanks/laughter from private words or invent a classifier from
 voice activity. Any unavailable semantic or wake input will be an explicit
 contract question and limitation, not a fabricated live observation.
 
+## 2026-10-14, 18:24 ICT: task 35 input contracts and open questions
+
+Ready for lamp-voice: no
+
+Read the current producers and V1 ambient sleep suppression before designing
+Mood. Current Controls messages do not distinguish a sleep request from the
+second-hold clear outcome; task #711 is replacing them. No existing bus event
+identifies gratitude/laughter, and no public recorded day was found. Asked
+First on #713 for the new touch outcome contract, the intended semantic
+producer, and sanitized recorded-day metadata or acceptance of an explicitly
+authored replay. These gaps do not block deterministic engine work.
+
+The safe current interpretation is metadata only: fresh Stop/Pet can count
+as touch, existing voice activity can count as company, and words are discarded
+without sentiment inference. No microphone action, readiness assertion, or
+invented sleep/wake toggle. Thanks/laughter remain pure-engine/replay inputs
+until there is an actual typed producer. Planned restart: no persisted state,
+no attention or familiarity, local-clock awake baseline, neutral energy/warmth.
+A fresh pending reminder may be accepted once again after Mood itself restarts;
+there is no speech or durable-delivery acknowledgement. Morning, faces and
+noise cannot clear sleep after it latches. A privacy-closed microphone remains
+closed regardless of a metadata name/touch/reminder cue.
+
+Transport review found two boundaries that timing must name: bus receive can
+skip an unbounded stream of invalid datagrams inside a call, and Latest publish
+writes synchronously to disk. Isolate transport from the pure state engine;
+use bounded admission/queues and report slow-I/O/invalid-input behavior without
+claiming a hard syscall deadline. Existing head Pet is also delayed by its
+recognizer, so receipt-to-state time cannot be called physical-touch latency.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
