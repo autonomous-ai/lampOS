@@ -1825,6 +1825,33 @@ reproduced its JSONL byte for byte. No real recorded day was substituted.
 Task evidence is in Mood's worktree under `verification/mood-host-20261014/`;
 full gate completion and native ARM64 CI are still required before handoff.
 
+## 2026-10-14, 19:30 ICT: queue refresh, host disk recovery and Body reply
+
+Ready for lamp-voice: no
+
+The half-hour fetch/read leaves Fourth's queue unchanged. Upstream is now
+`bf85845f85e80064c69535d17737134feea4844d`. First answered #698: `652a196e1`
+fixes the inherited Linux Body warnings (`inspection::run` is test-only and
+an unnecessary `mut` is removed). Fourth's log and idle Memory branch have
+been rebased; Mood stays on its pinned source until its current tests finish.
+The fix still needs Fourth's own dependency-gate verification before handoff.
+
+The full Mac Mood/Msgs-dependent run passed formatting and strict workspace
+Clippy, then failed unchanged Health's initial-journal assertion at
+`tests/program.rs:536`: the machine was 6% disk-free, so its real board warning
+preceded the expected missing-Eyes line. Kept the full failure. Reclaimed only
+Fourth's reproducible judge/Records target directories and Memory debug caches;
+free disk rose from about 26.3 to 56.5 GiB. No source, retained evidence, release
+timing artifact, assertion or Health threshold was changed.
+
+Health's whole suite now passes, including that case. The continuation covers
+all 21 packages not fully completed before the failure, then outstanding
+doctests for the 12 completed packages and the workspace build. Cargo artifact
+and workspace metadata prove that union covers all 33 members; no required
+test was excluded. Exact commands, plan and cache-reclaim output are retained
+with Mood's evidence. The remaining run and the three task ARM64 runs are
+still active. No failing or unfinished task has been marked ready.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
