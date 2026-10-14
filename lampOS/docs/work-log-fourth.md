@@ -470,11 +470,149 @@ key, paid service, owner relay, lamp access or deployment was used.
   release mode with first/repeated boundaries stated. These are targets,
   not lamp results. No hardware access or owner answer is needed to start.
 
+## 2026-10-14: task 16, lean-check — done
+
+Implementation `98dccf7fa` on `fourth/lean-check`, fast-forwarded to
+`lamp-fourth`. New `lamp-lean` library, one synthetic geometry JSON, a finite
+read-only catalogue example, tests, [Lean documentation](lean.md), and reuse
+notes. Body, Expression, messages, deployment and the running list are untouched.
+The base at `6a1d2745c` passed formatting and workspace build before the task
+(52.95 seconds), completing the check mentioned in the taken entry.
+
+**Built:** five named joints in explicit physical serial order, SI units,
+encoder-angle conversion, measured zero/axis conventions, each rigid part's
+own COM including the last wrist, and the fixed base's COM. Validated convex
+support geometry supplies true signed distance to an inward-margin polygon,
+including outside corners and edges that disappear during inset. All input
+values, sizes and work are bounded; malformed geometry never passes through.
+The wholly invented five-rod data are labelled `stand_in` and cannot establish
+anything about the lamp's real mass or dimensions.
+
+One call checks a pose; one checks every prescribed movement step and its
+declared joint-linear interpolation; one checks a complete isolated Expression
+smoothstep cycle on a fixed absolute posture, with explicit weight, limits
+and applied-joint mask. Conservative COM-displacement bounds cover between
+evaluations. Outside witnesses and unresolved bounds are distinct refusals.
+At most 10,000 prescribed samples, 100,000 total evaluations and 20 subdivision
+levels are allowed. Clip admission, exit, interruption, overlapping behaviours,
+moving base postures and asynchronous servo motion require separate owner
+composition/qualification; those are not silently inferred from samples.
+
+The example reads only supplied bounded JSON and counts, reports both all-five
+and today's head/yaw mask, and always emits `actuation_qualified:false`.
+Nothing is wired to the lamp or changes its behavior. Future integration needs
+an explicit off-by-default switch owned by First. The document specifies the
+final Body write sites and covers ruler/scale measurements of masses, local
+COMs, origins, axes, zeros, supported contacts and uncertainty.
+
+**Verified on the development Mac:** macOS 26.6.2 (25G83), x86_64 Intel
+Core i7-10700K 3.80 GHz, 16 logical CPUs, 64 GiB RAM; Rust/Cargo 1.96.0,
+compiler `ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96`. From `lampOS/`, with
+`/Users/autonomous/.cargo/bin/cargo`:
+
+| Command | Result |
+|---|---|
+| `cargo fmt --all --check` | Pass |
+| `cargo clippy -p lamp-lean --all-targets --offline --locked -- -D warnings` | Pass, no warnings |
+| `cargo test -p lamp-lean --all-targets --offline --locked` | 63 passed; zero failed; two finite timing tests normally ignored |
+| `cargo build --workspace --offline --locked` | Pass; workspace also built before the task |
+| `cargo tree -i lamp-lean --offline --locked` | No dependent workspace crate |
+| `cargo +stable clippy -p lamp-lean --all-targets --target aarch64-unknown-linux-gnu --offline --locked -- -D warnings` | Pass, cross-target source checking only |
+
+The tests comprise 10 footprint, 30 pose, 15 movement/clip, three catalogue
+and five example tests. They cover hand-worked standing/folded/level-arm
+answers; farther forward never improving clearance; all joint/rotation/order
+conventions; malformed data; safe endpoints with an unsafe interior; the
+actual clamped curve differing from clipped-endpoint interpolation; true
+quarter-time smoothstep; every prescribed step despite a refusal; and separate
+depth/evaluation-cap exhaustion. The current five behaviours have 16 declared
+state/mask combinations, compared against independent dense composition.
+
+**Standalone Linux:** 727 source files copied outside the parent tree to
+`/private/tmp/lamp-fourth-lean-final-jwpt8hc9`; no credentials, `.git` or ignored
+build outputs. The existing local VM is Linux 6.12.13-200.fc41.x86_64, six
+configured CPUs, 8 GiB RAM. Its name `lampos-arm64` does not imply ARM execution.
+The cached Rust/Cargo 1.96.0 image passed the same 63 tests, with the two timing
+tests deliberately ignored there. Exact command:
+
+```sh
+/usr/local/bin/podman run --rm --network none \
+  -v /private/tmp/lamp-fourth-lean-final-jwpt8hc9:/source:ro \
+  -v /Users/autonomous/.cargo/registry:/root/.cargo/registry:ro \
+  -v /Users/autonomous/.cargo/git:/root/.cargo/git:ro \
+  -w /source localhost/lampos-arm64-cross:latest \
+  /bin/sh -c 'CARGO_TARGET_DIR=/tmp/lean-target cargo test -p lamp-lean --all-targets --offline --locked --target x86_64-unknown-linux-gnu'
+```
+
+**Measured only on that Mac, release mode:** one invocation of
+`cargo test -p lamp-lean --release --test cost --offline --locked -- --ignored
+--nocapture` while `arithmetic_cost` was the sole ignored test. Then one invocation
+of `cargo test -p lamp-lean --release --test cost inconclusive_cost --offline
+--locked -- --ignored --nocapture` after adding the work-cap timing test. Each
+workload measured its first call and 30 subsequent calls, with resident inputs,
+`Instant` boundaries and no cache eviction:
+
+| Boundary | First / median / p95 / worst (ms) |
+|---|---|
+| Parse geometry and construct model | 0.061448 / 0.004308 / 0.006650 / 0.008095 |
+| Check one pose, model already constructed | 0.000667 / 0.000209 / 0.000281 / 0.000305 |
+| Check ordinary 1,000-step path, including allocation | 0.277907 / 0.203836 / 0.240004 / 0.256831 |
+| Check a 1.2-second repeating clip, 61 evaluations | 0.024176 / 0.015126 / 0.015775 / 0.017979 |
+| Exhaust all 100,000 evaluations on a near-boundary path | 19.921472 / 19.950070 / 21.012518 / 21.340156 |
+
+The ordinary path is 1,000 sinusoidal small-angle poses at 20 ms intervals.
+The clip uses all-five application over a fixed synthetic posture, also at
+20 ms. Neither needs adaptive extra evaluations. The work-cap case always
+returns `Unresolved` and its timing includes two result assertions. File I/O,
+process startup, Body composition, transport and physical motion are excluded.
+These are first in-process calls, not CPU/disk-cold runs. The stated 1 ms pose
+and 10 ms ordinary-path targets passed; near-boundary work is explicitly
+slower and belongs outside immediate feedback. No before/after or lamp timing
+claim is made.
+
+The native release example exited 0 with 16 positive stand-in results for
+`2048,2048,2048,2048,2048`. The level-arm fixture
+`2048,3072,2048,2048,2048` exited 1 at −0.07 m baseline clearance; an invalid
+4096 count exited 2 with no JSON result. All are arithmetic inputs, never
+commands to a motor.
+
+**Failures kept:** no crate test or clippy stage failed. An initial worker
+format invocation lacked the Cargo-bin `PATH`; the explicit binary passed.
+Sandboxed `sysctl` initially refused the hardware read; an authorized read-only
+retry supplied the machine identity. Review added the clamp/time/bound-limit
+regressions above before the final gate. ARM checking used the already-installed
+`+stable` target with the identical 1.96.0 compiler; it did not execute ARM code.
+
+**One first command on the lamp:** First cross-builds `--example check`, names
+that executable `lean-check`, and places it beside `geometry.stand-in.json`
+and the exact Expression `behaviours.json`. From that directory:
+
+```sh
+./lean-check geometry.stand-in.json behaviours.json 2048,2048,2048,2048,2048
+```
+
+Expect stand-in provenance, COM `[0,0,0.25]` within rounding tolerance,
+clearance +0.09 m, 16 `within_margin` results,
+`model_within_margin_all_checks:true`, `actuation_qualified:false`, and exit 0.
+Then substitute fully measured geometry and all five freshly observed counts,
+compare predictions with independently supported scale readings, and qualify
+the actual final-command paths before adding a disabled-by-default Body gate.
+The all-2048 tuple is **not** a prescribed physical pose.
+
+**Most likely wrong on the lamp:** the masses and which rigid assembly owns
+each motor/cable/attachment, then local COM vectors, zero/axis signs and the
+loaded contact footprint. Correct arithmetic with wrong physical data can
+approve the wrong static model. This library does not establish dynamic tipping,
+collision, friction, compliance, servo tracking, stopping or recovery safety.
+No lamp access, account, key, paid service or deployment was used. No owner
+answer is required; task 17 is next after fetching the list.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
 real extraction model, speaker recognition, natural multi-day spoken test,
 provider-context deletion, or end-to-end lamp latency. Memory remains behind
 `--memory-days`; record deletion requires explicit apply and its disabled-by-
-default configuration switch. The log contains no unanswered question requiring
+default configuration switch. Lean is not wired to Body and all supplied
+geometry remains synthetic. The log contains no unanswered question requiring
 the owner to relay a message.
