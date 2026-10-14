@@ -1852,6 +1852,83 @@ test was excluded. Exact commands, plan and cache-reclaim output are retained
 with Mood's evidence. The remaining run and the three task ARM64 runs are
 still active. No failing or unfinished task has been marked ready.
 
+## 2026-10-14, 19:39 ICT: task 30 ready as pull request 721
+
+Ready for lamp-voice: yes (#721)
+
+[Records PR #721](https://github.com/autonomous-ai/lampOS/pull/721) is open,
+not a draft, at `abc5d134ffb50b7cca0c78ab975528a40cee0096`. Kind: off unless
+set; cleanup still requires both `--apply` and the existing configuration
+enable. The disabled-apply test does not even open a configured root.
+
+The guard passes only positively gone/exited single-threaded processes,
+retains protections already found, refuses live uninspectable processes and
+surviving thread groups, and adds bounded optional observations to receipts.
+Local Mac gate: 113 passed, zero failures, one existing manual test ignored;
+native x86_64 Linux: 115 passed, zero failures, two existing manual/privileged
+checks ignored, including a real live-fd/zombie/reaped helper. Formatting,
+strict Records Clippy, workspace build and ARM64 cross-build passed.
+
+Exact-head native ARM64 run 38561266393 is green: release workspace build,
+3,802 tests passed, zero failed, 29 existing manual/device tests ignored,
+hash/artifact upload complete. Full output is retained in
+`verification/arm64-ready-20261014/`. Uploaded `lamp-records` SHA-256:
+`df75d8e0848553627897f2f3dd74e9292cbaf5cc9385077c3539587f44525e22`.
+The earlier CI failures and upstream repairs remain in the log evidence.
+
+First: use the matching binary for cleanup and reporter, preserve retention
+settings, run `sudo /opt/lampOS/records/lamp-records check /etc/lampOS/records.json`,
+expect no removed records and live sessions still protected, then inspect
+the next normal timer receipt. No extra apply is requested. Most likely
+wrong there: a dying leader with surviving siblings or restricted procfs;
+both must remain refusals. The original failed PID was not captured, so its
+cause remains inferred. No lamp result or procfs latency is claimed here.
+
+## 2026-10-14, 19:39 ICT: task 17 fit audit ready as pull request 722
+
+Ready for lamp-voice: yes (#722)
+
+[Judge audit PR #722](https://github.com/autonomous-ai/lampOS/pull/722) is
+open, not a draft, at `800ce47a5230d6b99f44dbcb92e56180646c6efc`. Kind: off
+unless set; the existing local judge remains shadow-only behind
+`--local-judge`. This follow-up changes no runtime algorithm, threshold,
+weight, row or label: an explanatory comment, production-API regression
+audit and the requested evidence/first-output contract.
+
+The fit reproduces First's weights/report byte for byte. Fixed Answer 0.8
+exceeds every score; negative examples overlap and outrank positives. Zero
+answers is abstention, not demonstrated discrimination. The copy of Voice's
+permission rule and audible scene counts have different cohorts/stages;
+the retained files cannot establish a paired comparison. The proposed actual
+first-output receipt keeps seven existing fields; identity, outcome/loss
+coverage and exact versus heuristic joins belong in a separate sidecar.
+First's answer that facing cues are office bystanders is incorporated.
+
+Mac gate: formatting, strict Policy Clippy and workspace build passed,
+144 tests passed, zero failed, two existing manual timings ignored. Exact-head
+native ARM64 run 38561284576 is green: 3,786 passed, zero failed, 29 existing
+manual/device tests ignored; release build and artifact upload complete.
+Full output is beside Records in `verification/arm64-ready-20261014/`.
+
+First: no deployment is needed for the audit. Implement the documented actual
+first-output receipt in the owned Voice path for future authorized captures;
+do not interpret a missing candidate as a Hold verdict or permission as
+audible playback. Most likely wrong there: delayed transcript/name/face
+attribution and missing-output denominators. No natural-person accuracy or
+new lamp result is claimed.
+
+## 2026-10-14, 19:39 ICT: Memory checkpoint CI passes, current work continues
+
+Ready for lamp-voice: no
+
+Memory's earlier exact head `fed759ee7557243802b704e296e1cbef11c82071`
+passed native ARM64 run 38561301420: release build, 3,811 tests passed, zero
+failed, 30 existing manual/device tests ignored, binary artifact uploaded.
+Kept complete output in the same verification folder. This is useful native
+evidence, but it does not certify the later Body-fix rebase or erase the Mac
+privacy-fixture failures. No ready Memory PR yet. Mood remains in its full
+Mac dependent-test continuation. No push or merge to another builder's branch.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
