@@ -1632,6 +1632,38 @@ startup baseline absorbing a hand, pulsed TTP223 holds, pause-dependent slide
 speed, shared I2C load and service-user lock permissions. Physical timing and
 actual acoustic/privacy/motion results remain First's lamp qualification.
 
+## 2026-10-14 — Task 33 — native gate passed; hardware answer adds working pads
+
+Ready for lamp-voice: no
+
+Native ARM64 run [38564855931](https://github.com/autonomous-ai/lampOS/actions/runs/38564855931)
+passed on `721d7c0722320281ff02d0b7d97cd91c3c23e730`: release workspace
+build, then 3,987 tests passed, zero failed and 29 inherited ignored in 263
+harnesses. The machine was GitHub's Ubuntu 22.04.5 ARM64 runner with Rust
+1.96.0, not a lamp. [Raw output, hashes and artifact identity](verification/touch-arm64-20261014/README.md)
+are kept. No count is added to the overlapping host gates.
+
+At 20:05 First relayed the hardware team's answer on #711: lamp-4ace's
+E4/E8 are faulty, sensing through the shell is uneven, and the working set
+and each pad's thresholds must be per-unit settings. Its head pads are
+37/96 active-high; other units must discover their own two. The periodic
+fetch reached `888be65e8` and the Third queue is unchanged.
+
+The explicit twelve-value touch/release arrays already preserve per-pad
+settings, but the task's all-twelve geometry restriction needs changing.
+The task remains on `third/touch`, with no PR or ready-yes handoff while
+that change is built. Known excluded electrodes will be omitted from contact
+topology while physical strip positions retain their full span; excluded-only
+bits cannot create or hold an action. Actual read errors and unexplained
+gaps remain unknown. The original all-twelve replay remains a comparison,
+not a lamp-4ace calibration. Each working electrode still needs calibration
+and qualification on the particular lamp; no threshold is invented as a
+measurement here.
+
+The new tests, gate and exact-head native run will follow before the PR.
+No lamp was accessed. #714 has only been read for dependencies, not claimed
+or implemented; its unchanged Expression baseline was saved in scratch.
+
 ## Not shown
 
 No lamp was accessed. No new Voice publisher or actuator consumer was run on
@@ -1646,4 +1678,4 @@ production supervisor, trusted feed, lamp storage durability and full-service
 latency remain unqualified. Schedule and Tasks passed their host gates; their
 real storage, clock, Harness and Voice integrations remain for First to qualify
 on the lamp. The current remaining Third queue is #711, #714, #709 and #699;
-Task 33 remains pending its native gate and PR.
+Task 33 remains pending the working-pad update, its new native gate and PR.
