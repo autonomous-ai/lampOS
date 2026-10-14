@@ -1422,6 +1422,53 @@ The remembered data, deadlines, opt-in client and real-store tests can be
 built inside the assigned files meanwhile; that work continues. The final
 handoff will distinguish a wired service switch from a direct-client test.
 
+## 2026-10-14, 17:04 ICT: issue workflow adopted; task 30 — taken
+
+Ready for lamp-voice: no
+
+Read the new `joining.md`, `builders/fourth.md`, Queue #705 and Fourth's
+issue comments after fetching. The current integration is pinned at
+`462c18b924cd397f04df45f72503362b6a607b60`. Rebased Fourth and pushed with
+a lease (`e484d862a`); task 28's code was already integrated. A rebase
+conflict in reuse-decisions retained the upstream Schedule section and
+its already-present Memory health section; no runtime source was changed.
+
+First reports task 28 on lamp-4ace at 16:54 in closed
+[#697](https://github.com/autonomous-ai/lampOS/issues/697): built for the
+lamp, tests passed under emulation, Memory and Health flags enabled, and
+Memory OK among twelve reports. That is First's lamp evidence, not a run
+by Fourth. The finished task is the previously handed-off implementation,
+now integrated as `7e858065b`.
+
+Task 29 remains in progress on `fourth/memory-voice`; its pre-migration
+claim is now recorded in [#698](https://github.com/autonomous-ai/lampOS/issues/698).
+Fourth-Q29 was moved there once, as the adopted workflow requires. The
+new client and real-store tests are implemented in the permitted files;
+strict Clippy for Memory, Voice and its dependent Voice Eval passes on the
+Mac, as do 22 focused Voice tests and 12 real-store/protocol tests. Full
+gates and timings remain to do. No unfinished runtime code is on
+`lamp-fourth`. The connector could read issues but returned HTTP 403 for
+labels/comments; the already authenticated repository `gh` CLI completed
+the authorized claims and question without a new account or credential.
+
+Queue #705 now puts [#707](https://github.com/autonomous-ai/lampOS/issues/707),
+task 30, first. Claimed it with `status:taken`, posted this session's claim,
+and reread the comments: the first claim is this session's. Task branch
+`fourth/records-exit`, in an isolated checkout while task 29's scope answer
+is pending. Scope: `crates/records`, `docs/records.md` and test evidence.
+
+Fix the scan's handling of a process that disappears or becomes a zombie
+while its arguments are read. Keep refusing live but uninspectable
+processes, including a live kernel thread with empty arguments; do not
+weaken protection for a session held by a live process. Report which
+processes were safely skipped. Use bounded rechecks, not a retry loop;
+measure synthetic scan cost on this machine and keep it separate from
+the lamp's hourly timer. Existing apply/enabled deletion opt-ins remain.
+Run fixtures for disappearance, ESRCH, zombie, empty live arguments and
+protected live sessions, the full Records gate, standalone verification
+and the newly required Linux ARM64 build if the available toolchain can
+provide it. First runs the finished build on lamp-4ace's timer.
+
 ## Not shown
 
 No lamp access or deployment, Linux ARM64 execution, physical power-loss test,
