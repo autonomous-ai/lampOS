@@ -3697,6 +3697,27 @@ names, what the played records of 14 and 15 Oct already show of two
 people, and what leading products do.
 
 
+## 2026-10-15, 21:40 ICT: #828's branch gated and pushed; #829 step 3 built
+
+Ready for lamp-voice: no
+
+`fourth/stop-word` at `856beec1a` is pushed: the suppressor switch, the
+`hearing_replay` example and step 1's evidence. Gate on Fourth's Intel Mac:
+format, Clippy and build passed; Audio 161, Voice 1,318, Voice-eval 284 and
+Memory 151 passed. One process timing test failed
+(`pilot_faults::rapid_mute_and_reopen…`, "service privacy freshness lost",
+#739's kind, on a path the change does not touch); alone it passed 5 of 5.
+No pull request yet: step 2 waits on the played minute asked for on #828.
+
+#829: lamp-4ace's first-output records of 15 Oct show 6 of 9 going-on
+answers in a busy room with nobody facing, all in one live exchange, so a
+follow-up is to be judged by the same voice, not by a face (#829, 21:23).
+Step 3, "the lamp" spoken of is no call (`LAMP_NAME_IN_PASSING=ignored`), is
+built on `fourth/two-people` (`f76f51c66`), with tests of the rule and
+through the worker's own loop; its gate is running. A speaker-voice model
+for step 2 is being researched.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
