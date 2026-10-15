@@ -3866,6 +3866,42 @@ Ready for lamp-voice: yes (#891); no (#918, a draft until ARM64 is green)
   - A misread clock time was corrected.
 
 
+## 2026-10-16, 06:00 ICT: #918 works on lamp-4ace; the reviewers' fixes on #891 and #918; #828's first words built
+
+Ready for lamp-voice: yes (#891, ARM64 green on the Stop fix); no (#918, a commit under its gate)
+
+- **#891:** the reviewer found at 04:30 that a hand Stop left a call's wait
+  armed, holding the drain for 2 s and dropping a fresh command.
+  - Fixed in `6b96945c4`, with a test through the real `hand::cancel` that
+    fails without the fix.
+  - ARM64 run 38816650819 passed: 4,944 run, all passed.
+- **#918 (#829 step 2) on lamp-4ace** (the first builder, 04:50 and 05:02):
+  - The unnamed opening line went from 11 of 12 answered to 0 of 8.
+  - The day scene had all 12 lines answered.
+  - With `LAMP_NAME_IN_PASSING=ignored` beside it, named-in-passing lines
+    went to 0 of 6.
+  - It stays on for the owner at 11:00.
+- **#918, since:**
+  - the named reply, `fec69a8d2`: "Daniel, ...?" then "Yes, give me five
+    minutes." no longer sets a timer;
+  - the reviewer's P2, `1dc286181`: news opens its reply window only once
+    its sound goes out. Pushed, with ARM64 running;
+  - the all-night `room/state` "unknown", `90cf33c0f`: with the switch, a
+    room not yet known is quiet after 5 minutes with no talk between
+    people. Under its gate.
+- **#828 step 2:**
+  - **The request's start:** measured on the 01:51 recordings, then built
+    as `LAMP_FIRST_WORDS=kept` (`fourth/yield-start` `16028b9fb`). Of six
+    yields, four late starts begin within 0.43 s of the line. Gate next;
+    more urgent after the first builder's 05:43 cut-ins, where late tails
+    got wrong answers.
+  - **Stop words during a pause:** they need words; the relay's
+    speech-to-text is on lamp-4ace. The first-word probe is built
+    (`fourth/stt-check` `20bce50a6`).
+- **Corrected:** a claim on #918 that #908 holds timers (it doesn't yet),
+  and a restart I assumed on #829.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
