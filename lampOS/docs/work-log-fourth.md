@@ -3605,6 +3605,61 @@ behind a switch, measured on the same played set both ways. #809 (#782)
 waits on the first builder's 400/550 minute on lamp-4ace.
 
 
+## 2026-10-15, 20:28 ICT: task 50 (#782), the follow-up to #809; #828 under way
+
+Ready for lamp-voice: no (#853, a draft until its ARM64 run is green)
+
+The first builder merged [#809](https://github.com/autonomous-ai/lampOS/pull/809)
+at 18:22. At 18:28 the reviewer found a P1 on it: `LAMP_CUT_KEEPS_NAME=on`
+did nothing on lamp-4ace's own path (`--endpoint smart-turn-fast`, the
+600 ms window, kept-start, no `--early-end-ms`). There the words after a
+comma are a fresh admission through `commit_admitted_input`, which always
+said `continues: false`, and #809's tests set it by hand at the worker. The
+first builder asked for a small follow-up with a test through that path,
+before #828.
+
+[#853](https://github.com/autonomous-ai/lampOS/pull/853), from
+`fourth/cut-keeps-name` on `lamp-voice` `a583fda28`: `241681d9f` (the fix
+and its tests), `1d01d3bf4` and `71f3888b7` (evidence and gate). **Kind: off
+unless set**, the same switch. With it, the next admission's Start says
+`continues: true` when all of these hold:
+- the speech began within 1 s of the block that ended the turn, whether the
+  model ended it at 400 ms or the 600 ms window did;
+- nothing of the answer had been heard;
+- the connection and microphone generation are the same.
+
+Tests cross the coordinator: its own loop on a `model_complete` end, and
+the real provider worker on a window end and on speech over a played
+answer, each with and without the switch, each checked against a mutated
+coordinator.
+
+Gate on `b77130759`, Fourth's Intel Mac: format, Clippy and build passed;
+Voice 1,321, Voice-eval 284 and Memory 151 passed, none failed, 13 ignored.
+ARM64: run 38742831656 on the head, going. The first gate, before the
+rebase, had one process timing test fail (`coordinator::motor`,
+`child-position-writes`), which passed 5 of 5 alone.
+
+Found, not mine:
+- `lamp-voice` `740e1e892` did not build its tests (`continues_cut_off`, the
+  second voice's three Starts). Said on #705 at 19:51, after the second
+  builder at 19:49; #851 fixed it.
+- In a room the coordinator counts as busy, the floor hold (`HOLD_FLOOR_US`)
+  drops the rest of a cut line before admission, with or without the
+  switch. In the 15 Oct records, 401 floor holds came within 1 s of an end,
+  and 46 next turns were admitted that soon. Asked the first builder on
+  #782 at 20:28 whether the switch should let such speech through.
+- The shared disk filled during the build (238 MB free; `/private/tmp` holds
+  103 GB, 46 GB of it in Claude sessions' scratch folders). I deleted only my
+  own `target/debug/incremental` (7.3 GB).
+
+#828: the findings went on the issue at 18:36 (the canceller takes out 51
+of 88 short stop words played over the lamp's voice). Step 1, the
+canceller's suppressor settings with `replay-aec` able to replay them, is
+on `fourth/stop-word` (`a161346b1`), not yet gated. The 14 Oct duplex
+recordings arrived at 19:48 (`~/lamp-voice-data/sessions/duplex-20261014/`,
+local only), so step 1 is measured on them next.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
