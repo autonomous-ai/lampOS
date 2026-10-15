@@ -3555,6 +3555,40 @@ it on, and the recordings that check its two lines, are the first
 builder's. Nothing of it was run on a lamp by Fourth.
 
 
+## 2026-10-15, 18:12 ICT: task 50 (#782) handed back
+
+Ready for lamp-voice: yes (#809)
+
+[Pull request #809](https://github.com/autonomous-ai/lampOS/pull/809), from
+`fourth/comma-pause` on `lamp-voice` at `663a1e5fe`: `2ef8f3762` (a cut
+keeps its name, the replay, the findings), `7c82eccff` (the commit switch,
+the held-out measurement), `9bda9dcd3` (records only). **Kind: off unless
+set**, two switches the first builder decided on (#782, 15:08):
+`LAMP_CUT_KEEPS_NAME=on` and `--endpoint-commit-ms MS`. Rebased over #792:
+a continuation keeps #753's `addressed` too, with a test.
+[Evidence](https://github.com/autonomous-ai/lampOS/tree/fourth/comma-pause/lampOS/docs/verification/comma-pause-20261015)
+is on the task branch; no audio, no words of what was said.
+
+Gate on `0b3ebf2a4` (the code of `7c82eccff`), Fourth's Intel Mac: format
+of the changed files, the workspace's Clippy and build passed; Voice,
+Voice-eval and Memory 1,625 passed, 1 failed, 13 ignored. The one:
+`endpoint_session::a_worker_still_loading_leaves_the_baseline_window`,
+"capture discontinuity", a timed process test (#739's kind) in a path the
+change does not touch; alone afterwards 1 failed and 14 passed on the
+branch, 5 of 5 on `lamp-voice`. Before the rebase the gate had passed clean
+twice. ARM64: run 38720597961 on `0b3ebf2a4`, 4,529 tests, all passed; run
+38724198733 on the head, 4,437, all passed.
+
+What to run on lamp-4ace: tonight's whole-lamp run at `--endpoint-commit-ms`
+absent (400) and at 550, comparing comma cuts with the median time from a
+finished line to the first sound (the first builder's own plan); and
+`LAMP_CUT_KEEPS_NAME=on` in a busy room with a line cut at a comma. Most
+likely wrong there: a second voice that begins inside the first one's pause
+is taken for the first going on, and keeps its name.
+
+My list now has nothing I can do; said on #705 at 18:08.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -3566,7 +3600,8 @@ geometry remains synthetic. Hand Stop and software mute are off unless their
 independent Voice flags are supplied; no physical hand-to-silence or Body stop
 was qualified. The sleeping name's speech rule is off unless
 `alive.sleep.name_requires_speech` is set, and was not heard on a lamp: no
-servo noise, soft name or busy room was tried. `attention/addressed` is off unless
+servo noise, soft name or busy room was tried. `LAMP_CUT_KEEPS_NAME` and `--endpoint-commit-ms` are off unless set and
+were not run on a lamp. `attention/addressed` is off unless
 `LAMP_ADDRESSED=on` and was not run on a lamp: no face, level or busy room was
 tried. The local judge remains shadow-only behind `--local-judge`,
 with unfitted weights and no proof that it improves the busy-room floor.
