@@ -1,0 +1,59 @@
+{
+  "captured_at": "2026-10-15T00:00:54.375279+00:00",
+  "records": [
+    {
+      "file": "queue-never-idle.json",
+      "original": "/private/tmp/lamp-third-relative-watch-0012/6/queue.json",
+      "bytes": 10641,
+      "sha256": "e0b300293ae66f2b66cc9900d0d61b6c74d83b52e056002a0347342878ac6af0"
+    },
+    {
+      "file": "fixture-task-paused.json",
+      "original": "/private/tmp/lamp-third-relative-watch-0012/6/issue-739.json",
+      "bytes": 17385,
+      "sha256": "03264221e2488fb064d6cfb88054c03df776590a83786992a312437cc8669791"
+    },
+    {
+      "file": "relative-reminder-waiting.json",
+      "original": "/private/tmp/lamp-third-relative-watch-0012/6/pr-748.json",
+      "bytes": 5857,
+      "sha256": "9dc412f5fda734a95a8e347c1749ce4e8be1fec809a37402dff9a27135e182c3"
+    },
+    {
+      "file": "issue-699-before.json",
+      "original": "/private/tmp/lamp-third-shared-settings-issue-699-before.json",
+      "bytes": 3857,
+      "sha256": "d6aed3f15f1f3234bf44998b93f7340cf955412e2c88fe7f50503c10f2cc858a"
+    },
+    {
+      "file": "issue-699-taken.json",
+      "original": "/private/tmp/lamp-third-shared-settings-claim-verified.json",
+      "bytes": 5099,
+      "sha256": "b542a546625cf321077609cea22dbd67abc68e569ed2730bacc04413477dd505"
+    },
+    {
+      "file": "claim-record.json",
+      "original": "/private/tmp/lamp-third-shared-settings-claim-record.json",
+      "bytes": 436,
+      "sha256": "f48d44405908c2a3ac956265b2a820d55ba769ca06a5ec3bd1254fd966c307d3"
+    },
+    {
+      "file": "claim-body.md",
+      "original": "/private/tmp/lamp-third-shared-settings-claim.md",
+      "bytes": 782,
+      "sha256": "6af0ec813ad17393a233941f049e4ecb513dcb1e201608a1169298d14ce62b23"
+    },
+    {
+      "file": "log-rebase.json",
+      "original": "/private/tmp/lamp-third-shared-settings-log-rebase.json",
+      "bytes": 109820,
+      "sha256": "1fc77abc783a0fa53f9fc6f03234e5d3b87d0ff853af4d35ebe7f55f5b98e18b"
+    },
+    {
+      "file": "log-rebase-output.txt",
+      "original": "/private/tmp/lamp-third-shared-settings-log-rebase-output.txt",
+      "bytes": 894,
+      "sha256": "f9cc8bb74967e4a5a445671fac6c9353bfcab19c8cb8ef0171a87f8bf7d79751"
+    }
+  ]
+}
