@@ -3033,7 +3033,7 @@ router, hotspot or lamp; step 4 of #806 needs a builder with a lamp.
 
 | Id | Proposal | Issue | Answer |
 |---|---|---|---|
-| third-P1 | Expression reads the system's time zone (`--zone system`), so a lamp outside Vietnam keeps its days across daylight saving; Memory's owner the same | #820 | — |
+| third-P1 | Expression reads the system's time zone (`--zone system`), so a lamp outside Vietnam keeps its days across daylight saving; Memory's owner the same | #820 | Yes (First, 18:20; Second for the policy, 18:34); #844 |
 
 ## 2026-10-15 — Setup for a home (#806) ready as #817; #795 and #808 rebased
 
@@ -3054,3 +3054,45 @@ Ready for lamp-voice: yes (#817), yes (#795), no (#808 until its ARM64 run)
   `msgs/src/lib.rs` (new `attention` and `tasks` modules beside mine); moved
   onto it, both sides kept: #795 `c156c34af`, #808 `c9d997e51`. Their ARM64
   runs restart.
+
+## 2026-10-15 — #711 turns to the head pads; #820 as #844; #817's findings as #845
+
+Ready for lamp-voice: yes (#795, green), yes (#797, tool by hand), yes
+(#808, reviewed), #844 and #845 once their ARM64 runs are green
+
+- **#711, new direction (First, 19:28, the owner's choice):** the head pads
+  carry every touch action; the base strip does nothing until after the MVP
+  (`docs/creature.md`, "Touch"). First in my list, before #820: tap while
+  talking stops it under 150 ms (to be measured), a short tap while quiet
+  makes it listen, a hold leans in at 1 s and sleeps at 3 s with a dimming
+  eye, a tap while asleep wakes it, and a touch while the head is pushed by
+  hand means nothing. Mapping what Controls, Voice, Expression and the body
+  do now, before the plan goes on #711. My slider answer (18:56) is parked.
+- **#797:** First's second lamp run (`4543f1cb9`): own swipes now differ by
+  pad, but a finger reads 17 to 31 on a neighbour against 22 to 43 on its own
+  pad, and E2 and E6 were never the most touched. The reviewer's two points
+  are fixed in `10585b465`: the 50% cutoff no longer rounds down (16 of 33 is
+  out), and `footprint_new` replays release and debounce instead of single
+  crossings; both new tests fail on the old head. Controls 386 passed. ARM64
+  run 38727552759 attempt 2 on `4543f1cb9`: 4,509 passed.
+- **#795:** `862fec7d0` (onto `8ddffb629`, plus `NotConnected` accepted in
+  `privacy_worker.rs`, as Linux reports it). Run 38728246092 attempt 3:
+  4,579 passed, the Linux-only lease test among them; attempts 1 and 2
+  stopped at kill tests outside it. Waits for First's lamp minute.
+- **#808:** ARM64 run 38726383908, 4,506 passed; marked ready; the reviewer
+  found nothing (209 tests on its side).
+- **#820 as #844:** `--zone system` in Expression, Memory and the policy, one
+  commit each, through a new shared reader, `lamp-local-time`, that checks
+  `/etc/localtime` at every reading and so takes up the zone setup writes
+  with no restart (Second's point). `--utc-offset-minutes` unchanged; no unit
+  passes `--zone`. Host: local-time 7, Expression 233, policy 162 passed;
+  Memory passed but for two `binary` tests failing the same on `lamp-voice`.
+- **#845:** the reviewer's four findings on merged #817 (name after the
+  hotspot, a TLS handshake for the Internet as V1's, nginx stopped for the
+  own page, `tasks-told` in the reset plan), done by a subagent and checked
+  here; 33 setup tests passed.
+- **#840 filed:** `lamp-memory`'s killed-process binary test loses a log line
+  and stops ARM64 runs (it stopped #797's and #795's); it fails 3 of 3 on
+  plain `lamp-voice` on my Mac.
+- Commits had waited on my person's word; it came at 19:39 ("commit and push
+  everything you do").
