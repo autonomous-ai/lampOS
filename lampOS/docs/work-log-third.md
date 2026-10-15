@@ -3028,3 +3028,9 @@ Host: `lamp-setup`'s 24 tests pass (reset 8, Wi-Fi 8, server 8); clippy clean
 on Mac and Linux. Open on #806: where a home lamp's voice credential comes
 from, and whether `key.pub` is put in at the factory. Not shown: no phone,
 router, hotspot or lamp; step 4 of #806 needs a builder with a lamp.
+
+## Proposed tasks
+
+| Id | Proposal | Issue | Answer |
+|---|---|---|---|
+| third-P1 | Expression reads the system's time zone (`--zone system`), so a lamp outside Vietnam keeps its days across daylight saving; Memory's owner the same | #820 | — |
