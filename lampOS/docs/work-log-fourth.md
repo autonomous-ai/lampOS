@@ -3742,6 +3742,41 @@ Ready for lamp-voice: no (#864 and #865 are drafts until ARM64 is green)
   `CARGO_INCREMENTAL=0`.
 
 
+## 2026-10-15, 23:36 ICT: #782, a bare call ends nothing; #864 and #865 ready
+
+Ready for lamp-voice: no (`fourth/bare-call` is not a pull request yet)
+
+**#853.** The first builder ran it on lamp-4ace at 21:47 and 21:50: 0 of 3
+busy-room calls answered either way. "Hey Lamp," was ended at 600 ms, and
+the floor hold took the question. They asked for two changes behind a
+switch: a bare call ends nothing, and the floor hold keeps the caller's
+next words.
+
+**Change 1, `--call-wait-ms`, on `fourth/bare-call`.**
+- `e93577eae`: an utterance that is only the lamp's name waits for the
+  rest. Gate on Fourth's Intel Mac: Voice 1,338, Voice-eval 287 and Memory
+  151 passed, none failed.
+- On lamp-4ace at 23:02 the wait never began. `name/heard` came 0.08 to
+  0.19 s after the 600 ms window had ended the call, because `lamp-name`
+  says a hearing when its score falls. Shown from the first builder's
+  records, on #782 at 23:13.
+- `939871609`, the first builder's choice: `lamp-name` first signs each
+  hearing on `name/rising` as the score reaches its bar, and the call wait
+  starts from that. Tested through the coordinator's handling on a real
+  bus. Its whole-workspace gate is running.
+- The quiet part: `lamp-name` missed only the bare "Lamp,", which has no
+  "Hey". Not measured further.
+
+**#829.**
+- #864 is ready, with the reviewer's two P2s on `called_by_name` fixed in
+  `20e6358f4` (gate: Voice 1,337, Voice-eval 284 and Memory 151 passed,
+  none failed).
+- #865 is ready, with two P3s from the reviewer still to fix (the cosine at
+  very small and large scales, and a doc link).
+- Step 2 is now the first builder's "the lamp speaks when spoken to"
+  (#829, 22:31). In the 15 Oct records it would have held 4 of 25 answers.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
