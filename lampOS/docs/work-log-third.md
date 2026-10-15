@@ -2961,3 +2961,20 @@ Ready for lamp-voice: yes (#797), yes (#795)
   child means diagnostic only; a started writer keeps its black-write and
   exit requirement. Two new tests; the first fails on the old behaviour.
   ARM64 for this head is running.
+
+## 2026-10-15 — Logs and settings (#699) in draft #808; the disk filled
+
+Ready for lamp-voice: no (#808 is a draft until its ARM64 run is green)
+
+- #808, two commits on `d731283a5`, both off unless started. Host gate at the
+  head, Third's Intel Mac: workspace 4,510 passed, 4 failed, 35 ignored, 295
+  harnesses; the 4 are in health (two that fail on `lamp-voice` itself, one
+  failing on a full disk) and memory's usage test (the log relay). The first
+  commit alone: fmt and clippy clean, workspace builds, bus and msgs 158
+  passed, 0 failed.
+- This Mac's disk filled to 100% (4.2 GB free) during the gate, from my own
+  scratch build folders (about 41 GB). I removed the 27 GB no longer needed;
+  30 GB is free now. The repository's own `lampOS/target` holds 67 GB from
+  earlier sessions; I have not touched it.
+- #795: the reviewer asked for the docs to say that a ring start failing
+  before any writer exists does not block unmute; done on `4c154fee3`.
