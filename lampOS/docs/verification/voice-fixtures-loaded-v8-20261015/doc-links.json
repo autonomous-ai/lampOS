@@ -1,0 +1,20 @@
+{
+  "new_relative_doc_links": [
+    {
+      "document": "docs/endpoint-detection.md",
+      "link": "voice-test-fixtures.md",
+      "exists": true
+    },
+    {
+      "document": "docs/live-motor-integration.md",
+      "link": "voice-test-fixtures.md",
+      "exists": true
+    },
+    {
+      "document": "docs/pilot-faults.md",
+      "link": "voice-test-fixtures.md",
+      "exists": true
+    }
+  ],
+  "missing": []
+}

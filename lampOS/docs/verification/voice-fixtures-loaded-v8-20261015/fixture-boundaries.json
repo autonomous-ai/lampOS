@@ -1,0 +1,23 @@
+{
+  "manifest_sha256": "3bc32852dc8eacebde04547e0c3a50051dad5a2257193f79d8980fb064a5bf01",
+  "base": "cf2f5b43c8113a704324c2743af3cd92bbc4fdda",
+  "build_configuration": {
+    "normal_privacy_freshness_us": 50000,
+    "selected_real_worker_fixture_freshness_us": 100000,
+    "endpoint_stepped_and_mute_freshness_us": 50000,
+    "reopen_stable_us": 60000,
+    "input_and_channel_freshness_us": 100000,
+    "real_conversation_watchdog_seconds": 12
+  },
+  "focused_evidence_commit": "b2ea6d2dbea61c453eda4ec1bec4c191fdb4f185",
+  "unchanged_source_file_count": 2363,
+  "source_files": {
+    "crates/voice/src/coordinator.rs": "64ddf8d6609428a74e6b8e329749a9423d8a6c6e4ae4541386d5d2d8f131b210",
+    "crates/voice/src/coordinator/tests/endpoint_session.rs": "8c4fb3a4447b14a5282cb3b90fb73dddbd0b1d06ff9a88795af3bdf0aad1ec66",
+    "docs/endpoint-detection.md": "887f628fc8b30b6879ac805bc34c8fdd646fc1d0496a12f44c41e1053edaf804",
+    "docs/voice-test-fixtures.md": "f2bcca11157afad940560dc7bb205c045bcddec2b9ec9250f3af8c000798c9ff"
+  },
+  "production_change_since_v7": false,
+  "note": "Only a non-executable coordinator comment changes outside endpoint fixture tests and documentation. This record describes inspected code, not a runtime result.",
+  "focused_load_attribution_clarification_commit": "747ef2b96482340b586ab9924beca08fca4c3b96"
+}

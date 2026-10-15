@@ -1,0 +1,35 @@
+{
+  "scope": "V8 full auditor and first-run inspector, scratch only",
+  "method": "Independent agent adaptation and 50 synthetic checks; root read full auditor, first inspector and the final missing/partial-count correction, then ran the inspector on the actual terminal first run.",
+  "findings_resolved": [
+    "Prior unconditional parse raised on valid-hash terminal compile/partial failures, preventing archived false qualification; now errors are retained and false qualification is explicit."
+  ],
+  "script_sha256": {
+    "lamp-fourth-audit-fixtures-v8.py": "e098396ca9adbc3ec204d454aea033cd7559161711bb9138c5a781de04999227",
+    "lamp-fourth-inspect-fixtures-v8-first.py": "addf62589e839b01f1f37fb09c3470a8f6f78eb9521e529e7583aba765105cd8",
+    "lamp-fourth-validate-fixtures-v8-auditors.py": "9a0143e82a18e3a1dc11b60f89d761113d8b8b15c974511a7a7cba854d8750f3"
+  },
+  "synthetic_checks": 50,
+  "synthetic_cli_checks": 7,
+  "synthetic_report_sha256": "36187d9f2fd507fb2faa47017a75a32a7af2c2ab93612138c03aa4c9cdd0182e",
+  "verified_properties": [
+    "Exactly 101 affected-cohort outcomes from a pinned passing V6 raw baseline plus three regressions.",
+    "Exact raw summary/source-manifest hash binding and frozen file inventory/hash verification.",
+    "Missing/partial counts, missing ordinary targets, timeouts, failed builds, requested stops and source changes cannot qualify.",
+    "Raw/count-file/source hash mismatches still reject.",
+    "Explicit synthetic mode can never claim ten real runs."
+  ],
+  "actual_first_run_inspector": {
+    "exit_code": 0,
+    "run_checks_satisfied": true,
+    "cohort_differences": {},
+    "ignored": 8,
+    "ignored_changed": false,
+    "ordinary_library_privacy_state_passed": 4,
+    "ordinary_library_core_passed": 10
+  },
+  "limitations": [
+    "Synthetic checks are parser/control-flow tests, not additional Voice runs.",
+    "One first-run inspection is not the ten-run gate, native ARM64 execution or lamp evidence."
+  ]
+}

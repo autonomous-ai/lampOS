@@ -1,0 +1,473 @@
+{
+  "evidence_kind": "SYNTHETIC PARSER VALIDATION ONLY; no V8 run was read or performed",
+  "fixture_directory": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/SYNTHETIC-NOT-V8-RUNS",
+  "checks": [
+    {
+      "check": "reconstructed passing sequence is synthetic and cannot qualify",
+      "passed": true,
+      "checks_satisfied": true,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "first-run inspector reads complete synthetic records without certifying sequence",
+      "passed": true,
+      "checks_satisfied": true,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "missing cohort result",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "unexpected cohort result",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "duplicate cohort result",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "incomplete cohort row",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "failed cohort status",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "cohort unexpectedly ignored",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "raw hash mismatch",
+      "passed": true,
+      "rejected_with": "raw hash mismatch: /private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/SYNTHETIC-NOT-V8-RUNS/mac-voice-01.txt"
+    },
+    {
+      "check": "build raw hash mismatch",
+      "passed": true,
+      "rejected_with": "raw hash mismatch: /private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/SYNTHETIC-NOT-V8-RUNS/arm64-build-001.txt"
+    },
+    {
+      "check": "count-file raw hash mismatch",
+      "passed": true,
+      "rejected_with": "count-file raw hash mismatch: /private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/SYNTHETIC-NOT-V8-RUNS/mac-voice-01-counts.json"
+    },
+    {
+      "check": "missing count file",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "missing run counts",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "stored parser error",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "count mismatch",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "raw truncated before full suite inventory",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "explicit stop",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "run timeout despite zero exit",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "run failure",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "source mutation in run",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "source mutation at final check",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "build error",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "build timeout despite zero exit",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "build failure",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "no compiler overlap",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "only nine complete runs",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "first inspector rejects mismatched terminal record",
+      "passed": true,
+      "rejected_with": "raw command and terminal run records disagree: exit_code"
+    },
+    {
+      "check": "first inspector rejects absent post-source-check record",
+      "passed": true,
+      "rejected_with": "[Errno 2] No such file or directory: '/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/SYNTHETIC-NOT-V8-RUNS/mac-runs.json'"
+    },
+    {
+      "check": "first inspector rejects changed reminder source hash",
+      "passed": true,
+      "rejected_with": "frozen source hash mismatch: crates/voice/src/reminders/tests.rs"
+    },
+    {
+      "check": "first inspector rejects missing counts",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false
+    },
+    {
+      "check": "full audit rejects altered source manifest",
+      "passed": true,
+      "rejected_with": "frozen source hash mismatch: crates/voice/src/reminders/tests.rs"
+    },
+    {
+      "check": "full audit rejects missing frozen file",
+      "passed": true,
+      "rejected_with": "frozen source inventory mismatch: missing=['missing.rs'], unexpected=[]"
+    },
+    {
+      "check": "full audit rejects unlisted frozen file",
+      "passed": true,
+      "rejected_with": "frozen source inventory mismatch: missing=[], unexpected=['crates/voice/src/reminders/tests.rs']"
+    },
+    {
+      "check": "full audit rejects changed frozen file bytes",
+      "passed": true,
+      "rejected_with": "frozen source hash mismatch: crates/voice/src/reminders/tests.rs"
+    },
+    {
+      "check": "full audit rejects file changed into symlink",
+      "passed": true,
+      "rejected_with": "frozen source hash mismatch: crates/voice/src/reminders/tests.rs"
+    },
+    {
+      "check": "full audit archives compile failure without completed counts",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false,
+      "archived_as_failure": true,
+      "counts_error": [
+        "synthetic external count-parser failure",
+        "raw count parser: no completed suite counts",
+        "run has no parsed counts",
+        "missing retained count file"
+      ],
+      "archive": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-36",
+      "archive_function": "audit"
+    },
+    {
+      "check": "first inspector archives compile failure without completed counts",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false,
+      "archived_as_failure": true,
+      "counts_error": [
+        "synthetic external count-parser failure",
+        "raw count parser: no completed suite counts",
+        "run has no parsed counts",
+        "missing retained count file",
+        "missing or duplicate ordinary-library target"
+      ],
+      "archive": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-37",
+      "archive_function": "first"
+    },
+    {
+      "check": "full audit archives partial cohort result row",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false,
+      "archived_as_failure": true,
+      "counts_error": [
+        "cohort parser: incomplete or unsupported cohort result: test coordinator::tests::pilot_faults::metadata_release_on_unwind_unblocks_the_real_writer_and_keeps_the_panic ... ",
+        "synthetic external count-parser failure",
+        "raw count parser: no completed suite counts",
+        "run has no parsed counts",
+        "missing retained count file"
+      ],
+      "archive": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-38",
+      "archive_function": "audit"
+    },
+    {
+      "check": "first inspector archives partial cohort result row",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false,
+      "archived_as_failure": true,
+      "counts_error": [
+        "cohort parser: incomplete or unsupported cohort result: test coordinator::tests::pilot_faults::metadata_release_on_unwind_unblocks_the_real_writer_and_keeps_the_panic ... ",
+        "synthetic external count-parser failure",
+        "raw count parser: no completed suite counts",
+        "run has no parsed counts",
+        "missing retained count file",
+        "missing or duplicate ordinary-library target"
+      ],
+      "archive": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-39",
+      "archive_function": "first"
+    },
+    {
+      "check": "full audit archives partial suite count row",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false,
+      "archived_as_failure": true,
+      "counts_error": [
+        "synthetic external count-parser failure",
+        "raw count parser: unrecognized test result line: test result: ok. 980 passed; 0 failed; 8 ignored;",
+        "run has no parsed counts",
+        "missing retained count file"
+      ],
+      "archive": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-40",
+      "archive_function": "audit"
+    },
+    {
+      "check": "first inspector archives partial suite count row",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false,
+      "archived_as_failure": true,
+      "counts_error": [
+        "synthetic external count-parser failure",
+        "raw count parser: unrecognized test result line: test result: ok. 980 passed; 0 failed; 8 ignored;",
+        "run has no parsed counts",
+        "missing retained count file",
+        "missing or duplicate ordinary-library target"
+      ],
+      "archive": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-41",
+      "archive_function": "first"
+    },
+    {
+      "check": "first inspector archives missing ordinary-library target",
+      "passed": true,
+      "checks_satisfied": false,
+      "ten_runs_qualified": false,
+      "archived_as_failure": true,
+      "counts_error": [
+        "missing or duplicate ordinary-library target"
+      ],
+      "archive": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-42",
+      "archive_function": "first"
+    },
+    {
+      "check": "CLI writes failure JSON: full audit archives compile failure without completed counts",
+      "passed": true,
+      "command": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "/private/tmp/lamp-fourth-audit-fixtures-v8.py",
+        "--root",
+        "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-36",
+        "--synthetic"
+      ],
+      "exit_code": 0,
+      "audit_file": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-36/qualification-audit.json",
+      "counts_error": [
+        "synthetic external count-parser failure",
+        "raw count parser: no completed suite counts",
+        "run has no parsed counts",
+        "missing retained count file"
+      ],
+      "cli_output_sha256": "13e815c51f64d5a4df2f598429bb322a0a8edfa85e033f73e7a4f8bb46ef5adf"
+    },
+    {
+      "check": "CLI writes failure JSON: first inspector archives compile failure without completed counts",
+      "passed": true,
+      "command": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "/private/tmp/lamp-fourth-inspect-fixtures-v8-first.py",
+        "--root",
+        "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-37",
+        "--synthetic"
+      ],
+      "exit_code": 0,
+      "audit_file": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-37/lamp-fourth-fixtures-v8-first-run-audit.json",
+      "counts_error": [
+        "synthetic external count-parser failure",
+        "raw count parser: no completed suite counts",
+        "run has no parsed counts",
+        "missing retained count file",
+        "missing or duplicate ordinary-library target"
+      ],
+      "cli_output_sha256": "f70d31b4ec7ede5094b049ecfc3184e5fa62576d7ec9d431ea012b0499dfbbcf"
+    },
+    {
+      "check": "CLI writes failure JSON: full audit archives partial cohort result row",
+      "passed": true,
+      "command": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "/private/tmp/lamp-fourth-audit-fixtures-v8.py",
+        "--root",
+        "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-38",
+        "--synthetic"
+      ],
+      "exit_code": 0,
+      "audit_file": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-38/qualification-audit.json",
+      "counts_error": [
+        "cohort parser: incomplete or unsupported cohort result: test coordinator::tests::pilot_faults::metadata_release_on_unwind_unblocks_the_real_writer_and_keeps_the_panic ... ",
+        "synthetic external count-parser failure",
+        "raw count parser: no completed suite counts",
+        "run has no parsed counts",
+        "missing retained count file"
+      ],
+      "cli_output_sha256": "13e815c51f64d5a4df2f598429bb322a0a8edfa85e033f73e7a4f8bb46ef5adf"
+    },
+    {
+      "check": "CLI writes failure JSON: first inspector archives partial cohort result row",
+      "passed": true,
+      "command": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "/private/tmp/lamp-fourth-inspect-fixtures-v8-first.py",
+        "--root",
+        "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-39",
+        "--synthetic"
+      ],
+      "exit_code": 0,
+      "audit_file": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-39/lamp-fourth-fixtures-v8-first-run-audit.json",
+      "counts_error": [
+        "cohort parser: incomplete or unsupported cohort result: test coordinator::tests::pilot_faults::metadata_release_on_unwind_unblocks_the_real_writer_and_keeps_the_panic ... ",
+        "synthetic external count-parser failure",
+        "raw count parser: no completed suite counts",
+        "run has no parsed counts",
+        "missing retained count file",
+        "missing or duplicate ordinary-library target"
+      ],
+      "cli_output_sha256": "f70d31b4ec7ede5094b049ecfc3184e5fa62576d7ec9d431ea012b0499dfbbcf"
+    },
+    {
+      "check": "CLI writes failure JSON: full audit archives partial suite count row",
+      "passed": true,
+      "command": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "/private/tmp/lamp-fourth-audit-fixtures-v8.py",
+        "--root",
+        "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-40",
+        "--synthetic"
+      ],
+      "exit_code": 0,
+      "audit_file": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-40/qualification-audit.json",
+      "counts_error": [
+        "synthetic external count-parser failure",
+        "raw count parser: unrecognized test result line: test result: ok. 980 passed; 0 failed; 8 ignored;",
+        "run has no parsed counts",
+        "missing retained count file"
+      ],
+      "cli_output_sha256": "13e815c51f64d5a4df2f598429bb322a0a8edfa85e033f73e7a4f8bb46ef5adf"
+    },
+    {
+      "check": "CLI writes failure JSON: first inspector archives partial suite count row",
+      "passed": true,
+      "command": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "/private/tmp/lamp-fourth-inspect-fixtures-v8-first.py",
+        "--root",
+        "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-41",
+        "--synthetic"
+      ],
+      "exit_code": 0,
+      "audit_file": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-41/lamp-fourth-fixtures-v8-first-run-audit.json",
+      "counts_error": [
+        "synthetic external count-parser failure",
+        "raw count parser: unrecognized test result line: test result: ok. 980 passed; 0 failed; 8 ignored;",
+        "run has no parsed counts",
+        "missing retained count file",
+        "missing or duplicate ordinary-library target"
+      ],
+      "cli_output_sha256": "96f951fbe77749a45f4a3e9310eb35ff1b011431cd4db71f0648d8ab26b33e33"
+    },
+    {
+      "check": "CLI writes failure JSON: first inspector archives missing ordinary-library target",
+      "passed": true,
+      "command": [
+        "/usr/local/opt/python@3.14/bin/python3.14",
+        "/private/tmp/lamp-fourth-inspect-fixtures-v8-first.py",
+        "--root",
+        "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-42",
+        "--synthetic"
+      ],
+      "exit_code": 0,
+      "audit_file": "/private/tmp/lamp-fourth-v8-auditor-synthetic-km4n1uml/archivable-cases/case-42/lamp-fourth-fixtures-v8-first-run-audit.json",
+      "counts_error": [
+        "missing or duplicate ordinary-library target"
+      ],
+      "cli_output_sha256": "72029dd0ca772375804597c0c03e55d543cbc0f95aeb56726c46e2d53a0df50c"
+    },
+    {
+      "check": "audit binds exact summary and verified two-file synthetic source manifest",
+      "passed": true
+    }
+  ],
+  "all_checks_passed": true,
+  "baseline_raw_sha256": "69392a042fff673fc9e19f50b0763645f260af244c9e5da870ed4c2c77c2ed91",
+  "expected_cohort_counts": {
+    "coordinator::tests::early_end::": 16,
+    "coordinator::motor::tests::": 31,
+    "coordinator::tests::pilot_faults::": 36,
+    "coordinator::tests::endpoint_session::": 18
+  },
+  "expected_cohort_total": 101,
+  "input_description": "Retained V6 run-1 output, three invented success lines, deliberately synthetic timing metadata, and an explicit two-file frozen source tree. Negative cases mutate only these scratch copies.",
+  "scripts": {
+    "/private/tmp/lamp-fourth-audit-fixtures-v8.py": "e098396ca9adbc3ec204d454aea033cd7559161711bb9138c5a781de04999227",
+    "/private/tmp/lamp-fourth-inspect-fixtures-v8-first.py": "addf62589e839b01f1f37fb09c3470a8f6f78eb9521e529e7583aba765105cd8",
+    "/private/tmp/lamp-fourth-validate-fixtures-v8-auditors.py": "9a0143e82a18e3a1dc11b60f89d761113d8b8b15c974511a7a7cba854d8750f3"
+  }
+}

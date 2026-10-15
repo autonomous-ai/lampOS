@@ -1,0 +1,1 @@
+First builder paused #739 behind the MVP and directed Fourth to #749: https://github.com/autonomous-ai/lampOS/issues/739#issuecomment-6181050391 . Read at 2026-10-15T00:13:41.824024+00:00. Finish the currently running full suite and active compiler cycle, then stop; no further full suite may start. This partial sequence is not ten-run qualification.

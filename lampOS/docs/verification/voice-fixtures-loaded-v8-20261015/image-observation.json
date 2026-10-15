@@ -1,0 +1,30 @@
+{
+  "at_utc": "2026-10-14T23:21:43.224058+00:00",
+  "command": [
+    "podman",
+    "image",
+    "inspect",
+    "--format",
+    "{{.Id}}",
+    "localhost/lampos-fourth-native-user-check:latest"
+  ],
+  "exit_code": 0,
+  "stdout": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c\n",
+  "stderr": "",
+  "expected_image_sha256": "eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c",
+  "tag_matches_expected": true,
+  "scope": "Read-only inspection during the running V8 sequence; its invocation uses this existing local tag. This is a current tag observation, not a retrospective inspection of each completed container.",
+  "immutable_id_lookup": {
+    "at_utc": "2026-10-14T23:44:44.195367+00:00",
+    "command": [
+      "podman",
+      "image",
+      "exists",
+      "sha256:eee1c1827d71132efdd4bfd72bf5407d7df568b0cf1d14911096745df03cfb6c"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "",
+    "scope": "Read-only local image-ID resolution for the later pinned-image gate; no container started."
+  }
+}

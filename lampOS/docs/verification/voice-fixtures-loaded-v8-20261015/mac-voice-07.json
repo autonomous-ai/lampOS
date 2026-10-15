@@ -1,0 +1,29 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-voice",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/private/tmp/lamp-fourth-fixtures-source-v8-y004od8t",
+  "started_at_utc": "2026-10-14T23:58:11.151491+00:00",
+  "load_at_start": [
+    9.6435546875,
+    8.17919921875,
+    7.24169921875
+  ],
+  "exit_code": 0,
+  "finished_at_utc": "2026-10-15T00:04:41.436829+00:00",
+  "elapsed_seconds": 390.26050346996635,
+  "load_at_end": [
+    7.82275390625,
+    7.74560546875,
+    7.36572265625
+  ],
+  "raw_sha256": "81eb3d6cf6c533bc36061d146df8a6527174b226c79b0fdd369490fcbfd32ee5"
+}

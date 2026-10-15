@@ -1,0 +1,46 @@
+     Removed 681 files, 578.7MiB total
+warning: output filename collision at /target/aarch64-unknown-linux-gnu/release/examples/replay_cost
+  |
+  = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/source_fixtures/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/source_fixtures/crates/controls)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+warning: output filename collision at /target/aarch64-unknown-linux-gnu/release/examples/replay_cost.dwp
+  |
+  = note: the example target `replay_cost` in package `lamp-expression v0.1.0 (/source_fixtures/crates/expression)` has the same output filename as the example target `replay_cost` in package `lamp-controls v0.1.0 (/source_fixtures/crates/controls)`
+  = note: this may become a hard error in the future; see <https://github.com/rust-lang/cargo/issues/6313>
+  = help: consider changing their names to be unique or compiling them separately
+   Compiling lamp-bus v0.1.0 (/source_fixtures/crates/bus)
+   Compiling lamp-ipc v0.1.0 (/source_fixtures/crates/ipc)
+   Compiling lamp-turn-owner v0.1.0 (/source_fixtures/crates/turn-owner)
+   Compiling lamp-gemini v0.1.0 (/source_fixtures/crates/gemini)
+   Compiling lamp-camera v0.1.0 (/source_fixtures/crates/camera)
+   Compiling lamp-turn-end-wire v0.1.0 (/source_fixtures/crates/turn-end-wire)
+   Compiling lamp-msgs v0.1.0 (/source_fixtures/crates/msgs)
+   Compiling lamp-keeper v0.1.0 (/source_fixtures/crates/keeper)
+   Compiling lamp-body v0.1.0 (/source_fixtures/crates/body)
+   Compiling lamp-schedule v0.1.0 (/source_fixtures/crates/schedule)
+   Compiling lamp-controls v0.1.0 (/source_fixtures/crates/controls)
+   Compiling lamp-ring v0.1.0 (/source_fixtures/crates/ring)
+   Compiling lamp-expression v0.1.0 (/source_fixtures/crates/expression)
+   Compiling lamp-audio v0.1.0 (/source_fixtures/crates/audio)
+   Compiling lamp-actions v0.1.0 (/source_fixtures/crates/actions)
+   Compiling lamp-voice v0.1.0 (/source_fixtures/crates/voice)
+   Compiling lamp-surround v0.1.0 (/source_fixtures/crates/surround)
+   Compiling lamp-observer v0.1.0 (/source_fixtures/crates/observer)
+   Compiling lamp-policy v0.1.0 (/source_fixtures/crates/policy)
+   Compiling lamp-tasks v0.1.0 (/source_fixtures/crates/tasks)
+   Compiling lamp-sound-fixtures v0.1.0 (/source_fixtures/crates/sound-fixtures)
+   Compiling lamp-eyes v0.1.0 (/source_fixtures/crates/eyes)
+   Compiling lamp-memory v0.1.0 (/source_fixtures/crates/memory)
+   Compiling lamp-mood v0.1.0 (/source_fixtures/crates/mood)
+   Compiling lamp-lean v0.1.0 (/source_fixtures/crates/lean)
+   Compiling lamp-turn-end v0.1.0 (/source_fixtures/crates/turn-end)
+   Compiling lamp-voice-eval v0.1.0 (/source_fixtures/crates/voice-eval)
+   Compiling lamp-name v0.1.0 (/source_fixtures/crates/name)
+   Compiling lamp-update v0.1.0 (/source_fixtures/crates/update)
+   Compiling lamp-health v0.1.0 (/source_fixtures/crates/health)
+   Compiling lamp-records v0.1.0 (/source_fixtures/crates/records)
+   Compiling lamp-ears v0.1.0 (/source_fixtures/crates/ears)
+   Compiling lamp-air v0.1.0 (/source_fixtures/crates/air)
+   Compiling lamp-environment v0.1.0 (/source_fixtures/crates/environment)
+    Finished `release` profile [optimized] target(s) in 2m 27s

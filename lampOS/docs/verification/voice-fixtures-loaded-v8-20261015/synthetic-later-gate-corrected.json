@@ -1,0 +1,867 @@
+{
+  "synthetic_only": true,
+  "scope": "Copied scripts executed with AST path rewrites and fake subprocess/os.killpg/platform imports. No subprocess was actually created; no Cargo, Podman, repository, live V8 evidence or target writes.",
+  "script_sha256": {
+    "lamp-fourth-fixtures-v8-remaining-gate.py": "01347b9f11f93d242fde16f3b58380f746f734c4b3d7c418809893cdb1dc620e",
+    "lamp-fourth-collect-fixtures-v8-gate.py": "88e5022d9a5e890c04d46eba5e239c2aae29d28ef10051c9cd3e6195c866a373"
+  },
+  "runner_cases": [
+    {
+      "name": "manifest_mismatch",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "loaded and remaining gates must use the identical manifest",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-fixtures-v8-remaining-gate.py\", line 35, in <module>\n    assert json.loads((LOADED / 'source.json').read_text()) == SOURCE, 'loaded and remaining gates must use the identical manifest'\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: loaded and remaining gates must use the identical manifest\n"
+      },
+      "checks": {
+        "rejected_before_output_or_commands": true
+      },
+      "passed": true,
+      "summary": null
+    },
+    {
+      "name": "source_audit_mismatch",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "source audit is stale",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-fixtures-v8-remaining-gate.py\", line 36, in <module>\n    assert audit['source_manifest_sha256'] == sha(LOADED / 'source.json'), 'source audit is stale'\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: source audit is stale\n"
+      },
+      "checks": {
+        "rejected_before_output_or_commands": true
+      },
+      "passed": true,
+      "summary": null
+    },
+    {
+      "name": "summary_audit_mismatch",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "summary audit is stale",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-fixtures-v8-remaining-gate.py\", line 37, in <module>\n    assert audit['summary_raw_sha256'] == sha(LOADED / 'summary.json'), 'summary audit is stale'\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: summary audit is stale\n"
+      },
+      "checks": {
+        "rejected_before_output_or_commands": true
+      },
+      "passed": true,
+      "summary": null
+    },
+    {
+      "name": "source_content_changed",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-fixtures-v8-remaining-gate.py\", line 32, in <module>\n    assert not changed()\n           ^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      "checks": {
+        "rejected_before_output_or_commands": true
+      },
+      "passed": true,
+      "summary": null
+    },
+    {
+      "name": "audit_negative",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "raw hashes, source, cohorts, counts, compiler overlap and terminal builds must qualify",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-fixtures-v8-remaining-gate.py\", line 41, in <module>\n    assert audit['ten_runs_qualified'], 'raw hashes, source, cohorts, counts, compiler overlap and terminal builds must qualify'\n           ~~~~~^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: raw hashes, source, cohorts, counts, compiler overlap and terminal builds must qualify\n"
+      },
+      "checks": {
+        "rejected_before_output_or_commands": true
+      },
+      "passed": true,
+      "summary": null
+    },
+    {
+      "name": "nine_runs",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-fixtures-v8-remaining-gate.py\", line 39, in <module>\n    assert len(qualification['runs']) == 10 and all(r['exit_code'] == 0 and not r.get('outer_timeout', False) for r in qualification['runs'])\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      "checks": {
+        "rejected_before_output_or_commands": true
+      },
+      "passed": true,
+      "summary": null
+    },
+    {
+      "name": "prior_timeout_exit0",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-fixtures-v8-remaining-gate.py\", line 39, in <module>\n    assert len(qualification['runs']) == 10 and all(r['exit_code'] == 0 and not r.get('outer_timeout', False) for r in qualification['runs'])\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      "checks": {
+        "rejected_before_output_or_commands": true
+      },
+      "passed": true,
+      "summary": null
+    },
+    {
+      "name": "prior_requested_stop",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-fixtures-v8-remaining-gate.py\", line 38, in <module>\n    assert qualification['finished_at_utc'] and not qualification['requested_stop']\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      "checks": {
+        "rejected_before_output_or_commands": true
+      },
+      "passed": true,
+      "summary": null
+    },
+    {
+      "name": "prior_build_error",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-fixtures-v8-remaining-gate.py\", line 40, in <module>\n    assert not qualification['build_errors'] and not qualification['changed_source_files']\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      "checks": {
+        "rejected_before_output_or_commands": true
+      },
+      "passed": true,
+      "summary": null
+    },
+    {
+      "name": "all_pass",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 0,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "confirmed_terminal_targets_released": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.686378+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": true,
+        "shared_targets_released": true,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "parsed_failure",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "later_stages_not_started": true,
+        "confirmed_terminal_targets_released": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.699178+00:00",
+        "completed_command_groups": 1,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": true,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "parsed_filtered",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "later_stages_not_started": true,
+        "confirmed_terminal_targets_released": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.711783+00:00",
+        "completed_command_groups": 1,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": true,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "parser_failure",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "later_stages_not_started": true,
+        "confirmed_terminal_targets_released": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.723743+00:00",
+        "completed_command_groups": 1,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": true,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "mac_timeout_exit0",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "later_stages_not_started": true,
+        "confirmed_terminal_targets_released": true,
+        "timeout_retained_even_when_exit_zero": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.735625+00:00",
+        "completed_command_groups": 1,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": true,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "mac_timeout_exit_race",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "later_stages_not_started": true,
+        "confirmed_terminal_targets_released": true,
+        "timeout_retained_even_when_exit_zero": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.747831+00:00",
+        "completed_command_groups": 1,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": true,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "mac_timeout_unreapable",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "later_stages_not_started": true,
+        "unconfirmed_target_not_released": true,
+        "timeout_retained_even_when_exit_zero": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.760381+00:00",
+        "completed_command_groups": 1,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": false,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "linux_missing_cid",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "unconfirmed_target_not_released": true,
+        "invalid_cid_not_used_as_container_target": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.774189+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": false,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "linux_invalid_cid",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "unconfirmed_target_not_released": true,
+        "invalid_cid_not_used_as_container_target": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.788880+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": false,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "linux_nonutf8_cid",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "unconfirmed_target_not_released": true,
+        "invalid_cid_not_used_as_container_target": true,
+        "unreadable_receipt_diagnostic_retained": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.802745+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": false,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "linux_spawn_error",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "unconfirmed_target_not_released": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.816298+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": false,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "linux_timeout_exit0",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "confirmed_terminal_targets_released": true,
+        "timeout_retained_even_when_exit_zero": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.831001+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": true,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "linux_timeout_stop_timeout_removed",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "confirmed_terminal_targets_released": true,
+        "timeout_retained_even_when_exit_zero": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.845790+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": true,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "linux_timeout_stop_timeout_kill",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "confirmed_terminal_targets_released": true,
+        "timeout_retained_even_when_exit_zero": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.860630+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": true,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "linux_timeout_cleanup_unconfirmed",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "unconfirmed_target_not_released": true,
+        "timeout_retained_even_when_exit_zero": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.875112+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": false,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "linux_cid_oserror",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "unconfirmed_target_not_released": true,
+        "invalid_cid_not_used_as_container_target": true,
+        "unreadable_receipt_diagnostic_retained": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.889714+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": false,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "linux_cleanup_child_exception",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "unconfirmed_target_not_released": true,
+        "failed_linux_cleanup_record_retained": true,
+        "unexpected_child_cleanup_exception_fail_closed": true,
+        "container_cleanup_still_attempted_after_child_exception": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.903573+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": false,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "linux_cleanup_container_exception",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "unconfirmed_target_not_released": true,
+        "invalid_cid_not_used_as_container_target": true,
+        "failed_linux_cleanup_record_retained": true,
+        "unexpected_container_cleanup_exception_fail_closed": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.916833+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": false,
+        "changed_source_files": []
+      }
+    },
+    {
+      "name": "linux_cleanup_both_exceptions",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": null
+      },
+      "checks": {
+        "expected_terminal_exit_without_exception": true,
+        "all_attempted_commands_retained": true,
+        "gate_success_only_for_all_pass": true,
+        "unconfirmed_target_not_released": true,
+        "invalid_cid_not_used_as_container_target": true,
+        "failed_linux_cleanup_record_retained": true,
+        "unexpected_child_cleanup_exception_fail_closed": true,
+        "unexpected_container_cleanup_exception_fail_closed": true
+      },
+      "passed": true,
+      "summary": {
+        "finished_at_utc": "2026-10-14T23:28:03.930185+00:00",
+        "completed_command_groups": 3,
+        "expected_command_groups": [
+          "mac-dependent-tests",
+          "mac-workspace-build",
+          "linux-clippy-build"
+        ],
+        "all_remaining_commands_passed": false,
+        "shared_targets_released": false,
+        "changed_source_files": []
+      }
+    }
+  ],
+  "collector_cases": [
+    {
+      "name": "all_pass",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 0,
+        "exception": null
+      },
+      "checks": {
+        "collector_gate_true_only_for_all_pass": true
+      },
+      "passed": true
+    },
+    {
+      "name": "parsed_failure",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 0,
+        "exception": null
+      },
+      "checks": {
+        "collector_gate_true_only_for_all_pass": true,
+        "unattempted_mac_build_marked": true,
+        "unattempted_linux_marked": true,
+        "no_false_linux_ran_claim": true,
+        "failure_title": true
+      },
+      "passed": true
+    },
+    {
+      "name": "linux_missing_cid",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 0,
+        "exception": null
+      },
+      "checks": {
+        "collector_gate_true_only_for_all_pass": true,
+        "attempted_linux_row_not_mislabeled": true
+      },
+      "passed": true
+    },
+    {
+      "name": "linux_timeout_exit0",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 0,
+        "exception": null
+      },
+      "checks": {
+        "collector_gate_true_only_for_all_pass": true,
+        "attempted_linux_row_not_mislabeled": true
+      },
+      "passed": true
+    },
+    {
+      "name": "linux_nonutf8_cid",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 0,
+        "exception": null
+      },
+      "checks": {
+        "collector_gate_true_only_for_all_pass": true,
+        "attempted_linux_row_not_mislabeled": true
+      },
+      "passed": true
+    },
+    {
+      "name": "linux_cid_oserror",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 0,
+        "exception": null
+      },
+      "checks": {
+        "collector_gate_true_only_for_all_pass": true,
+        "attempted_linux_row_not_mislabeled": true
+      },
+      "passed": true
+    },
+    {
+      "name": "linux_cleanup_child_exception",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 0,
+        "exception": null
+      },
+      "checks": {
+        "collector_gate_true_only_for_all_pass": true,
+        "attempted_linux_row_not_mislabeled": true
+      },
+      "passed": true
+    },
+    {
+      "name": "linux_cleanup_container_exception",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 0,
+        "exception": null
+      },
+      "checks": {
+        "collector_gate_true_only_for_all_pass": true,
+        "attempted_linux_row_not_mislabeled": true
+      },
+      "passed": true
+    },
+    {
+      "name": "linux_cleanup_both_exceptions",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 0,
+        "exception": null
+      },
+      "checks": {
+        "collector_gate_true_only_for_all_pass": true,
+        "attempted_linux_row_not_mislabeled": true
+      },
+      "passed": true
+    },
+    {
+      "name": "source_binding",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-collect-fixtures-v8-gate.py\", line 23, in <module>\n    assert sha(RESULTS / 'source.json') == binding['source_manifest_sha256']\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      "checks": {
+        "invalid_evidence_rejected_before_copy": true
+      },
+      "passed": true
+    },
+    {
+      "name": "count_raw_hash",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-collect-fixtures-v8-gate.py\", line 34, in <module>\n    assert parsed['raw_sha256'] == results[0]['raw_sha256'] and parsed['total'] == counts\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      "checks": {
+        "invalid_evidence_rejected_before_copy": true
+      },
+      "passed": true
+    },
+    {
+      "name": "count_values",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-collect-fixtures-v8-gate.py\", line 34, in <module>\n    assert parsed['raw_sha256'] == results[0]['raw_sha256'] and parsed['total'] == counts\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      "checks": {
+        "invalid_evidence_rejected_before_copy": true
+      },
+      "passed": true
+    },
+    {
+      "name": "nonterminal_summary",
+      "synthetic_only": true,
+      "outcome": {
+        "exit_code": 1,
+        "exception": "AssertionError",
+        "error": "copy only terminal evidence",
+        "traceback": "Traceback (most recent call last):\n  File \"/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/check.py\", line 184, in execute\n    exec(compile(tree, str(script), 'exec'), namespace)\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/private/tmp/lamp-fourth-collect-fixtures-v8-gate.py\", line 12, in <module>\n    assert summary['finished_at_utc'], 'copy only terminal evidence'\n           ~~~~~~~^^^^^^^^^^^^^^^^^^^\nAssertionError: copy only terminal evidence\n"
+      },
+      "checks": {
+        "invalid_evidence_rejected_before_copy": true
+      },
+      "passed": true
+    }
+  ],
+  "checks_passed": 41,
+  "checks_total": 41,
+  "failed_cases": []
+}

@@ -1,0 +1,37 @@
+{
+  "review_scope": [
+    "remaining-gate runner",
+    "remaining-gate collector"
+  ],
+  "initial_findings": [
+    "exact source/audit binding missing",
+    "cleanup could abandon child/container terminal proof",
+    "mutable image tag claimed as fixed",
+    "partial collector described unattempted stages as run",
+    "parsed failed/filtered counts did not stop later stages"
+  ],
+  "root_corrections": [
+    "exact source and summary audit hash checks",
+    "recorded CID-specific cleanup with explicit terminal states",
+    "immutable image-ID invocation",
+    "unattempted rows and conditional wording",
+    "parsed failures stop before next stage"
+  ],
+  "synthetic_followup": {
+    "first_result": "32 of 33 passed; non-UTF-8 CID caused incorrect target-release/attempt wording",
+    "artifacts": "/private/tmp/lamp-fourth-v8-gate-synthetic-m9rNg3/results.json",
+    "correction": "Catch unreadable CID and unexpected cleanup errors; retain failed active record with terminal state unconfirmed",
+    "final_result": "41 of 41 synthetic scenarios passed",
+    "final_artifacts": "/private/tmp/lamp-fourth-v8-gate-synthetic-fixed-mnDk3N/results.json",
+    "final_results_sha256": "68f2e1344b649576e8ebe9ba055fa92816d70907db8363844813c2a88c435d64"
+  },
+  "limitations": [
+    "Synthetic process APIs only; no real Cargo, Podman or lamp result.",
+    "No changes to the active V8 loaded runner or source.",
+    "Fake process APIs exercise control flow; they do not establish actual process-group descendant or container-runtime cleanup behavior."
+  ],
+  "tested_script_hashes": {
+    "lamp-fourth-fixtures-v8-remaining-gate.py": "01347b9f11f93d242fde16f3b58380f746f734c4b3d7c418809893cdb1dc620e",
+    "lamp-fourth-collect-fixtures-v8-gate.py": "88e5022d9a5e890c04d46eba5e239c2aae29d28ef10051c9cd3e6195c866a373"
+  }
+}

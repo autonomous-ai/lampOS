@@ -1,0 +1,240 @@
+{
+  "raw_sha256": "81eb3d6cf6c533bc36061d146df8a6527174b226c79b0fdd369490fcbfd32ee5",
+  "counts_scope": "standard libtest/doctest plus custom harness result lines",
+  "total": {
+    "suites": 21,
+    "passed": 1173,
+    "failed": 0,
+    "ignored": 8,
+    "measured": 0,
+    "filtered": 0
+  },
+  "standard": {
+    "suites": 21,
+    "passed": 1173,
+    "failed": 0,
+    "ignored": 8,
+    "measured": 0,
+    "filtered": 0
+  },
+  "custom": {
+    "suites": 0,
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered": 0
+  },
+  "suite_results": [
+    {
+      "suite": "Running unittests src/lib.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-a714350f33563503)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 980,
+      "failed": 0,
+      "ignored": 8,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running unittests src/main.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/lamp_voice-073be753c843adac)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/admission.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/admission-ae83e2a4a3de6a55)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/camera_config.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/camera_config-d2bfafc6bb329d23)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/camera_runtime.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/camera_runtime-1abb6d8184ce2fc4)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 33,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/capture_hold_worker.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/capture_hold_worker-193e5c8b6f19beca)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/core.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/core-cdf874198e052dc5)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/diagnostics.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/diagnostics-c5fc35b24576bfa7)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 18,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/end_silence.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/end_silence-1b07d442f9f9d884)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/endpoint_confirmation.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/endpoint_confirmation-efbc613b09089948)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/expression_out.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/expression_out-213a1146112e46c2)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/fixture_provider.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/fixture_provider-61bb87ecc741e3fd)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 27,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/privacy_state.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/privacy_state-3ad584ded4409f37)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/process.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/process-f7548b0504663154)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/provider_config.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/provider_config-72b380570e6592ea)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/reference_link.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/reference_link-76c858db0df3f0d9)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/reference_prime.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/reference_prime-f9ce52e6bf14a611)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/review_2026_10_14.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/review_2026_10_14-a22ed2d592488905)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/ring_worker.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/ring_worker-37a1996793cee9f7)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 17,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Running tests/visual_options.rs (/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/deps/visual_options-06d1cccb99ca3a4f)",
+      "format": "standard",
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    {
+      "suite": "Doc-tests lamp_voice",
+      "format": "standard",
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    }
+  ]
+}

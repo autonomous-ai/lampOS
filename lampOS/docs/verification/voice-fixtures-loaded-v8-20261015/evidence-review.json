@@ -1,0 +1,24 @@
+{
+  "reviewed_at_utc": "2026-10-14T22:46:14.469801+00:00",
+  "scope": "Scratch evidence audit, collector and read-only lamp handoff; no task source edits or Cargo runs.",
+  "corrections": [
+    "Missing parser counts retain counts_error and remain archivable but unqualified.",
+    "Run/build outer_timeout rejects qualification even if process exit is zero.",
+    "Task compatibility minute requires running executable hash to equal exact-head native CI artifact.",
+    "README distinguishes UTC boundaries from monotonic elapsed durations and allows an active build to finish without claiming a failed build ends after Mac sampling."
+  ],
+  "findings_after_correction": [],
+  "synthetic_checks": {
+    "path": "/private/tmp/lamp-fourth-v6-evidence-synthetic-a73z9aih/selfcheck-results.json",
+    "sha256": "71aa9ed377de6dc3c55c9ce0fac56ac431015e7f3b64771ad0191c30c45df234",
+    "passed": 4,
+    "counted_as_real_qualification": false,
+    "method": "SYNTHETIC evidence-script checks only. Ten rows replay ONE completed Mac run, with deliberate metadata mutations. This is not ten real runs, qualification evidence, a Cargo run, a native run, or lamp evidence."
+  },
+  "current_script_hashes": {
+    "audit": "c054c5c69720c14113b40e35860b7e7ae0a25da6e7778aac4720da18455f6d0d",
+    "collector": "fddf12ec7b704e5e071446cb0c38f72a8e4c6f11f1870416cd6e3fe8d704d665",
+    "handoff": "b24b3f352d136afaa5d7184a62ce724f2e608d7d86fa722c3f54a817bbbad423"
+  },
+  "note": "The tested audit and collector included the final README wording. The collector later added only the review/self-check JSON copies and an explicit synthetic-check paragraph; its qualification predicate and failure handling did not change."
+}

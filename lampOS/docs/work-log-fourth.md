@@ -3208,6 +3208,38 @@ be stated exactly. This is separate from #739's unfinished ten-run requirement.
 The new queue is #749, then #753, then #733; #739 returns after the MVP.
 
 
+## 2026-10-15, 07:24 ICT: task 46, v8 terminal evidence retained while paused
+
+Ready for lamp-voice: no
+
+The requested stop completed at 00:20:01 UTC, before run 10. Nine complete
+serial Mac Voice runs each passed 1,173 tests, failed none and kept the same
+eight existing ignores across 21 suites. All 25 concurrent ARM64 cross-build
+cycles passed; the active final compiler cycle was allowed to finish. The
+orchestrator returned 2 for the deliberate stop. The auditor correctly says
+`ten_runs_qualified: false`: this is nine of ten, not task qualification.
+All raw logs, source hashes, count audits, stop reason and bounded host-load
+samples are in [the terminal v8 folder](verification/voice-fixtures-loaded-v8-20261015/).
+No failed or earlier-version run is counted toward this sequence. The 2,367
+frozen source files remained unchanged and match the parked task source
+`ddb13741b1971cf386087f0f980aef39f8e50727`. The work remains paused at First's
+request, with no PR and with later dependent/workspace gates unrun.
+
+The machine was Fourth's Intel Mac, macOS 26.6.2, i7-10700K, 64 GiB,
+Rust/Cargo 1.96.0. Compiler load came from Fourth's x86_64 Linux Podman VM
+cross-compiling ARM64; it was not native ARM64 execution or a lamp. There
+were 724 five-second host samples, one-minute load 3.675 to 13.274, and
+minimum available space 38,846,226,432 bytes. These samples end with the Mac
+sequence, before the final joined build ended. No lamp measurements.
+
+Task 47 (#749) now proceeds from integration
+`e4922a3cb18153bda9344b7049ad0c8d9d342753` on `fourth/sleep-name`.
+The intended path is accepted `voice/activity` person speech plus the name's
+source onset, inside Expression only. Its latency target is the next 20 ms
+planner tick after the second valid matching input; the successful path
+adds no deliberate wait. Pending evidence is bounded and cannot block the
+planner. First owns on-lamp acoustic, physical wake and overnight checks.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
