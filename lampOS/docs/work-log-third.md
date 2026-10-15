@@ -3034,3 +3034,23 @@ router, hotspot or lamp; step 4 of #806 needs a builder with a lamp.
 | Id | Proposal | Issue | Answer |
 |---|---|---|---|
 | third-P1 | Expression reads the system's time zone (`--zone system`), so a lamp outside Vietnam keeps its days across daylight saving; Memory's owner the same | #820 | — |
+
+## 2026-10-15 — Setup for a home (#806) ready as #817; #795 and #808 rebased
+
+Ready for lamp-voice: yes (#817), yes (#795), no (#808 until its ARM64 run)
+
+- #817, head `b21a26bb3`, off unless set. ARM64 run 38722230047: 4,426
+  passed, 0 failed; `lamp-setup` `e5dd2d75…9a9d`. Host: workspace 4,485
+  passed, 2 failed (health's two, failing on `lamp-voice` too); `lamp-setup`
+  27 passed. A subagent's review found the reset killing itself (its watcher
+  inside `lampos.target`) and accented Wi-Fi names never matching; both fixed
+  before ready, with the rest of its findings. First asked to mark it ready
+  with questions 1 and 2 still open; the pull request takes both in their
+  narrowest reading. Step 4, the run on another lamp, is for a builder with
+  one: `docs/setup.md`, "On a lamp". Most likely wrong there: the radio V1's
+  image left, `iw` scanning with the hotspot up, V1's page meeting a 404, and
+  the page finding the lamp on the home network.
+- #795 and #808 conflicted with `lamp-voice` `8ddffb629` in
+  `msgs/src/lib.rs` (new `attention` and `tasks` modules beside mine); moved
+  onto it, both sides kept: #795 `c156c34af`, #808 `c9d997e51`. Their ARM64
+  runs restart.
