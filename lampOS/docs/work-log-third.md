@@ -2915,3 +2915,29 @@ The log relay's lost lines also fail Controls' `touch_program.rs`
 `replay_succeeds_with_a_nonexistent_i2c_adapter_and_an_unopenable_bus_root`)
 at random: on `lamp-voice` `05da0a8bf` itself, 1 run of 3 failed two of them,
 with nothing on stderr where the test expects the error.
+
+## 2026-10-15 — #795 changes asked by First; #711 calibration draft #797; #699 resumed
+
+Ready for lamp-voice: yes (#795), no (#797, #699)
+
+- #795: First asked, before the lamp minute, for a named test of Controls
+  stopping with the slide open, and a trimmed verification folder. Added
+  `controls_stopping_with_the_slide_open_closes_both_microphones_within_50_ms`
+  (both microphones open 1 µs before the last acquisition is 50 ms old, both
+  closed at 50 ms, closed for the next 240 ms, reopened only by a new worker
+  after 60 ms of fresh HIGH; it fails if Ears keeps a permit 10 ms longer).
+  The folder is one README of counts and failing test names. One commit,
+  force-pushed on my branch: `1a0e81d4a`. Its ARM64 run is queued.
+- #711: First agreed the calibration and asked for E4/E8 named as not working,
+  the rule as a number, and the 10-minute watch with the office as it is. All
+  three are in draft #797 (touch at 40% and release at 20% of the way from a
+  pad's noise to its weakest swipe). Draft until its ARM64 run is green; since
+  `af7aed833` the run starts only from a pull request.
+- #699 (after the MVP, taken while both wait on ARM64): the checkpoint moved
+  onto `d731283a5` as two commits, without the raw checkpoint folder. First
+  test run: all passed but two settings tests (a tagged `bool` rule accepting
+  unknown fields; a test-only race where a child process briefly inherits
+  Records' directory lock). Both fixed. The settings command now counts a
+  reply as success only when it names the guarded store's next revision.
+  Host, this Mac only: a durable save round trip p50 about 30 ms, worst 61 ms
+  (target 250 ms); log admission median 0.54 µs (target 1 ms).
