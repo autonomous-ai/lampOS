@@ -3472,6 +3472,38 @@ let the test ask about the parts with the board check left out, or point
 it at a disk of its own. Not mended here.
 
 
+## 2026-10-15, 16:45 ICT: task 50 (#782), what was found and what is being built
+
+Ready for lamp-voice: no
+
+Found, on the 44 scenes played to lamp-4ace today (records read on the Mac
+Fourth shares with the first builder; counts only kept): of 84 fast ends
+(400 ms, p ≥ 0.9), 10 cut a played line, 9 of them at a comma (p 0.91 to
+0.99), and the rest came in as a new turn each time; the 600 ms window cut
+two more just after "Hey Lamp,". Replayed digitally through the voice's own
+detector and the pinned model (`turn_end_replay`, new, on the task branch),
+the same lines get the same verdicts at those commas, but only 1 of the 9 is
+cut: as lamp-4ace heard them those pauses were 400 to 560 ms, 50 to 150 ms
+longer than `say` makes them, and the room's floor in the replay does not
+account for it. Others' settings and people's own pauses (median 580 to
+640 ms inside a turn) say no early end under about 600 ms leaves people
+whole. Posted on [#782](https://github.com/autonomous-ai/lampOS/issues/782#issuecomment-6187506538)
+with three proposals for the first builder.
+
+Being built, the second of them: `LAMP_CUT_KEEPS_NAME=on`, off unless set.
+The coordinator marks a request that continues one it ended early
+(`ProviderInput::Start::continues`, sent only with the switch), and the
+provider worker begins it with the first part's name, score, text and
+nearness (`Attention::continued_at`). A test through the worker's own loop
+with the start kept: in a busy room the rest is held without the switch and
+answered with it. On `fourth/comma-pause` at `a6bbc80ac`; the gate and its
+ARM64 run are going. Its limit, said in `attention.md`: a second voice that
+begins within the first one's pause is taken for the first going on.
+
+#792 (#753): the reviewer left it for the first builder (it adds a message
+type to `crates/msgs`); its pull request's ARM64 run is queued.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
