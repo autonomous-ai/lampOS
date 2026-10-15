@@ -3777,6 +3777,30 @@ next words.
   (#829, 22:31). In the 15 Oct records it would have held 4 of 25 answers.
 
 
+## 2026-10-16, 01:35 ICT: #782's call wait works on lamp-4ace, pull request #891; #865 merged
+
+Ready for lamp-voice: no (#891 is a draft until ARM64 is green)
+
+- **#782, a bare call ends nothing**
+  - **On lamp-4ace:** the first builder ran `fourth/bare-call` at 00:27.
+    Busy-room calls went from 0 of 3 to 3 of 3 answered, the two people's
+    talk was left alone, and the quiet-room calls were answered. lamp-4ace
+    keeps `--call-wait-ms 2000` on.
+  - **Pull request:** [#891](https://github.com/autonomous-ai/lampOS/pull/891),
+    rebased onto `lamp-voice` and stacked on #853.
+  - **Gate:** over the whole workspace, on `b541779fb`. 4,855 passed, 4
+    failed, 35 ignored. The crates it touches passed with none failing.
+    The 4 failures are #862's lost lines and an `ipc` timing test.
+- **#865** was merged by the reviewer at 01:17.
+- **#864** is rebased and ARM64 green, with the reviewer's Furhat P3 fixed
+  in `ee0339fd0`. It waits on the reviewer.
+- **Corrected:** a #865 comment named an evidence commit before it existed.
+  A correction comment is posted, and the memory rule is extended to
+  hashes.
+- **Next on #782:** the "Yes?" note when a call wait runs out with only the
+  call; change 2, the floor hold; the bare "Lamp,".
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
