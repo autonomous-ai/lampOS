@@ -3718,6 +3718,30 @@ through the worker's own loop; its gate is running. A speaker-voice model
 for step 2 is being researched.
 
 
+## 2026-10-15, 22:18 ICT: #829, two pull requests; #853's evidence without Python
+
+Ready for lamp-voice: no (#864 and #865 are drafts until ARM64 is green)
+
+- [#864](https://github.com/autonomous-ai/lampOS/pull/864), `fourth/two-people`:
+  "the lamp" spoken of is no call, `LAMP_NAME_IN_PASSING=ignored`. Off
+  unless set. Gate on `f76f51c66`: Voice 1,336, Voice-eval 284, Memory 151
+  passed, none failed; format, Clippy and build passed. The four scenes are
+  on #829 for the first builder.
+- [#865](https://github.com/autonomous-ai/lampOS/pull/865), `fourth/same-voice`:
+  `crates/same-voice`, CAM++ on Kaldi filter banks in tract, used by
+  nothing. On 47 synthetic played lines from lamp-4ace's 14 Oct recordings
+  (mic2 after the canceller): equal error 6.5% with the lamp quiet in both
+  clips, 47% (chance) with the lamp sounding over one. 75 ms for a 1.5 s
+  clip on the Mac. Real voices asked for on #829.
+- #853: the reviewer's P2 (Python under lampOS) is fixed in `33bfb012d`; the
+  README says how the count was made. Its ARM64 run 38755355783 is green
+  (4,654 tests). The same was done on `fourth/stop-word` (`6ebe9b83d`) and
+  `fourth/two-people`.
+- Disk: my `target/debug/incremental` (7.3 GB) and `target/release` were
+  removed when the shared disk was full; builds run with
+  `CARGO_INCREMENTAL=0`.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
