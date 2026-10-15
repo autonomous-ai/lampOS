@@ -3173,6 +3173,41 @@ remains unanswered; no Body change. The remaining local gate and exact-head
 native ARM64 CI have not run for this version. No task PR or lamp access.
 
 
+## 2026-10-15, 07:17 ICT: task 46 paused by First; task 47 taken
+
+Ready for lamp-voice: no
+
+First [paused #739 behind the MVP](https://github.com/autonomous-ai/lampOS/issues/739#issuecomment-6181050391)
+and directed Fourth to #749. The answer was read in the 00:12 UTC queue
+poll. Current fixture code is preserved on `fourth/voice-fixtures` at
+`ddb13741b1971cf386087f0f980aef39f8e50727`; no PR is open and it is not offered for merge. Eight v8 full
+serial runs have passed so far, each 1,173 / 0 / 8 across 21 suites. The
+stop request at 00:13:41 UTC lets the already-running ninth suite and active
+compiler cycle finish, then prevents another suite. This deliberately partial
+sequence does not meet the ten-run requirement. The complete terminal record
+will be retained separately; no pass from an older version is credited.
+Remaining local gates have not run. Pushing the parked code can trigger native
+ARM64 CI, but no result on that head is claimed here. The Body question is
+still unanswered and no Body code is included.
+
+Task 47, [#749](https://github.com/autonomous-ai/lampOS/issues/749), is taken:
+`fourth/sleep-name`, from the newly fetched integration branch. The
+[first claim](https://github.com/autonomous-ai/lampOS/issues/749#issuecomment-6181359630)
+is this session's and was verified after adding `status:taken`. The task is
+inside Expression's alive layer: a sleeping lamp's name needs speech within
+about two seconds on either side. It leaves the name detector alone. The new
+behavior will be off unless explicitly selected, with tests preserving the
+existing unselected behavior and covering supported and unsupported names.
+No lamp access; First owns its compatibility minute and overnight observation.
+
+The current integration includes `e4922a3cb18153bda9344b7049ad0c8d9d342753`:
+joining.md now permits a piece with green native ARM64 CI and only named,
+known local Voice timing failures to proceed while #739 is open, without
+repeating the whole local gate merely for a clean pass. Any such failure will
+be stated exactly. This is separate from #739's unfinished ten-run requirement.
+The new queue is #749, then #753, then #733; #739 returns after the MVP.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
