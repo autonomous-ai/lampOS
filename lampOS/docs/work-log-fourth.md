@@ -3542,6 +3542,19 @@ of continued pauses and 49% of finished ends. Posted on #782 at 16:32.
 is fixed in `1b8f585a2`; it will merge once that head's ARM64 run is green.
 
 
+## 2026-10-15, 16:52 ICT: task 49 (#753) merged
+
+Ready for lamp-voice: yes (#792, merged)
+
+The reviewer merged [#792](https://github.com/autonomous-ai/lampOS/pull/792)
+at 16:49 and closed #753: the opt-in `attention/addressed` signal and the
+near-and-facing rule, off unless `LAMP_ADDRESSED=on` with `LAMP_ATTENTION`
+and `LAMP_BUS=on`. Its one review finding (the bus prerequisite) was fixed
+in `1b8f585a2`, whose pull-request ARM64 run 38709256741 succeeded. Turning
+it on, and the recordings that check its two lines, are the first
+builder's. Nothing of it was run on a lamp by Fourth.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
