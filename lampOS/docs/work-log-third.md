@@ -2978,3 +2978,28 @@ Ready for lamp-voice: no (#808 is a draft until its ARM64 run is green)
   earlier sessions; I have not touched it.
 - #795: the reviewer asked for the docs to say that a ring start failing
   before any writer exists does not block unmute; done on `4c154fee3`.
+
+## 2026-10-15 — Setup for a home (#806) taken
+
+Ready for lamp-voice: no
+
+The Queue put #806 third in my list, after #795 and #797, which now wait only
+on review and First's lamp minute. Claimed first on the issue (session
+`2cee12fc-d91c-4668-b460-0375577592b5`, lamp none).
+
+Scope as First wrote it: V2 ships with V1's setup flow (the lamp's hotspot, a
+setup page on a phone, the switch to the home's Wi-Fi), writing what lampOS
+needs (Wi-Fi, the voice's provider credentials, `/etc/lampOS/update/key.pub`,
+the person's name and time zone), with nothing of lampOS listening before
+setup is done; a 5 s hold of the reset button (header pin 37, chip 0 line 100)
+returns to setup and wipes the person's data. First step: study V1's flow and
+write `docs/setup.md` with a verdict per part. Starting point on the V2 side:
+`lamp-surround` (my task 12, never installed on a lamp) already has a setup
+page, a NetworkManager adapter, provider generations and a reset contract;
+whether V1's server runs beside lampOS or its parts are ported decides how
+much of that is used. Shown on a lamp only by a builder with one; I have none.
+
+Latency target, before building: from a phone joining the lamp's hotspot to the
+setup page, under 5 s; from submitting home Wi-Fi to the page saying joined or
+failed, within V1's own bounds (45 s join); the reset hold acted on at 5 s and
+not before. These are targets, not measurements.
