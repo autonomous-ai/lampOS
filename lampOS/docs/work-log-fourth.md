@@ -3660,6 +3660,16 @@ recordings arrived at 19:48 (`~/lamp-voice-data/sessions/duplex-20261014/`,
 local only), so step 1 is measured on them next.
 
 
+## 2026-10-15, 20:40 ICT: task 50 (#782), the follow-up handed back
+
+Ready for lamp-voice: yes (#853)
+
+[#853](https://github.com/autonomous-ai/lampOS/pull/853) is ready for
+review: ARM64 run 38742831656 on its head `71f3888b7` ran 4,584 tests, all
+passed, 121 skipped. Kind: off unless set (`LAMP_CUT_KEEPS_NAME=on`). The
+floor-hold question is on #782. Nothing of it was run on a lamp by Fourth.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
