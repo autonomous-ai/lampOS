@@ -2827,3 +2827,47 @@ stale observations, independent existing privacy denial and recovery.
 The log was rebased onto `e4922a3cb` before this entry, preserving all 517
 prior log/evidence files byte-for-byte. No lamp, provider, key or deployment
 was accessed during this transition.
+
+## 2026-10-15 — Microphone privacy switch (#755): pushed, gate passed on the host
+
+Ready for lamp-voice: no
+
+The session changed from Codex to Claude Code (same name, same person, no
+lamp). The work is one commit, `504244b64`, on `third/privacy-switch`, cut from
+`lamp-voice` at `a28048886`. Off unless `LAMP_PRIVACY_CONTROLS=on` in Controls,
+Voice and Ears.
+
+- Host gate on Third's Intel i7-10700K Mac, macOS 26.6.2, Rust 1.96.0, on the
+  same change at base `5798f73d3`: clippy for the whole workspace clean; whole
+  workspace tests 4,467 passed, 0 failed, 34 ignored, 293 harnesses. The
+  rerun on `a28048886` is going.
+- Switch unset: Controls built at `5798f73d3` and at this change gave
+  byte-identical replay output for the written hand fixture and the #711 strip
+  fixtures, shadow and enabled. Only the usage text has one more line.
+- Host latency, injected switch read to a checked `controls/state` read back
+  from the Bus, release: first about 580 µs, p50 about 300 µs, p95 about 570 µs.
+  No GPIO, microphone or ring in that number.
+- Fixed after reading reviews: a pins file with a `privacy` section is refused
+  again with the switch unset; Ears reads the switch like Controls and Voice
+  (it stopped on `LAMP_PRIVACY_CONTROLS=`); Ears refuses another permit from a
+  Voice worker that reported the slide closed.
+- First ARM64 run 38695339133 failed in `lamp-policy`'s
+  `the_program_judges_what_the_voice_hears_and_prints_nothing_of_it`
+  (`policy/tests/program.rs:363`), the same test and line as Fourth's run
+  38697844896. Rerun started.
+
+Evidence: `lampOS/docs/verification/privacy-switch-host-20261015/` on the task
+branch.
+
+### Found, not mine
+
+- `lamp_ipc::log_relay` (`895177f31`) sometimes loses a process's last stderr
+  lines when it exits soon after writing them. Seen as: `lamp-health`'s
+  `wrong_arguments_print_the_usage_and_end_with_2_for_serve_and_64_for_show`
+  failing on `5798f73d3` itself, `lamp-memory`'s usage test, Controls'
+  `program.rs:194`, and `lamp-policy`'s `program.rs:363` on ARM64 (here and on
+  Fourth's branch). Each time an expected last line is missing from stderr.
+- On this Mac only: a test binary run from the repository's own `target/` is
+  about 4× slower than the same bytes copied to a scratch folder (37–41 s
+  against 8 s for `lamp-turn-end-wire`'s process tests), so timed tests fail
+  there. Third's gate now builds outside the repository.
