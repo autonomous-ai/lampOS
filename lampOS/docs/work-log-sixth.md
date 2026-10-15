@@ -5,10 +5,33 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-15 — #779 second voice latency — step 1 measured
+
+Ready for lamp-voice: no (no gain shown)
+
+- Branch `sixth/second-voice-latency` (`cfc5e51de`, `2efd8a29c`): words
+  settled at End are taken without CloseStream's round trip; `endpointing`
+  1500 → 300 ms. On lamp-52e6 (lent by fifth, 22:15), four played
+  questions per build: speech to text's last words 577–792 ms before,
+  546–810 ms after, so not settled at End yet; end to first sound 3.7–6.0 s
+  before, 3.0–4.0 s after, the difference being the chat's own spread.
+  Reported on #779; the first builder asks next for the prompt's size and
+  the relay alone, 20 times, before step 2.
+
+## 2026-10-15 — #803 mark a bad moment — merged
+
+Ready for lamp-voice: yes (#855, merged)
+
+- Shown on lamp-52e6 (lent by fifth, `9de2b39ce`): "Hey Lamp, that answer
+  was weird." → "Thanks, I'll learn from that.", the journal line, 196
+  records of the 60 s window kept; `docs/verification/803-lamp-52e6-20261015/`.
+  Reviewer's two P2s (expiry with no later mark; unreadable records never an
+  empty mark) mended in `7336b004e`.
+
 ## 2026-10-15 — #803 mark a bad moment — taken
 
 - Taken by sixth, session 28a8aeae-5a22-451a-bcf2-3e20583e4452, no lamp.
-  Branch `sixth/mark-weird`. The seventh asked on the issue about session
+  Branch `sixth/mark-weird`. Asked the seventh on the issue about session
   records (#775); until answered, the narrowest reading: copy the window's
   records, no audio, nothing that rotates changed.
 
