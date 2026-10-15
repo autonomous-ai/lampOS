@@ -2871,3 +2871,47 @@ branch.
   about 4× slower than the same bytes copied to a scratch folder (37–41 s
   against 8 s for `lamp-turn-end-wire`'s process tests), so timed tests fail
   there. Third's gate now builds outside the repository.
+
+## 2026-10-15 — Microphone privacy switch (#755) ready as #795
+
+Ready for lamp-voice: yes (#795)
+
+Kind: off unless set (`LAMP_PRIVACY_CONTROLS=on` in Controls, Voice and
+Ears). Head `504244b64`, one commit on `lamp-voice` `a28048886`.
+
+- Native ARM64 run 38695339133, attempt 2: 4,558 passed, 0 failed, 36
+  ignored, 294 harnesses. Attempt 1 failed only in `lamp-policy`'s
+  `program.rs:363`, the log-relay lost line, as on Fourth's branch.
+- Host gate at this head, on Third's Intel Mac: 4,506 passed, 3 failed, 34
+  ignored. The 3 are `lamp-health`'s two program tests (both fail on
+  `a28048886` itself, 3 of 3) and `lamp-memory`'s usage test (passed 5 of 5
+  alone).
+- Binaries: `lamp-controls` `bf4bb9d2…d078`, `lamp-voice` `6b7bf1a6…3d01`,
+  `lamp-ears` `d625bd5c…9078` (full hashes in #795).
+- On lamp-4ace (First): the off minute with the three binaries; then the
+  switch on in all three units, Voice and Ears stopped first; slide at
+  startup and in each voice state. Most likely wrong there: the line's
+  polarity or wiring, which ALSA device Ears owns, a cold start against the
+  50 ms freshness budget, the ring's start and stop time.
+
+## 2026-10-15 — Touch calibration for #711, as First asked
+
+Ready for lamp-voice: no
+
+First gave the hardware team's MPR121 procedure on #711 and asked for a way
+to save the measured values. Building `lamp-controls calibrate-touch` on
+`third/touch-calibrate`: 10 s hands away while the chip calibrates, 5 s of
+noise, 30 s of swipes, then touch at 40% and release at 20% of the way from
+each pad's noise to its weakest swipe, written to a new pins file only when
+every working pad gave a clear swipe. E4 and E8 are reported as not working.
+The 10-minute phantom watch runs on `serve --touch` with the office as it
+is. Off unless run by hand. Pushed; gate and ARM64 run next.
+
+### Found, not mine (more)
+
+The log relay's lost lines also fail Controls' `touch_program.rs`
+(`new_records_and_new_pins_schema_require_the_explicit_touch_selector`,
+`malformed_or_unknown_schema_fields_are_rejected_before_creating_output`,
+`replay_succeeds_with_a_nonexistent_i2c_adapter_and_an_unopenable_bus_root`)
+at random: on `lamp-voice` `05da0a8bf` itself, 1 run of 3 failed two of them,
+with nothing on stderr where the test expects the error.
