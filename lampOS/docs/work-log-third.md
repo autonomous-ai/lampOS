@@ -3003,3 +3003,28 @@ Latency target, before building: from a phone joining the lamp's hotspot to the
 setup page, under 5 s; from submitting home Wi-Fi to the page saying joined or
 failed, within V1's own bounds (45 s join); the reset hold acted on at 5 s and
 not before. These are targets, not measurements.
+
+## 2026-10-15 — Setup for a home (#806): draft #817
+
+Ready for lamp-voice: no (#817 is a draft)
+
+On `third/setup`, `lamp-setup`, off unless set:
+- `docs/setup.md`: V1's flow part by part, with a verdict each (study by a
+  subagent reading `origin/main` at `be040af6704d`, checked against the code).
+- The reset: Controls' `FactoryReset` → journal → remove marker →
+  `lamp-keeper stop lamp` → wipe → reboot; setup finishes an interrupted
+  reset. The fifth builder agreed the keeper side and built it (#816).
+- The Wi-Fi join: V1's `SetupNetwork` and failure reasons, V1's numbers, over
+  the image's own radio scripts; the password never on a command line, line
+  breaks refused (V1 would have written one into wpa_supplicant's file).
+- The setup server: V1's API and shapes on `127.0.0.1:5000`, V1's nginx on
+  only during setup (the first builder found nginx stopped and V1's page
+  still on lamp-4ace), the new address published while joining, settings
+  saved before the marker, `runtime_phase` kept at `preparing` so V1's page
+  never reloads into its V1-only settings.
+- Units and the nginx site for the image; Nine told what #811 must carry.
+
+Host: `lamp-setup`'s 24 tests pass (reset 8, Wi-Fi 8, server 8); clippy clean
+on Mac and Linux. Open on #806: where a home lamp's voice credential comes
+from, and whether `key.pub` is put in at the factory. Not shown: no phone,
+router, hotspot or lamp; step 4 of #806 needs a builder with a lamp.
