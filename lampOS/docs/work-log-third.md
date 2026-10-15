@@ -3136,3 +3136,35 @@ runs are green and the owners have read #844's Memory and policy commits)
 - **#797:** the reviewer confirmed both fixes at `10585b465`; ARM64 green.
 - **#795:** green at `862fec7d0` (run 38728246092 attempt 3); waits for
   First's lamp minute. **#808:** reviewed, no finding.
+
+## 2026-10-16 — #849 reads the body's hand and counts down on the ring; #912 repairs Expression's fixtures for #844
+
+Ready for lamp-voice: no (#849, draft); yes (#912, #845); #844 and #795
+wait on their owners and a lamp
+
+- **#849, head pads** (head `b1a61026c` on `lamp-voice` `ba2ad4dfa`, ARM64
+  green, still merges cleanly):
+  - `a6dc88272`: `--touch` Controls reads the fifth's `body/hand` (#848,
+    merged) before each step's head samples, so a touch during a push asks
+    nothing; replay records it as `head_pushed`.
+  - `ae45743a6`: the ring dims from 1 s to 3 s of a hand on the head, a
+    countdown to sleep, and brightens again when the hand lifts.
+  - `b1a61026c`: attention.md says a short sound after a tap is still judged
+    as a sound first (#800).
+  - Still waiting on First's two voice answers on #711 (the "hm?" and how
+    sleep closes the microphones); the ring's sleep look comes after.
+- **#912** (new, tests only): the reviewer's full serial gate on #844 failed
+  six Expression tests on stale joints (1,263 ms and 2,301 ms). The fixtures
+  published the joints first and made the service before stepping. Now the
+  joints go last and the step uses the wall clock read just after. With a
+  1.3 s stall put in, `lamp-voice` fails exactly those six and #912 passes
+  all 34. Expression 230 passed; clippy clean on macOS and Linux ARM64.
+- **#844** (head `b3c3ca47e` on `fc5a7c792`): rebuilt twice for workspace
+  members (`crates/selftest`) and Memory's move into `application.rs`. ARM64
+  run 38798952867 green, 4,894 passed. PR body refreshed to the final head
+  and both gates. Waits on the seventh's Memory read and First's lamp check.
+- **#795** (head `171289872` on `c5f8d7337`): rebuilt for the new `selftest`
+  msgs module (both kept). ARM64 run 38800171243 green, 4,971 passed; new
+  binary hashes in the body. Waits on First's lamp minute.
+- **Merged:** #808, #797, #886 (the log relay regression test, after #881),
+  and the fifth's #848 that #849 reads.
