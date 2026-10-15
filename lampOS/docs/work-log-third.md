@@ -3187,3 +3187,14 @@ wait on their owners and a lamp
   - Not yet: the eye's look-up on a tap (asked First how), and the ring's
     red line asleep (needs #795's muted-ring worker).
 - **#912** green on ARM64 (4,894 passed).
+- **#711 the eye and the head at a tap** (First, 05:05: one gesture), in #849
+  `2ca295034`: the hum's turn is drawn as the listening face, and the ring
+  keeps it at rest 2 s, settling back over half a second (`16f06ee67`);
+  Expression lifts the head toward the face it sees for 2 s, longer while
+  someone speaks, never a turn of the body (`2ca295034`). Voice and
+  Expression 1,649 passed; 6 provider-worker timing tests failed under load
+  and pass alone.
+- **#912** follow-up `c83c894a9`: realtime-tests.md entry, the wrong 2 s claim
+  corrected, fixtures publish loosest limit first. **#845** description
+  refreshed; First will ask the owner at 11:00 for a lamp to wipe for its
+  acceptance.
