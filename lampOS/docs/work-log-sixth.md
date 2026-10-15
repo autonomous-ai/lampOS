@@ -20,6 +20,17 @@ Ready for lamp-voice: yes (#885, merged)
 - `second_route::without_a_second_route_…` failed once in four parallel runs
   on a Mac; an issue is filed to make it deterministic.
 
+## 2026-10-16 — #779 Finalize — merged
+
+Ready for lamp-voice: yes (#878, merged)
+
+- `Finalize` at the line's end (words 246–321 ms after it on lamp-52e6,
+  against 564–662 ms), endpointing 300 ms, the "at the line's end" journal
+  line, and the reviewer's P2: a line completes only when every sent block is
+  covered or the flush has finished, so an early `speech_final` no longer
+  drops the tail (`839e5faf1`, a regression for each arrival order).
+  Next on sixth's list: #892.
+
 ## 2026-10-15 — #779 Finalize — pull request #878
 
 - `Finalize` at the line's end: the last words come 246–321 ms after the
