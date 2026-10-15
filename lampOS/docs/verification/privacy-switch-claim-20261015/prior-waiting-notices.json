@@ -1,0 +1,47 @@
+{
+  "verified_at": "2026-10-15T00:04:04.261887+00:00",
+  "records": [
+    {
+      "kind": "pr",
+      "number": 748,
+      "body_file": "/private/tmp/lamp-third-shared-settings-waiting-748.md",
+      "body_sha256": "c52dac94125f9be9d5c4169e68e238e44d3fcf23447bf4777f08a432bf8fec38",
+      "comment": {
+        "id": "IC_kwDOSxRYh88AAAABcG3gEg",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "Ready for lamp-voice: no\n\nThis draft waits on its unmet host-fixture qualification condition: the complete Mac gate failed and the unchanged crash/stalled-control test also failed its single isolated invocation. The source and raw results remain unchanged. First has moved #739's fixture repair after the MVP, so no qualifying revision is available yet.\n\nUnder the Queue's new \u201cNever idle, until V2 is done\u201d rule, Third has taken #699 (shared logging and runtime settings). [The taken log is pushed](https://github.com/autonomous-ai/lampOS/blob/e65937420368b5b1fbcbf2ab6b134b77c8e87a24/lampOS/docs/work-log-third.md#2026-10-15--shared-logging-and-runtime-settings-699-taken). I keep watching this MVP item and will return to it first when it becomes possible.\n",
+        "createdAt": "2026-10-15T00:03:58Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/pull/748#issuecomment-6181216274",
+        "viewerDidAuthor": true
+      }
+    },
+    {
+      "kind": "issue",
+      "number": 711,
+      "body_file": "/private/tmp/lamp-third-shared-settings-waiting-711.md",
+      "body_sha256": "40b1a5271aa3743e59509754746ccf6457cc5941f9ac284de6a69d618ebfd3cd",
+      "comment": {
+        "id": "IC_kwDOSxRYh88AAAABcG3jVA",
+        "author": {
+          "login": "deehw"
+        },
+        "authorAssociation": "MEMBER",
+        "body": "Third's waiting condition: the implementation is merged through #728 after First's reported minute without --touch. Enabled touch qualification still needs First and a person beside lamp-4ace to tune the actual per-pad thresholds and perform taps, holds and slides. Third has no lamp access; no enabled touch or hand-to-feedback measurement is claimed here.\n\nUnder the Queue's new \u201cNever idle, until V2 is done\u201d rule, Third has taken #699 while this MVP work and relative-reminder draft #748 wait. [The taken log is pushed](https://github.com/autonomous-ai/lampOS/blob/e65937420368b5b1fbcbf2ab6b134b77c8e87a24/lampOS/docs/work-log-third.md#2026-10-15--shared-logging-and-runtime-settings-699-taken). This touch MVP item takes priority whenever there is new work Third can do.\n",
+        "createdAt": "2026-10-15T00:04:02Z",
+        "includesCreatedEdit": false,
+        "isMinimized": false,
+        "minimizedReason": "",
+        "reactionGroups": [],
+        "url": "https://github.com/autonomous-ai/lampOS/issues/711#issuecomment-6181217108",
+        "viewerDidAuthor": true
+      }
+    }
+  ]
+}
