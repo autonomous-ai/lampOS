@@ -3515,6 +3515,33 @@ times were written without reading `date`. Every time Fourth writes now
 comes from `date` just before.
 
 
+## 2026-10-15, 16:33 ICT: task 50 (#782), both switches built; draft #809
+
+Ready for lamp-voice: no
+
+The first builder decided on #782 (15:08): keep the name across a cut, now;
+build the commit as a switch; it copies the post-AEC captures of the cut
+scenes to this Mac, local only. Both switches are on `fourth/comma-pause`
+(head `4b677c852`, on `lamp-voice` at `96974cd0b`), in draft pull request
+[#809](https://github.com/autonomous-ai/lampOS/pull/809):
+`LAMP_CUT_KEEPS_NAME=on` and `--endpoint-commit-ms MS`, both off unless set.
+The gate on `a6bbc80ac` (the first commit only) passed: Voice, Voice-eval
+and Memory 1,601 passed, 0 failed, 13 ignored; the workspace's Clippy and
+build passed. The gate on the head and its ARM64 run are going.
+
+Measured on Pipecat's public held-out test clips (1,167 human, shards 4 and
+5, checked by SHA-256), replayed through the voice's own detector with
+lamp-4ace's 600 ms window: splits 527 at the 400 ms commit, 474 at 450,
+424 at 500, 369 at 550, 330 with the window alone; the wait at a finished
+end grows 50 ms a step. 550 ms takes away 80% of what the 400 ms commit
+adds, for the +150 ms the first builder allowed. Holding longer on a rise
+in the last 300 ms was measured and not built: the pitch rose before 55%
+of continued pauses and 49% of finished ends. Posted on #782 at 16:32.
+
+#792 (#753): the reviewer's one finding (the switch needs `LAMP_BUS=on`)
+is fixed in `1b8f585a2`; it will merge once that head's ARM64 run is green.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
