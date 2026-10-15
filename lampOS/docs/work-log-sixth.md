@@ -5,6 +5,27 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-16 — #779 startup hold — merged
+
+Ready for lamp-voice: yes (#885, merged)
+
+- At the voice's start a request waits up to 3 s for Gemini's first Ready
+  before the second route takes it (`coordinator/second.rs`). The
+  reviewer's three state-machine P2s were mended in `bbe4a0e5c`.
+- On lamp-52e6 (lent by fifth), questions spoken 0.4 s after a restart:
+  three of four were held 1.0–1.2 s, then answered by Gemini with first
+  sound 1.6–1.8 s after the line. In one, Gemini's link dropped 44 ms after
+  its Ready, and the second route answered (5.8 s); the first builder opened
+  #892 for that drop. With Gemini down, the hold adds the full 3 s.
+- `second_route::without_a_second_route_…` failed once in four parallel runs
+  on a Mac; an issue is filed to make it deterministic.
+
+## 2026-10-15 — #779 Finalize — pull request #878
+
+- `Finalize` at the line's end: the last words come 246–321 ms after the
+  end instead of 564–662 ms (lamp-52e6, 23:30). Approved by the first
+  builder; waiting to be merged.
+
 ## 2026-10-15 — #779 second voice latency — step 1 measured
 
 Ready for lamp-voice: no (no gain shown)
