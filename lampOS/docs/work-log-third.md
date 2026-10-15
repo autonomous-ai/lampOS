@@ -2941,3 +2941,23 @@ Ready for lamp-voice: yes (#795), no (#797, #699)
   reply as success only when it names the guarded store's next revision.
   Host, this Mac only: a durable save round trip p50 about 30 ms, worst 61 ms
   (target 250 ms); log admission median 0.54 µs (target 1 ms).
+
+## 2026-10-15 — Touch calibration (#711) ready as #797; #795 reviewer fix
+
+Ready for lamp-voice: yes (#797), yes (#795)
+
+- #797, head `e4431d40a`, off unless run by hand: `lamp-controls
+  calibrate-touch`. ARM64 run 38704582746: 4,493 passed, 0 failed, four
+  shards. `lamp-controls` `8f6ae004…0ded`. Host: Controls 330 passed;
+  workspace at the first commit 4,450 passed, 13 failed (health's two, one
+  turn-end-wire timing test, eight Voice motor fixtures of #739, and two
+  Voice tests that then passed 3 of 3 alone), on a machine loaded by another
+  builder's tests. On lamp-4ace: follow the three prompts with a person,
+  then the 10-minute watch with the office as it is. Most likely wrong: the
+  authored 40%/20% rule, a noise step quieter than the day, and the chip's
+  charge auto-configuration differing at each start.
+- #795: the reviewer found that a muted indication whose ring process never
+  started still ended Voice after a stable unmute. Fixed on `1c00814d5`: no
+  child means diagnostic only; a started writer keeps its black-write and
+  exit requirement. Two new tests; the first fails on the old behaviour.
+  ARM64 for this head is running.
