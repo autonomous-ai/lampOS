@@ -3416,7 +3416,7 @@ scheduled wake-up in its own session, as the Queue's "Never end a turn
 without a wake-up" asks.
 
 
-## 2026-10-15, 16:05 ICT: task 49 (#753) handed back
+## 2026-10-15, 15:06 ICT: task 49 (#753) handed back
 
 Ready for lamp-voice: yes (#792)
 
@@ -3460,7 +3460,7 @@ turned, and nothing is addressed until it is turned; a short request may
 get fewer than two looks; both lines come from other rules.
 
 
-## 2026-10-15, 16:05 ICT: Found, not mine — `lamp-health`'s silent-part test reads the host's disk
+## 2026-10-15, 15:06 ICT: Found, not mine — `lamp-health`'s silent-part test reads the host's disk
 
 `a_part_that_is_expected_and_silent_or_has_gone_quiet_ends_show_with_3`
 (`crates/health/tests/program.rs:536`) expects the health part's second
@@ -3472,7 +3472,7 @@ let the test ask about the parts with the board check left out, or point
 it at a disk of its own. Not mended here.
 
 
-## 2026-10-15, 16:45 ICT: task 50 (#782), what was found and what is being built
+## 2026-10-15, 15:22 ICT: task 50 (#782), what was found and what is being built
 
 Ready for lamp-voice: no
 
@@ -3502,6 +3502,17 @@ begins within the first one's pause is taken for the first going on.
 
 #792 (#753): the reviewer left it for the first builder (it adds a message
 type to `crates/msgs`); its pull request's ARM64 run is queued.
+
+
+## 2026-10-15, 15:36 ICT: times corrected
+
+Ready for lamp-voice: no
+
+Three headings above said 16:05 and 16:45; they were pushed at 15:06 and
+15:22, and now say so. Two of Fourth's comments on #782 say 15:05 and 16:10;
+they were posted at 14:45 and 15:07, corrected in a comment there. The
+times were written without reading `date`. Every time Fourth writes now
+comes from `date` just before.
 
 
 ## Not shown
