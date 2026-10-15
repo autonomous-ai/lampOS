@@ -3096,3 +3096,43 @@ Ready for lamp-voice: yes (#795, green), yes (#797, tool by hand), yes
   plain `lamp-voice` on my Mac.
 - Commits had waited on my person's word; it came at 19:39 ("commit and push
   everything you do").
+
+## 2026-10-15 — The head pads (#711) as draft #849; review fixes on #844, #845, #797
+
+Ready for lamp-voice: no (#849, draft); yes (#844, #845 once their ARM64
+runs are green and the owners have read #844's Memory and policy commits)
+
+- **#849, the head pads, each step off unless set** (`--touch` Controls,
+  `LAMP_HEAD_TOUCH=on` Voice, `--head-touch` Expression), in the order the
+  plan on #711 gave and First approved at 19:45:
+  - `534c704c0`, `c237b5c3b`: Controls' head. Touch at 20 ms (Stop if
+    speaking, `Notice` if quiet), Tap let go in 0.12-0.5 s (Attend, or Wake),
+    Stroke at 1 s, Hold at 3 s (Sleep). Gaps under `head_gap_ms` join one
+    hand; `held_us` counts through them. A push from the body spoils a
+    contact (`set_head_pushed`; wired once the fifth's `body/hand`, #848,
+    lands). Qualify, shortest tap and gap are pins-file settings, to be sized
+    from First's recording tomorrow; a lone edge under 120 ms (one at 19:25)
+    never asks the lamp to listen.
+  - `e274316f5`: Voice stops at a head touch while it says its answer,
+    through the button's `hand::cancel`; quiet or thinking, it only notes it.
+    Host probe on my Mac, a real bus to the voice's poll, 3 runs of 100:
+    medians 1.8-2.1 ms, p95 2.7 ms. One earlier run lost a touch for 2 s, not
+    seen again. The pad, Controls' 20 ms, the speaker and silence need a lamp.
+  - `7f724dff8`: a head tap is a call for 6 s in the attention rule, read by
+    the provider worker from the bus beside the name.
+  - `a7c3a6a4f`: Expression leans into a hand kept on the head, sleeps at a
+    3 s hold by day too, and wakes at a tap.
+  - `8cfbcf841`: the ARM64 build failed on a Linux-only test literal my Mac
+    never compiles (Voice's C dependencies stop a Linux check here).
+  - Waiting on First (asked at 20:2x on #711): how the "hm?" plays (a
+    lamp-owned turn with a local hum, no provider) and how sleep closes the
+    microphones (a latch beside the software mute, or the mute itself).
+- **#844 review:** the zone reader now reloads on a change to the name file
+  or a broken link too (`9fb5f5985`); Memory's days keep their days by the
+  local calendar across a clock change (`fefe9dd17`). Each test failed on the
+  old head.
+- **#845 review:** one name lookup for the whole setup service, so a failed
+  attempt's lookup is never doubled (`9b4f499f3`).
+- **#797:** the reviewer confirmed both fixes at `10585b465`; ARM64 green.
+- **#795:** green at `862fec7d0` (run 38728246092 attempt 3); waits for
+  First's lamp minute. **#808:** reviewed, no finding.
