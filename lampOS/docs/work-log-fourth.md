@@ -3670,6 +3670,33 @@ passed, 121 skipped. Kind: off unless set (`LAMP_CUT_KEEPS_NAME=on`). The
 floor-hold question is on #782. Nothing of it was run on a lamp by Fourth.
 
 
+## 2026-10-15, 21:05 ICT: #828 step 1 measured; #829 taken
+
+Ready for lamp-voice: no
+
+#828, step 1: on the recordings of 14 October replayed on Fourth's Intel
+Mac, neither suppressor setting nor the stop spotter keeps a short stop
+under the lamp's voice:
+- yields for 3, 4 and 3 of 11 stop words, with 2, 3 and 3 false yields in
+  2.5 min of the lamp speaking to nobody;
+- the spotter heard 0 to 1 of the 11 over the lamp, and 4 of 9 with the
+  lamp quiet.
+
+About half of each word's speech-like blocks lie under the lamp's own
+voice, where the duplex rule cannot tell them from its leak. The findings
+are on #828 at 21:01, and a played minute is asked for there (present
+volume and 6 dB lower). The evidence is on `fourth/stop-word`
+(`docs/verification/stop-word-20261015/`), whose gate is running.
+
+[#829](https://github.com/autonomous-ai/lampOS/issues/829), two people at
+the lamp, is taken
+([claim](https://github.com/autonomous-ai/lampOS/issues/829#issuecomment-6194007362),
+the first "taken" comment), on `fourth/two-people` from `lamp-voice`, while
+#828 waits on that minute and #853 on the reviewer. First: the scenes it
+names, what the played records of 14 and 15 Oct already show of two
+people, and what leading products do.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
