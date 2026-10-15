@@ -3801,6 +3801,42 @@ Ready for lamp-voice: no (#891 is a draft until ARM64 is green)
   call; change 2, the floor hold; the bare "Lamp,".
 
 
+## 2026-10-16, 02:57 ICT: #853 pushed, #891's fixes under the gate, #829 step 2 built
+
+Ready for lamp-voice: no (#853 waits on its ARM64 run on `14e3b4e20`; #891 on its gate)
+
+- **#864** was merged by the reviewer at 01:40 (`LAMP_NAME_IN_PASSING=ignored`).
+- **#853:** the reviewer found at 02:17 that the standby route's new test
+  rig lacked the switch's field. It is rebased onto `lamp-voice`
+  `ba2ad4dfa`, fixed in `14e3b4e20`, and pushed at 02:53.
+  - **Gate:** Voice 1,372, Voice-eval 365 and Memory 159 passed.
+  - 3 timing tests failed under the shared Mac's load. Each passed 3 of 3
+    alone.
+- **#891:** the reviewer's three findings are fixed:
+  - P2: a first sign heard while the call is still said keeps the wait;
+  - P3: the heartbeat renews `name/rising` too;
+  - P3: the policy record names `name/rising`.
+
+  It is rebased onto #853 (`310d6add0`, local) and its whole-workspace
+  gate is running.
+- **#782's "Yes?" note** (`fourth/call-note`): rebased onto the new
+  bare-call branch, locally. Its gate and pull request come after #891's.
+- **#829 step 2, `LAMP_SPOKEN_TO=on`:** built on `fourth/spoken-to`, local,
+  gate next.
+  - In every room, an answer plays only when the lamp was spoken to, and
+    the lamp actions of the rest never run (the first builder's two
+    tests).
+  - The first builder's day scene (02:39) is in: a held request isn't
+    talk, busy ends 3 minutes after the last talk, the first thing said
+    after the lamp's news is a reply, and a question about its work is
+    for it.
+  - **Its cost:** "Lamp, ..." with nobody facing the lamp is held about 9
+    times in 10. The text showed the call for 84 of 769 such calls, and
+    `lamp-name` doesn't hear "Lamp," alone.
+- **Corrected on #829:** two of the four answers the switch would have held
+  on 15 Oct were the rest of a cut call, not unknown people.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
