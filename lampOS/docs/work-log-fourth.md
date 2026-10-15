@@ -3837,6 +3837,35 @@ Ready for lamp-voice: no (#853 waits on its ARM64 run on `14e3b4e20`; #891 on it
   on 15 Oct were the rest of a cut call, not unknown people.
 
 
+## 2026-10-16, 04:30 ICT: #853 merged, #891 green, #829 step 2 is pull request #918
+
+Ready for lamp-voice: yes (#891); no (#918, a draft until ARM64 is green)
+
+- **#853** was merged by the reviewer at 03:17.
+- **#891** is pushed at `49c492146`, rebased onto `lamp-voice` after #853.
+  - **Gate:** the crates it touches passed on the head (Msgs 89, Name 11,
+    Voice 1,381, Voice-eval 377, Memory 162). The whole workspace passed on
+    the same change before the rebase (4,950).
+  - The failures were a reminder store test, which passed 3 of 3 alone,
+    and a `lamp-health` board test that fails while the shared disk is 9%
+    free.
+  - **ARM64:** run 38806859179, 4,919 passed. It waits on the reviewer.
+- **#829 step 2** is [#918](https://github.com/autonomous-ai/lampOS/pull/918)
+  (`fourth/spoken-to` `211f32c74`).
+  - It holds what nobody said to the lamp, and the lamp actions it calls
+    for.
+  - It covers the day scene's points and the name needing no face (03:29).
+  - **Gate:** Voice 1,398, Voice-eval 377 and Memory 162 passed. One stall
+    timing test failed and passed 3 of 3 alone.
+  - Handed to the first builder with their three pass marks.
+- **#828 step 2**, posted:
+  - A paused reply has no words, so "don't resume after stop" needs words
+    heard during the pause. The plan uses the speech-to-text the second
+    voice already uses, through the company relay on lamp-4ace.
+  - The request's start comes first, measured on the 01:51 recordings.
+  - A misread clock time was corrected.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
