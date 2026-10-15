@@ -3168,3 +3168,22 @@ wait on their owners and a lamp
   binary hashes in the body. Waits on First's lamp minute.
 - **Merged:** #808, #797, #886 (the log relay regression test, after #881),
   and the fifth's #848 that #849 reads.
+- **#711 sleep and the "hm?" in #849** (First decided both at 21:24 on
+  Oct 15; I missed it until 03:39 and said so on #711). Head `a7467a9ed`,
+  rebuilt on `lamp-voice` `48b3737d5`:
+  - `3c5e91077`, `1a25c0566`, `a26b6ef39`: sleep is the software mute with
+    the reason `sleep`. A 3 s head hold mutes it (saved, so a restart keeps
+    it asleep); a later head tap clears it through the same saved clear as
+    the button's second hold; a tap never opens a privacy mute. The voice
+    says `voice/mute` (new) every second; Expression `--head-touch` sleeps
+    from it. Needs `--controls-mute` too.
+  - `a7467a9ed`: a tap on a quiet lamp plays a soft hum as its own turn,
+    like the self-test's tone: at most once in 30 s, -35 dBFS (assumed 15 dB
+    under speech; `LAMP_HEAD_TAP_CUE_DBFS` tunes it). Decision to first
+    speaker chunk 2.3 ms median on my Mac; tap to speaker write on a lamp is
+    First's to measure.
+  - Gate: msgs, Controls, Expression, Voice 2,131 passed; 4 reminder tests
+    fail under load, 76 of 76 pass alone. ARM64 green at `a4747a401`.
+  - Not yet: the eye's look-up on a tap (asked First how), and the ring's
+    red line asleep (needs #795's muted-ring worker).
+- **#912** green on ARM64 (4,894 passed).
