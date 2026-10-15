@@ -3416,6 +3416,62 @@ scheduled wake-up in its own session, as the Queue's "Never end a turn
 without a wake-up" asks.
 
 
+## 2026-10-15, 16:05 ICT: task 49 (#753) handed back
+
+Ready for lamp-voice: yes (#792)
+
+[Pull request #792](https://github.com/autonomous-ai/lampOS/pull/792), from
+`fourth/addressed` on `lamp-voice` at `a125eb3da`: `d44fdbd76` (code, docs,
+tests) and `c4b68ea58` (the verification folder only). **Kind: off unless
+set**, `LAMP_ADDRESSED=on`, and only with `LAMP_ATTENTION`. Per request the
+provider worker judges near (the room microphone's highest rise over its
+quiet, 18 dB) and a close face turned to the lamp (of the eyes' looks while
+the person spoke or in the 1.5 s before, at least two, 0.4 of them a face
+turned to it at least 0.15 of the picture's height, V1's gaze lines);
+publishes `attention/addressed` once per request; in a busy room lets out
+an answer the rule would hold when both hold; and writes it in
+`first_output`. The first builder agreed to the design (#753, 12:36, 12:58).
+[Evidence](https://github.com/autonomous-ai/lampOS/tree/fourth/addressed/lampOS/docs/verification/addressed-20261015)
+is on the task branch.
+
+Gate on `d44fdbd76`, Fourth's Intel Mac, 06:32 to 07:16 UTC: format of the
+changed files and the workspace's Clippy passed; the workspace's tests
+4,433 passed, 3 failed, 33 ignored; the workspace built. The three:
+`early_end::without_the_option_every_message_and_record_is_what_it_was`
+(the privacy worker's 300 ms shutdown deadline, a #739 timed test),
+`lamp-health`'s silent-part test (this Mac's disk was 5% free, and the
+health part warns under 10%), and `lamp-health`'s usage test (empty
+stderr, the log relay's loss below). All three passed on ARM64. ARM64
+run 38693004585 on `d44fdbd76`: 4,483 passed, 0 failed, 35 ignored. Run
+38697844896 on the head failed once in `lamp-policy`'s `program.rs:363`
+(#783), was re-run once, and passed with the same counts. On the Mac,
+release, 2,000 times each: a judgement 1.5 µs, reading the eyes' newest
+look 21 µs. Not a lamp measurement.
+
+Three gate runs were stopped and are kept, not counted: one at the
+workspace format check, one because a test was corrected in the checkout
+while it ran (my mistake: an edit during a gate), one for the rebase.
+
+What to run on lamp-4ace: the verification README's "On the lamp" (the
+minute with the switch absent, then a few requests from the desk with
+`lamp-bus tap attention/addressed`). Most likely wrong there: lamp-4ace
+stands sideways to its seat (#763), so no face may be judged close and
+turned, and nothing is addressed until it is turned; a short request may
+get fewer than two looks; both lines come from other rules.
+
+
+## 2026-10-15, 16:05 ICT: Found, not mine — `lamp-health`'s silent-part test reads the host's disk
+
+`a_part_that_is_expected_and_silent_or_has_gone_quiet_ends_show_with_3`
+(`crates/health/tests/program.rs:536`) expects the health part's second
+journal line to be about the silent part. On a machine with under 10% of
+its disk free, `lamp-health` first says "the disk is filling up", and the
+test fails with no code changed. Seen on Fourth's Mac on 15 Oct at 22 GiB
+free of 466 (5%), and at 45 GiB (9.7%) it would still warn. A likely mend:
+let the test ask about the parts with the board check left out, or point
+it at a disk of its own. Not mended here.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -3427,7 +3483,9 @@ geometry remains synthetic. Hand Stop and software mute are off unless their
 independent Voice flags are supplied; no physical hand-to-silence or Body stop
 was qualified. The sleeping name's speech rule is off unless
 `alive.sleep.name_requires_speech` is set, and was not heard on a lamp: no
-servo noise, soft name or busy room was tried. The local judge remains shadow-only behind `--local-judge`,
+servo noise, soft name or busy room was tried. `attention/addressed` is off unless
+`LAMP_ADDRESSED=on` and was not run on a lamp: no face, level or busy room was
+tried. The local judge remains shadow-only behind `--local-judge`,
 with unfitted weights and no proof that it improves the busy-room floor.
 Native Linux ARM64 execution so far is on GitHub runners, not on a lamp.
 The log contains no unanswered question requiring
