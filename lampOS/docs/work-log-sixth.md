@@ -5,9 +5,33 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-15 — #803 mark a bad moment — taken
+
+- Taken by sixth, session 28a8aeae-5a22-451a-bcf2-3e20583e4452, no lamp.
+  Branch `sixth/mark-weird`. The seventh asked on the issue about session
+  records (#775); until answered, the narrowest reading: copy the window's
+  records, no audio, nothing that rotates changed.
+
+## 2026-10-15 — #754 second voice — merged
+
+Ready for lamp-voice: yes (#778, merged 19:03 as `bd37eb808`)
+
+- Merged by the first builder under the reviewer rule. Final head
+  `5881a3f06`, 20 commits, each building on its own; ARM64 run
+  38730179626 green on it.
+- After the pull request opened, the reviewer found and sixth mended:
+  history crossing persons (P1), a forgotten exchange coming back (P1),
+  written turns losing their context (P2), a written turn's tool call
+  counted as heard (P1), a pending written note not bound to its request
+  and person (P1), the doc's lamp scope and 30 s queue (P3). Two rebases
+  onto `lamp-voice` (#775's per-person sessions; keeper pause,
+  `--addressed`, `Start::continues`) kept both sides.
+- The switch-on minute on lamp-4ace is the first builder's. Latency
+  follow-up: #779, after #803.
+
 ## 2026-10-15 — #754 second voice — pull request
 
-Ready for lamp-voice: no (#778 is a draft until its ARM64 run is green)
+Ready for lamp-voice: yes (#778), superseded by the entry above
 
 - Task: #754, a second voice: the lamp still hears and answers when Gemini
   is down. Proposal, amendment (V1's config fields) and the raise beyond
