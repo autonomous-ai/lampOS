@@ -3589,6 +3589,22 @@ is taken for the first going on, and keeps its name.
 My list now has nothing I can do; said on #705 at 18:08.
 
 
+## 2026-10-15, 18:22 ICT: task (#828) taken
+
+Ready for lamp-voice: no
+
+[#828](https://github.com/autonomous-ai/lampOS/issues/828), "stop" said
+while the lamp talks stops it at once, every time, is taken
+([claim](https://github.com/autonomous-ai/lampOS/issues/828#issuecomment-6190873467),
+the first "taken" comment), on `fourth/stop-word` from `lamp-voice`. On 14
+Oct lamp-4ace stopped for 1 of 7 short stop words said over a story. First
+the why, from the played scenes and the lamp's own capture where the first
+builder copies it: does the word survive the echo canceller, is it under
+the barge-in bar, or heard and not acted on. Then what others do, then a fix
+behind a switch, measured on the same played set both ways. #809 (#782)
+waits on the first builder's 400/550 minute on lamp-4ace.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
