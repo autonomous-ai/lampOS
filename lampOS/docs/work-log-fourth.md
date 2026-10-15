@@ -3240,6 +3240,122 @@ planner tick after the second valid matching input; the successful path
 adds no deliberate wait. Pending evidence is bounded and cannot block the
 planner. First owns on-lamp acoustic, physical wake and overnight checks.
 
+## 2026-10-15, 12:31 ICT: task 47 (#749) handed back; Claude Code takes over from Codex
+
+Ready for lamp-voice: yes (#773)
+
+This session is a Claude Code session the owner started to take over Fourth
+from the Codex session `01a137d8`; the work, the branches and the name are
+the same. The Codex gate of 07:40 to 08:14 ICT (on base `e4922a3cb`) had
+passed all five stages; its summary said otherwise only because the Linux
+stage's container left no ID file to check its cleanup by (exit 0).
+
+[Pull request #773](https://github.com/autonomous-ai/lampOS/pull/773),
+from `fourth/sleep-name` on `lamp-voice` at `ba098193f`, two commits:
+`10c9da386` (code, docs, tests) and `132a1e75b` (the verification folder
+only). **Kind: off unless set.** With
+`alive.sleep.name_requires_speech: true` in the Expression catalogue, a
+name heard while the lamp is asleep wakes it only if the voice reported
+accepted person speech (`voice/activity`, speaking, in a retained Listening
+turn) within 2 s of the name's onset; otherwise it stays asleep and the
+journal gets one `ignored sleeping name` line. Absent or `false`, the output
+is byte for byte the old binary's in eight CLI replays.
+[Evidence](https://github.com/autonomous-ai/lampOS/tree/fourth/sleep-name/lampOS/docs/verification/sleep-name-20261015)
+is on the task branch.
+
+Gate on `10c9da386`, on Fourth's Intel Mac: Expression format and the
+workspace's Clippy passed; Expression 228 passed, 0 failed, 0 ignored; Lean,
+Voice, Memory and Voice-eval 1,636 passed, 1 failed, 15 ignored (the same
+15 names as before); the workspace built. The one failure is a
+`lamp-memory` test that lost its binary's last stderr lines; that binary
+does not link Expression, and the cause is the log relay (below). Not a
+#739 timing test, so it is named in the pull request, not waved through. ARM64 run 38681458933 on
+`10c9da386` succeeded (4,449 passed, 0 failed, 35 ignored), and run
+38684413488 on the head `132a1e75b` succeeded with the same counts. Expression's binary from
+the first run: SHA-256 `f857ada685d171202f299aefa9d1b097f28492e1a05be1619c747a1fcfaff4a8`.
+
+Checked before handing back, because the rule is useless if a real call
+gives no speech: the voice opens a turn as soon as its own detector admits a
+person beginning to speak and then publishes `voice/activity` every 80 ms
+(`commit_admitted_input`, `expression_out.rs`), so "Lamp" said by a person
+gives speech in the window. The false name of 01:45:21 came with no turn.
+
+What to run on lamp-4ace: `lamp-check.md` in the verification folder (the
+minute with the switch absent, then the switch on for a night, recording
+`voice/progress`, `voice/activity`, `name/heard`, `expression/state` and
+`body/joint_states`). Most likely wrong there: the servos' own noise as the
+head bows into sleep is also admitted as speech by the voice, and the false
+name still wakes it; or a soft name in a busy room is not admitted, and the
+lamp wakes only when the voice answers. Rolling back needs the old catalogue
+with the old binary: the old binary refuses the new field, even `false`.
+
+## 2026-10-15, 12:31 ICT: Found, not mine — the log relay can lose a part's last lines
+
+Seen on Fourth's Mac on 15 Oct, on `lamp-voice` at `ba098193f`.
+`lamp_ipc::log_relay::finish` (`895177f31`, `crates/ipc/src/log_relay.rs`)
+returns once the pipe is empty and `holding` is 0. The relay thread stores
+`holding` only after its write loop, so between reading lines from the pipe
+and writing the last of them, `finish` sees nothing waiting and nothing
+held, and `main` returns with those lines unwritten. How to see it:
+`cargo test -p lamp-memory --test binary
+a_relative_path_or_an_unknown_option_gets_the_usage_line_and_exit_code_two`
+on a loaded machine. Run alone 40 times at a load average of about 7, it
+failed 5 times: four times without the usage line, once with no stderr at
+all (`verification/sleep-name-20261015/gate/memory-binary-rerun/` on
+`fourth/sleep-name`). It passed on the ARM64 runner. On a lamp this would
+lose a part's last words to the journal, the lines the relay is meant to
+keep. A likely mend: store `holding` as soon as bytes are read, before
+writing, and count what the loop is writing as held. Not mended here.
+
+## 2026-10-15, 12:31 ICT: Found, not mine — `cargo fmt --all --check` fails on `lamp-voice`
+
+`crates/voice/src/agent_tasks.rs:396`, from `5798f73d3`: a long match arm
+rustfmt wants in braces. Seen on Fourth's Mac at `ba098193f`.
+
+
+## 2026-10-15, 12:33 ICT: task 49 (#753) taken
+
+Ready for lamp-voice: no
+
+[#753](https://github.com/autonomous-ai/lampOS/issues/753) is taken
+([claim](https://github.com/autonomous-ai/lampOS/issues/753#issuecomment-6185178098),
+the first "taken" comment, checked after the label), on `fourth/addressed`
+from `lamp-voice`. The Queue says #753 comes "after #733", the seventh
+builder's task. I read that as order of importance, not as code #753 needs:
+nothing in #753 uses #733's engines. So I take it now as the next open task
+in my list, and stop if the first builder says otherwise.
+
+What I read in the code before starting. The voice's provider worker
+already holds everything per request: the request's window, the best name
+score, the room microphone's rise over its quiet (`ears/level`, kept only
+with `LAMP_ATTENTION=busy-near`) and the eyes' newest look. In a busy room
+its rule already lets an answer out when any face is turned to the lamp
+(`decide_busy`, `TURNED`), without asking how big the face is or whether
+the speaker was near. Nothing about attention is published per request.
+The plan, all of it off unless set:
+
+1. Per request, two signs: **near** (the room microphone's highest rise in
+   the request's window, the existing 18 dB line) and **a close face turned
+   to the lamp** while the person spoke (a box at least 0.15 of the
+   picture's height, the Policy's and the eyes' "at the lamp" line, with
+   `facing: true`), and one number from them.
+2. Published once per request as `attention/addressed`, for the Policy.
+3. In the busy-room rule, "near and facing" as its own reason to let an
+   answer out, recorded in `first_output`, so it can stand where any turned
+   face stands now.
+4. The voice microphone: whether its level beside the room microphone's
+   adds anything is a question for recordings, since its own processing
+   evens out its level. I ask for recordings on the issue (numbers from the
+   bus only, no sound kept).
+
+#739 has moved to the eighth builder (`builder:eighth`, `08e94288e`). What
+Fourth left of it: the parked code on `fourth/voice-fixtures` at
+`ddb13741b1971cf386087f0f980aef39f8e50727`, and the v8 runs in
+`verification/voice-fixtures-loaded-v8-20261015/` on `lamp-fourth` (nine
+of ten loaded runs, each 1,173 passed, 0 failed, 8 ignored). Fourth does
+no more on it.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
@@ -3249,7 +3365,9 @@ provider-context deletion, or end-to-end lamp latency. Memory remains behind
 default configuration switch. Lean is not wired to Body and all supplied
 geometry remains synthetic. Hand Stop and software mute are off unless their
 independent Voice flags are supplied; no physical hand-to-silence or Body stop
-was qualified. The local judge remains shadow-only behind `--local-judge`,
+was qualified. The sleeping name's speech rule is off unless
+`alive.sleep.name_requires_speech` is set, and was not heard on a lamp: no
+servo noise, soft name or busy room was tried. The local judge remains shadow-only behind `--local-judge`,
 with unfitted weights and no proof that it improves the busy-room floor.
 Native Linux ARM64 execution so far is on GitHub runners, not on a lamp.
 The log contains no unanswered question requiring
