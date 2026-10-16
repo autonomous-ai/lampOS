@@ -14,8 +14,9 @@ every result on a lamp below names it. Newest first.
   session) is fixed.
 - #1175 (`06942f058`, 03:0x): the first request after a stop is told so
   with `STOPPED_NOTE`, behind `LAMP_STOP_TOLD`. A stop whose request is
-  never asked goes to the next request in the same session. The follow-ups
-  (a stop asked then given up, a 2 min limit) are #1200.
+  never asked goes to the next request in the same session. #1200
+  (`6430c2d53`, 03:4x): a stop asked and then given up goes on to its
+  `continues_cut_off` successor, and is never told past 2 min.
 - The relay's chat was down from about 02:29 to 03:00: 40 s timeouts, then
   401 after 60 s, while its speech to text was fine. Gemini on lamp-4ace
   was unaffected. #1195 (open): with `LAMP_SECOND_DOWN_LINE=on`, the backup
