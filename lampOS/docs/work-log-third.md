@@ -3256,3 +3256,16 @@ wait on their owners and a lamp
   for `stop`.
 - #844 green at `db7d65846` (5,409) for First to merge; #795 green at
   `5bdde2e3a` (5,475).
+- **#849 merged** (`70bc131f8`, 12:02). #711 stays open for a hand on the
+  head in the owner's session.
+- **#844** rebuilt on it (`93f4bbdfb`, `--zone` beside `--head-touch`),
+  green (5,448), for First's merge. **#795** rebuilt on it (`446cb0d2d`:
+  the hand and the privacy switch side by side in Controls).
+- **#993 review P2s** (`a321f1d88`): one entry per asker, a request given
+  way keeping its place, so whatever is held can be given way (the 17th
+  skill case); a person's light read always counts, wall-clock stamps
+  ordering only one look (a clock set back). Checked on the old head: the
+  17th showed over the person there; the clock test fails there at its
+  first half. msgs and Voice 1,637 passed.
+- **#1016** for Nine's install: `serve-own-page.json` and
+  `reset-plan-product.json` held together by a test.
