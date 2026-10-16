@@ -221,7 +221,8 @@ degree.
 A catalogue with a `speaking` section (`crates/expression/src/speaking.rs`;
 in `alive-behaviours.json` since #933) adds three things from the lamp's own
 sound, as the body meets it: the playout said ahead, sampled at
-`body_lag_us`. All are head only, within the catalogue's limits, in any room
+`body_lag_us`. The nods move the head's pitch and the sway turns the base,
+within the catalogue's limits, in any room
 (it is the lamp's own speech). None runs while the body is held, while
 concentrating, asleep, or once someone has cut in, and nothing is owed after.
 - **A nod on a stressed word.** A dip of `nod` (0.035 rad of head pitch, about
@@ -232,9 +233,14 @@ concentrating, asleep, or once someone has cut in, and nothing is owed after.
   100% of `nod`, so no two are alike.
 - **A sway between sentences.** After `pause_us` (0.35 s) of the lamp silent
   (level under 0.06), as the next sentence begins (level back over 0.12),
-  the head rolls over `sway_us` (0.6 s) to the other side: `sway_roll`
-  (0.025 rad, about 1.4°), 75% to 100% of it each time. It stays there until
-  the next pause, and comes back level when the answer ends.
+  the base turns over `sway_us` (0.8 s), eased, to the other side:
+  `sway_yaw` (0.08 rad, about 52 counts, inside the body's 70-count cap for
+  Expression), 75% to 100% of it each time. It stays there until the next
+  pause, and comes back to centre when the answer ends. Until #955's review
+  it rolled the head 0.025 rad: filmed from the front on lamp-4ace, head roll
+  that small did not show, and on lamp-52e6 roll has a reach of 1 count. The
+  base turning does. The body adds it to wherever its own gaze has turned
+  the base; see `body.md`.
 - **A settle as it finishes.** One soft nod (`settle`, 0.03 rad) over
   `settle_us` (0.6 s) when an answer of at least `settle_after_us` (1.5 s)
   ends, then rest.
@@ -254,15 +260,16 @@ held until just before the first word) was already there. It is too short to
 show in stills 4.5 s apart.
 
 Tests: `crates/expression/src/speaking.rs` (a stressed word nods and a steady
-voice does not; nods keep their gap and differ; a pause sways the next
-sentence to the other side, eased, and a short breath does not; a long
+voice does not; nods keep their gap and differ; a pause turns the base
+to the other side for the next sentence, eased, without rolling the head,
+and a short breath does not; a long
 answer settles and a short one does not; held or cut in on, nothing moves;
 poses outside the limits are refused). `crates/expression/tests/speaking_engine.rs`
 runs an eight-second answer with stressed words every 1.1 s and a half-second
 pause every 3 s through the engine, in a quiet and a busy room. It expects
-5 to 8 nods, the head rolled both ways by more than 0.015 rad, over 0.02 rad
+5 to 8 nods, the base turned both ways by more than 0.055 rad, over 0.02 rad
 of pitch range, the settle, and what speaking adds never stepping more than
-0.007 rad of pitch or 0.003 of roll in a 20 ms tick. Without `speaking`, the
+0.007 rad of pitch or of yaw in a 20 ms tick. Without `speaking`, the
 same answer plans none of it. It also checks the fences: a new turn, or a
 cancelled answer, carries none of the old answer's motion (the offsets equal
 a catalogue without speaking on every tick), and a finished answer is

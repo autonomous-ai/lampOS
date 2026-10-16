@@ -6,12 +6,14 @@
 //!   jumps over what it has just been, never closer than a gap to the last
 //!   nod, each a little different in size;
 //! - **a sway between sentences:** after a pause in its speech, as the next
-//!   sentence begins, the head rolls a little to the other side and stays;
+//!   sentence begins, the base turns a little to the other side and stays
+//!   (#955: head roll this small cannot be seen from the front, where the
+//!   person sits; the base turning can);
 //! - **a settle as it finishes:** one soft nod when an answer of some length
 //!   ends, then rest.
 //!
-//! Only the head, within the catalogue's limits, in any room: it is the
-//! lamp's own speech. Off unless the catalogue has a `speaking` section.
+//! The head's pitch and the base's turn, within the catalogue's limits, in
+//! any room: it is the lamp's own speech. Off unless the catalogue has a `speaking` section.
 use crate::Error;
 use crate::catalogue::{add, ease};
 use lamp_msgs::BodyOffsets;
@@ -37,9 +39,9 @@ pub struct Speaking {
     /// times the recent level.
     pub stress_level: f32,
     pub stress_rise: f32,
-    /// The sway: the head's roll to each side, the pause in the lamp's
-    /// speech that ends a sentence, and how long the head takes to move.
-    pub sway_roll: f64,
+    /// The sway: the base's turn to each side, the pause in the lamp's
+    /// speech that ends a sentence, and how long the base takes to turn.
+    pub sway_yaw: f64,
     pub pause_us: u64,
     pub sway_us: u64,
     /// The settle as it finishes, after at least `settle_after_us` of speech.
@@ -59,9 +61,9 @@ impl Speaking {
         if !within(self.nod) || !within(self.settle) {
             return Err(Error("speaking: a pose exceeds configured limits".into()));
         }
-        if !self.sway_roll.is_finite() || !(0.0..=limits.head_roll).contains(&self.sway_roll) {
+        if !self.sway_yaw.is_finite() || !(0.0..=limits.base_yaw).contains(&self.sway_yaw) {
             return Err(Error(
-                "speaking: sway_roll must be within the head roll limit".into(),
+                "speaking: sway_yaw must be within the base yaw limit".into(),
             ));
         }
         if !(0.0..=1.0).contains(&self.stress_level) || !(1.0..=10.0).contains(&self.stress_rise) {
@@ -144,9 +146,9 @@ impl SpeechMotion {
         self.settle = Some(now_us);
     }
 
-    /// The head's roll from the sway now.
-    fn roll(&self, rules: &Speaking, now_us: u64) -> f64 {
-        let target = self.side * rules.sway_roll;
+    /// The base's turn from the sway now.
+    fn yaw(&self, rules: &Speaking, now_us: u64) -> f64 {
+        let target = self.side * rules.sway_yaw;
         match self.sway {
             Some((at, from)) => {
                 let share = now_us.saturating_sub(at) as f64 / rules.sway_us as f64;
@@ -157,14 +159,14 @@ impl SpeechMotion {
     }
 
     fn sway_to(&mut self, rules: &Speaking, side: f64, now_us: u64) {
-        let from = self.roll(rules, now_us);
+        let from = self.yaw(rules, now_us);
         self.side = side;
         self.sway = Some((now_us, from));
     }
 
     /// One tick. `speaking`: the lamp's answer is under way; `level`: its
     /// sound as the body meets it now (0 between pieces); `still`: the body
-    /// is held or concentrating, or someone cut in. Returns the head's
+    /// is held or concentrating, or someone cut in. Returns the body's
     /// offsets and names what it is doing.
     pub(crate) fn step(
         &mut self,
@@ -182,7 +184,7 @@ impl SpeechMotion {
         self.last_us = Some(now_us);
         if still {
             // Held, concentrating or cut in on: nothing of its speech moves
-            // the head, and nothing is owed when it ends.
+            // the body, and nothing is owed when it ends.
             *self = Self {
                 last_us: Some(now_us),
                 nods: self.nods,
@@ -199,7 +201,7 @@ impl SpeechMotion {
             } else {
                 self.quiet_since = None;
                 if self.paused && level >= SPEAKING_LEVEL {
-                    // A new sentence: the head rolls over to the other side,
+                    // A new sentence: the base turns over to the other side,
                     // a little more or less each time.
                     self.paused = false;
                     self.sways += 1;
@@ -242,17 +244,17 @@ impl SpeechMotion {
                 names.push("nodding on a stressed word");
             }
         }
-        let roll = self.roll(rules, now_us);
-        // A sway is over once its time has passed, not when it is level:
-        // it starts level.
+        let yaw = self.yaw(rules, now_us);
+        // A sway is over once its time has passed, not when it is centred:
+        // it starts centred.
         if self
             .sway
             .is_some_and(|(at, _)| now_us.saturating_sub(at) >= rules.sway_us)
         {
             self.sway = None;
         }
-        if roll != 0.0 {
-            out.head_roll += roll;
+        if yaw != 0.0 {
+            out.base_yaw += yaw;
             if speaking {
                 names.push("swaying between sentences");
             }
@@ -285,9 +287,9 @@ mod tests {
             nod_gap_us: 900_000,
             stress_level: 0.35,
             stress_rise: 1.5,
-            sway_roll: 0.025,
+            sway_yaw: 0.08,
             pause_us: 350_000,
-            sway_us: 600_000,
+            sway_us: 800_000,
             settle: head(0.03),
             settle_us: 600_000,
             settle_after_us: 1_500_000,
@@ -372,7 +374,7 @@ mod tests {
     }
 
     #[test]
-    fn after_a_pause_the_next_sentence_sways_the_head_to_the_other_side() {
+    fn after_a_pause_the_next_sentence_turns_the_base_to_the_other_side() {
         let mut motion = SpeechMotion::default();
         // Speech, a 0.5 s pause, speech, a 0.5 s pause, speech.
         let level = |at: u64| {
@@ -383,21 +385,23 @@ mod tests {
             }
         };
         let ticks = run(&mut motion, 1_000_000, 300, true, level);
-        let roll_at = |at: u64| ticks.iter().find(|(t, _, _)| *t >= at).unwrap().1.head_roll;
-        assert_eq!(roll_at(1_900_000), 0.0);
-        let first = roll_at(3_900_000);
-        let second = roll_at(6_000_000);
+        let yaw_at = |at: u64| ticks.iter().find(|(t, _, _)| *t >= at).unwrap().1.base_yaw;
+        assert_eq!(yaw_at(1_900_000), 0.0);
+        let first = yaw_at(3_900_000);
+        let second = yaw_at(6_000_000);
         assert!(
-            first.abs() >= 0.75 * 0.025 - 1e-9 && first.abs() <= 0.025,
+            first.abs() >= 0.75 * 0.08 - 1e-9 && first.abs() <= 0.08,
             "{first}"
         );
-        assert!(second.abs() >= 0.75 * 0.025 - 1e-9 && first.signum() != second.signum());
+        assert!(second.abs() >= 0.75 * 0.08 - 1e-9 && first.signum() != second.signum());
+        // Only the base: the head does not roll for it.
+        assert!(ticks.iter().all(|(_, out, _)| out.head_roll == 0.0));
         // Eased over, never a jump.
         let fastest = ticks
             .windows(2)
-            .map(|w| (w[1].1.head_roll - w[0].1.head_roll).abs())
+            .map(|w| (w[1].1.base_yaw - w[0].1.base_yaw).abs())
             .fold(0.0, f64::max);
-        assert!(fastest < 0.003, "{fastest}");
+        assert!(fastest < 0.007, "{fastest}");
         // A short breath inside a sentence is not a pause.
         let mut breath = SpeechMotion::default();
         let ticks = run(&mut breath, 1_000_000, 150, true, |at| {
@@ -407,7 +411,7 @@ mod tests {
                 0.3
             }
         });
-        assert!(ticks.iter().all(|(_, out, _)| out.head_roll == 0.0));
+        assert!(ticks.iter().all(|(_, out, _)| out.base_yaw == 0.0));
     }
 
     #[test]
@@ -464,7 +468,7 @@ mod tests {
         deep.nod.head_pitch = 0.1;
         assert!(deep.check(limits).is_err());
         let mut wide = rules();
-        wide.sway_roll = 0.07;
+        wide.sway_yaw = 0.11;
         assert!(wide.check(limits).is_err());
         let mut fast = rules();
         fast.nod_gap_us = 100_000;
