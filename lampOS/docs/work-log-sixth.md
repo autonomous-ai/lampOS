@@ -22,7 +22,8 @@ Merged into lamp-voice:
 - #1154 (`e6ac71f14`): a look's first round gets 5 s, and then the lamp says "I
   couldn't get a good look." instead of nothing.
 
-Open: #1159 (a full look with no still is a look too, and a doc comment).
+#1159 (`37f44de92`, 23:00): a full look with no still is a look on the
+second voice too (5 s, then the line); `COULD_NOT_LOOK` has a doc comment.
 Next: the second route takes `after_stop` and `continues_cut_off` once #1148
 lands. Not yet on a lamp: the time from "Let me look." to the first word on
 the backup voice.
