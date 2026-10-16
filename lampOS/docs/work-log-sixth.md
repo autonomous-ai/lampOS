@@ -19,9 +19,10 @@ every result on a lamp below names it. Newest first.
   `continues_cut_off` successor, and is never told past 2 min.
 - The relay's chat was down from about 02:29 to 03:00: 40 s timeouts, then
   401 after 60 s, while its speech to text was fine. Gemini on lamp-4ace
-  was unaffected. #1195 (open): with `LAMP_SECOND_DOWN_LINE=on`, the backup
-  voice then says "I can't think right now; give me a minute." at most
-  once a minute.
+  was unaffected. #1195 (`e56fd008b`, 04:3x): with `LAMP_SECOND_DOWN_LINE=on`,
+  a spoken turn whose chat never began says "I can't think right now;
+  give me a minute." at most once a minute, rendered after a turn, never on
+  the lamp's own turns. The words are still the first builder's to change.
 - On lamp-52e6 at 00:08–00:14 (restored): a real look's first event came at
   3.27 s, inside #1154's 5 s, and "Let me look." to the answer took 7.0 s.
   The relay was slow (tiny prompt 1.05–18.5 s to first byte), and 3 of 6
