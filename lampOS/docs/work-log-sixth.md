@@ -12,9 +12,15 @@ every result on a lamp below names it. Newest first.
   its own. Only that request's words count, the one begun just before in the
   same session, taken at every start. The reviewer's P2 (old words from any
   session) is fixed.
-- #1175 (open): the first request after a stop is told so with
-  `STOPPED_NOTE`, behind `LAMP_STOP_TOLD`. It waits on #1148. The reviewer's
-  P2 is to fix: keep the stop when its request is never asked.
+- #1175 (`06942f058`, 03:0x): the first request after a stop is told so
+  with `STOPPED_NOTE`, behind `LAMP_STOP_TOLD`. A stop whose request is
+  never asked goes to the next request in the same session. The follow-ups
+  (a stop asked then given up, a 2 min limit) are #1200.
+- The relay's chat was down from about 02:29 to 03:00: 40 s timeouts, then
+  401 after 60 s, while its speech to text was fine. Gemini on lamp-4ace
+  was unaffected. #1195 (open): with `LAMP_SECOND_DOWN_LINE=on`, the backup
+  voice then says "I can't think right now; give me a minute." at most
+  once a minute.
 - On lamp-52e6 at 00:08–00:14 (restored): a real look's first event came at
   3.27 s, inside #1154's 5 s, and "Let me look." to the answer took 7.0 s.
   The relay was slow (tiny prompt 1.05–18.5 s to first byte), and 3 of 6
