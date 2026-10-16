@@ -4106,6 +4106,21 @@ a story; #1148, a draft on #1030 and #1107, its full gate running)
 - **On lamp-4ace since 20:47:** #1100, #1107, #1108, #1126 and #1047 (the first builder, 20:52).
 - **Still to come from the lamp:** the heard texts of the three wrong names (GEE, Gina, GSEMZEM) for #1057's cases; today's decision records to count #1083's return; request 16's record for the umbrella follow-up.
 
+## 2026-10-16, 21:37 ICT: #970, #1070 and #1090 merged; #1069's two P2s fixed; #1047's missing line was mine
+
+Ready for lamp-voice: yes (#1030, #1057, #1083, #1092, #1100, #1107, #1108,
+#1126, #1148: gate and ARM64 green, waiting for review); no (#1069, its
+fix's ARM64 running; #1047, a draft until a played "Stop." gets words back)
+
+- **Merged:** #1070 (21:10), #1090 (21:17) and #970 (21:19), by the reviewer.
+- **#1069 (`d4f4f79ed`):** the reviewer found the call counted as the lamp answering before the Policy decided it (18:08), and lookups counted too (21:10).
+  - A call now counts only in `ToolDesk::run`, where something is done (Executive, Schedule, Tasks, Faces, Mark): never a held request, an action the Policy held, or a lookup.
+  - Three worker tests: a run action keeps the conversation; a held action, and a lookup followed by `not_for_me`, leave the line counted as left alone. The last two fail on the old code.
+  - lamp-voice: 1,597 passed, 1 load failure that passed alone 3 of 3.
+- **#1047 (`0a82cb92d`):** the first builder saw no "the stream took…" line at all (21:02). It was my bug: a reply's end revokes the stream before `Rest` comes, so the line had no stream to report. It now keeps the revoked stream's counts and logs the thread's end. Gate: Audio 161, Voice 1,593, Voice-eval 521, Memory 208, 1 load failure that passed alone 3 of 3. ARM64 passed 5,690.
+- **#1148:** ready. Same-voice 3, Voice 1,625, Voice-eval 521, Memory 208, none failed. ARM64 passed 5,684.
+- **#1083:** rebased onto `lamp-voice` after #1090 (both added a field in `Attention`; both kept), head `7935450ae`.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
