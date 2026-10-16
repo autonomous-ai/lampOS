@@ -3297,3 +3297,13 @@ wait on their owners and a lamp
   lamp's own device key, written by `install`; setup takes none, the page
   asks for none, both reset plans keep it. Older `serve.json` files that
   name a credential are still read. lamp-setup 37 passed.
+- **Peer reviews for First's queue (14:25):** #1034 and #1043 no finding;
+  #1032 two P3s (an ageless `room/state`; "ends with the facts"); #1046
+  one P3 (`oldest` by the stored deadline while the newest is shown).
+- **#1045 merged** with the Fifth's two P3s; **#1064** fixes them: an empty
+  scan never replaces the last list, every scan has a time limit (4 s
+  before the hotspot, logged with its time).
+- **#994** Fifth's P3 (`d…`): a move file is opened once, non-blocking,
+  checked and read through its cap on that handle.
+- **#795** rebuilt on #1025 (`c6a9250ca`): the asleep face stays off with
+  the Controls privacy route, one ring writer at a time.
