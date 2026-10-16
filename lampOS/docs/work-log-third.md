@@ -3364,3 +3364,14 @@ wait on their owners and a lamp
   authority instead of ending; the chain that ended the voice at 00:00:06 was
   the worker's exit, then an unverified ring cleanup. #1166: El approved;
   her doc P3 in. Told El on #806 her setup steps match the code.
+- **2026-10-17 04:10:** #795 merged (#755 closed); #1182 merged. **#1191** (the ring
+  resyncs once after a held turn, holds its late frame, 3 holds in 10 min):
+  one commit `85a8c664d`, the reviewer's 03:34 P2 fixed (a receipt read in
+  the deadline's pass was lost), voice 1,763/0/11. **#1194** (the log relay
+  never makes the real stderr non-blocking): the reviewer's child-process
+  test in, all P3s taken (Linux: own non-blocking file on a pipe from
+  /proc, `MSG_DONTWAIT` first on a socket), the First's partial-send P3;
+  one commit `a13cd910b`. **#1209**: #1176's P3s (a reset line pressed at
+  start never arms, `legacy_head` needs head pads, install holds
+  `--head-touch` to the sleep mute, doc reasons). All three wait on ARM64
+  and review. `cargo clean` run after #1209.
