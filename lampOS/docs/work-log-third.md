@@ -3342,3 +3342,10 @@ wait on their owners and a lamp
   light's is unknown, poisoned locks). Rebuilt once after #1118 for the
   flaky `lamp-update` test.
 - #795 and #1096: green, waiting on the reviewer.
+- **23:06:** #1120 and #1132 merged. The first builder's 22:41 three:
+  (1) **#1163**, `lamp-air` backs off a missing sensor (3 looks, then every
+  10 min; 8 I2C transactions an hour instead of ~18,000; green);
+  (2) **#1069** peer review: no P1/P2, both P2 tests fail on the old code,
+  needs a rebase; (3) **#1166**, `light/reached` from the ring (the
+  seventh's #1146 waits on it). Then El's find: the product's reset button
+  did nothing (no `--touch`, no `reset` pin), fixed in **#1167**.
