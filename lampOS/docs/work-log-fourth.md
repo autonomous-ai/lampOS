@@ -4142,6 +4142,21 @@ Ready for lamp-voice: yes (#1030, #1057, #1069, #1083, #1100, #1107, #1108,
 - **#1057:** rebased after the eyes' tests moved to letters. Its own tests and docs no longer use the owner's records' names or a colleague's.
 - **Reviewed #1054** (Second's): a P2. A following `stay_quiet` lets `cancel_reminder` run, and a wrong cancel is silent and can't be undone. Two P3s.
 
+## 2026-10-17, 02:09 ICT: #1069, #1083, #1100 and #1107 merged; #1092 and #1148 reworked; raw mic2 for the stop words
+
+Ready for lamp-voice: yes (#1057, #1108, #1148 once ARM64 is green, #1180);
+no (#1047 and #1158, drafts; #1092, its gate running)
+
+- **Merged:** #1069, #1083 (the rise lines), #1100 and #1107.
+- **#1100:** the reviewer's two new P2s. Each exchange is now stamped with the name the eyes give as it is made, and the counted person decides only the session. Someone known counts at once after the one before was gone 30 s (the second route). Voice 1,637, Memory 208.
+- **#1107:** the reviewer's two P2s. In the 4 s after a Stop a sound is judged without the close count (`not_speech::dropped`), and a head tap that stopped the lamp's speech is no call (`TapsIn` reads `voice/state`). The P3s too: the 4 s end when the lamp speaks again.
+- **#1148:** the first builder's two P2s. `StopToTell` gives the Stop back when a thrown-out sound took it, and the note is in the hidden form behind `LAMP_STOP_TOLD=on`. Approved at 23:19; restacked onto today's `lamp-voice` (`0712a39d8`).
+- **#1047:** `LAMP_STOP_WORDS_SOURCE=raw` feeds the stop-word stream the microphone before the canceller (`--raw-blocks`, `MicrophoneFrame::raw`). sonora gives no linear output, and mic1 was dropped by the first builder.
+- **#1092:** the first builder's P1 and the reviewer's. A waiting candidate is decided before its read history runs out or once its line ends. A kept line is kept until it pauses. `record` judges where `on` decides. Every change has a test that fails without it.
+- **#1180:** my #1069 tests raced on the process's one thread in parallel runs (the eighth). They hold one lock now: 5 of 10 runs failed before, 0 of 10 after.
+- **Answered:** #1160 (yes, a voice print can come after the first answer audio on a lamp; I'll take a late-print follow-up).
+- **Re-checked:** #1054 (Second's fixes, no finding).
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
