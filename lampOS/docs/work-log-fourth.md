@@ -4006,6 +4006,33 @@ gate; #918, rebased, its gate next)
   which I rebased onto `lamp-voice`'s per-thread room and own turn.
 
 
+## 2026-10-16, 14:22 ICT: #828's heard-always, names (#1057), #829's two rules (#1029, #1030), and the reviewer's P2 on #992 fixed
+
+Ready for lamp-voice: yes (#918, #970, #992, #1029, #1030, each green on
+ARM64 and waiting for review); no (#1047, the first builder's P1, after
+#1024 merges; #1057, ARM64 running)
+
+- **#992:** the reviewer's P2 (the call note could take the last place in
+  Gemini's input queue before the end) is fixed: the worker keeps the note
+  for the end and sends both only when there is room for both
+  (`has_room_for`). Gemini 269, Voice 1,514, Voice-eval 515, Memory 205.
+- **#918, #970** rebased twice onto a fast `lamp-voice` (#926's ask-again,
+  #849's head tap and stop, the per-thread room of #971); each gate and
+  ARM64 green on its head.
+- **#1029** (two lines left alone end a conversation, the 06:15 case) and
+  **#1030** (the same-voice check as the voice's child) are up on #918.
+- **#828:** the first builder's 01:51 recordings replayed show why a lone
+  "Stop." makes no yield: in its speech-like blocks the lamp's own sound
+  explained 96 to 99% of the microphone, and no per-block sign told it
+  from the lamp's voice. `LAMP_STOP_WORDS=heard-always` (#1047, approved at
+  13:07) hears everything while the lamp speaks and stops it on a stop
+  word the lamp did not say itself.
+- **Names** (the first builder's 13:24): a name was never kept on 15
+  October (the tool was never called), and today one face was kept under
+  two names. #1057, `LAMP_NAMES=checked`: a name told is kept, only a name
+  the person said, one name for one face.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
