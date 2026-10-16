@@ -5,6 +5,21 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-16 — #890 second route tests deterministic — merged
+
+Ready for lamp-voice: yes (#944, merged 08:26)
+
+- `coordinator::tests::second_route` failed on a busy host with "service
+  privacy freshness lost": its privacy thread was starved past the 50 ms
+  lease. The fixture now steps every peer on `scenario_clock`, as
+  `pilot_faults`' stepped runs do; test only. Under a CPU load of 2× ncpu
+  `yes`, before: 3 of 6 runs failed (21–35 s each); after: 6 of 6 passed
+  (about 6 s each).
+- Also today: the relay's speech-to-text first-word time for stop phrases
+  on lamp-52e6 (#828, the fourth's probe #945): words come only after
+  `Finalize`, 0.22–0.30 s after the audio; a held burst's tail was lost
+  ("Lamp," for "Lamp, stop."), fixed in #956.
+
 ## 2026-10-16 — #779 startup hold — merged
 
 Ready for lamp-voice: yes (#885, merged)
