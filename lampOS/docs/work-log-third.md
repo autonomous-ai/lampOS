@@ -3224,3 +3224,15 @@ wait on their owners and a lamp
   commits (the reviewer's P3) and makes `--rules`' quiet morning end at the
   zone's noon (635 passed); #849 met #926's ask-again (a head touch drops
   it too). #795 merges cleanly and builds.
+- **#940 the light, #993** (`a3f324ff1`, behind `LAMP_LIGHT_REQUESTS=on`):
+  the ring takes `light/request` claims (one per asker, at most 30 s
+  ahead) and shows the highest that holds, the person's light again once
+  none does; the person's own `light/command` ends lower requests and
+  their renewals. msgs and Voice 1,610 passed, 8 timing tests under load
+  pass alone; ring 134 serially.
+- **#940 move files, #994** (`af79a9ef1`): `lamp-body --moves DIR` reads
+  `NAME.json` moves at start, held to the built-in clips' bounds, played
+  by name as a gesture; a bad file refused with why. Body 300 passed,
+  clippy clean on macOS and Linux ARM64. The body's arbitration waits on
+  the fifth.
+- #844 green on ARM64 at `2a4168cc5` (5,378); #795 at `3f3d87366` (5,386).
