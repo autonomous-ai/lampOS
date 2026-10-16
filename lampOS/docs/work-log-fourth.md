@@ -3955,6 +3955,30 @@ Ready for lamp-voice: yes (#891, #918, #945); no (#936, ARM64 running on the age
   `lamp-voice`.
 
 
+## 2026-10-16, 10:16 ICT: the stop-word half is pull request #970; #945 merged; #936 green; the call note rebased
+
+Ready for lamp-voice: yes (#918, #936); no (#970, ARM64 running; the call
+note, its gate running)
+
+- **#970, #828's stop-word half** (`fourth/stop-heard`, `f98f44dfb`,
+  `LAMP_STOP_WORDS=heard`): a stream on the second voice's speech-to-text
+  is made ready at each reply; a yield's audio goes to it, the words are
+  asked for after 100 ms of stillness, and a stop phrase commits the yield.
+  The rule waits for the words before stillness may resume, and its 1.1 s
+  deadline still resumes it. Gate: Audio 161, Voice 1,477, Voice-eval 508
+  and Memory 205 passed, none failed. The first builder accepted sending a
+  yield's audio to the relay on lamp-4ace (#828, 09:49). How to play it is
+  on #828.
+- **#945** merged at 09:28, and the sixth builder's #956 (the tail kept
+  after a short `Finalize` answer) at 09:31.
+- **#936:** ARM64 38840853589 on the age fix passed 5,277.
+- **#891** merged at 06:23. The call note (#782's "Yes?") is rebased onto
+  `lamp-voice` as `d6b8d07dc`, one commit; its gate is running.
+- The fifth's reading on lamp-52e6 (#705, 10:07): stop words come through
+  the canceller about 50 dB above its floor, so the ones lost at 05:39 were
+  the rule resuming on stillness, which #970 changes.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
