@@ -3208,3 +3208,19 @@ wait on their owners and a lamp
   #844 rebased onto `69bae3831` for First's `--zone system` check before
   10:30; #849 and #795 rebuilt onto the same base. #928 (Schedule stop)
   green, First's to merge.
+- **#955 review fix** (`1c9e1bddd`): speech motion is forgotten with the
+  other transients; a finished answer keeps its settle, a new turn cuts it.
+  Merged, as were #928 and #845.
+- **`third/lamp-1100`** for First's 11:00 session with the owner:
+  `lamp-voice` `b419747e8` with #849, #795, #955 and #844 merged in.
+  Non-voice 1,189 passed / 1 flake, Voice 1,521 / 5 flakes.
+- **#940 step 1** (`third/arbitration` `71b531d66`): msgs `arbitration.rs`,
+  the five priorities, a claim with a 30 s cap, `light/request`. Plan on
+  #940; step 2 waits for First (the ring in the voice crate) and the fifth
+  (the body: a `body/request` topic or `mood.sock`).
+- **Rebuilds on #884 (`ec8317fe2`):** #849 (offline ring beside the
+  listening face, `local_only`), #844 (the kernel clock beside the zone),
+  #795. Then on `f5a20ba28`: #844 `2a4168cc5` takes El's two start-line
+  commits (the reviewer's P3) and makes `--rules`' quiet morning end at the
+  zone's noon (635 passed); #849 met #926's ask-again (a head touch drops
+  it too). #795 merges cleanly and builds.
