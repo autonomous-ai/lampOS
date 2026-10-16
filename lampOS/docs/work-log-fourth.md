@@ -4157,6 +4157,20 @@ no (#1047 and #1158, drafts; #1092, its gate running)
 - **Answered:** #1160 (yes, a voice print can come after the first answer audio on a lamp; I'll take a late-print follow-up).
 - **Re-checked:** #1054 (Second's fixes, no finding).
 
+## 2026-10-17, 03:28 ICT: #1092 merged and its follow-up, #1047's cadence, #1057 folded, #1108's P2, a flaky test of mine
+
+- **Merged:** #1092 (asker first, off unless `LAMP_ASKER_FIRST` is set), at 02:33 on the first builder's re-check.
+- **#1197** (`fourth/asker-follow-up`), the first builder's three P3s on #1092: a test for the 0.3 s echo filter, a 2 s bound on a kept line, and the waits in `group-talk.md`.
+  - The missing test showed a bug in the merged rule: a quiet line from across the room that the answer began over was admitted a block into the answer and replaced it.
+  - Fixed there. Gate green: Voice 1,733 passed, none failed, 11 ignored.
+  - The reviewer's 03:20 P2 (the asker's own soft "um" over the answer's start was let go) is being fixed now: the line is judged on until its last chance.
+- **#1047:** the half-second cadence with the raw source (`62e111719`), for the first builder's 02:57. Rechecked from a touched tree: Clippy, and `stop_words::` 13 passed.
+- **#1057:** the reviewer's P2 (names in the commit history) and P3 (the description) are done. The five commits are folded into one with the same final tree, and force-pushed (`d98513362`).
+  - The first builder's three 16:46 records are tests now. A name is kept from the turn in hand, or from one before once the lamp said it back and they agreed. A repeated letter spells nothing, a letter count said must match, and `replace` needs their yes.
+- **#1108:** the reviewer's 22:01 P2, which I missed then: a bare call counts only on its own hearing. Plus "on the Live route" in the doc (`ec332c432`). I asked the first builder for two gaps from the 16:30 journal to set the 3 s. The full gate is running.
+- **#1201** (new): `duplex::first_words_older_than_the_provider_takes_are_dropped_before_the_commit`, mine from #936, failed with `ClockRegression` on a loaded Mac. Its paced reads were on the host clock while the speaker dispatch gave the turn owner the host's `now()`. It's now on the scenario clock: 27 duplex tests pass, and it passes alone 3 of 3.
+- **Build folders:** the main checkout's was 32 GB, so it was cleaned (35.3 GiB freed). A side folder used for one worktree after another served a stale `lamp-ring`, so each worktree's sources are now touched first. That's in the build-folder memory.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
