@@ -4121,6 +4121,27 @@ fix's ARM64 running; #1047, a draft until a played "Stop." gets words back)
 - **#1148:** ready. Same-voice 3, Voice 1,625, Voice-eval 521, Memory 208, none failed. ARM64 passed 5,684.
 - **#1083:** rebased onto `lamp-voice` after #1090 (both added a field in `Attention`; both kept), head `7935450ae`.
 
+## 2026-10-16, 22:42 ICT: #1100's privacy P2 fixed; #1083 split; #1092 reworked; #1054 reviewed
+
+Ready for lamp-voice: yes (#1030, #1057, #1069, #1083, #1100, #1107, #1108,
+#1126, #1148: gate and ARM64 green, or ARM64 running on today's fixes); no
+(#1047 and #1158, drafts; #1092, its rework's gate running)
+
+- **#1100 (`fdf036b0d`):** the reviewer's privacy P2. What a newcomer says in their first 10 s, answered in the previous person's session, was saved as that person's and told to them later.
+  - Once the newcomer counts, their exchanges since the eyes first knew them are re-stamped as theirs (`Presence::arrived`, `Thread::at_lamp_since`), with a test that fails without it.
+  - The name note follows the counted person. The docs give the equal-match restart numbers and the second route's thread switches. The misheard names are out of the description. Voice 1,636, Memory 208, ARM64 5,712.
+- **#1083 split** as the reviewer suggested.
+  - #1083 is now the rise lines only, on every verdict line ("held back" too), changing nothing the lamp does. Voice 1,636.
+  - The day/night rule is draft **#1158**, with the reviewer's clock fix (never night while the clock is unset). It waits for request 169's text and the measured bars.
+- **#1092 (`f7d26953a`):** the first builder's three P2s and the reviewer's two.
+  - New speech is judged on its own blocks, by their upper tenth, and waits kept rather than cleared.
+  - The asker's level comes from their own turn, away from the lamp's sound. The rule ends after 5 s, and `LAMP_ASKER_FIRST=record` judges without acting.
+  - The reviewer's probes now reach the provider whole: 164 blocks for a soft start (124 before), and the asker's audio begins before their first block.
+- **#1069 (`d4f4f79ed`):** a call counts as answering only where it runs, never as a lookup or an action the Policy held. ARM64 5,710.
+- **#1107 and #1108:** Second's P3s fixed (an idle Stop opens no 4 s; comments back in place). #1148 brought up to #1107's head. ARM64 5,712, 5,712 and 5,724.
+- **#1057:** rebased after the eyes' tests moved to letters. Its own tests and docs no longer use the owner's records' names or a colleague's.
+- **Reviewed #1054** (Second's): a P2. A following `stay_quiet` lets `cancel_reminder` run, and a wrong cancel is silent and can't be undone. Two P3s.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
