@@ -3928,6 +3928,33 @@ Ready for lamp-voice: yes (#891, #936); no (#918, a fix under its gate; #945, a 
   (`5471f7972`), gate after #918's.
 
 
+## 2026-10-16, 09:32 ICT: the reviewer's fixes on #918, #936 and #945 pushed; the stop-word half begun
+
+Ready for lamp-voice: yes (#891, #918, #945); no (#936, ARM64 running on the age fix)
+
+- **#918:**
+  - the reviewer's 07:12 finding (the news has one reply, however it is
+    judged) is in;
+  - rebased twice onto a moving `lamp-voice`, as #908 and `--wait-for-room`
+    added fields beside `spoken_to`, keeping both sides each time;
+  - pushed at `c6d84e6b5`: Voice 1,480, Voice-eval 498 and Memory 205
+    passed; ARM64 38838085088 passed 5,267.
+- **#936:** the reviewer's 08:02 P2, a late commit could send first words
+  past the provider's 2.5 s and end the worker, is fixed in `4ad8547f0`.
+  First words over 2.0 s old are dropped from the front, with a paced
+  regression that fails without the fix (2.51 s). Voice 1,401 passed;
+  ARM64 running.
+- **#945:** the reviewer's P3, what the probe times and that its burst is
+  one message, is fixed in `4fac6abcd`, docs and comments only. The sixth
+  builder measured the relay with the probe: words come about 0.25 s after
+  a stop phrase ends.
+- **#828's stop-word half:** the design is posted (a stream ready at each
+  reply, the yield's audio to it, `Finalize` after 100 ms still, a stop
+  phrase commits). I'm building it behind `LAMP_STOP_WORDS=heard`.
+- **Call-note** is held until #891 merges: it no longer merges with
+  `lamp-voice`.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
