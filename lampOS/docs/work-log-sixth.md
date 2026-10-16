@@ -5,6 +5,49 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-16 — #754's open limits 1–4 — #1031, #1032, #1034 merged; #1028 open
+
+Ready for lamp-voice: #1031 (merged 14:58), #1032 (14:40), #1034 (14:42);
+#1028 waits for its merge
+
+- #1031: a chat stream that ends before `[DONE]` or a `finish_reason`
+  fails the turn instead of being said as the whole answer.
+- #1032: each turn is told the session and room facts a Live session is
+  told. Third's two P3s (a room with no freshness, the doc's place for the
+  facts) are mended in #1062: a room older than 3 s is unknown.
+- #1034: the lamp's tools are declared as they stand at each chat request,
+  so an executive started after the voice is offered.
+- #1028: busy-near on the second route (a name heard close to the lamp);
+  Second's P3 (the sampling thread outliving its rule) mended.
+
+## 2026-10-16 — #1014 the second voice as quiet as Gemini — merged
+
+Ready for lamp-voice: yes (#1023, merged 14:56)
+
+- The second worker runs the Live route's own rule for whom it answers
+  (`attention::Attention`) on each spoken turn, fed the room, the name's
+  hearings, the eyes and the thread from the bus; words it holds end the
+  turn unanswered. Sentences are said with a space between. On lamp-4ace
+  from 12:33 (first builder's stacked build); the busy-room afternoon is
+  the first builder's.
+
+## 2026-10-16 — #960 reconnect hold at rest — merged
+
+Ready for lamp-voice: yes (#980, merged 15:00)
+
+- A question at rest while Gemini's link reconnects waits for Gemini
+  instead of going to the second route. The mid-line holds were removed
+  after the reviewer's two P2s (a retired request's replay is dropped by
+  the worker; the hold could start in the future). ARM64 38852199231 green
+  on `9fac3c526`. Mid-line would need a new request id; not proposed.
+- Also today: the second voice's slow chat (first builder's 13:11). Probe
+  from lamp-52e6 to the relay: `gpt-4.1-mini` 0.7–1.8 s to the first word
+  (40 of 40), `gpt-5-mini` 5–9 s, `gpt-5` 13–23 s; lamp-4ace already runs
+  `gpt-4.1-mini`, so not the model there. #1049: a first round not begun
+  within 3 s ends the turn unanswered (Second's P2 mended: a round after a
+  tool ran is said). Peer reviews posted: #992 (no finding), #1020 (one
+  P3), #1029 (two P3s), #1035 (no finding).
+
 ## 2026-10-16 — #960 second route: stall, exit, busy room — merged
 
 Ready for lamp-voice: yes (#962, merged 10:56)
