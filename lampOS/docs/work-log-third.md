@@ -3349,3 +3349,12 @@ wait on their owners and a lamp
   needs a rebase; (3) **#1166**, `light/reached` from the ring (the
   seventh's #1146 waits on it). Then El's find: the product's reset button
   did nothing (no `--touch`, no `reset` pin), fixed in **#1167**.
+- **2026-10-17 00:04:** #1096, #1163, #1167 and #1171 merged. **#1138**'s Expression half
+  OK'd (doc-line P3 mine, after it lands). **#1166**: the reviewer's P1 (a
+  turn's face never shows the lamp's light: resting frames only), restart on
+  stall or a tap's face, said again on renewal, tests through `rest()`;
+  rebuilt after a msgs.md conflict. **#1176**: the reviewer's post-merge #1167
+  P2s, `legacy_head` keeps a pat a Pet on product lamps, the reset needs
+  pull-up and a released second, `hand: reset` lines; El told to drop the
+  head-tap step. Open for the first builder: should a turn's face show a
+  skill's light (the seventh's question)?
