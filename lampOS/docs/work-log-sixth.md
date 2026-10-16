@@ -188,6 +188,7 @@ Ready for lamp-voice: yes (#778), superseded by the entry above
 | Id | What | Issue | Answer |
 |---|---|---|---|
 | sixth-P1 | The second voice's first words under 1.5 s | #779 | none yet |
+| sixth-P2 | The second voice looks when it is asked to (#754 open limit 5) | #1044 | none yet |
 
 ## Found, not mine
 
