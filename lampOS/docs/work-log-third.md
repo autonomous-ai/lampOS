@@ -3333,3 +3333,12 @@ wait on their owners and a lamp
   clippy clean. Leo to test on lamp-52e6; Nine to review against #1102.
 - **Disk (Dee):** one build folder, `lampOS/target`; old worktrees and
   extra target folders deleted; `cargo clean` after this task.
+- **20:52, #1120:** the reviewer's P2 (no key on a lamp without one is
+  refused) and P3s, and Nine's two P3s, fixed in `4dcf73991`; Nine
+  re-checked; green. Waits on #1102.
+- **#1132** (#940, the skills half of a skill's light on `light/request`,
+  First's 17:26 order): the seventh approved, no P1/P2; its three P3s fixed
+  in `e4992196c` (the ring looked for at each step, level 3 when the
+  light's is unknown, poisoned locks). Rebuilt once after #1118 for the
+  flaky `lamp-update` test.
+- #795 and #1096: green, waiting on the reviewer.
