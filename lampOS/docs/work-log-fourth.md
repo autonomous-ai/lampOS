@@ -3979,6 +3979,33 @@ note, its gate running)
   the rule resuming on stillness, which #970 changes.
 
 
+## 2026-10-16, 11:22 ICT: the call note is #992; the reviewer's findings on #970 fixed; #829's stack rebased, with two new rules
+
+Ready for lamp-voice: no (#992, ARM64 running; #970, its fix under the
+gate; #918, rebased, its gate next)
+
+- **#992, the call note** (#782's "Yes?", `fourth/call-note`,
+  `e3f53a597`): rebased onto `lamp-voice` after #891 merged, with two
+  fixes the rebase showed. No note goes for an offline turn (#830), and the
+  note never takes the end's queue slot past the bound. Voice 1,513,
+  Voice-eval 515 and Memory 205 passed, none failed.
+- **#970:** the reviewer's P1 (relay audio revoked only behind its queue)
+  and P2 (words of a forgotten yield taken by the next) at 10:47. The fix
+  is a revocation counter apart from the queue, checked under its lock at
+  the handoff to the stream, with an age bound, a bounded close on drop,
+  and every result tagged with its yield. Two tests through the relay's
+  real thread against an in-memory speech-to-text; each fails with its
+  guard taken out. Rebased onto `lamp-voice` with #936 (merged) beside it.
+- **#829:** my 07:56 was wrong about the 06:15 case: the budget line was
+  the same voice as the euros question. What shows it is the two lines
+  left alone between. `fourth/going-on`: with `LAMP_SPOKEN_TO=on`, two
+  lines left unanswered since the lamp last spoke end its conversation.
+  `fourth/voice-check`: the same-voice model as the voice's child
+  (`lamp-same-voice serve`), off without `LAMP_SAME_VOICE_MODEL`, for the
+  first line of other people's talk inside the 45 s. Both sit on #918,
+  which I rebased onto `lamp-voice`'s per-thread room and own turn.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
