@@ -4094,6 +4094,18 @@ on lamp-4ace with `7607b2a0f`)
 - **Merged runs:** seven heads together (Voice 1,637, none failed), then #1126 with #1083 (Voice 1,620, none failed).
 - **Waiting:** telling the model a Stop happened (#1107's other half), after #1030 merges; the umbrella follow-up's record; the rises to bring #1083 back.
 
+## 2026-10-16, 20:58 ICT: the model told of a Stop (#1148); #1048 re-checked; my five on lamp-4ace
+
+Ready for lamp-voice: yes (#970, #1030, #1057, #1069, #1070, #1083, #1090,
+#1092, #1100, #1107, #1108, #1126: gate and ARM64 green, the reviewer has
+them in order since 20:51); no (#1047, a draft until "Stop." is played over
+a story; #1148, a draft on #1030 and #1107, its full gate running)
+
+- **#1148:** the first request after a hand or head Stop, within 2 minutes, tells the model it was stopped and that what it was saying is over. That's the other half of the first builder's 16:33 (the story began again after each tap). Format, Clippy, build and the touched tests (58) pass. It's stacked on #1030 for the Start field beside `over_the_lamp`.
+- **#1048 (Second's, `d119c2ee3`):** re-checked. My P1 is fixed with #1042's `each` trigger, and my P2 and P3s are fixed. One new doc [P3]: `settled_of` sits between `unread`'s comment and `unread`. 425 tests passed. I left it waiting since 16:02, and Second asked twice.
+- **On lamp-4ace since 20:47:** #1100, #1107, #1108, #1126 and #1047 (the first builder, 20:52).
+- **Still to come from the lamp:** the heard texts of the three wrong names (GEE, Gina, GSEMZEM) for #1057's cases; today's decision records to count #1083's return; request 16's record for the umbrella follow-up.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
