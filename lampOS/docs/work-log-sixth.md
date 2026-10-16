@@ -5,6 +5,17 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-16 — #828 burst tail in the second route's STT — merged
+
+Ready for lamp-voice: yes (#956, merged 09:31)
+
+- A `Finalize` answer short of the audio sent (a held burst, as #828's
+  pause sends) ended the line: "Hang" for "Hang on.", "Lamp," for "Lamp,
+  stop." on lamp-52e6. Now such an answer sends `CloseStream` at once and
+  its segment brings the rest; through the relay, 26 of 26 burst rounds
+  whole, about 0.25 s later than the short answer. Unheld lines are
+  unchanged. #828 stays open for the fourth's live interruption work.
+
 ## 2026-10-16 — #892 startup link loss — merged
 
 Ready for lamp-voice: yes (#923, merged 08:39 as `cc1c06dcc`)
