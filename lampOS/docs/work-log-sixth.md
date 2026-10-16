@@ -5,6 +5,22 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-16 — #960 second route: stall, exit, busy room — merged
+
+Ready for lamp-voice: yes (#962, merged 10:56)
+
+- The second worker skips authority that lapsed while it was held up (as
+  the Live worker since #784), so a stall no longer ends it and the voice.
+  A second worker that exits is dropped and its turn ended as one the
+  provider interrupted; Gemini's worker stays mandatory in either slot
+  (`coordinator::mandatory`). A turn begun on the second route goes to
+  Gemini once Ready, so a busy room cannot keep the lamp off Gemini (the
+  198 s on lamp-4ace at 09:03). Two reviewer P2s mended. Ran on lamp-4ace
+  from 09:41 with no backup-route crash (first builder).
+- Next: #980, a request held for Gemini while its link reconnects; on
+  lamp-52e6 a drop early in a line is held and answered by Gemini, while
+  a 2 s reconnect outlasts the hold Gemini's 2.5 s audio age bound leaves.
+
 ## 2026-10-16 — #828 burst tail in the second route's STT — merged
 
 Ready for lamp-voice: yes (#956, merged 09:31)
