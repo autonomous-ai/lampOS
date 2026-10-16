@@ -3236,3 +3236,13 @@ wait on their owners and a lamp
   clippy clean on macOS and Linux ARM64. The body's arbitration waits on
   the fifth.
 - #844 green on ARM64 at `2a4168cc5` (5,378); #795 at `3f3d87366` (5,386).
+- **Rebuilds on `1d318b390`/`6d2bea2e1`:** #844 (`db7d65846`): #883's
+  `--hello` takes `--zone` too; the ARM64 build failed once on Voice's
+  `hello_wait` example (a caller my four-crate clippy missed), fixed, and
+  workspace-wide clippy is now part of my gate after an API change. #994
+  after First's V1 moves became built-in clips (test moves renamed); green
+  on ARM64 (5,395). #993 green (5,401). #795 rebuilt (msgs `arrival`).
+- **#699, #1013:** `lamp-bus keep-logs DIR` keeps the shared log on disk:
+  one JSON line per log with its bus identity, a new file each start, 2 MiB
+  files and the newest 10, losses counted, synced at most once a second.
+  Off; the unit and folder are #737's. Bus and msgs 197 passed.
