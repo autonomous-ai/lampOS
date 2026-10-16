@@ -3307,3 +3307,14 @@ wait on their owners and a lamp
   checked and read through its cap on that handle.
 - **#795** rebuilt on #1025 (`c6a9250ca`): the asleep face stays off with
   the Controls privacy route, one ring writer at a time.
+- **#1013 and #1064 merged** (the reviewer back at 15:08). #1064's P3 is
+  **#1074** (an empty scan's answer kept for its 5 s).
+- **#1016**: the Fifth's P2 fixed (`3a6e28adf`, Harness's sign-in wiped,
+  its service kept); Thirteen: P3 only; green; ready line posted for the
+  chain #1016 → #1018 → #1041. Its P3 (a leftover credential temp file)
+  follows once it merges.
+- **#795 on lamp-06c1:** El found the slide wired (15:08, trace rows);
+  First said yes. ARM64 on `07debea9c` failed the lost-Controls worker
+  test (it required reading a fault that had aged out under load; the
+  service needs only the clean exit). Test fixed in `2899db9d5`; the lamp
+  run waits for its green build.
