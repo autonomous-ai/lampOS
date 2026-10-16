@@ -5,6 +5,15 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-16 — the first builder's (3), a call written as words — #1139 merged
+
+Merged into lamp-voice as `78ad1a58e` (21:2x). A function call written as
+words (`not_for_me{}` at 17:12 on lamp-4ace) is never the lamp's: not on
+`voice/said`, not in the thread, and the backup voice takes
+`not_for_me…` as the call. Second's two P3s are in it: a call split across
+pieces is left out whole (`not_speech::CallsLeftOut`), and `BusOut::said`
+has a test of its own. Known ceiling: a split inside the first word.
+
 ## 2026-10-16 — the afternoon's merges: #1028, #1049, #1062, #1068, #1111, #1086
 
 Merged into lamp-voice:
