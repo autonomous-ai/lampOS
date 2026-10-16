@@ -4033,6 +4033,35 @@ ARM64 and waiting for review); no (#1047, the first builder's P1, after
   the person said, one name for one face.
 
 
+## 2026-10-16, 15:27 ICT: #918, #992 and #1029 merged; #1047's gate; #1069 and #1070 up; #829's asker first begun
+
+Ready for lamp-voice: yes (#970, #1057, green and waiting for review); no
+(#1047, a draft until the first builder's rerun on lamp-4ace; #1030, #1069
+and #1070, tests and ARM64 running on their new heads)
+
+- **Merged:** #918 at 13:08, #1029 at 14:40 and #992 since. The sixth's
+  [P3] on #1029 (a request answered by a call alone was counted as left
+  alone) came after it merged, so its fix is its own draft, **#1069**.
+  **#1030** is rebased onto `lamp-voice` alone.
+- **#1047 (heard-always):** on lamp-4ace at 14:28 nothing ran, with no
+  stop-word line. The 14:28 trail's `duplex_policy` says
+  `stop_words_always: true`, so the switch reached the coordinator. The
+  head `8bfaa6773` has the P1 fix (`SPOKEN_STOP` in `LOCAL_CANCELS`) and
+  journal lines for the start, each stream and each reply. Gate: Audio
+  161, Voice 1,588, Voice-eval 521, Memory 208; one timed Policy test
+  failed under load and passed alone 3 of 3. ARM64 passed 5,537.
+- **#1070:** the paced duplex test's harness reads each paced block at
+  its own gap, so a late host can't make a gap over 50 ms ("capture
+  discontinuity" once at 13:40).
+- **#829, the first builder's 14:23:** the 14:21 `user_interrupted` cases
+  weren't duplex yields (no `duplex_yield` in their records). An awaited
+  answer was replaced by talk from across the room once the busy room's
+  1.8 s floor hold had lapsed. `LAMP_ASKER_FIRST=on` (local,
+  `fourth/asker-first`): while an answer is awaited, speech more than
+  6 dB under the asker's takes no turn, the name still does. The margin
+  is to be set from the session's `speech_level` records, asked for on
+  #829.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
