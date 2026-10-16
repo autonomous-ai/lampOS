@@ -5,6 +5,28 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-16 — the afternoon's merges: #1028, #1049, #1062, #1068, #1111, #1086
+
+Merged into lamp-voice:
+
+- #1028 (`551356e6c`): busy-near on the second route, a name heard close to
+  the lamp.
+- #1049 (`792adf467`): a second voice chat not begun within 3 s ends the
+  turn unanswered.
+- #1062 (`5192fb222`): the room read from the bus is unknown once older than
+  3 s (#1032's P3s).
+- #1068 (`42c4dec84`): #980's two P3s.
+- #1111 (`62d2d48cf`): the 16:38 crash on lamp-4ace. A link change inside a
+  300 ms worker hold-up is dated at the sample after the gap and no longer
+  ends the worker.
+- #1086 (`ece68e04a`, sixth-P3): the backup voice makes one soft sound
+  when its first round has not begun at 1.5 s, then waits until 4.5 s.
+  Shown on lamp-52e6 in 7 of 8 slow turns.
+
+Open: #1075 (sixth-P2, the look; rebased on #1086, the real look shown on
+lamp-52e6), #1137 (close speech skips the scrap gate), #1139 (a call written
+as words is never the lamp's).
+
 ## 2026-10-16 — #754's open limits 1–4 — #1031, #1032, #1034 merged; #1028 open
 
 Ready for lamp-voice: #1031 (merged 14:58), #1032 (14:40), #1034 (14:42);
@@ -232,7 +254,7 @@ Ready for lamp-voice: yes (#778), superseded by the entry above
 |---|---|---|---|
 | sixth-P1 | The second voice's first words under 1.5 s | #779 | none yet |
 | sixth-P2 | The second voice looks when it is asked to (#754 open limit 5) | #1044 | yes, as proposed (15:14) |
-| sixth-P3 | The backup voice makes a small sound while it waits | #754 (comment) | none yet |
+| sixth-P3 | The backup voice makes a small sound while it waits | #754 (comment) | merged as #1086 |
 
 ## Found, not mine
 
