@@ -3318,3 +3318,18 @@ wait on their owners and a lamp
   test (it required reading a fault that had aged out under load; the
   service needs only the clean exit). Test fixed in `2899db9d5`; the lamp
   run waits for its green build.
+- **17:18, #795**: the reviewer's 15:50 P2 fixed (on the Controls route the
+  privacy worker's unreadable fault, or a lost message after its clean
+  exit, is no failed shutdown; new test fails on the old code) and the doc
+  P3s. The indicator window is left, with a proposal for its own PR.
+  El's lamp-06c1 run (16:0x) passed: line 9 taken, the red breath held
+  while the slide was closed. Rebuilt on `lamp-voice` (msgs conflict),
+  head `9b0202dbc`.
+- **#1096** (#993's follow-up): the reviewer's P2 and P3s and Twelve's doc
+  P3 fixed, `450da4bd3`; waits on review and ARM64.
+- **#1120, the setup key** (the owner's 16:13 decision on #806, First's
+  order 1): setup takes `llm_api_key` again, writes it 0600 for the voice
+  and the Policy; both reset plans wipe both (order 3). `lamp-setup` 44/0,
+  clippy clean. Leo to test on lamp-52e6; Nine to review against #1102.
+- **Disk (Dee):** one build folder, `lampOS/target`; old worktrees and
+  extra target folders deleted; `cargo clean` after this task.
