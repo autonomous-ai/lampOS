@@ -5,6 +5,23 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-17 — the second route's hidden notes — #1168 merged, #1175 open
+
+- #1168 (`185df75f6`, 01:52): a request going on from one given up after an
+  early end (`continues_cut_off`) is asked with that request's words before
+  its own. Only that request's words count, the one begun just before in the
+  same session, taken at every start. The reviewer's P2 (old words from any
+  session) is fixed.
+- #1175 (open): the first request after a stop is told so with
+  `STOPPED_NOTE`, behind `LAMP_STOP_TOLD`. It waits on #1148. The reviewer's
+  P2 is to fix: keep the stop when its request is never asked.
+- On lamp-52e6 at 00:08–00:14 (restored): a real look's first event came at
+  3.27 s, inside #1154's 5 s, and "Let me look." to the answer took 7.0 s.
+  The relay was slow (tiny prompt 1.05–18.5 s to first byte), and 3 of 6
+  backup questions hit the 3 s bound.
+- A relay latency log runs for 24 h from 01:57 (every 10 min, from
+  lamp-52e6, timings only), for the 3 s bound.
+
 ## 2026-10-16 — the look, close speech, the look's bound — #1075, #1137, #1154 merged
 
 Merged into lamp-voice:
