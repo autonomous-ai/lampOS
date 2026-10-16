@@ -5,6 +5,28 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-16 — the look, close speech, the look's bound — #1075, #1137, #1154 merged
+
+Merged into lamp-voice:
+
+- #1075 (`6302e7b05`, sixth-P2, #1044): the second voice looks when asked. The
+  eye's newest picture goes with the words to the relay's model, or the
+  no-look note goes when there is none. The announcement is heard, not
+  written, so an answer's "Let me look." takes the look. Shown on lamp-52e6
+  at 19:00: a real 21–23 KB picture, the desk described, first event 1.50 s.
+- #1137 (`bff7ec945`, the first builder's (1)): an utterance said close (room mic
+  rise ≥ 18 dB) counts its loud blocks (≥ -31 dBFS) as speech and needs 16,
+  not 30. This keeps the owner's six dropped turns of 17:13–17:16, while a
+  knock at the desk stays a sound (Ten's P2). Records carry `said_close`.
+  `bus.latest` timed on lamp-52e6: 30 µs median.
+- #1154 (`e6ac71f14`): a look's first round gets 5 s, and then the lamp says "I
+  couldn't get a good look." instead of nothing.
+
+Open: #1159 (a full look with no still is a look too, and a doc comment).
+Next: the second route takes `after_stop` and `continues_cut_off` once #1148
+lands. Not yet on a lamp: the time from "Let me look." to the first word on
+the backup voice.
+
 ## 2026-10-16 — the first builder's (3), a call written as words — #1139 merged
 
 Merged into lamp-voice as `78ad1a58e` (21:2x). A function call written as
@@ -262,7 +284,7 @@ Ready for lamp-voice: yes (#778), superseded by the entry above
 | Id | What | Issue | Answer |
 |---|---|---|---|
 | sixth-P1 | The second voice's first words under 1.5 s | #779 | none yet |
-| sixth-P2 | The second voice looks when it is asked to (#754 open limit 5) | #1044 | yes, as proposed (15:14) |
+| sixth-P2 | The second voice looks when it is asked to (#754 open limit 5) | #1044 | merged as #1075 |
 | sixth-P3 | The backup voice makes a small sound while it waits | #754 (comment) | merged as #1086 |
 
 ## Found, not mine
