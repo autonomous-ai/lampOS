@@ -3289,3 +3289,11 @@ wait on their owners and a lamp
   seen.
 - #795 green at `1204446bd` (5,553, the Linux worker test included); #1013
   green at `6f9d46ae8` (5,470).
+- **#844 merged** (`7b7000066`, 13:50). First on #795: the route stays off
+  by default; the red breath is for the hardware switch only; asked El
+  whether lamp-06c1 has the slide wired; #1025's asleep-face filter goes
+  in whichever lands second.
+- **#806 decision (12:36), in #1016 `10596b41a`:** the voice's key is the
+  lamp's own device key, written by `install`; setup takes none, the page
+  asks for none, both reset plans keep it. Older `serve.json` files that
+  name a credential are still read. lamp-setup 37 passed.
