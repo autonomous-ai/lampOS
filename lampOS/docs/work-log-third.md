@@ -3280,3 +3280,12 @@ wait on their owners and a lamp
   the ring should show the muted breath for an unreadable switch.
 - **#1013 P2** (`6f9d46ae8`): a write that fails partway is cut back to the
   last whole line; a file that cannot be cut back is not written again.
+- **#993** rebuilt (`13ff8cf91`): it had conflicted since #849 merged, so
+  GitHub ran no ARM64 on the review fixes. **#994** rebuilt (`686d8d5af`).
+- **lamp-06c1's first setup (El):** hotspot 26 s after reboot, Setup to the
+  marker 14 s, back on the office Wi-Fi 22 s later; network lists failed
+  until "Look again" a few times. **#1045**: scan once before the hotspot,
+  warm the list in its first 10 s, answer a refused scan with the last list
+  seen.
+- #795 green at `1204446bd` (5,553, the Linux worker test included); #1013
+  green at `6f9d46ae8` (5,470).
