@@ -4062,6 +4062,23 @@ and #1070, tests and ARM64 running on their new heads)
   is to be set from the session's `speech_level` records, asked for on
   #829.
 
+## 2026-10-16, 16:51 ICT: the owner's session: the flip, the tap, the bare call; #1083 and #1090; reviews fixed on #1030, #1057 and #970
+
+Ready for lamp-voice: yes (#1057, #1069, #1070, #1083: ARM64 green, ready for
+review); no (#1047, a draft until the relay check on lamp-4ace; #1030, #1090,
+#1092, #1100, #1107, #1108, in the merged run now)
+
+- **The owner's live session, four faults, each built at once:**
+  - **#1100:** the eyes flipped the owner between two names, and each flip opened a new session, so the lamp was deaf. Now a different known person counts only once seen 10 s with the one at the lamp unseen.
+  - **#1107:** a head tap's own noise was sent as a short reply, and the model began the story again. Now a short sound just after a Stop is a sound, sent nowhere.
+  - **#1108:** "Lamp," then "Check my work." The request just after a bare call is called.
+  - **Asked for:** the record of the umbrella follow-up held 3 s after an answer (`going_on` false).
+- **#1083** (busy room by day: the name alone needs near or sure) went on lamp-4ace and came off: it held the owner's own calls at the desk. The rises the new journal line gives are to set it.
+- **#1090** (a reply to someone else is theirs): Second's two P2s fixed. A line is to another person only with a question to them, and times, sentence words and "True" are no one's name.
+- **Reviews fixed:** #1030's five (judged once, another voice counts as talk, a supervised child), #1057's six (`gives_a_name`, spelled letters, two names), and #970's three P3s.
+- **#1047:** `lamp-voice stt-check` for the relay, its replies counted by kind, and the stream at the reply's first sound.
+- **Gates:** two merged runs. #1047 with #1057: Audio 161, Eyes 60, Voice 1,622, Voice-eval 521, Memory 208, none failed. The next, with #1030, #1090, #1092, #1100 and #970's fixes, had two test failures, both fixed and running again.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
