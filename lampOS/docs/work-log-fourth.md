@@ -4171,6 +4171,25 @@ no (#1047 and #1158, drafts; #1092, its gate running)
 - **#1201** (new): `duplex::first_words_older_than_the_provider_takes_are_dropped_before_the_commit`, mine from #936, failed with `ClockRegression` on a loaded Mac. Its paced reads were on the host clock while the speaker dispatch gave the turn owner the host's `now()`. It's now on the scenario clock: 27 duplex tests pass, and it passes alone 3 of 3.
 - **Build folders:** the main checkout's was 32 GB, so it was cleaned (35.3 GiB freed). A side folder used for one worktree after another served a stale `lamp-ring`, so each worktree's sources are now touched first. That's in the build-folder memory.
 
+## 2026-10-17, 05:09 ICT: #1057 merged and #1208, #1197's three rounds, #1108's worker test
+
+- **Merged:** #1057 (names, `LAMP_NAMES=checked`) at 03:50.
+- **#1208** (`fourth/names-after`), its follow-up. In it:
+  - The reviewer's three P3s: ordinary yeses agree, the doc comment is back on its own test, and two doc lines say what the check costs.
+  - A name from earlier now needs the lamp's last answer to say it.
+  - The reviewer's small gaps: NFD, the comma below, and "double U".
+- **#1208's review rounds, from Ten and the reviewer:**
+  - 04:20 P2: a no right after a yes took nothing back. Now any no takes a yes back, but in "no problem" and the like.
+  - 04:40 P2: "Yes, but it's Kess." still agreed. Now a yes to the read-back must be plain: only yeses, the name and a few words beside them (`6a9253121`).
+- **#1197** (asker first's follow-up), three review rounds:
+  - 03:20: the asker's soft start over the answer's start was let go. The waited line was then judged on until its last chance.
+  - 04:12: the lamp's leaked voice counted as the line's level. Only blocks the render doesn't explain count now.
+  - 04:50: over the reply's unmatched start nothing can be told. The answer's first block now waits for the line's judgement, at most about 0.26 s (`b47ff573b`).
+  - Each has its test, mutation-checked. Gate: Voice 1,761 passed, none failed.
+- **#1047:** ARM64 is green on the cadence head (5,991 passed). It waits for lamp-4ace.
+- **#1108:** clean on the reviewer's side. The worker's handing of the bare call, which #1108 left unexercised, now has a test on `fourth/after-call-test` (`e5728a0a9`). It fails both ways when the code is taken out, and goes up as its own pull request once #1108 merges.
+- **#1201:** ARM64 is green, and it waits for a review.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
