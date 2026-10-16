@@ -3902,6 +3902,32 @@ Ready for lamp-voice: yes (#891, ARM64 green on the Stop fix); no (#918, a commi
   and a restart I assumed on #829.
 
 
+## 2026-10-16, 07:55 ICT: #936 works on lamp-4ace; #945 opened; #918's last fix under its gate
+
+Ready for lamp-voice: yes (#891, #936); no (#918, a fix under its gate; #945, a draft until ARM64)
+
+- **#936, `LAMP_FIRST_WORDS=kept`** (#828 step 2's first half): the gate
+  passed (one timing test, which passed alone); ARM64 run 38829045821 has
+  5,165 passed. It's marked ready.
+  - **On lamp-4ace** (the first builder, 07:38): the cut-ins yielded 7 of 10
+    and the lamp did the right thing 6 times, against 3 before. "Lamp, stop.
+    What is two plus two?" was heard whole and answered.
+  - It stays on there, and merges after the reviewer.
+- **#945, `lamp-voice stt-check`:** the relay's first-word probe the first
+  builder asked for, handed over with the command for lamp-4ace. A draft
+  until ARM64.
+- **#918:**
+  - pushed at `ad5b684ae` with ARM64 green: the room state, the
+    short-sound reply, and the news at the credited send;
+  - the reviewer's 07:12 finding, the news window used up on every path,
+    is `f2af0d786`, under its gate.
+- **#918, the first builder's 06:15 report:** it comes from `going_on`, not
+  from the new commits. A new speaker within 45 s rides on the
+  conversation; I proposed a speaker check (#865) next.
+- **Call-note** (#782's "Yes?"): rebased onto #891's Stop fix
+  (`5471f7972`), gate after #918's.
+
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
