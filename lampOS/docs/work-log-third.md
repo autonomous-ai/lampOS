@@ -3269,3 +3269,14 @@ wait on their owners and a lamp
   first half. msgs and Voice 1,637 passed.
 - **#1016** for Nine's install: `serve-own-page.json` and
   `reset-plan-product.json` held together by a test.
+- **#795, First's 10:08 crash loop** (missed until 12:4x, answered then):
+  Controls failed to open the privacy line silently and for good (likely
+  the old voice still holding it). `c7203c4c9`: Controls asks again each
+  second and says why; unit lines for lamp-4ace on #795. `1204446bd`: on
+  the Controls route an unreadable switch keeps the voice up and closed,
+  read again each second, never a crash loop; the worker ends cleanly with
+  `privacy switch unreadable:`; the wait's cleanup no longer fails on an
+  already-ended worker (tested against the old code). Asked First whether
+  the ring should show the muted breath for an unreadable switch.
+- **#1013 P2** (`6f9d46ae8`): a write that fails partway is cut back to the
+  last whole line; a file that cannot be cut back is not written again.
