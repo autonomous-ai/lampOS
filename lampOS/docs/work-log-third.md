@@ -3246,3 +3246,13 @@ wait on their owners and a lamp
   one JSON line per log with its bus identity, a new file each start, 2 MiB
   files and the newest 10, losses counted, synced at most once a second.
   Off; the unit and folder are #737's. Bus and msgs 197 passed.
+- **#994 review** (`e589efe95`): P2, an oversized moves folder (over 64
+  moves or 1,024 entries) is refused whole without reading on; P3, the
+  example lasts 1.5 s, tested from the doc line itself. Body 305 passed.
+- **lamp-06c1 bring-up (El):** answered setup's two files on #705 (own
+  page, credential matching `provider.json`, the reset plan's stop).
+  **#1016**: `reset-plan-product.json`, the plan for an install lamp with
+  no keeper, stopping `lampos.target`; tested equal to the example but
+  for `stop`.
+- #844 green at `db7d65846` (5,409) for First to merge; #795 green at
+  `5bdde2e3a` (5,475).
