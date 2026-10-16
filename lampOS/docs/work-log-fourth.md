@@ -4079,6 +4079,21 @@ review); no (#1047, a draft until the relay check on lamp-4ace; #1030, #1090,
 - **#1047:** `lamp-voice stt-check` for the relay, its replies counted by kind, and the stream at the reply's first sound.
 - **Gates:** two merged runs. #1047 with #1057: Audio 161, Eyes 60, Voice 1,622, Voice-eval 521, Memory 208, none failed. The next, with #1030, #1090, #1092, #1100 and #970's fixes, had two test failures, both fixed and running again.
 
+## 2026-10-16, 18:01 ICT: heard-always finalizes at pauses; every verdict in the journal; twelve ready
+
+Ready for lamp-voice: yes (#970, #1030, #1057, #1069, #1070, #1083, #1090,
+#1092, #1100, #1107, #1108, #1126: gate and ARM64 green on each head,
+waiting for review); no (#1047, a draft until "Stop." is played over a story
+on lamp-4ace with `7607b2a0f`)
+
+- **#1047:** the first builder's `stt-check` on lamp-4ace showed that through the relay a short "Stop." gets no interim result, only words from `Finalize`, 269 ms after its audio. heard-always never finalized during a reply: 33 replies with sound, 0 results.
+  - Now 200 ms with nothing speech-like after speech asks the stream for its words and keeps it open (`SttStream::flush`).
+  - Rebased onto #970's new head. Gate: Audio 161, Voice 1,590, Voice-eval 521, Memory 208. Two load failures passed alone 3 of 3. ARM64 passed 5,647.
+- **#1126:** an answer to colleagues' Vietnamese played with no verdict line (17:21). Most played verdicts weren't logged, and output for a request not in hand is never judged. Every verdict now says why, and such output says it wasn't judged.
+- **#1083:** the near rule's played line gives the rise, for the first builder's table (request 169 at 17:08).
+- **Merged runs:** seven heads together (Voice 1,637, none failed), then #1126 with #1083 (Voice 1,620, none failed).
+- **Waiting:** telling the model a Stop happened (#1107's other half), after #1030 merges; the umbrella follow-up's record; the rises to bring #1083 back.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
