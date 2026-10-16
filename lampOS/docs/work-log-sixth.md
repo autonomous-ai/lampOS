@@ -5,6 +5,19 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-16 — #892 startup link loss — merged
+
+Ready for lamp-voice: yes (#923, merged 08:39 as `cc1c06dcc`)
+
+- A held line given to Gemini at its first Ready goes two commands a
+  tick; the startup hold is derived from Gemini's audio age bound (1.9 s).
+  With a second route configured (`--wait-for-room`), Gemini's worker
+  offers input, and a cancellation's End, only when its queue has room
+  (the reviewer's two P2s and P3). Without one, nothing changes.
+- On lamp-52e6 (lent by fifth): 4 of 4 restarts held 1.2–1.3 s, then
+  answered by Gemini, first sound 1.5–1.9 s, no link loss; the first
+  builder saw 4 of 4 at 1.1–1.4 s on lamp-4ace.
+
 ## 2026-10-16 — #890 second route tests deterministic — merged
 
 Ready for lamp-voice: yes (#944, merged 08:26)
