@@ -3358,3 +3358,9 @@ wait on their owners and a lamp
   pull-up and a released second, `hand: reset` lines; El told to drop the
   head-tap step. Open for the first builder: should a turn's face show a
   skill's light (the seventh's question)?
+- **2026-10-17 01:56:** #1138 merged; #1177 (its doc P3s) ready. #1176: Nine clean,
+  green, ready (Nine's update-test P3 follows once it merges). **#1182**,
+  the P1 #1178 item 3: the ring worker holds dark through a lapsed or late
+  authority instead of ending; the chain that ended the voice at 00:00:06 was
+  the worker's exit, then an unverified ring cleanup. #1166: El approved;
+  her doc P3 in. Told El on #806 her setup steps match the code.
