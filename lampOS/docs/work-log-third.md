@@ -3198,3 +3198,13 @@ wait on their owners and a lamp
   corrected, fixtures publish loosest limit first. **#845** description
   refreshed; First will ask the owner at 11:00 for a lamp to wipe for its
   acceptance.
+- **#933 (today's target), #955:** the lamp's head barely moved while it
+  spoke: the only speaking clip was under a degree. New optional catalogue
+  section `speaking` (in `alive-behaviours.json`): a ~2° nod on a stressed
+  word, a ~1.4° sway to the other side after each sentence pause, a soft
+  settle at the end. Expression 238 passed. For First to play before 11:00.
+- **Review fixes:** #849 (tap window 2 s everywhere; head bus on its own
+  thread; flood test cleanup), #795 (muted ring's lease on its own thread).
+  #844 rebased onto `69bae3831` for First's `--zone system` check before
+  10:30; #849 and #795 rebuilt onto the same base. #928 (Schedule stop)
+  green, First's to merge.
