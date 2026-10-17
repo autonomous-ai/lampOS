@@ -3399,3 +3399,16 @@ wait on their owners and a lamp
   failed join, and frees the ring before the marker; on for the product
   through `serve-own-page.json`'s `light`. Waits on ARM64, review and a lamp
   check. `cargo clean` run after each.
+- **2026-10-17 23:10:** merged: **#1316** (warmer/cooler) and **#1343** (white
+  and warm are colours: 10 of 11 on lamp-4ace, the "cooler" miss the model's);
+  **#1325** (setup's breathing ring light: white, blue, amber, freed before the
+  marker) with **#1336**, **#1341**, **#1348** and **#1358** (a stop ends it
+  black and clean, tested through `start_unless_stopped`); **#1380** (#820: a
+  home lamp keeps the person's zone: memory and Expression on `--zone system`,
+  setup and install write `zone.env`) and **#1391** / **#1405** (third-P1,
+  #1384: skills on `--zone system`, quiet hours across summer time). Peer
+  reviews: #1354, #1401, #1402. Drafts for Sunday's tries: **#1362** (head
+  touch on in the product; the sheet on #711) and **#1365** (the product's
+  catalogue speaks, after #1067; #933). Missed the first builder's 15:48 and
+  17:37 asks until 18:20, both done by 18:32. PR bodies now carry no
+  attribution (joining.md). `cargo clean` after each.
