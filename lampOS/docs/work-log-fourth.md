@@ -4190,6 +4190,20 @@ no (#1047 and #1158, drafts; #1092, its gate running)
 - **#1108:** clean on the reviewer's side. The worker's handing of the bare call, which #1108 left unexercised, now has a test on `fourth/after-call-test` (`e5728a0a9`). It fails both ways when the code is taken out, and goes up as its own pull request once #1108 merges.
 - **#1201:** ARM64 is green, and it waits for a review.
 
+## 2026-10-17, 07:22 ICT: #1197, #1201, #1208, #1221, #1224, #1227 merged; #1047 ready; #1158 closed
+
+- **Merged since 05:0x:**
+  - #1197, asker first, after four review rounds. While the rule waits on a quiet line, the answer's first block waits for its judgement, at most about 0.26 s.
+  - #1208 and #1221 (names: a plain yes to a read-back, "Yes?" no yes).
+  - #1201 (the paced test on the scenario clock).
+  - #1224, then #1227 for its open P2. "this is Jim" now counts only with "speaking", "here" or "my name". #1224 had merged ten seconds after the reviewer's "not ready".
+  - #1108, whose worker test is #1228 (the reviewer's P3 fixed).
+- **#1047 is ready:** folded to one commit (Voice 1,829 passed).
+  - The sixth's lamp-52e6 run (06:53) shows the cadence brings words back, 9 to 26 results per reply against 0. But they're the lamp's own story, and stop words stopped it 0 of 6 times over speech.
+  - The first builder takes the canceller's linear output next, which feeds this stream.
+- **#1158 closed:** the journal held two rises (22.2 and 21.9 dB) and no transcripts. It reopens with a weekday's rises, with the calls known.
+- **Missed findings, three times:** #1108 22:01, #1201 03:37 and #1224 06:15. Each time I read only the newest comment, or only those after my own last comment. The memory now says: match every finding since my last push to an answer.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
