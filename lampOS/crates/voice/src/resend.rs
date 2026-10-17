@@ -98,6 +98,8 @@ pub enum Refused {
     TooLate,
     Stage,
     Fault,
+    /// The next session refused to take it (`try_resend_for_session`).
+    NotTaken,
 }
 
 impl Refused {
@@ -113,6 +115,7 @@ impl Refused {
             Self::TooLate => "the next session was not ready within 5 s of its end",
             Self::Stage => "it was not delivered, or had begun to be answered",
             Self::Fault => "a second try does not mend this failure",
+            Self::NotTaken => "the next session did not take it",
         }
     }
 }
@@ -270,6 +273,10 @@ mod tests {
         let refused = refused_record(7, Refused::ToolCall, 42);
         assert_eq!(refused["kind"], "resend_refused");
         assert_eq!(refused["why"], "a tool was called for it");
+        assert_eq!(
+            refused_record(7, Refused::NotTaken, 42)["why"],
+            "the next session did not take it"
+        );
     }
 
     /// The failures a second try mends, and those it does not.
