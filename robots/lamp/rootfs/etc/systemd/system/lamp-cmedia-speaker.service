@@ -1,7 +1,7 @@
 [Unit]
 Description=Pin the C-Media hardware speaker level and create the softvol "Speaker" control before HAL restores volume
-# See the device_speaker block in /etc/asound.conf. Pulled in by udev when the
-# C-Media card appears (99-lamp-device.rules); ordered before hal.
+# See the device_speaker block in /etc/asound.conf. Pulled in by udev each time the
+# C-Media card appears or comes back (99-lamp-device.rules); ordered before hal.
 Before=hal.service
 ConditionPathExists=/etc/asound.conf
 
@@ -9,5 +9,9 @@ ConditionPathExists=/etc/asound.conf
 Type=oneshot
 # Standard profile: step 9 = -28 dB, 3 dB above the previous step 6.
 ExecStart=/usr/bin/amixer -q -c device_cmedia sset Speaker 9
-ExecStart=/bin/sh -c 'head -c 64 /dev/zero | aplay -q -D device_speaker -t raw -f S16_LE -c 2 -r 16000 -'
-RemainAfterExit=yes
+# Creates the softvol control on first use. "-": after the card comes back the voice may already hold the
+# speaker, and a failed open must not fail the unit (the control exists by then, or the voice's open makes it).
+ExecStart=-/bin/sh -c 'head -c 64 /dev/zero | aplay -q -D device_speaker -t raw -f S16_LE -c 2 -r 16000 -'
+# Not kept active once run: a card that drops off USB comes back at its own default level (lamp-4ace,
+# 17 Oct 18:15, step 17 = -20 dB), and udev's SYSTEMD_WANTS on its return starts only an inactive unit.
+RemainAfterExit=no

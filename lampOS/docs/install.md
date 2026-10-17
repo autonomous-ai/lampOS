@@ -589,11 +589,16 @@ lamp-update check-units --cat units.txt --product lampOS/deploy/product
 - `lamp-cmedia-speaker.service` (the speaker's level, from V1) is the
   image's, not the product's: `robots/lamp/rootfs/etc/systemd/system/`, at
   step 9 (−28 dB), with the `pro` override at step 6 (−31 dB). udev starts it
-  when the C-Media card appears (`99-lamp-device.rules`). It sets the card's
+  when the C-Media card appears (`99-lamp-device.rules`), and again each time
+  the card comes back after a USB drop (`RemainAfterExit=no`), since the card
+  returns at its own louder default. It sets the card's
   hardware level and creates `/etc/asound.conf`'s softvol "Speaker"
   control. `install` sets no level of its own. The product's voice unit is
   ordered after it, without wanting it (El on #705, 17 Oct). On lamp-06c1
-  it is byte for byte the image's.
+  it was byte for byte the image's before #1370. Not run on a lamp: when the
+  card comes back, the unit's `aplay` holds the speaker for a moment, so a
+  voice reopening the speaker after its `Broken pipe` in that window may be
+  refused once (#1370); watch for it in the lamp run.
 - Which group may read the GPIO chips and the I²C bus on the base image was
   not checked.
 - `lamp-surround` was not read beyond its unit, and `lamp-records` has two
