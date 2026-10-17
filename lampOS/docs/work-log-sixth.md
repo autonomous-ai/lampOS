@@ -15,9 +15,15 @@ every result on a lamp below names it. Newest first.
   is also the lamp's own renewal (`renew_when_idle`). On lamp-52e6 since
   17:15 all 5 were renewals after 8 unanswered requests, and lamp-4ace
   since 17:17 agrees.
-- #1388 (open, reviewed): the first session is for whom the eyes name as
+- #1388 merged at 23:15: the first session is for whom the eyes name as
   the voice starts. The 4 go-aways 0 s after a start on lamp-52e6 on
-  15 October were that session renewed for them.
+  15 October were that session renewed for them. Tonight's lamp-4ace soak
+  checks it: no go-away within 2 s of a session opening.
+- #1407 merged at 23:18: a `transport` failure says its cause by kind
+  (io reset, TLS, protocol, HTTP status), never the URL. Until now nothing
+  told the drops apart, and lamp-52e6's journal keeps only about 5 hours.
+  Their timing (clusters 20 s apart, 19 of 48 before any ready) reads as
+  the network's.
 - #1400 merged at 22:32: a renewal waits for a request awaiting its
   response, and for the line kept behind it, pinned as a test. lamp-52e6's
   26 go-aways with a turn open cut no line.
