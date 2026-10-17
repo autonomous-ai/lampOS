@@ -49,7 +49,7 @@ routes are not served. Each kind is carried out by the part that owns it.
 | `cmd` / `kind` | Answer |
 |---|---|
 | `info` | the identity fields above |
-| `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`build`, `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name and gateway; the host's name, device id, uptime and zone |
+| `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime and zone |
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
 | `mic.get` | `{"muted", "hw_switch_muted", "available"}`: the voice's own mute (`voice/mute`), the privacy switch (`voice/privacy`, `null` while unknown) and whether the voice is running |
 | `lamp.health` | `lamp/health`'s `level` and `message`, and `stale` |
