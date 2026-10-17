@@ -57,6 +57,9 @@ lamp-expression = { path = "../expression" }
 # What decides progress news (`tests/progress_news.rs`): tested against,
 # never linked.
 lamp-policy = { path = "../policy" }
+# The tasks part the news is told back to (`tests/news_told.rs`, #1390):
+# tested against, never linked.
+lamp-tasks = { path = "../tasks" }
 # Paused runtime clock, as `lamp-gemini`'s: speech to text's wait for its
 # last words measured without the wait.
 tokio = { version = "=1.53.1", features = ["test-util"] }

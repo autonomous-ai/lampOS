@@ -560,6 +560,9 @@ struct Reply {
     /// The Stop this request tells the model of, if it does: given back if
     /// it is thrown out before its End goes (`not_speech::StopToTell`).
     told_stop: Option<(u64, u64)>,
+    /// The news this turn tells (its key, and those told with it): handed
+    /// to the tasks part only once the turn is heard whole (#1390).
+    news: Vec<String>,
 }
 impl Reply {
     fn settled(&self, speaker_pending: &Option<PendingSpeaker>) -> bool {
@@ -572,18 +575,47 @@ impl Reply {
             && self.notice.settled()
     }
 
-    fn complete_reminder(&mut self, speaker_pending: &Option<PendingSpeaker>, snapshot: Snapshot) {
-        if self.settled(speaker_pending)
+    /// Whether this turn, as it ends, was the model's and heard whole:
+    /// settled and complete, its audio played with no gap, nobody else
+    /// owning the turn, and the mic allowed.
+    fn heard_whole(&self, speaker_pending: &Option<PendingSpeaker>, snapshot: Snapshot) -> bool {
+        self.settled(speaker_pending)
             && snapshot.owner().is_none()
             && snapshot.microphone_permission() == Permission::Allowed
             && matches!(self.cloud.outcome, Some(RequestOutcome::Complete))
             && self.had_audio
             && self.playback_gaps == 0
             && self.notice.origin() == SpeechOrigin::Provider
+    }
+
+    fn complete_reminder(&mut self, speaker_pending: &Option<PendingSpeaker>, snapshot: Snapshot) {
+        if self.heard_whole(speaker_pending, snapshot)
             && let Some(reminder) = &mut self.reminder
         {
             reminder.completed();
         }
+    }
+
+    /// The news this turn told, as it ends: all of it when the turn was
+    /// heard whole ([`Self::heard_whole`], the proof a say's `spoken`
+    /// takes), and none otherwise, so its harness stays open. A Stop, a
+    /// reply cut off or with no audio, or a muted mic is no news heard (the
+    /// reviewer on #1425).
+    fn heard_news(
+        &mut self,
+        speaker_pending: &Option<PendingSpeaker>,
+        snapshot: Snapshot,
+    ) -> Vec<String> {
+        let news = std::mem::take(&mut self.news);
+        if news.is_empty() || self.heard_whole(speaker_pending, snapshot) {
+            return news;
+        }
+        eprintln!(
+            "lamp-voice: the news ({}) was not heard whole ({}): its harness stays open",
+            news.join(", "),
+            self.delivery_outcome()
+        );
+        Vec::new()
     }
 
     /// A say this turn was ([`crate::say`]) is answered as it ends:
@@ -599,14 +631,7 @@ impl Reply {
             && self.settled(speaker_pending)
             && self.notice.retired()
             && self.playback_gaps == 0;
-        let spoken = sound
-            || self.settled(speaker_pending)
-                && snapshot.owner().is_none()
-                && snapshot.microphone_permission() == Permission::Allowed
-                && matches!(self.cloud.outcome, Some(RequestOutcome::Complete))
-                && self.had_audio
-                && self.playback_gaps == 0
-                && self.notice.origin() == SpeechOrigin::Provider;
+        let spoken = sound || self.heard_whole(speaker_pending, snapshot);
         say.answer(if spoken {
             crate::say::Outcome::Spoken
         } else {
@@ -6236,6 +6261,12 @@ fn conversation_with_gate(
             last_publish = monotonic_us();
             current.complete_reminder(&speaker_pending, snapshot);
             current.answer_say(&speaker_pending, snapshot);
+            let heard = current.heard_news(&speaker_pending, snapshot);
+            if !heard.is_empty()
+                && let Some(news) = task_news.as_ref()
+            {
+                news.heard(heard);
+            }
             record(
                 trace,
                 json!({"kind":"turn_finished","turn":turn,"generation":current.owner.generation(),"at_us":monotonic_us(),"outcome":current.delivery_outcome(),"playback_gaps":current.playback_gaps,
@@ -7228,6 +7259,7 @@ fn conversation_with_gate(
             )?;
             last_publish = monotonic_us();
             begun_for(ticket, reply);
+            news_on(told, reply);
         }
         service_optional_ring(rig, &mut choreography, owner, trace, &mut ring_trace)?;
         if clock.saturating_sub(last_health) >= 50_000 {
@@ -7929,6 +7961,14 @@ fn news_for_skill(
     )
 }
 
+/// The news this turn tells, its own key and those told with it, put on the
+/// turn: handed to the tasks part only once it is heard whole (#1390).
+fn news_on(told: crate::task_news::News, reply: &mut Option<Reply>) {
+    if let Some(current) = reply.as_mut() {
+        current.news = std::iter::once(told.key).chain(told.also).collect();
+    }
+}
+
 /// A skill asked for what this turn says: it is begun, and is answered as
 /// the turn ends, on the proof a reminder's acknowledgement takes.
 fn begun_for(ticket: Option<crate::say::Ticket>, reply: &mut Option<Reply>) {
@@ -8285,6 +8325,7 @@ fn commit_written_turn(
         local_only: None,
         reminder: None,
         say: None,
+        news: Vec::new(),
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -8416,6 +8457,7 @@ fn commit_admitted_input(
         local_only: None,
         reminder: None,
         say: None,
+        news: Vec::new(),
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -8518,6 +8560,7 @@ fn commit_offline_input(
         }),
         reminder: None,
         say: None,
+        news: Vec::new(),
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -8679,6 +8722,7 @@ fn commit_back_online(
         }),
         reminder: None,
         say: None,
+        news: Vec::new(),
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -8765,6 +8809,7 @@ fn continue_after_early_end(
         local_only: None,
         reminder: None,
         say: None,
+        news: Vec::new(),
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),
@@ -9301,6 +9346,12 @@ fn record_cancelled_reply(
     let mut current = current;
     if let Some(say) = current.say.take() {
         say.answer(crate::say::Outcome::Dropped(reason.to_owned()));
+    }
+    if !current.news.is_empty() {
+        eprintln!(
+            "lamp-voice: the news ({}) was cut short ({reason}): its harness stays open",
+            current.news.join(", ")
+        );
     }
     finish_duplex_yield(trace, cancelled_at_us, reason, None, None)?;
     trace
@@ -10292,6 +10343,7 @@ mod tests {
                 local_only: None,
                 reminder: None,
                 say: None,
+                news: Vec::new(),
                 last_provider_audio_at_us: None,
                 start: StartGate::new(0),
                 need: StartNeed::default(),
@@ -11156,6 +11208,7 @@ mod tests {
             local_only: None,
             reminder: None,
             say: None,
+            news: Vec::new(),
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
             need: StartNeed::default(),
@@ -11441,6 +11494,7 @@ mod tests {
             local_only: None,
             reminder: None,
             say: None,
+            news: Vec::new(),
             last_provider_audio_at_us: None,
             start: StartGate::new(0),
             need: StartNeed::default(),

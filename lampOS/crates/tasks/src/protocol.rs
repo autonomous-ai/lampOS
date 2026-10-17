@@ -74,6 +74,15 @@ pub enum Request {
         session_id: String,
         played: bool,
     },
+    /// The voice told this observation's news (#1390): the model said it in
+    /// its own words, so no exact text is claimed. Its harness may then be
+    /// closed (`serve --close-told`).
+    Told {
+        guard: Guard,
+        id: u64,
+        observation_id: u64,
+        session_id: String,
+    },
 }
 
 const fn page_size() -> u16 {
@@ -95,7 +104,8 @@ impl Request {
             | Self::Cancel { guard, .. }
             | Self::Observe { guard, .. }
             | Self::ClaimSpeech { guard, .. }
-            | Self::AckSpeech { guard, .. } => Some(guard),
+            | Self::AckSpeech { guard, .. }
+            | Self::Told { guard, .. } => Some(guard),
             _ => None,
         }
     }
@@ -103,7 +113,10 @@ impl Request {
     pub fn trusted(&self) -> bool {
         matches!(
             self,
-            Self::Confirm { .. } | Self::ClaimSpeech { .. } | Self::AckSpeech { .. }
+            Self::Confirm { .. }
+                | Self::ClaimSpeech { .. }
+                | Self::AckSpeech { .. }
+                | Self::Told { .. }
         )
     }
 
@@ -111,7 +124,8 @@ impl Request {
         match self {
             Self::Confirm { session_id, .. }
             | Self::ClaimSpeech { session_id, .. }
-            | Self::AckSpeech { session_id, .. } => Some(session_id),
+            | Self::AckSpeech { session_id, .. }
+            | Self::Told { session_id, .. } => Some(session_id),
             _ => None,
         }
     }
@@ -130,6 +144,7 @@ impl Request {
             Self::Observe { .. } => "observe",
             Self::ClaimSpeech { .. } => "claim_speech",
             Self::AckSpeech { .. } => "ack_speech",
+            Self::Told { .. } => "told",
         }
     }
 }
