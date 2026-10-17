@@ -5,6 +5,23 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-17 — evening: #828 confounded, go-aways are the lamp's own
+
+- #828: the release ran without the second voice and every newer build
+  with it. The fair rerun (release with and without the second config on
+  lamp-52e6) gave 10 of 10 and 6 of 10, so the spread on one lamp is as big
+  as the gaps. No code regression is claimed from 52e6.
+- Go-aways (the first builder's task): `server_go_away` in the link events
+  is also the lamp's own renewal (`renew_when_idle`). On lamp-52e6 since
+  17:15 all 5 were renewals after 8 unanswered requests, and lamp-4ace
+  since 17:17 agrees.
+- #1388 (open, reviewed): the first session is for whom the eyes name as
+  the voice starts. The 4 go-aways 0 s after a start on lamp-52e6 on
+  15 October were that session renewed for them.
+- #1400 merged at 22:32: a renewal waits for a request awaiting its
+  response, and for the line kept behind it, pinned as a test. lamp-52e6's
+  26 go-aways with a turn open cut no line.
+
 ## 2026-10-17 — midday: #828's yields fell, maybe our code
 
 - #1264 (Second's listening gaps) on lamp-52e6: 0 self-yields in five
