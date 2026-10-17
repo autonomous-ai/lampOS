@@ -8,7 +8,7 @@
 //!
 //! [`health`] is the whole of the rule and touches nothing: the reports,
 //! the time and what is expected go in, and a `Health` comes out.
-use lamp_msgs::{Diagnostic, Health, HealthItem, Level, Online, SelfTest, Verdict};
+use lamp_msgs::{Diagnostic, Health, HealthItem, Level, Occasion, Online, SelfTest, Verdict};
 use std::{
     collections::BTreeMap,
     time::{Duration, Instant},
@@ -241,9 +241,13 @@ pub struct SelfTests {
     /// When the newest run began (the wall clock's seconds), and how many
     /// of its parts it could not check.
     newest: Option<(f64, usize)>,
-    /// The parts whose last checked verdict was a fail, and why, in the
-    /// order they first failed.
-    failed: Vec<(String, String)>,
+    /// The parts whose last checked verdict was a fail, why, and the
+    /// self-test build and occasion that said so, in the order they first
+    /// failed.
+    failed: Vec<(String, String, Option<String>, Occasion)>,
+    /// Fails an older self-test build gave that a newer one could not check
+    /// (#1399): a warning, not "not well", until a run checks the part.
+    before: Vec<(String, String)>,
     /// The newest run's line for the lamp's USB hub dropping (its
     /// `voice_mic` part's `usb_hub_said`), until a run says it never did:
     /// a warning, since the lamp works once the hub is back, but the voice,
@@ -258,18 +262,61 @@ pub struct SelfTests {
 impl SelfTests {
     /// Take a whole run (one that passed `SelfTest::check`).
     pub fn take(&mut self, test: &SelfTest) {
+        // A fail kept from another build (or a run that names none) that this
+        // run could not check, or left out, is the older rule's (#1399): the
+        // lamp at 23:53 on 17 Oct said "not well" for a storage fail the new
+        // rule no longer gives. It is kept as a warning, never dropped: the
+        // old fault may have been real.
+        // Two runs that name no build are the same, as before; no build
+        // against one is not (a run from before the field, then one after).
+        let same = |build: &Option<String>| *build == test.build;
+        let checked = |name: &str| {
+            test.parts
+                .iter()
+                .any(|part| part.part == name && part.verdict != Verdict::NotChecked)
+        };
+        // A passive run never checks the speaker, the ring's colours or the
+        // head move, so it never demotes a fail an active run gave, whatever
+        // its build (the eighth on #1426: every update changes the build).
+        let passive_over_active = |occasion: &Occasion| {
+            test.occasion == Occasion::FirstBoot && *occasion != Occasion::FirstBoot
+        };
+        let (kept, older): (Vec<_>, Vec<_>) = std::mem::take(&mut self.failed)
+            .into_iter()
+            .partition(|(name, _, build, occasion)| {
+                same(build) || checked(name) || passive_over_active(occasion)
+            });
+        self.failed = kept;
+        for (name, reason, _, _) in older {
+            self.before.retain(|(kept, _)| *kept != name);
+            if self.before.len() < MOST_PARTS {
+                self.before.push((name, reason));
+            }
+        }
         for part in &test.parts {
             match part.verdict {
                 Verdict::Fail => {
-                    if let Some(kept) = self.failed.iter_mut().find(|(name, _)| *name == part.part)
+                    self.before.retain(|(name, _)| *name != part.part);
+                    if let Some(kept) = self
+                        .failed
+                        .iter_mut()
+                        .find(|(name, _, _, _)| *name == part.part)
                     {
                         kept.1.clone_from(&part.reason);
+                        kept.2.clone_from(&test.build);
+                        kept.3 = test.occasion;
                     } else if self.failed.len() < MOST_PARTS {
-                        self.failed.push((part.part.clone(), part.reason.clone()));
+                        self.failed.push((
+                            part.part.clone(),
+                            part.reason.clone(),
+                            test.build.clone(),
+                            test.occasion,
+                        ));
                     }
                 }
                 Verdict::Pass | Verdict::NotFitted => {
-                    self.failed.retain(|(name, _)| *name != part.part);
+                    self.failed.retain(|(name, _, _, _)| *name != part.part);
+                    self.before.retain(|(name, _)| *name != part.part);
                 }
                 Verdict::NotChecked => {}
             }
@@ -299,10 +346,23 @@ impl SelfTests {
     /// (`now_unix_s`, the wall clock's seconds); it is never stale.
     pub fn item(&self, now_unix_s: f64) -> Option<HealthItem> {
         let (started, unchecked) = self.newest?;
+        let before = (!self.before.is_empty()).then(|| {
+            let parts: Vec<String> = self
+                .before
+                .iter()
+                .map(|(part, reason)| format!("{} ({reason})", part_known_as(part)))
+                .collect();
+            format!(
+                "a fault seen before this update, which this self-test could not check: {}",
+                parts.join(", ")
+            )
+        });
         let (level, message) = if self.failed.is_empty() {
-            match &self.hub {
-                Some(hub) => (Level::Warn, hub.clone()),
-                None => {
+            match (&self.hub, before) {
+                (Some(hub), Some(before)) => (Level::Warn, format!("{hub}; {before}")),
+                (Some(hub), None) => (Level::Warn, hub.clone()),
+                (None, Some(before)) => (Level::Warn, before),
+                (None, None) => {
                     let message = match unchecked {
                         0 => "passed".to_owned(),
                         n => format!("passed; {n} not checked"),
@@ -314,7 +374,7 @@ impl SelfTests {
             let failed: Vec<String> = self
                 .failed
                 .iter()
-                .map(|(part, reason)| format!("{} ({reason})", part_known_as(part)))
+                .map(|(part, reason, _, _)| format!("{} ({reason})", part_known_as(part)))
                 .collect();
             let parts = if failed.len() == 1 { "part" } else { "parts" };
             let mut message = format!("{} {parts} failing: {}", failed.len(), failed.join(", "));
@@ -334,6 +394,11 @@ impl SelfTests {
                     });
                     format!("{short}; {message}")
                 };
+            }
+            // After the failed parts, so nothing is hidden: the line's cap
+            // cuts its end first (the eighth on #1426).
+            if let Some(before) = before {
+                message = format!("{message}; {before}");
             }
             (Level::Error, message)
         };
@@ -564,6 +629,7 @@ mod tests {
             took: 2.0,
             verdict: SelfTest::verdict_of(&parts),
             parts,
+            build: None,
         }
     }
 
@@ -784,6 +850,137 @@ mod tests {
         ));
         let item = tests.item(300.0).unwrap();
         assert_eq!((item.level, item.message.as_str()), (Level::Ok, "passed"));
+    }
+
+    /// #1399 (lamp-4ace, 17 Oct 23:27 and 23:53): a fail an older self-test
+    /// build gave stands as `error` only while the same build cannot check
+    /// it. A newer build that cannot check it, or leaves it out, keeps it as
+    /// a warning saying so, never dropped; a run that checks it settles it.
+    #[test]
+    fn a_fail_from_an_older_self_test_that_a_newer_one_cannot_check_is_a_warning() {
+        let built = |parts: &[(&str, Verdict, &str)], started: f64, build: Option<&str>| {
+            let mut test = run(parts, started);
+            test.build = build.map(str::to_owned);
+            test
+        };
+        let retuned = "the SD/MMC host re-tuned and timed out 8 times since boot (#784)";
+        // Tonight: the old rule's fail (a run from before the field), then
+        // the new build's not_checked.
+        let mut tests = SelfTests::default();
+        tests.take(&built(&[("storage", Verdict::Fail, retuned)], 0.0, None));
+        assert_eq!(tests.item(1.0).unwrap().level, Level::Error);
+        tests.take(&built(
+            &[(
+                "storage",
+                Verdict::NotChecked,
+                "the log no longer holds this boot",
+            )],
+            100.0,
+            Some("88f83dd8c"),
+        ));
+        let item = tests.item(100.0).unwrap();
+        assert_eq!(item.level, Level::Warn, "{item:?}");
+        assert_eq!(
+            item.message,
+            format!(
+                "a fault seen before this update, which this self-test could not check: the SD card ({retuned})"
+            )
+        );
+        // A run of that build that checks it settles it, either way.
+        let mut passing = SelfTests::default();
+        passing.take(&built(
+            &[("storage", Verdict::Fail, retuned)],
+            0.0,
+            Some("old"),
+        ));
+        passing.take(&built(&[("ring", Verdict::Pass, "")], 50.0, Some("new")));
+        assert_eq!(passing.item(50.0).unwrap().level, Level::Warn, "left out");
+        passing.take(&built(
+            &[("storage", Verdict::Pass, "")],
+            100.0,
+            Some("new"),
+        ));
+        assert_eq!(passing.item(100.0).unwrap().message, "passed");
+        let mut failing = SelfTests::default();
+        failing.take(&built(
+            &[("storage", Verdict::Fail, retuned)],
+            0.0,
+            Some("old"),
+        ));
+        failing.take(&built(
+            &[("storage", Verdict::NotChecked, "no log")],
+            50.0,
+            Some("new"),
+        ));
+        failing.take(&built(
+            &[("storage", Verdict::Fail, "1 I/O error")],
+            100.0,
+            Some("new"),
+        ));
+        let item = failing.item(100.0).unwrap();
+        assert_eq!(
+            (item.level, item.message.as_str()),
+            (Level::Error, "1 part failing: the SD card (1 I/O error)")
+        );
+        // The eighth on #1426: a passive run (the 6-hourly timer) never
+        // checks the speaker, so after an update it does not demote an
+        // active run's speaker fail; another active run that cannot check it
+        // still does.
+        let active = |parts: &[(&str, Verdict, &str)], started: f64, build: &str| {
+            let mut test = built(parts, started, Some(build));
+            test.occasion = lamp_msgs::Occasion::OnDemand;
+            test
+        };
+        let mut speaker = SelfTests::default();
+        speaker.take(&active(
+            &[("speaker", Verdict::Fail, "no sound heard")],
+            0.0,
+            "a",
+        ));
+        speaker.take(&built(
+            &[("speaker", Verdict::NotChecked, "not at first boot")],
+            50.0,
+            Some("b"),
+        ));
+        assert_eq!(
+            speaker.item(50.0).unwrap().level,
+            Level::Error,
+            "passive after update"
+        );
+        speaker.take(&active(
+            &[("speaker", Verdict::NotChecked, "too loud")],
+            100.0,
+            "b",
+        ));
+        assert_eq!(
+            speaker.item(100.0).unwrap().level,
+            Level::Warn,
+            "active after update"
+        );
+        // Beside a part failing now, the older fault is still named, after it.
+        speaker.take(&active(&[("air", Verdict::Fail, "no answer")], 150.0, "b"));
+        let item = speaker.item(150.0).unwrap();
+        assert_eq!(item.level, Level::Error);
+        assert!(
+            item.message.starts_with(
+                "1 part failing: the air sensor (no answer); a fault seen before this update"
+            ),
+            "{}",
+            item.message
+        );
+        // The same build that could not check it keeps it failed (#1243).
+        let mut same = SelfTests::default();
+        same.take(&built(
+            &[("storage", Verdict::Fail, retuned)],
+            0.0,
+            Some("one"),
+        ));
+        same.take(&built(
+            &[("storage", Verdict::NotChecked, "no CAP_SYSLOG")],
+            50.0,
+            Some("one"),
+        ));
+        assert_eq!(same.item(50.0).unwrap().level, Level::Error);
     }
 
     /// A failed run makes a well lamp `error`, with the item first and the

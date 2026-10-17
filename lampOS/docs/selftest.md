@@ -11,9 +11,11 @@ the lamp.
 
 - `lamp/selftest`, type `lamp_msgs/SelfTest` (`crates/msgs/src/selftest.rs`),
   kind latest, published once at the end of a run: the occasion, when it
-  started, how long it took, every part's result in the order it ran, and
-  the run's verdict.
-- `/var/lib/lampOS/selftest/<started>.json` for each run, the newest 20
+  started, how long it took, every part's result in the order it ran, the
+  run's verdict, and its `build`: the program's folder under
+  `/opt/lampOS/selftest/` as installed (`build_of`), absent when run from
+  anywhere else, so `lamp-health` can tell an older rule's fail (#1399).
+- `/var/lib/lamp-selftest/<started>.json` (`--dir`, both units) for each run, the newest 20
   kept, with `latest.json` and `latest.txt` (one line a part) beside them.
   Each file is written whole and renamed, so a power cut leaves no half
   report.
@@ -37,7 +39,9 @@ part as stale until it restarts (`crates/health/src/parts.rs`). Instead
 `lamp-health` reads `lamp/selftest` and carries the runs as one item of
 `lamp/health`: `error` naming each part that failed and why, until a later
 run checks that part and it passes; a run that could not check it leaves the
-fail (#812; [health.md](health.md#the-self-tests-run)). A reboot forgets it.
+fail (#812; [health.md](health.md#the-self-tests-run)), unless the run is
+another build's: an older build's fail it could not check is a warning, not
+"not well" (#1399). A reboot forgets it.
 
 ## How each part is checked
 

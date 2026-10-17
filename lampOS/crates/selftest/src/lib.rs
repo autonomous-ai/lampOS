@@ -47,6 +47,22 @@ pub trait Check {
     fn run(&mut self, deadline: Instant) -> PartResult;
 }
 
+/// The build a self-test program is, from its own path as installed:
+/// `/opt/lampOS/selftest/<build>/lamp-selftest`, where `<build>` is the
+/// folder `current` links to (`current_exe` gives the link's target). Any
+/// other path, a test's or one run by hand, is no build (#1399).
+pub fn build_of(program: &std::path::Path) -> Option<String> {
+    let folder = program.parent()?;
+    let build = folder.file_name()?.to_str()?;
+    let part = folder.parent()?.file_name()?.to_str()?;
+    (part == "selftest"
+        && build != "current"
+        && !build.is_empty()
+        && build.len() <= 128
+        && !build.chars().any(char::is_control))
+    .then(|| build.to_owned())
+}
+
 /// Runs every check in order. A check that starts after the budget is spent
 /// is not run and says so; one that overruns its deadline keeps its result.
 pub fn run(occasion: Occasion, checks: &mut [Box<dyn Check + '_>], budget: Duration) -> SelfTest {
@@ -80,6 +96,8 @@ pub fn run(occasion: Occasion, checks: &mut [Box<dyn Check + '_>], budget: Durat
         took: begin.elapsed().as_secs_f64(),
         verdict: SelfTest::verdict_of(&parts),
         parts,
+        // The program's own build (#1399).
+        build: std::env::current_exe().ok().as_deref().and_then(build_of),
     }
 }
 
@@ -247,5 +265,25 @@ mod tests {
             BUDGET,
         );
         assert_eq!(once.verdict, Verdict::Pass);
+    }
+
+    /// #1399: the build is the program's folder under `selftest/`, as
+    /// installed; a program anywhere else, or reached through `current`, is
+    /// no build.
+    #[test]
+    fn the_build_is_the_programs_own_folder_as_installed() {
+        use std::path::Path;
+        assert_eq!(
+            build_of(Path::new("/opt/lampOS/selftest/0e8211e769ed/lamp-selftest")).as_deref(),
+            Some("0e8211e769ed")
+        );
+        for other in [
+            "/opt/lampOS/selftest/current/lamp-selftest",
+            "/home/someone/target/debug/lamp-selftest",
+            "/opt/lampOS/health/0e8211e769ed/lamp-selftest",
+            "lamp-selftest",
+        ] {
+            assert_eq!(build_of(Path::new(other)), None, "{other}");
+        }
     }
 }

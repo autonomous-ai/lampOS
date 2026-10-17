@@ -108,6 +108,12 @@ pub struct SelfTest {
     pub verdict: Verdict,
     /// Every part checked, in the order they ran.
     pub parts: Vec<PartResult>,
+    /// The self-test build that ran it (its program's folder under
+    /// `/opt/lampOS/selftest/`), so `lamp-health` can tell a fail written by
+    /// an older rule from one this build would still give (#1399). Absent
+    /// from runs before it, and from a program run outside an install.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<String>,
 }
 
 impl SelfTest {
@@ -154,6 +160,13 @@ impl SelfTest {
         if self.verdict != Self::verdict_of(&self.parts) {
             return Err(Invalid("verdict is not the worst of the parts".into()));
         }
+        if let Some(build) = &self.build
+            && (build.is_empty() || build.len() > 128 || build.chars().any(char::is_control))
+        {
+            return Err(Invalid(
+                "build is not a plain name of 1 to 128 bytes".into(),
+            ));
+        }
         Ok(())
     }
 }
@@ -169,6 +182,7 @@ mod tests {
             took: 95.5,
             verdict: SelfTest::verdict_of(&parts),
             parts,
+            build: None,
         }
     }
 

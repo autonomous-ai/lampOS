@@ -81,6 +81,7 @@ mod tests {
             took: 61.4,
             verdict: SelfTest::verdict_of(&parts),
             parts,
+            build: None,
         }
     }
 

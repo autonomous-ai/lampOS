@@ -165,13 +165,25 @@ its last *checked* verdict (`parts::SelfTests`): a part that failed stays
 failed until a later run checks it and it passes, or is not fitted. A run
 that could not check it (`not_checked`, or without it: a passive run checks
 no speaker, ring colours or head move) leaves the fail standing (the
-reviewer on #1243). Each time the health is worked out it gets one more
-item, `selftest` (`SelfTests::item`, `parts::mark_selftest`):
+reviewer on #1243), **unless the run is another self-test build's** (its
+`build`, #1399): then that fail was the older rule's. On lamp-4ace on
+17 Oct, a storage fail from the build before #1399 held "the lamp is not
+well" after the new build said `not_checked`. Such a fail moves to a
+warning, never dropped, since the old fault may have been real; a run that
+checks the part settles it. A passive run (`first-boot`, the 6-hourly
+timer), which never checks the speaker, the ring's colours or the head move,
+never demotes a fail an active run (`on-demand`, `factory`) gave, whatever
+its build: every update changes the build (the eighth on #1426). Two runs
+that name no build count as the same (runs from before the field), and no
+build against one does not. Each time
+the health is worked out it gets one more item, `selftest`
+(`SelfTests::item`, `parts::mark_selftest`):
 
 - **A part still failed:** `error`, `N parts failing: PART (REASON), …` for each, each part by the name a person knows it by (`storage` is "the SD card", `air` "the air sensor", `parts::part_known_as`),
   in the order they first failed, with each one's newest reason. The lamp
   is then `error` too, with that as its message.
 - **The lamp's USB hub dropped** (the newest run's `voice_mic` says `usb_hub_said`): `warn` with that line when nothing failed, and before the failed parts' message when something did (so the line's 160-byte cap never cuts it). Beside failed parts, when the whole line won't fit, it's the self-test's short form (`usb_hub_said_short`: "the lamp's USB hub dropped 2 times since boot, with the voice mic, servo port, speaker/room mic and camera"), so the part's name still fits and at worst the end of its reason is cut; until a run's `voice_mic` says nothing of it. `lamp-health` can't read the kernel's log itself (it runs as `lampos`, without `CAP_SYSLOG`), so it takes the self-test's word.
+- **A fault from before an update:** "a fault seen before this update, which this self-test could not check: PART (REASON), …". Alone it is `warn`, after the hub's line if there is one; beside a part failing now it is named after the failed parts, inside the `error`, where the 160-byte cap cuts it first.
 - **None failed:** `ok`, `passed`, or `passed; N not checked` for the newest
   run. An ok item lowers nothing.
 - **Its age** is since the newest run began, by the wall clock. It is never
