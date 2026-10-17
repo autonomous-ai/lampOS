@@ -60,10 +60,12 @@ routes are not served. Each kind is carried out by the part that owns it.
 
 ## Where things are kept
 
-- **Setup's account**, `/etc/lampOS/cloud/account.json`, root's, 0600:
+- **Setup's account**, `/etc/lampOS/setup/backend.json`, root's, 0600:
   `device_id`, `mqtt_endpoint`, `mqtt_port`, `mqtt_username`,
   `mqtt_password`, `fa_channel`, `fd_channel` and `llm_base_url`, as the
-  app's setup request sends them (Third's setup PR keeps them, #806). The
+  app's setup request sends them. Setup writes it (#1401, `setup.md`), and
+  `tests/setup.rs` reads the product's own setup settings and setup's own
+  writer, so the unit's path and the fields can't drift from setup's. The
   voice's key stays in `/etc/lampOS/voice/credential`.
 - **The unit** (`deploy/product/lamp-cloud.service`) runs it as `lampos` and
   hands it those two files and `lamp-update`'s `state.json` (for the build)
@@ -73,7 +75,7 @@ routes are not served. Each kind is carried out by the part that owns it.
 - **Never printed:** the broker's password and the key appear in no journal
   line and on no bus topic; the account's debug form hides them.
 - **The reset** empties `/var/lib/lampos-cloud` and removes
-  `/etc/lampOS/cloud/account.json` with the rest of the person's data.
+  `/etc/lampOS/setup/backend.json` with the rest of the person's data.
 
 ## Not yet known, for the backend (#1396)
 

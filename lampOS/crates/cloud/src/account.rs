@@ -1,6 +1,7 @@
 //! The account link setup keeps: the company broker's address, its login,
-//! the two channels and the backend's base (`/etc/lampOS/cloud/account.json`,
-//! root's, 0600, read through systemd's `LoadCredential=`). The broker's
+//! the two channels and the backend's base (setup's
+//! `/etc/lampOS/setup/backend.json`, root's, 0600, read through systemd's
+//! `LoadCredential=`). The broker's
 //! password is a secret: it is never printed, in a log line or a debug one.
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt;

@@ -21,6 +21,9 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls-no-p
 webpki-roots = "1"
 
 [dev-dependencies]
+# Setup's own settings and writer, so the account is read where and as setup
+# writes it (tests/setup.rs).
+lamp-setup = { path = "../setup" }
 # The tests' broker reads and writes with rumqttc's own codec.
 bytes = "1"
 tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "net", "sync", "io-util"] }
