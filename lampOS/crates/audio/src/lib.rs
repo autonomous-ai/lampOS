@@ -57,10 +57,14 @@ pub struct EchoProcessor {
     observer: evidence::EchoObserver,
     steady: Option<Box<steady::SteadyReference>>,
     noise_suppression: bool,
+    /// Whether the canceller keeps its linear output ([`Self::with_linear_output`]).
+    export_linear: bool,
     render_input: [f32; RENDER_SAMPLES],
     render_output: [f32; RENDER_SAMPLES],
     capture_input: [f32; CAPTURE_SAMPLES],
     capture_output: [f32; CAPTURE_SAMPLES],
+    linear_output: [[f32; CAPTURE_SAMPLES]; 1],
+    linear: Option<CaptureBlock>,
 }
 
 impl EchoProcessor {
@@ -70,21 +74,40 @@ impl EchoProcessor {
 
     pub fn with_reference(noise_suppression: bool, reference: Reference) -> Self {
         Self {
-            inner: Self::build(noise_suppression),
+            inner: Self::build(noise_suppression, false),
             observer: evidence::EchoObserver::new(),
             steady: (reference == Reference::Steady).then(Box::default),
             noise_suppression,
+            export_linear: false,
             render_input: [0.0; RENDER_SAMPLES],
             render_output: [0.0; RENDER_SAMPLES],
             capture_input: [0.0; CAPTURE_SAMPLES],
             capture_output: [0.0; CAPTURE_SAMPLES],
+            linear_output: [[0.0; CAPTURE_SAMPLES]; 1],
+            linear: None,
         }
     }
 
-    fn build(noise_suppression: bool) -> AudioProcessing {
+    /// Also keep the canceller's linear output for [`Self::linear`]: the
+    /// microphone, high-pass filtered, less the echo the canceller's
+    /// adaptive filter predicts, before its residual echo suppressor and
+    /// before noise suppression. The suppressor takes speech over the lamp
+    /// away with the echo; the linear output keeps that speech, and keeps
+    /// the echo the filter does not predict. Off by default. On,
+    /// [`Self::capture`] returns exactly the blocks it returns off.
+    pub fn with_linear_output(mut self) -> Self {
+        self.export_linear = true;
+        self.reset();
+        self
+    }
+
+    fn build(noise_suppression: bool, export_linear: bool) -> AudioProcessing {
         AudioProcessing::builder()
             .config(Config {
-                echo_canceller: Some(EchoCanceller::default()),
+                echo_canceller: Some(EchoCanceller {
+                    export_linear_aec_output: export_linear,
+                    ..EchoCanceller::default()
+                }),
                 noise_suppression: noise_suppression.then(NoiseSuppression::default),
                 // Do not silently change mic gain or boost background speech.
                 ..Config::default()
@@ -97,7 +120,7 @@ impl EchoProcessor {
     /// Reinitialize after lost reference/capture samples, device reopen or privacy.
     /// Reset is a cold operation and must be recorded as a discontinuity.
     pub fn reset(&mut self) {
-        self.inner = Self::build(self.noise_suppression);
+        self.inner = Self::build(self.noise_suppression, self.export_linear);
         self.observer.reset();
         if let Some(steady) = self.steady.as_mut() {
             steady.reset();
@@ -106,6 +129,8 @@ impl EchoProcessor {
         self.render_output.fill(0.0);
         self.capture_input.fill(0.0);
         self.capture_output.fill(0.0);
+        self.linear_output = [[0.0; CAPTURE_SAMPLES]; 1];
+        self.linear = None;
     }
 
     pub fn render(&mut self, samples: &RenderBlock) -> Result<()> {
@@ -133,6 +158,7 @@ impl EchoProcessor {
         samples: &CaptureBlock,
         device_delay_ms: u16,
     ) -> Result<CaptureBlock> {
+        self.linear = None;
         if device_delay_ms > 500 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -162,6 +188,15 @@ impl EchoProcessor {
         }
         let clean = self.capture_output.map(float_to_pcm);
         self.observer.capture(samples, &clean);
+        // Only for `linear`: it never fails the block above.
+        if self.export_linear
+            && self.inner.linear_aec_output(&mut self.linear_output)
+            && self.linear_output[0]
+                .iter()
+                .all(|sample| sample.is_finite())
+        {
+            self.linear = Some(self.linear_output[0].map(float_to_pcm));
+        }
         Ok(clean)
     }
 
@@ -174,6 +209,19 @@ impl EchoProcessor {
     /// What the echo evidence's skip did since construction.
     pub fn evidence_skipped(&self) -> evidence::Skipped {
         self.observer.skipped()
+    }
+
+    /// The canceller's linear output for the block [`Self::capture`] last
+    /// returned (see [`Self::with_linear_output`]), 160 samples at the
+    /// capture rate. It is one 64-sample canceller block (4 ms) behind the
+    /// microphone, and one block ahead of the processed output, which the
+    /// residual echo suppressor delays by another. `None` without
+    /// `with_linear_output`, when that call failed or the canceller gave no
+    /// finite linear output, and until a capture has run since the last
+    /// reset. Before the canceller has had any render it passes the
+    /// microphone through and this is silence.
+    pub fn linear(&self) -> Option<&CaptureBlock> {
+        self.linear.as_ref()
     }
 
     /// What the render explains of the capture block just processed, before

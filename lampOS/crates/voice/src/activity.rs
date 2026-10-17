@@ -61,6 +61,31 @@ pub const REACH_BACK_BLOCKS: usize = 160;
 /// And how much before its earliest speech-like block it begins.
 pub const REACH_LEAD_BLOCKS: usize = 20;
 
+/// With `linear`, the detector reads the echo canceller's linear output in
+/// place of the processed block (#828): the residual suppressor that follows
+/// the canceller can take a person's "Stop." said over the lamp's own voice
+/// down with the echo. Only the detector: the provider's audio, the residual
+/// and the evidence keep the processed block. Off unless set.
+pub const INPUT_ENVIRONMENT: &str = "LAMP_VAD_INPUT";
+
+/// Whether this worker's detector reads the linear output, read once.
+pub fn reads_linear() -> bool {
+    std::env::var_os(INPUT_ENVIRONMENT).as_deref() == Some(std::ffi::OsStr::new("linear"))
+}
+
+/// The block the detector reads: the linear output when asked for and there
+/// is one for this block, `clean` otherwise.
+pub fn detector_input<'a>(
+    linear_on: bool,
+    clean: &'a CaptureBlock,
+    linear: Option<&'a CaptureBlock>,
+) -> &'a CaptureBlock {
+    match linear {
+        Some(linear) if linear_on => linear,
+        _ => clean,
+    }
+}
+
 pub struct SpeechProbability {
     vad: VoiceActivityDetectorWrapper,
     buffer: [f32; CAPTURE_SAMPLES],
@@ -892,6 +917,56 @@ impl Confirmation {
                 Some(decide("silence_fallback", None, Some("timeout")))
             }
             _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// "Stop. Please stop talking." generated with Piper's
+    /// `en_US-libritts-high` voice, speaker 0 (trained on LibriTTS, CC BY 4.0,
+    /// openslr.org/60; voices repository MIT), as `docs/stop-word.md` chose
+    /// its generated speech. 22.05 kHz resampled to 16 kHz mono s16le.
+    const SPEECH: &[u8] = include_bytes!("../fixtures/piper-stop-16k.s16");
+
+    fn blocks() -> Vec<CaptureBlock> {
+        let samples: Vec<i16> = SPEECH
+            .chunks_exact(2)
+            .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
+            .collect();
+        samples
+            .chunks_exact(CAPTURE_SAMPLES)
+            .map(|chunk| chunk.try_into().unwrap())
+            .collect()
+    }
+
+    /// The first builder's test for #828: the processed block suppressed to
+    /// silence while the linear output still holds the speech scores speech
+    /// with the switch and not without it.
+    #[test]
+    fn the_detector_hears_the_linear_output_only_with_the_switch() {
+        let speech = blocks();
+        let suppressed: CaptureBlock = [0; CAPTURE_SAMPLES];
+        let loudest = |linear_on| {
+            let mut detector = SpeechProbability::default();
+            speech
+                .iter()
+                .map(|linear| {
+                    detector.analyze(detector_input(linear_on, &suppressed, Some(linear)))
+                })
+                .fold(0.0_f32, f32::max)
+        };
+        assert!(loudest(true) >= START_PROBABILITY, "{}", loudest(true));
+        assert!(loudest(false) < SILENCE_PROBABILITY, "{}", loudest(false));
+        // No linear output for this block (no reference yet, or none kept):
+        // the processed block, switch or not.
+        for linear_on in [false, true] {
+            assert!(std::ptr::eq(
+                detector_input(linear_on, &suppressed, None),
+                &suppressed
+            ));
         }
     }
 }

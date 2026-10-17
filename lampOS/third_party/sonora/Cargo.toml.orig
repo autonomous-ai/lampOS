@@ -1,0 +1,54 @@
+[package]
+name = "sonora"
+version = "0.2.0"
+description = "WebRTC Audio Processing — pure Rust port with echo cancellation, noise suppression, and AGC"
+keywords = ["audio", "webrtc", "echo-cancellation", "noise-suppression", "agc"]
+categories = ["multimedia::audio"]
+readme = "README.md"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+autoexamples = false
+
+[features]
+examples = ["dep:anyhow", "dep:clap", "dep:cpal", "dep:ctrlc", "dep:hound", "dep:ringbuf"]
+
+[dependencies]
+sonora-common-audio = { workspace = true }
+sonora-aec3 = { workspace = true }
+sonora-agc2 = { workspace = true }
+sonora-ns = { workspace = true }
+sonora-simd = { workspace = true }
+tracing = { workspace = true }
+
+# Optional deps for examples
+anyhow = { workspace = true, optional = true }
+clap = { workspace = true, optional = true }
+cpal = { workspace = true, optional = true }
+ctrlc = { workspace = true, optional = true }
+hound = { workspace = true, optional = true }
+ringbuf = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+sonora-fft = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[lints]
+workspace = true
+
+[[bench]]
+name = "pipeline"
+harness = false
+
+[[example]]
+name = "simple"
+
+[[example]]
+name = "karaoke"
+required-features = ["examples"]
+
+[[example]]
+name = "recording"
+required-features = ["examples"]

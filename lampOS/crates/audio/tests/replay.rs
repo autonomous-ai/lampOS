@@ -1099,3 +1099,36 @@ fn where_a_recording_cannot_be_followed_the_replay_names_the_record_and_keeps_wh
         report.limitations
     );
 }
+
+#[test]
+fn the_linear_output_is_written_only_when_asked_for_and_changes_no_other_output() {
+    let fixture = Fixture::new();
+    let plain = fixture.replay("plain", ReplayOptions::default()).unwrap();
+    let linear = fixture
+        .replay(
+            "linear",
+            ReplayOptions {
+                linear_output: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert!(linear.source_certified && linear.replay_complete_for_recorded_capture);
+    let name = "segment-001-aec_linear.wav";
+    assert!(!fixture.output("plain").join(name).exists());
+    assert!(plain.segments[0].aec_linear.is_none());
+    let report: Value =
+        serde_json::from_slice(&fs::read(fixture.output("plain").join("report.json")).unwrap())
+            .unwrap();
+    assert!(report["segments"][0].get("aec_linear").is_none());
+    let mut files = linear.segments[0].wav_pcm_sha256.clone();
+    assert!(files.remove(name).is_some());
+    assert_eq!(files, plain.segments[0].wav_pcm_sha256);
+    let wav = hound::WavReader::open(fixture.output("linear").join(name)).unwrap();
+    assert_eq!(wav.spec().sample_rate, 16000);
+    assert_eq!(u64::from(wav.len()), linear.replayed_capture_frames);
+    assert_eq!(
+        linear.segments[0].aec_linear.as_ref().map(|s| s.frames),
+        Some(480)
+    );
+}

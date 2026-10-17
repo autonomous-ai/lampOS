@@ -121,6 +121,18 @@ Every nonempty DSP segment produces four mono 16 kHz PCM16 WAVs:
 - `segment-NNN-aec_only.wav`: offline AEC with noise suppression disabled.
 - `segment-NNN-aec_ns.wav`: offline AEC with noise suppression enabled.
 
+With `--linear-output` it also writes a fifth, and `report.json` gives its
+signal statistics as `aec_linear`:
+
+- `segment-NNN-aec_linear.wav`: the AEC-only canceller's linear output, the
+  microphone (high-pass filtered) less the echo its adaptive filter predicts,
+  before its residual echo suppressor. It keeps speech over the lamp that the
+  suppressor removes, and the echo the filter does not predict. It is one
+  64-sample canceller block (4 ms) behind `pre_aec` and one ahead of
+  `aec_only`, which the suppressor delays by another. The other four files
+  are the same with or without the option. It comes from the lampOS patch to
+  Sonora in `third_party/sonora` (`PATCH.md`).
+
 `report.json` records source hashes and certification, processing provenance,
 replayed versus available sample counts, per-segment identities, recorded
 clock/delay ranges, PCM SHA256 hashes, RMS, peak level, saturated/near-rail

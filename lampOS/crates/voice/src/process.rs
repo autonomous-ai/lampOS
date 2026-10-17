@@ -771,6 +771,10 @@ fn worker_command(
             role,
             var(crate::quiet_pace::EVIDENCE_ENVIRONMENT).as_deref(),
         ))
+        .envs(vad_input_worker_environment(
+            role,
+            var(crate::activity::INPUT_ENVIRONMENT).as_deref(),
+        ))
         .envs(person_name_worker_environment(
             role,
             var(crate::person::ENVIRONMENT).as_deref(),
@@ -821,6 +825,16 @@ fn quiet_evidence_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "capture" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::quiet_pace::EVIDENCE_ENVIRONMENT, "on"))
+}
+
+// The detector's input (#828), to the one worker that runs it: capture,
+// and only the exact `linear`.
+fn vad_input_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "capture" && value == Some(std::ffi::OsStr::new("linear")))
+        .then_some((crate::activity::INPUT_ENVIRONMENT, "linear"))
 }
 
 // The typed name's file (#806), to the two workers that build the model's
@@ -945,7 +959,7 @@ mod tests {
     /// the environment it got: the provider has the memory's two switches,
     /// the clock and the typed name's file, the second route the memory's
     /// days, the clock and the name's file (#1323), and capture the quiet
-    /// evidence switch (#1285). With every other variable set to a secret,
+    /// evidence switch (#1285) and the detector's input (#828). With every other variable set to a secret,
     /// nothing else reaches any of them but the shell's own.
     #[test]
     fn a_started_worker_gets_its_roles_switches_and_nothing_else() {
@@ -968,6 +982,8 @@ mod tests {
                 .contains(&name)
                 {
                     "on"
+                } else if name == crate::activity::INPUT_ENVIRONMENT {
+                    "linear"
                 } else if name == crate::person::ENVIRONMENT {
                     "/etc/lampOS/person/name"
                 } else {
@@ -1021,7 +1037,10 @@ mod tests {
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                 ],
             ),
-            ("capture", vec!["LAMP_QUIET_EVIDENCE=on"]),
+            (
+                "capture",
+                vec!["LAMP_QUIET_EVIDENCE=on", "LAMP_VAD_INPUT=linear"],
+            ),
         ] {
             let status = worker_command(&script, &home.path, role, (boot, boot), &[], on)
                 .status()

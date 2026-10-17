@@ -132,3 +132,87 @@ fn cold_report_starts_at_first_capture_and_keeps_reset_near_end_separate() {
     assert_eq!(first_near.output_rms_pcm, (near_energy / 4000.0).sqrt());
     assert_ne!(first_echo.output_rms_pcm, first_near.output_rms_pcm);
 }
+
+#[test]
+fn the_linear_output_is_off_by_default_and_on_changes_no_processed_block() {
+    for noise_suppression in [false, true] {
+        let mut plain = EchoProcessor::new(noise_suppression);
+        let mut linear = EchoProcessor::new(noise_suppression).with_linear_output();
+        assert_eq!(linear.linear(), None);
+        for i in 0..400 {
+            let (render, capture) = synthetic_echo_block(i);
+            plain.render(&render).unwrap();
+            linear.render(&render).unwrap();
+            assert_eq!(
+                plain.capture(&capture, 18).unwrap(),
+                linear.capture(&capture, 18).unwrap(),
+                "block {i}, noise suppression {noise_suppression}"
+            );
+            assert_eq!(plain.linear(), None);
+            assert!(linear.linear().is_some());
+        }
+        assert!(linear.capture(&[0; CAPTURE_SAMPLES], 501).is_err());
+        assert_eq!(linear.linear(), None);
+        linear.reset();
+        plain.reset();
+        assert_eq!(linear.linear(), None);
+        for i in 400..450 {
+            let (render, capture) = synthetic_echo_block(i);
+            plain.render(&render).unwrap();
+            linear.render(&render).unwrap();
+            assert_eq!(
+                plain.capture(&capture, 18).unwrap(),
+                linear.capture(&capture, 18).unwrap()
+            );
+            assert!(linear.linear().is_some());
+        }
+    }
+}
+
+fn energy(samples: &[i16]) -> f64 {
+    samples.iter().map(|&x| f64::from(x).powi(2)).sum()
+}
+
+/// Normalized correlation of `a` with `b` delayed by `lag` samples.
+fn correlation(a: &[i16], b: &[i16], lag: usize) -> f64 {
+    let (a, b) = (&a[..a.len() - lag], &b[lag..]);
+    let product: f64 = a
+        .iter()
+        .zip(b)
+        .map(|(&x, &y)| f64::from(x) * f64::from(y))
+        .sum();
+    product / (energy(a) * energy(b)).sqrt()
+}
+
+#[test]
+fn the_linear_output_removes_a_linear_echo_and_passes_speech_over_silence() {
+    let mut echo = EchoProcessor::new(false).with_linear_output();
+    let mut near = EchoProcessor::new(false).with_linear_output();
+    let (mut microphone, mut echo_linear) = (Vec::new(), Vec::new());
+    let (mut near_linear, mut near_output) = (Vec::new(), Vec::new());
+    for i in 0..600 {
+        let (render, capture) = synthetic_echo_block(i);
+        echo.render(&render).unwrap();
+        echo.capture(&capture, 18).unwrap();
+        // The same sound as speech with the lamp silent.
+        near.render(&[0; RENDER_SAMPLES]).unwrap();
+        let output = near.capture(&capture, 0).unwrap();
+        if i >= 300 {
+            microphone.extend(capture);
+            echo_linear.extend(*echo.linear().unwrap());
+            near_linear.extend(*near.linear().unwrap());
+            near_output.extend(output);
+        }
+    }
+    // 36.5 dB on this Mac (x86_64), 2026-10-17.
+    let removed = 10.0 * (energy(&microphone) / energy(&echo_linear)).log10();
+    assert!(removed > 20.0, "{removed} dB");
+    // 0.53 dB less, after the high-pass filter.
+    let kept = 10.0 * (energy(&near_linear) / energy(&microphone)).log10();
+    assert!(kept.abs() < 1.5, "{kept} dB");
+    // The linear output is one 64-sample block behind the microphone and
+    // one ahead of the processed output, which the suppressor delays.
+    assert!(correlation(&microphone, &near_linear, 64) > 0.7);
+    assert!(correlation(&microphone, &near_linear, 0) < 0.3);
+    assert!(correlation(&near_linear, &near_output, 64) > 0.99);
+}

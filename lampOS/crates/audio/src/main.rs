@@ -35,6 +35,7 @@ fn run() -> Result<()> {
                     "--exploratory-prefix" if !options.exploratory_prefix => {
                         options.exploratory_prefix = true
                     }
+                    "--linear-output" if !options.linear_output => options.linear_output = true,
                     "--historical-processing" if options.historical_processing.is_none() => {
                         let noise_suppression = match args.next().as_deref() {
                             Some("on") => true,
@@ -123,7 +124,7 @@ fn run() -> Result<()> {
         }
         _ => {
             return Err(usage(
-                "usage: lamp-audio replay-aec RUN NEW_OUT [--exploratory-prefix] [--historical-processing on|off SOURCE_EVIDENCE.json] [--steady-reference | --as-given-reference] | notices DIR [--accept-test] | bench-aec [500..60000 blocks] | export-aec-fixture NEW_DIR [blocks] | bench-aec-fixture FIXTURE_DIR NEW_REPORT.json",
+                "usage: lamp-audio replay-aec RUN NEW_OUT [--exploratory-prefix] [--linear-output] [--historical-processing on|off SOURCE_EVIDENCE.json] [--steady-reference | --as-given-reference] | notices DIR [--accept-test] | bench-aec [500..60000 blocks] | export-aec-fixture NEW_DIR [blocks] | bench-aec-fixture FIXTURE_DIR NEW_REPORT.json",
             ));
         }
     }

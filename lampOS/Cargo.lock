@@ -3535,8 +3535,6 @@ dependencies = [
 [[package]]
 name = "sonora"
 version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e1ce442ab5cb392c4067b8f2cced20be4cf12e479f6dfbf44acbe9b14ac9250"
 dependencies = [
  "sonora-aec3",
  "sonora-agc2",

@@ -51,6 +51,12 @@ pub struct ReplayOptions {
     /// (`--steady-reference`, `--as-given-reference`;
     /// docs/steady-reference.md). `None` is as the recording was made.
     pub reference: Option<Given>,
+    /// Also write the AEC-only canceller's linear output, before its
+    /// residual echo suppressor, as `segment-NNN-aec_linear.wav`
+    /// (`--linear-output`). It is 64 samples ahead of `aec_only` (see
+    /// [`EchoProcessor::linear`]). The other outputs are the same either
+    /// way.
+    pub linear_output: bool,
 }
 pub struct HistoricalProcessing {
     pub noise_suppression: bool,
@@ -242,6 +248,9 @@ pub struct SegmentReport {
     pub recorded_post_aec: SignalStats,
     pub aec_only: SignalStats,
     pub aec_ns: SignalStats,
+    /// With `--linear-output`: the AEC-only canceller's linear output.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aec_linear: Option<SignalStats>,
     pub aec_only_mismatched_samples_vs_recorded: u64,
     pub aec_ns_mismatched_samples_vs_recorded: u64,
     pub wav_pcm_sha256: BTreeMap<String, String>,
@@ -378,6 +387,11 @@ pub fn replay(
             .limitations
             .push(format!("source certification failed: {reason}"));
     }
+    if options.linear_output {
+        report.limitations.push(
+            "aec_linear is the AEC-only canceller's linear output, before its residual echo suppressor, 64 samples ahead of aec_only: it keeps the echo its adaptive filter does not predict".into(),
+        );
+    }
     if trace.cut_off {
         report.limitations.push(
             "events.jsonl ends in a line cut off part way (the session was stopped while writing it); that line was not read".into(),
@@ -394,6 +408,7 @@ pub fn replay(
         segments: Vec::new(),
         reference,
         clock,
+        linear: options.linear_output,
     };
     for step in steps {
         let result = apply_step(
@@ -872,6 +887,8 @@ struct Segment {
     post: Vec<i16>,
     aec: Vec<i16>,
     ns: Vec<i16>,
+    /// The AEC-only canceller's linear output, when asked for.
+    linear: Option<Vec<i16>>,
     aec_processor: EchoProcessor,
     ns_processor: EchoProcessor,
     /// Evidence for the cancellation the recording itself contains.
@@ -880,12 +897,14 @@ struct Segment {
     sounding: Sounding,
     clock: Option<ClockReplay>,
 }
-/// Segments replayed, how their cancellers are given the render, and
-/// whether the recorded voice's reference was capture-clocked.
+/// Segments replayed, how their cancellers are given the render,
+/// whether the recorded voice's reference was capture-clocked, and whether
+/// the linear output is kept.
 struct Completed {
     segments: Vec<Segment>,
     reference: Given,
     clock: bool,
+    linear: bool,
 }
 
 /// The voice's capture-clocked reference, rebuilt from what the recording
@@ -959,7 +978,8 @@ impl Sounding {
     }
 }
 impl Segment {
-    fn new(reset: Reset, next_sequence: u64, reference: Given, clock: bool) -> Self {
+    fn new(reset: Reset, next_sequence: u64, reference: Given, clock: bool, linear: bool) -> Self {
+        let aec_processor = EchoProcessor::with_reference(false, reference);
         Self {
             reset,
             next_sequence,
@@ -977,7 +997,12 @@ impl Segment {
             post: Vec::new(),
             aec: Vec::new(),
             ns: Vec::new(),
-            aec_processor: EchoProcessor::with_reference(false, reference),
+            linear: linear.then(Vec::new),
+            aec_processor: if linear {
+                aec_processor.with_linear_output()
+            } else {
+                aec_processor
+            },
             ns_processor: EchoProcessor::with_reference(true, reference),
             recorded_observer: crate::evidence::EchoObserver::new(),
             reference,
@@ -1063,6 +1088,7 @@ fn apply_step(
                 next_sequence,
                 completed.reference,
                 completed.clock,
+                completed.linear,
             ));
         }
         CaptureStep::Boundary {
@@ -1206,6 +1232,13 @@ fn apply_step(
             let only = segment
                 .aec_processor
                 .capture(&pre, meta.aec_queue_delay_ms)?;
+            if let Some(linear) = segment.linear.as_mut() {
+                let block = segment
+                    .aec_processor
+                    .linear()
+                    .ok_or_else(|| at(sequence, "the canceller gave no finite linear output"))?;
+                linear.extend_from_slice(block);
+            }
             let ns = segment
                 .ns_processor
                 .capture(&pre, meta.aec_queue_delay_ms)?;
@@ -1359,12 +1392,14 @@ fn finish_segment(segment: Segment, output: &Output, report: &mut ReplayReport) 
         return Ok(());
     }
     let mut files = BTreeMap::new();
-    for (name, samples) in [
+    let outputs = [
         ("pre_aec", &segment.pre),
         ("recorded_post_aec", &segment.post),
         ("aec_only", &segment.aec),
         ("aec_ns", &segment.ns),
-    ] {
+    ];
+    let linear = segment.linear.as_ref().map(|linear| ("aec_linear", linear));
+    for (name, samples) in outputs.into_iter().chain(linear) {
         let file = format!("segment-{:03}-{name}.wav", report.segments.len() + 1);
         output.wav(&file, samples)?;
         files.insert(file, digest_pcm(samples));
@@ -1388,6 +1423,7 @@ fn finish_segment(segment: Segment, output: &Output, report: &mut ReplayReport) 
         recorded_post_aec: signal(&segment.post),
         aec_only: signal(&segment.aec),
         aec_ns: signal(&segment.ns),
+        aec_linear: segment.linear.as_deref().map(signal),
         aec_only_mismatched_samples_vs_recorded: segment
             .aec
             .iter()

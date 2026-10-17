@@ -351,6 +351,35 @@ second figure: on x86 the canceller's filters decay into subnormal floats in
 the silence after speech and its cost rises tenfold (705 us), which the
 lamp's ARM cores do not pay.
 
+With `LAMP_VAD_INPUT=linear` (off unless set, passed on to the capture
+worker only, and only that exact value) the local speech detector reads the
+canceller's linear output in place of the processed block (#828): the
+residual echo suppressor after the canceller can take a person's "Stop."
+said over the lamp's own voice down with the echo, and the linear output
+keeps it ([microphone-experiments.md](microphone-experiments.md),
+`--linear-output`). It also keeps most of the lamp's own voice: on lamp-4ace's
+mic2 the linear stage took 3.1–4.1 dB of it out, and a person 10 dB under the
+echo stayed 4–7 dB under (#828, 17 October 08:01). So with the switch the
+detector may score the lamp's own speech as speech for most of its talk,
+opening the "no speech" gate that held most of the stop lines' blocks, and
+leaving the explained share and the floor (`audio/src/duplex.rs`) alone
+against false yields. The replay that decides it reads the `vad` share over
+the lamp-alone seconds as well as over the stop. Capture says at start that
+the detector reads the linear output, and once a minute on how many blocks
+it did (for example `the speech detector read the linear output on 5990 of
+6000 blocks in the last 60 s`, not a measured figure): 0 would mean the switch
+did not take. Only the detector's input changes: the provider's audio, the
+residual and the evidence keep the processed block. The score's readers all
+get the new score: the turn's start and end, the re-centre's quiet test
+(`reference/recovery.rs`, `note_score`), the frame's probability handed to the
+turn detector, and the recordings' `vad_score`. The linear output comes
+before noise suppression, which every unit runs off (`--noise-suppression
+off`), so that part changes nothing today. The canceller keeps its
+linear output only with the switch, and a block with none (no reference
+yet) is read as before. `activity::tests::the_detector_hears_the_linear_output_only_with_the_switch`
+scores a generated "Stop." (Piper `en_US-libritts-high`) with the processed block silenced: speech with
+the switch, silence without it.
+
 ## Stop and current limits
 
 After entering the coordinator loop, SIGTERM/SIGINT records a service-stop request,

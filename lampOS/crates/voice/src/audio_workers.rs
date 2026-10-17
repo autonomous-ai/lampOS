@@ -521,6 +521,18 @@ fn capture_loop<D: CaptureDevice>(
         }
     };
     let mut echo = EchoProcessor::with_reference(noise_suppression.enabled(), echo_reference);
+    // The detector may read the canceller's linear output (#828); the
+    // canceller keeps it only then.
+    let vad_linear = crate::activity::reads_linear();
+    if vad_linear {
+        echo = echo.with_linear_output();
+        eprintln!(
+            "lamp-voice: capture: the speech detector reads the canceller's linear output (LAMP_VAD_INPUT=linear)"
+        );
+    }
+    // Blocks the detector scored, and of those on the linear output, since
+    // the last minute's line: a run with the switch shows it took.
+    let mut vad_said = (Instant::now(), 0u64, 0u64);
     let evidence_skip = crate::quiet_pace::evidence_skipped();
     echo.skip_evidence_while_render_silent(evidence_skip);
     let mut evidence_said = (Instant::now(), echo.evidence_skipped());
@@ -835,7 +847,15 @@ fn capture_loop<D: CaptureDevice>(
                 Some(delay) => (echo.capture(&frame.samples, delay)?, delay),
                 None => (frame.samples, 0),
             };
-            let probability = speech.analyze(&clean);
+            // The linear output is this block's only when the canceller ran.
+            // With the switch the score is 4 ms (one canceller block) ahead
+            // of the block handed on; the letters, `explained` and `heard`
+            // still come from `clean`.
+            let linear = step.and(echo.linear());
+            vad_said.1 += 1;
+            vad_said.2 += u64::from(vad_linear && linear.is_some());
+            let probability =
+                speech.analyze(crate::activity::detector_input(vad_linear, &clean, linear));
             reference.note_score(probability);
             if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
                 return Err(io::Error::other("invalid local speech probability").into());
@@ -938,6 +958,14 @@ fn capture_loop<D: CaptureDevice>(
                     evidence_line(counts, evidence_said.1, evidence_said.0.elapsed())
                 );
                 evidence_said = (Instant::now(), counts);
+            }
+            if evidence_due(vad_linear, vad_said.0.elapsed()) {
+                let (since, blocks, linear) = vad_said;
+                eprintln!(
+                    "lamp-voice: capture: the speech detector read the linear output on {linear} of {blocks} blocks in the last {} s (LAMP_VAD_INPUT=linear)",
+                    since.elapsed().as_secs()
+                );
+                vad_said = (Instant::now(), 0, 0);
             }
         }
         // A change of trust found while draining reference is not kept

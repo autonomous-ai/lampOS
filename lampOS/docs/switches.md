@@ -38,13 +38,13 @@ on or removed.
 
 ## The count
 
-111 switches (`LAMP_SERVICE_DOWN_LINE` added with #830 (C), off; `LAMP_EYES_SPEAKING` added with #1385, off; `LAMP_QUIET_PACE` and `--call-wait-ms` added with #1332, both set in the product unit, counted as on):
+112 switches (`LAMP_VAD_INPUT` added with #1416, off; `LAMP_SERVICE_DOWN_LINE` added with #830 (C), off; `LAMP_EYES_SPEAKING` added with #1385, off; `LAMP_QUIET_PACE` and `--call-wait-ms` added with #1332, both set in the product unit, counted as on):
 
 | | Voice: hearing, turns, ring | Voice: tasks, memory, schedule, skills, looks | Voice: its own flags | Other parts | All |
 |---|---|---|---|---|---|
 | On already, or right at its default | 16 | 10 | 8 | 16 | **50** |
 | **Proposed to turn on now** | 0 | 1 | 0 | 1 | **2** |
-| Off until its named lamp check | 27 | 13 | 0 | 6 | **46** |
+| Off until its named lamp check | 28 | 13 | 0 | 6 | **47** |
 | Stays off (diagnostic, turned down, or not needed) | 5 | 1 | 2 | 2 | **10** |
 | A setting, not a behaviour | 1 | 2 | 0 | 0 | **3** |
 
@@ -114,6 +114,7 @@ motion, since lamp-4ace's motors stay still until Monday: `LAMP_STAFF_NOTE`
 | LAMP_STOP_TOLD | `on`; off. First request after a hand/head stop tells the model it was stopped | — | on (#1332) | #1148 | Code and not-speech.md: "off until it is played on lamp-4ace" | off until played on lamp-4ace | Its own doc says it waits on that lamp check (from 16 Oct 16:32, story restarted 4 of 6 times) |
 | LAMP_STOP_WORDS | `heard`; off. Stop words heard in a yield end the reply (relay speech-to-text) | — | — | #970 | Count yield outcomes against played cut-ins; privacy accepted for lamp-4ace only (#828, 16 Oct). On 17 Oct #1246 measured on lamp-4ace that neither microphone carries a person's word over the lamp's own speech, which this depends on | off | stop-word.md: privacy "to be decided again before home lamps"; speech goes to the relay during yields |
 | LAMP_TRANSCRIPTION_LANGUAGE | a language tag (`en-US`); unset, none; not a tag, none and said. The service's transcript of what it hears gets that language hint (`inputAudioTranscription.languageCodes`); the reply's language is not set by it (not measured under the hint) | — | — | #926 (17 Oct) | Accepted by the service (a made-up field there is refused, 1007); no change on clear English. An accented clip not yet run | off until the accented clip shows Latin with it where none gives Devanagari, and 05:39's cut-ins replayed with it are still held or answered in English | Twelve runs `transcript_probe` on the clip |
+| LAMP_VAD_INPUT | `linear`; off. The local speech detector reads the echo canceller's linear output in place of the processed block; passed to capture only | — | — | #1416 | The replay of the owner's "Stop." over the lamp (#828): the stop scored as speech, and the lamp-alone seconds' `vad` share (≥ 0.5, linear against aec_only) read too | off until that replay | The linear output keeps the stop the suppressor removes, but also most of the lamp's own voice (3.1–4.1 dB taken out on lamp-4ace mic2) |
 | LAMP_VOICE_LINK | `on` (with bus); off. Publishes voice/link for lamp/online | — | — | #884 | lamp/online false 5 s after the link drops (with lamp-health --online on); not run | off until that check and lamp-health --online on in product | Only a signal; nothing in product reads it yet; offline.md shows nothing run |
 | LAMP_WAIT_KEEPS_ANSWER | `on`, or `words`; off. A short sound does not cut off an answer still to come; with `words` (needs LAMP_VOICE_SECOND_CONFIG) one whose words say something takes the turn, and a lone stop said before the answer (#1352) stops it | — | on (#1332) | #1130; `words` #1123 step 2 | lamp-4ace steps 1–4: cough within 2 s, real follow-up, #1123 count before/after; not documented done. `words`: "No." and "Wait." five times each and five coughs in the gap, counting `wait_words` and `stop_said` (group-talk.md; a lone "Wait." now stops the answer, "Wait, what about…" takes the turn); not run | off until those lamp-4ace steps | #1130 "Most likely wrong": the 1 s, and a short "No."/"Wait." let go; `words` sends a waited sound to the relay, a privacy line still to decide |
 | LAMP_SAME_VOICE_MODEL | absolute model path; unset = no check. The same-voice check beside LAMP_SPOKEN_TO (a line in another voice counts as talk) | — | — | #1030 | none recorded on a lamp | off until played with LAMP_SPOKEN_TO | It works only beside LAMP_SPOKEN_TO, which is itself off until its scenes pass |
