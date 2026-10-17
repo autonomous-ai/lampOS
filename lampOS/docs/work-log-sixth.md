@@ -5,6 +5,19 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-17 — the morning: #1226 merged, #828 on lamp-52e6
+
+- #1226 (09:04): a request going on after an early end (`continues`) keeps
+  what the second voice's rule knew of the request begun just before it,
+  in the same session, when the rule judged that one. Its P3 (the first
+  half read twice) is #1262.
+- #1047 on lamp-52e6 (06:53, 07:20): the raw-mic cadence gets words back,
+  but only the lamp's own story. Stop words were 0 of 6 at volume 45, and
+  louder cut-ins only made Gemini yield.
+- #828 A/B on lamp-52e6 (08:24): the moving body yielded 9 of 10, resting
+  8 of 10, so no cost seen. Part (2), a stop is a stop, is #1255 (off): it
+  caught 2 of 5. Gemini already says "Okay.", so the gap is the yield.
+
 ## 2026-10-17 — the second route's hidden notes — #1168 merged, #1175 open
 
 - #1168 (`185df75f6`, 01:52): a request going on from one given up after an
