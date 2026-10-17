@@ -895,6 +895,59 @@ at rest for the rest of the window. A tap the voice doesn't answer gets no
 hum and no face (First on #705, 17 Oct 07:26). The tap is still a call for
 the attention rule.
 
+**The same "hm?" after an empty "Sorry?"** (`LAMP_UNCLEAR_HUM=on`, off unless
+set; #1417). When the lamp can't make out a turn, it asks again with a
+written turn of its own that tells the model to say only "Sorry?" (#926). On
+lamp-4ace on 17 Oct (16:26) "make your light a bit cooler" was heard as Hindi,
+that turn came back with no audio (`no_audio_answer`), and the person got
+silence. With the switch, that turn's silent end owes the "hm?". Silent is no
+audio at its settled end, or an answer cut as `nothing_said` ("...", or a
+function's name said aloud), as the second look counts it.
+- It plays as its own sound turn with the ring's listening face, as the tap's
+  does, under the tap's rule (`may_hum` above): the microphone allowed, the
+  lamp quiet and listening-ready, no look owed.
+- The tap's 30 s rarity doesn't apply. That keeps a sound nobody asked for
+  rare; this one answers the person's own words each time they aren't made
+  out, and each needs words of theirs first. A second empty "Sorry?" hums
+  again (the Seventh on #1421). It still sets the tap's 30 s.
+- It plays within 2 s of the silent end (`UNCLEAR_HUM_WITHIN_US`), and is
+  dropped if any turn begins first or the person's Stop comes (`cancelled`).
+- Only that turn: a turn that ended silent because it was the room's talk
+  stays silent, and a "Sorry?" the model said owes nothing.
+- Expression gives no look-up here: that comes from a tap on the head, and
+  the hum's own turn is no turn for the head (`speaker_tone`).
+
+The trace says `unclear_hum_owed` at the silent end (with `"after":
+"nothing_said"` for a cut answer), then `unclear_hum` with `plays` and, when it
+doesn't, `why` (`another_turn_began`, `late`, `cancelled`, or `may_hum`'s word)
+and `held_by` (what held it back last, if anything). Its speaker rows are its
+own, not the tap's: `unclear_hum_attempted`, `unclear_hum_first_write` and
+`unclear_hum_final_sample_retired` (`SpeechOrigin::UnclearHum`), so a count of
+tap hums doesn't take it in.
+
+How fast: the hum is decided in the loop pass that sees the silent end, and
+its first chunk goes to the speaker as the tap's does (2.3 ms median from the
+decision on Third's Mac, above). The boundary to report is the end-of-speech
+decision to `unclear_hum_first_write`. Most of it is the provider's: on
+17 Oct's transcript the end of speech was decided at 3.63 s, the "Sorry?" was
+asked at 4.69 s, and its empty end came at 8.70 s, so the hum would start
+about 5.1 s after the person stopped. The target for the lamp's own part is
+the silent end to `unclear_hum_first_write` under 100 ms. The light battery
+reports both. Not measured on a lamp.
+
+Tests:
+- `coordinator::tests::reminders::an_empty_sorry_owes_one_hm_and_a_said_one_or_another_silent_turn_none`:
+  the state, with this transcript's two turn ends, a "Sorry?" the model
+  said, another silent turn, someone speaking first, too late, the held
+  reason and a Stop.
+- `coordinator::tests::second_route::an_empty_sorry_in_the_loop_hums_with_the_switch_and_only_then`:
+  the loop itself, through a scripted provider. An unclear turn, the written
+  "Sorry?", and its empty end hum to the speaker with the switch and not
+  without; "..." hums too, and a said "Sorry?" doesn't. Said again after the
+  first hum and unclear again, the second empty "Sorry?" hums too. With the
+  asking's mark taken out, with "..." owing nothing, or with the tap's 30 s
+  put back, it fails.
+
 ## The record of whom it answered
 
 Off unless set: `LAMP_FIRST_OUTPUT=/absolute/private/directory` in the

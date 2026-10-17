@@ -777,6 +777,99 @@ fn an_unclear_turn_is_asked_again_once_over_and_never_late_or_over_someone() {
     }) if *request == asking.turn() && text == crate::speak_up::ASK_AGAIN_NOTE));
 }
 
+/// #1417, the light row's one miss (lamp-4ace, 17 Oct 16:26): "make your
+/// light a bit cooler" heard as Hindi ended `unclear` (4.68 s), the lamp's
+/// own "Sorry?" was admitted (4.69 s) and ended `no_audio_answer` (8.70 s),
+/// and the person got silence. With `LAMP_UNCLEAR_HUM=on` that empty
+/// "Sorry?" owes one "hm?"; a "Sorry?" the model said, and a silent turn
+/// that was not the lamp's asking, owe none.
+#[test]
+fn an_empty_sorry_owes_one_hm_and_a_said_one_or_another_silent_turn_none() {
+    assert!(crate::head_cue::unclear(Some("on")));
+    for off in [None, Some(""), Some("off"), Some("1")] {
+        assert!(!crate::head_cue::unclear(off), "{off:?}");
+    }
+    // The transcript's two ends: the unclear turn, then the empty "Sorry?".
+    let mut hum = UnclearHum::default();
+    assert!(!hum.finished(7, true, 4_680_000), "the unclear turn itself");
+    assert_eq!(hum.owed(), None);
+    hum.asked(8);
+    assert!(hum.finished(8, true, 8_700_000), "the empty Sorry?");
+    assert_eq!(hum.owed(), Some(8_700_000));
+    assert_eq!(hum.due(None, 8_720_000), HumDue::Now);
+    // It plays through the tap's own rule: a quiet lamp, allowed to listen.
+    let now = crate::head_cue::Now {
+        at_us: 8_720_000,
+        began_us: 8_700_000,
+        allowed: true,
+        quiet: true,
+        listening_ready: true,
+        reply_owed: false,
+        last_said_us: None,
+        last_hum_us: None,
+    };
+    assert_eq!(crate::head_cue::may_hum(&now), Ok(()));
+    // Not over a mute, and not twice in 30 s with a tap's.
+    let muted = crate::head_cue::Now {
+        allowed: false,
+        ..now
+    };
+    assert_eq!(
+        crate::head_cue::may_hum(&muted),
+        Err("microphone_not_allowed")
+    );
+    let lately = crate::head_cue::Now {
+        last_hum_us: Some(8_000_000),
+        ..now
+    };
+    assert_eq!(crate::head_cue::may_hum(&lately), Err("hummed_recently"));
+    hum.done();
+    assert_eq!(hum.owed(), None);
+
+    // A "Sorry?" the model said: the answered turn is unchanged.
+    let mut hum = UnclearHum::default();
+    hum.asked(8);
+    assert!(!hum.finished(8, false, 8_700_000));
+    assert_eq!(hum.owed(), None);
+    // A silent turn that was not the lamp's asking (the room's talk).
+    let mut hum = UnclearHum::default();
+    assert!(!hum.finished(9, true, 9_000_000));
+    assert_eq!(hum.owed(), None);
+    // A "Sorry?" cancelled without finishing leaves no watch on a later turn.
+    let mut hum = UnclearHum::default();
+    hum.asked(8);
+    assert!(!hum.finished(9, true, 9_000_000));
+    assert!(!hum.finished(8, true, 9_500_000));
+    assert_eq!(hum.owed(), None);
+
+    // Someone speaking first drops it; so does waiting past 2 s for quiet.
+    let mut hum = UnclearHum::default();
+    hum.asked(8);
+    hum.finished(8, true, 8_700_000);
+    assert_eq!(
+        hum.due(Some(9), 8_800_000),
+        HumDue::Drop("another_turn_began")
+    );
+    assert_eq!(
+        hum.due(None, 8_700_000 + UNCLEAR_HUM_WITHIN_US + 1),
+        HumDue::Drop("late")
+    );
+    assert_eq!(
+        hum.due(None, 8_700_000 + UNCLEAR_HUM_WITHIN_US),
+        HumDue::Now
+    );
+    // What held it is kept for the drop's row (the Seventh's P3 on #1421).
+    hum.hold("listening_not_ready");
+    assert_eq!(hum.held(), Some("listening_not_ready"));
+    // A Stop drops an owed hum, and the watch, saying when it was owed.
+    assert_eq!(hum.cancelled(), Some(8_700_000));
+    assert_eq!((hum.owed(), hum.held()), (None, None));
+    let mut hum = UnclearHum::default();
+    hum.asked(8);
+    assert_eq!(hum.cancelled(), None);
+    assert!(!hum.finished(8, true, 9_000_000), "no watch after a Stop");
+}
+
 /// #941, the first builder on #1146: a turn the lamp wrote itself (its own
 /// look, a hello, a "Sorry?") takes no still from "Let me take a look.":
 /// pictures never chain with nobody speaking. A turn someone spoke still does.

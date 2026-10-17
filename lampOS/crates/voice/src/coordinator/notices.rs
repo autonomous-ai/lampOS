@@ -149,6 +149,9 @@ pub(super) enum SpeechOrigin {
     FailureNotice,
     /// The head tap's "hm?" (`crate::head_cue`, #711): local PCM, no answer.
     HeadCue,
+    /// The same "hm?" for the lamp's own empty "Sorry?" (#1417): its own
+    /// name in the trace, so it isn't counted as a tap's.
+    UnclearHum,
     /// A skill's own sound (`crate::say`, #938): local PCM, no answer.
     SkillSound,
 }
@@ -160,7 +163,7 @@ impl SpeechOrigin {
     /// A turn that is only a short sound of the lamp's own, and none for the
     /// face, the head, the room or the voice's state.
     pub(super) fn unshown(self) -> bool {
-        matches!(self, Self::HeadCue | Self::SkillSound)
+        matches!(self, Self::HeadCue | Self::UnclearHum | Self::SkillSound)
     }
     /// The trace's name for what plays.
     pub(super) fn trace_name(self) -> &'static str {
@@ -168,6 +171,7 @@ impl SpeechOrigin {
             Self::Provider => "speaker",
             Self::FailureNotice => "failure_notice",
             Self::HeadCue => "head_tap_cue",
+            Self::UnclearHum => "unclear_hum",
             Self::SkillSound => "skill_sound",
         }
     }
@@ -181,7 +185,7 @@ pub(super) enum NoticeDelivery {
     Unselected,
     Skipped(Missing),
     Selected {
-        /// `FailureNotice`, `HeadCue` or `SkillSound`.
+        /// `FailureNotice`, `HeadCue`, `UnclearHum` or `SkillSound`.
         origin: SpeechOrigin,
         recording: Arc<Recording>,
         cursor: usize,

@@ -34,6 +34,19 @@ pub const DBFS_RANGE: (f64, f64) = (-60.0, -20.0);
 /// At most one hum in this long (creature.md: the non-word sounds are kept
 /// rare). A tap in between gets no hum.
 pub const RARE_US: u64 = 30_000_000;
+/// The same hum when the lamp's own "Sorry?" (#926) came back with nothing
+/// said (#1417): `LAMP_UNCLEAR_HUM=on`, off unless set.
+pub const UNCLEAR_SWITCH: &str = "LAMP_UNCLEAR_HUM";
+
+/// Whether the switch is on in this process's environment.
+pub fn unclear_from_environment() -> bool {
+    unclear(std::env::var(UNCLEAR_SWITCH).ok().as_deref())
+}
+
+/// Whether the switch's value turns it on: only `on`.
+pub fn unclear(value: Option<&str>) -> bool {
+    value == Some("on")
+}
 
 /// The level `LAMP_HEAD_TAP_CUE_DBFS` asks for, or [`DBFS`] when unset.
 pub fn level_from_environment() -> Result<f64, String> {
