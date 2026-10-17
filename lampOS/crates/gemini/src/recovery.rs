@@ -565,6 +565,12 @@ pub struct Supervisor<C> {
     /// prevents an old request from being submitted to a replacement session.
     submitted: Cell<Option<Lineage>>,
     retired_through: Cell<u64>,
+    /// Whether a request whose turn is lost may be started once more on a
+    /// later connection ([`Self::resend_lost_lines`]).
+    resend_lost: bool,
+    /// The request whose turn was lost before any output, while it may
+    /// still be sent again ([`Self::try_resend_for_session`]).
+    lost: Cell<Option<Lineage>>,
     /// Camera grants revoked so far; applied to every new connection.
     revoked_images: Cell<Option<u64>>,
     resume: Option<ResumptionPoint>,
@@ -600,6 +606,8 @@ impl<C: Connect> Supervisor<C> {
             tracked: Cell::new(None),
             submitted: Cell::new(None),
             retired_through: Cell::new(0),
+            resend_lost: false,
+            lost: Cell::new(None),
             revoked_images: Cell::new(None),
             resume: None,
             recoveries: VecDeque::new(),
@@ -666,6 +674,62 @@ impl<C: Connect> Supervisor<C> {
             self.retire(previous);
         }
         let lineage = Lineage { session, request };
+        self.submitted.set(Some(lineage));
+        self.tracked.set(Some(Tracked {
+            lineage,
+            stage: Stage::InputOpen,
+        }));
+        Ok(())
+    }
+    /// Let a request whose turn is lost before any output be started once
+    /// more on a later connection ([`Self::try_resend_for_session`]). Off
+    /// by default: input is then never replayed, as before (#705, Step B).
+    pub fn resend_lost_lines(&mut self, on: bool) {
+        self.resend_lost = on;
+        if !on {
+            self.lost.set(None);
+        }
+    }
+    /// The request whose turn was lost before any output, while it may
+    /// still be sent again: the last one lost, not retired since, with
+    /// nothing newer started.
+    pub fn lost(&self) -> Option<Lineage> {
+        self.lost.get()
+    }
+    /// Start `request` once more on `expected`, the live connection, after
+    /// its turn was lost on an earlier one before any output: only with
+    /// [`Self::resend_lost_lines`], only the request [`Self::lost`] names,
+    /// and only once. Its answer is then that request's on the new
+    /// connection, and its input is the caller's to send again, as after any
+    /// start. A connection that is not live, or not `expected`, or the one it
+    /// was lost on, refuses, and so does a request retired or superseded
+    /// since.
+    pub fn try_resend_for_session(
+        &self,
+        expected: SessionId,
+        request: RequestId,
+    ) -> std::result::Result<(), StartRefusal> {
+        let Some(lost) = self.lost.get().filter(|lost| lost.request == request) else {
+            return Err(StartRefusal::Refused(Error::StaleRequest));
+        };
+        let (input, live) = self.input().map_err(|_| StartRefusal::NotConnected)?;
+        if live != expected {
+            return Err(StartRefusal::SessionMismatch { live });
+        }
+        if live == lost.session
+            || self
+                .submitted
+                .get()
+                .is_some_and(|previous| previous.request > request)
+        {
+            return Err(StartRefusal::Refused(Error::StaleRequest));
+        }
+        input.try_start(request).map_err(StartRefusal::Refused)?;
+        self.lost.set(None);
+        let lineage = Lineage {
+            session: live,
+            request,
+        };
         self.submitted.set(Some(lineage));
         self.tracked.set(Some(Tracked {
             lineage,
@@ -877,6 +941,11 @@ impl<C: Connect> Supervisor<C> {
     /// applies to output still held by a failed connection, and never waits
     /// for the network or for a connection to exist.
     pub fn retire(&self, request: RequestId) {
+        // Retired by the caller, or superseded by a newer start: no longer
+        // sent again.
+        if self.lost.get().is_some_and(|lost| lost.request <= request) {
+            self.lost.set(None);
+        }
         self.retired_through
             .set(self.retired_through.get().max(request.get()));
         let cancelled = |tracked: &Tracked| tracked.lineage.request <= request;
@@ -1202,7 +1271,15 @@ impl<C: Connect> Supervisor<C> {
     ) {
         let completed_at = connection.ready_at();
         let input = connection.input();
-        if let Ok(retired) = RequestId::new(self.retired_through.get()) {
+        // A lost request that may be sent again stays open on the new
+        // connection; only this supervisor's own guard refuses an ordinary
+        // start of it.
+        let retired = self.retired_through.get();
+        let retired = match self.lost.get() {
+            Some(lost) if lost.request.get() == retired => retired - 1,
+            _ => retired,
+        };
+        if let Ok(retired) = RequestId::new(retired) {
             input.retire(retired);
         }
         if let Some(revoked) = self.revoked_images.get() {
@@ -1369,13 +1446,19 @@ impl<C: Connect> Supervisor<C> {
             return;
         };
         // Its identifier ends with that connection: a later session must not
-        // accept the same request again as if nothing had happened.
+        // accept the same request again as if nothing had happened. With
+        // `resend_lost_lines`, one lost before any output is the exception:
+        // it is kept as `lost`, and the live connection is not told to retire
+        // it, so `try_resend_for_session` may start it once more (#705).
         self.retired_through.set(
             self.retired_through
                 .get()
                 .max(tracked.lineage.request.get()),
         );
-        if let Link::Connected(live) = &self.link {
+        let resendable =
+            self.resend_lost && matches!(tracked.stage, Stage::InputOpen | Stage::AwaitingResponse);
+        self.lost.set(resendable.then_some(tracked.lineage));
+        if !resendable && let Link::Connected(live) = &self.link {
             live.input.retire(tracked.lineage.request);
         }
         debug_assert!(self.pending_output.is_none());
