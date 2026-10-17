@@ -632,3 +632,23 @@ async fn a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_s
     assert!(desk.asked.try_recv().is_err(), "cancel_reminder was run");
     rig.stop().await;
 }
+
+/// `--provider-patience` is read where the coordinator puts it, after
+/// `--staff-note`, on both routes (#705, 17 Oct).
+#[test]
+fn provider_patience_is_read_after_the_staff_note() {
+    let dir = std::path::Path::new("/run/test");
+    let flags: Vec<String> = [crate::staff_note::FLAG, crate::config::PATIENCE_FLAG]
+        .map(String::from)
+        .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.provider_patience);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert!(files.provider_patience);
+    let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
+    assert!(!files.provider_patience);
+    let wrong: Vec<String> = [crate::config::PATIENCE_FLAG, crate::staff_note::FLAG]
+        .map(String::from)
+        .into();
+    assert!(parse_flags(dir, &wrong).is_err());
+}

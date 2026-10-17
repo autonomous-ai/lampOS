@@ -46,7 +46,7 @@ pub struct ProviderConfig {
     #[serde(default)]
     resumption: ReconnectContext,
     #[serde(default)]
-    silent_response: SilentResponse,
+    silent_response: Option<SilentResponse>,
     /// Longest wait for the first output of a response, in milliseconds.
     #[serde(default)]
     response_timeout_ms: Option<u32>,
@@ -121,6 +121,37 @@ pub const CHAT_INSTRUCTION: &str = "You are Lamp, a considerate desk companion h
 /// Availability is not sight: only an attached frame supplies visual evidence.
 pub const CAMERA_CHAT_INSTRUCTION: &str = "You are Lamp, a considerate desk companion having a live conversation with the person beside you. Always speak English, whatever language you hear, and respond to their meaning. Give short answers when appropriate; expand when asked. Do not use spoken waiting fillers or repetitive acknowledgments. A fresh camera image may accompany a question. Describe only what an attached image supports; if there is no image or details are unclear, say so. Do not pretend to remember, browse, control devices or finish tasks you cannot access. A human may pause mid-thought; do not finish their thought for them.";
 
+/// Where the coordinator reads whether the provider file's unset waits
+/// are filled in ([`ProviderConfig::with_patience`]). Off unless `on`.
+pub const PATIENCE_ENVIRONMENT: &str = "LAMP_PROVIDER_PATIENCE";
+/// The provider worker's flag for it.
+pub const PATIENCE_FLAG: &str = "--provider-patience";
+/// The no-reply wait it fills in, in milliseconds.
+pub const PATIENT_NO_REPLY_MS: u32 = 8_000;
+/// The first-output wait it fills in, in milliseconds.
+pub const PATIENT_RESPONSE_MS: u32 = 12_000;
+
+/// The provider worker's argument for it, from the environment.
+pub fn patience_arguments_from_environment() -> Vec<String> {
+    patience_arguments(std::env::var(PATIENCE_ENVIRONMENT).ok().as_deref())
+}
+
+fn patience_arguments(value: Option<&str>) -> Vec<String> {
+    if value == Some("on") {
+        vec![PATIENCE_FLAG.to_owned()]
+    } else {
+        Vec::new()
+    }
+}
+
+/// Take a leading [`PATIENCE_FLAG`] off a worker's flags.
+pub fn take_patience(flags: &[String]) -> (bool, &[String]) {
+    match flags {
+        [flag, rest @ ..] if flag == PATIENCE_FLAG => (true, rest),
+        _ => (false, flags),
+    }
+}
+
 impl ProviderConfig {
     pub fn load(path: &Path) -> io::Result<Self> {
         let data = read_private(path, 16_384)?;
@@ -130,6 +161,11 @@ impl ProviderConfig {
                 "invalid private provider configuration",
             )
         })?;
+        config.checked()
+    }
+    /// The file's own rules, also for what [`Self::with_patience`] fills in.
+    fn checked(self) -> io::Result<Self> {
+        let config = self;
         if !Path::new(&config.credential_file).is_absolute() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -177,7 +213,26 @@ impl ProviderConfig {
     }
     /// What the provider worker does about a response that goes silent.
     pub fn barrier_policy(&self) -> BarrierPolicy {
-        self.silent_response.into()
+        self.silent_response.unwrap_or_default().into()
+    }
+    /// With `LAMP_PROVIDER_PATIENCE=on`, what the private provider file
+    /// leaves unset is filled in so that a silent service costs no
+    /// connection (#705, 17 Oct: on lamp-cb94 every `barrier_timeout` and
+    /// `response_timeout` dropped the session and the line waiting on it):
+    /// a response asked to stop and silent is taken as over
+    /// (`assume_over`), a request with no output for 8 s ends as unanswered
+    /// on the same connection, and the first output is waited for 12 s, not
+    /// 30. On lamp-4ace no first output, audio or tool call, of 2,693 took
+    /// more than 4 s. What the file sets is kept; a no-reply wait not under
+    /// its response timeout is not added.
+    pub fn with_patience(mut self) -> Self {
+        self.silent_response
+            .get_or_insert(SilentResponse::AssumeOver);
+        let response = *self.response_timeout_ms.get_or_insert(PATIENT_RESPONSE_MS);
+        if self.no_reply_after_ms.is_none() && PATIENT_NO_REPLY_MS < response {
+            self.no_reply_after_ms = Some(PATIENT_NO_REPLY_MS);
+        }
+        self
     }
     /// What a lost connection is replaced with. A configuration that opens a
     /// new conversation on every reconnect never holds a handle, so requiring
@@ -370,6 +425,61 @@ mod tests {
             BarrierPolicy::AssumeAfterQuiet
         );
         assert!(parsed(r#","silent_response":"ignore""#).is_err());
+    }
+
+    /// #705 (17 Oct): `LAMP_PROVIDER_PATIENCE=on` fills in what the file
+    /// leaves unset, keeps what it sets, and never makes a no-reply wait
+    /// the loader would refuse.
+    #[test]
+    fn patience_fills_in_only_what_the_file_leaves_unset() {
+        assert_eq!(patience_arguments(Some("on")), [PATIENCE_FLAG]);
+        for value in [None, Some(""), Some("1"), Some("ON"), Some("off")] {
+            assert!(patience_arguments(value).is_empty(), "{value:?}");
+        }
+        let flags: Vec<String> = [PATIENCE_FLAG, "--next"].map(str::to_owned).to_vec();
+        assert_eq!(take_patience(&flags), (true, &flags[1..]));
+        assert_eq!(take_patience(&flags[1..]), (false, &flags[1..]));
+
+        let patient = parsed("").unwrap().with_patience();
+        assert_eq!(patient.barrier_policy(), BarrierPolicy::AssumeAfterQuiet);
+        assert_eq!(patient.response_timeout_ms, Some(PATIENT_RESPONSE_MS));
+        assert_eq!(patient.no_reply_after_ms, Some(PATIENT_NO_REPLY_MS));
+        // Without it, as before.
+        let plain = parsed("").unwrap();
+        assert_eq!(plain.barrier_policy(), BarrierPolicy::Require);
+        assert_eq!(
+            (plain.response_timeout_ms, plain.no_reply_after_ms),
+            (None, None)
+        );
+        // What the file sets is kept.
+        let set = parsed(
+            r#","silent_response":"fail","response_timeout_ms":20000,"no_reply_after_ms":5000"#,
+        )
+        .unwrap()
+        .with_patience();
+        assert_eq!(set.barrier_policy(), BarrierPolicy::Require);
+        assert_eq!(
+            (set.response_timeout_ms, set.no_reply_after_ms),
+            (Some(20_000), Some(5_000))
+        );
+        // A response timeout at or under 8 s gets no no-reply wait.
+        let short = parsed(r#","response_timeout_ms":6000"#)
+            .unwrap()
+            .with_patience();
+        assert_eq!(
+            (short.response_timeout_ms, short.no_reply_after_ms),
+            (Some(6_000), None)
+        );
+        // The filled-in values pass the file's own rules.
+        let checked = |config: ProviderConfig| {
+            ProviderConfig {
+                credential_file: "/run/credential".into(),
+                ..config
+            }
+            .checked()
+        };
+        assert!(checked(patient).is_ok());
+        assert!(checked(short).is_ok());
     }
 
     /// #806: the name typed at setup reaches the model's instruction through

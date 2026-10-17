@@ -319,7 +319,16 @@ replaces the 30 s wait for the first output of a response; `no_reply_after_ms`
 (1,000 to 30,000, and shorter than the response timeout) makes a request with
 no output at all for that long end as one the service chose not to answer: the
 turn finishes with outcome `no_audio_answer`, the connection and the
-conversation stay, and an answer that still arrives later is dropped. Without
+conversation stay, and an answer that still arrives later is dropped. With `LAMP_PROVIDER_PATIENCE=on` in the voice's unit (the provider
+worker's `--provider-patience`; the product sets it), the three are filled in
+where the file leaves them unset: `silent_response: assume_over`,
+`no_reply_after_ms: 8000` and `response_timeout_ms: 12000`, so neither a
+silent cut-off response nor a request the service never answers drops the
+connection and the line waiting on it (#705, 17 Oct: lamp-cb94 lost a line to
+each of its 57 `barrier_timeout` and 45 `response_timeout` drops, the latter
+after 30 s of silence). What the file sets is kept, and no no-reply wait is
+added unless it is under the response timeout. The cost is that of
+`assume_over`: the next answer's ownership is assumed, not confirmed. Without
 it such a request fails the connection at the response timeout. On lamp-4ace a
 service instructed to stay quiet for speech not meant for it sent nothing at
 all for such a request, and the ten-second timeout ended the process;

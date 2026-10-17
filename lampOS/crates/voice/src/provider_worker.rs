@@ -192,6 +192,10 @@ pub struct Files {
     /// name one of the staff (`--staff-note`, `crate::staff_note`). Only
     /// with the tasks part.
     pub staff_note: bool,
+    /// Whether the provider file's unset waits are filled in
+    /// (`--provider-patience`, `LAMP_PROVIDER_PATIENCE`,
+    /// [`ProviderConfig::with_patience`]).
+    pub provider_patience: bool,
 }
 
 /// The bus's root for this worker, if it publishes.
@@ -260,6 +264,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (ask_unclear, flags) = crate::not_speech::take_unclear(flags);
     let (policy_holds, flags) = crate::policy_holds::take(flags);
     let (staff_note, flags) = crate::staff_note::take(flags);
+    let (provider_patience, flags) = crate::config::take_patience(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
@@ -294,6 +299,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         ask_unclear,
         policy_holds,
         staff_note,
+        provider_patience,
     };
     Ok((continuation, sight, files, visual))
 }
@@ -1011,7 +1017,10 @@ pub async fn run_with_continuation(
     if let Some(place) = &files.tools.tasks {
         crate::agent_tasks::start(place);
     }
-    let provider_config = ProviderConfig::load(config_path)?;
+    let mut provider_config = ProviderConfig::load(config_path)?;
+    if files.provider_patience {
+        provider_config = provider_config.with_patience();
+    }
     let barrier = provider_config.barrier_policy();
     let recovery = if files.keep_link {
         provider_config.serving_recovery_policy()
