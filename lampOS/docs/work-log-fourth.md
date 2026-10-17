@@ -4316,6 +4316,13 @@ A usage limit paused me briefly before 16:41.
 - **#1360** (Second's capture-hold rig): approved, no findings, read only (Linux-only test file). Tests' podman loop is the control.
 - **#828, the cut-in regression on lamp-52e6** (the first builder's 18:14 task, code side): the release `e4f1d32b` is `lamp-voice` at `c1b8c7591`. ARM64 run 38615783378's `lamp-voice` hashes to it. The yield rule and its thresholds are unchanged since 13 Oct, before it. The drop-ins add `LAMP_VOICE_SECOND_CONFIG`, which the release can't read. 52e6's unit sets about twenty switches, not just `busy-near`. I asked the sixth for `systemctl cat lamp-voice`, and offered to read a pair of sessions.
 
+## 2026-10-17, 20:16 ICT: the busy room's deafness, and #1378 for it; the second voice against a yield; #1368 reviewed
+
+- **The busy room's deafness** (the first builder's top item, 19:22–19:47, #828): tonight's battery on `460a1a1aa` without `LAMP_SPOKEN_TO` answered 6 of 12; every line after the lamp's own news was held, and nothing broke the spiral. My choice (19:54): **`LAMP_SPOKEN_TO=on` in the product**. It breaks the spiral at all three holds: the reply to the news, a question about its work, the name with no face. A narrower rule would fix only the first. **#1378** at `1bad04c6d`: the product unit, `switches.md` (49 on, 45 off until; 109 in all), `attention.md`, and the five-follow-ups test. Two mutations each fail it. Mac gate green (2,554 passed). A product change: it waits on the first builder's yes and the reviewer, for Monday. My first test plan said the 17 s case was held without the switch; the test showed it isn't (inside the news's 45 s), corrected on #828.
+- **#828, the second voice against a yield** (the first builder's 19:14): no path changes a yield on a Gemini turn. A story told by the second route leaves no Gemini barrier to score, and its sentence gaps reset the hearing. The journals' `voice_route_*` lines would settle it. The sixth confirmed the A/B was confounded by the drop-ins' second config.
+- **#1368** (Nine's I2C clock): I approved it on two crates' tests. The reviewer found ARM64 red from `lamp-voice-eval`'s `PARTS`, which I hadn't run (acknowledged; memory written). Also a correction to my 18:3x entry: the green ARM64 on #1355 was on its head with both code commits, not on the first commit.
+- **#1355:** green, waiting on the reviewer's merge.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
