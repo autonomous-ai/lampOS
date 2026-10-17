@@ -5,6 +5,22 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-18 — overnight: #1416 merged, the replay's held steps
+
+- #1416 merged at 06:35: `LAMP_VAD_INPUT=linear` lets the speech detector
+  read the canceller's linear output (#828), on the first builder's
+  `first/aec-linear`. It is passed to capture only, says in the journal that
+  it took, and its fixture is Piper's `en_US-libritts-high` (the reviewer's
+  licence P2). The linear output also keeps most of the lamp's own voice, so
+  the owner's replay reads the lamp-alone seconds too.
+- The relay's day (17–18 Oct): chat first byte median 2.0 s, p90 16–18 s,
+  past 3 s on 28–35 % of probes, 7 timeouts; the listen websocket 0.88 s
+  with no failure.
+- #1430 (open): `replay-aec` refused the rehearsal because `mic1`'s capture
+  hold puts the reference four steps ahead of each recorded block. The
+  recorder now keeps those steps and the replay takes them, still bit for
+  bit.
+
 ## 2026-10-17 — evening: #828 confounded, go-aways are the lamp's own
 
 - #828: the release ran without the second voice and every newer build
