@@ -890,6 +890,29 @@ at rest for the rest of the window. A tap the voice doesn't answer gets no
 hum and no face (First on #705, 17 Oct 07:26). The tap is still a call for
 the attention rule.
 
+**The same "hm?" after an empty "Sorry?"** (`LAMP_UNCLEAR_HUM=on`, off unless
+set; #1417). When the lamp can't make out a turn, it asks again with a
+written turn of its own that tells the model to say only "Sorry?" (#926). On
+lamp-4ace on 17 Oct (16:26) "make your light a bit cooler" was heard as Hindi,
+that turn came back with no audio (`no_audio_answer`), and the person got
+silence. With the switch, that turn's empty end owes the "hm?":
+- It plays as its own sound turn with the ring's listening face, as the tap's
+  does, under the same rules (`may_hum` above): the microphone allowed, the
+  lamp quiet and listening-ready, no look owed, and at most one in 30 s,
+  shared with the tap's.
+- It plays within 2 s of the empty end (`UNCLEAR_HUM_WITHIN_US`), and is
+  dropped if any turn begins first.
+- Only that turn: a turn that ended silent because it was the room's talk
+  stays silent, and a "Sorry?" the model said owes nothing.
+- Expression gives no look-up here: that comes from a tap on the head, and
+  the hum's own turn is no turn for the head (`speaker_tone`).
+
+The trace says `unclear_hum_owed` at the empty end, then `unclear_hum` with
+`plays` and, when it doesn't, `why`. Test:
+`coordinator::tests::reminders::an_empty_sorry_owes_one_hm_and_a_said_one_or_another_silent_turn_none`
+(this transcript's two turn ends, a "Sorry?" the model said, another silent
+turn, someone speaking first, too late). Not shown on a lamp.
+
 ## The record of whom it answered
 
 Off unless set: `LAMP_FIRST_OUTPUT=/absolute/private/directory` in the
