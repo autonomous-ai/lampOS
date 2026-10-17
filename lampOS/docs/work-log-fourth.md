@@ -4343,6 +4343,16 @@ A usage limit paused me briefly before 16:41.
 - **#1378 merged** at 23:03 (`831afba60`): the product sets `LAMP_SPOKEN_TO=on`, with narrowing (a). The first builder's lamp check on lamp-4ace (`d1690b67b`'s build, 22:46–23:01): 12 of 12 day lines answered, 4 of 4 stories, 3 of 3 handed over, 3 lines held back, first words 1.16–4.51 s after the end of speech. That closes my #828 busy-room task.
 - **Next:** #1396's app part, waiting on the backend's `lamp-v2` number, the setup choice, Ten's Light answer and a yes to push there. Free for reviews meanwhile.
 
+## 2026-10-18, 00:15 ICT: "Several people": #1415, and the reviewer's two P2s on it
+
+- **The lines** (seven of tonight's batteries, #829): scene 3's "And what about tomorrow?" and "I should bring an umbrella then." (Samantha, after Daniel's named question) are answered 7 of 7. No line for the lamp was held. The same-voice model separates her lines from his off the lamp (cosine 0.12–0.16 against 0.75–0.86, the real CAM++ on `say` clips).
+- **#1415** (the first builder's yes at 23:34): with the same-voice check, one line held as another voice ends the conversation. Without it, the check only moved the error to Daniel's own remark. Off unless `LAMP_SAME_VOICE_MODEL` is set. It was tested through the worker's loop, with a mutation that fails it; Mac gate 1,938 passed. ARM64 green.
+- **The reviewer's 00:07 (2 P2, 2 P3):**
+  - a sound held as another voice ended the conversation: fixed, with a test;
+  - the 1.5 s bar counts the pre-roll and the end silence, so on the lamp the short follow-up is judged and likely held. My 23:32 said otherwise; corrected on #829 for the first builder's run of the model on lamp-4ace tonight;
+  - the cost (the asker's reply to the lamp's own question held) and the wording, in the docs.
+  At `0186c11ec`, gate running.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
