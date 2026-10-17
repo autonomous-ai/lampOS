@@ -61,6 +61,16 @@ jobs:
     name: lampOS — build and test on Linux ARM64 (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-22.04-arm
     timeout-minutes: 90
+    # In four full runs that failed on 2026-10-16 (#874), one shard each
+    # stopped in `cargo build` fetching the crates.io index, before its tests;
+    # the other shards ran theirs. The failures were curl 55 (SSL_ERROR_SYSCALL)
+    # (#788) and "[16] Error in the HTTP2 framing layer". HTTP/1.1 reaches
+    # those index fetches. Cargo 0.97 (Rust 1.96) does not retry an index
+    # fetch, so `net.retry` covers crate files and git only; the fetch step
+    # below tries the whole fetch again instead.
+    env:
+      CARGO_HTTP_MULTIPLEXING: 'false'
+      CARGO_NET_RETRY: '10'
     strategy:
       fail-fast: false
       matrix:
@@ -88,6 +98,17 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
+      - name: fetch (the index and every crate, up to three tries)
+        working-directory: lampOS
+        # A full run on another branch finds no cache and fetches the index
+        # cold, where a lost connection ended four runs (#874).
+        run: |
+          for try in 1 2 3; do
+            cargo fetch --locked && exit 0
+            echo "cargo fetch failed (try $try of 3)"
+            sleep $((try * 10))
+          done
+          exit 1
       - name: build (release, the lamps' binaries)
         working-directory: lampOS
         run: cargo build --locked --release --workspace --bins --examples
