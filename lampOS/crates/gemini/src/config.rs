@@ -1,6 +1,6 @@
 use crate::{
-    Error, MAX_HANDLE_BYTES, MAX_INSTRUCTION_BYTES, MAX_TOOLS, OUTPUT_BUFFER_BYTES, OUTPUT_RATE,
-    Result, Tool,
+    Error, INPUT_QUEUE_CAPACITY, MAX_HANDLE_BYTES, MAX_INPUT_QUEUE, MAX_INSTRUCTION_BYTES,
+    MAX_TOOLS, OUTPUT_BUFFER_BYTES, OUTPUT_RATE, Result, Tool,
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt, str::FromStr, sync::Arc, time::Duration};
@@ -53,6 +53,12 @@ pub struct Timeouts {
     pub connect: Duration,
     pub setup: Duration,
     pub write: Duration,
+    /// Added to a write's bound for each KiB of the message, so a big
+    /// message (the look's picture, a camera frame) has time to go out on a
+    /// slow link. Zero by default: each write has `write`, a camera frame its
+    /// own 400 ms. A block of audio never gets it: it keeps its own bound,
+    /// which its age caps.
+    pub write_per_kib: Duration,
     pub read: Duration,
     /// Longest silence of an earlier response, after it was asked to stop,
     /// before its idle completion. Only the next request's activityEnd waits
@@ -87,6 +93,7 @@ impl Default for Timeouts {
             connect: Duration::from_secs(10),
             setup: Duration::from_secs(10),
             write: Duration::from_millis(200),
+            write_per_kib: Duration::ZERO,
             read: Duration::from_secs(60),
             barrier: Duration::from_secs(2),
             response: Duration::from_secs(30),
@@ -119,6 +126,9 @@ impl Timeouts {
             }
         }
         if self.keepalive >= self.read {
+            return Err(Error::InvalidConfiguration);
+        }
+        if self.write_per_kib > Duration::from_millis(50) {
             return Err(Error::InvalidConfiguration);
         }
         // Not a failure bound: it has to end before the one for a response.
@@ -283,6 +293,12 @@ pub struct SessionConfig {
     pub(crate) barrier_reports: bool,
     pub(crate) successor_start: SuccessorStart,
     pub(crate) output_buffer: usize,
+    /// Commands the input queue holds ([`Self::writes`]).
+    pub(crate) input_queue: usize,
+    /// A write that held the session owes a read before any quiet bound is
+    /// judged ([`Self::writes`]). Off by default: the read loop is as
+    /// before (the reviewer on lampOS#1397).
+    pub(crate) read_after_long_writes: bool,
 }
 impl SessionConfig {
     /// Custom proxies are explicit WSS endpoints. Authentication belongs only in
@@ -311,6 +327,8 @@ impl SessionConfig {
             barrier_reports: false,
             successor_start: SuccessorStart::AtOnce,
             output_buffer: OUTPUT_BUFFER_BYTES,
+            input_queue: INPUT_QUEUE_CAPACITY,
+            read_after_long_writes: false,
         })
     }
     pub fn google(credential: Credential) -> Result<Self> {
@@ -477,6 +495,39 @@ impl SessionConfig {
             return Err(Error::InvalidConfiguration);
         }
         self.output_buffer = seconds as usize * 2 * OUTPUT_RATE as usize;
+        Ok(self)
+    }
+    /// How long a write to the service may wait, and how much input waits
+    /// behind it. `write` is every write's bound, `per_kib` is added for each
+    /// KiB of the message ([`Timeouts::write_per_kib`]), and
+    /// `input_queue` is how many commands the input queue holds. A block of
+    /// audio is one command of 20 ms, and a write that waits takes no input
+    /// meanwhile. So the queue bounds how long a write may wait while someone
+    /// speaks before the connection ends as [`Error::Backpressure`]:
+    /// [`INPUT_QUEUE_CAPACITY`] is 640 ms, and [`MAX_INPUT_QUEUE`] reaches the
+    /// audio's own [`crate::MAX_INPUT_AGE`] (lampOS#705).
+    ///
+    /// It also makes a write that held the session 100 ms or more owe a read:
+    /// what the service sent meanwhile is read before the barrier's quiet or a
+    /// response bound is judged. Without it the read loop is as before.
+    pub fn writes(
+        mut self,
+        write: Duration,
+        per_kib: Duration,
+        input_queue: usize,
+    ) -> Result<Self> {
+        if !(INPUT_QUEUE_CAPACITY..=MAX_INPUT_QUEUE).contains(&input_queue) {
+            return Err(Error::InvalidConfiguration);
+        }
+        let timeouts = Timeouts {
+            write,
+            write_per_kib: per_kib,
+            ..self.timeouts
+        };
+        timeouts.validate()?;
+        self.timeouts = timeouts;
+        self.input_queue = input_queue;
+        self.read_after_long_writes = true;
         Ok(self)
     }
     pub(crate) fn request(&self) -> Result<Request> {

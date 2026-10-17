@@ -176,6 +176,10 @@ pub struct Files {
     /// Where whom it answered is recorded (`--first-output-log`,
     /// [`crate::first_output`]), if anywhere.
     pub first_output: Option<std::path::PathBuf>,
+    /// Whether a write to the service may wait on a link that is behind
+    /// (`--provider-writes-patient`, `LAMP_PROVIDER_WRITES`,
+    /// [`crate::config::patient_writes`]).
+    pub patient_writes: bool,
     /// Whether a short sound let through in a quiet room is held unless
     /// something shows it was said to the lamp (`--sounds-checked`,
     /// `crate::not_speech::CHECKED`). Only with `attention`.
@@ -259,6 +263,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (head_touch, flags) = crate::attention::take_head_touch(flags);
     let (bus_root, flags) = crate::bus_out::take_root(flags)?;
     let (first_output, flags) = crate::first_output::take(flags)?;
+    let (patient_writes, flags) = crate::config::take_writes(flags);
     let (sounds_checked, flags) = crate::not_speech::take_checked(flags);
     let (ask_unclear, flags) = crate::not_speech::take_unclear(flags);
     let (transcription_language, flags) = crate::not_speech::take_transcription(flags);
@@ -294,6 +299,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         head_touch,
         bus_root,
         first_output,
+        patient_writes,
         sounds_checked,
         ask_unclear,
         transcription_language,
@@ -395,6 +401,21 @@ const RETAINED_INPUT_US: u64 = 100_000;
 /// queue: past the link's own write bound (200 ms), so a write that is only
 /// slow is waited out and one that is stuck has failed the link first.
 const ROOM_WAIT_US: u64 = 250_000;
+/// The same past patient writes' 1 s (`LAMP_PROVIDER_WRITES=patient`, the
+/// reviewer on #1397): with a second route, a replayed line and speech
+/// that fill the queue while a write waits are waited out with it.
+const PATIENT_ROOM_WAIT_US: u64 = 1_050_000;
+/// The wait in force: [`PATIENT_ROOM_WAIT_US`] once the worker takes patient
+/// writes, otherwise [`ROOM_WAIT_US`].
+static ROOM_WAIT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(ROOM_WAIT_US);
+/// The room wait for a worker with patient writes or without.
+fn room_wait_us(patient_writes: bool) -> u64 {
+    if patient_writes {
+        PATIENT_ROOM_WAIT_US
+    } else {
+        ROOM_WAIT_US
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -701,7 +722,7 @@ pub enum Fault {
     ConnectTimeout,
     SetupTimeout,
     ReadTimeout,
-    /// Which write did not finish in time, its size on the wire in KiB and
+    /// Which write did not finish in time, the message's size in KiB and
     /// its bound (lampOS#705). Absent in records from before.
     WriteTimeout {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1043,13 +1064,22 @@ pub async fn run_with_continuation(
     } else {
         provider_config.recovery_policy()
     };
-    let config = continuation.apply(
-        crate::not_speech::with_transcription(
-            provider_config.into_session_with_camera(visual.is_some())?,
-            files.transcription_language.as_deref(),
-        )
-        .barrier_policy(barrier),
-    )?;
+    let session = crate::not_speech::with_transcription(
+        provider_config.into_session_with_camera(visual.is_some())?,
+        files.transcription_language.as_deref(),
+    )
+    .barrier_policy(barrier);
+    ROOM_WAIT.store(
+        room_wait_us(files.patient_writes),
+        std::sync::atomic::Ordering::Relaxed,
+    );
+    // A write may wait on a link that is behind (#705).
+    let session = if files.patient_writes {
+        crate::config::patient_writes(session)?
+    } else {
+        session
+    };
+    let config = continuation.apply(session)?;
     // Whose the first session is, read before it opens: the eyes' known
     // face, when each session is one person's (the switch below). The
     // switch's count starts from the same reading.
@@ -3309,7 +3339,7 @@ struct RetainedInput {
     command: ProviderInput,
     received_at_us: u64,
     /// Held for room in Gemini's input queue, which bounds it by
-    /// [`ROOM_WAIT_US`] instead of [`RETAINED_INPUT_US`].
+    /// [`ROOM_WAIT`] instead of [`RETAINED_INPUT_US`].
     awaiting_room: bool,
 }
 
@@ -3356,7 +3386,7 @@ impl ProviderIntake {
                 .checked_sub(retained.received_at_us)
                 .is_none_or(|age| {
                     age >= if retained.awaiting_room {
-                        ROOM_WAIT_US + RETAINED_INPUT_US
+                        ROOM_WAIT.load(std::sync::atomic::Ordering::Relaxed) + RETAINED_INPUT_US
                     } else {
                         RETAINED_INPUT_US
                     }
@@ -3519,13 +3549,14 @@ impl ProviderIntake {
             // full, as it is for a moment when a write is slow and input
             // comes faster than speech (a held line replayed, lampOS#892).
             // The command waits here, first in line, and nothing more is
-            // read; past ROOM_WAIT_US it goes, and a queue still full is
+            // read; past ROOM_WAIT it goes, and a queue still full is
             // the link's failure as before. A retired request's End owed
             // for want of room goes first.
             let now_us = now();
             if self.handoff.wait_for_room
                 && (!input.has_room() || self.handoff.owes_end())
-                && now_us.saturating_sub(retained.received_at_us) < ROOM_WAIT_US
+                && now_us.saturating_sub(retained.received_at_us)
+                    < ROOM_WAIT.load(std::sync::atomic::Ordering::Relaxed)
             {
                 retained.awaiting_room = true;
                 self.retained = Some(retained);
@@ -11067,6 +11098,16 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(1)).await;
         }
         assert_eq!(lost, Some(Fault::Local));
+    }
+
+    /// A command waits for room past the link's write bound: 200 ms today,
+    /// 1 s with patient writes (the reviewer's P3 on #1397).
+    #[test]
+    fn the_room_wait_is_past_the_write_bound_with_patient_writes_or_without() {
+        let today = room_wait_us(false);
+        assert!(today > 200_000 && today < 1_000_000, "{today}");
+        let patient = u64::try_from(crate::config::PATIENT_WRITE.as_micros()).unwrap();
+        assert!(room_wait_us(true) > patient, "{}", room_wait_us(true));
     }
 
     #[test]

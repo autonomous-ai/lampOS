@@ -1,5 +1,5 @@
 use super::*;
-use crate::{Credential, GOOGLE_ENDPOINT};
+use crate::{Credential, GOOGLE_ENDPOINT, INPUT_QUEUE_CAPACITY};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde_json::{Value, json};
 use tokio::io::DuplexStream;
@@ -489,7 +489,8 @@ async fn read_response_and_write_waits_have_finite_deadlines() {
             &mut client,
             Message::text("x".repeat(4096)),
             Duration::from_millis(20),
-            crate::Write::Context
+            crate::Write::Context,
+            Duration::ZERO
         )
         .await,
         Err(Error::WriteTimeout {
@@ -2004,6 +2005,7 @@ mod continuation;
 mod open_activity;
 mod retain;
 mod tools;
+mod writes;
 
 /// A stop as a fence on the wire. The transport here can hold a write before
 /// or after it has accepted some of it, and can record a stop at the moment
