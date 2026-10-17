@@ -4218,6 +4218,24 @@ no (#1047 and #1158, drafts; #1092, its gate running)
 - **#1228** (the bare-call worker test) merged after its two P3s (`OwnRoom`, the logical clock). **#782** closed with its summary.
 - **Peer reviews:** #1237 (Second's task ask): no finding, its control checked. #1254 (Fifth's body-test rename): approve, `lamp-body` 387/0, the duplicate helper confirmed on `lamp-voice`.
 
+## 2026-10-17, 10:14 ICT: #1047 merged and its P3s in #1266; #1158 given its own value; #1262 reviewed; #829's follow-on
+
+- **#1047** (stop words over the lamp's voice) merged at 09:11.
+  - Its four P3s are **#1266**: the play-time stamp is one tested function (`plays_at_us`), plus the date and where the Linux-only test runs (nightly, or `-f full=true`).
+  - Two are left as they are, with reasons in `stop-word.md`.
+  - ARM64 is green on both runs. The full one ran `raw_blocks_carry_the_microphone_before_the_canceller_only_when_asked` for the first time, and it passed.
+- **#1158** (#829's day and night bars):
+  - **I had missed four of the reviewer's 08:38 findings**, answering only Ten's review.
+  - All five are now answered at `3465ed766`. The day half is its own value, `LAMP_SPOKEN_TO=day-and-night`, since no lamp has played it by day, and `on` is as on `lamp-voice`.
+  - A bare call close by day no longer shows the call alone, with that value.
+  - `attention.md` says the 18 dB bar decides no named answer with the switch.
+  - Voice 1,840 passed, none failed.
+- **#1262** (the sixth's #1226 P3) peer-reviewed: one P2. The new `trim_start()` runs the two halves' words together ("HeyLamp"), so a carried-over call is held; a probe shows it.
+- **#829, the first builder's 09:01 scene** (a follow-up 12 s after an answer got silence):
+  - None of my rules decides it. The model got the line with nothing beside it, and the character file's "a moment ago" left it to the model.
+  - Building `LAMP_FOLLOWS_ON=on` on `fourth/follows-on`: a line begun within 20 s of the lamp's words finishing is told it may follow on, unless the room is busy.
+- **#828, the first builder's 09:27 point 1:** the busy room came from the run of three lines left unanswered within a minute, not the room microphone's rise. A cut-in battery feeds that run. The proposal is on #828.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
