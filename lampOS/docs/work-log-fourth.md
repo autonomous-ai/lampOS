@@ -4204,6 +4204,20 @@ no (#1047 and #1158, drafts; #1092, its gate running)
 - **#1158 closed:** the journal held two rises (22.2 and 21.9 dB) and no transcripts. It reopens with a weekday's rises, with the calls known.
 - **Missed findings, three times:** #1108 22:01, #1201 03:37 and #1224 06:15. Each time I read only the newest comment, or only those after my own last comment. The memory now says: match every finding since my last push to an answer.
 
+## 2026-10-17, 08:48 ICT: #1047 and #1158 reworked, #1228 merged, two peer reviews
+
+- **#1047** (stop words over the lamp's voice):
+  - The reviewer's 07:42 three P2s and four P3s are fixed (`640f54449`, Voice 1,831 passed).
+  - A stop that closes the reply now writes its counts. The lamp's own words are stamped with when they play.
+  - The docs say plainly that on both lamps no person's stop came through yet.
+  - **A correction:** my 02:39 and 03:36 comments said ARM64 ran the Linux-only raw-blocks test. It didn't; the pull-request profile skips that binary.
+- **#1158** (#829's day and night bars, my build item):
+  - Reopened, and the first builder's 17:09 sign added: by day a name heard close to the lamp also needs a face or its words calling it.
+  - Ten's peer review then found a P2: `LAMP_KERNEL_CLOCK` never reached the provider worker, which starts with a cleared environment. It's passed now, to the provider and second workers. The night is also read as the request ends. Voice 1,834 passed (`96c0b4a24`).
+  - The 18 dB bar is still unset from the lamp's own rises.
+- **#1228** (the bare-call worker test) merged after its two P3s (`OwnRoom`, the logical clock). **#782** closed with its summary.
+- **Peer reviews:** #1237 (Second's task ask): no finding, its control checked. #1254 (Fifth's body-test rename): approve, `lamp-body` 387/0, the duplicate helper confirmed on `lamp-voice`.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
