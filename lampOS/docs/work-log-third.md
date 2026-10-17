@@ -3385,3 +3385,17 @@ wait on their owners and a lamp
   waits for El's lamp-06c1 reinstall. Peer-reviewed Tests' **#1222** (no
   finding; stress 0 of 120 against 2 of 120). Closed **#699** (all three
   parts merged); #711 closes with #1209.
+- **2026-10-17 15:10:** merged since: **#1209** (10:00), **#1244** (the
+  listening face after a head tap follows the hum), **#1252** (a skill's
+  body requests say who asks), **#1282** + **#1301** (muted for privacy, a
+  head tap gets no look up; an unknown slide counts as closed), **#1288** (a
+  tap while muted shows the asleep face for about a second), **#1310**
+  (`muted_wait` holds its closures). #711's software half is all in; it
+  closes with El's lamp-06c1 check. **#1316** (the light steps warmer and
+  cooler along white, warm, orange): the reviewer's four P3s taken,
+  `4eae7a0ed`, ARM64 green, needs a lamp check. **#1325** (the first
+  builder's 14:44 item 2, #806): `lamp-setup` breathes soft white on the
+  ring while the hotspot waits, soft blue while Wi-Fi joins, amber after a
+  failed join, and frees the ring before the marker; on for the product
+  through `serve-own-page.json`'s `light`. Waits on ARM64, review and a lamp
+  check. `cargo clean` run after each.
