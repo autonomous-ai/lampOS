@@ -4302,6 +4302,13 @@ A usage limit paused me briefly before 16:41.
 - **#828:** #1291's switch gave no help on lamp-4ace (7 of 20 against 8 of 20), so it stays off. `LAMP_SPOKEN_TO`'s own A/B runs 16:40–17:20.
 - **For Sunday:** the two-people table for `LAMP_SPOKEN_TO` is on #829. Four scenes it should hold (from 02:16, 04:58/15:39 and 06:07 on 16 Oct, and the unplayed busy-room reply), four it must not take away (calls by name, a follow-up, a reply to the lamp's news, the cut-ins), and the rule that decides.
 
+## 2026-10-17, 17:38 ICT: why "Yes. Please start it." went unanswered, and #1355 for it; #1352 peer-reviewed
+
+- **#828, the 16:11 battery (the first builder's 16:53 task):** the end came after "Yes." (`silence_fallback`), which was heard as "bien", so the request ended as a short sound. The model's first output was `confirm_agent_task`. The short-sound check (#800) held it (not a short word, not close, nobody turned), so the call was answered and not run, and nothing was said. The lead-in played no part. On lamp-4ace (the first builder's count), 17 requests were held this way since 16 Oct, 3 of them in a conversation.
+- **#1355** at `0637b82e8`, for Monday: under `quiet-room-checked`, a sound with a word in it, right after the lamp's own question, in a conversation going on, plays and the model judges it. Each first-output line has `lamp_asked`. Mac gate green (1,913 passed, none failed). It changes behaviour, so it needs the reviewer's check. The second voice is unchanged.
+- **#1352** (Second's lone stop before the answer): P2 with a probe. "Wait, … what about tomorrow?" with a comma's pause, its words back after the person goes on: the answer is stopped and, with the loop's own cancel, the question is dropped. P3: `waited_stop` can outlive its pass.
+- **`LAMP_SPOKEN_TO`'s A/B** (the first builder, lamp-4ace): no difference in cutting in, 12 of 20 unset against 11 of 20 on.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
