@@ -107,7 +107,10 @@ it wakes sleep; a person's own mute still needs their hold. See [controls](contr
 durability protocol, clear fences and physical acceptance procedure.
 
 Unmute creates fresh controller/worker/provider identities. Old PCM, prospective
-input, request IDs, permits and queued output are not replayed. No preservation
+input, request IDs, permits and queued output are not replayed. A line
+kept to be sent again after a lost connection (`LAMP_RESEND_LOST_LINE=on`,
+#705) is tied to its privacy generation: a mute or a privacy change drops it,
+and it is never sent across one. No preservation
 of Gemini conversational memory across physical mute is claimed. There is no
 periodic context reset or timer-based reopen. A later stable unmute must satisfy
 the new runtime's ordinary readiness checks again.

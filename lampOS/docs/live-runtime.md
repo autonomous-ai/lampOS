@@ -253,7 +253,18 @@ its selected provider session before submission. A failed answer retains its
 already-received audio and ends as `provider_failed`, with the actual request
 stage and cause. An input interrupted by an outage drains through its real
 endpoint before a fresh utterance may be submitted on the recovered session.
-Input is never replayed and no answer is requested twice. Require remains the
+Input is never replayed and no answer is requested twice, with one
+exception under `LAMP_RESEND_LOST_LINE=on` (the provider worker's
+`--resend-lost-line`, [`crate::resend`], #705): a line lost with its
+connection, before any output or tool call for it, is sent once more on the
+next ready session, under the same request, if its privacy generation is
+unchanged, it is at most 15 s long, no newer line has begun, the failure is
+one a second try mends (a barrier, write or read timeout, a transport loss,
+a peer close, a go-away, a stalled response; never a quota, a refusal or a
+silent model) and the next session is ready within 5 s of its end. Its
+answer, or the held `TurnFailed` if that try fails too, is the request's one
+outcome; the trace says `line_resent` or `resend_refused` with why. Off
+unless set, nothing is ever sent twice. Require remains the
 cancellation policy; there is no automatic assumption of an unconfirmed cut-off.
 The library's explicit Legacy entry point remains for existing callers; worker
 and coordinator must be upgraded together. See the

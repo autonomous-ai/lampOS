@@ -4,7 +4,11 @@
 stream. It is an additive worker contract. `run_with_reporting()` selects the
 contract explicitly; `run()` continues to select `Legacy`. The directed CLI's
 paired selection is described in the [coordinator contract](coordinator-outage-contract.md).
-The provider's cancellation barrier remains `Require`, and input is never replayed.
+The provider's cancellation barrier remains `Require` unless the provider
+file or `LAMP_PROVIDER_PATIENCE` says otherwise, and input is never replayed,
+except a line lost with its connection before any output or tool call, sent
+once more on the next ready session under `LAMP_RESEND_LOST_LINE=on` with the
+guards in [live-runtime.md](live-runtime.md) (`crate::resend`, #705).
 
 On each 2 ms worker control tick, after urgent Stop/privacy controls, the worker
 calls `Supervisor::poll_link()`. This runs even when PCM credit is zero, the
