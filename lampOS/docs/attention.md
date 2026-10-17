@@ -237,7 +237,12 @@ What the model then says is spoken like any answer. The trace has
   within three seconds of the silence is dropped too.
 - **It is late.** That nothing was said is only known when the service's
   wait for an answer has run out, four seconds after the person stopped
-  (`no_reply_after_ms`). The answer comes a second or so after that.
+  (`no_reply_after_ms`, lamp-4ace's provider file). The answer comes a
+  second or so after that. On a product lamp the wait is the 8 s that
+  `LAMP_PROVIDER_PATIENCE` fills in, so the second look comes about 9 s
+  after the person stopped; before it, a silent request there ended at 30 s
+  with its connection and the second look was dropped (the reviewer on
+  #1394).
 - **A name like the lamp's.** Lines to "Lan" or "Liam" set the name part
   off in five of ten at the score it reports from (0.9) and in two of ten
   at 0.999 ([name.md](name.md)); 0.98 is between, and what such a line

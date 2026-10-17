@@ -78,6 +78,9 @@ Environment=LAMP_TASK_NEWS_AT_PAUSE=on
 Environment=LAMP_MEMORY_RULES=on
 Environment=LAMP_LIGHT_REQUESTS=on
 Environment=LAMP_QUIET_PACE=on
+# A silent service costs no connection and no line waiting on it: the provider file's unset
+# waits become assume_over, 8 s with no output = unanswered, 12 s for a first output (#705).
+Environment=LAMP_PROVIDER_PATIENCE=on
 Environment=LAMP_START_OFFLINE=on
 # No link: the offline line once, the amber breath, and "back online" after (lampOS/docs/offline.md; #830), on
 # lamp-health's lamp/online. The line is silent until recordings are given (--failure-notice-dir). Without

@@ -2638,6 +2638,7 @@ fn provider_arguments(
     arguments.extend(crate::not_speech::transcription_arguments_from_environment());
     arguments.extend(crate::policy_holds::arguments_from_environment());
     arguments.extend(crate::staff_note::arguments_from_environment());
+    arguments.extend(crate::config::patience_arguments_from_environment());
     if let Some(camera) = camera {
         arguments.extend(camera.source.arguments());
     }

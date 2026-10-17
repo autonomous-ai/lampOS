@@ -114,8 +114,8 @@ neither that nor any further output for `Timeouts::barrier` (2 s):
 
 | `BarrierPolicy` | Result |
 |---|---|
-| `Require` (library and production worker default) | `BarrierTimeout`; the connection fails |
-| `AssumeAfterQuiet` (explicit transport/test policy) | The response is treated as over; `Event::BarrierAssumed` names both requests; the next request is committed |
+| `Require` (library default; the worker's with `silent_response: fail` or unset) | `BarrierTimeout`; the connection fails |
+| `AssumeAfterQuiet` (`silent_response: assume_over`, which `LAMP_PROVIDER_PATIENCE=on` fills in; the product sets it) | The response is treated as over; `Event::BarrierAssumed` names both requests; the next request is committed |
 
 The bound restarts on every event of the earlier response, so a slow but
 active response is waited for. If it produces output again after an assumption
@@ -124,11 +124,16 @@ that is still producing 30 s (`Timeouts::response`) after it was asked to stop
 fails the connection under either policy, so the next request cannot wait
 forever.
 
-Integration deliberately retains `Require`. The live endpoint has not been
-probed for cancellation ordering, and the coordinator does not yet consume
-`ownership_assumed`. Silence cannot qualify a late answer's owner. The explicit
-assumption policy remains covered in tests and in the service probe tool, but
-is not selected by the production worker or exposed in its configuration.
+Integration kept `Require` until #1394: the live endpoint has not been
+probed for cancellation ordering, and silence cannot qualify a late answer's
+owner. The provider file's `silent_response: assume_over` selects the
+assumption policy, and `LAMP_PROVIDER_PATIENCE=on` (on in the product unit)
+fills it in where the file leaves it unset: on lamp-cb94 every
+`BarrierTimeout` had cost the line behind it (#705). The coordinator records
+each assumption as `provider_ownership_assumed`; the answer that follows is
+the next request's by assumption, not confirmation. With the switch the
+response bound above is 12 s, not 30, so a response still producing 12 s
+after it was asked to stop fails the connection under either policy.
 
 ## Unqualified behavior
 
