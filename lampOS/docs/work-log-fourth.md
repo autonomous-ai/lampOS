@@ -4323,6 +4323,14 @@ A usage limit paused me briefly before 16:41.
 - **#1368** (Nine's I2C clock): I approved it on two crates' tests. The reviewer found ARM64 red from `lamp-voice-eval`'s `PARTS`, which I hadn't run (acknowledged; memory written). Also a correction to my 18:3x entry: the green ARM64 on #1355 was on its head with both code commits, not on the first commit.
 - **#1355:** green, waiting on the reviewer's merge.
 
+## 2026-10-17, 22:13 ICT: #1355 merged; #1378 narrowed and rebased; #1396's app part read
+
+- **#1355 merged** at 21:43 (the first builder's lamp check on lamp-4ace: "Yes. [700 ms] Please start it." handed over 4 of 4 against 3 of 3, no regression).
+- **#1378** (`LAMP_SPOKEN_TO=on` in the product): the Second's P2 (two colleagues answered 45–180 s after the lamp's news) is fixed by the first builder's narrowing (a). In a busy room a reply to the news is taken only when it asks about the lamp's work. It's tested on the 19:02 battery's own lines and times: "How is that task going?" at 46.8 s, then three as a conversation. The colleagues are held with and without the switch. The reviewer's four P3s are in. Rebased onto `lamp-voice` (a `switches.md` count conflict with #1385, resolved: 110 switches, 49 on, 46 off until). Mac gate 2,572 passed. It waits on the product yes. I had missed the first builder's 20:41 call at first.
+- **#1396, the app** (`ecm-sds-mobile` `v3`, mine since 21:44): read with an Explore agent, and its key claims checked by hand. Unchanged, the app would set a V2 lamp up as V1: loose matching claims against V1's Lamp record, both generations broadcast `lamp-xxxx`, and presence would show "Starting" forever without `openclaw_detected`. The list of changes and three decisions are on the issue. I corrected one claim there 3 minutes later (the wizard claims before it reads the lamp's status), so I recommend two products, as Intern has.
+- **#828:** closed for the second voice: no cost to cut-ins on either lamp (first builder 21:16).
+- Cleaned the shared target dir at 21 GB (26.5 GiB removed).
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
