@@ -52,8 +52,11 @@ const STEP: Duration = Duration::from_millis(20);
 const STEADY: Duration = Duration::from_millis(200);
 /// A servo's turn is 4,096 counts.
 const COUNTS_A_RADIAN: f64 = 4096.0 / TAU;
-/// What one move takes at most, with the margin of a renewal or two.
-const ONE_MOVE: Duration = Duration::from_millis(5_600);
+/// How long a joint may take to hold still before a move reads its start.
+const SETTLE_WITHIN: Duration = Duration::from_secs(1);
+/// What one move takes at most, with the margin of a renewal or two, and
+/// the wait for the joint to hold still first.
+const ONE_MOVE: Duration = Duration::from_millis(6_600);
 
 /// Which joint a move asks of.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -363,6 +366,55 @@ pub fn judge(tried: &[Tried], interrupted: Option<&str>) -> PartResult {
     with_values(PartResult::new(PART, Verdict::Pass, ""))
 }
 
+/// A joint's position and goal once its position has held within half a
+/// count for [`STEADY`], as [`reached`] asks of a goal; `Err` if it does not
+/// within [`SETTLE_WITHIN`], or something ends the check meanwhile.
+fn settled(bus: &Bus, watch: &mut Watch, joint: Joint) -> Result<(f64, f64), String> {
+    let began = Instant::now();
+    let mut still: Option<(Instant, f64)> = None;
+    let mut last_seq = None;
+    loop {
+        if let Some(why) = watch.interruption(bus) {
+            return Err(why);
+        }
+        let Some((seq, position, goal)) = read(bus, joint) else {
+            return Err(format!(
+                "{} is not read on {}",
+                joint.name(),
+                JointState::TOPIC
+            ));
+        };
+        if last_seq != Some(seq) {
+            last_seq = Some(seq);
+            match still {
+                Some((since, at)) if (position - at).abs() < 0.5 => {
+                    if since.elapsed() >= STEADY {
+                        return Ok((position, goal));
+                    }
+                }
+                _ => still = Some((Instant::now(), position)),
+            }
+        }
+        if began.elapsed() >= SETTLE_WITHIN {
+            // A body that stopped saying its joints is named as such, as
+            // before a move (the reviewer on #1340).
+            if let Some(age) = newest_age(bus).filter(|age| *age > listen::FAST_FRESH) {
+                return Err(format!(
+                    "lamp-body is not publishing {} (newest {:.1} s old)",
+                    JointState::TOPIC,
+                    age.as_secs_f64()
+                ));
+            }
+            return Err(format!(
+                "{} did not hold still within {} s before its move",
+                joint.name(),
+                SETTLE_WITHIN.as_secs()
+            ));
+        }
+        std::thread::sleep(STEP);
+    }
+}
+
 /// A joint's position and goal, in counts, from the body's newest reading.
 fn read(bus: &Bus, joint: Joint) -> Option<(u64, f64, f64)> {
     let message = bus.latest(JointState::TOPIC).ok()??;
@@ -567,13 +619,11 @@ fn one_move(
             age.unwrap_or_default().as_secs_f64()
         ));
     }
-    let Some((_, start, goal_was)) = read(bus, joint) else {
-        return Err(format!(
-            "{} is not read on {}",
-            joint.name(),
-            JointState::TOPIC
-        ));
-    };
+    // From where the joint holds still, not from where the last move's
+    // return was counted while it was still settling: the next return is
+    // judged against this start (Tests on #1329: the merged test passed by
+    // 0.1 count of `NEAR`, and a head settling a little slower fails).
+    let (start, goal_was) = settled(bus, watch, joint)?;
     let target = joint.counts() * sign;
     let began = Instant::now();
     let mut samples: Vec<Sample> = Vec::new();
@@ -1151,6 +1201,76 @@ mod tests {
         let late = run_against(Fake::FoldsLettingGoLast, "late");
         assert_eq!(late.verdict, Verdict::NotChecked, "{late:?}");
         assert!(late.reason.contains("began to fold"), "{}", late.reason);
+    }
+
+    /// Tests on #1329: a move's start is read where the joint holds still,
+    /// not where it still moves after the last return. A head pitch
+    /// settling from 1768 toward 1771 gives 1771; one that drifts a count
+    /// every 100 ms never holds still, and gives why within its second.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_moves_start_is_read_once_the_joint_holds_still() {
+        let root = std::path::PathBuf::from(format!("/tmp/hm-settle-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        // A head pitch going to 1771 by a third of the way each 20 ms, or
+        // drifting a count every 100 ms for ever.
+        let head = |root: std::path::PathBuf,
+                    shakes: bool,
+                    stop: std::sync::Arc<std::sync::atomic::AtomicBool>| {
+            std::thread::spawn(move || {
+                let bus = Bus::new(&root).unwrap();
+                let mut joints = bus
+                    .publisher_declared(JointState::TOPIC, &JointState::declaration(), "body")
+                    .unwrap();
+                let (mut pitch, began) = (1768.0f64, std::time::Instant::now());
+                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    // Drifting a count every 100 ms by the clock can never hold
+                    // still for 200 ms, however the readings are seen (the reviewer
+                    // on #1340).
+                    pitch = if shakes {
+                        1771.0 + (began.elapsed().as_millis() / 100) as f64
+                    } else {
+                        pitch + (1771.0 - pitch) * 0.3
+                    };
+                    let radians = |counts: f64| counts / COUNTS_A_RADIAN;
+                    let state = JointState {
+                        name: ["base_yaw", "shoulder", "elbow", "head_roll", "head_pitch"]
+                            .map(str::to_owned)
+                            .to_vec(),
+                        position: [2035.0, 2657.0, 2602.0, 2035.0, pitch]
+                            .map(radians)
+                            .to_vec(),
+                        velocity: Vec::new(),
+                        effort: Vec::new(),
+                        commanded: [2035.0, 2657.0, 2602.0, 2035.0, 1771.0]
+                            .map(radians)
+                            .to_vec(),
+                    };
+                    joints
+                        .publish_json(lamp_ipc::monotonic_us(), &state)
+                        .unwrap();
+                    std::thread::sleep(STEP);
+                }
+            })
+        };
+        let bus = Bus::new(&root).unwrap();
+        let mut watch = Watch::on(&bus).unwrap();
+        for shakes in [false, true] {
+            let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let moving = head(root.clone(), shakes, stop.clone());
+            std::thread::sleep(Duration::from_millis(30));
+            let got = settled(&bus, &mut watch, Joint::Pitch);
+            stop.store(true, std::sync::atomic::Ordering::Relaxed);
+            moving.join().unwrap();
+            if shakes {
+                assert!(got.unwrap_err().contains("did not hold still"));
+            } else {
+                let (start, _) = got.unwrap();
+                assert!((start - 1771.0).abs() < 0.5, "{start}");
+            }
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// A body that said its joints once and stopped is named, not taken for
