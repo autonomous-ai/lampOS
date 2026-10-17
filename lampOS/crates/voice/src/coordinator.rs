@@ -2383,6 +2383,21 @@ fn observe_provider_output(
         // Asked again by the loop once the turn is over (#926); a tool's
         // look is taken by the loop too (#941).
         ProviderOutput::Unclear { .. } | ProviderOutput::LookAsked { .. } => {}
+        // A finished task's news the person asked about, answered in this
+        // turn: the tasks part is told so only once the turn is heard whole
+        // (#1390), as with news told unasked.
+        ProviderOutput::NewsAnswered { request, key } => {
+            match reply.as_mut().filter(|r| r.owner.turn() == *request) {
+                Some(current) => {
+                    if !current.news.contains(key) {
+                        current.news.push(key.clone());
+                    }
+                }
+                None => eprintln!(
+                    "lamp-voice: the news ({key}) was answered for a turn already over: its harness stays open"
+                ),
+            }
+        }
         ProviderOutput::Ended { .. } => cloud.end_output()?,
         ProviderOutput::Started {
             request, session, ..
@@ -4542,6 +4557,8 @@ fn conversation_with_gate(
                         json!({"kind":"provider_turn_unclear","turn":request,"why":why,"at_us":monotonic_us(),"asked_again":current}),
                     )?;
                 }
+                // Put on its turn by `observe_provider_output`.
+                ProviderOutput::NewsAnswered { .. } => {}
                 ProviderOutput::LookAsked {
                     request,
                     session,

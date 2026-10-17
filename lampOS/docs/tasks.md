@@ -330,11 +330,15 @@ started once its answer is told:
     - **Not sent:** hand-over and progress news, of no observation; with
       `--close-told` off, `told` is answered `told:false` and writes nothing,
       so the revision a tool's guard read still holds.
-    - **Not covered yet:** a finished answer the person only asked about
-      (`check_agent_task`). Its words go to the model from the provider
-      worker, another process, and its turn isn't known there. Such a task
-      is kept as told, so it isn't told unasked either, and its harness
-      stays open.
+    - **Asked about** (`check_agent_task`): its answer carries the finished
+      news's key, which the provider worker takes out before the model is
+      told and, once the model has the answer, hands to the coordinator
+      (`NewsAnswered`) for that request. It rides on that turn like news
+      told unasked, on the same proof. Told before or not: a telling unasked
+      may have been cut short. Only the tasks part's own answer can carry a
+      key.
+      The second voice's model isn't given the key either, but it puts no
+      news on its turns, so news asked about there leaves its harness open.
     - Before this, on lamp-4ace on 18 Oct, task 147 was told and never
       closed: the news path never said so.
   - **Or by a speech claim:** its telling played, or isn't known to have
@@ -409,6 +413,10 @@ started once its answer is told:
   `news_heard_whole_is_handed_on_as_the_turn_ends`,
   `news_cut_short_is_never_handed_on`,
   `news_not_heard_whole_is_never_handed_on` (no audio, a playback gap).
+- **The asked path:** `agent_tasks`'
+  `an_answer_with_finished_news_carries_its_key_for_the_worker_alone`; the
+  provider worker's `an_answer_with_news_hands_its_key_on_once_it_is_sent`;
+  `coordinator::tests::say::news_answered_to_a_question_rides_on_its_own_turn`.
 - **The voice's `tests/news_told.rs`, with a real `lamp-tasks` on its
   sockets:**
   - `news_heard_whole_closes_the_harness_it_was_of` (news taken to tell

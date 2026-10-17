@@ -688,7 +688,8 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::Interrupted { request }
         | ProviderOutput::TurnComplete { request, .. }
         | ProviderOutput::Unclear { request, .. }
-        | ProviderOutput::LookAsked { request, .. } => Some(*request),
+        | ProviderOutput::LookAsked { request, .. }
+        | ProviderOutput::NewsAnswered { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
     }
 }

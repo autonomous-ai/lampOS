@@ -341,6 +341,34 @@ fn news_heard_whole_is_handed_on_as_the_turn_ends() {
     assert_eq!(test.heard, NEWS);
 }
 
+/// #1390, the follow-up to #1425: news the person asked about
+/// (`check_agent_task`) comes from the provider worker as `NewsAnswered`
+/// for the request it was answered in. On that turn it is handed on as the
+/// turn ends heard whole, like news told unasked; for another request, a
+/// turn already over, it is let go.
+#[test]
+fn news_answered_to_a_question_rides_on_its_own_turn() {
+    let mut test = Test::new();
+    let turn = test.reply.as_ref().unwrap().owner.turn();
+    for (request, key) in [(turn, "s1:2:4"), (turn + 1, "s1:3:5"), (turn, "s1:2:4")] {
+        observe_provider_output(
+            &mut test.cloud,
+            &mut test.reply,
+            &ProviderOutput::NewsAnswered {
+                request,
+                key: key.into(),
+            },
+        )
+        .unwrap();
+    }
+    let chunk = test.generation(17);
+    test.provider_complete();
+    test.accept(&chunk, 240);
+    test.retire(&chunk);
+    assert!(test.finish_if_settled());
+    assert_eq!(test.heard, ["s1:2:4"]);
+}
+
 /// A Stop or the person speaking over it cancels the turn: the news goes
 /// with it, never handed on, and its harness stays open.
 #[test]

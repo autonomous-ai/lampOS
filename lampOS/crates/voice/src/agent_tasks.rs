@@ -1183,7 +1183,26 @@ fn check(
     if told_before {
         answered["told_before"] = json!(true);
     }
+    // The provider worker takes this out before the model is told it, and
+    // the tasks part hears the news was told once its turn is heard whole
+    // (#1390). Told before or not: one told unasked may have been cut short.
+    if settled {
+        answered[NEWS_KEY] = json!(key);
+    }
     (answered, true)
+}
+
+/// Where a `check_agent_task` answer carries the key of the finished news it
+/// gives (#1390), for the provider worker alone.
+const NEWS_KEY: &str = "news_key";
+
+/// The news key in a `check_agent_task` answer `told`, taken out, so that the
+/// model is never told it (#1390).
+pub fn take_news_key(told: &mut Value) -> Option<String> {
+    told.as_object_mut()?
+        .remove(NEWS_KEY)?
+        .as_str()
+        .map(str::to_owned)
 }
 
 /// What the model is told to do with the last look at the agent.
@@ -1759,6 +1778,27 @@ mod tests {
         let (answered, ok) = check(&place, None, told, PEER_WAIT);
         assert!(ok, "{answered}");
         answered
+    }
+
+    /// #1390: an answer with a finished task's news carries its key, told
+    /// before or not (a telling unasked may have been cut short), for the
+    /// provider worker to take out before the model is told; one still
+    /// working carries none.
+    #[test]
+    fn an_answer_with_finished_news_carries_its_key_for_the_worker_alone() {
+        let directory = std::env::temp_dir().join(format!("agent-news-key-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let told = directory.join("told");
+        for _ in 0..2 {
+            let mut answered = checked(&directory, &told, "idle", "Lumi, Sunny and Archie.", false);
+            assert_eq!(take_news_key(&mut answered).as_deref(), Some("s1:2:4"));
+            assert!(answered.get(NEWS_KEY).is_none(), "{answered}");
+            assert_eq!(answered["answer"], "Lumi, Sunny and Archie.");
+        }
+        let mut working = checked(&directory, &told, "working", "", false);
+        assert_eq!(take_news_key(&mut working), None);
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     /// On lamp-4ace on 2026-10-15 at 08:02 the story was told unasked at
