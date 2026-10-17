@@ -82,6 +82,7 @@ pub mod quiet_pace;
 pub mod reference;
 pub mod remember;
 pub mod reminders;
+pub mod resend;
 pub mod ring_asleep;
 pub mod ring_face;
 pub mod ring_head;
