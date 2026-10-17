@@ -122,6 +122,57 @@ to be run. A minute of two real people at the lamp is to set it.
   rule. In the 06:07 scene with the model answering Samantha, her
   "Anyway, …" then counts, and Daniel's "Did you get my message about
   the budget?" after his own unanswered line is held.
+- **One such line ends the conversation** (`RoomTold::another_voice_held`,
+  17 October). It counts as the two lines left alone do, at once: two
+  people are talking, so whoever speaks next needs the name or a face,
+  until the lamp speaks again. Without it, the check only moved the
+  error in the first builder's battery (scene 3: Daniel asks the weather
+  by name, Samantha says "And what about tomorrow?", then "I should bring
+  an umbrella then."). With the umbrella line held, Daniel's own "Yes, and
+  we should leave a bit early.", to her, came with the lamp quiet, in the
+  conversation's voice, inside 45 s, and would have been answered. A
+  sound let through (`End { sound: true }`) is no one's voice: held, it
+  ends nothing (the reviewer on #1415). **Its cost:** with one person
+  talking to the lamp, someone else's line near it, held as another voice,
+  ends that person's conversation too. Its sharpest form: the lamp asks
+  "Shall I start it?", someone else's line comes between, and the asker's
+  own "Yes, please start it." is held, since a reply to the lamp's
+  question is only let through while a conversation is going on. And it
+  needn't be a second person (the Seventh on #1415): a TV's line of 1.5 s
+  or more, or the asker's own line shouted or whispered, can fall under
+  0.25 too, which was set on synthetic voices at one level. Before, one
+  false "another voice" held one line; now it holds every unnamed line
+  after it until the lamp speaks. **So before `LAMP_SAME_VOICE_MODEL`
+  goes on anywhere,** #829's battery on lamp-4ace gets a TV line and a
+  raised-voice line between a call and its follow-up. If those end the
+  conversation, the fallback is to end it only when the other voice was
+  near the lamp (`set_near`) or a second face is in view.
+  - **Off the lamp, on the battery's lines** (made with `say` in its two
+    voices, 16 kHz, the real model, `lamp-same-voice pairs`): against
+    Daniel's "Hey Lamp, … Hanoi", Samantha's umbrella line (1.58 s) has a
+    cosine of 0.13, her "Okay, I will book the car for eight." (2.14 s)
+    0.16 and her "Yes, I read it this morning…" (3.07 s) 0.12. Daniel's
+    own lines are 0.75 to 0.86, and her "And what about tomorrow?"
+    (1.19 s) 0.16. These are clean clips, not through the lamp's speaker
+    and microphone.
+  - **On the lamp the short follow-up is judged too.** The 1.5 s bar
+    counts the request's audio as the worker gets it: the coordinator's
+    0.3 s pre-roll first, then the line, then the end silence (0.6 s in
+    the product's and lamp-4ace's units; the reviewer on #1415). So a
+    1.19 s line arrives as about 1.8 to 2.1 s, and is judged. At 0.16 it
+    is held as another voice, which is the scene's own expectation for B's
+    follow-up without a face or the name, and with this rule the
+    conversation ends there. A's own short follow-up, in A's voice, stays
+    answered unless the model takes it for another: 7.7% of same-voice
+    pairs under 1.5 s on lamp-4ace's October recordings. Judging the bar
+    on a line's own speech instead would keep a 1.19 s line unjudged, and
+    would put a 1.58 s one such as the umbrella line just under it.
+  - Test: `with_the_switch_and_a_voice_check_another_voice_ends_the_conversation`
+    (scene 3 through the worker's own loop at the lengths the lamp sends,
+    with and without the check, and the umbrella line alone between the
+    call and A's remark, which only this rule holds) and `room_told`'s
+    `with_the_switch_one_line_held_as_another_voice_ends_the_conversation`
+    (with a sound let through, which ends nothing).
 - **The child is supervised, with bounds.** One that gives no answer to a
   line within 2 s (`ANSWER_WITHIN`) is killed and started again, with a
   journal line. One that ends 3 times in a row before it is ready

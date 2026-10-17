@@ -1432,7 +1432,11 @@ The first line of that talk, Samantha's "Anyway, …", came before any line
 was left alone, and rode on Daniel's conversation. With a voice model
 (`LAMP_SAME_VOICE_MODEL`, [same-voice.md](same-voice.md), "In the voice"),
 a line of 1.5 s or more, said with the lamp quiet, in a voice plainly not
-the conversation's, is no part of it.
+the conversation's, is no part of it. A line held as another voice ends
+the conversation: whoever speaks next needs the name or a face, until the
+lamp speaks again (the battery's scene 3, 17 October; same-voice.md). The
+voice is judged at the first output, so a line the model leaves alone is
+never judged, and counts as one line left alone, as before.
 
 Beyond the reply to the lamp's news, the question about its work and the
 name without a face (with `day-and-night`, at night only), the switch only

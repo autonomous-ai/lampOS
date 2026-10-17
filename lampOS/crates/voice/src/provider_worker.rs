@@ -2038,6 +2038,15 @@ async fn serve_with_visual<C: Connect>(
                             {
                                 told.held(request);
                             }
+                            // And that one line ends the conversation: the
+                            // two people are talking (the battery's scene 3,
+                            // #829, 17 October).
+                            if matches!(verdict, Some(crate::attention::Verdict::Hold(_)))
+                                && other_voice
+                                && let Ok(mut told) = crate::room_told::room().lock()
+                            {
+                                told.another_voice_held(request);
+                            }
                             if let (Some(log), Some(verdict)) = (first_output.as_mut(), verdict) {
                                 let (play, reason) = match verdict {
                                     crate::attention::Verdict::Play(why) => (true, why),

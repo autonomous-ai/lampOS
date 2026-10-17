@@ -107,7 +107,8 @@ const BUSY_ENDS_AFTER_US: u64 = 180_000_000;
 /// unanswered since the lamp last spoke, and a conversation with it is no
 /// longer going on: the people have gone on talking to each other
 /// ([`RoomTold::talked_past_the_lamp`]). One is a person saying "okay" or
-/// thinking aloud between their questions.
+/// thinking aloud between their questions. One line held as another voice
+/// counts as this many ([`RoomTold::another_voice_held`]).
 pub const TALK_ENDS_CONVERSATION: usize = 2;
 /// The room is told only when nothing has been heard or said for this
 /// long: a fact written into a request would be taken for part of it, and
@@ -277,6 +278,27 @@ impl RoomTold {
         }
     }
 
+    /// The answer to `request` was held for being said in another voice than
+    /// the conversation's (the same-voice check, `LAMP_SAME_VOICE_MODEL`,
+    /// #829). With [`Self::count_only_talk`] that one line is talk past the
+    /// lamp, as [`TALK_ENDS_CONVERSATION`] lines left alone are: two people
+    /// are talking, and the conversation with the lamp is over until it
+    /// speaks again, whoever says the next line. In the battery's scene 3 on
+    /// lamp-4ace (17 October), with the umbrella line held, the asker's own
+    /// "Yes, and we should leave a bit early.", to the other person, would
+    /// otherwise have been answered as the conversation still going on.
+    /// A sound let through is no one's voice, and no talk: it ends nothing
+    /// (the reviewer on #1415).
+    pub fn another_voice_held(&mut self, request: u64) {
+        if self.sound == Some(request) {
+            return;
+        }
+        if self.talk_only {
+            self.talk_counted = self.talk_counted.max(request);
+            self.talk_since_spoke = self.talk_since_spoke.max(TALK_ENDS_CONVERSATION);
+        }
+    }
+
     /// The lamp is speaking in `request`.
     pub fn spoke(&mut self, request: u64, now_us: u64) {
         if self.open.is_some_and(|(open, _)| open == request) {
@@ -308,7 +330,8 @@ impl RoomTold {
     /// Whether people have gone on talking to each other since the lamp
     /// last spoke, with [`Self::count_only_talk`] (#829):
     /// [`TALK_ENDS_CONVERSATION`] things said since then and left
-    /// unanswered as talk, not as sounds or held by the lamp's own rule. A
+    /// unanswered as talk, not as sounds or held by the lamp's own rule, or
+    /// one line held as another voice ([`Self::another_voice_held`]). A
     /// conversation with the lamp is then no longer going on, however
     /// lately it spoke. On lamp-4ace on 16 October at 06:07, Daniel asked
     /// the lamp for euros and was answered; Samantha and he each said a
@@ -760,6 +783,45 @@ mod tests {
         room.unanswered(7, 46 * S);
         assert!(room.talked_past_the_lamp());
         room.spoke(8, 50 * S);
+        assert!(!room.talked_past_the_lamp());
+    }
+
+    /// #829, the battery's scene 3 (17 October): one line held as another
+    /// voice ends the conversation, as two lines left alone do, still when
+    /// its end is learned later; the lamp speaking again begins afresh, and
+    /// a sound held so ends nothing. Without the switch it changes nothing.
+    #[test]
+    fn with_the_switch_one_line_held_as_another_voice_ends_the_conversation() {
+        let after = |talk_only: bool| {
+            let mut room = RoomTold::new();
+            room.count_only_talk(talk_only);
+            // A's "Hey Lamp, what is the weather like…", answered.
+            said(&mut room, 1, 0);
+            room.spoke(1, 4 * S);
+            // B's "I should bring an umbrella then.", held as another voice.
+            said(&mut room, 2, 8);
+            room.another_voice_held(2);
+            let ended = room.talked_past_the_lamp();
+            room.unanswered(2, 11 * S);
+            (ended, room)
+        };
+        let (ended, mut room) = after(true);
+        assert!(ended);
+        assert!(room.talked_past_the_lamp());
+        room.spoke(3, 20 * S);
+        assert!(!room.talked_past_the_lamp());
+        let (ended, room) = after(false);
+        assert!(!ended && !room.talked_past_the_lamp());
+        // A sound let through, a thump or a chair heard for 1.5 s, is no
+        // voice: held, it ends nothing.
+        let mut room = RoomTold::new();
+        room.count_only_talk(true);
+        said(&mut room, 1, 0);
+        room.spoke(1, 4 * S);
+        said(&mut room, 2, 8);
+        room.ended_as_sound(2, 10 * S);
+        room.another_voice_held(2);
+        room.unanswered(2, 11 * S);
         assert!(!room.talked_past_the_lamp());
     }
 

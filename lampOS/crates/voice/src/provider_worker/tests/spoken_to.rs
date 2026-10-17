@@ -958,6 +958,85 @@ async fn with_the_switch_and_a_voice_check_a_line_held_as_another_voice_counts_a
     assert_eq!(scene(false).await, (true, true));
 }
 
+/// #829, the battery's two-people scene 3 on lamp-4ace (17 October), line by
+/// line through the worker's own loop, with the room and the conversation as
+/// the worker keeps them. Each line is as long as the lamp sends it: its
+/// `say` length with the coordinator's 0.3 s pre-roll before it and the
+/// product's 0.6 s of end silence after it (the reviewer on #1415), so B's
+/// short "And what about tomorrow?" (1.19 s alone) is long enough to be
+/// judged. A asks the lamp by name and is answered; B's lines are held as
+/// another voice; and one such line ends the conversation, so A's own remark
+/// to B after it, which the service would answer, is held. With no voice
+/// check every line is played, as all seven of that evening's batteries
+/// played the umbrella line. On the paused clock, as its sibling above is:
+/// in real time the call's answer and the next line's verdict could fall
+/// the other way (the Seventh on #1415).
+#[tokio::test(start_paused = true)]
+async fn with_the_switch_and_a_voice_check_another_voice_ends_the_conversation() {
+    let _clock = logical_clock();
+    const CALL: &str = "Hey Lamp, what is the weather like in Hanoi today?";
+    const FOLLOW_UP: &str = "And what about tomorrow?";
+    const UMBRELLA: &str = "I should bring an umbrella then.";
+    const EARLY: &str = "Yes, and we should leave a bit early.";
+    const CAR: &str = "Okay, I will book the car for eight.";
+    // The pre-roll and the end silence, in 10 ms blocks.
+    const SENT: u64 = 30 + 60;
+    let scene = |check: bool, lines: Vec<(i16, u64, &'static str)>| async move {
+        let _mark = OwnMark::kept();
+        let _room = OwnRoom::fresh();
+        let mut options = options(true, attention_now, crate::tools::Settings::default());
+        if check {
+            options.voices = Some(Box::new(TwoVoices(Default::default())));
+        }
+        let mut rig = LiveRig::start_configured(
+            quick_policy(),
+            options,
+            BARRIER,
+            false,
+            Continuation::Off,
+            lamp_gemini::MAX_WIRE_BYTES * 2,
+            |config| {
+                config
+                    .timeouts(lamp_gemini::Timeouts {
+                        unanswered: Some(Duration::from_millis(100)),
+                        ..Default::default()
+                    })
+                    .unwrap()
+            },
+        );
+        let mut dial = rig.ready().await;
+        let mut played = Vec::new();
+        for (voice, blocks, text) in lines {
+            played.push(
+                voice_line(&mut rig, &mut dial, false, voice, SENT + blocks, text, true).await,
+            );
+        }
+        rig.stop().await;
+        played
+    };
+    // A is voice 1, B voice -1; each line's own length in 10 ms blocks is
+    // what `say` gives it in the battery's voices.
+    let scene_3 = || {
+        vec![
+            (1, 295, CALL),
+            (-1, 119, FOLLOW_UP),
+            (-1, 158, UMBRELLA),
+            (1, 222, EARLY),
+            (-1, 214, CAR),
+        ]
+    };
+    assert_eq!(
+        scene(true, scene_3()).await,
+        [true, false, false, false, false]
+    );
+    assert_eq!(scene(false, scene_3()).await, [true; 5]);
+    // One line of B's between: the two-lines rule alone would leave A's
+    // remark to B in the conversation; one line held as another voice ends it.
+    let one_between = || vec![(1, 295, CALL), (-1, 158, UMBRELLA), (1, 222, EARLY)];
+    assert_eq!(scene(true, one_between()).await, [true, false, false]);
+    assert_eq!(scene(false, one_between()).await, [true; 3]);
+}
+
 /// #829, through the worker's own loop, with a conversation going on: after
 /// Daniel's call is answered, a line of 1.5 s in another voice is held, and
 /// one in his is played. Said over the lamp, or with no voice check, the
