@@ -4236,6 +4236,23 @@ no (#1047 and #1158, drafts; #1092, its gate running)
   - Building `LAMP_FOLLOWS_ON=on` on `fourth/follows-on`: a line begun within 20 s of the lamp's words finishing is told it may follow on, unless the room is busy.
 - **#828, the first builder's 09:27 point 1:** the busy room came from the run of three lines left unanswered within a minute, not the room microphone's rise. A cut-in battery feeds that run. The proposal is on #828.
 
+## 2026-10-17, 12:42 ICT: #1158, #1266 and #1284 merged; #1278, #1291 and #1295 up; my merges audited for #828's regression
+
+A usage limit paused me from about 10:27 to 11:40.
+
+- **#1158 merged at 11:49**: #829's day and night bars, my build item. `LAMP_SPOKEN_TO=day-and-night` is the day's own bars, and `on` is unchanged.
+  - The reviewer's two P3s are **#1295**: a worker's switches tested through the command it starts with (`worker_command`), and `offline.md`. Voice 1,873/0.
+- **#1266 merged at 12:00**: #1047's P3s. The full ARM64 run ran the Linux-only raw-blocks test for the first time, and it passed.
+- **#1284 merged at 12:19**: the journal ties output dropped after an unanswered close, and the usage after it, to its request (the first builder's 10:02).
+  - Its P3s are on `fourth/late-words`: the line now says "the service sent something", since a late silent turn end reads the same; and once a request is pinned.
+  - The reviewer's third point, that the late words reach the thread, is being tested: the earlier request they're given to was retired when the closed one started.
+- **#1278** (`LAMP_FOLLOWS_ON`, the first builder's 09:01 scene) got one P2 from the reviewer, which El agreed with: `reply.is_some()` also holds while a sound sent on is in hand.
+  - Fixed at `71566dd40`: `took_over` instead, no mark after a Stop, a drop guard for the room in the worker test, and a comment answering El's question.
+  - It's now tested through the coordinator's loop and the real worker. The early-end harness's speaker can retire answers, so one that plays settles. Gate running.
+- **#1291 new** (`LAMP_CUT_INS_NOT_TALK`, #828 point 1, the first builder's 10:14 yes): a line said over the lamp's reply and left unanswered isn't counted toward a busy room.
+  - Gate: 1,863 passed and 4 failed. The 4 were `coordinator::motor` real-child timeouts under load, which passed 3 of 3 alone.
+- **#828's cut-in regression:** I audited my five merges in `36b872d1c..ef0df3019` (#1092, #1107, #1108, #1148, #1224). None changes anything with every switch off. #1107 has no switch, but acts only after the button or a head touch. The range's one `lamp_audio` change is #1214's.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
