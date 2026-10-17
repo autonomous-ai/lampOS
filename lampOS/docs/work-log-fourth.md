@@ -4268,6 +4268,17 @@ A usage limit paused me from about 10:27 to 11:40.
 - **Answered Ten:** the stop words' counts file keeps the last 16 results plus every one with a stop phrase.
 - **#828's bisect:** none of my merges is in the narrowed range. The first builder cleared #1108's call wait on lamp-4ace.
 
+## 2026-10-17, 14:56 ICT: #1278 and #1311 merged; #1291 rebased with its wiring test; #1320 up; #828's A/B build
+
+- **#1278 merged at 13:57**: `LAMP_FOLLOWS_ON`, the first builder's 09:01 scene on #829. With it on, a line begun within 20 s of the lamp's words finishing is told it may follow on, never a sound, never after a Stop, and not in a busy room.
+- **#1311 merged at 14:36** (#1295's and #1297's P3s). Its own P3 is **#1320**: the worker environment test prints only the names a child got, never their values. Voice 1,889/0.
+- **#1291** (`LAMP_CUT_INS_NOT_TALK`) is rebased to its own three commits after #1278 merged.
+  - The reviewer's wiring P3 is fixed: a test through `commit_admitted_input`, which fails with `over_the_lamps_voice = replacing`.
+  - `took_over` shares `lamps_voice_heard`. Voice 1,892/0, ARM64 running. El approved the code.
+- **#828:** the first builder found lamp-4ace's head losing cut-ins with `LAMP_SPOKEN_TO=on` (2 of 10 against 8 unset) and asked me what #1158 changes.
+  - By the code, nothing with `on`. I pushed `fourth/head-without-1158` (`d029bbbc6`, not for merging) for a same-hour A/B.
+  - **A correction:** I first offered a "fruitless yields" lead, then read `turn_taking.rs`: a fruitless yield is decided by the hearing, not by held answers. I took it out.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
