@@ -213,6 +213,10 @@ struct Observed {
     last_seen: Audit,
     seen_count: u64,
     speech: Option<Speech>,
+    /// When the voice told this news in its own words ([`Request::Told`],
+    /// #1390): its model says the news, so there is no exact text to claim.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    told: Option<Audit>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -375,14 +379,15 @@ fn settled(value: &Observation) -> bool {
 }
 /// Whether this lamp should close the harness it started for `task` now
 /// (#1390): a task this version made, whose newest answer was kept from an
-/// agent `idle` with an answer, and told (its telling played, or not known
-/// to have). Harness's `ask` is what the agent was last asked, the lamp's
-/// own task text, so it says nothing here. One that waits for the person
-/// (`needs-input`) is left to them: Harness would refuse it anyway. The
-/// close itself first reads the agent again, and closes only if it is
-/// still idle on that turn. A close that failed is tried again after
-/// [`CLOSE_RETRY_MS`], [`CLOSE_TRIES`] times in all; a refused, left or
-/// done one never.
+/// agent `idle` with an answer, and told: its claimed telling played, or
+/// is not known to have, or the voice told it in its own words
+/// ([`Request::Told`]). Harness's `ask` is what the agent was last asked,
+/// the lamp's own task text, so it says nothing here. One that waits for
+/// the person (`needs-input`) is left to them: Harness would refuse it
+/// anyway. The close itself first reads the agent again, and closes only if
+/// it is still idle on that turn. A close that failed is tried again after
+/// [`CLOSE_RETRY_MS`], [`CLOSE_TRIES`] times in all; a refused, left or done
+/// one never.
 fn close_due(task: &Task, now: &Clock) -> bool {
     if !task.closable
         || task.dispatch.state != DispatchState::Accepted
@@ -411,10 +416,11 @@ fn close_due(task: &Task, now: &Clock) -> bool {
     newest.data.ask == first.data.ask
         && newest.data.state == "idle"
         && settled(&newest.data)
-        && newest
-            .speech
-            .as_ref()
-            .is_some_and(|speech| speech.state != SpeechState::Claimed)
+        && match &newest.speech {
+            // A playout under way is not told yet.
+            Some(speech) => speech.state != SpeechState::Claimed,
+            None => newest.told.is_some(),
+        }
 }
 
 /// Whether a task is over, so that it may give way to a new one when the
@@ -657,6 +663,13 @@ impl State {
                             }) => {}
                         _ => return Err(fail()),
                     }
+                }
+                if observed.told.as_ref().is_some_and(|told| {
+                    !told.check(self)
+                        || !told.follows(&observed.observed)
+                        || !task.updated.follows(told)
+                }) {
+                    return Err(fail());
                 }
             }
             if let Some(read) = &task.read {
@@ -1140,6 +1153,16 @@ impl<P: Persistence> Engine<P> {
                 "Use the current store identity and a valid request ID.",
             ));
         }
+        // Without `--close-told` nothing is closed, so news told is kept
+        // nowhere: the store and its revision stay as they are, and a guard
+        // the model's tools just read still holds (the reviewer on #1425).
+        if let Request::Told {
+            id, observation_id, ..
+        } = request
+            && !self.close_told
+        {
+            return self.reply(json!({"id":id,"observation_id":observation_id,"told":false}));
+        }
         if let Some(receipt) = &self.state.last_receipt {
             if receipt.request == *request {
                 if matches!(request, Request::ClaimSpeech { .. }) {
@@ -1356,6 +1379,17 @@ impl<P: Persistence> Engine<P> {
                 }
                 speech.state = SpeechState::Spoken;
                 speech.finished = Some(at.clone());
+                task.updated = at.clone();
+            }
+            Request::Told {
+                id, observation_id, ..
+            } => {
+                let task = &mut next.tasks[find(&self.state, *id)?];
+                let oi = find_observation(task, *observation_id)?;
+                if task.observations[oi].told.is_some() {
+                    return Err(err("already_told", "This observation was already told."));
+                }
+                task.observations[oi].told = Some(at.clone());
                 task.updated = at.clone();
             }
             _ => unreachable!("read requests returned above"),
@@ -1835,6 +1869,7 @@ impl<P: Persistence> Engine<P> {
                 last_seen: at.clone(),
                 seen_count: 1,
                 speech: None,
+                told: None,
             });
             id
         };
@@ -1990,7 +2025,7 @@ fn task_metadata(task: &Task) -> Value {
 fn observation_metadata(observed: &Observed) -> Value {
     json!({"id":observed.id,"digest":observed.digest,"state":observed.data.state,"observed":observed.observed,
         "last_seen":observed.last_seen,"seen_count":observed.seen_count,"truncated":observed.data.truncated,"tools":observed.data.tools,
-        "speech":observed.speech.as_ref().map(|s|json!({"claim_id":s.claim_id,"text_digest":s.text_digest,"state":s.state,"claimed":s.claimed,"finished":s.finished})),"completion":"unverified"})
+        "speech":observed.speech.as_ref().map(|s|json!({"claim_id":s.claim_id,"text_digest":s.text_digest,"state":s.state,"claimed":s.claimed,"finished":s.finished})),"told":observed.told,"completion":"unverified"})
 }
 
 fn receipt_effect<'a>(state: &'a State, request: &Request) -> Result<&'a Audit, Error> {
@@ -2003,7 +2038,8 @@ fn receipt_effect<'a>(state: &'a State, request: &Request) -> Result<&'a Audit, 
         | Request::Cancel { id, .. }
         | Request::Observe { id, .. }
         | Request::ClaimSpeech { id, .. }
-        | Request::AckSpeech { id, .. } => state.tasks.iter().find(|task| task.id == *id),
+        | Request::AckSpeech { id, .. }
+        | Request::Told { id, .. } => state.tasks.iter().find(|task| task.id == *id),
         _ => None,
     }
     .ok_or_else(storage)?;
@@ -2021,6 +2057,10 @@ fn receipt_effect<'a>(state: &'a State, request: &Request) -> Result<&'a Audit, 
             } else {
                 speech.finished.as_ref().ok_or_else(storage)
             }
+        }
+        Request::Told { observation_id, .. } => {
+            let oi = find_observation(task, *observation_id).map_err(|_| storage())?;
+            task.observations[oi].told.as_ref().ok_or_else(storage)
         }
         _ => Err(storage()),
     }
@@ -2120,6 +2160,18 @@ fn receipt_body(state: &State, request: &Request) -> Result<Value, Error> {
             Ok(
                 json!({"id":id,"observation_id":observation_id,"claim_id":claim_id,"text_digest":text_digest,"reported_spoken":true}),
             )
+        }
+        Request::Told {
+            id, observation_id, ..
+        } => {
+            let task = &state.tasks[find(state, *id).map_err(|_| storage())?];
+            if task.observations[find_observation(task, *observation_id).map_err(|_| storage())?]
+                .told
+                .is_none()
+            {
+                return Err(storage());
+            }
+            Ok(json!({"id":id,"observation_id":observation_id,"told":true}))
         }
         _ => Err(storage()),
     }
@@ -2763,6 +2815,85 @@ mod tests {
                 .code,
             "stale_job"
         );
+    }
+
+    /// The first builder on #1390, lamp-4ace: the voice tells news as a turn
+    /// its model says in its own words, so it claims no text. It says the
+    /// news was `told`, on the trusted route only, and that closes the
+    /// harness, though hours after the read. An exact retry is its receipt;
+    /// another `told` of the same news is refused.
+    #[test]
+    fn news_the_voice_told_in_its_own_words_closes_the_harness() {
+        let (mut engine, memory) = opened();
+        let id = accepted(&mut engine, 0);
+        let read = request_read(&mut engine, id, 10);
+        engine
+            .finish_observation(&read, data("Done."), &clock(10))
+            .unwrap();
+        let observation_id = engine.state.tasks[0]
+            .read
+            .as_ref()
+            .unwrap()
+            .observation_id
+            .unwrap();
+        let told = |engine: &Engine<Memory>| Request::Told {
+            guard: guard(engine, "told"),
+            id,
+            observation_id,
+            session_id: engine.session_id().into(),
+        };
+        let request = told(&engine);
+        assert_eq!(
+            engine.handle(&request, &clock(11), false).unwrap_err().code,
+            "untrusted"
+        );
+        assert!(engine.begin_close(&clock(12)).unwrap().is_none());
+
+        // News waits for someone at the lamp: three hours here.
+        let later = 10 + 3 * 3_600_000;
+        let reply = engine.handle(&request, &clock(later), true).unwrap();
+        assert_eq!(reply["told"], true);
+        assert_eq!(
+            engine.handle(&request, &clock(later + 1), true).unwrap(),
+            reply
+        );
+        assert_eq!(
+            engine
+                .handle(&told(&engine), &clock(later + 2), true)
+                .unwrap_err()
+                .code,
+            "already_told"
+        );
+        assert!(stored(&memory).tasks[0].observations[0].told.is_some());
+        let job = engine.begin_close(&clock(later + 3)).unwrap().unwrap();
+        assert_eq!((job.task_id, job.agent_id.as_str()), (id, AGENT));
+
+        // The reviewer on #1425: with the switch off, `told` is answered and
+        // nothing is written, so the revision a tool's guard read holds.
+        let (mut engine, memory) = opened();
+        engine.close_told(false);
+        let id = accepted(&mut engine, 0);
+        let read = request_read(&mut engine, id, 10);
+        engine
+            .finish_observation(&read, data("Done."), &clock(10))
+            .unwrap();
+        let observation_id = engine.state.tasks[0]
+            .read
+            .as_ref()
+            .unwrap()
+            .observation_id
+            .unwrap();
+        let request = Request::Told {
+            guard: guard(&engine, "told"),
+            id,
+            observation_id,
+            session_id: engine.session_id().into(),
+        };
+        let (revision, before) = (engine.revision(), stored(&memory));
+        let reply = engine.handle(&request, &clock(11), true).unwrap();
+        assert_eq!(reply["told"], false);
+        assert_eq!(engine.revision(), revision);
+        assert_eq!(stored(&memory), before);
     }
 
     /// One that waits for the person is left to them, however long; one the

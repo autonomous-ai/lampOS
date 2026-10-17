@@ -254,6 +254,8 @@ pub struct TaskNews {
     /// The newest `tasks/status` the progress reader has: a queued note is
     /// checked against it, never waited on.
     status: Arc<Mutex<Option<TaskStatus>>>,
+    /// News heard whole, for the tasks part to be told ([`Self::heard`]).
+    heard: Sender<String>,
 }
 
 impl Drop for TaskNews {
@@ -287,6 +289,122 @@ pub fn keep_told(file: &Path, key: &str) {
             "lamp-voice: task news told, not kept in {}: {error}",
             file.display()
         );
+    }
+}
+
+/// The store, task and observation that the news `key` tells
+/// (`<store>:<task>:<observation>`); none for a hand-over or progress.
+fn observation_of(key: &str) -> Option<(&str, u64, u64)> {
+    let mut fields = key.rsplitn(3, ':');
+    let observation = fields.next()?.parse().ok()?;
+    let task = fields.next()?.parse().ok()?;
+    Some((fields.next()?, task, observation))
+}
+
+/// What became of one `told` for the tasks part.
+#[derive(Debug, PartialEq, Eq)]
+enum Sent {
+    /// Taken, taken before, or of nothing the tasks part still keeps: never
+    /// sent again.
+    Done,
+    /// It couldn't be reached, or stayed busy: sent again at the next pass.
+    Again,
+}
+
+/// How many times [`send_told`] reads the store and sends again in one pass,
+/// while the tasks part changed in between or was busy.
+const TOLD_TRIES: usize = 3;
+/// How many passes, [`READ_EVERY`] apart, a `told` the tasks part couldn't
+/// take is kept for: an hour, as through a restart of the tasks part.
+const TOLD_PASSES: u32 = 360;
+
+/// Tell the tasks part in `directory`, on its trusted socket, that the news
+/// `key` of a task's observation was heard (#1390): with
+/// `lamp-tasks serve --close-told` the harness the lamp started for it is
+/// then closed. The model says the news in its own words, so no text is
+/// claimed, as `claim_speech` would. News of another store than the one
+/// kept now is of a task gone.
+fn send_told(directory: &Path, key: &str) -> Sent {
+    let Some((store, id, observation_id)) = observation_of(key) else {
+        return Sent::Done;
+    };
+    for _ in 0..TOLD_TRIES {
+        let Some(status) = ask(&directory.join("request.sock"), &json!({"op":"status"})) else {
+            return Sent::Again;
+        };
+        if status["store_id"] != json!(store) {
+            return Sent::Done;
+        }
+        let (Some(revision), Some(session)) = (
+            status["revision"].as_u64(),
+            status["summary"]["session_id"].as_str(),
+        ) else {
+            return Sent::Again;
+        };
+        let line = json!({"op":"told","guard":{"store_id":store,"revision":revision,
+            "request_id":format!("voice-told-{id}-{observation_id}-{revision}")},
+            "id":id,"observation_id":observation_id,"session_id":session});
+        let Some(answer) = crate::tools::exchange_up_to(
+            &directory.join("voice.sock"),
+            &line,
+            ASK_DEADLINE,
+            crate::tools::MAX_TASKS_ANSWER_BYTES,
+        ) else {
+            return Sent::Again;
+        };
+        if answer["ok"] == json!(true) || answer["error"] == json!("already_told") {
+            return Sent::Done;
+        }
+        // Changed since the read, not sure it was kept, or the tasks part
+        // restarted in between (a new session) or was not taking requests:
+        // read again. One kept meanwhile is then `already_told`.
+        let code = answer["error"].as_str().unwrap_or_default();
+        if ![
+            "conflict",
+            "uncertain",
+            "busy",
+            "timeout",
+            "stale_session",
+            "unavailable",
+        ]
+        .contains(&code)
+        {
+            eprintln!("lamp-voice: the tasks part did not take the news heard ({key}): {code}");
+            return Sent::Done;
+        }
+    }
+    Sent::Again
+}
+
+/// Tell the tasks part in `directory` of each piece of news heard as it
+/// comes from `heard`, and again every [`READ_EVERY`] while it can't take
+/// one, for [`TOLD_PASSES`] passes. Ends when the news is let go.
+fn send_heard(directory: &Path, heard: &Receiver<String>, stopping: &AtomicBool) {
+    let mut unsent: Vec<(String, u32)> = Vec::new();
+    loop {
+        match heard.recv_timeout(READ_EVERY) {
+            Ok(key) => {
+                if observation_of(&key).is_some() && !unsent.iter().any(|(kept, _)| *kept == key) {
+                    unsent.push((key, 0));
+                }
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => return,
+        }
+        if stopping.load(Ordering::Relaxed) {
+            return;
+        }
+        unsent.retain_mut(|(key, passes)| {
+            if send_told(directory, key) == Sent::Done {
+                return false;
+            }
+            *passes += 1;
+            if *passes < TOLD_PASSES {
+                return true;
+            }
+            eprintln!("lamp-voice: the news heard ({key}) could not be told to the tasks part");
+            false
+        });
     }
 }
 
@@ -415,6 +533,17 @@ impl TaskNews {
                 }
             }
         }
+        // News heard whole is told to the tasks part on a thread of its own
+        // (#1390), so that neither the coordinator nor the reading of news
+        // waits on it.
+        let (heard, to_send) = mpsc::channel();
+        {
+            let (directory, stopping) = (directory.clone(), stopping.clone());
+            std::thread::Builder::new()
+                .name("lamp-voice-task-heard".into())
+                .spawn(move || send_heard(&directory, &to_send, &stopping))
+                .ok()?;
+        }
         let shared = told_already.clone();
         std::thread::Builder::new()
             .name("lamp-voice-task-news".into())
@@ -429,7 +558,19 @@ impl TaskNews {
             told_already,
             stopping,
             status,
+            heard,
         })
+    }
+
+    /// News told in a turn that was heard whole, on the proof a say's
+    /// `spoken` takes (`coordinator`): the tasks part is told so, so that
+    /// with `--close-told` the harness its task started is closed (#1390).
+    /// News taken to tell but cut short, or not heard, never comes here.
+    /// Never waits.
+    pub fn heard(&self, keys: Vec<String>) {
+        for key in keys {
+            let _ = self.heard.send(key);
+        }
     }
 
     /// The news waiting to be told, if any. Call every tick: it never blocks.
@@ -2080,6 +2221,7 @@ mod tests {
             told_already: Arc::new(Mutex::new(BTreeSet::new())),
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),
+            heard: mpsc::channel().0,
         };
         let soon = News {
             key: "s:3:progress-1".into(),
@@ -2107,6 +2249,7 @@ mod tests {
             told_already: told_already.clone(),
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),
+            heard: mpsc::channel().0,
         };
         assert!(news.waiting().is_none());
         let one = News {
@@ -2173,6 +2316,7 @@ mod tests {
             told_already: Arc::new(Mutex::new(BTreeSet::new())),
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),
+            heard: mpsc::channel().0,
         };
         (news, offer, heard)
     }
@@ -2370,6 +2514,57 @@ mod tests {
         at.settled.clear();
         assert!(!newly_settled(&at, &mut seen));
         assert!(seen.is_empty());
+    }
+
+    /// The reviewer on #1425: the tasks part restarted between the voice's
+    /// `status` and its `told`, so the `told` names the old session and is
+    /// refused as `stale_session`. The store is read again, and the `told`
+    /// sent with the new session is taken.
+    #[test]
+    fn a_told_refused_across_a_restart_of_the_tasks_part_is_sent_again() {
+        let root = std::env::temp_dir().join(format!("task-told-restart-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let (sent, lines) = mpsc::channel();
+        for (name, answers) in [
+            (
+                "request.sock",
+                vec![
+                    json!({"ok":true,"store_id":"s1","revision":4,"summary":{"session_id":"old"}}),
+                    json!({"ok":true,"store_id":"s1","revision":4,"summary":{"session_id":"new"}}),
+                ],
+            ),
+            (
+                "voice.sock",
+                vec![
+                    json!({"ok":false,"error":"stale_session"}),
+                    json!({"ok":true,"told":true}),
+                ],
+            ),
+        ] {
+            let listener = UnixListener::bind(root.join(name)).unwrap();
+            let sent = sent.clone();
+            std::thread::spawn(move || {
+                for (stream, answer) in listener.incoming().zip(answers) {
+                    let mut stream = stream.unwrap();
+                    let mut line = String::new();
+                    BufReader::new(&stream).read_line(&mut line).unwrap();
+                    let _ = sent.send(serde_json::from_str::<Value>(&line).unwrap());
+                    writeln!(stream, "{answer}").unwrap();
+                }
+            });
+        }
+        assert_eq!(send_told(&root, "s1:2:4"), Sent::Done);
+        let told: Vec<Value> = lines
+            .try_iter()
+            .filter(|line| line["op"] == "told")
+            .collect();
+        assert_eq!(told.len(), 2);
+        assert_eq!(
+            (told[0]["session_id"].clone(), told[1]["session_id"].clone()),
+            (json!("old"), json!("new"))
+        );
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// #560: the tasks part is read at once when a task settles, not at the

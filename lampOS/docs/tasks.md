@@ -91,7 +91,7 @@ must be prepared/confirmed again after restart, even if an alias was remapped.
 
 The request socket permits preparation, inspection, cancellation before an
 attempt, and an explicit observation request. Only the separate Voice socket
-permits `confirm`, `claim_speech` and `ack_speech`. Both sockets and their
+permits `confirm`, `claim_speech`, `ack_speech` and `told`. Both sockets and their
 parent are private to the service user. This separation is an integration
 boundary, not authentication against another process with that same UID.
 Actions must expose only the public operations to the model. First must wire
@@ -182,6 +182,7 @@ inspection evidence, not a playback grant.
 | `observe` | `guard`, `id` | Explicit `show` of the bound accepted agent |
 | `claim_speech` | `guard`, `id`, `observation_id`, `text`, `session_id` | Trusted one-time playback grant |
 | `ack_speech` | `guard`, `id`, `observation_id`, `claim_id`, `text_digest`, `session_id`, `played:true` | Trusted completed-playout attestation |
+| `told` | `guard`, `id`, `observation_id`, `session_id` | Trusted: the voice's news of this observation was heard whole, in its model's own words ([#1390](#closing-a-finished-harness-1390-serve---close-told-off-unless-set)); once only, `already_told` after. Without `--close-told`, `told:false` and nothing written |
 
 The [protocol](../crates/tasks/src/protocol.rs) and
 [engine](../crates/tasks/src/engine.rs) define the serialized fields and error
@@ -313,8 +314,31 @@ ever handed over. With `serve --close-told`, the lamp closes the harness it
 started once its answer is told:
 
 - **When:** the task was made by this version, and its newest kept answer is
-  from an agent `idle` with an answer. The telling must have played, or not
-  be known to have played (`spoken` or `uncertain`).
+  from an agent `idle` with an answer, and that answer was told:
+  - **Heard from the voice's news** (`told`): the voice's task news tells it
+    as a turn its model says in its own words, so it claims no exact text.
+    The turn carries its news keys (the task's, and those told with it).
+    As it ends heard whole, on the proof a skill's say takes for `spoken`
+    (settled and complete, its audio played with no gap, the mic allowed),
+    the voice sends `told` for each on the trusted socket. A turn cut short
+    (a Stop, the person speaking over it, muting) or ended with no audio or
+    a gap sends nothing, and the harness stays open. The news is still kept
+    as told when its turn begins, so it is never told twice.
+    - **Sent off the coordinator's loop,** on a thread of the news's own.
+      If the tasks part can't be reached (restarting, say), it's sent again
+      every 10 s, for an hour.
+    - **Not sent:** hand-over and progress news, of no observation; with
+      `--close-told` off, `told` is answered `told:false` and writes nothing,
+      so the revision a tool's guard read still holds.
+    - **Not covered yet:** a finished answer the person only asked about
+      (`check_agent_task`). Its words go to the model from the provider
+      worker, another process, and its turn isn't known there. Such a task
+      is kept as told, so it isn't told unasked either, and its harness
+      stays open.
+    - Before this, on lamp-4ace on 18 Oct, task 147 was told and never
+      closed: the news path never said so.
+  - **Or by a speech claim:** its telling played, or isn't known to have
+    (`spoken` or `uncertain`). One still `claimed` is being played: not yet.
   - **`ask` doesn't count:** Harness's `ask` is what the agent was last
     asked, the lamp's own task text, so it plays no part here.
   - **Left to the person:** an agent that waits for them (`needs-input`).
@@ -356,7 +380,9 @@ started once its answer is told:
 - **The journal:** each close prints one line, `tasks: closing task N's
   harness: …`, and `get_task` shows the task's `close`.
 - **Reverting:** a `Task` is `deny_unknown_fields`, so a `lamp-tasks` from
-  before this can't load a store with `close` or `closable` in it. Going back
+  before this can't load a store with `close` or `closable` in it, nor one
+  from before `told` a store with an observation `told` (written only with
+  `--close-told` on). Going back
   on a lamp means resetting its tasks store, as with `watch_idle`.
 - **Not done:** the sessions already on a computer from before this are the
   person's to close. This touches none of them.
@@ -364,6 +390,9 @@ started once its answer is told:
 **Tests:**
 - **`engine::tests`:**
   - `a_harness_done_and_told_is_closed_once`;
+  - `news_the_voice_told_in_its_own_words_closes_the_harness` (`told` on
+    the trusted socket only, hours after the read, once; with the switch
+    off, nothing written);
   - `a_harness_the_person_has_is_left_to_them` (`needs-input`, `left`, and a
     task from an older store);
   - `a_turn_the_person_asked_or_a_task_from_before_the_switch_is_never_closed`;
@@ -376,9 +405,25 @@ started once its answer is told:
   - `a_harness_the_person_went_on_with_or_that_waits_for_them_is_left`.
 - **`tests/harness.rs`, on the fixture CLI:**
   `close_names_the_agent_on_its_machine_never_now_and_reads_the_exit_code`.
+- **The voice's `coordinator::tests::say`, the turn's proof:**
+  `news_heard_whole_is_handed_on_as_the_turn_ends`,
+  `news_cut_short_is_never_handed_on`,
+  `news_not_heard_whole_is_never_handed_on` (no audio, a playback gap).
+- **The voice's `tests/news_told.rs`, with a real `lamp-tasks` on its
+  sockets:**
+  - `news_heard_whole_closes_the_harness_it_was_of` (news taken to tell
+    closes nothing, with the clock past three close retries);
+  - `news_heard_while_the_tasks_part_is_down_is_told_once_it_is_back`.
 
-Not run against a real Harness yet: that needs a lamp handing a task to a
-paired computer, with `--close-told`.
+**Against a real Harness (0.4.18), 18 Oct:**
+- **lamp-4ace, by voice:** task 147 was told, and nothing closed: the news
+  path never said it was told. `told` is that fix.
+- **A laptop, as the person:** a task told and read idle on its turn wasn't
+  closed. `harness close` exited 1 (`WORKING`) twice, six minutes apart,
+  while `show`, `ps` and `wait` all said `idle`. Harness's close asks its
+  daemon's own activity check (the session's busy flag and screen), not the
+  transcript `wait` reads. Until that's settled with the Harness team, such
+  a close fails three times and stops there.
 
 ## Bounds, durability and health
 
@@ -802,7 +847,9 @@ used only to say it.
   may pass it on only if it is a question to the person. The same words
   (`task_news::waiting`) answer `check_agent_task`. A stop is said plainly. Each piece is told once: its key
   (store, task, observation) goes into `/var/lib/lampOS/voice/tasks-told`
-  (`LAMP_TASKS_TOLD`), read again on each pass.
+  (`LAMP_TASKS_TOLD`), read again on each pass. With `--close-told`,
+  once its turn is heard whole, a task's observation is also marked `told`
+  in the tasks part, so that its harness can be [closed](#closing-a-finished-harness-1390-serve---close-told-off-unless-set).
 - **Asked** (`check_agent_task`). "How's it going?" or "what did Claude Code
   say?" is answered at once from what was last seen, with no new read; a
   finished answer heard this way is kept as told, so it is not told again
