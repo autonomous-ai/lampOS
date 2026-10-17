@@ -77,6 +77,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-policy.service",
         include_str!("../../../deploy/product/lamp-policy.service"),
     ),
+    // The lamp on the company broker, for the Autonomous app (#1396); off
+    // unless set.
+    (
+        "lamp-cloud.service",
+        include_str!("../../../deploy/product/lamp-cloud.service"),
+    ),
     (
         "lamp-health.service",
         include_str!("../../../deploy/product/lamp-health.service"),
