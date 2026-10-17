@@ -4338,6 +4338,11 @@ A usage limit paused me briefly before 16:41.
 - **#1406** (Third's setup link): approved, 170 passed.
 - **#1378:** ARM64 green, waiting on the product yes.
 
+## 2026-10-17, 23:09 ICT: #1378 merged
+
+- **#1378 merged** at 23:03 (`831afba60`): the product sets `LAMP_SPOKEN_TO=on`, with narrowing (a). The first builder's lamp check on lamp-4ace (`d1690b67b`'s build, 22:46–23:01): 12 of 12 day lines answered, 4 of 4 stories, 3 of 3 handed over, 3 lines held back, first words 1.16–4.51 s after the end of speech. That closes my #828 busy-room task.
+- **Next:** #1396's app part, waiting on the backend's `lamp-v2` number, the setup choice, Ten's Light answer and a yes to push there. Free for reviews meanwhile.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
