@@ -319,6 +319,63 @@ pub(crate) fn read_private(path: &Path, max: usize) -> io::Result<Vec<u8>> {
     Ok(bytes)
 }
 
+/// Where the coordinator reads whether a write to the service may wait on a
+/// link that is behind ([`patient_writes`]). Off unless `patient`.
+pub const WRITES_ENVIRONMENT: &str = "LAMP_PROVIDER_WRITES";
+/// The provider worker's flag for it.
+pub const WRITES_FLAG: &str = "--provider-writes-patient";
+/// Each write's bound with it, the session's own maximum.
+pub const PATIENT_WRITE: std::time::Duration = std::time::Duration::from_secs(1);
+/// What it adds for each KiB of a write's message: a 1 Mbit/s floor.
+pub const PATIENT_WRITE_PER_KIB: std::time::Duration = std::time::Duration::from_millis(8);
+
+/// The provider worker's argument for it, from the environment.
+pub fn writes_arguments_from_environment() -> Vec<String> {
+    writes_arguments(std::env::var(WRITES_ENVIRONMENT).ok().as_deref())
+}
+
+fn writes_arguments(value: Option<&str>) -> Vec<String> {
+    if value == Some("patient") {
+        vec![WRITES_FLAG.to_owned()]
+    } else {
+        Vec::new()
+    }
+}
+
+/// Take a leading [`WRITES_FLAG`] off a worker's flags.
+pub fn take_writes(flags: &[String]) -> (bool, &[String]) {
+    match flags {
+        [flag, rest @ ..] if flag == WRITES_FLAG => (true, rest),
+        _ => (false, flags),
+    }
+}
+
+/// With `LAMP_PROVIDER_WRITES=patient`, a write to the service may wait on a
+/// link that is behind before the connection is given up (#705, 17 Oct: on
+/// lamp-4ace 84 lines were lost to `write_timeout`, a write past 200 ms):
+/// - each write has 1 s, the session's own maximum;
+/// - 8 ms more for each KiB of the message, so the look's picture of
+///   up to 245 KiB has about 3 s and a camera frame about 1.1 s;
+/// - the input queue holds 128 blocks of audio, past their own 2.5 s age,
+///   so the person's speech waiting behind a write does not overflow it
+///   after 640 ms and end the connection as `Backpressure` instead.
+///
+/// A block of audio keeps its own bound, which its age caps. While a write
+/// waits nothing is read, so an answer's audio behind it comes late; what
+/// came in meanwhile is read before any quiet bound is judged. Its limits:
+/// a stall longer than 1 s still ends the connection, as does speech behind
+/// a picture write longer than the queue's 2.56 s. The 1 s is to be sized
+/// from the writes #1393 names on lamp-4ace.
+pub fn patient_writes(session: SessionConfig) -> io::Result<SessionConfig> {
+    session
+        .writes(
+            PATIENT_WRITE,
+            PATIENT_WRITE_PER_KIB,
+            lamp_gemini::MAX_INPUT_QUEUE,
+        )
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -508,5 +565,37 @@ mod tests {
         for instruction in [CHAT_INSTRUCTION, CAMERA_CHAT_INSTRUCTION] {
             assert!(instruction.contains("Always speak English, whatever language you hear"));
         }
+    }
+
+    /// #705 (17 Oct): `LAMP_PROVIDER_WRITES=patient`, and nothing else, asks
+    /// for patient writes. The worker reads its flag where the coordinator
+    /// puts it, after the first-output log, on both routes, and the bounds
+    /// it sets are ones a session takes.
+    #[test]
+    fn patient_writes_are_asked_for_only_by_name_and_read_in_their_place() {
+        assert_eq!(writes_arguments(Some("patient")), [WRITES_FLAG]);
+        for value in [None, Some(""), Some("on"), Some("Patient"), Some("off")] {
+            assert!(writes_arguments(value).is_empty(), "{value:?}");
+        }
+        let dir = Path::new("/run/test");
+        let flags: Vec<String> = [crate::first_output::FLAG, "/run/first", WRITES_FLAG]
+            .map(String::from)
+            .into();
+        let (_, _, files, _) = crate::provider_worker::parse_flags(dir, &flags).unwrap();
+        assert!(files.patient_writes);
+        let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+        assert!(files.patient_writes);
+        let (_, _, files, _) = crate::provider_worker::parse_flags(dir, &flags[..2]).unwrap();
+        assert!(!files.patient_writes);
+        let wrong: Vec<String> = [WRITES_FLAG, crate::first_output::FLAG, "/run/first"]
+            .map(String::from)
+            .into();
+        assert!(crate::provider_worker::parse_flags(dir, &wrong).is_err());
+        let session = SessionConfig::new(
+            lamp_gemini::GOOGLE_ENDPOINT,
+            Credential::api_key("test-only").unwrap(),
+        )
+        .unwrap();
+        assert!(patient_writes(session).is_ok());
     }
 }

@@ -283,7 +283,7 @@ async fn an_image_the_link_cannot_take_fails_the_connection_within_its_write_bou
         input.try_image(request, 1, 1, Instant::now(), &jpeg(MAX_IMAGE_BYTES, 7)),
         Ok(ImageOffer::Queued)
     );
-    // The peer never reads. The drop names the image, its size on the wire
+    // The peer never reads. The drop names the image, the message's size
     // and its bound (lampOS#705).
     let kib = u32::try_from(
         crate::wire::encode_image(&jpeg(MAX_IMAGE_BYTES, 7))

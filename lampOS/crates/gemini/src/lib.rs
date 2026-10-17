@@ -35,6 +35,14 @@ pub const MAX_INPUT_SAMPLES: usize = 320;
 /// that person's speech precedes the moment their request is accepted.
 pub const MAX_INPUT_AGE: Duration = Duration::from_millis(2_500);
 pub const INPUT_QUEUE_CAPACITY: usize = 32;
+/// The most an input queue may hold ([`SessionConfig::writes`]): 128 blocks of
+/// audio, 2.56 s, about the audio's own [`MAX_INPUT_AGE`]. A block's age is
+/// checked only when the session takes it, which it cannot while a write
+/// waits, so speech behind a write that waits longer than that still fills
+/// the queue and ends the connection as [`Error::Backpressure`]. Only the
+/// look's picture under patient writes can wait so long (the reviewer on
+/// lampOS#1397).
+pub const MAX_INPUT_QUEUE: usize = 128;
 pub const EVENT_QUEUE_CAPACITY: usize = 16;
 /// Decoded output held for a consumer slower than the network, as real-time
 /// playback always is: 300 s of 24 kHz PCM. Past this the socket is not read.
@@ -543,7 +551,7 @@ pub enum Error {
     SetupTimeout,
     ReadTimeout,
     /// A write did not finish within its deadline: the transport's buffer
-    /// stayed full, so the link is behind. `kib` is its size on the wire,
+    /// stayed full, so the link is behind. `kib` is the message's size,
     /// rounded up, and `deadline_ms` the time it had.
     WriteTimeout {
         write: Write,

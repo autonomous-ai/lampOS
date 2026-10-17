@@ -2633,6 +2633,7 @@ fn provider_arguments(
     arguments.extend(crate::attention::head_touch_arguments_from_environment());
     arguments.extend(crate::bus_out::worker_arguments_from_environment());
     arguments.extend(crate::first_output::arguments_from_environment());
+    arguments.extend(crate::config::writes_arguments_from_environment());
     arguments.extend(crate::not_speech::arguments_from_environment());
     arguments.extend(crate::not_speech::unclear_arguments_from_environment());
     arguments.extend(crate::not_speech::transcription_arguments_from_environment());

@@ -1,12 +1,12 @@
 use crate::{
     BarrierOutcome, BarrierPolicy, BarrierReport, BarrierWait, Discard, EVENT_QUEUE_CAPACITY,
-    Error, Event, INPUT_QUEUE_CAPACITY, ImageLedger, ImageOffer, ImageReceipt, ImageRefusal,
-    ImageRevocation, Lineage, MAX_IMAGE_AGE, MAX_IMAGE_BYTES, MAX_IMAGES_PER_REQUEST,
-    MAX_INPUT_AGE, MAX_INPUT_SAMPLES, MAX_OPEN_ACTIVITY_REQUESTS, MAX_RETAINED_SAMPLES,
-    MAX_WIRE_BYTES, OUTPUT_RATE, RequestId, Result, Resumption, ResumptionHandle, SessionConfig,
-    SessionId, StartRelease, State, SuccessorStart, Timeouts, Write, wire,
+    Error, Event, ImageLedger, ImageOffer, ImageReceipt, ImageRefusal, ImageRevocation, Lineage,
+    MAX_IMAGE_AGE, MAX_IMAGE_BYTES, MAX_IMAGES_PER_REQUEST, MAX_INPUT_AGE, MAX_INPUT_SAMPLES,
+    MAX_OPEN_ACTIVITY_REQUESTS, MAX_RETAINED_SAMPLES, MAX_WIRE_BYTES, OUTPUT_RATE, RequestId,
+    Result, Resumption, ResumptionHandle, SessionConfig, SessionId, StartRelease, State,
+    SuccessorStart, Timeouts, Write, wire,
 };
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{FutureExt, SinkExt, StreamExt};
 use std::{
     collections::VecDeque,
     sync::{
@@ -97,6 +97,13 @@ const WITHDRAWN_KEPT: usize = 64;
 /// held, in order, and sent afterwards; audio must stay well inside
 /// [`MAX_INPUT_AGE`].
 const IMAGE_WRITE: Duration = Duration::from_millis(400);
+/// A write that held this actor this long owes a read: what the service sent
+/// meanwhile is read before any quiet or response bound is judged
+/// ([`Session::read_waiting`]).
+const READ_OWED_AFTER: Duration = Duration::from_millis(100);
+/// The most messages that read takes in one go. One is enough to show the
+/// service was not quiet; the rest are read in the ordinary way.
+const READ_OWED_MESSAGES: usize = 16;
 /// Commands held during one image write, beyond the command queue itself.
 const HELD_COMMANDS: usize = 64;
 
@@ -697,6 +704,7 @@ where
         Message::text(wire::encode_setup(&config)?),
         config.timeouts.write,
         Write::Setup,
+        config.timeouts.write_per_kib,
     )
     .await?;
     let setup = async {
@@ -737,6 +745,7 @@ where
                         Message::Pong(bytes),
                         config.timeouts.write,
                         Write::Keepalive,
+                        config.timeouts.write_per_kib,
                     )
                     .await?
                 }
@@ -749,7 +758,7 @@ where
     let ready_at = timeout(config.timeouts.setup, setup)
         .await
         .map_err(|_| Error::SetupTimeout)??;
-    let (commands_tx, commands) = mpsc::channel(INPUT_QUEUE_CAPACITY);
+    let (commands_tx, commands) = mpsc::channel(config.input_queue);
     let (events_tx, events) = mpsc::channel(EVENT_QUEUE_CAPACITY);
     let (state_tx, state) = watch::channel(State::Ready);
     let (stop, stop_rx) = watch::channel(None);
@@ -815,6 +824,8 @@ where
         activity_open: false,
         last_request: 0,
         read_at: Clock::now(),
+        read_owed: false,
+        read_after_long_writes: config.read_after_long_writes,
         ping_at: Clock::now(),
     };
     // The actor publishes its terminal state before it lets go of the event
@@ -1076,6 +1087,11 @@ struct Actor<S> {
     activity_open: bool,
     last_request: u64,
     read_at: Clock,
+    /// A write held this actor past [`READ_OWED_AFTER`] since it last read.
+    read_owed: bool,
+    /// Whether a write that held this actor owes a read at all
+    /// ([`SessionConfig::writes`]); off, the read loop is as before.
+    read_after_long_writes: bool,
     ping_at: Clock,
 }
 fn cost(event: &Event) -> usize {
@@ -1146,6 +1162,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
             self.retire_active().await?;
             self.apply_discard();
             self.purge_retired();
+            self.read_waiting().await?;
             self.enforce_barrier().await?;
             self.drain_held().await?;
             self.flush();
@@ -1262,7 +1279,13 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
         let mut held = VecDeque::new();
         let mut open = true;
         let written = {
-            let write = send(&mut self.socket, message, IMAGE_WRITE, Write::Image);
+            let write = send(
+                &mut self.socket,
+                message,
+                IMAGE_WRITE,
+                Write::Image,
+                self.timeouts.write_per_kib,
+            );
             tokio::pin!(write);
             loop {
                 tokio::select! {
@@ -1321,6 +1344,9 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
         // An abandoned write ends the connection here. What was held behind
         // it is dropped with `held`, unsent.
         written?;
+        if self.read_after_long_writes && now.duration_since(started) >= READ_OWED_AFTER {
+            self.read_owed = true;
+        }
         for command in held {
             // A shutdown or failure recorded while the image was written, or
             // while an earlier held command was: nothing further is sent.
@@ -1433,7 +1459,14 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
         if let Some(stop) = *self.stop.borrow() {
             return Err(stop.error);
         }
-        let write = send(&mut self.socket, message, deadline, what);
+        let started = Clock::now();
+        let write = send(
+            &mut self.socket,
+            message,
+            deadline,
+            what,
+            self.timeouts.write_per_kib,
+        );
         tokio::pin!(write);
         loop {
             tokio::select! {
@@ -1451,9 +1484,42 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
                         return Err(Error::Closed);
                     }
                 }
-                result = &mut write => return result,
+                result = &mut write => {
+                    if result.is_ok()
+                        && self.read_after_long_writes
+                        && started.elapsed() >= READ_OWED_AFTER
+                    {
+                        self.read_owed = true;
+                    }
+                    return result;
+                }
             }
         }
+    }
+    /// What the service sent while a write held this actor, read before any
+    /// quiet or response bound is judged. The barrier's quiet counts from
+    /// the last event read, and nothing is read while a write waits. A
+    /// confirmation that came in meanwhile is not silence (Nine on
+    /// lampOS#1397). Only what is already readable is taken, up to
+    /// [`READ_OWED_MESSAGES`]; the rest is read in the ordinary way.
+    async fn read_waiting(&mut self) -> Result<()> {
+        if !std::mem::take(&mut self.read_owed) {
+            return Ok(());
+        }
+        for _ in 0..READ_OWED_MESSAGES {
+            if self.gated || self.stop.borrow().is_some() {
+                return Ok(());
+            }
+            let Some(incoming) = self.socket.next().now_or_never() else {
+                return Ok(());
+            };
+            let incoming = incoming
+                .ok_or(Error::PeerClosed { code: None })?
+                .map_err(transport_error)?;
+            self.read_at = Clock::now();
+            self.message(incoming).await?;
+        }
+        Ok(())
     }
     async fn start_activity(&mut self) -> Result<()> {
         if !self.activity_open {
@@ -2515,16 +2581,24 @@ fn check_age(captured_at: Instant, clock: &CaptureClockSource) -> Result<Duratio
         .filter(|age| *age < MAX_INPUT_AGE)
         .ok_or(Error::StaleInput)
 }
-/// Write `message` to the service within `deadline`. One that does not
-/// finish in time is `write`, named in its [`Error::WriteTimeout`] with its
-/// size and deadline.
+/// Write `message` to the service within `deadline`, and `per_kib` more for
+/// each KiB of the message unless it is audio, which keeps its own
+/// bound ([`crate::Timeouts::write_per_kib`]). One that does not finish in
+/// time is `write`, named in its [`Error::WriteTimeout`] with its size and
+/// the bound it had.
 async fn send<S: AsyncRead + AsyncWrite + Unpin>(
     socket: &mut WebSocketStream<S>,
     message: Message,
     deadline: Duration,
     write: Write,
+    per_kib: Duration,
 ) -> Result<()> {
     let kib = u32::try_from(message.len().div_ceil(1024)).unwrap_or(u32::MAX);
+    let deadline = if write == Write::Audio {
+        deadline
+    } else {
+        deadline.saturating_add(per_kib.saturating_mul(kib))
+    };
     let deadline_ms = u32::try_from(deadline.as_millis()).unwrap_or(u32::MAX);
     timeout(deadline, socket.send(message))
         .await

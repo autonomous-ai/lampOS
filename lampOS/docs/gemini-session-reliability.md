@@ -546,6 +546,88 @@ this:
 `Reporting::Typed` is implemented and tested but not enabled. It keeps the
 worker running and sends the statuses below. See the next section.
 
+### When a write cannot finish
+
+A write finishes once the transport's buffer takes it, so it only waits
+when that buffer is full: the link is behind. A write that doesn't finish
+within its bound ends the connection as `write_timeout`. Since #1393 the
+error also says which write it was, so a drop can be traced to it
+(lampOS#705). For example:
+`{"category":"write_timeout","write":"picture","kib":245,"deadline_ms":200}`.
+- `write` is one of:
+  - `setup`;
+  - `audio`, a block of the person's audio;
+  - `image`, a camera frame with speech;
+  - `picture`, a written turn with the lamp's look;
+  - `written`;
+  - `activity`, a start or an end;
+  - `note`;
+  - `context`;
+  - `tool`, a tool's response;
+  - `keepalive`, a ping or a pong.
+- `kib` is the message's size, rounded up.
+- `deadline_ms` is the bound it had, rounded down. That is
+  `Timeouts::write` (200 ms unless set), 400 ms for a camera frame, and
+  less for a block of audio near its age bound: 2.5 s, or 2.5 s plus the
+  patience for kept audio (`drain_held`). A block with under 1 ms left
+  reads 0.
+
+The running records carry it today:
+- `provider_unavailable`'s `link.state.reason`;
+- `provider_ready`'s `link.state.after`;
+- `provider_terminal`'s `link.state.fault`;
+- `provider_turn_failed`'s `reason`;
+- the journal's `connection lost (…)`.
+
+Records from before carry the category alone.
+
+**How long a write may wait** is the session's own choice
+(`SessionConfig::writes`), because two bounds meet there:
+- **The write bound:** `Timeouts::write` for every write, plus
+  `Timeouts::write_per_kib` for each KiB of the message, so a big message
+  has time to go out. The allowance is zero by default. A block of audio
+  never gets it, since its bound is capped by its age.
+- **The input queue:** while a write waits, the session takes no input.
+  The queue holds `INPUT_QUEUE_CAPACITY` (32) commands by default, and a
+  block of audio is one command of 20 ms, so 640 ms of the person's speech
+  fits. A wait past that while someone speaks fills it, and the next block
+  ends the connection as `Backpressure`. A longer write bound alone only
+  turns a `write_timeout` into that. The queue may hold up to
+  `MAX_INPUT_QUEUE` (128 blocks, 2.56 s). A block's age is checked only
+  when the session takes it, so speech behind a write that waits longer
+  than that still ends the connection.
+- **The quiet and response bounds:** the barrier's quiet counts from the
+  last event read, and nothing is read while a write waits. With
+  `SessionConfig::writes` (patient writes), a write that
+  held the session 100 ms or more owes a read, so what the service sent
+  meanwhile is read before either bound is judged (`read_waiting`, Nine on
+  lampOS#1397). A confirmation that came in during a stall is not silence
+  (`session::tests::writes::a_confirmation_that_comes_while_a_write_waits_is_read_before_the_quiet_is_judged`;
+  judged first, it ends as `BarrierTimeout`).
+  Without it the read loop is as before, and a confirmation that comes in
+  during a write of 140 ms still ends as `BarrierTimeout`
+  (`without_patient_writes_the_quiet_is_judged_as_before`, the reviewer on
+  lampOS#1397).
+
+With `LAMP_PROVIDER_WRITES=patient`, the voice's provider worker sets
+1 s, 8 ms a KiB (a 1 Mbit/s floor) and 128 blocks
+(`voice::config::patient_writes`). The look's picture of up to 245 KiB
+then has about 3 s, and a camera frame about 1.1 s. A line spoken over a
+stall of 0.8 s keeps every block and its connection, where today's bounds
+end the connection on that line's audio
+(`session::tests::writes::a_line_over_a_stall_is_kept_only_with_patient_writes_and_their_queue`).
+The cost: while a write waits nothing is read, so an answer's audio behind
+it comes late.
+
+**Its limits, unmeasured on a lamp:**
+- A stall longer than 1 s still ends the connection as `write_timeout`.
+  The 1 s is to be sized from the writes lampOS#1393 names on lamp-4ace.
+- Speech behind the look's picture written for longer than 2.56 s ends it
+  as `Backpressure`.
+- With a second route, a command waits for room in the queue up to
+  1.05 s instead of 250 ms, past the write bound either way
+  (`provider_worker::ROOM_WAIT`).
+
 ## Proposed coordinator contract
 
 Not enabled. `ProviderOutput` is matched exhaustively in `coordinator.rs`, so
@@ -572,29 +654,6 @@ to become `ProviderOutput` variants unchanged.
 `completion_timeout`, `authentication`, `rate_limited`, `quota_exceeded`,
 `server_unavailable`, `server_rejected`, `server_go_away`, `transport`,
 `peer_closed` (with `code`), `protocol`, `local`.
-
-`write_timeout` also says which write did not finish within its bound, so
-a drop can be traced to it (lampOS#705), for example
-`{"category":"write_timeout","write":"picture","kib":245,"deadline_ms":200}`:
-- `write` is one of:
-  - `setup`;
-  - `audio`, a block of the person's audio;
-  - `image`, a camera frame with speech;
-  - `picture`, a written turn with the lamp's look;
-  - `written`;
-  - `activity`, a start or an end;
-  - `note`;
-  - `context`;
-  - `tool`, a tool's response;
-  - `keepalive`, a ping or a pong.
-- `kib` is its size on the wire, rounded up.
-- `deadline_ms` is the time it had. That is `Timeouts::write` (200 ms
-  unless set), 400 ms for a camera frame, and less for a block of audio
-  near its 2.5 s age.
-
-A write finishes once the transport's buffer takes it, so it only waits
-when that buffer is full: the link is behind. Records from before carry
-the category alone.
 
 Each `turn_failed` is sent once. Remaining input for a failed request is
 dropped by the worker until the coordinator retires it, and never reaches a
