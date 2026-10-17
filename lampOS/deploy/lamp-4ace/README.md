@@ -24,3 +24,12 @@ sit beside the build they were installed with, not in `/etc/lampOS`, which
 only root may read; the controls run as `orangepi`. `lean-first-software.json`
 is the first software's body model in the lean check's form, a stand-in
 ([lean.md](../../docs/lean.md), "lamp-4ace, 14 October").
+
+`fold-and-start.sh` is step 4a of the Sunday sheet, run on the lamp by the
+operator with the owner at the arm: it checks the body is stopped and nothing
+holds the servo port, reads the arm, waits while the arm is folded by hand,
+re-reads it (shoulder and elbow within 80 of `--folded-arm`, torque on), asks
+for the elbow and cable check, starts the body through the operator's
+`body-integration.sh` and prints `lamp-body exit-report`. It never writes to a
+servo: the torque off and on for the shoulder and elbow are the operator's
+manual steps. Run it with `--dry-run` first to see every command.
