@@ -138,6 +138,43 @@ fn the_list_is_there_a_call_changes_the_control_and_anything_else_is_refused_in_
             String::from_utf8_lossy(refused)
         );
     }
+    // #1396: the app's two calls, answered in numbers on the same socket,
+    // and never in the model's list.
+    assert_eq!(
+        ask(
+            &home,
+            b"{\"op\":\"call\",\"name\":\"volume_level\",\"args\":{}}\n"
+        ),
+        json!({"ok":true,"level":{"volume":50,"raw":50,"max_volume":100}})
+    );
+    assert_eq!(
+        ask(
+            &home,
+            b"{\"op\":\"call\",\"name\":\"volume_to\",\"args\":{\"volume\":35}}\n"
+        ),
+        json!({"ok":true,"level":{"volume":35,"raw":35,"max_volume":100}})
+    );
+    assert_eq!(level.load(Ordering::Acquire), 35);
+    assert_eq!(
+        ask(
+            &home,
+            b"{\"op\":\"call\",\"name\":\"volume_to\",\"args\":{\"volume\":101}}\n"
+        )["ok"],
+        false
+    );
+    assert_eq!(level.load(Ordering::Acquire), 35);
+    assert!(
+        !names(&home)
+            .iter()
+            .any(|name| name.starts_with("volume_level") || name == "volume_to")
+    );
+    assert_eq!(
+        ask(
+            &home,
+            b"{\"op\":\"call\",\"name\":\"volume_to\",\"args\":{\"volume\":50}}\n"
+        )["level"]["raw"],
+        50
+    );
     assert_eq!(level.load(Ordering::Acquire), 50);
     // A caller that connects and says nothing costs the next one a second,
     // not the service.

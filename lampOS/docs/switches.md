@@ -1,7 +1,7 @@
 # Switches
 
 Every setting that turns a behaviour on in `lamp-voice`, `lamp-body`, `lamp-eyes`,
-`lamp-expression`, `lamp-skills`, `lamp-tasks` and `lamp-controls`: what it does,
+`lamp-expression`, `lamp-skills`, `lamp-tasks`, `lamp-controls` and `lamp-cloud`: what it does,
 what lamp-4ace and the product set, the pull request that added it with the lamp
 check it named, and the product default proposed for it. Made for the owner's
 question of 17 October, "why off?", and for switching lamp-4ace on group by
@@ -37,13 +37,13 @@ on or removed.
 
 ## The count
 
-110 switches (`LAMP_EYES_SPEAKING` added with #1385, off; `LAMP_QUIET_PACE` and `--call-wait-ms` added with #1332, both set in the product unit, counted as on):
+111 switches (`LAMP_CLOUD` added with #1396, off; `LAMP_EYES_SPEAKING` added with #1385, off; `LAMP_QUIET_PACE` and `--call-wait-ms` added with #1332, both set in the product unit, counted as on):
 
 | | Voice: hearing, turns, ring | Voice: tasks, memory, schedule, skills, looks | Voice: its own flags | Other parts | All |
 |---|---|---|---|---|---|
 | On already, or right at its default | 14 | 10 | 8 | 16 | **48** |
 | **Proposed to turn on now** | 0 | 1 | 0 | 1 | **2** |
-| Off until its named lamp check | 28 | 13 | 0 | 6 | **47** |
+| Off until its named lamp check | 28 | 13 | 0 | 7 | **48** |
 | Stays off (diagnostic, turned down, or not needed) | 5 | 1 | 2 | 2 | **10** |
 | A setting, not a behaviour | 1 | 2 | 0 | 0 | **3** |
 
@@ -202,6 +202,7 @@ its lamp-4ace run is Monday's, with a person there.
 | `lamp-skills --tools-dir` | absolute folder; unset = no skill tools. Skills' own tools offered to the voice | — | set | #984 | skills.md: "not yet run on a lamp" | on (already in product); lamp-4ace's unit lacks it | The product passes it; nothing recorded on a lamp |
 | `lamp-controls --enable` | flag; off (shadow). Gestures act, not only watched | set | set | commit 1c765da78 (direct) | Watching only on lamp-4ace from 14 Oct 11:03, then enabled; shown | on (already) | Without it the button and pads say `enabled: false` and nothing acts |
 | `lamp-controls --touch` | flag; off. The touch path: head and strip pads, and the reset button held 5 s, on controls/touch | — | set | #728 | Per-pad thresholds, faulty E4/E8, latency listed; not yet shown | on (already in product) | The product needs it for the 5 s reset hold (#1167); without it the reset did nothing |
+| `LAMP_CLOUD` (`lamp-cloud`) | `on`; off unless set. The lamp on the company broker with setup's account, V1's `info` and `data` replies, and the backend's 15 s ping, so the Autonomous app shows it online and its page reads the volume, the microphones and health (#1396, `cloud.md`) | — | — | this PR (#1396) | The backend's record for the lamp goes `connected`, and the app's page reads and sets the volume, on one lamp with the backend | off until its lamp check | Needs the backend's word on what marks a lamp connected, the broker's port and the `device` field |
 
 ## What the census found
 

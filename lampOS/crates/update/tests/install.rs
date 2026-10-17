@@ -492,7 +492,7 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             );
         }
     }
-    assert_eq!(gated.len(), 19, "{gated:?}");
+    assert_eq!(gated.len(), 20, "{gated:?}");
     for outside in ["lamp-update.service", "lamp-records.timer"] {
         assert!(!gated.contains(&outside), "{outside}");
     }

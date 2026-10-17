@@ -136,6 +136,54 @@ impl<M: Mixer> Volume<M> {
     }
 }
 
+/// The volume as the Autonomous app's slider has it (V1's `volume.*`):
+/// `volume` is 0 to 100 of the allowed range, `raw` the control's points and
+/// `max_volume` the ceiling.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct Level {
+    pub volume: u8,
+    pub raw: u8,
+    pub max_volume: u8,
+}
+
+impl<M: Mixer> Volume<M> {
+    fn level_at(&self, raw: u8) -> Level {
+        let share = (u16::from(raw) * 100 + u16::from(self.ceiling) / 2) / u16::from(self.ceiling);
+        Level {
+            volume: share.min(100) as u8,
+            raw,
+            max_volume: self.ceiling,
+        }
+    }
+
+    /// The volume now, for the app's page (#1396).
+    pub fn level(&mut self) -> Result<Level, String> {
+        self.mixer
+            .get()
+            .map(|raw| self.level_at(raw))
+            .map_err(|_| UNREAD.to_owned())
+    }
+
+    /// Set the volume to `volume` of 100 of the allowed range, as the app's
+    /// slider asks (#1396), read back: within a point of the level asked,
+    /// or not done. Never past the ceiling.
+    pub fn to_share(&mut self, volume: u8) -> Result<Level, String> {
+        let raw = ((u16::from(volume.min(100)) * u16::from(self.ceiling) + 50) / 100) as u8;
+        if self.mixer.set(raw).is_err() {
+            return Err("I could not change my speaker's volume.".to_owned());
+        }
+        match self.mixer.get() {
+            Ok(now) if now.abs_diff(raw) <= 1 => {
+                if now > 0 {
+                    self.before_mute = None;
+                }
+                Ok(self.level_at(now))
+            }
+            _ => Err(UNCONFIRMED.to_owned()),
+        }
+    }
+}
+
 /// The control through `amixer`, the tool ALSA ships. Each call is one
 /// short process, ended if it has not finished in [`AMIXER_WAIT`].
 pub struct Amixer {
@@ -242,6 +290,55 @@ pub(crate) mod tests {
             Outcome::Done(said) => said,
             Outcome::Failed(said) => panic!("expected it done, was told: {said}"),
         }
+    }
+
+    /// #1396: the app's slider reads and sets the volume as a share of the
+    /// allowed range, never past the ceiling, and a set is read back.
+    #[test]
+    fn the_apps_slider_is_a_share_of_the_ceiling_read_back() {
+        let mut volume = at(60, 80);
+        assert_eq!(
+            volume.level(),
+            Ok(Level {
+                volume: 75,
+                raw: 60,
+                max_volume: 80
+            })
+        );
+        assert_eq!(
+            volume.to_share(50),
+            Ok(Level {
+                volume: 50,
+                raw: 40,
+                max_volume: 80
+            })
+        );
+        assert_eq!(volume.to_share(100).unwrap().raw, 80);
+        assert_eq!(
+            volume.to_share(0).unwrap(),
+            Level {
+                volume: 0,
+                raw: 0,
+                max_volume: 80
+            }
+        );
+        let mut stuck = Volume::new(
+            Fake {
+                level: 30,
+                stuck: true,
+                ..Fake::default()
+            },
+            100,
+        );
+        assert_eq!(stuck.to_share(90), Err(UNCONFIRMED.to_owned()));
+        let mut unreadable = Volume::new(
+            Fake {
+                unreadable: true,
+                ..Fake::default()
+            },
+            100,
+        );
+        assert_eq!(unreadable.level(), Err(UNREAD.to_owned()));
     }
 
     #[test]

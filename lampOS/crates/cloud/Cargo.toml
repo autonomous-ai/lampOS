@@ -1,0 +1,29 @@
+[package]
+name = "lamp-cloud"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+lamp-bus = { path = "../bus" }
+lamp-msgs = { path = "../msgs" }
+# The company broker's MQTT v5 client (#1396, the first builder: a well-used
+# client, not our own). Pinned; TLS through rustls with no provider of its
+# own, the ring one installed here as the other lampOS clients do.
+rumqttc = { version = "=0.25.1", default-features = false, features = ["use-rustls-no-provider"] }
+tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "net", "sync"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+# The backend's ping, as the voice's second provider makes its requests.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+webpki-roots = "1"
+
+[dev-dependencies]
+# The tests' broker reads and writes with rumqttc's own codec.
+bytes = "1"
+tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "net", "sync", "io-util"] }
+
+[lints]
+workspace = true

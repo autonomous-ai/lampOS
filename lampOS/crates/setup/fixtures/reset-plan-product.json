@@ -15,6 +15,7 @@
     "/var/lib/lampos-tasks/.harness/logs",
     "/var/lib/lampos-schedule/store",
     "/var/lib/lampos-policy",
+    "/var/lib/lampos-cloud",
     "/var/lib/lampOS/voice/sessions",
     "/var/lib/lampOS/voice/schedule-delivery",
     "/var/lib/lampOS/voice/first-output",
@@ -22,6 +23,7 @@
     "/run/lampos-voice/thread.json",
     "/etc/lampOS/voice/credential",
     "/etc/lampOS/policy/jev.key",
+    "/etc/lampOS/cloud/account.json",
     "/etc/lampOS/person/name",
     "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
   ],
