@@ -510,5 +510,30 @@
         }
       ]
     }
+  },
+  "speaking": {
+    "nod": {
+      "base_yaw": 0.0,
+      "shoulder": 0.0,
+      "elbow": 0.0,
+      "head_roll": 0.0,
+      "head_pitch": 0.035
+    },
+    "nod_us": 360000,
+    "nod_gap_us": 900000,
+    "stress_level": 0.35,
+    "stress_rise": 1.5,
+    "sway_yaw": 0.08,
+    "pause_us": 350000,
+    "sway_us": 800000,
+    "settle": {
+      "base_yaw": 0.0,
+      "shoulder": 0.0,
+      "elbow": 0.0,
+      "head_roll": 0.0,
+      "head_pitch": 0.03
+    },
+    "settle_us": 600000,
+    "settle_after_us": 1500000
   }
 }
