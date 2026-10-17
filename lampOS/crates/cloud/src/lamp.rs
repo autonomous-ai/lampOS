@@ -11,7 +11,7 @@ use std::net::{Ipv4Addr, UdpSocket};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// How long `lamp-actions` has to answer: its own callers get a second.
 const ACTIONS_WAIT: Duration = Duration::from_secs(2);
@@ -45,6 +45,51 @@ pub struct Real {
     pub device_id: String,
     /// The installed build, as `version` says it.
     pub build: String,
+    /// The Wi-Fi's name, asked of `iw` within a bound and kept a while.
+    pub wifi: Wifi,
+}
+
+/// How long `iw` has to say the Wi-Fi's name: the runtime that asks also
+/// drives the broker's keepalive, so a hung `iw` must not hold it (Fourth on
+/// #1404).
+pub const IW_WITHIN: Duration = Duration::from_millis(500);
+/// How long a name `iw` said is kept before it is asked again.
+pub const SSID_KEPT: Duration = Duration::from_secs(60);
+
+/// The Wi-Fi's name, from `program` (`iw`), bounded by `within` and kept for
+/// [`SSID_KEPT`] per interface.
+#[derive(Clone, Debug)]
+pub struct Wifi {
+    pub program: PathBuf,
+    pub within: Duration,
+    kept: Option<(Instant, String, String)>,
+}
+
+impl Default for Wifi {
+    fn default() -> Self {
+        Self {
+            program: "iw".into(),
+            within: IW_WITHIN,
+            kept: None,
+        }
+    }
+}
+
+impl Wifi {
+    /// The name for `iface`: kept if asked within [`SSID_KEPT`], else asked
+    /// again. An `iw` that does not answer in time is killed and the name is
+    /// empty, and kept as such, so it is not asked again until then.
+    pub fn ssid(&mut self, iface: &str, now: Instant) -> String {
+        if let Some((at, kept_iface, name)) = &self.kept
+            && kept_iface == iface
+            && now.saturating_duration_since(*at) < SSID_KEPT
+        {
+            return name.clone();
+        }
+        let name = ssid(&self.program, iface, self.within);
+        self.kept = Some((now, iface.to_owned(), name.clone()));
+        name
+    }
 }
 
 /// The build from `lamp-update`'s `state.json`: `<sequence>+<commit>`, the
@@ -86,18 +131,36 @@ fn source_for(gateway: Ipv4Addr) -> Option<Ipv4Addr> {
     }
 }
 
-/// The Wi-Fi's name, as `iw` says it; empty on ethernet or without `iw`.
-fn ssid(iface: &str) -> String {
-    let Ok(output) = Command::new("iw")
+/// The Wi-Fi's name, as `program` (`iw`) says it within `within`; empty on
+/// ethernet, without `iw`, or when it does not answer in time (it is then
+/// killed and reaped).
+fn ssid(program: &Path, iface: &str, within: Duration) -> String {
+    let Ok(mut child) = Command::new(program)
         .args(["dev", iface, "link"])
         .stdin(Stdio::null())
+        .stdout(Stdio::piped())
         .stderr(Stdio::null())
-        .output()
+        .spawn()
     else {
         return String::new();
     };
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
+    let deadline = Instant::now() + within;
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(5)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return String::new();
+            }
+        }
+    }
+    let mut out = String::new();
+    if let Some(mut stdout) = child.stdout.take() {
+        let _ = std::io::Read::read_to_string(&mut stdout, &mut out);
+    }
+    out.lines()
         .find_map(|line| line.trim().strip_prefix("SSID: ").map(str::to_owned))
         .unwrap_or_default()
 }
@@ -175,7 +238,9 @@ struct Level {
 
 impl Lamp for Real {
     fn versions(&mut self) -> Value {
-        json!({"build": self.build, "lamp-cloud": env!("CARGO_PKG_VERSION")})
+        // `firmware` is what the app's About reads (Fourth on #1404): the
+        // build, as `build` also says.
+        json!({"firmware": self.build, "build": self.build, "lamp-cloud": env!("CARGO_PKG_VERSION")})
     }
 
     fn network(&mut self) -> Value {
@@ -199,7 +264,7 @@ impl Lamp for Real {
             "private_ip": route.and_then(|(_, gateway)| source_for(gateway)).map(|ip| ip.to_string()).unwrap_or_default(),
             "interface": iface,
             "mac": mac,
-            "ssid": if iface.is_empty() { String::new() } else { ssid(&iface) },
+            "ssid": if iface.is_empty() { String::new() } else { self.wifi.ssid(&iface, Instant::now()) },
             "gateway": gateway,
         })
     }
@@ -335,6 +400,7 @@ mod tests {
             bus: None,
             device_id: "d-42".into(),
             build: "812+460a1a1aa2b3".into(),
+            wifi: Wifi::default(),
         };
         let level = Volume {
             volume: 35,
@@ -364,6 +430,8 @@ mod tests {
                 "uptime_seconds": 86400, "timezone": "Asia/Ho_Chi_Minh"})
         );
         assert_eq!(lamp.versions()["build"], "812+460a1a1aa2b3");
+        // The app's About reads `firmware` (Fourth on #1404).
+        assert_eq!(lamp.versions()["firmware"], "812+460a1a1aa2b3");
         // No bus: the microphones are unknown, health not reporting.
         assert_eq!(
             lamp.mic(),
@@ -375,5 +443,61 @@ mod tests {
         );
         assert!(lamp.health().is_err());
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// A stand-in `iw`: a script in a folder of its own that says `said`
+    /// after `sleep` seconds.
+    fn fake_iw(name: &str, said: &str, sleep: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("lamp-cloud-iw-{name}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("iw");
+        std::fs::write(&path, format!("#!/bin/sh\nsleep {sleep}\necho '{said}'\n")).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    }
+
+    /// Fourth on #1404: `iw` is asked within a bound, so a hung one cannot
+    /// hold the runtime that drives the keepalive; it is killed, the name is
+    /// empty, and nothing is asked again until the kept minute ends.
+    #[test]
+    fn the_wifis_name_is_asked_within_a_bound_and_kept_a_minute() {
+        // An answering `iw` is given far more than the bound, so a loaded
+        // machine starting the stand-in's shell slowly never fails it (El on
+        // #1423: one unexplained failure in 27 runs on a busy Mac).
+        let roomy = Duration::from_secs(10);
+        let answering = fake_iw("answering", "\tSSID: Example Home", "0");
+        assert_eq!(ssid(&answering, "wlan0", roomy), "Example Home");
+        let hung = fake_iw("hung", "\tSSID: Never", "5");
+        let began = Instant::now();
+        assert_eq!(ssid(&hung, "wlan0", IW_WITHIN), "");
+        assert!(
+            began.elapsed() < Duration::from_secs(2),
+            "{:?}",
+            began.elapsed()
+        );
+        assert_eq!(ssid(Path::new("/nonexistent/iw"), "wlan0", IW_WITHIN), "");
+        // Kept a minute per interface: a hung `iw` is not asked again then.
+        let mut wifi = Wifi {
+            program: answering.clone(),
+            within: roomy,
+            ..Wifi::default()
+        };
+        let now = Instant::now();
+        assert_eq!(wifi.ssid("wlan0", now), "Example Home");
+        wifi.program = hung.clone();
+        wifi.within = IW_WITHIN;
+        // Kept: the hung `iw`, asked, would have said nothing.
+        assert_eq!(
+            wifi.ssid("wlan0", now + SSID_KEPT - Duration::from_secs(1)),
+            "Example Home"
+        );
+        assert_eq!(wifi.ssid("wlan0", now + SSID_KEPT), "");
+        wifi.program = answering.clone();
+        wifi.within = roomy;
+        assert_eq!(wifi.ssid("wlan1", now + SSID_KEPT), "Example Home");
+        for path in [answering, hung] {
+            std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        }
     }
 }
