@@ -56,9 +56,25 @@ enum Live {
     LookSilent,
     /// A skill's tool answered with a look, then the turn is unclear.
     LookUnclear,
+    /// The turn is unclear (heard as another language, #1417): no audio,
+    /// then completion.
+    Unclear,
     /// A skill's tool answered with a look, then as `FailThenLate`: the
     /// second route takes the turn.
     LookFail(Fault, usize),
+}
+
+/// How the Live route answers a turn the lamp wrote itself (a "Sorry?").
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Written {
+    /// Not at all, as before #1421.
+    Ignore,
+    /// Started, then completion with no audio (#1417's empty "Sorry?").
+    Silent,
+    /// Started, the words "...", then completion: nothing said.
+    Dots,
+    /// Started, `packets` of audio, then completion: said.
+    Said(usize),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -103,6 +119,11 @@ struct Script {
     /// The capture frame a `DropLink` or `Reconnect` link drops at (50).
     link_drops_at: Option<u64>,
     turn_taking: TurnTaking,
+    /// How a written turn is answered.
+    written: Written,
+    /// Privacy reports muted at this capture frame, whatever has settled:
+    /// for a run whose turns go on past the person's (the lamp's own).
+    mute_at_frame: Option<u64>,
 }
 
 impl Script {
@@ -123,6 +144,8 @@ impl Script {
             live_dies_at: None,
             link_drops_at: None,
             turn_taking: TurnTaking::V1Baseline,
+            written: Written::Ignore,
+            mute_at_frame: None,
         }
     }
 }
@@ -332,7 +355,14 @@ impl Peers {
         }
         // A voice still serving a second after its second route died can
         // be muted then, which ends the run cleanly.
-        if self.settled >= self.script.turns
+        if self
+            .script
+            .mute_at_frame
+            .is_some_and(|frame| self.frames >= frame)
+        {
+            self.muted.store(true, Ordering::SeqCst);
+        }
+        if self.script.mute_at_frame.is_none() && self.settled >= self.script.turns
             || (self.script.mute_after_second_dies
                 && self
                     .second_died_at
@@ -619,6 +649,37 @@ impl Peers {
                         waiting_for_barrier: false,
                     });
                 }
+                ProviderInput::Written {
+                    request, session, ..
+                } if live => {
+                    let queued = &mut self.peers[index].queued;
+                    let started = ProviderOutput::Started {
+                        request,
+                        session,
+                        waiting_for_barrier: false,
+                    };
+                    match self.script.written {
+                        Written::Ignore => {}
+                        Written::Silent => {
+                            queued.push_back(started);
+                            self.finish(index, request);
+                        }
+                        Written::Dots => {
+                            queued.push_back(started);
+                            queued.push_back(ProviderOutput::Transcript {
+                                request: Some(request),
+                                text: "...".into(),
+                                finished: true,
+                            });
+                            self.finish(index, request);
+                        }
+                        Written::Said(packets) => {
+                            queued.push_back(started);
+                            self.audio(index, request, packets, LIVE);
+                            self.finish(index, request);
+                        }
+                    }
+                }
                 ProviderInput::End { request, .. } => {
                     self.ended.insert(request);
                     if !live {
@@ -670,6 +731,13 @@ impl Peers {
                                     dropped: None,
                                 });
                             self.audio(index, request, packets, LIVE);
+                            self.finish(index, request);
+                        }
+                        Live::Unclear => {
+                            self.peers[index].queued.push_back(ProviderOutput::Unclear {
+                                request,
+                                why: "fixture".into(),
+                            });
                             self.finish(index, request);
                         }
                         Live::LookSilent | Live::LookUnclear | Live::LookFail(..) => {
@@ -1588,4 +1656,111 @@ fn a_question_during_a_reconnect_at_rest_waits_for_gemini() {
     assert_eq!(held[0]["to"], "live");
     assert!(run.seen.second.is_empty());
     assert_eq!(run.played(1), vec![LIVE; 48]);
+}
+
+/// #1421, the Seventh's P2: the loop's own wiring, from the asking to the
+/// hum. The person's turn is unclear, the lamp asks "Sorry?" in writing, and
+/// that turn comes back with nothing said (#1417). With `LAMP_UNCLEAR_HUM=on`
+/// the lamp hums its "hm?" as a sound turn of its own, to the speaker;
+/// without it, silence, as before. A "Sorry?" whose only words are "..." is
+/// as silent and hums too; one the model said doesn't.
+#[test]
+fn an_empty_sorry_in_the_loop_hums_with_the_switch_and_only_then() {
+    let _one = super::pilot_faults::one_session();
+    let with = |on: bool, written| {
+        TEST_UNCLEAR_HUM.with(|hum| hum.set(on));
+        let run = run(Script {
+            second: false,
+            written,
+            mute_at_frame: Some(900),
+            ..Script::question(Live::Unclear)
+        });
+        TEST_UNCLEAR_HUM.with(|hum| hum.set(false));
+        run
+    };
+    let rows = |run: &Run, kind: &str| -> Vec<Value> {
+        run.trace
+            .iter()
+            .filter(|event| event["kind"] == kind)
+            .cloned()
+            .collect()
+    };
+    let asked = |run: &Run| {
+        run.trace
+            .iter()
+            .filter(|event| {
+                event["kind"] == "input_admitted" && event["admission_basis"] == "asked_again"
+            })
+            .count()
+    };
+
+    // The transcript's two ends, then the hum, played to the speaker.
+    let silent = with(true, Written::Silent);
+    assert_eq!(rows(&silent, "provider_turn_unclear").len(), 1);
+    assert_eq!(asked(&silent), 1, "the lamp asked Sorry?");
+    let owed = rows(&silent, "unclear_hum_owed");
+    assert_eq!(owed.len(), 1, "{:?}", rows(&silent, "turn_finished"));
+    let played = rows(&silent, "unclear_hum");
+    assert_eq!(played.len(), 1);
+    assert_eq!(played[0]["plays"], true, "{played:?}");
+    assert_eq!(rows(&silent, "unclear_hum_attempted").len(), 1);
+    assert!(rows(&silent, "head_tap_cue_attempted").is_empty());
+    // Its ring frames show the listening face, every one of them while its
+    // turn lasts, as the tap's hum's do (the Seventh's P3 on #1421): the
+    // first is set in the pass that admits it, the rest by the ring's own
+    // reading of the turn (`tell_ring_of_turn`).
+    let hum = rows(&silent, "input_admitted")
+        .into_iter()
+        .find(|row| row["admission_basis"] == "unclear_hum")
+        .expect("the hum's own turn");
+    let faces: Vec<bool> = rows(&silent, "ring_requested")
+        .iter()
+        .filter(|row| row["owner"] == hum["owner"])
+        .map(|row| row["frame"]["listening"] == true)
+        .collect();
+    assert!(faces.len() > 1, "{faces:?}");
+    assert!(faces.iter().all(|listening| *listening), "{faces:?}");
+
+    // The switch off: asked the same, and silence, as before.
+    let off = with(false, Written::Silent);
+    assert_eq!(asked(&off), 1);
+    assert!(rows(&off, "unclear_hum_owed").is_empty());
+    assert!(rows(&off, "unclear_hum").is_empty());
+    assert!(rows(&off, "unclear_hum_attempted").is_empty());
+
+    // "..." is nothing said: cut as such, and the hum owed after it.
+    let dots = with(true, Written::Dots);
+    let owed = rows(&dots, "unclear_hum_owed");
+    assert_eq!(owed.len(), 1);
+    assert_eq!(owed[0]["after"], "nothing_said");
+    assert_eq!(rows(&dots, "unclear_hum")[0]["plays"], true);
+
+    // A "Sorry?" the model said: nothing owed, nothing hummed.
+    let said = with(true, Written::Said(6));
+    assert_eq!(asked(&said), 1);
+    assert!(rows(&said, "unclear_hum_owed").is_empty());
+    assert!(rows(&said, "unclear_hum").is_empty());
+
+    // Said again once the first "hm?" plays, heard as unclear again, and
+    // the second empty "Sorry?" hums too, well inside the tap's 30 s: it
+    // answers the person's words, so it doesn't go blank the second time
+    // (the Seventh's P2 on #1421).
+    TEST_UNCLEAR_HUM.with(|hum| hum.set(true));
+    let again = run(Script {
+        second: false,
+        written: Written::Silent,
+        live: vec![Live::Unclear, Live::Unclear],
+        speak_again: Some(When::Accepted(1)),
+        mute_at_frame: Some(1_100),
+        ..Script::question(Live::Unclear)
+    });
+    TEST_UNCLEAR_HUM.with(|hum| hum.set(false));
+    assert_eq!(rows(&again, "provider_turn_unclear").len(), 2);
+    assert_eq!(asked(&again), 2);
+    let hums: Vec<bool> = rows(&again, "unclear_hum")
+        .iter()
+        .map(|row| row["plays"] == true)
+        .collect();
+    assert_eq!(hums, [true, true], "{:?}", rows(&again, "unclear_hum"));
+    assert_eq!(rows(&again, "unclear_hum_attempted").len(), 2);
 }

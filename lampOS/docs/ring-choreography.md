@@ -84,6 +84,13 @@ speaker not yet free); `listening_not_ready`; `reply_owed`; and
 ring read taps from the bus itself, and showed the face on every tap at
 rest.
 
+The same hum after the lamp's own empty "Sorry?" (`LAMP_UNCLEAR_HUM=on`,
+#1417) is drawn the same way. Its turn (`SpeechOrigin::UnclearHum`) is
+stamped listening from the pass that admits it, so it opens the same 2 s
+window (`TAP_LISTENS_US`) and settles the same. It isn't held to
+`hummed_recently` ([attention.md](attention.md)), so a second empty "Sorry?"
+gets its face too.
+
 The head's hand time (above) is read from the bus by a thread of the head's
 own (`ring_head.rs`), never by the ring's loop, which only reads what it
 last found, after each tick's Stop, Authority and expiry (#849 review,
