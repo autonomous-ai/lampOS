@@ -165,7 +165,8 @@ it showed "not set", and none has since.
   `lamp-health serve --online on`, which already runs and already hears every
   part's `diagnostics`: online while the voice's fresh report says its link
   is `ready` or `connecting`, offline when it says `down` (past the voice's
-  5 s grace), with `down_for_s`; unknown while no voice reports. Once a
+  5 s grace), with `down_for_s`; unknown while no voice reports, and while
+  it says `closed` (waiting with its microphones off, #1371). Once a
   second. No probe of its own and no new process. Off unless set.
 - Next: the voice's recorded line and Expression's look, from `lamp/online`.
 

@@ -198,8 +198,9 @@ pub fn take_passing(flags: &[String]) -> (bool, &[String]) {
 /// in every room, an answer is played only when something shows the lamp
 /// was spoken to: its name, a face turned to it, a conversation with it
 /// going on, or a person close to it and turned to it; or the lamp began
-/// the turn itself. A reply to the lamp's own news, and a question about
-/// its own work, are played too ([`NEWS_REPLY_US`], [`about_its_work`]).
+/// the turn itself. A reply to the lamp's own news outside a busy room, and
+/// a question about its own work, are played too ([`NEWS_REPLY_US`],
+/// [`about_its_work`]).
 /// And only talk between people makes the room busy
 /// (`crate::room_told::RoomTold::count_only_talk`).
 pub const SPOKEN_TO_ENVIRONMENT: &str = "LAMP_SPOKEN_TO";
@@ -251,9 +252,12 @@ pub const NOT_SPOKEN_TO: &str =
 
 /// With the switch, the first thing anyone says this soon after the lamp's
 /// own news (a turn it began itself: a task's news, a reminder) is a reply
-/// to it, in every room. On lamp-4ace on 16 October at 02:30, "How is that
-/// task going?" came 45.3 s after the news, past the 45 s an answer keeps
-/// a conversation going, and was held; people take a while to come back.
+/// to it, in a room not known to be busy. On lamp-4ace on 16 October at
+/// 02:30, "How is that task going?" came 45.3 s after the news, past the
+/// 45 s an answer keeps a conversation going, and was held; people take a
+/// while to come back. In a busy room only a reply that asks about the
+/// lamp's work is taken so ([`about_its_work`]): two colleagues talking a
+/// minute or two after the news were answered every line (#1378).
 pub const NEWS_REPLY_US: u64 = 180_000_000;
 const AFTER_NEWS: &str = "the first thing said after the lamp's own news";
 
@@ -607,6 +611,7 @@ const TURNED: &str = "someone is turned to the lamp";
 const SOUND_A_WORD: &str = "a short sound, heard as a short word said to the lamp";
 const SOUND_NEAR: &str = "a short sound, said close to the lamp";
 const SOUND_TURNED: &str = "a short sound, with someone turned to the lamp";
+const SOUND_ANSWERS: &str = "a short sound with a word in it, right after the lamp's own question, in a conversation going on";
 const SOUND_HELD: &str = "a short sound, and nothing shows it was said to the lamp: not a short word, not close, nobody turned to it";
 const NAMED_PLAINLY: &str = "its name was heard plainly in the room's sound";
 
@@ -1232,7 +1237,8 @@ impl Attention {
         // 2026-10-15 at 13:03 a room sound of 0.7 s was heard as "¿Qué?" and
         // answered, nobody having spoken to the lamp. It is answered only
         // when what was heard is a short word said to the lamp, or it was
-        // said close to the lamp, or someone is turned to it.
+        // said close to the lamp, or someone is turned to it, or it has a
+        // word in it and answers the lamp's own question in a conversation.
         if self.sound_in_hand() && !own {
             // A reply to someone the room had just called by name is not
             // the lamp's, short or not (the reviewer on #918 at 06:06): only
@@ -1245,6 +1251,14 @@ impl Attention {
                 Verdict::Play(SOUND_NEAR)
             } else if turned == Some(true) {
                 Verdict::Play(SOUND_TURNED)
+            } else if self.lamp_asked && going_on && self.heard.chars().any(char::is_alphanumeric) {
+                // On lamp-4ace on 2026-10-17 at 16:11, "Yes. Please start
+                // it." to the lamp's "Shall I start it?" was ended after
+                // "Yes." and heard as "bien": held, its handing over was
+                // never run. A line with a word in it, right after the
+                // lamp's own question in a conversation going on, is the
+                // person's answer, and the model judges it.
+                Verdict::Play(SOUND_ANSWERS)
             } else {
                 Verdict::Hold(SOUND_HELD)
             };
@@ -1265,16 +1279,21 @@ impl Attention {
             self.verdict = Some(verdict);
             return Some(verdict);
         }
-        // #829, with the switch, in every room: the first thing said after
-        // the lamp's own news is a reply to it, and a question about its
-        // own work is for it.
+        // #829, with the switch: the first thing said after the lamp's own
+        // news is a reply to it, outside a busy room; and in every room, a
+        // question about its own work is for it. In a busy room a reply to
+        // the news is taken only so, or as any other line is (a name, a
+        // face, a conversation going on): two colleagues talking a minute
+        // or two after the news were answered every line (the Second on
+        // #1378), while the battery's "How is that task going?", 46.8 s
+        // after it, asks about the lamp's work.
         if self.spoken_to
             && !own
             && !answering_another
             && let Some(began) = self.began_us
         {
             let since = |at: Option<u64>| at.filter(|at| *at <= began).map(|at| began - at);
-            let why = if news_ago.is_some_and(|ago| ago <= NEWS_REPLY_US) {
+            let why = if news_ago.is_some_and(|ago| ago <= NEWS_REPLY_US) && room != Room::Busy {
                 Some(AFTER_NEWS)
             } else if since(self.worked_us).is_some_and(|ago| ago <= WORK_ASKED_US)
                 && about_its_work(&self.heard)
@@ -1488,6 +1507,82 @@ mod tests {
         assert!(attention.sound_in_hand());
         attention.began_at(8, 1, 80_000_000);
         assert!(!attention.sound_in_hand());
+    }
+
+    /// On lamp-4ace on 2026-10-17 at 16:11 "Yes. Please start it.", said
+    /// to the lamp's "Shall I start it?", was ended after "Yes." as a short
+    /// sound heard as "bien", and its handing over was held. With a word in
+    /// it, right after the lamp's own question, in a conversation going on,
+    /// it is the person's answer; without any one of the three it is held
+    /// as before, and a room sound with no question before it most of all.
+    #[test]
+    fn a_short_sound_with_a_word_right_after_the_lamps_question_is_its_answer() {
+        let decide = |heard: &str, asked: bool, going_on: bool, room: Room| {
+            let mut attention = Attention::default();
+            attention.check_sounds(true);
+            attention.began_at(7, 1, 70_000_000);
+            attention.heard(heard);
+            attention.ended_as_sound(7);
+            attention.lamp_asked(asked);
+            attention
+                .first_output_busy(7, room, going_on, false, None)
+                .unwrap()
+        };
+        // The scene of 16:11, in every room.
+        for room in [Room::Quiet, Room::Busy, Room::Unknown] {
+            assert_eq!(
+                decide("bien", true, true, room),
+                Verdict::Play(SOUND_ANSWERS),
+                "{room:?}"
+            );
+        }
+        assert_eq!(
+            decide("¿Qué?", true, true, Room::Quiet),
+            Verdict::Play(SOUND_ANSWERS)
+        );
+        // A room sound with no question before it, or no conversation, or
+        // no word heard in it: held.
+        assert_eq!(
+            decide("bien", false, true, Room::Quiet),
+            Verdict::Hold(SOUND_HELD)
+        );
+        assert_eq!(
+            decide("¿Qué?", false, true, Room::Quiet),
+            Verdict::Hold(SOUND_HELD)
+        );
+        assert_eq!(
+            decide("bien", true, false, Room::Quiet),
+            Verdict::Hold(SOUND_HELD)
+        );
+        for heard in ["", " ", "…", "¿?"] {
+            assert_eq!(
+                decide(heard, true, true, Room::Quiet),
+                Verdict::Hold(SOUND_HELD),
+                "{heard:?}"
+            );
+        }
+        // A short word keeps its own reason.
+        assert_eq!(
+            decide("Yes.", true, true, Room::Quiet),
+            Verdict::Play(SOUND_A_WORD)
+        );
+        // Not checked, or not a sound: the question changes nothing here.
+        let unchecked = |sound: bool, checked: bool| {
+            let mut attention = Attention::default();
+            attention.check_sounds(checked);
+            attention.began_at(7, 1, 70_000_000);
+            attention.heard("bien");
+            if sound {
+                attention.ended_as_sound(7);
+            }
+            attention.lamp_asked(true);
+            attention
+                .first_output_busy(7, Room::Quiet, true, false, None)
+                .unwrap()
+        };
+        assert_ne!(unchecked(true, false), Verdict::Play(SOUND_ANSWERS));
+        assert_ne!(unchecked(false, true), Verdict::Play(SOUND_ANSWERS));
+        assert_eq!(unchecked(true, false), unchecked(false, false));
     }
 
     #[test]
@@ -2044,7 +2139,9 @@ mod tests {
                     .unwrap()
             };
             [
-                // 45.3 s after the news began to be said.
+                // 45.3 s after the news began to be said: in a busy room a
+                // reply to the news is taken for asking about its work
+                // (#1378).
                 judge(1, 146, "How is that task going?"),
                 // The window is spent: what follows is judged as before.
                 judge(2, 150, "What's my favorite color?"),
@@ -2062,7 +2159,7 @@ mod tests {
         assert_eq!(
             day(true),
             [
-                Verdict::Play(AFTER_NEWS),
+                Verdict::Play(ABOUT_ITS_WORK),
                 held,
                 Verdict::Play(ABOUT_ITS_WORK),
                 held,
@@ -2082,6 +2179,156 @@ mod tests {
         );
         assert!(about_its_work("How is that TASK going?"));
         assert!(!about_its_work("I'll ask him about it."));
+    }
+
+    /// A busy room after the lamp's own news, with `strict` and no face, as
+    /// the worker keeps the conversation: each line at `at_s` seconds after
+    /// the news began; the lamp's answer goes into the thread 2 s after each
+    /// line it plays.
+    fn after_news(spoken_to: bool, room: Room, lines: &[(u64, &str)]) -> Vec<Verdict> {
+        const S: u64 = 1_000_000;
+        let start = std::time::Instant::now();
+        let at = |us: u64| start + std::time::Duration::from_micros(us);
+        let mut thread = crate::thread::Thread::new();
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(spoken_to);
+        own_request().store(9_828, Ordering::Release);
+        attention.began_at(9_828, 4, 100 * S);
+        assert_eq!(
+            attention.first_output_busy(9_828, room, false, true, Some(false)),
+            Some(Verdict::Play("the lamp began this turn itself"))
+        );
+        attention.spoke(9_828, 100 * S);
+        thread.lamp(
+            9_828,
+            "Oh, Claude Code just finished the story for you.",
+            at(100 * S),
+        );
+        own_request().store(0, Ordering::Release);
+        let mut verdicts = Vec::new();
+        for (request, (at_ms, line)) in (1..).zip(lines) {
+            let began = 100 * S + at_ms * 1_000;
+            attention.began_at(request, 4, began);
+            attention.heard(line);
+            thread.person(line, true, at(began));
+            let going_on = thread.going_on(at(began));
+            let verdict = attention
+                .first_output_busy(request, room, going_on, true, Some(false))
+                .unwrap();
+            if matches!(verdict, Verdict::Play(_)) {
+                thread.lamp(request, "Here it is.", at(began + 2 * S));
+            }
+            attention.ended(request, began + S);
+            verdicts.push(verdict);
+        }
+        verdicts
+    }
+
+    const GOING_ON: Verdict = Verdict::Play("a conversation with the lamp is going on");
+    const BUSY_HELD: Verdict = Verdict::Hold(
+        "a busy room, and nothing shows it was called or that anyone is turned to the lamp",
+    );
+
+    /// The first builder's battery on lamp-4ace on 17 October at 19:02
+    /// (#828, 19:22; the lines on #1378 at 20:41), with
+    /// `LAMP_ATTENTION=busy-near`, a busy room and nobody's face seen (the
+    /// camera saw the floor). The news began at 153.46 s and ended at
+    /// 165.00 s. "How is that task going?" came 46.8 s after it began, just
+    /// past the 45 s a conversation lasts, and was held; so was every line
+    /// after it, since a held line gets no answer and starts no
+    /// conversation. With the switch, that line asks about the lamp's work,
+    /// and its answer makes the next three a conversation going on.
+    #[test]
+    fn with_the_switch_the_battery_after_the_lamps_news_does_not_go_deaf() {
+        let battery = [
+            (46_770, "How is that task going?"),
+            (65_610, "Remind me in two minutes to stretch."),
+            (82_960, "What's my favourite colour?"),
+            (99_280, "What time is it?"),
+        ];
+        let mut answered = vec![Verdict::Play(ABOUT_ITS_WORK)];
+        answered.extend([GOING_ON; 3]);
+        assert_eq!(after_news(true, Room::Busy, &battery), answered);
+        assert_eq!(after_news(false, Room::Busy, &battery), [BUSY_HELD; 4]);
+    }
+
+    /// The first builder's spec (#828, 19:22, and #705, 19:55): after the
+    /// news, five follow-ups 17 s apart with no face and no name, all
+    /// answered with the switch, the first asking about the lamp's work
+    /// 100 s after the news; without it, all held. And talk between two
+    /// people is still held: a line calling someone else by a made-up name,
+    /// 17 s on inside the conversation, and one a minute after it, the
+    /// conversation over. A first line within the news's own 45 s is
+    /// answered either way, as a conversation going on; without the switch
+    /// the line to someone else is answered too there.
+    #[test]
+    fn with_the_switch_five_follow_ups_after_the_news_are_answered_and_talk_is_held() {
+        let at = |first: u64| {
+            [
+                (first, "Is the task done?"),
+                (first + 17_000, "And the other one?"),
+                (first + 34_000, "How long did it take?"),
+                (first + 51_000, "Was anything left over?"),
+                (first + 68_000, "Okay, what comes next?"),
+                (
+                    first + 85_000,
+                    "Zemba, are you coming to the meeting at two?",
+                ),
+                (first + 145_000, "Did you get my message about the budget?"),
+            ]
+        };
+        let mut answered = vec![Verdict::Play(ABOUT_ITS_WORK)];
+        answered.extend([GOING_ON; 4]);
+        answered.extend([BUSY_HELD; 2]);
+        assert_eq!(after_news(true, Room::Busy, &at(100_000)), answered);
+        assert_eq!(after_news(false, Room::Busy, &at(100_000)), [BUSY_HELD; 7]);
+        assert_eq!(after_news(true, Room::Busy, &at(17_000)), answered);
+        let mut unswitched = vec![GOING_ON; 6];
+        unswitched.push(BUSY_HELD);
+        assert_eq!(after_news(false, Room::Busy, &at(17_000)), unswitched);
+    }
+
+    /// The Second on #1378 (20:29): with `AFTER_NEWS` taken on timing alone,
+    /// two colleagues talking to each other 120 s after the lamp's news, no
+    /// name and no face, were answered every line, the first as a reply to
+    /// the news and the rest as a conversation going on. In a busy room a
+    /// reply to the news is now taken only when it asks about the lamp's
+    /// work, or as any other line is: their talk is held, with the switch
+    /// and without it. Within the news's own 45 s their talk is a
+    /// conversation going on either way. Outside a busy room the first line
+    /// after the news is still a reply to it, whatever it says.
+    #[test]
+    fn two_people_talking_soon_after_the_news_in_a_busy_room_are_held() {
+        let at = |first: u64| {
+            [
+                (first, "Did you get my message about the budget?"),
+                (first + 4_000, "Yes, I'll look at it after lunch."),
+                (first + 8_000, "Can you send me the numbers first?"),
+                (first + 12_000, "Sure, give me ten minutes."),
+                (first + 16_000, "Thanks, that works."),
+            ]
+        };
+        for spoken_to in [true, false] {
+            assert_eq!(
+                after_news(spoken_to, Room::Busy, &at(120_000)),
+                [BUSY_HELD; 5],
+                "{spoken_to}"
+            );
+            assert_eq!(
+                after_news(spoken_to, Room::Busy, &at(30_000)),
+                [GOING_ON; 5],
+                "{spoken_to}"
+            );
+        }
+        // The cost of the narrowing: a reply that says nothing of the work,
+        // 100 s after the news, is held in a busy room and taken in a quiet
+        // one.
+        let reply = [(100_000, "Can you check it once more?")];
+        assert_eq!(after_news(true, Room::Busy, &reply), [BUSY_HELD]);
+        assert_eq!(
+            after_news(true, Room::Quiet, &reply),
+            [Verdict::Play(AFTER_NEWS)]
+        );
     }
 
     /// #918, the reviewer at 05:11: the lamp's own turn opens the reply

@@ -283,15 +283,38 @@ async fn an_image_the_link_cannot_take_fails_the_connection_within_its_write_bou
         input.try_image(request, 1, 1, Instant::now(), &jpeg(MAX_IMAGE_BYTES, 7)),
         Ok(ImageOffer::Queued)
     );
-    // The peer never reads.
-    assert_eq!(disconnected(&connection).await, Error::WriteTimeout);
+    // The peer never reads. The drop names the image, its size on the wire
+    // and its bound (lampOS#705).
+    let kib = u32::try_from(
+        crate::wire::encode_image(&jpeg(MAX_IMAGE_BYTES, 7))
+            .unwrap()
+            .len()
+            .div_ceil(1024),
+    )
+    .unwrap();
+    assert_eq!(
+        disconnected(&connection).await,
+        Error::WriteTimeout {
+            write: crate::Write::Image,
+            kib,
+            deadline_ms: 400
+        }
+    );
     let took = offered.elapsed();
     assert!(
         took >= IMAGE_WRITE && took <= IMAGE_WRITE + Duration::from_millis(50),
         "{took:?}"
     );
     // A write timeout is a link failure a supervisor reconnects from.
-    assert_eq!(Error::WriteTimeout.recovery(), crate::Recovery::Reconnect);
+    assert_eq!(
+        Error::WriteTimeout {
+            write: crate::Write::Image,
+            kib,
+            deadline_ms: 400
+        }
+        .recovery(),
+        crate::Recovery::Reconnect
+    );
     drop(server);
 }
 

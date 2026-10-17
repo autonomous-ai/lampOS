@@ -1491,6 +1491,13 @@ impl Engine {
         self.clock = Some((utc_offset_minutes, now_us, unix_ms));
     }
 
+    /// [`Engine::clock`] in `local`, with its offset at `unix_ms` (#1384): a
+    /// zone's changes with summer time, so quiet hours stay at the same clock
+    /// hours across one, which a fixed offset can't do.
+    pub fn clock_in(&mut self, local: &lamp_local_time::LocalTime, now_us: u64, unix_ms: u64) {
+        self.clock(local.offset_minutes_at(unix_ms), now_us, unix_ms);
+    }
+
     /// Time passes with no message: a run held until its trigger ends ends
     /// when the trigger topic's newest value has expired (its header's
     /// `expires_ms`) or, naming no lifespan, when the topic has said nothing

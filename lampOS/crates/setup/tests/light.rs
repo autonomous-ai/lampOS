@@ -3,7 +3,7 @@
 
 use lamp_ring::{EncodedFrame, FrameSink, PRIMER_BYTES, Rgb, setup::SetupRing};
 use lamp_setup::{
-    light::{FADE_IN, FADE_OUT, Light, ReleasingSave},
+    light::{Clock, FADE_IN, FADE_OUT, FRAME, Light, RETRY, ReleasingSave},
     serve::{Phase, Save, Status},
 };
 use std::{
@@ -66,6 +66,9 @@ impl Save for Marker {
     fn timezone(&mut self, _: &str) -> io::Result<()> {
         Ok(())
     }
+    fn backend(&mut self, _: &lamp_setup::serve::Backend) -> io::Result<()> {
+        Ok(())
+    }
     fn marker(&mut self) -> io::Result<()> {
         self.0.lock().unwrap().push(Seen::Marker);
         Ok(())
@@ -91,9 +94,47 @@ fn shows(seen: &Seens, wanted: fn(Rgb) -> bool) -> bool {
         {
             return true;
         }
-        thread::sleep(Duration::from_millis(20));
+        thread::sleep(Duration::from_millis(2));
     }
     false
+}
+
+/// The painter's clock in the tests that would otherwise wait out its fades:
+/// each frame's pause moves it on by exactly the frame and waits a fiftieth
+/// of that. So a fade takes no time, and the painter's time is its frames,
+/// however the machine stalls.
+#[derive(Clone)]
+struct Fast(Arc<(Instant, Mutex<Duration>)>);
+
+impl Fast {
+    fn new() -> Self {
+        Self(Arc::new((Instant::now(), Mutex::new(Duration::ZERO))))
+    }
+
+    /// How long the painter has painted, in its own time.
+    fn painted(&self) -> Duration {
+        *self.0.1.lock().unwrap()
+    }
+
+    /// Wait until the painter has painted `long` more of its own time.
+    fn wait(&self, long: Duration) {
+        let until = self.painted() + long;
+        let cap = Instant::now() + Duration::from_secs(4);
+        while self.painted() < until {
+            assert!(Instant::now() < cap, "the painter stopped");
+            thread::sleep(Duration::from_micros(200));
+        }
+    }
+}
+
+impl Clock for Fast {
+    fn now(&self) -> Instant {
+        self.0.0 + self.painted()
+    }
+    fn pause(&self, pause: Duration) {
+        *self.0.1.lock().unwrap() += pause;
+        thread::sleep(pause / 50);
+    }
 }
 
 fn set(status: &Mutex<Status>, phase: Phase, run: u64) {
@@ -107,7 +148,8 @@ fn the_light_follows_setup_and_lets_the_ring_go_before_the_marker() {
     let seen: Seens = Arc::default();
     let status = Arc::new(Mutex::new(Status::new("lamp-test".into())));
     let opens = Arc::new(Mutex::new(0));
-    let light = Light::spawn(
+    let clock = Fast::new();
+    let light = Light::spawn_with_clock(
         Arc::clone(&status),
         {
             let seen = Arc::clone(&seen);
@@ -118,6 +160,8 @@ fn the_light_follows_setup_and_lets_the_ring_go_before_the_marker() {
             }
         },
         |line| panic!("nothing should be said: {line}"),
+        RETRY,
+        clock.clone(),
     );
     // Waiting for the person: soft white, from a black first frame.
     assert!(shows(&seen, white), "{:?}", seen.lock().unwrap().last());
@@ -126,7 +170,8 @@ fn the_light_follows_setup_and_lets_the_ring_go_before_the_marker() {
     set(&status, Phase::Connecting, 1);
     assert!(shows(&seen, blue), "{:?}", seen.lock().unwrap().last());
 
-    // The join went well: the ring is black and closed before the marker.
+    // The join went well: the ring is black and closed before the marker,
+    // and letting it go did not wait out `RELEASE_WAIT` (the host's clock).
     let released = Instant::now();
     let mut save = ReleasingSave {
         save: Marker(Arc::clone(&seen)),
@@ -152,7 +197,7 @@ fn the_light_follows_setup_and_lets_the_ring_go_before_the_marker() {
     save.marker().unwrap();
     set(&status, Phase::Connected, 2);
     let count = seen.lock().unwrap().len();
-    thread::sleep(Duration::from_millis(300));
+    clock.wait(Duration::from_millis(300));
     assert_eq!(
         seen.lock().unwrap().len(),
         count,
@@ -221,7 +266,8 @@ fn a_ring_freed_in_its_retry_window_is_not_opened_after_the_marker() {
     let opens = Arc::new(AtomicUsize::new(0));
     let status = Arc::new(Mutex::new(Status::new("lamp-test".into())));
     set(&status, Phase::Connecting, 1);
-    let light = Light::spawn_with_retry(
+    let clock = Fast::new();
+    let light = Light::spawn_with_clock(
         Arc::clone(&status),
         {
             let (seen, busy, opens) = (Arc::clone(&seen), Arc::clone(&busy), Arc::clone(&opens));
@@ -238,14 +284,15 @@ fn a_ring_freed_in_its_retry_window_is_not_opened_after_the_marker() {
             move |line: &str| said.lock().unwrap().push(line.to_owned())
         },
         Duration::ZERO,
+        clock.clone(),
     );
     let until = Instant::now() + Duration::from_secs(4);
     while said.lock().unwrap().is_empty() && Instant::now() < until {
-        thread::sleep(Duration::from_millis(10));
+        thread::sleep(Duration::from_millis(1));
     }
     assert_eq!(said.lock().unwrap().len(), 1);
     // Faded in (with no ring), so letting go has a fade out to wait through.
-    thread::sleep(FADE_IN);
+    clock.wait(FADE_IN);
     ReleasingSave {
         save: Marker(Arc::clone(&seen)),
         light: Some(&light),
@@ -253,7 +300,7 @@ fn a_ring_freed_in_its_retry_window_is_not_opened_after_the_marker() {
     .marker()
     .unwrap();
     busy.store(false, Ordering::SeqCst);
-    thread::sleep(FADE_OUT + Duration::from_millis(300));
+    clock.wait(FADE_OUT + Duration::from_millis(300));
     assert_eq!(opens.load(Ordering::SeqCst), 0, "opened after the marker");
     assert_eq!(*seen.lock().unwrap(), [Seen::Marker]);
     // Saving failed after all: then the ring is wanted again, and opened.
@@ -270,13 +317,15 @@ fn the_press_after_a_failed_save_shows_blue_at_once() {
     let seen: Seens = Arc::default();
     let status = Arc::new(Mutex::new(Status::new("lamp-test".into())));
     set(&status, Phase::Connecting, 1);
-    let light = Light::spawn(
+    let light = Light::spawn_with_clock(
         Arc::clone(&status),
         {
             let seen = Arc::clone(&seen);
             move || SetupRing::new(Sink(Arc::clone(&seen)))
         },
         |line| panic!("nothing should be said: {line}"),
+        RETRY,
+        Fast::new(),
     );
     assert!(shows(&seen, blue));
     ReleasingSave {
@@ -287,11 +336,24 @@ fn the_press_after_a_failed_save_shows_blue_at_once() {
     .unwrap();
     set(&status, Phase::Failed, 1);
     assert!(shows(&seen, amber), "{:?}", seen.lock().unwrap().last());
-    let amber_from = seen.lock().unwrap().len();
-    set(&status, Phase::Connecting, 1);
-    let pressed = Instant::now();
+    // The press, with the frames shown so far counted at the same moment.
+    let amber_from = {
+        let shown = seen.lock().unwrap();
+        set(&status, Phase::Connecting, 1);
+        shown.len()
+    };
     assert!(shows(&seen, blue), "{:?}", seen.lock().unwrap().last());
-    assert!(pressed.elapsed() < Duration::from_millis(1_500));
+    // At once in the painter's own time: its frames from the press to the
+    // first blue one, each a frame of its time on this clock.
+    let frames = seen.lock().unwrap()[amber_from..]
+        .iter()
+        .position(|seen| matches!(seen, Seen::Frame(colour) if blue(*colour)))
+        .unwrap()
+        + 1;
+    assert!(
+        FRAME * u32::try_from(frames).unwrap() < Duration::from_millis(1_500),
+        "blue after {frames} frames"
+    );
     assert!(
         !seen.lock().unwrap()[amber_from..].contains(&Seen::Closed),
         "the ring went dark between the press and its run"

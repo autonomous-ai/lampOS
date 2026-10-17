@@ -123,6 +123,17 @@ async fn setup(State(shared): State<Arc<Shared>>, body: Bytes) -> Response {
         Ok(accepted) => accepted,
         Err(why) => return json(StatusCode::BAD_REQUEST, failure(&why)),
     };
+    // A link named but not kept leaves a line to read (Third on #1401), with
+    // the fields' names only.
+    if let Err(fields) = crate::serve::backend_link(&request)
+        && !fields.is_empty()
+    {
+        eprintln!(
+            "lamp-setup: the request named a backend link, but {} {} missing or not valid; setup goes on without it",
+            fields.join(", "),
+            if fields.len() == 1 { "is" } else { "are" }
+        );
+    }
     {
         let mut status = shared.status.lock().unwrap();
         if status.phase == Phase::Connecting {

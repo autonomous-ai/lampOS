@@ -699,7 +699,16 @@ pub enum Fault {
     ConnectTimeout,
     SetupTimeout,
     ReadTimeout,
-    WriteTimeout,
+    /// Which write did not finish in time, its size on the wire in KiB and
+    /// its bound (lampOS#705). Absent in records from before.
+    WriteTimeout {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        write: Option<lamp_gemini::Write>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kib: Option<u32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        deadline_ms: Option<u32>,
+    },
     BarrierTimeout,
     ResponseTimeout,
     StalledResponse,
@@ -725,7 +734,15 @@ impl From<Error> for Fault {
             Error::ConnectTimeout => Self::ConnectTimeout,
             Error::SetupTimeout => Self::SetupTimeout,
             Error::ReadTimeout => Self::ReadTimeout,
-            Error::WriteTimeout => Self::WriteTimeout,
+            Error::WriteTimeout {
+                write,
+                kib,
+                deadline_ms,
+            } => Self::WriteTimeout {
+                write: Some(write),
+                kib: Some(kib),
+                deadline_ms: Some(deadline_ms),
+            },
             Error::BarrierTimeout => Self::BarrierTimeout,
             Error::ResponseTimeout => Self::ResponseTimeout,
             Error::StalledResponse => Self::StalledResponse,
@@ -1942,7 +1959,8 @@ async fn serve_with_visual<C: Connect>(
                                 }
                                 addressed_said = Some(said);
                             }
-                            attention.lamp_asked(crate::thread::THREAD.lock().is_ok_and(|thread| thread.lamp_asked(request)));
+                            let lamp_asked = crate::thread::THREAD.lock().is_ok_and(|thread| thread.lamp_asked(request));
+                            attention.lamp_asked(lamp_asked);
                             // #829: a line in another voice than the
                             // conversation's is no part of it. Judged once,
                             // while its answer's verdict is still to come
@@ -2024,6 +2042,7 @@ async fn serve_with_visual<C: Connect>(
                                     addressed: addressed_said.filter(|said| {
                                         said.session == lineage.session.get() && said.request == request
                                     }),
+                                    lamp_asked,
                                 });
                             }
                             // The rise the near rule judged, on the lines the
@@ -10548,6 +10567,31 @@ mod tests {
         assert_eq!(Fault::from(Error::MalformedMessage), Fault::Protocol);
         assert_eq!(Fault::from(Error::Backpressure), Fault::Local);
         assert_eq!(Fault::from(Error::OpenActivityOverrun), Fault::Local);
+        // A write past its bound says which write, its size and its bound
+        // (lampOS#705), and a record from before still reads.
+        let stalled = Fault::from(Error::WriteTimeout {
+            write: lamp_gemini::Write::Picture,
+            kib: 245,
+            deadline_ms: 200,
+        });
+        assert_eq!(
+            serde_json::to_value(ProviderStatus::Unavailable { reason: stalled }).unwrap(),
+            json!({"kind":"unavailable","reason":{"category":"write_timeout",
+                "write":"picture","kib":245,"deadline_ms":200}})
+        );
+        assert_eq!(
+            serde_json::from_value::<ProviderStatus>(
+                json!({"kind":"unavailable","reason":{"category":"write_timeout"}})
+            )
+            .unwrap(),
+            ProviderStatus::Unavailable {
+                reason: Fault::WriteTimeout {
+                    write: None,
+                    kib: None,
+                    deadline_ms: None
+                }
+            }
+        );
         assert!(
             serde_json::from_value::<ProviderStatus>(json!({"kind":"unavailable",
             "reason":{"category":"transport"},"detail":"x"}))

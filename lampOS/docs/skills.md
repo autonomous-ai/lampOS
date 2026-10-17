@@ -155,7 +155,7 @@ must not leave a step silently undone)*.
 | `trigger.name` | no | What a step's `on` calls it: lowercase letters, digits and `_`, a different one for each trigger (#1021) |
 | `trigger.each` with `trigger.key` | no | `each` names a field that is a list, and `key` the field that names one of its items (`each = "settled"`, `key = "task"` on `tasks/status`). The `field` test is then of each item on its own, and `when` must be `appears`: a run for each item that holds where, in the trigger's last message, it did not or was not in the list. So an item new to the list that holds counts (every item of #1048's `settled` is first seen already settled), and so does one that leaves and comes back. What is there at the first message since the program started is not news: it only says what is there *(chosen: a restart must not tell everything again)*. At a reload the items begin again from the topic's value the program keeps, so what was there then is not news and the next message, the next change, is compared with it (the reviewer on #1042); with no value kept yet, the topic's first message only says what is there, as at the start. A missing list is an empty one. Each item's run is asked about on its own, and two in one message are two runs, in the items' order across the skill's triggers: by number when the key is a number (task 9 before task 10), else by text. Not with `near`, `absent_for`, `for`, `gap`, `rearm`, `cooldown` or `wait`, which are timed over the whole topic *(chosen)*. Nor in a skill with `[quiet]` or a dim `until = "ends"`: an item's run has no quiet hours and no end of its own, so quiet would be passed over and a held dim would keep the skill busy *(chosen, the reviewer on #1042)*. With the Policy asked (`LAMP_SKILLS_ASK=policy`), its answer starts the item's run only if that item is still in the list and holds |
 | `[[while]]` | no | Conditions that must also hold, all of them, on the newest value of each topic while that value lasts: a `topic` with `field` and one of `equals`, `not_equals` (anything else, #1140), `above` or `below`, or `humans/faces/tracked` with `present = true`; with `for`, it has also held that long, by the messages of its topic since this program started. It begins again after a value that expired, and when a reload changes the condition |
-| `[quiet]` | no | `from` and `to`, two different local times as `"HH:MM"` (`from = "22:00"`, `to = "08:00"`, past midnight when `to` comes first): from `from` up to `to`, the skill never starts itself (#1021). A chance that comes then is kept, as `wait` keeps one through a talk, and taken at the trigger's first message after `to`, while the trigger still holds; the trigger stopping (past its `gap`) spends it (Stuffy air, stuffy from 23:00 to 10:00: one droop at 08:00, the reviewer on #1066). A trigger with `when = "appears"` spends it: someone who came at 22:30 is not greeted at 08:00. The local time is the program's wall clock and its `--utc-offset-minutes`; without that flag the time of day is not known, and a skill with quiet hours never starts itself *(chosen: "never at night" holds when the night cannot be told)*. Only with a trigger |
+| `[quiet]` | no | `from` and `to`, two different local times as `"HH:MM"` (`from = "22:00"`, `to = "08:00"`, past midnight when `to` comes first): from `from` up to `to`, the skill never starts itself (#1021). A chance that comes then is kept, as `wait` keeps one through a talk, and taken at the trigger's first message after `to`, while the trigger still holds; the trigger stopping (past its `gap`) spends it (Stuffy air, stuffy from 23:00 to 10:00: one droop at 08:00, the reviewer on #1066). A trigger with `when = "appears"` spends it: someone who came at 22:30 is not greeted at 08:00. The local time is the program's wall clock and its `--zone` or `--utc-offset-minutes`; without either the time of day is not known, and a skill with quiet hours never starts itself *(chosen: "never at night" holds when the night cannot be told)*. Only with a trigger |
 | `[ask] policy` | yes, with a trigger | The Policy's question asked before anything is done *(chosen: required, since every trigger is something the lamp starts itself)*. A tool's call is not asked about: a person asked for it |
 | `[[do]]` | at least one | The steps, in order. Within one table: body, then light, then say, then sound |
 | `do.body.look_at` | no | Only `"face"`. The largest face in view goes to the body's `gaze.sock` as the eyes send one (`{"face":{"x","y","size","turned":0}}`) |
@@ -269,13 +269,17 @@ Its own process, its own owner, like every part
 
 As built on 2026-10-16 (#938, `crates/skills`, not yet run on a lamp):
 
-    lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] [--tools-dir DIR] [--clock-control PATH] [--utc-offset-minutes N]
+    lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] [--tools-dir DIR] [--clock-control PATH] [--zone system|NAME | --utc-offset-minutes N]
     lamp-skills test SKILL_DIR...
 
-- `--utc-offset-minutes` is the lamp's local time east of UTC (-720 to
-  840), as the Policy, Expression and memory take it, read with the wall
-  clock at each message, for a skill's `[quiet]` hours (#1021). Without it,
-  a skill with quiet hours never starts itself.
+- `--zone` or `--utc-offset-minutes` is the lamp's local time, as the
+  Policy, Expression and memory take it, read with the wall clock at each
+  message, for a skill's `[quiet]` hours (#1021). `--zone system` follows
+  `/etc/localtime` (setup's zone, #820) and `--zone NAME` a named zone, each
+  with its offset at that moment, so quiet hours stay at the same clock
+  hours across summer time (#1384); `--utc-offset-minutes` (-720 to 840) is
+  fixed all year. One or the other; a zone that can't be read ends the start.
+  Without either, a skill with quiet hours never starts itself.
 - It loads every folder in `--dir` (`/var/lib/lampOS/skills`), looks at the
   folder every two seconds, and loads them all again when a file other
   than a test changed. Cooldowns are kept across a reload.
@@ -422,10 +426,9 @@ As built on 2026-10-16 (#938, `crates/skills`, not yet run on a lamp):
 `deploy/product/lamp-skills.service`, Welcome back in `/var/lib/lampOS/skills`,
 and the product voice with the say service on and its own hello off.
 `deploy/units/lamp-skills.service` stays the template for a lamp set up by hand.
-It reads the lamp's zone (`LAMP_UTC_OFFSET_MINUTES`) from
-`/etc/lampOS/zone.env`, as the product units do, for `--utc-offset-minutes`;
-neither the product unit nor lamp-4ace's passes it yet, so there a skill
-with `[quiet]` hours never starts itself. Neither puts Stuffy air in its
+The product unit passes `--zone system`, the zone setup saved (#820), across
+summer time (#1384). lamp-4ace's passes neither yet, so there a skill with
+`[quiet]` hours never starts itself. Neither puts Stuffy air in its
 folder today (install puts only Welcome back on a home lamp).
 lamp-4ace's folder carries `lamp-skills.service`, and its voice unit has the
 voice's own hello (`LAMP_SPEAK_FIRST`) off and the say service on, so only

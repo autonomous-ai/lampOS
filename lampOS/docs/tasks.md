@@ -196,7 +196,7 @@ for a mutation. It is not evidence that no commit or dispatch occurred.
 
 ## Harness adapter
 
-Only five argv forms are constructed, without a shell; `ps` only with
+Only six argv forms are constructed, without a shell; `ps` only with
 `serve --progress` and `wait` only with `serve --push-wait`:
 
 ```text
@@ -205,6 +205,7 @@ harness new codex --machine <full-machine-id> <project> --name <unique-label> --
 harness show --machine <full-machine-id> <full-agent-id> --chars 4000 --json
 harness ps --machine <full-machine-id> --json
 harness wait --machine <full-machine-id> <agent-id>[,<agent-id>…] --any --timeout 600s --json
+harness close --machine <full-machine-id> <full-agent-id> --json
 ```
 
 `--mode auto` (Harness's default) since 2026-10-15, approved by the owner: the
@@ -301,6 +302,83 @@ answered) with no question text (`answer` empty or the previous answer), and
 `wait --timeout 1s` exited 124 throughout, never 3. So `needs-input` is taken
 from `show`, and the voice says the agent is waiting on the person's computer
 rather than voicing a question it does not have.
+
+## Closing a finished harness (#1390, `serve --close-told`, off unless set)
+
+Each hand-over starts a Harness session (a Claude Code process) on the
+person's computer, and until 17 Oct nothing closed it. The office Mac had 52
+idle `lamp-*` harnesses from three days of tests, holding part of 17 GB of
+Claude processes. A customer's computer would keep one for every job the lamp
+ever handed over. With `serve --close-told`, the lamp closes the harness it
+started once its answer is told:
+
+- **When:** the task was made by this version, and its newest kept answer is
+  from an agent `idle` with an answer. The telling must have played, or not
+  be known to have played (`spoken` or `uncertain`).
+  - **`ask` doesn't count:** Harness's `ask` is what the agent was last
+    asked, the lamp's own task text, so it plays no part here.
+  - **Left to the person:** an agent that waits for them (`needs-input`).
+    The lamp can't answer it, and Harness would refuse to close it.
+  - **Old tasks:** only a task made while `--close-told` is on is marked
+    `closable`. A task from a store written before this version, or made
+    while the switch was off, is never closed, so turning it on later closes
+    nothing older. Its harness may be one the person has gone on with since.
+  - **The lamp's own turn only:** the told turn's asked text must still be
+    the task's own, the `ask` of its first kept answer. If the person asked
+    the agent more at the computer ("Now make it longer.") and that newer
+    turn was kept and told, it's theirs, and never closed.
+  - **No "go on" from the lamp:** no request lets the person ask the lamp to
+    go on with a task, so a task told is a task done, from the lamp's side.
+- **Read first, every time:** the close job reads the agent (`show`) just
+  before closing.
+  - **Still idle on the told turn** (the same answer to the same asked
+    text): closed with `harness close --machine <id> <agent-id> --json`, by
+    the agent's own id, never `--now`. Harness saves its screen and stops it,
+    and keeps its conversation, so the person can still open and resume it.
+  - **Any other turn or state:** the person went on with it at the computer,
+    so it's theirs. It's left for good (`left`), never asked again.
+  - **Stopped or failed already:** nothing to close (`closed`, code `gone`).
+- **Only the lamp's own:** as an agent caller, Harness refuses one the caller
+  didn't start (exit 5). Called as the person (`--harness-as-person`, as the
+  product unit and lamp-4ace run it), Harness doesn't check that, so the
+  agent id the lamp kept from its own `new` is the only guard. The lamp never
+  closes by name, and never anything `ps` lists that isn't one of its tasks.
+- **Recorded first:** the attempt is saved before the call, like a launch and
+  a read.
+- **Exit codes:** Harness 0.4.18's `close` exits 0 (closed), 5 (refused:
+  `NOT_YOURS`, `SPAWN_LIMIT` or `TURNED_OFF`, never asked again) or 1. Exit 1
+  covers working or waiting for the person (`WORKING`), changed while closing
+  (`AGENT_CHANGED`) and gone alike, with only a message in the `--json`
+  reply. So exit 1 is `failed`: tried again a minute later (`CLOSE_RETRY_MS`),
+  three times in all (`CLOSE_TRIES`), each try reading the agent first.
+- **Restarts:** a restart during a close leaves it `failed`, code `restart`,
+  to be tried again the same way.
+- **The journal:** each close prints one line, `tasks: closing task N's
+  harness: …`, and `get_task` shows the task's `close`.
+- **Reverting:** a `Task` is `deny_unknown_fields`, so a `lamp-tasks` from
+  before this can't load a store with `close` or `closable` in it. Going back
+  on a lamp means resetting its tasks store, as with `watch_idle`.
+- **Not done:** the sessions already on a computer from before this are the
+  person's to close. This touches none of them.
+
+**Tests:**
+- **`engine::tests`:**
+  - `a_harness_done_and_told_is_closed_once`;
+  - `a_harness_the_person_has_is_left_to_them` (`needs-input`, `left`, and a
+    task from an older store);
+  - `a_turn_the_person_asked_or_a_task_from_before_the_switch_is_never_closed`;
+  - `a_failed_close_is_tried_three_times_and_a_refused_one_never`;
+  - `a_close_under_way_at_a_restart_is_tried_again`.
+- **`tests/runtime.rs`, through the service:**
+  - `a_harness_done_and_told_is_closed_once_by_the_service` (the person's
+    own idle harness listed by `ps` beside it is never closed);
+  - `without_close_told_no_harness_is_closed`;
+  - `a_harness_the_person_went_on_with_or_that_waits_for_them_is_left`.
+- **`tests/harness.rs`, on the fixture CLI:**
+  `close_names_the_agent_on_its_machine_never_now_and_reads_the_exit_code`.
+
+Not run against a real Harness yet: that needs a lamp handing a task to a
+paired computer, with `--close-told`.
 
 ## Bounds, durability and health
 

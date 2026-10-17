@@ -19,6 +19,8 @@ lamp-bus = { path = "../bus" }
 lamp-msgs = { path = "../msgs" }
 # The setup light (src/light.rs): the ring's own setup writer, no permit.
 lamp-ring = { path = "../ring" }
+# The person's zone's offset for zone.env (#820), from the zone data schedule uses.
+lamp-local-time = { path = "../local-time" }
 serde.workspace = true
 serde_json.workspace = true
 rustix = { version = "=1.1.5", features = ["fs", "process", "system"] }

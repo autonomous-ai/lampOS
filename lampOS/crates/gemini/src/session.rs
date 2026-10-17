@@ -4,7 +4,7 @@ use crate::{
     ImageRevocation, Lineage, MAX_IMAGE_AGE, MAX_IMAGE_BYTES, MAX_IMAGES_PER_REQUEST,
     MAX_INPUT_AGE, MAX_INPUT_SAMPLES, MAX_OPEN_ACTIVITY_REQUESTS, MAX_RETAINED_SAMPLES,
     MAX_WIRE_BYTES, OUTPUT_RATE, RequestId, Result, Resumption, ResumptionHandle, SessionConfig,
-    SessionId, StartRelease, State, SuccessorStart, Timeouts, wire,
+    SessionId, StartRelease, State, SuccessorStart, Timeouts, Write, wire,
 };
 use futures_util::{SinkExt, StreamExt};
 use std::{
@@ -696,6 +696,7 @@ where
         &mut socket,
         Message::text(wire::encode_setup(&config)?),
         config.timeouts.write,
+        Write::Setup,
     )
     .await?;
     let setup = async {
@@ -731,7 +732,13 @@ where
                     }
                 }
                 Message::Ping(bytes) => {
-                    send(&mut socket, Message::Pong(bytes), config.timeouts.write).await?
+                    send(
+                        &mut socket,
+                        Message::Pong(bytes),
+                        config.timeouts.write,
+                        Write::Keepalive,
+                    )
+                    .await?
                 }
                 Message::Pong(_) => {}
                 Message::Close(frame) => return Err(closed(frame)),
@@ -1155,8 +1162,12 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
                 return Err(Error::ServerGoAway);
             }
             if self.ping_at.elapsed() >= self.timeouts.keepalive {
-                self.write(Message::Ping(Vec::new().into()), self.timeouts.write)
-                    .await?;
+                self.write(
+                    Message::Ping(Vec::new().into()),
+                    self.timeouts.write,
+                    Write::Keepalive,
+                )
+                .await?;
                 self.ping_at = Clock::now();
             }
             // Output is buffered up to a fixed amount of audio so the answer is
@@ -1251,7 +1262,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
         let mut held = VecDeque::new();
         let mut open = true;
         let written = {
-            let write = send(&mut self.socket, message, IMAGE_WRITE);
+            let write = send(&mut self.socket, message, IMAGE_WRITE, Write::Image);
             tokio::pin!(write);
             loop {
                 tokio::select! {
@@ -1418,11 +1429,11 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
     ///
     /// An image is written by `send_image`, which ends on a stop in the
     /// same way and has its own accounting.
-    async fn write(&mut self, message: Message, deadline: Duration) -> Result<()> {
+    async fn write(&mut self, message: Message, deadline: Duration, what: Write) -> Result<()> {
         if let Some(stop) = *self.stop.borrow() {
             return Err(stop.error);
         }
-        let write = send(&mut self.socket, message, deadline);
+        let write = send(&mut self.socket, message, deadline, what);
         tokio::pin!(write);
         loop {
             tokio::select! {
@@ -1446,8 +1457,12 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
     }
     async fn start_activity(&mut self) -> Result<()> {
         if !self.activity_open {
-            self.write(Message::text(wire::ACTIVITY_START), self.timeouts.write)
-                .await?;
+            self.write(
+                Message::text(wire::ACTIVITY_START),
+                self.timeouts.write,
+                Write::Activity,
+            )
+            .await?;
             self.activity_open = true;
             self.open_activity.clear();
         }
@@ -1479,11 +1494,16 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
             self.write(
                 Message::text(wire::encode_note(&note)?),
                 self.timeouts.write,
+                Write::Note,
             )
             .await?;
         }
-        self.write(Message::text(wire::ACTIVITY_END), self.timeouts.write)
-            .await?;
+        self.write(
+            Message::text(wire::ACTIVITY_END),
+            self.timeouts.write,
+            Write::Activity,
+        )
+        .await?;
         self.activity_open = false;
         self.open_activity.clear();
         if let Some(turn) = self.current.as_mut() {
@@ -1784,8 +1804,12 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
             }
             // Handed to the socket from here: no longer droppable.
             self.note_sent(&audio)?;
-            self.write(Message::text(wire::encode_audio(&audio.samples)?), deadline)
-                .await?;
+            self.write(
+                Message::text(wire::encode_audio(&audio.samples)?),
+                deadline,
+                Write::Audio,
+            )
+            .await?;
         }
         if self
             .held
@@ -1851,8 +1875,12 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
                 }
                 let deadline = self.timeouts.write.min(MAX_INPUT_AGE - age);
                 self.note_sent(&audio)?;
-                self.write(Message::text(wire::encode_audio(&audio.samples)?), deadline)
-                    .await?;
+                self.write(
+                    Message::text(wire::encode_audio(&audio.samples)?),
+                    deadline,
+                    Write::Audio,
+                )
+                .await?;
             }
             Command::Written(request, text, picture) => {
                 if request.get() <= self.last_request
@@ -1879,6 +1907,11 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
                     self.write(
                         Message::text(wire::encode_written_turn(&text, picture.as_deref())?),
                         self.timeouts.write,
+                        if picture.is_some() {
+                            Write::Picture
+                        } else {
+                            Write::Written
+                        },
                     )
                     .await?;
                 }
@@ -1900,6 +1933,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
                     self.write(
                         Message::text(wire::encode_context(&text)?),
                         self.timeouts.write,
+                        Write::Context,
                     )
                     .await?;
                 }
@@ -1963,7 +1997,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
                     self.discard(Discard::StaleToolResponse);
                     return Ok(());
                 }
-                self.write(Message::text(message), self.timeouts.write)
+                self.write(Message::text(message), self.timeouts.write, Write::Tool)
                     .await?;
             }
         }
@@ -1989,7 +2023,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
                     &serde_json::json!({"not_done": crate::NOT_DONE_STILL_SPEAKING}),
                     silent,
                 )?;
-                self.write(Message::text(message), self.timeouts.write)
+                self.write(Message::text(message), self.timeouts.write, Write::Tool)
                     .await?;
             }
             self.discard(Discard::UnownedToolCall);
@@ -2060,7 +2094,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Actor<S> {
             Message::Text(text) => self.decode(text.as_bytes())?,
             Message::Binary(bytes) => self.decode(&bytes)?,
             Message::Ping(bytes) => {
-                self.write(Message::Pong(bytes), self.timeouts.write)
+                self.write(Message::Pong(bytes), self.timeouts.write, Write::Keepalive)
                     .await?;
                 return Ok(());
             }
@@ -2481,14 +2515,24 @@ fn check_age(captured_at: Instant, clock: &CaptureClockSource) -> Result<Duratio
         .filter(|age| *age < MAX_INPUT_AGE)
         .ok_or(Error::StaleInput)
 }
+/// Write `message` to the service within `deadline`. One that does not
+/// finish in time is `write`, named in its [`Error::WriteTimeout`] with its
+/// size and deadline.
 async fn send<S: AsyncRead + AsyncWrite + Unpin>(
     socket: &mut WebSocketStream<S>,
     message: Message,
     deadline: Duration,
+    write: Write,
 ) -> Result<()> {
+    let kib = u32::try_from(message.len().div_ceil(1024)).unwrap_or(u32::MAX);
+    let deadline_ms = u32::try_from(deadline.as_millis()).unwrap_or(u32::MAX);
     timeout(deadline, socket.send(message))
         .await
-        .map_err(|_| Error::WriteTimeout)?
+        .map_err(|_| Error::WriteTimeout {
+            write,
+            kib,
+            deadline_ms,
+        })?
         .map_err(transport_error)
 }
 fn transport_error(error: tungstenite::Error) -> Error {

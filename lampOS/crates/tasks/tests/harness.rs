@@ -1,7 +1,7 @@
 //! Scripted local executable fixtures. No installed Harness, daemon, account,
 //! remote agent, credentials or provider is invoked by these tests.
 use lamp_tasks::harness::{
-    Cli, CliConfig, Ended, EngineKind, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES,
+    Cli, CliConfig, Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES,
     MOST_LISTED, MOST_WAITED, PS_STDOUT_LIMIT, Target, iso_unix_ms, parse_ps, parse_wait,
 };
 use serde_json::{Value, json};
@@ -1096,4 +1096,42 @@ fn the_wait_listing_is_read_only_for_the_agents_waited_on() {
     );
     assert_eq!(parse_wait(None, b"", &agents), Err("wait_failed"));
     assert_eq!(parse_wait(Some(124), b"", &agents), Ok(vec![]));
+}
+
+/// #1390: `harness close` on the machine the agent was started on, by the
+/// agent's id, never `--now`; its exit code read as Harness 0.4.18's CLI
+/// gives it: 0 closed, 5 refused, and 1 for everything else (working,
+/// waiting for the person, changed, gone), which is a failure to try again
+/// after reading the agent. An id or a machine that isn't one starts no
+/// process at all.
+#[test]
+fn close_names_the_agent_on_its_machine_never_now_and_reads_the_exit_code() {
+    for (exit, said) in [
+        (0, Ok(Closed::Closed)),
+        (5, Ok(Closed::Refused)),
+        (1, Err("close_failed".to_string())),
+        (2, Err("close_failed".to_string())),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({"close":{"exit":exit}}));
+        assert_eq!(rig.cli().close(MACHINE, AGENT), said, "exit {exit}");
+        let calls = rig.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(
+            calls[0]["args"],
+            json!(["close", "--machine", MACHINE, AGENT, "--json"])
+        );
+    }
+    let rig = Rig::new();
+    for (machine, agent) in [
+        (MACHINE, "lamp-coffee-poem"),
+        (MACHINE, "--now"),
+        ("office", AGENT),
+    ] {
+        assert!(
+            rig.cli().close(machine, agent).is_err(),
+            "{machine} {agent}"
+        );
+    }
+    assert!(rig.calls().is_empty());
 }

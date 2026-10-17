@@ -1214,6 +1214,28 @@ reported failing, and they are left as they are. `rules`'
 `the_fact_is_kept_on_the_bus_and_a_stalled_bus_never_holds_up_a_session`
 asserts `took < 300 ms` on purpose: there the bound is what it checks.
 
+## The first control message's ages on a clock the test moves (#1128)
+
+`lamp-voice::first_control_message`'s only test (3.7 s, among the slowest
+of the 17 October full run) slept 0.3 s, 1.7 s and 1.7 s so that three
+messages would be that old when read: the first control message is taken
+after 300 ms (its grace), a later one 1.7 s old is refused past the longest
+hold-up (1.5 s), and a first data message gets no grace.
+
+The transport's `Channel` now has `send_with(payload, now)` and
+`receive_with(now)`, which read a clock given to them at the places `send`
+and `receive` read the host's: the send's stamp, and in a receive both the
+look before it (for how long since the last look) and the age after it.
+`send` and `receive` call them with `monotonic_us`, so the lamp reads the
+same clock at the same places. The test moves one clock for both sides by
+exactly what it used to sleep, so the ages and the gaps between looks are as
+before, and it takes no time. A second pair of channels still goes through
+the plain `send` and `receive` on the host's clock (the fifth's ask).
+
+Two deliberate breaks fail it as they fail the old test: `HELD_UP_US` at 2 s
+fails the later message's check, and no first-message grace fails the first
+check.
+
 ## Memory's timed-out mutation is sent before its caller gives up (#1280)
 
 `lamp-memory::voice`'s
@@ -1314,3 +1336,39 @@ same checks follow. On Linux x86_64 (release, as CI): the first test went from
 6.1 s to 1.1 s (5 of 5 each; what's left is the diagnostic's real one-second
 cadence), the second from 5.3 s (4 of 5; 0.15 s once) to 0.2 s, and the whole
 `runtime` binary from 6.4 s to 1.4 s.
+
+## Setup's light paints on a clock its tests run fast (#1128)
+
+Three of `lamp-setup::light`'s tests were among the slowest in the full run
+of 17 October (39029608429): `the_light_follows_setup_and_lets_the_ring_go_before_the_marker`
+(4.0 s), `a_ring_freed_in_its_retry_window_is_not_opened_after_the_marker`
+(3.8 s) and `the_press_after_a_failed_save_shows_blue_at_once` (2.7 s). They
+waited out the painter's real fades (`FADE_IN` 1.5 s, `CHANGE` 0.8 s,
+`FADE_OUT` 0.6 s) and slept through windows of their own.
+
+The painter now reads a `Clock` (`now`, and `pause` for a frame) at the places
+it read the host's: the start, each step's time, the retry's due time and
+the frame's sleep. `Light::spawn`, `spawn_if` and `spawn_with_retry` pass
+`HostClock`, which is `Instant::now` and `thread::sleep`, so the lamp is unchanged;
+`spawn_with_clock` takes another. The three tests give the painter a clock
+whose pause moves it on by exactly the frame and waits a fiftieth of that,
+so the painter's time is its frames however the machine stalls. Each of
+their own windows (the fade in before letting go, the fade out and 300 ms
+after it, the 300 ms of nothing after the marker) is waited in that time.
+A clock the test steps would not do: `release()` waits on the test's
+thread for the painter to fade out.
+
+The third's two bounds (#1128, 21:35): "blue at once" (`< 1.5 s`) is the
+painter's own reaction, so it is now counted in its frames from the press to
+the first blue one (12 here, against 30). `released.elapsed() < 2 s` asks
+whether letting go fell through to `RELEASE_WAIT`, a wait on the host's
+clock, so it stays there. The other three tests stay on `Light::spawn` and
+the host's clock, so the lamp's own wiring keeps a full fade in and out.
+
+On this Mac the three went from 4.07, 3.98 and 2.73 s to 0.12, 0.11 and
+0.07 s. Three deliberate breaks fail the same check in the old tests and the
+new: keeping the ring let go after a failed save (amber never shows),
+opening a ring while fading out after the marker, and a 3 s `CHANGE` (blue
+not at once). A 400 ms stall of the painter at its 30th frame, and of the
+test's thread after the press, after the marker and after the ring was
+freed, fails none of them.

@@ -18,9 +18,11 @@
 //! With `--sounds-checked` (`LAMP_SHORT_SOUNDS=quiet-room-checked`, #800),
 //! a spoken turn whose end came marked as a short sound let through is
 //! answered only when what was heard is, whole, a short word said to the
-//! lamp ([`crate::not_speech::short_word`]); otherwise it ends quietly
-//! after its words, as the Live route holds it. This route has no ears and
-//! no eyes, so the heard words are all that can show it was said to the
+//! lamp ([`crate::not_speech::short_word`]), or it has a word in it and
+//! the lamp's own last line was a question in a conversation going on
+//! ([`Asked`], 17 October); otherwise it ends quietly after its words, as
+//! the Live route holds it. This route has no ears and no eyes, so the
+//! heard words and the thread are all that can show it was said to the
 //! lamp: a sound said close or facing the lamp but not heard as a short
 //! word is held here where the Live route would answer it.
 //!
@@ -159,6 +161,10 @@ impl From<String> for Told {
 /// begun just before it, in the same session.
 pub type Heed =
     Arc<dyn Fn(u64, (u64, u64), &str, Option<u64>) -> Option<&'static str> + Send + Sync>;
+/// Whether the lamp's own last line before `request` was a question, in a
+/// conversation going on (`worker::lamp_just_asked`): then a checked sound
+/// with a word in it is the person's answer, as on the Live route.
+pub type Asked = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 /// The lamp's eye for a look: the newest picture, as a JPEG, or why there
 /// is none (`worker::serve` reads the eyes' look file with the Live route's
 /// bounds).
@@ -178,6 +184,7 @@ struct Shared {
     sequence: AtomicU64,
     out: mpsc::Sender<ProviderOutput>,
     heed: Option<Heed>,
+    asked: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
     /// [`DOWN_LINE`], when switched on.
@@ -406,6 +413,7 @@ impl Engine {
                 sequence: AtomicU64::new(0),
                 out,
                 heed: None,
+                asked: None,
                 cues: None,
                 down: None,
                 heard_last: Mutex::new(None),
@@ -424,6 +432,15 @@ impl Engine {
     /// Short sounds let through are checked (`--sounds-checked`, #800).
     pub fn checking_sounds(mut self, on: bool) -> Self {
         self.sounds_checked = on;
+        self
+    }
+
+    /// A checked sound with a word in it is answered when `asked` says the
+    /// lamp has just asked something (17 October). Before any turn only.
+    pub fn answering_the_lamp(mut self, asked: Asked) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.asked = Some(asked);
+        }
         self
     }
 
@@ -851,8 +868,21 @@ async fn spoken(
         _ => text,
     };
     let empty = text.trim().is_empty();
-    let held = checked.is_some_and(|sound| sound.load(Ordering::Acquire))
+    let marked = checked.is_some_and(|sound| sound.load(Ordering::Acquire))
         && !crate::not_speech::short_word(&text);
+    // A sound with a word in it, right after the lamp's own question in a
+    // conversation going on, is the person's answer, as on the Live route
+    // (lamp-4ace, 17 October 16:11: "Yes. Please start it." heard as
+    // "bien"). The rule (`heed`) judges it as it does any line.
+    let answers = marked
+        && text.chars().any(char::is_alphanumeric)
+        && shared.asked.as_ref().is_some_and(|asked| asked(request));
+    if answers {
+        eprintln!(
+            "lamp-voice second: request {request}: a short sound with a word in it, right after the lamp's own question, in a conversation going on: judged as a line"
+        );
+    }
+    let held = marked && !answers;
     if held && !empty {
         eprintln!(
             "lamp-voice second: request {request}: its answer is held back: a short sound, and nothing shows it was said to the lamp: not heard as a short word (this route has no ears or eyes)"

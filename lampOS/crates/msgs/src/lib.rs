@@ -281,6 +281,30 @@ pub struct Face {
     /// Whether the face is turned to the lamp, if that was judged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub facing: Option<bool>,
+    /// Whether the face's mouth moves as a speaking mouth does, if the
+    /// eyes were asked to judge it (`LAMP_EYES_SPEAKING=on`, docs/eyes.md,
+    /// "Whether a face is speaking"). Absent when they were not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speaking: Option<Speaking>,
+}
+
+/// A face's mouth, judged from its landmarks over the last second or so.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Speaking {
+    /// `yes`, `no`, or `unknown` when the face is too small, turned, too
+    /// new, or its landmarks jitter too much to tell.
+    pub state: SpeakingState,
+    /// How much the mouth moved beyond its landmarks' own jitter, in
+    /// inter-ocular distances; 0 when `unknown`.
+    pub score: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SpeakingState {
+    Yes,
+    No,
+    Unknown,
 }
 
 impl Face {
@@ -368,6 +392,12 @@ pub enum Voice {
     Thinking,
     Speaking,
 }
+
+/// How the voice's health message begins while it waits with its
+/// microphones off, by the privacy switch or a mute (#1371): `lamp-health
+/// show` says it on its first line, so a muted lamp never reads as a quiet
+/// one.
+pub const MICROPHONES_OFF: &str = "the microphones are off";
 
 /// What the voice is doing now (`voice/state`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1307,8 +1337,33 @@ mod tests {
     }
 
     #[test]
+    fn a_face_judged_for_speaking_says_its_state_and_score() {
+        let speaking = Speaking {
+            state: SpeakingState::Unknown,
+            score: 0.0,
+        };
+        assert_eq!(
+            serde_json::to_string(&speaking).unwrap(),
+            "{\"state\":\"unknown\",\"score\":0.0}"
+        );
+        let read: Face = serde_json::from_str(
+            "{\"id\":\"f1\",\"xmin\":0.1,\"ymin\":0.1,\"xmax\":0.2,\"ymax\":0.2,\"confidence\":0.9,\
+             \"speaking\":{\"state\":\"yes\",\"score\":0.05}}",
+        )
+        .unwrap();
+        assert_eq!(
+            read.speaking,
+            Some(Speaking {
+                state: SpeakingState::Yes,
+                score: 0.05
+            })
+        );
+    }
+
+    #[test]
     fn faces_are_a_list_of_boxes_in_fractions_of_the_picture() {
         let seen = Face {
+            speaking: None,
             id: "f7".into(),
             xmin: 0.25,
             ymin: 0.125,

@@ -83,6 +83,10 @@ pub struct Decision {
     /// judged (`LAMP_ADDRESSED=on`, `crate::addressed`). Not in the line
     /// otherwise, so a line without the switch is as it was.
     pub addressed: Option<lamp_msgs::Addressed>,
+    /// Whether the lamp's own last line before the request was a question
+    /// (`crate::thread::Thread::lamp_asked`), as the rule read it: a short
+    /// sound with a word in it then answers it (#800, 17 October).
+    pub lamp_asked: bool,
 }
 
 /// One function call and our answer to it. Times are this process's
@@ -208,6 +212,7 @@ impl FirstOutputLog {
             "evaluated_us": decision.evaluated_us,
             "input_began_us": decision.input_began_us,
             "input_ended_us": decision.input_ended_us,
+            "lamp_asked": decision.lamp_asked,
             "at_unix_ms": unix_ms(),
         });
         if let (Some(addressed), Some(fields)) = (&decision.addressed, line.as_object_mut()) {
@@ -405,6 +410,7 @@ mod tests {
             input_began_us: Some(1),
             input_ended_us: None,
             addressed: None,
+            lamp_asked: false,
         }
     }
 
@@ -451,6 +457,7 @@ mod tests {
         assert_eq!(baseline["text"], "And tomorrow?");
         assert_eq!(lines[0]["input_ended_us"], serde_json::Value::Null);
         assert!(lines[0].get("addressed").is_none());
+        assert_eq!(lines[0]["lamp_asked"], false);
         assert_eq!(lines[2]["event"], "capture_end");
         assert_eq!(lines[2]["decisions"], 2);
         assert_eq!(lines[2]["dropped"], 0);
@@ -536,6 +543,7 @@ mod tests {
             let mut log = FirstOutputLog::open(&directory).unwrap();
             log.decided(&Decision {
                 addressed: Some(said),
+                lamp_asked: true,
                 ..decision(5, true)
             });
             log.path().to_owned()
@@ -551,6 +559,7 @@ mod tests {
             serde_json::from_value::<lamp_msgs::Addressed>(line["addressed"].clone()).unwrap(),
             said
         );
+        assert_eq!(line["lamp_asked"], true);
         // The Policy's seven baseline fields are untouched.
         assert_eq!(line["baseline"].as_object().unwrap().len(), 7);
         std::fs::remove_dir_all(directory).unwrap();

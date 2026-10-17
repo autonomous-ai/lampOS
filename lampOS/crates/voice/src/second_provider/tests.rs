@@ -993,6 +993,17 @@ async fn a_tool_call_is_heard_only_in_a_spoken_turn() {
 /// `heard`, with sounds `checked` or not: its outputs, and how many times
 /// the chat was asked.
 async fn sound_turn(checked: bool, marked: bool, heard: &str) -> (Vec<String>, usize) {
+    sound_turn_asked(checked, marked, heard, None).await
+}
+
+/// [`sound_turn`], the engine told whether the lamp has just asked
+/// something (`answering_the_lamp`), if it is.
+async fn sound_turn_asked(
+    checked: bool,
+    marked: bool,
+    heard: &str,
+    asked: Option<bool>,
+) -> (Vec<String>, usize) {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new([vec![text("Yes?"), Ok(ChatEvent::Done)]].into()),
@@ -1000,6 +1011,12 @@ async fn sound_turn(checked: bool, marked: bool, heard: &str) -> (Vec<String>, u
     });
     let (engine, _, _) = scripted(script.clone());
     let mut engine = engine.checking_sounds(checked);
+    if let Some(asked) = asked {
+        engine = engine.answering_the_lamp(Arc::new(move |request| {
+            assert_eq!(request, 1);
+            asked
+        }));
+    }
     engine.submit(start(1));
     engine.submit(audio(1, 1));
     engine.submit(ProviderInput::End {
@@ -1033,6 +1050,29 @@ async fn a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked
             "{checked} {marked} {heard}: {labels:?}"
         );
         assert_eq!(asked, 1, "{checked} {marked} {heard}");
+    }
+}
+
+/// The Live route's case of 17 October on this route: "Yes. Please start
+/// it." to the lamp's "Shall I start it?" ended after "Yes." as a short
+/// sound heard as "bien". Checked, with the lamp having just asked, it is
+/// answered; not having asked, or with no word heard, it is held as before.
+#[tokio::test]
+async fn a_checked_sound_with_a_word_right_after_the_lamps_question_is_answered() {
+    let (labels, asked) = sound_turn_asked(true, true, "bien", Some(true)).await;
+    assert!(
+        labels.iter().any(|label| label.starts_with("audio:")),
+        "{labels:?}"
+    );
+    assert_eq!(asked, 1);
+    for (heard, lamp_asked) in [("bien", Some(false)), ("bien", None), ("¿?", Some(true))] {
+        let (labels, asked) = sound_turn_asked(true, true, heard, lamp_asked).await;
+        assert_eq!(
+            labels,
+            ["started:1", &format!("heard:{heard}"), "complete"],
+            "{heard} {lamp_asked:?}"
+        );
+        assert_eq!(asked, 0, "{heard} {lamp_asked:?}");
     }
 }
 

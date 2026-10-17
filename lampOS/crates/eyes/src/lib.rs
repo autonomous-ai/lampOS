@@ -24,6 +24,7 @@ pub mod kept;
 pub mod permit;
 pub mod picture;
 pub mod sight;
+pub mod speaking;
 pub mod steady;
 pub mod still;
 pub mod who;

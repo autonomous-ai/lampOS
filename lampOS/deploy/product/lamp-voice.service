@@ -85,6 +85,10 @@ Environment=LAMP_START_OFFLINE=on
 Environment=LAMP_RING_ASLEEP=on
 Environment=LAMP_OTHER_LANGUAGE=sorry
 Environment=LAMP_NAME_IN_PASSING=ignored
+# An answer plays only when the lamp was spoken to, and the reply to its own news (outside a busy room), a question
+# about its own work and its name heard with no face are played: without it a busy room holds every line nobody calls it in, and a held line
+# starts no conversation (lamp-4ace, 17 Oct 19:08: 6 of 12 day lines without it, 11 of 12 with it; #828).
+Environment=LAMP_SPOKEN_TO=on
 Environment=LAMP_FIRST_WORDS=kept
 Environment=LAMP_TASKS_ASKED=on
 Environment=LAMP_TASKS_WHO=on

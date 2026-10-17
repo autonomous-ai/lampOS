@@ -410,10 +410,27 @@ pub fn serve(
                 .and_then(|mut heeding| heeding.heed(request, said, heard, from))
         }));
     }
+    if checked {
+        let file = thread.clone();
+        engine = engine.answering_the_lamp(Arc::new(move |request| {
+            crate::thread::current(file.as_deref(), |thread| {
+                lamp_just_asked(thread, request, Instant::now())
+            })
+            .unwrap_or_default()
+        }));
+    }
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?
         .block_on(run(channels, boot, engine, thread))
+}
+
+/// Whether a checked sound heard for `request` may be the person's answer
+/// to the lamp: a conversation is going on and the lamp's own last line
+/// before it was a question, as the Live route's rule reads the same thread
+/// (`crate::attention`, 17 October).
+pub(crate) fn lamp_just_asked(thread: &crate::thread::Thread, request: u64, now: Instant) -> bool {
+    thread.going_on(now) && thread.lamp_asked(request)
 }
 
 /// What a Live session is told of the moment beside what it hears, told
@@ -946,6 +963,33 @@ pub async fn run(
 
 #[cfg(test)]
 mod tests {
+    /// What the engine is told for a checked sound (17 October): the lamp's
+    /// own last line a question, in a conversation going on. A line that
+    /// asks nothing, or the same question past the conversation, is not.
+    #[test]
+    fn the_lamp_just_asked_only_with_its_question_in_a_conversation() {
+        use std::time::{Duration, Instant};
+        let now = Instant::now();
+        let asked = |lamp: &str, later: Duration| {
+            let mut thread = crate::thread::Thread::new();
+            thread.person("Can you get the office build checked?", true, now);
+            thread.lamp(1, lamp, now);
+            super::lamp_just_asked(&thread, 2, now + later)
+        };
+        let question = "I can hand that to Codex. Shall I start it?";
+        assert!(asked(question, Duration::ZERO));
+        assert!(asked(question, Duration::from_secs(20)));
+        assert!(!asked(question, Duration::from_secs(120)));
+        assert!(!asked(
+            "I can hand that to Codex whenever you like.",
+            Duration::ZERO
+        ));
+        // Its own answer is not what it asked before.
+        let mut thread = crate::thread::Thread::new();
+        thread.lamp(2, question, now);
+        assert!(!super::lamp_just_asked(&thread, 2, now));
+    }
+
     /// Each fact as a Live session is told it; the session fact only with
     /// no conversation going on, the room only when known.
     #[test]

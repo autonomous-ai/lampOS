@@ -193,12 +193,16 @@ voice's own hello is off, as lamp-4ace now has it too.
 **17 October: lamp-4ace's switches of that day became the product's** (joining.md's rule), taken from lamp-4ace's unit as it ran that day; most were switched on there on 16 or 17 October, several only as part of the groups of #1238's census, so their lamp record is that day's running, not a run of their own. They're the switch groups (lead-in to a tool, a waited answer kept, the stop told, the asker first only recorded, names checked, the staff note, task news at a pause, memory rules), the light requests (the voice's ring and the skills' half, `lamp-skills.service`), the quiet pace, starting offline, the asleep ring, a sorry in another language, the lamp's name in passing ignored, first words kept, tasks asked and who asked, a cut keeping the name, the self-test's speaker, the stall recorder, the strong ring eye, and short sounds judged in a quiet room after a check. Not taken: those that need the second voice's configuration (stop words, its down-line and wait cue, the voice link), which a product lamp doesn't have; the office's own (its Harness target, its say group); head touch, which needs Controls' and Expression's flags as well (#711); those that need another part's flag the product doesn't pass (the Policy holding actions needs `lamp-policy --act attention`, its hello and progress news need `--hello` and `--progress`, the full look needs the eyes' `--full-look`, a restored mute needs `--controls-mute`); and "that was weird", a builder's review tool whose marks (`/var/lib/lampOS/voice/marked/`) the reset doesn't wipe. Expression's catalogue differs too (`expression-alive-name-speech` on
 lamp-4ace, `expression-alive` on lamp-52e6): the product takes lamp-4ace's.
 
-**Neither: the person's.** The time zone: `--utc-offset-minutes 420` in
-memory and Expression, `--zone Asia/Ho_Chi_Minh` in schedule. Setup writes
-the system's zone (#806); a fixed offset is wrong across daylight saving,
-as the third found. Until memory and Expression read a zone name, the
-install writes the offset from the system's zone, and the product unit
-does not hold it.
+**Neither: the person's.** The time zone (#820). Setup links `/etc/localtime`
+to the zone the person's phone gives and names it in `/etc/timezone` (#806).
+Memory, Expression and skills take `--zone system`, which follows that file,
+across daylight saving and without a restart (skills since #1384). Schedule
+takes `--zone ${LAMP_ZONE}` from `zone.env`, which install writes from the
+image's zone and setup writes again with the person's. The voice
+tells the time from `/etc/localtime` itself. The policy keeps none: only its
+hello and progress news would use one, and the product doesn't pass them.
+`install`'s `the_parts_that_keep_local_time_read_the_zone_setup_saves` holds
+the units to this.
 
 **Paths and users that are lamp-4ace's by history, not by need:** the board
 user `orangepi` and things in its home (the servo and camera lock folders
@@ -246,8 +250,10 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   never changes for one lamp; a lamp's file is written once, when the lamp
   is measured, and no update touches it.
 - **The zone**, `/etc/lampOS/zone.env`: `LAMP_ZONE` (schedule) and
-  `LAMP_UTC_OFFSET_MINUTES` (memory, Expression), written by the install
-  from the system's zone and again by setup.
+  `LAMP_UTC_OFFSET_MINUTES` (for a unit that takes an offset), written by
+  the install from the system's zone and again by setup with the person's
+  (#820). Memory, Expression and skills follow `/etc/localtime` instead
+  (`--zone system`, #1384).
 - **Locks, the bus and the voice's state**, `/etc/tmpfiles.d/lampos.conf`:
   `/run/lampos-bus` as the keeper makes it, and `/run/lampos-locks/{motor,camera}`
   (each 0700 and `lampos`'s, under a root 0755 parent, as the body and the
@@ -406,7 +412,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    install's only by such a record is recorded as install's before the next
    run's own intent takes the record's place, so two failed runs in a row
    lose nothing either (the reviewer on #815, 21:42).
-6. Writes `/etc/lampOS/zone.env` from the system's zone if it is not there.
+6. Writes `/etc/lampOS/zone.env` from the system's zone if it is not there,
+   and again when it names another zone than the one the lamp was set up in
+   (`/etc/timezone`): a lamp set up before setup wrote it kept the image's
+   zone for schedule (#820). Only to a zone file in
+   `/usr/share/zoneinfo`, as setup checks one: a wrong `/etc/timezone` keeps
+   the file, and says so, since schedule would not start on it.
    Writes the voice's service, `/etc/lampOS/voice/provider.json`
    (`deploy/product/settings/voice-provider.json`: V1's route, the
    campaign-api proxy's Gemini Live path, `resumption` off because the proxy
@@ -595,6 +606,35 @@ lamp-update check-units --cat units.txt --product lampOS/deploy/product
   control. `install` sets no level of its own. The product's voice unit is
   ordered after it, without wanting it (El on #705, 17 Oct). On lamp-06c1
   it is byte for byte the image's.
+- The journal's size is the image's too:
+  `robots/lamp/rootfs/etc/systemd/journald.conf.d/zz-lamp-journal.conf`
+  (#1178).
+  - **What it sets:** at most 20M of journal in files of 4M, with 10M of the
+    `/var/log` RAM disk always left free. The same for a journal kept in
+    `/run`. It's the base image's own `SystemMaxUse=20M` (its `journald.conf`
+    on lamp-75c9 and lamp-cb94), pinned in a drop-in so an edit of
+    `journald.conf` doesn't undo it.
+  - **Why:** lamp-4ace's had been set to 1G by hand. On 17 Oct its journal
+    filled the RAM disk, and the voice's lines were lost until a rotate by
+    hand. Its 171M were also copied whole by `orangepi-ramlog` at 00:00, the
+    night the voice ended at 00:00:06.
+  - **The RAM disk's size isn't ours:** it's `SIZE` in
+    `/etc/default/orangepi-ramlog`, 50M on the image as installed and 400M
+    where set by hand (lamp-4ace, a 375M `zram1`). The cap is the same
+    either way, so a bigger disk only leaves more free.
+  - **How long 20M lasts:** about three hours at lamp-4ace's rate on 17 Oct.
+    A quieter lamp keeps more, but no check should count on a whole day of
+    journal (`--since yesterday`).
+  - **Read last:** "zz-" puts it after any other drop-in, so its numbers win.
+  - **Tests:** `lamp-update`'s `tests/image_journal.rs` checks the numbers
+    against the disk. Where `systemd-analyze` exists, it checks that systemd
+    reads them last beside a 100M `persistent.conf`. lamp-75c9's systemd 252
+    reads it last after its own `journald.conf` too.
+  - **Existing lamps:** only a newly imaged lamp has it. `install` and
+    updates don't place the image's files (#1369). On a lamp already in use
+    it is copied there by hand, and journald reads it when it next starts,
+    at the next boot. `journalctl --vacuum-size=20M` shrinks the journal at
+    once, with no restart of anything.
 - Which group may read the GPIO chips and the I²C bus on the base image was
   not checked.
 - `lamp-surround` was not read beyond its unit, and `lamp-records` has two

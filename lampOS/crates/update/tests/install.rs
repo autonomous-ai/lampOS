@@ -2118,3 +2118,112 @@ fn prepare_then_reset_then_install_does_not_restore_the_old_key() {
         );
     }
 }
+
+/// #820: a home lamp outside +07 keeps its own clock. Expression, memory and
+/// skills follow the system's zone (`--zone system`: `/etc/localtime`, which
+/// setup points at the person's zone, across summer time, #1384), and
+/// schedule takes `zone.env`, which setup writes again with that zone. None
+/// keeps the offset install found in the image.
+#[test]
+fn the_parts_that_keep_local_time_read_the_zone_setup_saves() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .1
+    };
+    for name in [
+        "lamp-expression.service",
+        "lamp-memory.service",
+        "lamp-skills.service",
+    ] {
+        let text = unit(name);
+        let start = text
+            .lines()
+            .find(|line| line.starts_with("ExecStart="))
+            .unwrap();
+        let words: Vec<&str> = start.split_whitespace().collect();
+        assert!(
+            words.windows(2).any(|pair| pair == ["--zone", "system"]),
+            "{name}: {start}"
+        );
+        assert!(!text.contains("--utc-offset-minutes"), "{name}");
+        assert!(
+            !text.contains("EnvironmentFile=/etc/lampOS/zone.env"),
+            "{name}"
+        );
+    }
+    let schedule = unit("lamp-schedule.service");
+    assert!(schedule.contains("EnvironmentFile=/etc/lampOS/zone.env"));
+    assert!(schedule.contains(" --zone ${LAMP_ZONE} "));
+}
+
+/// #820 (the first builder, 20:46): a lamp set up before setup wrote
+/// `zone.env` keeps the image's zone there, which schedule reads, while its
+/// `/etc/timezone` names the person's. The next install writes it again from
+/// the saved zone; a file that already names that zone is left as it is.
+#[test]
+fn a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install() {
+    let zone_lines = |lamp: &Lamp| -> Vec<String> {
+        fs::read_to_string(lamp.on("/etc/lampOS/zone.env"))
+            .unwrap()
+            .lines()
+            .filter(|line| !line.starts_with('#'))
+            .map(str::to_owned)
+            .collect()
+    };
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    assert_eq!(
+        zone_lines(&lamp),
+        ["LAMP_ZONE=Asia/Ho_Chi_Minh", "LAMP_UTC_OFFSET_MINUTES=420"]
+    );
+    // A wrong /etc/timezone, a zone the lamp's zone data lacks, never
+    // replaces a good file: schedule would not start on it (the reviewer).
+    fs::create_dir_all(lamp.on("/usr/share/zoneinfo/America")).unwrap();
+    fs::write(lamp.on("/usr/share/zoneinfo/America/New_York"), b"TZif2").unwrap();
+    fs::write(lamp.on("/etc/timezone"), "Mars/Olympus_Mons\n").unwrap();
+    lamp.install().unwrap();
+    assert_eq!(
+        zone_lines(&lamp),
+        ["LAMP_ZONE=Asia/Ho_Chi_Minh", "LAMP_UTC_OFFSET_MINUTES=420"]
+    );
+    assert!(
+        lamp.said.iter().any(|line| line.contains(
+            "the lamp names Mars/Olympus_Mons as its zone, which is not a zone in /usr/share/zoneinfo"
+        )),
+        "{:?}",
+        lamp.said
+    );
+    // Set up in New York by the setup of before: /etc/timezone only.
+    fs::write(lamp.on("/etc/timezone"), "America/New_York\n").unwrap();
+    lamp.said.clear();
+    lamp.install().unwrap();
+    assert_eq!(
+        zone_lines(&lamp),
+        ["LAMP_ZONE=America/New_York", "LAMP_UTC_OFFSET_MINUTES=0"]
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("follows the zone this lamp was set up in, America/New_York")),
+        "{:?}",
+        lamp.said
+    );
+    // Once it names the saved zone, the file is the lamp's: kept as it is.
+    let kept = "# by hand\nLAMP_ZONE=America/New_York\nLAMP_UTC_OFFSET_MINUTES=-240\n";
+    fs::write(lamp.on("/etc/lampOS/zone.env"), kept).unwrap();
+    lamp.said.clear();
+    lamp.install().unwrap();
+    assert_eq!(
+        fs::read_to_string(lamp.on("/etc/lampOS/zone.env")).unwrap(),
+        kept
+    );
+    assert!(
+        !lamp
+            .said
+            .iter()
+            .any(|line| line.contains("follows the zone"))
+    );
+}

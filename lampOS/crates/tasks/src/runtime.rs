@@ -1,10 +1,12 @@
 //! Bounded local sockets, one durable owner and one independent Harness worker.
 use crate::{
     engine::{
-        Clock as ClockSample, Engine, Error as EngineError, LaunchJob, ObservationJob, Watched,
+        Clock as ClockSample, CloseJob, Engine, Error as EngineError, LaunchJob, ObservationJob,
+        Watched,
     },
     harness::{
-        Cli, CliConfig, Ended, Launch, LaunchOutcome, Listed, MOST_WAITED, Observation, Target,
+        Cli, CliConfig, Closed, Ended, Launch, LaunchOutcome, Listed, MOST_WAITED, Observation,
+        Target,
     },
     progress::{Reads, Tracker},
     protocol::{MAX_LINE_BYTES, MAX_REPLY_BYTES, Request},
@@ -127,6 +129,10 @@ pub struct Config {
     /// --push-wait`, #560). The watch's looks stay, as the backstop. Off
     /// unless set.
     pub push_wait: bool,
+    /// Close the harness each task started once its answer is told and a
+    /// read just before finds it idle on that turn (`serve --close-told`,
+    /// #1390). Off unless set.
+    pub close_told: bool,
 }
 
 /// An operator-owned file selects targets; a model supplies only an alias.
@@ -247,6 +253,12 @@ pub trait Adapter: Send + 'static {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
         None
     }
+    /// Close a harness this lamp started, its result told (#1390). An
+    /// adapter without it says so, and nothing is closed.
+    fn close(&self, machine_id: &str, agent_id: &str) -> Result<Closed, String> {
+        let _ = (machine_id, agent_id);
+        Err("unsupported".into())
+    }
 }
 impl Adapter for Cli {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
@@ -267,6 +279,24 @@ impl Adapter for Cli {
     fn status(&self, machine_id: &str) -> Result<Vec<Listed>, String> {
         Cli::status(self, machine_id)
     }
+    fn close(&self, machine_id: &str, agent_id: &str) -> Result<Closed, String> {
+        Cli::close(self, machine_id, agent_id)
+    }
+}
+
+/// Read the agent, then close it only if it is still idle on the very turn
+/// the lamp told (#1390): the same answer to the same asked text. Anything
+/// else is the person going on with it at the computer, and it is left to
+/// them; one already stopped or failed has nothing to close.
+fn close_told(adapter: &impl Adapter, job: &CloseJob) -> Result<Closed, String> {
+    let now = adapter.observe(&job.machine_id, &job.agent_id)?;
+    if matches!(now.state.as_str(), "stopped" | "failed") {
+        return Ok(Closed::Gone);
+    }
+    if now.state != "idle" || now.answer != job.answer || now.ask != job.asked {
+        return Ok(Closed::Left);
+    }
+    adapter.close(&job.machine_id, &job.agent_id)
 }
 
 struct Work {
@@ -290,11 +320,13 @@ enum Job {
     Launch(LaunchJob),
     Observe(ObservationJob),
     Status(String),
+    Close(CloseJob),
 }
 enum Outcome {
     Launch(u64, LaunchOutcome),
     Observe(ObservationJob, Result<Observation, String>),
     Status(String, Result<Vec<Listed>, String>),
+    Close(CloseJob, Result<Closed, String>),
 }
 struct Binding {
     path: PathBuf,
@@ -415,7 +447,7 @@ fn owner<C: Clock>(
     (jobs, outcomes): (SyncSender<Job>, Receiver<Outcome>),
     current: Arc<Mutex<Report>>,
     stop: Arc<AtomicBool>,
-    (watch, progress, lane): (bool, bool, Option<Arc<dyn WaitLane>>),
+    (watch, progress, lane, close_told): (bool, bool, Option<Arc<dyn WaitLane>>, bool),
 ) -> io::Result<()> {
     let mut requests = 0u64;
     let mut busy = false;
@@ -440,6 +472,12 @@ fn owner<C: Clock>(
                 Outcome::Launch(id, result) => engine.finish_launch(id, result, &now),
                 Outcome::Observe(job, Ok(value)) => engine.finish_observation(&job, value, &now),
                 Outcome::Observe(job, Err(code)) => engine.observation_failed(&job, &code, &now),
+                Outcome::Close(job, result) => {
+                    // One line a close, so the journal says which harness
+                    // the lamp closed and how it went.
+                    eprintln!("tasks: closing task {}'s harness: {result:?}", job.task_id);
+                    engine.finish_close(&job, result, &now)
+                }
                 Outcome::Status(machine, listed) => {
                     if let Some(tracker) = tracker.as_mut() {
                         let took = status_began.elapsed().as_millis();
@@ -518,6 +556,16 @@ fn owner<C: Clock>(
                         .begin_observation(&now)
                         .map_err(io::Error::other)?
                         .map(Job::Observe);
+                    // A harness done and told is closed after launches and
+                    // reads (#1390).
+                    let observe = match observe {
+                        Some(job) => Some(job),
+                        None if close_told => engine
+                            .begin_close(&now)
+                            .map_err(io::Error::other)?
+                            .map(Job::Close),
+                        None => None,
+                    };
                     // One `ps` a machine, after launches and reads: it is a
                     // read only and takes nothing from them.
                     observe.or_else(|| {
@@ -972,7 +1020,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     }
     let began = Instant::now();
     let sample = clock.sample()?;
-    let engine = Engine::open(
+    let mut engine = Engine::open(
         Store::open(&config.dir)?,
         config.targets,
         &random_id()?,
@@ -980,6 +1028,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         &sample,
     )
     .map_err(io::Error::other)?;
+    engine.close_told(config.close_told);
     let adapter = make_adapter(engine.store_id())?;
     let lane = if config.push_wait {
         let lane = adapter.wait_lane();
@@ -1034,6 +1083,10 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                                 let result = adapter.status(&machine);
                                 Outcome::Status(machine, result)
                             }
+                            Job::Close(job) => {
+                                let result = close_told(&adapter, &job);
+                                Outcome::Close(job, result)
+                            }
                         };
                         if outcomes_tx.try_send(result).is_err() {
                             break;
@@ -1046,7 +1099,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         })?;
     let (owner_tx, owner_rx) = mpsc::sync_channel(REQUEST_QUEUE);
     let owner_stop = stop.clone();
-    let switches = (config.watch, config.progress);
+    let switches = (config.watch, config.progress, config.close_told);
     let report = current.clone();
     let owner = thread::Builder::new()
         .name("tasks-store".into())
@@ -1058,7 +1111,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 (jobs_tx, outcomes_rx),
                 report,
                 owner_stop,
-                (switches.0, switches.1, lane),
+                (switches.0, switches.1, lane, switches.2),
             )
         })?;
     let (clients_tx, clients_rx) = mpsc::sync_channel::<(UnixStream, Instant, bool)>(CLIENT_QUEUE);
@@ -1527,6 +1580,7 @@ mod tests {
             watch: false,
             progress: false,
             push_wait: false,
+            close_told: false,
         };
         serve_with_adapter::<_, Never>(config, Never, Arc::new(AtomicBool::new(false)), |_| {
             panic!("adapter configured while disabled")

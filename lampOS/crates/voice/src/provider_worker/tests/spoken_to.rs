@@ -582,7 +582,7 @@ async fn news_whose_sound_a_cancellation_dropped_before_it_went_is_no_news() {
 /// Gives the test a room and a conversation of its own, as the worker keeps
 /// them (the room for its thread, the conversation for the process), and
 /// puts the ones before back when dropped, even when the test fails.
-struct OwnRoom {
+pub(super) struct OwnRoom {
     room: Option<crate::room_told::RoomTold>,
     thread: Option<crate::thread::Thread>,
     unanswered: u32,
@@ -597,7 +597,7 @@ struct OwnRoom {
 static ONE_THREAD: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 impl OwnRoom {
-    fn fresh() -> Self {
+    pub(super) fn fresh() -> Self {
         let one = ONE_THREAD
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());

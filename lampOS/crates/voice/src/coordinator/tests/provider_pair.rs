@@ -670,7 +670,7 @@ async fn paired_write_failure_before_started_preserves_both_input_stages_without
             FailedStage::InputOpen
         };
         assert!(
-            matches!(rig.outputs.first(), Some(ProviderOutput::TurnFailed { stage, reason:Fault::WriteTimeout, .. }) if *stage == expected),
+            matches!(rig.outputs.first(), Some(ProviderOutput::TurnFailed { stage, reason:Fault::WriteTimeout { .. }, .. }) if *stage == expected),
             "ended={ended} actual={:?}",
             rig.outputs
         );

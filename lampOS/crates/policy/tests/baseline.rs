@@ -200,6 +200,7 @@ fn a_later_transcript_must_not_be_substituted_for_the_first_output_prefix() {
 #[test]
 fn a_small_facing_face_opens_voice_even_when_the_policy_near_count_is_zero() {
     let face = lamp_msgs::Face {
+        speaking: None,
         id: "authored-distant-face".into(),
         xmin: 0.4,
         ymin: 0.4,

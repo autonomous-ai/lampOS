@@ -116,6 +116,24 @@ pub enum LaunchOutcome {
     Uncertain { code: String },
 }
 
+/// How closing one harness this lamp started went (#1390).
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Closed {
+    /// Saved and stopped; its conversation is kept, so the person can
+    /// resume it.
+    Closed,
+    /// Read just before, and already stopped or failed: nothing to close.
+    Gone,
+    /// Read just before, and no longer idle on the turn the lamp told: the
+    /// person went on with it at the computer, so it is theirs now and is
+    /// never closed.
+    Left,
+    /// Refused, not to be asked again (exit 5: `NOT_YOURS`, `SPAWN_LIMIT`
+    /// or `TURNED_OFF`).
+    Refused,
+}
+
 /// One harness as `harness ps --json` lists it: only what progress needs.
 /// `about` is the agent's own words; they stay in the tasks part.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -452,6 +470,38 @@ impl Cli {
             return Err("observe_failed".into());
         }
         parse_observation(&reply.stdout, agent_id).map_err(str::to_string)
+    }
+
+    /// Close a harness this lamp started, once its result has been told
+    /// (#1390): `harness close`, which saves its screen and stops it,
+    /// keeping its conversation. Never `--now`: Harness refuses one that is
+    /// working or waits for the person (`SESSION_NOT_IDLE`). As an agent,
+    /// Harness also refuses one this caller did not start (exit 5); called
+    /// as the person (`--harness-as-person`) it does not, and the agent id
+    /// the lamp kept from its own `new` is the only guard. The caller reads
+    /// the agent just before ([`Cli::observe`]), so this only closes one
+    /// still idle on the turn the lamp told.
+    pub fn close(&self, machine: &str, agent_id: &str) -> Result<Closed, String> {
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        if !uuid(agent_id) {
+            return Err("invalid_agent_id".into());
+        }
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run(
+                &[
+                    "close".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    agent_id.into(),
+                    "--json".into(),
+                ],
+                self.config.launch_timeout,
+            )
+            .map_err(|error| error.code.to_string())?;
+        closed(reply.code)
     }
 
     /// Every harness on one machine, with its state and progress line:
@@ -982,6 +1032,21 @@ struct PsRow {
     last_active: Option<String>,
     #[serde(default)]
     about: Option<String>,
+}
+
+/// `harness close`'s exit code (Harness 0.4.18's CLI): 0 closed, 5 refused
+/// (`NOT_YOURS`, `SPAWN_LIMIT`, `TURNED_OFF`; do not retry). Everything else
+/// is exit 1, with only a message in the `--json` reply: a harness working or
+/// waiting for the person (`WORKING`), one that changed while closing
+/// (`AGENT_CHANGED`) or one already gone alike. So none is told apart here:
+/// it failed this time, and the next try reads the agent again first.
+pub fn closed(code: Option<i32>) -> Result<Closed, String> {
+    match code {
+        Some(0) => Ok(Closed::Closed),
+        Some(5) => Ok(Closed::Refused),
+        Some(_) => Err("close_failed".into()),
+        None => Err("close_killed".into()),
+    }
 }
 
 /// What `harness ps --json` says (Harness 0.4.2): an object whose

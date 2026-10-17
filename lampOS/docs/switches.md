@@ -9,7 +9,8 @@ group: each switch that passes its check becomes the default in code before
 1 November (the first builder, #705, 07:30).
 
 **As of** `lamp-voice` `8c3df0449` (17 October 2026, about 08:50 +07), and the
-product column as #1332 (17 October, 15:41) sets it. The code is the source of
+product column as #1332 (17 October, 15:41) sets it, with `LAMP_SPOKEN_TO`
+from #1378. The code is the source of
 truth; this page is a census of it, to be kept up as switches are added, turned
 on or removed.
 
@@ -37,13 +38,13 @@ on or removed.
 
 ## The count
 
-109 switches (`LAMP_QUIET_PACE` and `--call-wait-ms` added with #1332, both set in the product unit, counted as on):
+110 switches (`LAMP_EYES_SPEAKING` added with #1385, off; `LAMP_QUIET_PACE` and `--call-wait-ms` added with #1332, both set in the product unit, counted as on):
 
 | | Voice: hearing, turns, ring | Voice: tasks, memory, schedule, skills, looks | Voice: its own flags | Other parts | All |
 |---|---|---|---|---|---|
-| On already, or right at its default | 14 | 10 | 8 | 16 | **48** |
+| On already, or right at its default | 15 | 10 | 8 | 16 | **49** |
 | **Proposed to turn on now** | 0 | 1 | 0 | 1 | **2** |
-| Off until its named lamp check | 28 | 13 | 0 | 5 | **46** |
+| Off until its named lamp check | 27 | 13 | 0 | 6 | **46** |
 | Stays off (diagnostic, turned down, or not needed) | 5 | 1 | 2 | 2 | **10** |
 | A setting, not a behaviour | 1 | 2 | 0 | 0 | **3** |
 
@@ -52,9 +53,12 @@ on or removed.
   works end to end on lamp-4ace and has answered there since 16 Oct 03:17
   (#842), with things held up by a person shown on lamp-52e6.
 
-`LAMP_SPOKEN_TO`, `LAMP_POLICY_HOLDS_ACTIONS` and `LAMP_TASKS_WHO` were proposed
-here at first on earlier passes; each has a newer lamp-4ace record that fails
-(the reviewer on #1238), so each is "off until" its scenes pass.
+`LAMP_POLICY_HOLDS_ACTIONS` and `LAMP_TASKS_WHO` were proposed here at first
+on earlier passes; each has a newer lamp-4ace record that fails (the reviewer
+on #1238), so each is "off until" its scenes pass. So was `LAMP_SPOKEN_TO`,
+until the battery of 17 October showed the product deaf in a busy room
+without it (#828, 19:22): it is on in the product unit since, and its two
+failing scenes are for Sunday's two-people table (#829).
 
 **The quickest wins among "off until"** are the switches whose check needs no
 motion, since lamp-4ace's motors stay still until Monday: `LAMP_STAFF_NOTE`
@@ -102,7 +106,7 @@ motion, since lamp-4ace's motors stay still until Monday: `LAMP_STAFF_NOTE`
 | LAMP_SECOND_WAIT_CUE | `on`; off. Backup voice makes one soft "Hm." if its first round is slow | — | — | #1086 | "Draft until lamp-52e6": five questions with Gemini down, how often/when the sound played | off until that lamp-52e6 run | No result of the named run in the PR or second-voice.md (which notes 9 of 10 turns waited past 1.5 s on lamp-4ace) |
 | LAMP_SHORT_SOUNDS | `quiet-room`/`quiet-room-checked`; off. Short sounds still go to the model in a quiet room | quiet-room | quiet-room-checked (#1332) | commit 3e3de2d7a (direct) | not-speech.md: 13 of 36 short words lost on lamp-4ace 14 Oct; #800: a room sound answered under quiet-room | quiet-room-checked once played (quiet-room meanwhile) | not-speech.md #800 shows quiet-room answers room sounds; the checked form exists but has no lamp result |
 | LAMP_SPEAK_FIRST | `on`; otherwise moments only recorded. The voice's own hello on arrival | — (commented out) | — (commented out) | commit 4985caf77 (direct) | RUNBOOK: on since 15 Oct, never due in 0 of 680 sessions; now replaced by Welcome back | off | Both units leave it commented so only the Welcome back skill greets (install.md, skills.md) |
-| LAMP_SPOKEN_TO | `on`, or `day-and-night` (by day the name also needs a sure hearing, a face or its words, #1158); off. In every room an answer plays only when the lamp was spoken to | — | — | #918 | Passed on lamp-4ace 16 Oct 04:38 on the pre-merge `211f32c74` (budget line 0 of 8, named 6 of 6, day.sh 12 of 12); **newer and failing**: 06:06 on `1dc286181` the budget line was answered 3 of 4 (#918, 06:15), and 15:39 "Yes, give me five minutes.", said to someone else, set a timer (#829, attention.md "To another"). The rules added for both (`TO_ANOTHER`, `AFTER_QUESTION`, `TALK_ENDS_CONVERSATION`) are not yet played | off until those two scenes pass on the merged build | The newest record is a failure, and the rules made for it are unplayed (attention.md, the "Not yet played" list) |
+| LAMP_SPOKEN_TO | `on`, or `day-and-night` (by day the name also needs a sure hearing, a face or its words, #1158); off. In every room an answer plays only when the lamp was spoken to | — | on (#828, 17 Oct) | #918 | Passed on lamp-4ace 16 Oct 04:38 on the pre-merge `211f32c74` (budget line 0 of 8, named 6 of 6, day.sh 12 of 12). Failing then: 06:06 on `1dc286181` the budget line was answered 3 of 4 (#918, 06:15), and 15:39 "Yes, give me five minutes.", said to someone else, set a timer (#829, attention.md "To another"); the rules added for both (`TO_ANOTHER`, `AFTER_QUESTION`, `TALK_ENDS_CONVERSATION`) are for Sunday's two-people table. **Without it, deaf**: on 17 Oct on `460a1a1aa` with `busy-near`, the battery answered 6 of 12 day lines without it (19:02) and 11 of 12 with it (19:26–19:40, as at 16:11); the cut-ins cost nothing (12 against 11 of 20). In a busy room a reply to the lamp's news is taken only when it asks about its work, so two colleagues talking a minute or two after the news stay held (#1378) | on | Without it a busy room holds every line nobody calls the lamp in, its name too with no face, and a held line starts no conversation, so it stays deaf (#828, 19:22) |
 | LAMP_STALLS | `on`; off. Logs loop stalls ≥50 ms with getrusage to /run/lampos-voice | — | on (#1332) | #1179 | Next: on in lamp-4ace's drop-in, a scene across 00:00 (#1178) | off | A diagnostic for #1178, meant for lamp-4ace (serve-runtime.md) |
 | LAMP_QUIET_PACE | `on`; off. The voice's idle loops look at their inputs less often while nobody talks and the lamp is silent, and at once again when a turn begins | — (lamp-4ace's drop-in sets it) | on (#1332) | #1261 | lamp-4ace A/B on 17 Oct, same build: the coordinator 16.3% → 14.4% of a core (the first builder, 11:46); a turn goes back to the fast pace at once (Twelve's review) | on (#1332) | About 2% of a core with hearing unchanged; the lamp runs hot (83–92 °C) |
 | LAMP_START_OFFLINE | `on`; off. Voice started without internet keeps listening past the 25 s budget | — | on (#1332) | #884 | Stop Wi-Fi, restart the voice, it stays up logging "listening with no link"; lamp-4ace's installed unit has run it since 16 Oct, and the line never printed because that day's cut left the link up (#1242, offline.md) | off until the Wi-Fi-off restart check | offline.md: "Not yet shown on a host with its network cut or on a lamp" |
@@ -190,6 +194,7 @@ its lamp-4ace run is Monday's, with a person there.
 | `lamp-eyes --full-look` | `WxH` with `--full-look-file`; off. One larger still when asked, after the head settles | — | — | #842 | Works end to end on lamp-4ace, answering since 16 Oct 03:17 (#842); held objects shown on lamp-52e6 | on, with LAMP_LOOK_FULL in the voice's units | Shown on both lamps; the two go on together |
 | `lamp-eyes --steady-rate` | `on`/`off`; off. Looks 2/s instead of 4/s while one face sits still | — | — | #1114 | Only an offline cost estimate (about 21% vs 11% of a core on lamp-4ace); lamp-52e6 still to measure | off until measured on a lamp | It halves the eyes' CPU but slows gaze correction (1.5 s vs 0.75 s), not yet seen on a lamp |
 | `lamp-eyes --leave-still-faces` | `on`/`off`; off. Leaves out a small, faint face at a fixed spot (a false face) | — | — | #766 | Host replay of lamp-4ace's night: 55 of 55 false faces left out, 0 people; not yet live | off now; on after one live night on lamp-4ace | The replay is strong, but a run on a lamp is still owed before it becomes the default |
+| `lamp-eyes` LAMP_EYES_SPEAKING | `on`; off. With `LAMP_BUS=on`, each face on `humans/faces/tracked` gets `speaking` (yes/no/unknown, score) from YuNet's five marks; nothing reads it yet | — | — | #720 | Offline only: synthetic faces at 60 px between the eyes and 0.3 px of jitter, looked at every 250 to 350 ms (still, nodding, nodding at a 20° tilt, turning, closer, talking, talking while moving) right in at least 90% of looks; at --steady-rate's 500 ms under half (eyes.md, "Whether a face is speaking") | off until YuNet's corner jitter on a still face at 0.5 and 1 m is measured on a lamp | It holds only for a near face (60 px, about 0.45 m) with steady marks; at 1 m (about 27 px) it does not, on the synthetic model; no reader exists yet |
 | `lamp-expression --enable` | flag; off (shadow). Publishes body and light requests instead of only planning | set | set | commit 6226dae33 (direct) | On lamp-4ace with the alive catalogue since 14 Oct, shown | on (already) | Without it Expression only plans, and nothing moves or lights |
 | `lamp-expression --head-touch` | flag; off. Leans into a held hand, sleeps on a 3 s hold, wakes on a tap | — | — | #849 | None shown: ARM64 binaries listed for a lamp run, no result recorded | off until shown, with the voice's LAMP_HEAD_TOUCH | Product Controls publish head touches (`--touch`), but nothing has been seen on a lamp |
 | `lamp-expression --kernel-clock` | flag; off. Time of day only once the kernel says the clock is set | — | set | #884 | Read-only on lamp-75c9 (chrony keeps the clock); nothing run with the network cut | on (already) | No battery clock, so without it a stale boot clock can bring a false night (install.md) |
@@ -198,6 +203,7 @@ its lamp-4ace run is Monday's, with a person there.
 | `lamp-tasks --watch` / `--no-watch` | watch on unless `--no-watch` (`--watch` changes nothing). Reads each task handed over | `--watch` | `--watch` | commits 45a1e4d2c, fd6c1ae7a (direct) | Shown in the first end-to-end run on lamp-4ace 15 Oct 00:49–00:56 | on (the code default; `--watch` in the units is redundant) | Already the code's default |
 | `lamp-tasks --progress` | flag; off. Puts each task's progress on the bus as tasks/status | — | set | #751 | Five lamp-4ace steps named; measured only on the Mac (tasks.md) | on (already in product) | #1156's wake and the Policy's progress need it; its cost on a lamp is not measured on its own (lamp-75c9's "about 1 point" is `--push-wait`'s) |
 | `lamp-tasks --push-wait` | flag; off. Holds Harness's wait, so a task's end is known in seconds | — | set | #1157 | Shown on lamp-75c9: idle to settled 8.3–10.2 s vs 38.9–41.2 s without | on (already in product) | Four times faster for about 1 point of CPU and a held ~130 MB Node process |
+| `lamp-tasks --close-told` | flag; off. Closes the harness a task started once its answer is told, after a read finds it still idle on that turn | — | — | #1390 | Tests only (engine, service, fixture CLI); not run against a real Harness | off until a run on a lamp paired with a computer | Without it, every hand-over leaves an idle Claude Code session on the person's computer (52 on the office Mac, 17 Oct) |
 | `lamp-tasks --harness-as-person` | flag; off. Calls Harness as the person's own call, without agent markers | set | set | commit b73dfe6fa (direct) | Shown on lamp-4ace 14 Oct 22:24 | on (already) | Otherwise `harness new` is refused unless an account-wide agent setting is on; the owner chose this |
 | `lamp-skills --tools-dir` | absolute folder; unset = no skill tools. Skills' own tools offered to the voice | — | set | #984 | skills.md: "not yet run on a lamp" | on (already in product); lamp-4ace's unit lacks it | The product passes it; nothing recorded on a lamp |
 | `lamp-controls --enable` | flag; off (shadow). Gestures act, not only watched | set | set | commit 1c765da78 (direct) | Watching only on lamp-4ace from 14 Oct 11:03, then enabled; shown | on (already) | Without it the button and pads say `enabled: false` and nothing acts |

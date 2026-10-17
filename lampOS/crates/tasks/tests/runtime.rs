@@ -2,7 +2,7 @@ use lamp_bus::Bus;
 use lamp_msgs::{AgentState, Diagnostic, Sign, TaskStatus};
 use lamp_tasks::{
     engine::{Clock as Sample, WATCH_EARLY_MS},
-    harness::{Ended, EngineKind, Launch, LaunchOutcome, Listed, Observation, Target},
+    harness::{Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, Observation, Target},
     progress::SETTLED_FOR_MS,
     runtime::{Adapter, Clock, Config, WaitLane, request, serve_with_adapter},
 };
@@ -22,6 +22,8 @@ use std::{
 };
 
 const AGENT: &str = "11111111-1111-4111-8111-111111111111";
+/// The person's own harness on the same machine (#1390).
+const THEIRS: &str = "33333333-3333-4333-8333-333333333333";
 #[derive(Clone)]
 struct Injected(Arc<Mutex<Sample>>);
 impl Clock for Injected {
@@ -44,6 +46,13 @@ struct Counts {
     waits: Mutex<Vec<Vec<String>>>,
     /// What the held `wait` comes back with, once set.
     wait_ends: Mutex<Option<Vec<Ended>>>,
+    /// `show` finds the agent idle with this answer while set, as Harness
+    /// gives it: its `ask` is the task's own text.
+    plain: Mutex<Option<String>>,
+    /// `ps` also lists the person's own harness, idle, while set.
+    theirs: AtomicBool,
+    /// Each `close`, with the machine and agent it named (#1390).
+    closes: Mutex<Vec<(String, String)>>,
 }
 struct ScriptLane(Arc<Counts>);
 impl WaitLane for ScriptLane {
@@ -94,6 +103,16 @@ impl Adapter for Script {
         // Read on the machine the task was started on.
         assert_eq!(machine, "0123456789abcdef0123456789abcdef");
         assert_eq!(id, AGENT);
+        if let Some(answer) = self.counts.plain.lock().unwrap().clone() {
+            return Ok(Observation {
+                agent_id: AGENT.into(),
+                state: "idle".into(),
+                ask: Some("Private scripted task".into()),
+                answer,
+                truncated: false,
+                tools: 1,
+            });
+        }
         if self.counts.idle.load(Ordering::SeqCst) {
             return Ok(Observation {
                 agent_id: AGENT.into(),
@@ -113,18 +132,35 @@ impl Adapter for Script {
             tools: 2,
         })
     }
+    fn close(&self, machine: &str, id: &str) -> Result<Closed, String> {
+        self.counts
+            .closes
+            .lock()
+            .unwrap()
+            .push((machine.into(), id.into()));
+        Ok(Closed::Closed)
+    }
     fn status(&self, machine: &str) -> Result<Vec<Listed>, String> {
         self.counts.listings.fetch_add(1, Ordering::SeqCst);
         assert_eq!(machine, "0123456789abcdef0123456789abcdef");
         if self.counts.ps_fails.load(Ordering::SeqCst) {
             return Err("timeout".into());
         }
-        Ok(vec![Listed {
+        let mut listed = vec![Listed {
             agent_id: AGENT.into(),
             state: "working".into(),
             last_active_unix_ms: Some(1_792_022_712_345),
             about: self.counts.about.lock().unwrap().clone(),
-        }])
+        }];
+        if self.counts.theirs.load(Ordering::SeqCst) {
+            listed.push(Listed {
+                agent_id: THEIRS.into(),
+                state: "idle".into(),
+                last_active_unix_ms: Some(1_792_022_712_345),
+                about: None,
+            });
+        }
+        Ok(listed)
     }
 }
 
@@ -145,6 +181,13 @@ impl Running {
         Self::configured(slow, progress, false)
     }
     fn configured(slow: bool, progress: bool, watch: bool) -> Self {
+        Self::all(slow, progress, watch, false)
+    }
+    /// With `serve --close-told` on or off, and progress on, so `ps` runs.
+    fn closing(close_told: bool) -> Self {
+        Self::all(false, true, false, close_told)
+    }
+    fn all(slow: bool, progress: bool, watch: bool, close_told: bool) -> Self {
         let root = tempfile::Builder::new()
             .prefix("tsk-")
             .tempdir_in("/private/tmp")
@@ -168,6 +211,7 @@ impl Running {
             watch,
             progress,
             push_wait: false,
+            close_told,
         };
         let mut running = Self {
             root,
@@ -350,6 +394,117 @@ fn observed_output_and_reported_playout_remain_separate_and_survive_restart() {
     );
     assert_eq!(s.counts.launches.load(Ordering::SeqCst), 1);
     assert_eq!(s.counts.reads.load(Ordering::SeqCst), 1);
+}
+
+/// Read, then told: the observation's claim and its played acknowledgement.
+fn read_and_tell(s: &Running, id: &Value) {
+    let observation = read(s, id);
+    tell(s, id, observation);
+}
+
+/// Read: the kept observation's id.
+fn read(s: &Running, id: &Value) -> Value {
+    assert_eq!(
+        s.ask(json!({"op":"observe","guard":s.guard(),"id":id}))["ok"],
+        true
+    );
+    let task = s.wait(id, |v| {
+        v["observations"].as_array().is_some_and(|v| !v.is_empty())
+    });
+    task["observations"][0]["id"].clone()
+}
+
+/// Told: the observation's claim and its played acknowledgement.
+fn tell(s: &Running, id: &Value, observation: Value) {
+    let session = s.status()["summary"]["session_id"].clone();
+    let granted = s.trusted(json!({"op":"claim_speech","guard":s.guard(),"id":id,"observation_id":observation,"text":"The agent finished.","session_id":session}));
+    assert_eq!(granted["ok"], true, "{granted}");
+    let ack = json!({"op":"ack_speech","guard":s.guard(),"id":id,"observation_id":observation,"claim_id":granted["claim_id"],"text_digest":granted["text_digest"],"session_id":session,"played":true});
+    assert_eq!(s.trusted(ack)["reported_spoken"], true);
+}
+
+fn closes(s: &Running) -> Vec<(String, String)> {
+    s.counts.closes.lock().unwrap().clone()
+}
+
+/// Prepared, confirmed and accepted: its id. Nothing is closed yet.
+fn handed(s: &Running) -> Value {
+    let prepared = s.prepare();
+    assert_eq!(s.trusted(s.confirmation(&prepared))["ok"], true);
+    s.wait(&prepared["id"], |v| {
+        v["task"]["dispatch"]["state"] == "accepted"
+    });
+    thread::sleep(Duration::from_millis(100));
+    assert!(closes(s).is_empty(), "closed before it was told");
+    prepared["id"].clone()
+}
+
+/// Handed over, then read and told.
+fn handed_and_told(s: &Running) -> Value {
+    let id = handed(s);
+    read_and_tell(s, &id);
+    id
+}
+
+fn closed_within(s: &Running, ms: u64) -> Vec<(String, String)> {
+    let begun = Instant::now();
+    while closes(s).is_empty() && begun.elapsed() < Duration::from_millis(ms) {
+        thread::sleep(Duration::from_millis(5));
+    }
+    closes(s)
+}
+
+/// #1390, through the service with `--close-told`: a harness done and told,
+/// and still idle on that turn when read again, is closed once, on its
+/// machine, by the agent this lamp started, and never again. The person's
+/// own idle harness that `ps` lists beside it is never closed.
+#[test]
+fn a_harness_done_and_told_is_closed_once_by_the_service() {
+    let s = Running::closing(true);
+    s.counts.theirs.store(true, Ordering::SeqCst);
+    *s.counts.plain.lock().unwrap() = Some("A poem about coffee.".into());
+    handed_and_told(&s);
+    assert!(!closed_within(&s, 5_000).is_empty(), "never closed");
+    s.clock.0.lock().unwrap().monotonic_ms = 10_000_000;
+    thread::sleep(Duration::from_millis(300));
+    assert_eq!(
+        closes(&s),
+        [(
+            "0123456789abcdef0123456789abcdef".to_string(),
+            AGENT.to_string()
+        )]
+    );
+    assert!(s.counts.listings.load(Ordering::SeqCst) > 0, "ps was read");
+}
+
+/// Without the switch, nothing is closed.
+#[test]
+fn without_close_told_no_harness_is_closed() {
+    let s = Running::closing(false);
+    *s.counts.plain.lock().unwrap() = Some("A poem about coffee.".into());
+    handed_and_told(&s);
+    assert!(closed_within(&s, 500).is_empty());
+}
+
+/// The person went on at the computer after the telling: the read just
+/// before the close finds another turn, so it is left to them for good. One
+/// that waits for the person (`needs-input`) is never closed either.
+#[test]
+fn a_harness_the_person_went_on_with_or_that_waits_for_them_is_left() {
+    let s = Running::closing(true);
+    *s.counts.plain.lock().unwrap() = Some("A poem about coffee.".into());
+    let id = handed(&s);
+    let observation = read(&s, &id);
+    // The person types a follow-up at the computer; then the lamp tells.
+    *s.counts.plain.lock().unwrap() = Some("Their own next answer.".into());
+    tell(&s, &id, observation);
+    s.wait(&id, |v| v["task"]["close"]["state"] == "left");
+    s.clock.0.lock().unwrap().monotonic_ms = 10_000_000;
+    assert!(closed_within(&s, 500).is_empty());
+
+    let s = Running::closing(true);
+    handed_and_told(&s);
+    assert!(closed_within(&s, 500).is_empty());
 }
 
 #[test]

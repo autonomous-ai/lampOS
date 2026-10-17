@@ -20,8 +20,8 @@ RuntimeDirectory=lampos-memory
 RuntimeDirectoryMode=0755
 PrivateNetwork=yes
 SupplementaryGroups=lampos
-EnvironmentFile=/etc/lampOS/zone.env
-ExecStart=/opt/lampOS/memory/current/lamp-memory --dir /var/lib/lampos-memory --socket /run/lampos-memory/memory.sock --keep-days 30 --utc-offset-minutes ${LAMP_UTC_OFFSET_MINUTES} --memory-days --bus-root /run/lampos-bus
+# --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), across summer time.
+ExecStart=/opt/lampOS/memory/current/lamp-memory --dir /var/lib/lampos-memory --socket /run/lampos-memory/memory.sock --keep-days 30 --zone system --memory-days --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=2s
 StandardInput=null

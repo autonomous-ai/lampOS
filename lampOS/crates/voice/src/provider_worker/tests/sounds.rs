@@ -35,7 +35,15 @@ fn heard(text: &str) -> serde_json::Value {
 async fn answered(options: Options, text: &str) -> bool {
     let mut rig = LiveRig::start_with(quick_policy(), options);
     let mut dial = rig.ready().await;
-    let request = rig.speak(&mut dial, false, false).await;
+    let played = sound_answered(&mut rig, &mut dial, text).await;
+    rig.stop().await;
+    played
+}
+
+/// In `rig`, a request whose sound the coordinator ended as a sound let
+/// through, heard as `text`: whether its answer's sound came out.
+async fn sound_answered(rig: &mut LiveRig, dial: &mut Dial, text: &str) -> bool {
+    let request = rig.speak(dial, false, false).await;
     let owner = rig.snapshot.owner().unwrap();
     rig.owner.input_ended(real_time(), owner).unwrap();
     rig.publish();
@@ -48,7 +56,7 @@ async fn answered(options: Options, text: &str) -> bool {
             cut_in: false,
         })
         .unwrap();
-    let ended = rig.service_message(&mut dial).await;
+    let ended = rig.service_message(dial).await;
     assert!(
         ended["realtimeInput"].get("activityEnd").is_some(),
         "{ended}"
@@ -68,7 +76,6 @@ async fn answered(options: Options, text: &str) -> bool {
             "{first:?}"
         );
     }
-    rig.stop().await;
     played
 }
 
@@ -119,6 +126,53 @@ fn both_workers_take_the_flag_that_checks_sounds() {
 
 fn talking() -> (crate::room_told::Room, bool) {
     (crate::room_told::Room::Quiet, true)
+}
+
+/// The scene on lamp-4ace on 2026-10-17 at 16:11, checked, in a
+/// conversation, with the conversation as the worker itself keeps it: a
+/// first request answered with `lamp_line`, then a short sound heard as
+/// `text`. Whether the sound's answer came out.
+async fn sound_after(lamp_line: &str, text: &str) -> bool {
+    let _room = super::spoken_to::OwnRoom::fresh();
+    let options = Options {
+        attention: Some(talking),
+        ..checked(true)
+    };
+    let mut rig = LiveRig::start_with(quick_policy(), options);
+    let mut dial = rig.ready().await;
+    let asked = rig.speak(&mut dial, false, true).await;
+    dial.service
+        .send(heard("Can you get the office build checked?"))
+        .await;
+    dial.service.send(provider_audio(7, 240)).await;
+    dial.service
+        .send(json!({"serverContent":{"outputTranscription":{"text":lamp_line}}}))
+        .await;
+    dial.service.send(idle_complete()).await;
+    loop {
+        if let ProviderOutput::TurnComplete { request, .. } = rig.output().await
+            && request == asked
+        {
+            break;
+        }
+    }
+    rig.owner
+        .complete_turn(real_time(), rig.snapshot.owner().unwrap())
+        .unwrap();
+    rig.publish();
+    let played = sound_answered(&mut rig, &mut dial, text).await;
+    rig.stop().await;
+    played
+}
+
+/// "Yes. Please start it." to the lamp's "Shall I start it?" was ended
+/// after "Yes." and heard as "bien": checked, its answer was held and its
+/// handing over never run. Right after the lamp's own question it is the
+/// person's answer; after a line that asks nothing, it is still held.
+#[tokio::test]
+async fn a_sound_with_a_word_right_after_the_lamps_question_is_answered() {
+    assert!(sound_after("I can hand that to Codex. Shall I start it?", "bien").await);
+    assert!(!sound_after("I can hand that to Codex whenever you like.", "bien").await);
 }
 
 /// In a conversation, with the switch, a turn ended as speech (a cut-in is

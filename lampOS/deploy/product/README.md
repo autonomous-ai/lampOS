@@ -11,8 +11,9 @@ What is one lamp's own is outside them:
 - `/etc/lampOS/body/lamp.env`: `BODY_POSES="--gaze .. --stand ..
   --folded-arm .. --home .."`, measured on that lamp ([body.md](../../docs/body.md)).
   Required: the body does not start without it.
-- `/etc/lampOS/zone.env`: `LAMP_ZONE=` and `LAMP_UTC_OFFSET_MINUTES=`,
-  from the system's zone.
+- `/etc/lampOS/zone.env`: `LAMP_ZONE=` (schedule) and `LAMP_UTC_OFFSET_MINUTES=`,
+  from the system's zone, written again by setup with the person's zone
+  (#820). Memory, Expression and skills follow `/etc/localtime` instead.
 - A switch a lamp must have off: a drop-in,
   `/etc/systemd/system/lamp-<part>.service.d/<why>.conf`.
 

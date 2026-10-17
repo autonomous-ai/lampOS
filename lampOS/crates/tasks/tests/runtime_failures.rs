@@ -56,6 +56,7 @@ fn config(root: &Path) -> Config {
         watch: false,
         progress: false,
         push_wait: false,
+        close_told: false,
     }
 }
 

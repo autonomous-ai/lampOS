@@ -15,9 +15,8 @@ User=lampos
 Group=lampos
 Slice=lampos-parts.slice
 Nice=5
-# LAMP_UTC_OFFSET_MINUTES: the lamp's zone, written by the install and by setup (lampOS/docs/install.md).
-EnvironmentFile=/etc/lampOS/zone.env
-ExecStart=/opt/lampOS/expression/current/lamp-expression serve --enable --bus-root /run/lampos-bus --catalogue /etc/lampOS/expression/expression.json --utc-offset-minutes ${LAMP_UTC_OFFSET_MINUTES} --kernel-clock
+# --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), across summer time.
+ExecStart=/opt/lampOS/expression/current/lamp-expression serve --enable --bus-root /run/lampos-bus --catalogue /etc/lampOS/expression/expression.json --zone system --kernel-clock
 Restart=on-failure
 RestartSec=5s
 StandardInput=null

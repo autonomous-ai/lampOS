@@ -246,7 +246,16 @@ async fn lost_before_the_start_was_written(end: bool) -> Vec<OutputNotice> {
             Err(_) => {}
         }
     }
-    assert_eq!(unavailable, Some(Error::WriteTimeout));
+    assert!(
+        matches!(
+            unavailable,
+            Some(Error::WriteTimeout {
+                write: crate::Write::Activity,
+                ..
+            })
+        ),
+        "{unavailable:?}"
+    );
     supervisor.shutdown();
     outputs
 }
@@ -271,7 +280,10 @@ async fn a_request_lost_before_its_start_was_written_is_reported_without_input_s
                 Some(OutputNotice::TurnLost {
                     lineage,
                     stage,
-                    error: Error::WriteTimeout,
+                    error: Error::WriteTimeout {
+                        write: crate::Write::Activity,
+                        ..
+                    },
                 }) if lineage.request.get() == 1 && *stage == expected
             ),
             "{outputs:?}"

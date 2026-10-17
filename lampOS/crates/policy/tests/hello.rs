@@ -228,6 +228,7 @@ impl Rig {
         thread::spawn(move || {
             while !stop.load(Ordering::Relaxed) {
                 let near = Face {
+                    speaking: None,
                     id: "f1".into(),
                     xmin: 0.3,
                     ymin: 0.2,

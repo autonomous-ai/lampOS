@@ -938,6 +938,11 @@ tomorrow?", which the model did not answer, gave none, as it should.
 With `LAMP_ADDRESSED=on` each line also has `addressed`: the request's
 `attention/addressed` judgement (above), if it was judged.
 
+Each line also has `lamp_asked`: whether the lamp's own last line before the
+request ended in a question, as the rule read it (the short-sound case below
+turns on it). It is beside the decision, not in the seven `baseline` fields,
+which the Policy's fitting reads as they are.
+
 What was heard is in these files, and so are bystanders' words in an office:
 they stay on the lamp and are not published. Not recorded yet: whether any
 sound of the answer was played (`request_outcome`), when a request began, and
@@ -949,9 +954,67 @@ With `LAMP_SHORT_SOUNDS=quiet-room-checked` ([not-speech.md](not-speech.md#a-roo
 the rule has one more case, before the busy-room ones: a request whose end
 came marked as a short sound let through is played only when what was heard
 is a short word said to the lamp, it was said close to the lamp (the room
-microphone, as for `--attention-near`), someone is turned to the lamp, or
-the lamp began the turn itself; otherwise it is held. Off unless set; the
-rule is otherwise as above.
+microphone, as for `--attention-near`), someone is turned to the lamp, the
+lamp began the turn itself, or it answers the lamp's own question (below);
+otherwise it is held. Off unless set; the rule is otherwise as above.
+
+**An answer to the lamp's own question (17 October).** On lamp-4ace on
+2026-10-17 at 16:11, the lamp asked "Shall I start it?" and the person said
+"Yes. Please start it.", with 700 ms between the two. The end came after
+"Yes." (`silence_fallback`), which was heard as "bien", so the request ended
+as a short sound. The model's first output was `confirm_agent_task`, and the
+check held it: not a short word, not close, nobody turned to the lamp. Held,
+the call was answered and not run, and nothing was said. A short sound is
+now played, with the reason "a short sound with a word in it, right after
+the lamp's own question, in a conversation going on", when all three hold:
+- what was heard has a letter or a digit in it;
+- a conversation is going on. With `LAMP_SPOKEN_TO=on` it must also not be
+  someone else's (#829: a reply to someone just called by name, a line
+  calling someone else). The product doesn't set that switch, so on a
+  product lamp a colleague's or a TV's short line in the window ("Sí,
+  bien") is played too, and the model judges it (the reviewer on #1355);
+- the lamp's own last line before the request ended in a question
+  (`Thread::lamp_asked`, as #926 reads it).
+
+Then the model judges it. "Right after" is as wide as the conversation:
+the lamp's newest line with a word in it ended in `?`, and some line of the
+lamp's began within the last 45 s (`GOING_ON_FOR`). Nothing short that ends
+within 4 s of the lamp's own words is marked a sound at all
+(`AFTER_OWN_WORDS_US`), so the case sees sounds from 4 s after the lamp
+stopped until 45 s after its question line began. It isn't once: a held
+sound adds no line of the lamp's, so every sound with a word in it in that
+window plays, until the lamp says something else (Twelve and the reviewer on
+#1355). The thread times an exchange from when the lamp's line began, not
+when it ended, so a tighter bound would cut the question at the end of a long
+answer. Only an ASCII `?` counts as a question (`Thread::lamp_asked`, #926's
+own): a line ending in a full-width `？` would not, which doesn't matter for
+the English the lamp speaks. It reads only the line's last mark: an answer
+that ends in a question of form ("Anything else?", or a story's "Who knew?")
+opens the window too, and a question with words after it ("Shall I start
+it? It takes a minute.") doesn't. The first-output record's `lamp_asked`
+shows how often it opens. A room sound with no question before it is held
+as before: of the 17 requests held this way on lamp-4ace from 16 to 17
+October, only 3 came in a conversation (the first builder's count on #828).
+What it lets through is a sound heard as words in that one moment, "¿Qué?"
+as well as "bien". It is part of `quiet-room-checked`, the mode the product
+runs (#1332), not a switch of its own. The second voice does the same
+from the same thread: its worker tells the engine whether the lamp has just
+asked (`worker::lamp_just_asked`), and the rule then judges the line as any
+other ([not-speech.md](not-speech.md#a-room-sound-let-through-and-answered-800)).
+Tests: `a_short_sound_with_a_word_right_after_the_lamps_question_is_its_answer`
+(`attention.rs`: "bien" played in every room; held with no question, with no
+conversation, with no word; a short word keeps its own reason; unchecked or
+not a sound, the question changes nothing) and
+`a_sound_with_a_word_right_after_the_lamps_question_is_answered` (the
+worker's own loop, with the conversation as the worker keeps it: "bien"
+after "Shall I start it?" answered, after a line that asks nothing held);
+on the second voice,
+`a_checked_sound_with_a_word_right_after_the_lamps_question_is_answered`
+(`second_provider/tests.rs`: "bien" answered when the lamp has just asked,
+held when it hasn't, "¿?" held) and
+`the_lamp_just_asked_only_with_its_question_in_a_conversation`
+(`second_provider/worker.rs`: the question within the conversation's 45 s,
+not after it, not a line that asks nothing).
 
 ## The lamp spoken of is not a call (#829)
 
@@ -1156,6 +1219,34 @@ fourth builder on 16 October 2026, from the first builder's judgement on
 is the switch with the day's own bars as well (below; the worker's
 `--spoken-to-by-day`, right after `--spoken-to`).
 
+**On in the product since 17 October (#828, #1378).** With
+`LAMP_ATTENTION=busy-near` and no face seen (the camera saw the floor),
+the battery that evening on `460a1a1aa` answered 6 of 12 day lines without
+the switch and 11 of 12 with it. Without it a busy room holds every line
+nobody calls the lamp in, its name heard too, and a held line gets no
+answer, so no conversation begins again. "How is that task going?", 46.8 s
+after the lamp's own task news began (35.2 s after it ended), just past the
+45 s a conversation lasts, was held, and so was everything after it. With
+the switch it asks about the lamp's work (`ABOUT_ITS_WORK`), its answer
+makes the next lines a conversation going on, and the name counts with no
+face. In a busy room a reply to the news is taken only so, or as any other
+line is: taken on timing alone (`AFTER_NEWS`), two colleagues talking 45 to
+180 s after the news were answered every line (the Second on #1378). Its
+cost: a reply that says nothing of the work, past the news's own 45 s in a
+busy room, is held, as without the switch. Outside a busy room the first
+line after the news is still a reply to it. Tests:
+`with_the_switch_the_battery_after_the_lamps_news_does_not_go_deaf` (the
+battery's four lines at their times: answered with the switch, held without
+it), `with_the_switch_five_follow_ups_after_the_news_are_answered_and_talk_is_held`
+(five follow-ups 17 s apart, the first asking about the task 100 s after
+the news, all answered with the switch and held without it; a line calling
+someone else by name inside the conversation and one a minute after it
+held; within the news's own 45 s the five answered either way) and
+`two_people_talking_soon_after_the_news_in_a_busy_room_are_held` (the
+Second's colleagues 120 s after the news, held with the switch and without;
+within 45 s a conversation going on either way; a reply about nothing held
+in a busy room and taken in a quiet one).
+
 Without it the rule holds answers only in a busy room. In a room not known
 to be busy, and in a session it trusts, every answer is played, whatever
 was said and to whom. On lamp-4ace at 02:16 on 16 October, "Did you get my
@@ -1199,7 +1290,9 @@ busy.
   needs the same-voice part (#865) on the lamp.
 - **The lamp's own news is replied to.** The first thing anyone says
   within 3 minutes of a turn the lamp began itself (a task's news, a
-  reminder) is played, once, in every room. Its answers keep their 45 s.
+  reminder) is played, once, in a room not known to be busy. In a busy
+  room only a reply that asks about its work (next) is (#1378). Its
+  answers keep their 45 s.
   The 3 minutes start when the turn's first sound is handed on to be
   played, owner-checked and with output credit. An own turn that ends
   silent, is cancelled before it speaks, or whose sound a cancellation
@@ -1493,7 +1586,8 @@ since 16 October; needs `lamp-policy --act attention`.
 or name from the sound without `LAMP_BUS=on`): in every room, an answer is
 played only when the lamp was spoken to (above). `day-and-night` adds the
 day's own bars (the worker's `--spoken-to-by-day`, right after
-`--spoken-to`). Off by default; not on any lamp.
+`--spoken-to`). Off by default; on in the product unit since 17 October
+(#1378), and on lamp-4ace by its drop-in.
 
 `LAMP_CUT_INS_NOT_TALK=on` (the worker's `--cut-ins-not-talk`, right
 after `--room-facts`): a line said while the lamp's answer could be heard,

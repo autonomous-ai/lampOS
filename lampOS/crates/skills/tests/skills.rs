@@ -4652,3 +4652,114 @@ fn a_queued_run_whose_item_left_is_let_go_and_the_next_still_starts() {
     assert!(says[1].1.contains("\"task\":6"), "{says:?}");
     assert!(says[1].0 - says[0].0 >= Duration::from_millis(600));
 }
+
+/// How often Stuffy air droops from `unix_ms`, its clock told in `local`
+/// (#1384). A droop's end, when the air clears, is not counted.
+fn stuffy_droops_in(
+    skill: &Path,
+    air: &[(u64, u32)],
+    local: &lamp_local_time::LocalTime,
+    unix_ms: u64,
+) -> usize {
+    let mut engine = Engine::new(vec![load(skill).unwrap()], true);
+    engine.clock_in(local, 0, unix_ms);
+    air.iter()
+        .map(|(minute, ppm)| {
+            let payload = format!(r#"{{"co2_ppm":{ppm}}}"#);
+            engine
+                .observe("air/state", minute * 60_000_000, payload.as_bytes(), None)
+                .iter()
+                .filter(|run| run.calls.contains(&Call::Gesture("sleepy".into())))
+                .count()
+        })
+        .sum()
+}
+
+/// #1384: a lamp in New York keeps its quiet hours (22:00 to 08:00) at the
+/// same clock hours across 1 Nov 2026, when its clocks go back an hour. A
+/// fixed offset from the day of setup (-240) starts the skill an hour early
+/// all winter; the zone does not.
+#[test]
+fn quiet_hours_keep_their_clock_hours_across_summer_time_in_the_lamps_zone() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = skill_with(dir.path(), "stuffy", STUFFY);
+    // Stuffy for half an hour, then clear: its tenth minute is 25 minutes
+    // after the start, and it has cleared before 08:00 from 07:15.
+    let mut air = co2(0, 30, 1300);
+    air.extend(co2(30, 35, 800));
+    let new_york = lamp_local_time::LocalTime::zone("America/New_York").unwrap();
+    let setup_day = lamp_local_time::LocalTime::Offset(-240);
+    // 31 Oct, 07:15 summer time (11:15 UTC): quiet either way.
+    const SUMMER_0715: u64 = 1_793_445_300_000;
+    assert_eq!(stuffy_droops_in(&skill, &air, &new_york, SUMMER_0715), 0);
+    assert_eq!(stuffy_droops_in(&skill, &air, &setup_day, SUMMER_0715), 0);
+    // 2 Nov, 07:15 winter time (12:15 UTC): still quiet in the zone, but
+    // 08:15 by the fixed offset, so it would droop an hour early.
+    const WINTER_0715: u64 = 1_793_621_700_000;
+    assert_eq!(stuffy_droops_in(&skill, &air, &new_york, WINTER_0715), 0);
+    assert_eq!(stuffy_droops_in(&skill, &air, &setup_day, WINTER_0715), 1);
+    // 2 Nov, 08:15 winter time (13:15 UTC): past the night.
+    const WINTER_0815: u64 = 1_793_625_300_000;
+    assert_eq!(stuffy_droops_in(&skill, &air, &new_york, WINTER_0815), 1);
+}
+
+/// `lamp-skills` with `args`: its exit code and what it said, if it ended
+/// within 5 s. One that starts serving instead is ended and fails the test.
+fn refused(args: &[&str]) -> (Option<i32>, String) {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+        .args(args)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let until = Instant::now() + Duration::from_secs(5);
+    while child.try_wait().unwrap().is_none() {
+        if Instant::now() >= until {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!("lamp-skills {args:?} started instead of refusing");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let output = child.wait_with_output().unwrap();
+    (
+        output.status.code(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+    )
+}
+
+/// #1391's start path (the reviewer and Nine): the zone flags are refused
+/// before anything starts when they can't stand, as memory refuses them.
+#[test]
+fn the_zone_flags_are_refused_before_the_start_when_they_cannot_stand() {
+    for (args, said) in [
+        (
+            &["--zone", "system", "--utc-offset-minutes", "420"][..],
+            "--zone and --utc-offset-minutes are one or the other",
+        ),
+        (
+            &["--zone", "Not/A_Zone"][..],
+            "time zone Not/A_Zone is unknown",
+        ),
+        (
+            &["--zone", "system", "--zone", "Asia/Tokyo"][..],
+            "--zone is given once",
+        ),
+        (
+            &["--utc-offset-minutes", "420", "--utc-offset-minutes", "0"][..],
+            "--utc-offset-minutes is given once",
+        ),
+        (
+            &["--zone", ""][..],
+            "--zone is system or a time zone's name",
+        ),
+        (
+            &["--utc-offset-minutes", "900"][..],
+            "--utc-offset-minutes is a whole number from -720 to 840",
+        ),
+    ] {
+        let (code, stderr) = refused(args);
+        assert_eq!(code, Some(2), "{args:?}: {stderr}");
+        assert!(stderr.contains(said), "{args:?}: {stderr}");
+    }
+}

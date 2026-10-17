@@ -11,7 +11,7 @@
 //! while the camera is open, and a list that old says nothing about who is
 //! there now. With the camera closed nothing is published, and the last
 //! list is left to run out.
-use crate::{faces, facing};
+use crate::{faces, facing, speaking};
 use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{Diagnostic, Face, Faces, Level};
 use std::{io, time::Duration};
@@ -35,6 +35,8 @@ pub struct Ids {
     next: u32,
     /// The id, the box (xmin, ymin, xmax, ymax) and when it was last seen.
     seen: Vec<(u32, [f32; 4], u64)>,
+    /// Each face's mouth, when speaking is judged (`LAMP_EYES_SPEAKING=on`).
+    pub mouths: Option<speaking::Mouths>,
 }
 
 fn overlap(a: &[f32; 4], b: &[f32; 4]) -> f32 {
@@ -104,11 +106,11 @@ pub fn edges(face: &faces::Face, filled: (usize, usize)) -> [f32; 4] {
 pub fn message(found: &[faces::Face], filled: (usize, usize), ids: &mut Ids, now_us: u64) -> Faces {
     let (width, height) = (filled.0.max(1) as f32, filled.1.max(1) as f32);
     let boxes: Vec<[f32; 4]> = found.iter().map(|face| edges(face, filled)).collect();
-    let ids = ids.of(&boxes, now_us);
+    let numbers = ids.of(&boxes, now_us);
     let faces = found
         .iter()
         .zip(&boxes)
-        .zip(ids)
+        .zip(numbers)
         // A box with no size is not a face in the picture.
         .filter(|((_, edges), _)| edges[0] < edges[2] && edges[1] < edges[3])
         .map(|((face, edges), id)| {
@@ -118,7 +120,12 @@ pub fn message(found: &[faces::Face], filled: (usize, usize), ids: &mut Ids, now
                 && facing::marks_seen(&face.marks, width, height);
             let turn = measured.then(|| facing::yaw_deg(&face.marks)).flatten();
             let to_the_right = face.marks[2].0 >= (face.marks[0].0 + face.marks[1].0) / 2.0;
+            let speaking = ids
+                .mouths
+                .as_mut()
+                .map(|mouths| mouths.judge(id, &face.marks, turn, now_us));
             Face {
+                speaking,
                 id: format!("f{id}"),
                 xmin: edges[0],
                 ymin: edges[1],
@@ -192,7 +199,10 @@ impl BusOut {
         Ok(Self {
             faces,
             health,
-            ids: Ids::default(),
+            ids: Ids {
+                mouths: speaking::from_environment(),
+                ..Ids::default()
+            },
             alive_at_us: 0,
             reported_at_us: None,
         })
@@ -427,5 +437,31 @@ mod tests {
         assert_eq!(said[0].level, Level::Ok);
         assert_eq!(said[3].message, "the camera does not open");
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn speaking_is_said_only_when_asked_for() {
+        let looks = [
+            face(240.0, 120.0, 160.0, 200.0, 0.0),
+            face(40.0, 100.0, 120.0, 150.0, 0.0),
+        ];
+        let mut off = Ids::default();
+        let text = serde_json::to_string(&message(&looks, PICTURE, &mut off, 0)).unwrap();
+        assert!(!text.contains("speaking"), "{text}");
+        let mut on = Ids {
+            mouths: Some(speaking::Mouths::default()),
+            ..Ids::default()
+        };
+        for look in 0..2u64 {
+            let seen = message(&looks, PICTURE, &mut on, look * 150_000);
+            assert_eq!(seen.faces.len(), 2);
+            for tracked in &seen.faces {
+                // New faces: too few looks to tell yet.
+                let said = tracked.speaking.expect("judged");
+                assert_eq!(said.state, lamp_msgs::SpeakingState::Unknown);
+            }
+            let text = serde_json::to_string(&seen).unwrap();
+            assert_eq!(text.matches("\"speaking\":").count(), 2, "{text}");
+        }
     }
 }

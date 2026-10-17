@@ -77,7 +77,8 @@ the saved network every 2 minutes only while no phone is on it.
 | Credentials only through the account page's URL | **Decided: the user's key, as in V1** | The owner, 2026-10-16 16:13 (#806, relayed by Leo; it replaces the first builder's 12:36): the key is the user's, and the factory has none to write. The account page (`/setup?llm_api_key=…&device_id=…`) or the app posts it down in `POST /api/device/setup`, and setup writes it to the voice's credential and the Policy's `jev.key`, root's, 0600, never logged or echoed. `install` still copies V1's key on a lamp that ran V1 (#1102). A reset wipes it with the rest of the person's data. |
 | Admin password = sticker suffix | **Take as is** | The person has the sticker; refuse to start if the hardware ID is unreadable. |
 | `set_up_completed` | **Take with a change** | One marker of V2's own, written only after the voice is healthy (not an agent); `lampos.target` starts only when it exists. |
-| Agent runtime, MQTT, channels, the backend ping | **Leave** | V2 has none of them. |
+| Agent runtime, channels | **Leave** | V2 has none of them. |
+| The backend's link: the MQTT four (`mqtt_endpoint`, `mqtt_port`, `mqtt_username`, `mqtt_password`), `fa_channel`, `fd_channel`, `device_id`, `llm_base_url` | **Keep** (17 Oct, #1396) | The Autonomous app sends them in the setup request (`ecm-sds-mobile` v3). They are kept so a lamp set up now can come online in the app later (`lamp-cloud`, #1396) without being set up again. Nothing reads them yet, and the MQTT link and the backend ping are not built. |
 | Name and time zone | **Take with a change** | V1 does not ask during setup. V2 asks for both; the zone is written the way `timezone.go` does it. |
 | Reset button: line 100, 5 s, a spoken notice, the wipe, a reboot | **Take with a change** | Same button and hold. V2 wipes its own stores (below) and the Wi-Fi configuration, then restarts into setup. |
 | MQTT soft reset | **Leave** | Cloud only, and it keeps the Wi-Fi. |
@@ -92,8 +93,9 @@ What lamp-4ace's units read today (`deploy/lamp-4ace/`):
 | Wi-Fi | V1's `wpa_supplicant-wlan0.conf` | The same file, mode 0600. |
 | The voice's service | `/etc/lampOS/voice/provider.json`, which names a credential file | The user's key, in that file and in the Policy's `/etc/lampOS/policy/jev.key` (#806, 16:13); `provider.json` comes with `install`. |
 | Update trust | `/etc/lampOS/update/key.pub` | Nothing: a trust root belongs in the image, not on a page anyone near the lamp can open. |
-| Time zone | Schedule takes `--zone Asia/Ho_Chi_Minh`; Memory, Expression and the policy take `--utc-offset-minutes 420` | `/etc/localtime` and `/etc/timezone`. Memory, Expression and the policy take `--zone system` (#820), which follows the file across daylight saving and takes up the zone setup writes without a restart; their units still pass the offset until First switches them. |
+| Time zone | Schedule takes `--zone Asia/Ho_Chi_Minh`; Memory, Expression and the policy take `--utc-offset-minutes 420` | `/etc/localtime` and `/etc/timezone`, and `/etc/lampOS/zone.env` again (#820). The product's memory and Expression take `--zone system`, which follows `/etc/localtime` across daylight saving and without a restart; schedule (`LAMP_ZONE`) and skills (`LAMP_UTC_OFFSET_MINUTES`) read `zone.env`. A zone the parts' own zone data lacks leaves `zone.env` as install wrote it, since schedule would not start on it. The voice reads `/etc/localtime` itself. |
 | The person's name | Read by the voice with `LAMP_PERSON_NAME` (the product unit sets it, #806): told to the model after its character, and the hello's name when no face is known (`crates/voice/src/person.rs`) | A private file, one line: `/etc/lampOS/person/name`. |
+| The backend's link | Nothing | `/etc/lampOS/setup/backend.json` (`backend` in the settings), root's, 0600, written after the zone and before the key. It holds the fields above when the request carries a whole link: an endpoint, a port (a number, or digits), both channels, each field at most 512 bytes with no space or control character (the password may hold spaces). A missing or broken link writes nothing; when the request named one (an `mqtt_endpoint`) the journal gets one line naming the fields that were missing or not valid, never their values. The device's id, the endpoint, the port and both channels are needed; the base, the username and the password may be empty. Neither a broken link nor one that cannot be written fails setup: the lamp joins the Wi-Fi and talks, and only its place in the app waits. The password never appears in a debug line, and a crashed write's temporary file is removed at start. |
 
 ## The person's data, which reset wipes
 
@@ -112,7 +114,7 @@ and `logs`: the sign-in, the pairings and what they left; not `.harness`
 whole, which is Harness itself, its CLI and its own Node, and not the
 Harness service `install` set up, #934; Nine on #1016), the user's key
 (`/etc/lampOS/voice/credential` and `/etc/lampOS/policy/jev.key`, #806,
-16:13), the name, the Wi-Fi configuration and the setup marker. Kept: the
+16:13), the name, the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396), the Wi-Fi configuration and the setup marker. Kept: the
 software, its releases, the update key, the touch calibration and other
 per-lamp facts, and physical privacy.
 
@@ -235,6 +237,8 @@ holds no check past its time, and three attempts in a row start one lookup.
 
 ## The setup server (built, off unless set)
 
+Its `GET /api/device/setup/status` answers V1's fields, plus one of its own: `"generation": "lamp-v2"`. The Autonomous app keeps V1's Lamp and this one as two products, as it does Intern's two, and stops before the setup `POST` when the lamp on the hotspot is not the product the person picked (#1396, decided 17 Oct).
+
 ```sh
 lamp-setup serve --config SERVE.json --plan PLAN.json --enable
 ```
@@ -260,7 +264,7 @@ While joining it reads the station address every second and publishes it as
 is done; a new run clears the last run's address at once, so V1's page cannot
 follow an old one. Once joined, it saves the name, the time zone
 (`/etc/localtime` linked to the zone, `/etc/timezone` naming it, as V1's
-`timezone.go`) and then the user's key (to the voice's credential and the
+`timezone.go`, and `/etc/lampOS/zone.env` for schedule and skills, #820) and then the user's key (to the voice's credential and the
 Policy's `jev.key`, both written before either is renamed into place, never
 logged, never in a reply), each private and synced, and only then the
 marker; the keeper starts the lamp. If anything cannot be saved, there is no

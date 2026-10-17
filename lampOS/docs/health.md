@@ -44,7 +44,7 @@ anybody listens.
 | `--run` | Where the clock's state is read | `/run` |
 | `--disk` | Any path on the disk whose free room is watched | `/` |
 | `--clock` | Who says whether the clock is set: `timesync`, systemd-timesyncd's marker under `--run`; or `kernel`, the kernel's own answer (`adjtimex`, as `timedatectl`'s `NTPSynchronized`), which any time client sets, with the marker still believed first (#830, [offline.md](offline.md)) | `timesync` |
-| `--online` | `on` to publish `lamp/online` too, once each report's time: whether the lamp can reach the internet, from the voice's `link` fact on `diagnostics` (`ready` and `connecting` are online, `down` is not, a voice not reporting or stale is unknown), with its `down_for_s` (#830, [offline.md](offline.md)) | `off` |
+| `--online` | `on` to publish `lamp/online` too, once each report's time: whether the lamp can reach the internet, from the voice's `link` fact on `diagnostics` (`ready` and `connecting` are online, `down` is not, a voice not reporting or stale, or saying `closed` while it waits with its microphones off (#1371), is unknown), with its `down_for_s` (#830, [offline.md](offline.md)) | `off` |
 | `--reach-probe` | `on`, with `--online on` only: while the voice's link is down, ask the internet itself (a TCP connection to 1.1.1.1:443 or 8.8.8.8:443, never port 53, at most every 30 s, each try bounded at 2 s, on its own thread). Its verdict goes in `lamp/online`, from `reach`: online if it answers (a relay down with the internet up is the service's trouble, not the home's), offline if not, and unknown while no probe has ended in the outage (#830, [offline.md](offline.md), "The relay is not the internet") | `off` |
 
 Every path is absolute. A wrong option prints the usage and exits with 2.
@@ -310,7 +310,10 @@ The first line is the lamp's level and message: `The lamp is well.`,
 `The lamp has a warning: ...`, `The lamp is not well: ...` for an error,
 `Not all of the lamp is reporting: ...` for stale, its part named as
 below, the first row's part when it is as bad as the lamp, so the two
-never name different parts. Then every part, worst first and, within a
+never name different parts. A well lamp whose voice waits with its
+microphones off says why on that line: `The lamp is well; the microphones
+are off (the privacy switch).` (or `(muted)`, `(asleep: a hand held on the
+head)`); the voice says it while it waits, below (#1371). Then every part, worst first and, within a
 level, by its name; a part not heard from is `quiet`, its message saying
 how long. Then the board's numbers, as `computer`: the hottest
 temperature, memory, disk, uptime, and the Wi-Fi signal and `clock set` or

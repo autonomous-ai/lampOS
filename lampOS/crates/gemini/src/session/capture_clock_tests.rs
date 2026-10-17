@@ -602,6 +602,19 @@ async fn connector_keeps_the_requested_duplex_capacity_and_original_write_timeou
         .unwrap();
     // Do not drain the 64-byte peer. Its capacity cannot hold this real frame.
     // A silently substituted default capacity would complete the write instead.
-    ended(&mut connection, &mut service, Error::WriteTimeout).await;
+    // The drop names the audio, its size on the wire and the requested bound.
+    let kib = u32::try_from(
+        crate::wire::encode_audio(&[5; MAX_INPUT_SAMPLES])
+            .unwrap()
+            .len()
+            .div_ceil(1024),
+    )
+    .unwrap();
+    let write = Error::WriteTimeout {
+        write: crate::Write::Audio,
+        kib,
+        deadline_ms: 50,
+    };
+    ended(&mut connection, &mut service, write).await;
     assert_eq!(clock.reads(), 3);
 }

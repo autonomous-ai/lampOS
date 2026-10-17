@@ -22,6 +22,7 @@
     "/run/lampos-voice/thread.json",
     "/etc/lampOS/voice/credential",
     "/etc/lampOS/policy/jev.key",
+    "/etc/lampOS/setup/backend.json",
     "/etc/lampOS/person/name",
     "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
   ],

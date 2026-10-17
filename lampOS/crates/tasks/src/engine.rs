@@ -1,7 +1,7 @@
 //! Durable task policy. A launch intent is committed before it can leave this
 //! module. Transcript observations and qualified speech receipts are separate.
 use crate::{
-    harness::{Launch, LaunchOutcome, Observation, Target},
+    harness::{Closed, Launch, LaunchOutcome, Observation, Target},
     protocol::{MAX_PAGE_SIZE, MAX_REPLY_BYTES, Request},
     store::{MAX_STATE_BYTES, Store},
 };
@@ -18,6 +18,10 @@ pub const MAX_ASK_BYTES: usize = 4096;
 pub const MAX_SPEECH_BYTES: usize = 1000;
 pub const CONFIRM_MS: u64 = 120_000;
 pub const SPEECH_AGE_MS: u64 = 600_000;
+/// A close that failed is tried again this long after, at most
+/// [`CLOSE_TRIES`] times in all, each time after reading the agent again.
+pub const CLOSE_RETRY_MS: u64 = 60_000;
+pub const CLOSE_TRIES: u8 = 3;
 /// How often a task handed over is looked at on its own (unless `serve --no-watch`):
 /// every half minute for its first ten minutes, then every two, until the
 /// agent has finished or asks something, and for at most a day.
@@ -211,6 +215,32 @@ struct Observed {
     speech: Option<Speech>,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum CloseState {
+    Attempting,
+    /// Closed, or found already stopped or gone.
+    Closed,
+    /// Harness refused it: never asked again.
+    Refused,
+    /// The person went on with it at the computer: theirs, never closed.
+    Left,
+    /// Failed this time; tried again after [`CLOSE_RETRY_MS`], up to
+    /// [`CLOSE_TRIES`].
+    Failed,
+}
+/// The lamp closing the harness it started, once its result was told
+/// (#1390).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct Close {
+    state: CloseState,
+    tries: u8,
+    attempted: Audit,
+    finished: Option<Audit>,
+    code: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 struct Task {
@@ -233,6 +263,14 @@ struct Task {
     /// Harness's own `wait` takes two looks at one turn for done.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     watch_idle: Option<String>,
+    /// Closing its harness once its result was told (#1390).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    close: Option<Close>,
+    /// Made by a version that closes its harness once told. A task from an
+    /// older store is never closed: its harness may be one the person has
+    /// gone on with since, and the issue leaves those to the person.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    closable: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -335,6 +373,50 @@ fn settled(value: &Observation) -> bool {
         _ => false,
     }
 }
+/// Whether this lamp should close the harness it started for `task` now
+/// (#1390): a task this version made, whose newest answer was kept from an
+/// agent `idle` with an answer, and told (its telling played, or not known
+/// to have). Harness's `ask` is what the agent was last asked, the lamp's
+/// own task text, so it says nothing here. One that waits for the person
+/// (`needs-input`) is left to them: Harness would refuse it anyway. The
+/// close itself first reads the agent again, and closes only if it is
+/// still idle on that turn. A close that failed is tried again after
+/// [`CLOSE_RETRY_MS`], [`CLOSE_TRIES`] times in all; a refused, left or
+/// done one never.
+fn close_due(task: &Task, now: &Clock) -> bool {
+    if !task.closable
+        || task.dispatch.state != DispatchState::Accepted
+        || task.dispatch.agent_id.is_none()
+    {
+        return false;
+    }
+    match &task.close {
+        None => {}
+        Some(close) if close.state == CloseState::Failed && close.tries < CLOSE_TRIES => {
+            let last = close.finished.as_ref().unwrap_or(&close.attempted);
+            if last.boot_id == now.boot_id
+                && now.monotonic_ms.saturating_sub(last.monotonic_ms) < CLOSE_RETRY_MS
+            {
+                return false;
+            }
+        }
+        Some(_) => return false,
+    }
+    let (Some(first), Some(newest)) = (task.observations.first(), task.observations.last()) else {
+        return false;
+    };
+    // The told turn must still be the lamp's own task: the same asked text
+    // as its first kept answer. A newer one asked by the person at the
+    // computer ("Now make it longer.") is theirs, kept and told or not.
+    newest.data.ask == first.data.ask
+        && newest.data.state == "idle"
+        && settled(&newest.data)
+        && newest
+            .speech
+            .as_ref()
+            .is_some_and(|speech| speech.state != SpeechState::Claimed)
+}
+
 /// Whether a task is over, so that it may give way to a new one when the
 /// store is full: it was never sent (it expired, was cancelled or was not
 /// sent), or its agent has finished, stopped or failed. A question waiting
@@ -699,6 +781,18 @@ pub struct Settled {
     pub ago_ms: u64,
 }
 
+/// One harness to close ([`Engine::begin_close`]): closed only if a read just
+/// before finds it idle on the very turn the lamp told, this answer to this
+/// asked text.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CloseJob {
+    pub task_id: u64,
+    pub machine_id: String,
+    pub agent_id: String,
+    pub answer: String,
+    pub asked: Option<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ObservationJob {
     pub task_id: u64,
@@ -720,8 +814,17 @@ pub struct Engine<P: Persistence> {
     /// fate is uncertain. None before the first (#830: with no internet
     /// every hand-over fails while the store itself is well).
     last_handover: Option<bool>,
+    /// `serve --close-told` (#1390): only a task made while it is on is
+    /// marked `closable`, so turning it on later closes no older task.
+    close_told: bool,
 }
 impl<P: Persistence> Engine<P> {
+    /// Whether tasks made from now on are closed once told
+    /// (`serve --close-told`).
+    pub fn close_told(&mut self, on: bool) {
+        self.close_told = on;
+    }
+
     pub fn open(
         mut persistence: P,
         targets: BTreeMap<String, Target>,
@@ -812,6 +915,16 @@ impl<P: Persistence> Engine<P> {
                     read.code = Some("restart".into());
                     changed = true;
                 }
+                if let Some(close) = &mut task.close
+                    && close.state == CloseState::Attempting
+                {
+                    // Not known whether it closed: tried again, as closing
+                    // twice is harmless.
+                    close.state = CloseState::Failed;
+                    close.finished = Some(at.clone());
+                    close.code = Some("restart".into());
+                    changed = true;
+                }
                 for observed in &mut task.observations {
                     if let Some(speech) = &mut observed.speech
                         && speech.state == SpeechState::Claimed
@@ -839,6 +952,7 @@ impl<P: Persistence> Engine<P> {
             last_clock: now.clone(),
             failed: false,
             last_handover: None,
+            close_told: false,
         })
     }
 
@@ -1103,6 +1217,8 @@ impl<P: Persistence> Engine<P> {
                     read: None,
                     observations: Vec::new(),
                     watch_idle: None,
+                    close: None,
+                    closable: self.close_told,
                 });
             }
             Request::Confirm {
@@ -1274,6 +1390,9 @@ impl<P: Persistence> Engine<P> {
                 || t.read
                     .as_ref()
                     .is_some_and(|r| r.state == ReadState::Attempting)
+                || t.close
+                    .as_ref()
+                    .is_some_and(|c| c.state == CloseState::Attempting)
         })
     }
 
@@ -1559,6 +1678,73 @@ impl<P: Persistence> Engine<P> {
             .collect()
     }
 
+    /// The next harness this lamp started whose work is done and told
+    /// ([`close_due`]), its close recorded before it is handed on. The
+    /// returned job is permission for one `harness close`.
+    pub fn begin_close(&mut self, now: &Clock) -> Result<Option<CloseJob>, Error> {
+        self.tick(now)?;
+        if self.active() {
+            return Ok(None);
+        }
+        let Some(index) = self.state.tasks.iter().position(|t| close_due(t, now)) else {
+            return Ok(None);
+        };
+        let mut next = self.state.clone();
+        let at = next_audit(&mut next, now)?;
+        let task = &mut next.tasks[index];
+        let tries = task.close.as_ref().map_or(0, |close| close.tries) + 1;
+        task.close = Some(Close {
+            state: CloseState::Attempting,
+            tries,
+            attempted: at.clone(),
+            finished: None,
+            code: None,
+        });
+        task.updated = at;
+        let told = &task.observations.last().expect("a told answer").data;
+        let job = CloseJob {
+            task_id: task.id,
+            machine_id: task.launch.target.machine_id.clone(),
+            agent_id: task.dispatch.agent_id.clone().expect("accepted task"),
+            answer: told.answer.clone(),
+            asked: told.ask.clone(),
+        };
+        self.save(next)?;
+        Ok(Some(job))
+    }
+
+    pub fn finish_close(
+        &mut self,
+        job: &CloseJob,
+        result: Result<Closed, String>,
+        now: &Clock,
+    ) -> Result<(), Error> {
+        self.clock(now)?;
+        let index = find(&self.state, job.task_id)?;
+        if self.state.tasks[index]
+            .close
+            .as_ref()
+            .is_none_or(|close| close.state != CloseState::Attempting)
+            || self.state.tasks[index].dispatch.agent_id.as_deref() != Some(&job.agent_id)
+        {
+            return Err(err("stale_job", "The close is not the current attempt."));
+        }
+        let mut next = self.state.clone();
+        let at = next_audit(&mut next, now)?;
+        let task = &mut next.tasks[index];
+        let close = task.close.as_mut().expect("current close");
+        (close.state, close.code) = match result {
+            Ok(Closed::Closed) => (CloseState::Closed, None),
+            Ok(Closed::Gone) => (CloseState::Closed, Some("gone".into())),
+            Ok(Closed::Refused) => (CloseState::Refused, None),
+            Ok(Closed::Left) => (CloseState::Left, None),
+            Err(code) => (CloseState::Failed, Some(code)),
+        };
+        close.finished = Some(at.clone());
+        task.updated = at;
+        self.save(next)
+    }
+
     pub fn begin_observation(&mut self, now: &Clock) -> Result<Option<ObservationJob>, Error> {
         self.tick(now)?;
         if self.active() {
@@ -1799,7 +1985,7 @@ fn identity(mut body: Value, store_id: &str, revision: u64) -> Value {
 }
 fn task_metadata(task: &Task) -> Value {
     json!({"id":task.id,"target_alias":task.target_alias,"prepare_request_id":task.prepare_request_id,"dispatch":task.dispatch,
-        "created":task.created,"updated":task.updated,"observations":task.observations.len(),"read":task.read,"completion":"unverified"})
+        "created":task.created,"updated":task.updated,"observations":task.observations.len(),"read":task.read,"close":task.close,"completion":"unverified"})
 }
 fn observation_metadata(observed: &Observed) -> Value {
     json!({"id":observed.id,"digest":observed.digest,"state":observed.data.state,"observed":observed.observed,
@@ -1994,7 +2180,9 @@ mod tests {
     }
     fn opened() -> (Engine<Memory>, Memory) {
         let memory = Memory::default();
-        let engine = Engine::open(memory.clone(), targets(), STORE, SESSION, &clock(0)).unwrap();
+        let mut engine =
+            Engine::open(memory.clone(), targets(), STORE, SESSION, &clock(0)).unwrap();
+        engine.close_told(true);
         (engine, memory)
     }
     fn guard(engine: &Engine<Memory>, prefix: &str) -> Guard {
@@ -2496,6 +2684,200 @@ mod tests {
                 .unwrap_err()
                 .code,
             "stale_job"
+        );
+    }
+
+    /// A task read in `state`, as Harness's `show` gives it (its `ask` is
+    /// the task's own text), and its telling played: (`at`, `at + 2`).
+    fn told(engine: &mut Engine<Memory>, state: &str, at: u64) -> u64 {
+        let id = accepted(engine, 0);
+        let job = request_read(engine, id, at);
+        let mut answer = data("A poem about coffee, in poem.txt.");
+        answer.state = state.into();
+        answer.ask = Some("Write a two-line poem about coffee.".into());
+        engine.finish_observation(&job, answer, &clock(at)).unwrap();
+        let observation = engine.state.tasks[0]
+            .read
+            .as_ref()
+            .unwrap()
+            .observation_id
+            .unwrap();
+        engine
+            .handle(&claim(engine, id, observation), &clock(at + 1), true)
+            .unwrap();
+        engine
+            .handle(
+                &acknowledgement(engine, id, observation),
+                &clock(at + 2),
+                true,
+            )
+            .unwrap();
+        id
+    }
+
+    /// #1390: the harness this lamp started is closed once its answer is told,
+    /// by its own agent id, carrying the told turn for the read just before;
+    /// nothing before the telling played, and never again after.
+    #[test]
+    fn a_harness_done_and_told_is_closed_once() {
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 0);
+        let read = request_read(&mut engine, id, 10);
+        engine
+            .finish_observation(&read, data("Done."), &clock(10))
+            .unwrap();
+        assert!(
+            engine.begin_close(&clock(11)).unwrap().is_none(),
+            "not told yet"
+        );
+
+        let (mut engine, memory) = opened();
+        let id = told(&mut engine, "idle", 10);
+        let job = engine.begin_close(&clock(13)).unwrap().unwrap();
+        assert_eq!((job.task_id, job.agent_id.as_str()), (id, AGENT));
+        assert_eq!(
+            job.machine_id,
+            engine.state.tasks[0].launch.target.machine_id
+        );
+        assert_eq!(
+            (job.answer.as_str(), job.asked.as_deref()),
+            (
+                "A poem about coffee, in poem.txt.",
+                Some("Write a two-line poem about coffee.")
+            )
+        );
+        // Recorded before it is handed on, and one at a time.
+        assert_eq!(
+            stored(&memory).tasks[0].close.as_ref().unwrap().state,
+            CloseState::Attempting
+        );
+        assert!(engine.begin_close(&clock(14)).unwrap().is_none());
+        engine
+            .finish_close(&job, Ok(Closed::Closed), &clock(15))
+            .unwrap();
+        assert!(engine.begin_close(&clock(10_000_000)).unwrap().is_none());
+        assert_eq!(
+            engine
+                .finish_close(&job, Ok(Closed::Closed), &clock(10_000_001))
+                .unwrap_err()
+                .code,
+            "stale_job"
+        );
+    }
+
+    /// One that waits for the person is left to them, however long; one the
+    /// person went on with (the read before the close found another turn) is
+    /// never asked again; and a task from a store before this version is
+    /// never closed at all.
+    #[test]
+    fn a_harness_the_person_has_is_left_to_them() {
+        let (mut engine, _) = opened();
+        told(&mut engine, "needs-input", 10);
+        assert!(engine.begin_close(&clock(100_000_000)).unwrap().is_none());
+
+        let (mut engine, _) = opened();
+        told(&mut engine, "idle", 10);
+        let job = engine.begin_close(&clock(13)).unwrap().unwrap();
+        engine
+            .finish_close(&job, Ok(Closed::Left), &clock(14))
+            .unwrap();
+        assert!(engine.begin_close(&clock(100_000_000)).unwrap().is_none());
+
+        let (mut engine, _) = opened();
+        told(&mut engine, "idle", 10);
+        engine.state.tasks[0].closable = false;
+        assert!(engine.begin_close(&clock(13)).unwrap().is_none());
+        // Such a task loads from a store written before the field.
+        let mut task = serde_json::to_value(&engine.state.tasks[0]).unwrap();
+        task.as_object_mut().unwrap().remove("closable");
+        let loaded: Task = serde_json::from_value(task).unwrap();
+        assert!(!loaded.closable);
+    }
+
+    /// The reviewer on #1395, 22:06: the agent answered, and before the
+    /// lamp told it the person asked it more at the computer ("Now make it
+    /// longer."). That newer turn, kept and told, is the person's: never
+    /// closed. A task made while `--close-told` was off is never closed
+    /// either, though the switch is on later.
+    #[test]
+    fn a_turn_the_person_asked_or_a_task_from_before_the_switch_is_never_closed() {
+        let (mut engine, _) = opened();
+        let id = told(&mut engine, "idle", 10);
+        let job = request_read(&mut engine, id, 20);
+        let mut theirs = data("A longer poem about coffee.");
+        theirs.ask = Some("Now make it longer.".into());
+        engine.finish_observation(&job, theirs, &clock(20)).unwrap();
+        let newest = engine.state.tasks[0]
+            .read
+            .as_ref()
+            .unwrap()
+            .observation_id
+            .unwrap();
+        engine
+            .handle(&claim(&engine, id, newest), &clock(21), true)
+            .unwrap();
+        engine
+            .handle(&acknowledgement(&engine, id, newest), &clock(22), true)
+            .unwrap();
+        assert!(engine.begin_close(&clock(100_000_000)).unwrap().is_none());
+
+        let (mut engine, _) = opened();
+        engine.close_told(false);
+        told(&mut engine, "idle", 10);
+        engine.close_told(true);
+        assert!(!engine.state.tasks[0].closable);
+        assert!(engine.begin_close(&clock(13)).unwrap().is_none());
+    }
+
+    /// A close that failed is tried again a minute later, three times in
+    /// all; one Harness refused never again.
+    #[test]
+    fn a_failed_close_is_tried_three_times_and_a_refused_one_never() {
+        let (mut engine, _) = opened();
+        told(&mut engine, "idle", 10);
+        let mut at = 13;
+        for _ in 0..CLOSE_TRIES {
+            let job = engine.begin_close(&clock(at)).unwrap().unwrap();
+            engine
+                .finish_close(&job, Err("close_failed".into()), &clock(at))
+                .unwrap();
+            assert!(
+                engine
+                    .begin_close(&clock(at + CLOSE_RETRY_MS - 1))
+                    .unwrap()
+                    .is_none()
+            );
+            at += CLOSE_RETRY_MS;
+        }
+        assert!(engine.begin_close(&clock(at * 10)).unwrap().is_none());
+
+        let (mut engine, _) = opened();
+        told(&mut engine, "idle", 10);
+        let job = engine.begin_close(&clock(13)).unwrap().unwrap();
+        engine
+            .finish_close(&job, Ok(Closed::Refused), &clock(14))
+            .unwrap();
+        assert!(engine.begin_close(&clock(10_000_000)).unwrap().is_none());
+    }
+
+    /// A restart while a close was under way leaves it not known, and so
+    /// tried again: the try reads the agent first.
+    #[test]
+    fn a_close_under_way_at_a_restart_is_tried_again() {
+        let (mut engine, memory) = opened();
+        told(&mut engine, "idle", 10);
+        engine.begin_close(&clock(13)).unwrap().unwrap();
+        let mut recovered = Engine::open(memory, targets(), STORE, RESTART, &clock(20)).unwrap();
+        let close = recovered.state.tasks[0].close.as_ref().unwrap();
+        assert_eq!(
+            (close.state, close.code.as_deref()),
+            (CloseState::Failed, Some("restart"))
+        );
+        assert!(
+            recovered
+                .begin_close(&clock(20 + CLOSE_RETRY_MS))
+                .unwrap()
+                .is_some()
         );
     }
 

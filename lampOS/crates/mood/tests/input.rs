@@ -97,6 +97,7 @@ fn controls() -> ControlsState {
 
 fn face(id: &str) -> Face {
     Face {
+        speaking: None,
         id: id.into(),
         xmin: 0.2,
         ymin: 0.2,

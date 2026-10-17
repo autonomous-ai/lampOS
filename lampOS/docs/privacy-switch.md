@@ -53,6 +53,32 @@ or capture permissions. The worker processes every LOW before later HIGH
 values, and a worker which has observed LOW cannot issue another Ears capture
 grant. A new worker and current owner authority are required.
 
+**While the voice waits, it says so (#1371).** With the switch closed, or a
+mute set, the voice runs no session and opens no audio; until #1371 nothing
+said how it was, so `lamp-health` took it for a voice gone quiet (lamp-06c1
+read `stale` for 2 h 25 min on 17 Oct). Every look of the wait now says its
+health on `diagnostics` (with `LAMP_BUS=on`), a little more often than once
+a second and at once when why changes (`bus_out::WaitHealth`), the worst
+reason first:
+- `ok` "the microphones are off (the privacy switch)": closed, or open but
+  not yet steady (a flap stays this one line, not "off" and "well" by turns),
+  whatever the mute says;
+- `warn` "(muted by the restart guard after a fault, not by choice)" (#960);
+- `warn` "the microphones are off until the privacy switch can be read",
+  only once it has gone unread for 1 s (`WAIT_UNREADABLE_AFTER_US`, the
+  wait's own grace), even beside a person's mute; before the worker's first
+  reading it is `ok` "(reading the privacy switch)", so a wait never opens
+  on a fault that is not there (the reviewer and Jarvis on #1376);
+- `ok` "(asleep: a hand held on the head)", then "(muted)";
+- the switch read open and nothing holding it: an empty `ok`, `link`
+  `connecting`, said once more as the wait ends, until the session's own
+  report.
+
+`lamp-health show` says it on its first line, `The lamp is well; the
+microphones are off (the privacy switch).` A muted voice is no longer stale,
+so `lamp-keeper --act` (error or stale for 30 s) no longer restarts a voice
+that was only muted.
+
 ## The second microphone
 
 Ears owns MIC1; Voice normally owns MIC2. `voice/privacy`

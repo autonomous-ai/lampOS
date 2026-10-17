@@ -102,9 +102,9 @@ The base's touch strip (the MPR121, 0x5A) is on the same bus and works at
 100 kHz. The product reads no MPR121 today: `lamp-controls` starts its strip
 worker only when the pins file sets `base` (`crates/controls/src/main.rs`),
 and neither the product's nor lamp-4ace's does (#711). When it does, each
-read checks the whole configuration, about 1,000 clock bits worked out (not
-measured): about 2.6 ms a sample at 400 kHz and 10.5 ms at 100 kHz (#1374
-checks a part of it per read). The strip's rules are times, not counts
+read checks a fifth of the configuration in turn (#1374), 354 clock bits
+worked out (not measured): about 0.9 ms of wire time a sample at 400 kHz
+and 3.5 ms at 100 kHz, under the strip's 5 ms pace (`controls.md`). The strip's rules are times, not counts
 (`crates/controls/src/base.rs`, which already allows an 11 ms poll). The
 adapter is waited for up to 10 s, in case its driver binds late; on a board
 with no `i2c-0` at all, that holds the air and the controls back by about

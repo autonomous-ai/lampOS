@@ -568,6 +568,29 @@ to become `ProviderOutput` variants unchanged.
 `server_unavailable`, `server_rejected`, `server_go_away`, `transport`,
 `peer_closed` (with `code`), `protocol`, `local`.
 
+`write_timeout` also says which write did not finish within its bound, so
+a drop can be traced to it (lampOS#705), for example
+`{"category":"write_timeout","write":"picture","kib":245,"deadline_ms":200}`:
+- `write` is one of:
+  - `setup`;
+  - `audio`, a block of the person's audio;
+  - `image`, a camera frame with speech;
+  - `picture`, a written turn with the lamp's look;
+  - `written`;
+  - `activity`, a start or an end;
+  - `note`;
+  - `context`;
+  - `tool`, a tool's response;
+  - `keepalive`, a ping or a pong.
+- `kib` is its size on the wire, rounded up.
+- `deadline_ms` is the time it had. That is `Timeouts::write` (200 ms
+  unless set), 400 ms for a camera frame, and less for a block of audio
+  near its 2.5 s age.
+
+A write finishes once the transport's buffer takes it, so it only waits
+when that buffer is full: the link is behind. Records from before carry
+the category alone.
+
 Each `turn_failed` is sent once. Remaining input for a failed request is
 dropped by the worker until the coordinator retires it, and never reaches a
 later session.

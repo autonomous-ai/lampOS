@@ -851,6 +851,7 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     controls: &RefCell<Option<HandControls>>,
     reminders: &RefCell<Option<crate::reminders::Reminders>>,
     tap_face: Option<crate::ring_asleep::TapFace<F>>,
+    mut health: Option<crate::bus_out::WaitHealth>,
     wait: impl FnOnce(
         &mut dyn FnMut(crate::privacy::PrivacyState, BootId, u64) -> Result<()>,
         &mut dyn FnMut() -> Result<bool>,
@@ -860,10 +861,19 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     // The slide's last state from the wait: closed is muted too, whatever
     // the software mute says (the reviewer on #1288).
     let slide = std::cell::Cell::new(None);
+    // Since when the switch has read unavailable, for the health's
+    // "cannot be read" (#1376): only past the wait's own grace.
+    let unread_since = std::cell::Cell::new(None::<u64>);
     let tap_face = RefCell::new(tap_face);
     let outcome = wait(
         &mut |state, boot, at_us| {
             slide.set(Some(state));
+            unread_since.set(match state {
+                crate::privacy::PrivacyState::Unavailable => {
+                    Some(unread_since.get().unwrap_or(at_us))
+                }
+                _ => None,
+            });
             let mut trace = trace.borrow_mut();
             record(
                 &mut trace,
@@ -876,22 +886,45 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
             if let Some(reminders) = reminders.borrow_mut().as_mut() {
                 reminders.poll(monotonic_us());
             }
-            let Some(controls) = &mut *controls.borrow_mut() else {
-                return Ok(true);
+            let (allowed, asleep, restored) = match &mut *controls.borrow_mut() {
+                None => (true, false, false),
+                Some(controls) => {
+                    let (allowed, observation) = controls.quiescent_observation()?;
+                    record_hand_pats(&mut trace.borrow_mut(), observation.pets)?;
+                    answer_muted_tap(
+                        tap_face.borrow_mut().as_mut(),
+                        &observation,
+                        may_hear(allowed, slide.get()),
+                        &mut trace.borrow_mut(),
+                    )?;
+                    (allowed, observation.asleep, controls.restored_after_fault())
+                }
             };
-            let (allowed, observation) = controls.quiescent_observation()?;
-            record_hand_pats(&mut trace.borrow_mut(), observation.pets)?;
-            answer_muted_tap(
-                tap_face.borrow_mut().as_mut(),
-                &observation,
-                may_hear(allowed, slide.get()),
-                &mut trace.borrow_mut(),
-            )?;
+            // No session runs while it waits, so the wait says how the
+            // voice is: its microphones off, and why (#1371).
+            if let Some(health) = &mut health {
+                let now = monotonic_us();
+                let unreadable = unread_since.get().is_some_and(|since| {
+                    now.saturating_sub(since) >= crate::bus_out::WAIT_UNREADABLE_AFTER_US
+                });
+                health.report(
+                    now,
+                    crate::bus_out::Waiting::of(slide.get(), unreadable, allowed, asleep, restored),
+                );
+            }
             Ok(allowed)
         },
     );
     if let Some(face) = tap_face.into_inner() {
         face.stop();
+    }
+    // The wait ends on the look that read the switch open, with no look
+    // after it: say the voice is opening, not still off, until the
+    // session's own report (#1376).
+    if let (Ok(crate::service_privacy::WaitOutcome::Allowed), Some(health)) =
+        (&outcome, &mut health)
+    {
+        health.report(monotonic_us(), crate::bus_out::Waiting::Opening);
     }
     outcome
 }
@@ -1718,6 +1751,7 @@ fn run_source(
                         &controls,
                         &reminders,
                         tap_face,
+                        crate::bus_out::WaitHealth::from_environment(),
                         |on_state, gate| {
                             crate::service_privacy_controls::wait_selected(
                                 &executable,

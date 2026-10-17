@@ -141,6 +141,7 @@ mod tests {
 
     fn face(xmin: f32, width: f32) -> Face {
         Face {
+            speaking: None,
             id: format!("f{xmin}"),
             xmin,
             ymin: 0.4,

@@ -669,11 +669,43 @@ pub fn install(
             meta.permissions().mode() & 0o777
         ));
     }
-    if !config.on(ZONE_PATH).exists() {
-        let zone = zone_of(config);
+    // Written when missing, and again when the lamp's saved zone is another
+    // (#820): a lamp set up before setup wrote this file kept the image's
+    // zone here, which schedule and skills read, while memory and Expression
+    // follow /etc/localtime. A lamp naming no zone keeps the file it has.
+    let saved = saved_zone(config);
+    let written = fs::read_to_string(config.on(ZONE_PATH)).ok();
+    let written_zone = written.as_deref().and_then(|text| {
+        text.lines()
+            .find_map(|line| line.strip_prefix("LAMP_ZONE="))
+            .map(str::trim)
+    });
+    let differs = written.is_some()
+        && saved
+            .as_deref()
+            .is_some_and(|zone| written_zone != Some(zone));
+    // Only to a zone the lamp has: a wrong /etc/timezone must not replace a
+    // good file, or schedule would not start on it (the reviewer on #1380).
+    let stale = differs
+        && saved
+            .as_deref()
+            .is_some_and(|zone| zone_file_known(config, zone));
+    if differs && !stale {
+        say(&format!(
+            "kept {ZONE_PATH}: the lamp names {} as its zone, which is not a zone in /usr/share/zoneinfo",
+            saved.as_deref().unwrap_or_default()
+        ));
+    }
+    if written.is_none() || stale {
+        let zone = saved.unwrap_or_else(|| "UTC".to_owned());
         let offset = host.utc_offset_minutes(&zone)?;
+        if stale {
+            say(&format!(
+                "{ZONE_PATH} follows the zone this lamp was set up in, {zone}"
+            ));
+        }
         let text = format!(
-            "# The lamp's zone, for schedule, memory and Expression (docs/install.md).\n\
+            "# The lamp's zone, for schedule and skills (docs/install.md).\n\
              # Written by lamp-update install from the system's zone; setup writes it again.\n\
              LAMP_ZONE={zone}\nLAMP_UTC_OFFSET_MINUTES={offset}\n"
         );
@@ -1314,13 +1346,41 @@ fn existing_groups(config: &Install, wanted: &[&str]) -> Vec<String> {
         .collect()
 }
 
-/// The system's zone: Debian's `/etc/timezone`, else where `/etc/localtime`
-/// points, else UTC.
-fn zone_of(config: &Install) -> String {
+/// Whether `zone` is a zone file in the lamp's zone data, as setup checks a
+/// zone before it saves one (`zone_known` in `crates/setup`): a plain name
+/// whose file, links followed, stays inside `/usr/share/zoneinfo` and is a
+/// `TZif` file.
+fn zone_file_known(config: &Install, zone: &str) -> bool {
+    if zone.is_empty()
+        || zone.len() > 64
+        || !zone
+            .split('/')
+            .all(|part| !part.is_empty() && part != "." && part != "..")
+        || !zone
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"/_+-".contains(&b))
+    {
+        return false;
+    }
+    let zoneinfo = config.on("/usr/share/zoneinfo");
+    let (Ok(root), Ok(file)) = (zoneinfo.canonicalize(), zoneinfo.join(zone).canonicalize()) else {
+        return false;
+    };
+    let mut magic = [0u8; 4];
+    file.starts_with(&root)
+        && fs::File::open(&file)
+            .and_then(|mut opened| io::Read::read_exact(&mut opened, &mut magic))
+            .is_ok()
+        && &magic == b"TZif"
+}
+
+/// The zone the lamp names: `/etc/timezone`, which setup writes with the
+/// person's zone, else where `/etc/localtime` links. None when neither says.
+fn saved_zone(config: &Install) -> Option<String> {
     if let Ok(text) = fs::read_to_string(config.on("/etc/timezone")) {
         let zone = text.trim();
         if !zone.is_empty() {
-            return zone.to_owned();
+            return Some(zone.to_owned());
         }
     }
     fs::read_link(config.on("/etc/localtime"))
@@ -1331,7 +1391,6 @@ fn zone_of(config: &Install) -> String {
                 .split_once("zoneinfo/")
                 .map(|(_, zone)| zone.to_owned())
         })
-        .unwrap_or_else(|| "UTC".to_owned())
 }
 
 #[cfg(test)]

@@ -1599,6 +1599,7 @@ fn the_muted_waits_own_closures_count_the_slide_for_a_taps_face() {
             &controls,
             &reminders,
             Some(face),
+            None,
             |on_state, gate| {
                 on_state(said, crate::process::new_boot().unwrap(), 1)?;
                 for _ in 0..3 {
@@ -1620,6 +1621,72 @@ fn the_muted_waits_own_closures_count_the_slide_for_a_taps_face() {
         "the slide closed, the mute open"
     );
     assert_eq!(faces_for(PrivacyState::Allowed), 0, "the slide open");
+}
+
+/// #1371, and the reviewer and Jarvis on #1376: the muted wait's own
+/// closures, around the real privacy wait and its mock GPIO worker (closed
+/// for its first readings, then open), say the voice's health while it
+/// waits. Before the first reading, "reading the privacy switch", never a
+/// warning that it cannot be read; closed and while it steadies, "the
+/// privacy switch"; open, an empty report as the wait ends. All well.
+#[test]
+fn the_muted_wait_says_the_microphones_are_off_by_the_switch() {
+    use crate::service_privacy::tests::{Script, mock};
+    use crate::service_privacy::{WaitOutcome, wait_worker_with_gate};
+    use lamp_msgs::{Diagnostic, Level};
+    use std::sync::{Arc, atomic::AtomicBool};
+    let root = std::path::PathBuf::from(format!("/tmp/lvw-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut hears = bus
+        .subscribe_typed(Diagnostic::TOPIC, "test", Diagnostic::TYPE)
+        .unwrap();
+    let directory = crate::process::SessionDirectory::create().unwrap();
+    let (worker, peer) = mock(
+        &directory.path,
+        Script::Unmute,
+        Arc::new(AtomicBool::new(false)),
+    );
+    let controls = RefCell::new(None);
+    let reminders = RefCell::new(None);
+    let mut trace = SessionState::default();
+    let outcome = muted_wait(
+        &mut trace,
+        &mut None,
+        &controls,
+        &reminders,
+        None::<crate::ring_asleep::TapFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
+        Some(crate::bus_out::WaitHealth::on(&bus).unwrap()),
+        |on_state, gate| {
+            wait_worker_with_gate(
+                worker,
+                crate::process::new_boot().unwrap(),
+                &Termination::inactive(),
+                on_state,
+                gate,
+            )
+        },
+    )
+    .unwrap();
+    assert_eq!(outcome, WaitOutcome::Allowed);
+    drop(peer.join().unwrap().channels);
+    let _ = std::fs::remove_dir(&directory.path);
+    let mut said = Vec::new();
+    while let Some(message) = hears.recv(std::time::Duration::from_millis(50)).unwrap() {
+        let report = message.parse::<Diagnostic>().unwrap();
+        said.push((report.level, report.message));
+    }
+    let off = |why: &str| (Level::Ok, format!("the microphones are off ({why})"));
+    assert_eq!(
+        said,
+        [
+            off("reading the privacy switch"),
+            off("the privacy switch"),
+            (Level::Ok, String::new()),
+        ]
+    );
+    let _ = std::fs::remove_dir_all(root);
 }
 
 /// A ring that takes every frame and keeps none.

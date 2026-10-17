@@ -611,6 +611,7 @@ fn with_images_the_question_is_asked_again_with_the_eyes_frame_beside_the_decisi
         .unwrap();
     listening(&bus, Faces::TOPIC);
     let near = Face {
+        speaking: None,
         id: "f1".into(),
         xmin: 0.3,
         ymin: 0.2,

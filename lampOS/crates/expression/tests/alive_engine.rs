@@ -63,6 +63,7 @@ fn ring(now_us: u64) -> f64 {
 
 fn face(xmin: f32, ymin: f32, side: f32) -> Face {
     Face {
+        speaking: None,
         id: "face-one".into(),
         xmin,
         ymin,

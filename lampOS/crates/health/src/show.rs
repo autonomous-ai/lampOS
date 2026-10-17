@@ -258,8 +258,16 @@ pub fn text(look: &Look, root: &Path) -> String {
                     .then_with(|| known_as(&a.name).cmp(known_as(&b.name)))
             });
             let message = plain(&said(health, items.first().copied()));
+            // A voice waiting with its microphones off says why, and a well
+            // lamp says it first: muted is not quiet (#1371).
+            let off = health.items.iter().find(|item| {
+                item.name == "voice" && item.message.starts_with(lamp_msgs::MICROPHONES_OFF)
+            });
             let _ = match health.level {
-                Level::Ok => writeln!(out, "The lamp is well."),
+                Level::Ok => match off {
+                    Some(voice) => writeln!(out, "The lamp is well; {}.", plain(&voice.message)),
+                    None => writeln!(out, "The lamp is well."),
+                },
                 Level::Warn => writeln!(out, "The lamp has a warning: {message}"),
                 Level::Error => writeln!(out, "The lamp is not well: {message}"),
                 Level::Stale => writeln!(out, "Not all of the lamp is reporting: {message}"),
@@ -757,6 +765,44 @@ mod tests {
             board_line(&state),
             "computer  memory 44% used  disk 13% free  up 59 s  clock not set"
         );
+    }
+
+    /// #1371: a voice waiting on the closed privacy switch is well, and the
+    /// first line says the microphones are off, not that the lamp is quiet.
+    #[test]
+    fn a_voice_muted_by_the_switch_is_said_on_the_first_line() {
+        let off = "the microphones are off (the privacy switch)";
+        let muted = health(
+            Level::Ok,
+            "",
+            vec![
+                item(Level::Ok, "voice", off, 300),
+                item(Level::Ok, "air", "", 300),
+            ],
+            &[],
+        );
+        let shown = text(
+            &seen(Some(muted), Some(board())),
+            Path::new("/run/lampos-bus"),
+        );
+        let mut lines = shown.lines();
+        assert_eq!(
+            lines.next(),
+            Some("The lamp is well; the microphones are off (the privacy switch).")
+        );
+        assert!(
+            shown
+                .lines()
+                .any(|line| line.contains("voice") && line.ends_with(off)),
+            "{shown}"
+        );
+        // Another part's message is not taken for it.
+        let other = health(Level::Ok, "", vec![item(Level::Ok, "air", off, 300)], &[]);
+        let shown = text(
+            &seen(Some(other), Some(board())),
+            Path::new("/run/lampos-bus"),
+        );
+        assert_eq!(shown.lines().next(), Some("The lamp is well."));
     }
 
     #[test]

@@ -95,6 +95,17 @@ impl Channel {
     }
 
     pub fn send<T: Serialize>(&mut self, payload: T) -> io::Result<()> {
+        self.send_with(payload, monotonic_us)
+    }
+
+    /// [`Self::send`], stamping the message with `now` instead of the host's
+    /// clock, read at the same place: for a test that steps time with
+    /// [`Self::receive_with`] instead of sleeping.
+    pub fn send_with<T: Serialize>(
+        &mut self,
+        payload: T,
+        now: impl FnOnce() -> u64,
+    ) -> io::Result<()> {
         #[cfg(test)]
         self.probe.attempt();
         let sequence = self
@@ -104,7 +115,7 @@ impl Channel {
         let data = encode(&Envelope {
             boot: self.sender,
             sequence,
-            sent_at_us: monotonic_us(),
+            sent_at_us: now(),
             payload,
         })?;
         self.endpoint.try_send(&data).map_err(|error| {
@@ -125,16 +136,27 @@ impl Channel {
     }
 
     pub fn receive<T: DeserializeOwned>(&mut self) -> io::Result<Option<T>> {
+        self.receive_with(monotonic_us)
+    }
+
+    /// [`Self::receive`], reading `now` instead of the host's clock at both
+    /// of its places (before the receive, for how long since the last look,
+    /// and after it, for the message's age): for a test that steps time with
+    /// [`Self::send_with`] instead of sleeping.
+    pub fn receive_with<T: DeserializeOwned>(
+        &mut self,
+        mut now: impl FnMut() -> u64,
+    ) -> io::Result<Option<T>> {
         #[cfg(test)]
         self.probe.attempt();
-        let now = monotonic_us();
+        let looked = now();
         if let Some(last) = self.last_look_us {
-            let gap = now.saturating_sub(last);
+            let gap = looked.saturating_sub(last);
             if gap > self.max_age_us {
                 self.held_up_us = self.held_up_us.max(gap.min(HELD_UP_US));
             }
         }
-        self.last_look_us = Some(now);
+        self.last_look_us = Some(looked);
         let mut data = [0; MAX_DATAGRAM_BYTES];
         let count = match self.endpoint.try_recv(&mut data) {
             Ok(count) => count,
@@ -151,9 +173,9 @@ impl Channel {
         } else {
             self.max_age_us
         };
-        // Read the clock after the receive: a message sent since `now` would
-        // otherwise look sent in the future, and be refused.
-        let now = monotonic_us();
+        // Read the clock after the receive: a message sent since `looked`
+        // would otherwise look sent in the future, and be refused.
+        let now = now();
         let next = self.incoming.is_next(&packet);
         let on_time = self
             .incoming

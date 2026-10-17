@@ -34,6 +34,25 @@ pub const RETRY: Duration = Duration::from_secs(5);
 /// The longest letting go waits for the ring to be closed.
 pub const RELEASE_WAIT: Duration = Duration::from_secs(2);
 
+/// Where the painter reads the time and waits out a frame: [`HostClock`] on a
+/// lamp. A test's clock may run faster, so that a fade takes no time.
+pub trait Clock: Send + 'static {
+    fn now(&self) -> Instant;
+    fn pause(&self, pause: Duration);
+}
+
+/// The host's clock, the painter's on a lamp.
+pub struct HostClock;
+
+impl Clock for HostClock {
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+    fn pause(&self, pause: Duration) {
+        thread::sleep(pause);
+    }
+}
+
 /// What the ring shows in a setup phase. `None` once setup is done: the ring
 /// is the lamp's.
 pub fn look(phase: Phase) -> Option<SetupLook> {
@@ -190,6 +209,24 @@ impl Light {
         O: FnMut() -> io::Result<SetupRing<S>> + Send + 'static,
         L: Fn(&str) + Send + Sync + 'static,
     {
+        Self::spawn_with_clock(status, open, log, retry, HostClock)
+    }
+
+    /// [`Light::spawn_with_retry`], painting on `clock` instead of the
+    /// host's: for a test that runs the fades fast.
+    pub fn spawn_with_clock<S, O, L, C>(
+        status: Arc<Mutex<Status>>,
+        open: O,
+        log: L,
+        retry: Duration,
+        clock: C,
+    ) -> Self
+    where
+        S: FrameSink + Send + 'static,
+        O: FnMut() -> io::Result<SetupRing<S>> + Send + 'static,
+        L: Fn(&str) + Send + Sync + 'static,
+        C: Clock,
+    {
         let log: Arc<dyn Fn(&str) + Send + Sync> = Arc::new(log);
         let state = Arc::new((
             Mutex::new(State {
@@ -202,7 +239,7 @@ impl Light {
             let state = Arc::clone(&state);
             let status = Arc::clone(&status);
             let log = Arc::clone(&log);
-            move || paint(&state, &status, open, |line| log(line), retry)
+            move || paint(&state, &status, open, |line| log(line), retry, &clock)
         });
         Self { state, log }
     }
@@ -247,9 +284,10 @@ fn paint<S: FrameSink>(
     mut open: impl FnMut() -> io::Result<SetupRing<S>>,
     log: impl Fn(&str),
     retry: Duration,
+    clock: &impl Clock,
 ) {
     let (state, changed) = state;
-    let start = Instant::now();
+    let start = clock.now();
     let mut painter = Painter::default();
     let mut ring: Option<SetupRing<S>> = None;
     let mut retry_at: Option<Instant> = None;
@@ -264,7 +302,7 @@ fn paint<S: FrameSink>(
         }
         let let_go = held.stop || held.released;
         let wanted = if let_go { None } else { look(phase) };
-        match painter.step(start.elapsed(), wanted) {
+        match painter.step(clock.now().saturating_duration_since(start), wanted) {
             Paint::Show {
                 from,
                 to,
@@ -273,9 +311,7 @@ fn paint<S: FrameSink>(
             } => {
                 // Opened only while a look is wanted: never while fading out
                 // after a release, when the marker may already be written.
-                if ring.is_none()
-                    && wanted.is_some()
-                    && retry_at.is_none_or(|at| Instant::now() >= at)
+                if ring.is_none() && wanted.is_some() && retry_at.is_none_or(|at| clock.now() >= at)
                 {
                     match open() {
                         Ok(opened) => {
@@ -291,7 +327,7 @@ fn paint<S: FrameSink>(
                                 log(&format!("the setup light cannot open the ring: {error}"));
                                 failing = true;
                             }
-                            retry_at = Some(Instant::now() + retry);
+                            retry_at = Some(clock.now() + retry);
                         }
                     }
                 }
@@ -303,7 +339,7 @@ fn paint<S: FrameSink>(
                         failing = true;
                     }
                     ring = None;
-                    retry_at = Some(Instant::now() + retry);
+                    retry_at = Some(clock.now() + retry);
                 }
             }
             Paint::Dark => {
@@ -324,7 +360,7 @@ fn paint<S: FrameSink>(
         }
         changed.notify_all();
         drop(held);
-        thread::sleep(FRAME);
+        clock.pause(FRAME);
     }
 }
 
@@ -344,6 +380,9 @@ impl<S: Save> Save for ReleasingSave<'_, S> {
     }
     fn timezone(&mut self, zone: &str) -> io::Result<()> {
         self.save.timezone(zone)
+    }
+    fn backend(&mut self, link: &crate::serve::Backend) -> io::Result<()> {
+        self.save.backend(link)
     }
     fn marker(&mut self) -> io::Result<()> {
         if let Some(light) = self.light {

@@ -505,6 +505,34 @@ pub enum Recovery {
     Fatal,
 }
 
+/// Which write to the service did not finish within its deadline
+/// ([`Error::WriteTimeout`]), so a connection lost that way says what it
+/// was writing (the first builder on lampOS#705, `write_timeout`).
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Write {
+    /// The session's setup, its first message.
+    Setup,
+    /// A block of the person's audio.
+    Audio,
+    /// A camera frame sent with speech.
+    Image,
+    /// A written turn with its picture: the lamp's look.
+    Picture,
+    /// A written turn without one.
+    Written,
+    /// An activity's start or end.
+    Activity,
+    /// The note that goes beside a request.
+    Note,
+    /// Context, between requests.
+    Context,
+    /// A tool's response.
+    Tool,
+    /// A ping or a pong.
+    Keepalive,
+}
+
 /// Fixed diagnostic categories. Never retain raw HTTP/WebSocket/server errors,
 /// close reasons, URLs, headers, response bodies, or authentication values.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -513,7 +541,14 @@ pub enum Error {
     ConnectTimeout,
     SetupTimeout,
     ReadTimeout,
-    WriteTimeout,
+    /// A write did not finish within its deadline: the transport's buffer
+    /// stayed full, so the link is behind. `kib` is its size on the wire,
+    /// rounded up, and `deadline_ms` the time it had.
+    WriteTimeout {
+        write: Write,
+        kib: u32,
+        deadline_ms: u32,
+    },
     BarrierTimeout,
     /// No output arrived for an ended input within `Timeouts::response`.
     ResponseTimeout,
@@ -558,7 +593,7 @@ impl Error {
             Self::ConnectTimeout
             | Self::SetupTimeout
             | Self::ReadTimeout
-            | Self::WriteTimeout
+            | Self::WriteTimeout { .. }
             | Self::BarrierTimeout
             | Self::ResponseTimeout
             | Self::StalledResponse
@@ -606,7 +641,8 @@ impl Error {
 }
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // All variants contain only fixed labels and an optional numeric code.
+        // All variants contain only fixed labels and numbers: an optional
+        // close code, and a write's kind, size and bound.
         write!(f, "Gemini Live {self:?}")
     }
 }

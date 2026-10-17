@@ -488,10 +488,15 @@ async fn read_response_and_write_waits_have_finite_deadlines() {
         send(
             &mut client,
             Message::text("x".repeat(4096)),
-            Duration::from_millis(20)
+            Duration::from_millis(20),
+            crate::Write::Context
         )
         .await,
-        Err(Error::WriteTimeout)
+        Err(Error::WriteTimeout {
+            write: crate::Write::Context,
+            kib: 4,
+            deadline_ms: 20
+        })
     );
 }
 
@@ -1787,6 +1792,85 @@ async fn something_to_know_is_one_incomplete_turn_and_is_not_a_request() {
         input
             .try_context(&"x".repeat(crate::wire::MAX_NOTE_BYTES + 1))
             .is_err()
+    );
+}
+
+/// The first builder on #705 (17 Oct): a renewal is the lamp's own choice,
+/// so it waits while a request awaits its response, and for the line after
+/// it. On lamp-52e6 the unanswered renewal is asked as the eighth request in
+/// a row is closed unanswered, which is when the person may already be
+/// saying the next thing, kept back behind it.
+#[tokio::test]
+async fn a_renewal_waits_for_a_request_awaiting_its_response_and_the_one_kept_behind_it() {
+    let config = configuration(Timeouts {
+        unanswered: Some(Duration::from_millis(300)),
+        barrier: Duration::from_secs(2),
+        ..Timeouts::default()
+    })
+    .barrier_policy(BarrierPolicy::AssumeAfterQuiet)
+    .barrier_wait(crate::BarrierWait::AtCommit)
+    .successor_start(crate::SuccessorStart::AfterFirstOutput {
+        patience: Duration::from_secs(2),
+    })
+    .unwrap();
+    // Awaiting its response: answered on this connection, which then ends.
+    let (mut connection, mut server) = mock_with(config.clone()).await;
+    let first = ended_turn(&mut connection, &mut server, 1).await;
+    connection.input().renew_when_idle();
+    quiet(&mut connection).await;
+    assert_eq!(connection.state(), State::Ready);
+    send_json(&mut server, audio(1)).await;
+    send_json(&mut server, generated()).await;
+    send_json(&mut server, idle()).await;
+    assert!(
+        matches!(event(&mut connection).await, Event::Audio { lineage, .. } if lineage.request == first)
+    );
+    assert!(matches!(
+        event(&mut connection).await,
+        Event::GenerationComplete { .. }
+    ));
+    assert!(matches!(
+        event(&mut connection).await,
+        Event::TurnComplete { .. }
+    ));
+    assert!(connection.next_event().await.is_none());
+    assert_eq!(connection.state(), State::Disconnected(Error::ServerGoAway));
+
+    // Closed unanswered with the next line kept behind it: the next line
+    // goes out on this connection, and the renewal waits for its answer.
+    let (mut connection, mut server) = mock_with(config).await;
+    ended_turn(&mut connection, &mut server, 1).await;
+    let second = request(2);
+    let input = connection.input();
+    input.try_start(second).unwrap();
+    assert!(matches!(
+        event(&mut connection).await,
+        Event::InputStarted { lineage, waiting_for_barrier: true } if lineage.request == second
+    ));
+    input
+        .try_audio(second, 0, Instant::now(), &[2; 160])
+        .unwrap();
+    input.renew_when_idle();
+    // The first is closed unanswered while the person still speaks.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert_eq!(connection.state(), State::Ready);
+    input.try_end(second).unwrap();
+    loop {
+        match event(&mut connection).await {
+            Event::BarrierAssumed {
+                successor: Some(new),
+                ..
+            } if new == second => break,
+            _ => {}
+        }
+    }
+    sent(&mut server, "activityStart").await;
+    sent(&mut server, "audio").await;
+    sent(&mut server, "activityEnd").await;
+    assert_eq!(connection.state(), State::Ready);
+    send_json(&mut server, audio(9)).await;
+    assert!(
+        matches!(event(&mut connection).await, Event::Audio { lineage, pcm, .. } if lineage.request == second && pcm == [9])
     );
 }
 

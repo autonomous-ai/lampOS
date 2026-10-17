@@ -482,6 +482,126 @@ pub fn health(
     }
 }
 
+/// Why the voice waits with no audio open (#1371): between sessions it
+/// runs none, and nothing else says how it is, so `lamp-health` took a
+/// lamp muted by its privacy switch for 2 h 25 min as a voice gone quiet
+/// (lamp-06c1, 17 Oct).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Waiting {
+    /// The privacy switch is closed.
+    Switch,
+    /// The switch has not been read for [`WAIT_UNREADABLE_AFTER_US`], so
+    /// the microphones stay closed.
+    Unreadable,
+    /// Muted by the restart guard after a fault, not by choice (#960).
+    RestartGuard,
+    /// Asleep: a hand held on the head (#711).
+    Asleep,
+    /// Muted by the person.
+    Muted,
+    /// The switch reads open and nothing else holds it: a session is
+    /// about to open.
+    Opening,
+    /// The switch is not read yet: the wait's first looks, before its
+    /// worker's first reading.
+    Reading,
+}
+
+/// A switch unread for this long while the voice waits is said to be
+/// unreadable: the GPIO wait's own `UNAVAILABLE_WAIT`, and the Controls
+/// route's retry. Before it, every wait's first looks would say a fault
+/// that is not there (the reviewer and Jarvis on #1376).
+pub const WAIT_UNREADABLE_AFTER_US: u64 = 1_000_000;
+
+impl Waiting {
+    /// From the switch as the wait last read it, whether it has gone
+    /// unread for [`WAIT_UNREADABLE_AFTER_US`], whether the software mute
+    /// lets the lamp hear, and why it is set. The worst reason first: a
+    /// closed switch, or one open but not yet steady (a flap), is the
+    /// microphones off whatever the mute says; then a mute nobody chose,
+    /// then a switch that cannot be read, which a person's mute must not
+    /// hide.
+    pub fn of(
+        slide: Option<crate::privacy::PrivacyState>,
+        unreadable: bool,
+        allowed: bool,
+        asleep: bool,
+        restored: bool,
+    ) -> Self {
+        use crate::privacy::PrivacyState;
+        match slide {
+            Some(PrivacyState::Muted | PrivacyState::Stabilizing) => Self::Switch,
+            _ if restored => Self::RestartGuard,
+            _ if unreadable => Self::Unreadable,
+            _ if asleep => Self::Asleep,
+            _ if !allowed => Self::Muted,
+            Some(PrivacyState::Allowed) => Self::Opening,
+            _ => Self::Reading,
+        }
+    }
+}
+
+/// The voice's report while it waits: well, saying the microphones are
+/// off and why ([`lamp_msgs::MICROPHONES_OFF`]); a warning for a mute
+/// nobody chose and a switch that cannot be read.
+pub fn waiting_health(waiting: Waiting) -> lamp_msgs::Diagnostic {
+    use lamp_msgs::{Diagnostic, Level, MICROPHONES_OFF};
+    let (level, why) = match waiting {
+        Waiting::Switch => (Level::Ok, "(the privacy switch)"),
+        Waiting::Muted => (Level::Ok, "(muted)"),
+        Waiting::Asleep => (Level::Ok, "(asleep: a hand held on the head)"),
+        Waiting::RestartGuard => (
+            Level::Warn,
+            "(muted by the restart guard after a fault, not by choice)",
+        ),
+        Waiting::Unreadable => (Level::Warn, "until the privacy switch can be read"),
+        Waiting::Reading => (Level::Ok, "(reading the privacy switch)"),
+        Waiting::Opening => return Diagnostic::ok(SOURCE).with("link", "connecting"),
+    };
+    Diagnostic::new(level, SOURCE, &format!("{MICROPHONES_OFF} {why}")).with("link", "closed")
+}
+
+/// The voice's health while it waits (#1371), as a running voice says it:
+/// a little more often than once a second, and at once when why changes.
+pub struct WaitHealth {
+    health: Publisher,
+    reported: Option<(u64, Waiting)>,
+}
+
+impl WaitHealth {
+    /// With `LAMP_BUS=on` and a bus that can be used; else nothing, as
+    /// [`BusOut::from_environment`].
+    pub fn from_environment() -> Option<Self> {
+        if std::env::var(ENVIRONMENT).ok().as_deref() != Some("on") {
+            return None;
+        }
+        Bus::from_environment().and_then(|bus| Self::on(&bus)).ok()
+    }
+
+    pub fn on(bus: &Bus) -> io::Result<Self> {
+        Ok(Self {
+            health: bus.publisher_declared(
+                lamp_msgs::Diagnostic::TOPIC,
+                &lamp_msgs::Diagnostic::declaration(),
+                SOURCE,
+            )?,
+            reported: None,
+        })
+    }
+
+    /// Call on every look of the wait.
+    pub fn report(&mut self, now_us: u64, waiting: Waiting) {
+        if self
+            .reported
+            .is_some_and(|(at, said)| said == waiting && now_us.saturating_sub(at) < 950_000)
+        {
+            return;
+        }
+        self.reported = Some((now_us, waiting));
+        let _ = self.health.publish_json(now_us, &waiting_health(waiting));
+    }
+}
+
 /// The link as `voice/link` says it: unavailable only once it has been
 /// down for [`LINK_GRACE_US`], so a session renewing itself is not the
 /// lamp going offline. The fault's own kind is not known here: the
@@ -706,6 +826,111 @@ mod tests {
         assert_eq!(room_at(Room::Busy, now + 500, now), Told::Busy);
     }
 
+    /// #1371: the voice waiting on a closed privacy switch says so as a
+    /// well voice with its microphones off; why it waits is read switch
+    /// first.
+    #[test]
+    fn a_waiting_voice_says_why_its_microphones_are_off() {
+        use crate::privacy::PrivacyState::*;
+        // (slide, unreadable, allowed, asleep, restored)
+        let of = Waiting::of;
+        assert_eq!(of(Some(Muted), false, true, false, false), Waiting::Switch);
+        assert_eq!(of(Some(Muted), true, false, true, true), Waiting::Switch);
+        // A flap: open, not yet steady, is still the switch.
+        assert_eq!(
+            of(Some(Stabilizing), false, true, false, false),
+            Waiting::Switch
+        );
+        assert_eq!(
+            of(Some(Allowed), false, false, false, true),
+            Waiting::RestartGuard
+        );
+        assert_eq!(
+            of(Some(Allowed), false, false, true, false),
+            Waiting::Asleep
+        );
+        assert_eq!(of(None, false, false, false, false), Waiting::Muted);
+        // Unread past the grace: said, even beside a person's mute.
+        assert_eq!(
+            of(Some(Unavailable), true, true, false, false),
+            Waiting::Unreadable
+        );
+        assert_eq!(
+            of(Some(Unavailable), true, false, true, false),
+            Waiting::Unreadable
+        );
+        // Not read yet: no fault.
+        assert_eq!(
+            of(Some(Unavailable), false, true, false, false),
+            Waiting::Reading
+        );
+        assert_eq!(of(None, false, true, false, false), Waiting::Reading);
+        assert_eq!(
+            of(Some(Allowed), false, true, false, false),
+            Waiting::Opening
+        );
+        assert_eq!(waiting_health(Waiting::Reading).level, lamp_msgs::Level::Ok);
+        let switch = waiting_health(Waiting::Switch);
+        assert_eq!(switch.level, lamp_msgs::Level::Ok);
+        assert_eq!(
+            switch.message,
+            "the microphones are off (the privacy switch)"
+        );
+        assert!(switch.message.starts_with(lamp_msgs::MICROPHONES_OFF));
+        assert_eq!(
+            waiting_health(Waiting::RestartGuard).level,
+            lamp_msgs::Level::Warn
+        );
+        assert_eq!(
+            waiting_health(Waiting::Unreadable).level,
+            lamp_msgs::Level::Warn
+        );
+        assert!(waiting_health(Waiting::Opening).message.is_empty());
+    }
+
+    /// #1371: an hour in the privacy wait, looked at every 2 ms, is said
+    /// on `diagnostics` at least once a second throughout, so `lamp-health`
+    /// (stale after 5 s) never takes it for a voice gone quiet; and a new
+    /// reason is said at once.
+    #[test]
+    fn an_hour_in_the_privacy_wait_never_goes_quiet() {
+        let (bus, root) = bus("wait");
+        let mut health = WaitHealth::on(&bus).unwrap();
+        let mut said = Vec::new();
+        let hour_us = 3_600_000_000;
+        let mut now = 0;
+        while now <= hour_us {
+            let before = health.reported;
+            health.report(now, Waiting::Switch);
+            if health.reported != before {
+                said.push(now);
+            }
+            now += 2_000;
+        }
+        assert!(said.windows(2).all(|pair| pair[1] - pair[0] <= 1_000_000));
+        assert!(hour_us - said.last().unwrap() <= 1_000_000);
+        assert!(said.len() > 3_600);
+        // On the bus, as `lamp-health` reads it: the switch once, then, the
+        // switch opened, an empty report at once, not a second later.
+        let mut hears = bus
+            .subscribe_typed(
+                lamp_msgs::Diagnostic::TOPIC,
+                "test",
+                lamp_msgs::Diagnostic::TYPE,
+            )
+            .unwrap();
+        let mut health = WaitHealth::on(&bus).unwrap();
+        health.report(0, Waiting::Switch);
+        health.report(2_000, Waiting::Switch);
+        health.report(4_000, Waiting::Opening);
+        let mut heard = Vec::new();
+        while let Some(message) = hears.recv(Duration::from_millis(50)).unwrap() {
+            heard.push(message.parse::<lamp_msgs::Diagnostic>().unwrap().message);
+        }
+        assert_eq!(heard, ["the microphones are off (the privacy switch)", ""]);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
     #[test]
     fn the_link_is_unavailable_only_after_its_grace_and_published_only_when_asked() {
         assert_eq!(link_state(true, 0), VoiceLink::ready());
@@ -781,6 +1006,7 @@ mod tests {
             .unwrap();
         eyes.expires_after(Some(Duration::from_millis(300)));
         let face = |facing: Option<bool>| Face {
+            speaking: None,
             id: "f1".into(),
             xmin: 0.4,
             ymin: 0.3,

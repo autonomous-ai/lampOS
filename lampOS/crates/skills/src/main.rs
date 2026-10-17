@@ -30,7 +30,7 @@ use std::{
 const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] \
                      [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] \
                      [--tools-dir DIR] [--boot-id ID] [--clock-control PATH]\n       \
-                     [--utc-offset-minutes N]\n       \
+                     [--zone system|NAME | --utc-offset-minutes N]\n       \
                      lamp-skills test SKILL_DIR...";
 /// How often the folder is looked at for a change.
 const RELOAD_EVERY: Duration = Duration::from_secs(2);
@@ -84,6 +84,7 @@ fn main() -> ExitCode {
     let mut boot_id = None;
     let mut clock_control = None;
     let mut offset = None;
+    let mut zone = None;
     let mut sockets = Sockets {
         gaze: "/run/lampos-body/gaze.sock".into(),
         mood: "/run/lampos-body/mood.sock".into(),
@@ -98,7 +99,12 @@ fn main() -> ExitCode {
         };
         if flag == "--utc-offset-minutes" {
             // The lamp's local time east of UTC, as the Policy and
-            // Expression take it: a skill's quiet hours need it.
+            // Expression take it: a skill's quiet hours need it. Once, as
+            // memory takes it: a second would silently replace the first.
+            if offset.is_some() {
+                eprintln!("--utc-offset-minutes is given once");
+                return ExitCode::from(2);
+            }
             match value.parse::<i32>() {
                 Ok(minutes) if (-720..=840).contains(&minutes) => offset = Some(minutes),
                 _ => {
@@ -106,6 +112,19 @@ fn main() -> ExitCode {
                     return ExitCode::from(2);
                 }
             }
+            continue;
+        }
+        if flag == "--zone" {
+            // The lamp's zone, `system` for /etc/localtime (#1384). Once.
+            if zone.is_some() {
+                eprintln!("--zone is given once");
+                return ExitCode::from(2);
+            }
+            if value.is_empty() || value.chars().any(char::is_control) {
+                eprintln!("--zone is system or a time zone's name");
+                return ExitCode::from(2);
+            }
+            zone = Some(value.clone());
             continue;
         }
         let value = PathBuf::from(value);
@@ -125,6 +144,23 @@ fn main() -> ExitCode {
             }
         }
     }
+    // One or the other; a zone that can't be read ends the start, never a
+    // silent UTC, as in memory, Expression and the Policy.
+    let local_time = match (zone, offset) {
+        (Some(_), Some(_)) => {
+            eprintln!("--zone and --utc-offset-minutes are one or the other");
+            return ExitCode::from(2);
+        }
+        (Some(zone), None) => match lamp_local_time::LocalTime::zone(&zone) {
+            Ok(local) => Some(Arc::new(local)),
+            Err(error) => {
+                eprintln!("lamp-skills: {error}");
+                return ExitCode::from(2);
+            }
+        },
+        (None, Some(minutes)) => Some(Arc::new(lamp_local_time::LocalTime::Offset(minutes))),
+        (None, None) => None,
+    };
     let ask = std::env::var("LAMP_SKILLS_ASK").unwrap_or_default();
     let options = Options {
         tools,
@@ -133,7 +169,7 @@ fn main() -> ExitCode {
         body_requests: std::env::var(BODY_REQUESTS_ENVIRONMENT).is_ok_and(|value| value == "on"),
         boot_id,
         clock_control,
-        utc_offset_minutes: offset,
+        local_time,
     };
     match serve(&dir, root, &sockets, &options) {
         Ok(()) => ExitCode::SUCCESS,
@@ -246,8 +282,9 @@ struct Options {
     /// `--clock-control`: a test's socket to skip the program's clock
     /// ([`clock_control`]).
     clock_control: Option<PathBuf>,
-    /// `--utc-offset-minutes`: the lamp's local time, for quiet hours.
-    utc_offset_minutes: Option<i32>,
+    /// `--zone` or `--utc-offset-minutes`: the lamp's local time, for quiet
+    /// hours.
+    local_time: Option<Arc<lamp_local_time::LocalTime>>,
 }
 
 /// A skip of the clock asked on `--clock-control`, and where to say it is
@@ -407,7 +444,7 @@ fn serve(
         glows,
         body_requests: options.body_requests,
         ends: RefCell::new(HashMap::new()),
-        utc_offset_minutes: options.utc_offset_minutes,
+        local_time: options.local_time.clone(),
     };
     let (ask, asks) = mpsc::channel::<ToolAsk>();
     if let Some(tools) = tools {
@@ -603,8 +640,8 @@ fn observe(
     // Received now, on the program's clock: the publisher's own stamps are
     // on its clock, not this one.
     let now_us = clock::now_us();
-    if let Some(offset) = runner.utc_offset_minutes {
-        engine.clock(offset, now_us, unix_ms());
+    if let Some(local) = &runner.local_time {
+        engine.clock_in(local, now_us, unix_ms());
     }
     let made = engine.observe(
         &message.header.topic,
@@ -731,8 +768,8 @@ struct Runner {
     body_requests: bool,
     /// By skill, the run that holds something until its trigger ends.
     ends: RefCell<HashMap<String, mpsc::Sender<()>>>,
-    /// The lamp's local time east of UTC, for quiet hours.
-    utc_offset_minutes: Option<i32>,
+    /// The lamp's local time, for quiet hours.
+    local_time: Option<Arc<lamp_local_time::LocalTime>>,
 }
 
 /// Milliseconds since the Unix epoch, by the wall clock.

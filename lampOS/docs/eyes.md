@@ -732,6 +732,88 @@ same way: before 2026-10-14 it was not given while the camera was not
 permitted, so the eyes read as gone from the bus whenever they were not
 looking.
 
+### Whether a face is speaking (`LAMP_EYES_SPEAKING=on`, #720)
+
+Off unless `LAMP_EYES_SPEAKING=on` is in the eyes' unit beside `LAMP_BUS=on`.
+Off, nothing is computed and `humans/faces/tracked` is byte for byte as
+before. On, each face also has `speaking`:
+`{"state":"yes"|"no"|"unknown","score":0.03}`
+([`speaking.rs`](../crates/eyes/src/speaking.rs)). It is read from the five
+landmarks YuNet already gives: a few additions a face a look, no new model,
+and no picture is kept or leaves the lamp. Nothing reads it yet.
+
+- **The shape:** the mouth's width over the distance between the eyes.
+  Moving, coming closer, turning and tilting scale both alike. A nod
+  shortens only what runs up and down, and both of these run across, so it
+  leaves the width alone too.
+- **Not used: the mouth's drop below the eye line.** A nod shortens it by
+  cos(pitch) just as an opening jaw lengthens it. The nose tip, which stands
+  out from the face, barely moves under a nod at the tilt of someone looking
+  down at a lamp (about 25 degrees), so it can't tell the two apart.
+  Measured before this was dropped: a silent face tilted 20 degrees, nodding
+  12 degrees, read `yes` in 36 to 78% of looks (#1385 review).
+- **The score:** the root mean square of the width's change from one look
+  to the next over the last 2 s (at least 5 looks), less what the marks'
+  own jitter explains. The jitter is read from how much the eye line bends
+  from look to look (turning, nodding and coming closer leave its angle as
+  it is, and speaking does not move the eyes), averaged over about the
+  face's last ten looks. `yes` from 0.02 eye distances a look.
+- **`unknown`, never `no`,** while the face has fewer than 5 looks in the
+  window, its eyes are under 24 detector pixels apart on average, it is
+  turned more than 30 degrees or its turn was not measured (see above), or
+  the eye line bends more than 0.1 radians a look.
+- **The pace:** the eyes look every 250 ms while they follow a face, up to
+  350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
+  `--steady-rate` a still face is looked at every 500 ms, 4 or 5 looks a
+  window, and it is mostly `unknown` or wrong (below).
+
+**What it rests on, and what it can't do.** YuNet has no lip points, so
+only the corners carry the mouth: they move in as the jaw opens and in or
+out as the lips round. #730 showed why pixel differences in the mouth box
+fail (head motion and camera noise were as large as the lips at 1 m, five
+runs on lamp-52e6). Tested offline only. The synthetic faces are five
+points of a head in millimetres, seen every 250 to 350 ms at random. The
+mouth is no pure tone: syllables at 3 to 6.5 Hz, louder and softer, lips
+rounding near 3 Hz. At 60 px between the eyes and 0.3 px of jitter, each of
+these is right in at least 90% of looks: still; nodding 12 degrees; the
+same nod at a 20 degree tilt; turning 20 degrees side to side; coming
+closer while drifting; talking; talking while turning 10 degrees, nodding
+5 and drifting. A face too small, turned 55 degrees or jittering 5 px is
+`unknown`. Talking while turning 20 and nodding 10 at once reads `yes` in
+only about half its looks, since a turned head's nod tips the eye line.
+
+The eye-distance division is what keeps a face coming closer from reading
+as speaking. With a fixed divisor in the same units, that test fails (`no`
+in 0% of looks), and so does turning (47%). The still and nodding faces
+pass either way.
+
+The margin is the marks' jitter against the face's size (`cargo test -p
+lamp-eyes speaking::tests::margins -- --nocapture` asserts it; share of
+looks right, still / talking):
+
+| Looks every | Jitter | Eyes 24 px | 30 px | 40 px | 60 px |
+|---|---|---|---|---|---|
+| 250–350 ms | 0.3 px | 0.46 / 0.55 | 0.86 / 0.94 | 0.90 / 0.96 | 0.97 / 0.98 |
+| 250–350 ms | 0.5 px | 0.27 / 0.45 | 0.66 / 0.80 | 0.79 / 0.92 | 0.90 / 0.95 |
+| 250–350 ms | 1 px | 0.01 / 0.24 | 0.15 / 0.41 | 0.33 / 0.57 | 0.66 / 0.80 |
+| 450–550 ms | 0.3 px | 0.11 / 0.25 | 0.27 / 0.48 | 0.34 / 0.48 | 0.46 / 0.48 |
+| 450–550 ms | 0.5 px | 0.07 / 0.20 | 0.13 / 0.45 | 0.20 / 0.48 | 0.31 / 0.48 |
+| 450–550 ms | 1 px | 0.00 / 0.07 | 0.03 / 0.29 | 0.08 / 0.39 | 0.13 / 0.45 |
+
+A face at 1 m fills about 25 pixels of mouth in the detector's 320-wide
+picture, so its eyes are about 27 pixels apart. On this model, that is too
+small at any jitter. The signal holds only for a near face (60 px, about
+0.45 m) with steady marks, and not under `--steady-rate`. **What a lamp
+still has to show,** numbers only: YuNet's corner jitter on a still face at
+0.5 and 1 m, and the score for a person silent, talking, nodding and
+turning. If 1 m matters, the next step is a landmark model with inner-lip
+points run on the tracked face box, as #720's comments propose.
+
+Once it can be trusted, the voice's "spoken to" judging is to read it
+(`LAMP_SPOKEN_TO=on`, `crates/voice/src/attention.rs`, #829). A line heard
+while the only face turned to the lamp reads `no` is not for it, and a face
+that reads `yes` with the voice's speech is the one speaking.
+
 ## Running it
 
 ```text
