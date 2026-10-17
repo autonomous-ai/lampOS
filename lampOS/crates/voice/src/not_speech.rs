@@ -455,6 +455,71 @@ pub fn take_unclear(flags: &[String]) -> (bool, &[String]) {
     }
 }
 
+/// Where the coordinator reads a language hint for the service's transcript
+/// of what it hears (#926): on lamp-4ace on 2026-10-17 English said with a
+/// Vietnamese accent came back in Devanagari and was held as another
+/// script. Unset, the transcript has no hint, as before.
+pub const TRANSCRIPTION_ENVIRONMENT: &str = "LAMP_TRANSCRIPTION_LANGUAGE";
+/// The provider worker's flag for it, followed by the language tag.
+pub const TRANSCRIPTION_FLAG: &str = "--transcription-language";
+
+/// The provider worker's arguments for the transcript's language hint, from
+/// the environment.
+pub fn transcription_arguments_from_environment() -> Vec<String> {
+    transcription_arguments(std::env::var(TRANSCRIPTION_ENVIRONMENT).ok().as_deref())
+}
+
+fn transcription_arguments(value: Option<&str>) -> Vec<String> {
+    match value {
+        Some(tag) if language_tag(tag) => vec![TRANSCRIPTION_FLAG.to_owned(), tag.to_owned()],
+        Some(other) if !other.is_empty() => {
+            // A wrong value must not stop the voice: no hint, said once a
+            // worker.
+            eprintln!(
+                "lamp-voice: {TRANSCRIPTION_ENVIRONMENT}={other:?} is not a language tag such as en-US; the transcript has no hint"
+            );
+            Vec::new()
+        }
+        _ => Vec::new(),
+    }
+}
+
+/// A language tag exactly as `lamp_gemini` takes one, by its own rule, so
+/// a value passed on is never one the worker's session refuses (the
+/// reviewer on #1367: `en-U` passed here and stopped the worker).
+fn language_tag(value: &str) -> bool {
+    lamp_gemini::valid_language_code(value)
+}
+
+/// Take a leading [`TRANSCRIPTION_FLAG`] and its tag off a worker's flags.
+pub fn take_transcription(flags: &[String]) -> (Option<String>, &[String]) {
+    match flags {
+        [flag, tag, rest @ ..] if flag == TRANSCRIPTION_FLAG => (Some(tag.clone()), rest),
+        _ => (None, flags),
+    }
+}
+
+/// The session with the transcript's language hint, when there is one.
+pub fn with_transcription(
+    session: lamp_gemini::SessionConfig,
+    language: Option<&str>,
+) -> lamp_gemini::SessionConfig {
+    let Some(language) = language else {
+        return session;
+    };
+    // A hint the session refuses is said and dropped: the voice starts
+    // without it rather than not at all.
+    match session.clone().transcription_language(language) {
+        Ok(hinted) => hinted,
+        Err(error) => {
+            eprintln!(
+                "lamp-voice provider: transcript language {language:?} refused ({error:?}); no hint"
+            );
+            session
+        }
+    }
+}
+
 /// Why something heard in a conversation is not answered but asked again
 /// (#926): the conversation is in English, so heard mostly in another
 /// script it was misheard, not said in that language.
@@ -710,6 +775,60 @@ pub fn unclear_in_conversation(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #926: `LAMP_TRANSCRIPTION_LANGUAGE` reaches the provider worker as a
+    /// flag and its tag, and from there the session's transcript, and only
+    /// there; unset or not a tag, nothing changes.
+    #[test]
+    fn a_transcription_language_reaches_only_the_sessions_transcript() {
+        assert_eq!(
+            transcription_arguments(Some("en-US")),
+            [TRANSCRIPTION_FLAG, "en-US"]
+        );
+        for value in [
+            None,
+            Some(""),
+            Some("english please"),
+            Some("e"),
+            Some("en_US"),
+            Some("en-U"),
+            Some("en-u-ca-gregory"),
+        ] {
+            assert!(transcription_arguments(value).is_empty(), "{value:?}");
+        }
+        let flags: Vec<String> = [TRANSCRIPTION_FLAG, "vi-VN", "--next"]
+            .map(str::to_owned)
+            .to_vec();
+        assert_eq!(
+            take_transcription(&flags),
+            (Some("vi-VN".to_owned()), &flags[2..])
+        );
+        assert_eq!(take_transcription(&flags[2..]), (None, &flags[2..]));
+        let session = || {
+            lamp_gemini::SessionConfig::new(
+                "wss://proxy.example/live",
+                lamp_gemini::Credential::api_key("TEST-ONLY-NOT-A-SECRET").unwrap(),
+            )
+            .unwrap()
+        };
+        let setup = |config: &lamp_gemini::SessionConfig| -> serde_json::Value {
+            serde_json::from_str(&lamp_gemini::wire::encode_setup(config).unwrap()).unwrap()
+        };
+        let hinted = setup(&with_transcription(session(), Some("en-US")));
+        assert_eq!(
+            hinted["setup"]["inputAudioTranscription"],
+            serde_json::json!({"languageCodes": ["en-US"]})
+        );
+        assert!(
+            hinted["setup"]["generationConfig"]["speechConfig"]
+                .get("languageCode")
+                .is_none()
+        );
+        let plain = setup(&with_transcription(session(), None));
+        assert_eq!(plain, setup(&session()));
+        // A tag the session refuses is dropped, never the worker.
+        assert_eq!(setup(&with_transcription(session(), Some("en-U"))), plain);
+    }
 
     /// The first builder on #1148: a Stop, then the tap's thump taken as a
     /// request and thrown out as a sound, then the person's real question,

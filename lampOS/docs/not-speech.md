@@ -396,6 +396,22 @@ in with "No no no, tell me a joke instead." The service heard it as "हिं�
 earlier cut-in heard as "23" got "Four." A cut-in is never a sound, so the
 rule above did not hold either.
 
+With `LAMP_TRANSCRIPTION_LANGUAGE=en-US` (any language tag; the provider
+worker's `--transcription-language`), the service's transcript of what it
+hears is given that language as a hint (`inputAudioTranscription.languageCodes`),
+so English said with an accent is less often written in another script (#926:
+"tell me the fact about eagle" came back as Devanagari on lamp-4ace). Only the
+transcript: the reply's language is not set by it, though how the model
+replies under the hint is not measured yet (`transcript_probe` prints the
+reply). Unset, or not a tag `lamp_gemini` takes (said once, and no hint; a
+hint the session still refuses is said and dropped), the setup is as before
+and the voice starts. Open before it is turned on: whether the hint keeps
+accented English in Latin, and whether it lets a real mishear through. With
+the hint, a cut-in misheard as another language (05:39 on 16 Oct) may come
+back in Latin letters and pass `OTHER_SCRIPT` while the model, which answers
+from the audio, still answers in that language; those cut-ins are replayed
+too before it goes on (the reviewer on #1367).
+
 With `LAMP_OTHER_LANGUAGE=sorry` in the voice's unit (the provider worker's
 `--ask-unclear`, and only with `LAMP_SPOKEN_TO=on`'s attention rule), while a
 conversation is going on (`Thread::going_on`: the lamp said something in the

@@ -184,6 +184,9 @@ pub struct Files {
     /// number alone is asked again (`--ask-unclear`, #926). Only with
     /// `attention`.
     pub ask_unclear: bool,
+    /// The language hint for the service's transcript of what it hears
+    /// (`--transcription-language`, `LAMP_TRANSCRIPTION_LANGUAGE`, #926).
+    pub transcription_language: Option<String>,
     /// Whether the lamp's actions wait for the Policy's attention decision
     /// (`--policy-holds-actions`, `crate::policy_holds`, #800). Only with the
     /// bus.
@@ -262,6 +265,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (first_output, flags) = crate::first_output::take(flags)?;
     let (sounds_checked, flags) = crate::not_speech::take_checked(flags);
     let (ask_unclear, flags) = crate::not_speech::take_unclear(flags);
+    let (transcription_language, flags) = crate::not_speech::take_transcription(flags);
     let (policy_holds, flags) = crate::policy_holds::take(flags);
     let (staff_note, flags) = crate::staff_note::take(flags);
     let (provider_patience, flags) = crate::config::take_patience(flags);
@@ -297,12 +301,16 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         first_output,
         sounds_checked,
         ask_unclear,
+        transcription_language,
         policy_holds,
         staff_note,
         provider_patience,
     };
     Ok((continuation, sight, files, visual))
 }
+/// The eyes' known face as the voice started, before its first session:
+/// that session's person, and where the switch's count starts.
+static KNOWN_AT_START: std::sync::OnceLock<(String, Instant)> = std::sync::OnceLock::new();
 /// When the lamp last looked (a picture went into this session), and when
 /// anything was last submitted. A picture in a session's history makes
 /// every later answer about half a second slower ([eyes.md]), so once the
@@ -1048,10 +1056,30 @@ pub async fn run_with_continuation(
         provider_config.recovery_policy()
     };
     let config = continuation.apply(
-        provider_config
-            .into_session_with_camera(visual.is_some())?
-            .barrier_policy(barrier),
+        crate::not_speech::with_transcription(
+            provider_config.into_session_with_camera(visual.is_some())?,
+            files.transcription_language.as_deref(),
+        )
+        .barrier_policy(barrier),
     )?;
+    // Whose the first session is, read before it opens: the eyes' known
+    // face, when each session is one person's (the switch below). The
+    // switch's count starts from the same reading.
+    if files.tools.memory.is_some()
+        && let Some(path) = files
+            .tools
+            .who
+            .as_deref()
+            .map(crate::known_faces::known_file_of)
+    {
+        let known = crate::known_faces::known_now(&path);
+        if let Ok(mut thread) = crate::thread::THREAD.lock() {
+            thread.at_start(known.as_deref());
+        }
+        if let Some(name) = known {
+            let _ = KNOWN_AT_START.set((name, Instant::now()));
+        }
+    }
     // Each session it opens is told how the conversation went until then.
     let provider = Supervisor::new(
         crate::thread::Recalling::new(config)
@@ -1192,6 +1220,9 @@ async fn serve_with_visual<C: Connect>(
         .as_deref()
         .filter(|_| options.tools.memory.is_some());
     let mut presence = crate::known_faces::Presence::default();
+    if let Some((name, at)) = KNOWN_AT_START.get() {
+        presence.seen(Some(name.clone()), *at);
+    }
     let mut presence_read_at: Option<Instant> = None;
     // The name of the one counted at the lamp, for the name note: a face
     // kept under two names is told one, not each in turn (the reviewer on

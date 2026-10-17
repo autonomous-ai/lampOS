@@ -1141,7 +1141,7 @@ fn a_part_the_selftest_failed_is_in_the_lamps_health_until_a_run_passes() {
         (
             "storage",
             Verdict::Fail,
-            "9 SD/MMC re-tunes timed out since boot",
+            "1 I/O error on the card since boot",
         ),
         ("touch", Verdict::NotChecked, "Controls is not running"),
     ]);
@@ -1166,14 +1166,14 @@ fn a_part_the_selftest_failed_is_in_the_lamps_health_until_a_run_passes() {
         item(&health, "selftest").map(|item| (item.level, item.message.as_str())),
         Some((
             Level::Error,
-            "1 part failing: the SD card (9 SD/MMC re-tunes timed out since boot)"
+            "1 part failing: the SD card (1 I/O error on the card since boot)"
         ))
     );
     assert_eq!(
         (health.level, health.message.as_str()),
         (
             Level::Error,
-            "selftest: 1 part failing: the SD card (9 SD/MMC re-tunes timed out since boot)"
+            "selftest: 1 part failing: the SD card (1 I/O error on the card since boot)"
         )
     );
 
@@ -1204,7 +1204,7 @@ fn a_part_the_selftest_failed_is_in_the_lamps_health_until_a_run_passes() {
         (health.level, health.message.as_str()),
         (
             Level::Error,
-            "selftest: 1 part failing: the SD card (9 SD/MMC re-tunes timed out since boot)"
+            "selftest: 1 part failing: the SD card (1 I/O error on the card since boot)"
         )
     );
     let passed = selftest(&[

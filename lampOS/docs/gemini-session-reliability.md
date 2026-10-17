@@ -494,7 +494,12 @@ output.
 
 Quota, rate-limit and usage-limit refusals, and authentication, configuration
 and protocol faults, do not reconnect. Server text is never retained: a close
-reason or error body only selects a fixed category.
+reason or error body only selects a fixed category. A `Transport` failure
+keeps no cause, so the socket's own kind is said on stderr as it happens
+(`lamp-gemini: the link failed: io ConnectionReset: …`, `tls: …`,
+`protocol: …`, `http 404`, `url`): the local error's words, never the URL,
+which carries the key (#705, 17 October: lamp-4ace's 166 transport drops
+could not be told apart).
 
 Context survives only through the service's resumption handle
 (`Resumption::Retain`: initial setup unchanged, handle kept in memory, never

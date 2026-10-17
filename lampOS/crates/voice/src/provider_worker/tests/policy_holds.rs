@@ -652,3 +652,35 @@ fn provider_patience_is_read_after_the_staff_note() {
         .into();
     assert!(parse_flags(dir, &wrong).is_err());
 }
+
+/// The worker reads `--transcription-language` and its tag where the
+/// coordinator puts them, after `--ask-unclear` and before
+/// `--policy-holds-actions`, on both routes (#926, the reviewer on #1367).
+#[test]
+fn the_transcription_language_is_read_after_ask_unclear() {
+    let dir = std::path::Path::new("/run/test");
+    let flags: Vec<String> = [
+        crate::not_speech::UNCLEAR_FLAG,
+        crate::not_speech::TRANSCRIPTION_FLAG,
+        "en-US",
+        crate::policy_holds::FLAG,
+    ]
+    .map(String::from)
+    .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.ask_unclear && files.policy_holds);
+    assert_eq!(files.transcription_language.as_deref(), Some("en-US"));
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert_eq!(files.transcription_language.as_deref(), Some("en-US"));
+    let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
+    assert_eq!(files.transcription_language, None);
+    // Out of its place it is refused.
+    let wrong: Vec<String> = [
+        crate::not_speech::TRANSCRIPTION_FLAG,
+        "en-US",
+        crate::not_speech::UNCLEAR_FLAG,
+    ]
+    .map(String::from)
+    .into();
+    assert!(parse_flags(dir, &wrong).is_err());
+}

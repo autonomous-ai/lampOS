@@ -361,3 +361,23 @@ fn search_adds_the_services_own_tool_and_no_tools_are_named_without_it() {
         plain["setup"]["generationConfig"]
     );
 }
+
+/// #926: the transcript's language hint goes only in
+/// `inputAudioTranscription`, only when set, and leaves the speech language
+/// alone; the speech language leaves the transcript's empty.
+#[test]
+fn a_transcription_language_goes_only_in_the_input_transcription() {
+    let value = setup(&configuration().transcription_language("en-US").unwrap());
+    assert_eq!(
+        value["setup"]["inputAudioTranscription"],
+        json!({"languageCodes": ["en-US"]})
+    );
+    assert!(
+        value["setup"]["generationConfig"]["speechConfig"]
+            .get("languageCode")
+            .is_none()
+    );
+    let value = setup(&configuration().language_code("en-US").unwrap());
+    assert_eq!(value["setup"]["inputAudioTranscription"], json!({}));
+    assert!(configuration().transcription_language("not a tag").is_err());
+}

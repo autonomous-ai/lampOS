@@ -2536,7 +2536,7 @@ async fn send<S: AsyncRead + AsyncWrite + Unpin>(
         .map_err(transport_error)
 }
 fn transport_error(error: tungstenite::Error) -> Error {
-    match error {
+    let mapped = match &error {
         tungstenite::Error::Http(response) => match response.status().as_u16() {
             401 | 403 => Error::Authentication,
             429 => Error::RateLimited,
@@ -2549,6 +2549,27 @@ fn transport_error(error: tungstenite::Error) -> Error {
             Error::PeerClosed { code: None }
         }
         _ => Error::Transport,
+    };
+    // `Transport` keeps no cause, so it is said here (#705: lamp-4ace's 166
+    // transport drops could not be told apart).
+    if mapped == Error::Transport {
+        eprintln!("lamp-gemini: the link failed: {}", transport_cause(&error));
+    }
+    mapped
+}
+
+/// What failed under the link, by kind: never the URL, which carries the
+/// key, so a URL error and an HTTP answer are named, not quoted.
+fn transport_cause(error: &tungstenite::Error) -> String {
+    match error {
+        tungstenite::Error::Io(io) => format!("io {:?}: {io}", io.kind()),
+        tungstenite::Error::Tls(tls) => format!("tls: {tls}"),
+        tungstenite::Error::Protocol(protocol) => format!("protocol: {protocol}"),
+        tungstenite::Error::Http(response) => format!("http {}", response.status().as_u16()),
+        tungstenite::Error::Url(_) => "url".to_owned(),
+        tungstenite::Error::Utf8(_) => "utf8".to_owned(),
+        tungstenite::Error::AttackAttempt => "attack attempt".to_owned(),
+        _ => "other".to_owned(),
     }
 }
 

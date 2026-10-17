@@ -2227,3 +2227,59 @@ fn a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_ins
             .any(|line| line.contains("follows the zone"))
     );
 }
+
+/// #830: a product lamp with no link says so once and keeps going. The voice
+/// starts without one and has the offline line (`LAMP_START_OFFLINE`,
+/// `LAMP_OFFLINE_VOICE`), and health publishes `lamp/online` from its link
+/// (`--online on`). The internet probe (`--reach-probe`, `LAMP_REACH_PROBE`)
+/// is only for a lamp with the voice's second route: without it, a relay
+/// outage would read as online and a person's speech be dropped without a
+/// word (docs/offline.md, "The relay is not the internet").
+#[test]
+fn a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .1
+    };
+    let settings = |text: &str| -> Vec<String> {
+        text.lines()
+            .filter(|line| !line.trim_start().starts_with('#'))
+            .map(str::to_owned)
+            .collect()
+    };
+    let voice = settings(unit("lamp-voice.service"));
+    for line in [
+        "Environment=LAMP_START_OFFLINE=on",
+        "Environment=LAMP_OFFLINE_VOICE=on",
+    ] {
+        assert!(
+            voice.iter().any(|set| set == line),
+            "the voice lacks {line}"
+        );
+    }
+    let health = settings(unit("lamp-health.service"));
+    let start = health
+        .iter()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    let words: Vec<&str> = start.split_whitespace().collect();
+    assert!(
+        words.windows(2).any(|pair| pair == ["--online", "on"]),
+        "{start}"
+    );
+    let second_route = voice
+        .iter()
+        .any(|line| line.contains("LAMP_VOICE_SECOND_CONFIG="));
+    for (name, text) in install::PRODUCT {
+        let probes = settings(text)
+            .iter()
+            .any(|line| line.contains("LAMP_REACH_PROBE=") || line.contains("--reach-probe"));
+        assert!(
+            !probes || second_route,
+            "{name} asks the internet with no second route for the voice"
+        );
+    }
+}

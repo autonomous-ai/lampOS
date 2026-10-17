@@ -389,7 +389,10 @@ So, with the same switch (a memory and `LAMP_EYES_WHO_SOCKET`), each
 provider session is one person's:
 
 - **Who is at the lamp** is read from the known file every 500 ms
-  (`known_faces::Presence`). Someone known counts at once when nobody was.
+  (`known_faces::Presence`), and once before the first session opens, so
+  that session is theirs and the count starts from that reading (#1388:
+  opened for the room, it was renewed the moment it was ready, 4 times on
+  lamp-52e6 on 15 October). Someone known counts at once when nobody was.
   A different known name counts only once the file has given it for 10 s
   with the person at the lamp unseen (`SOMEONE_ELSE_AFTER`): on lamp-4ace
   on 16 October from 16:06 the eyes flipped the owner between two names

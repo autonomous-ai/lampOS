@@ -669,6 +669,9 @@ pub fn encode_setup(config: &SessionConfig) -> Result<String> {
             "slidingWindow": {"targetTokens": target}
         });
     }
+    if let Some(language) = &config.transcription_language {
+        setup["setup"]["inputAudioTranscription"] = json!({"languageCodes": [language]});
+    }
     if let Some(language) = &config.language_code {
         setup["setup"]["generationConfig"]["speechConfig"]["languageCode"] = json!(language);
     }

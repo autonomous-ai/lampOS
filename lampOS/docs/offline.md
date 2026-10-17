@@ -215,6 +215,14 @@ internet, not the relay, and nothing in #830 depends on the relay.
   `input_not_submitted`). So a unit
   takes `LAMP_REACH_PROBE=on` where the second route is set, or knowingly
   without it (the reviewer on #1247).
+- **What the product sets** (#830, 17 Oct): `LAMP_START_OFFLINE=on` and
+  `LAMP_OFFLINE_VOICE=on` in the voice, `--online on` in health, and no
+  probe, since it has no second route. Any link loss, the internet's or the
+  relay's, gets the offline line once and the breath; the relay's is said
+  in the internet's words, but never dropped in silence. lamp-4ace sets the
+  probe too, beside its second route. `install`'s
+  `a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence`
+  holds it: the probe only where `LAMP_VOICE_SECOND_CONFIG` is set.
 - Tests: `reach::tests` (a target answering, none answering and asked again
   only after its time, a target that never answers given up within the
   bound, the default targets never on port 53), health's

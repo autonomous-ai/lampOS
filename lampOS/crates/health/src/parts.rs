@@ -695,7 +695,11 @@ mod tests {
             &[
                 ("ring", Verdict::Fail, "red did not light"),
                 ("air", Verdict::NotFitted, "no sensor"),
-                ("storage", Verdict::Fail, "9 re-tunes timed out"),
+                (
+                    "storage",
+                    Verdict::Fail,
+                    "1 I/O error on the card since boot",
+                ),
             ],
             1_000.0,
         ));
@@ -704,7 +708,7 @@ mod tests {
         assert_eq!(item.level, Level::Error);
         assert_eq!(
             item.message,
-            "2 parts failing: the light ring (red did not light), the SD card (9 re-tunes timed out)"
+            "2 parts failing: the light ring (red did not light), the SD card (1 I/O error on the card since boot)"
         );
         assert_eq!(item.age_ms, 90_500);
         let mut tests = SelfTests::default();
@@ -738,7 +742,11 @@ mod tests {
         let mut tests = SelfTests::default();
         tests.take(&run(
             &[
-                ("storage", Verdict::Fail, "9 re-tunes timed out"),
+                (
+                    "storage",
+                    Verdict::Fail,
+                    "1 I/O error on the card since boot",
+                ),
                 ("ring", Verdict::Fail, "red did not light"),
             ],
             0.0,
@@ -752,16 +760,20 @@ mod tests {
             (item.level, item.message.as_str()),
             (
                 Level::Error,
-                "2 parts failing: the SD card (9 re-tunes timed out), the light ring (red did not light)"
+                "2 parts failing: the SD card (1 I/O error on the card since boot), the light ring (red did not light)"
             )
         );
         tests.take(&run(
-            &[("storage", Verdict::Fail, "11 re-tunes timed out")],
+            &[(
+                "storage",
+                Verdict::Fail,
+                "2 I/O errors on the card since boot",
+            )],
             200.0,
         ));
         assert_eq!(
             tests.item(200.0).unwrap().message,
-            "2 parts failing: the SD card (11 re-tunes timed out), the light ring (red did not light)"
+            "2 parts failing: the SD card (2 I/O errors on the card since boot), the light ring (red did not light)"
         );
         tests.take(&run(
             &[

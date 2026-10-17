@@ -211,27 +211,40 @@ pub struct SetupRequest {
     pub password: String,
     #[serde(default)]
     pub llm_api_key: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "text")]
     pub llm_base_url: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "text")]
     pub device_id: String,
     #[serde(default)]
     pub name: String,
     #[serde(default)]
     pub timezone: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "text")]
     pub mqtt_endpoint: String,
     /// A number from the app, a string from a link: either is taken.
     #[serde(default, deserialize_with = "port")]
     pub mqtt_port: Option<u16>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "text")]
     pub mqtt_username: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "text")]
     pub mqtt_password: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "text")]
     pub fa_channel: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "text")]
     pub fd_channel: String,
+}
+
+/// A link field as text: a string as given, a number or `true`/`false` as its
+/// digits or word, and `null` (or anything else) as empty. The backend's link
+/// never fails a setup by its shape (the reviewer on #1406): a field it cannot
+/// use leaves the link out, and `backend_link` names it.
+fn text<'de, D: serde::Deserializer<'de>>(given: D) -> Result<String, D::Error> {
+    Ok(match Value::deserialize(given)? {
+        Value::String(text) => text,
+        Value::Number(number) => number.to_string(),
+        Value::Bool(word) => word.to_string(),
+        _ => String::new(),
+    })
 }
 
 /// A port given as a number or as digits; anything else, or 0, is none.

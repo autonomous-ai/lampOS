@@ -1145,3 +1145,47 @@ fn a_link_that_cannot_be_written_never_fails_setup() {
         ]
     );
 }
+
+#[test]
+fn a_null_or_a_number_in_a_link_field_never_fails_setup() {
+    let root = Root::new();
+    let config = root.config(false);
+    for field in [
+        "llm_base_url",
+        "device_id",
+        "mqtt_endpoint",
+        "mqtt_username",
+        "mqtt_password",
+        "fa_channel",
+        "fd_channel",
+    ] {
+        let mut body = app_body();
+        body[field] = Value::Null;
+        let accepted = check(&request(body), &config).unwrap();
+        assert_eq!(accepted.ssid, "Home", "{field}: setup goes on");
+        let mut body = app_body();
+        body[field] = json!(42);
+        assert!(
+            check(&request(body), &config).is_ok(),
+            "{field} as a number"
+        );
+    }
+    // A numeric id is the id, as digits.
+    let mut body = app_body();
+    body["device_id"] = json!(42);
+    assert_eq!(
+        check(&request(body), &config)
+            .unwrap()
+            .backend
+            .unwrap()
+            .device_id,
+        "42"
+    );
+    // A null endpoint is no link at all; a null channel is a broken one.
+    let mut body = app_body();
+    body["mqtt_endpoint"] = Value::Null;
+    assert!(backend_link(&request(body)).unwrap_err().is_empty());
+    let mut body = app_body();
+    body["fd_channel"] = Value::Null;
+    assert_eq!(backend_link(&request(body)).unwrap_err(), ["fd_channel"]);
+}

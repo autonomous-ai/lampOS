@@ -179,7 +179,12 @@ that. A session is told only the exchanges of the person it was opened for,
 and the worker opens a new session between turns when that person changes
 ([memory.md](memory.md#a-session-for-each-person-764-follow-up)), so past
 those 10 s one person's conversation never reaches another's session, and someone who
-comes back within ten minutes is told theirs again. The file keeps whose
+comes back within ten minutes is told theirs again. The first session is
+for whom the eyes name as the voice starts, read before it opens: opened
+for the room, it was renewed for them the moment it was ready: 4
+`server_go_away` drops 0 s after a start on lamp-52e6 on 15 October (#705;
+`thread::tests::the_first_session_is_for_whom_the_eyes_name_at_start`).
+The file keeps whose
 each exchange is (`whose`, left out for the room's, so a thread with
 nobody known is written as before); an entry whose `whose` is not a memory
 id is not read back. Forgetting still drops every thread. With nobody ever

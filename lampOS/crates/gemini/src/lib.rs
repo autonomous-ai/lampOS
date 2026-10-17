@@ -17,6 +17,7 @@ pub use config::{
     BarrierPolicy, BarrierWait, Credential, GOOGLE_ENDPOINT, MAX_CONTEXT_TOKENS,
     MAX_OPEN_ACTIVITY_REQUESTS, MAX_RETAINED_SAMPLES, MAX_SUCCESSOR_PATIENCE, MAX_THINKING_BUDGET,
     Resumption, ResumptionHandle, SessionConfig, SuccessorStart, ThinkingLevel, Timeouts,
+    valid_language_code,
 };
 pub use recovery::{
     Attempt, Connect, Context, Dialer, Failure, FailureReason, LinkUpdate, LinkUpdateKind,

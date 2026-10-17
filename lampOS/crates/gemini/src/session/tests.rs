@@ -2429,3 +2429,16 @@ pub(super) mod stop_fence {
         review_retirement_during_audio(false).await;
     }
 }
+
+#[test]
+fn a_transport_failure_is_named_by_kind_and_never_quotes_the_url() {
+    use tokio_tungstenite::tungstenite::error::{Error as Socket, UrlError};
+    let reset = Socket::Io(std::io::Error::from(std::io::ErrorKind::ConnectionReset));
+    assert_eq!(super::transport_error(reset), Error::Transport);
+    let reset = Socket::Io(std::io::Error::from(std::io::ErrorKind::ConnectionReset));
+    assert!(super::transport_cause(&reset).starts_with("io ConnectionReset"));
+    let url = Socket::Url(UrlError::UnableToConnect(
+        "wss://relay.example/live?key=SECRET".to_owned(),
+    ));
+    assert_eq!(super::transport_cause(&url), "url");
+}

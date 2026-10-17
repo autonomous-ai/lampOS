@@ -270,6 +270,7 @@ pub struct SessionConfig {
     pub(crate) thinking_budget: Option<u32>,
     pub(crate) context_window: Option<(u32, u32)>,
     pub(crate) language_code: Option<String>,
+    pub(crate) transcription_language: Option<String>,
     pub(crate) small_pictures: bool,
     pub(crate) search: bool,
     pub(crate) tools: Vec<Tool>,
@@ -297,6 +298,7 @@ impl SessionConfig {
             thinking_budget: None,
             context_window: None,
             language_code: None,
+            transcription_language: None,
             small_pictures: false,
             search: false,
             tools: Vec::new(),
@@ -371,6 +373,17 @@ impl SessionConfig {
             return Err(Error::InvalidConfiguration);
         }
         self.language_code = Some(language_code.into());
+        Ok(self)
+    }
+    /// A language hint for the service's transcript of what it hears, sent
+    /// as `inputAudioTranscription.languageCodes`: set by the voice with
+    /// `LAMP_TRANSCRIPTION_LANGUAGE`, and by the transcript probe (#926:
+    /// English said with a Vietnamese accent transcribed in Devanagari).
+    pub fn transcription_language(mut self, language_code: &str) -> Result<Self> {
+        if !valid_language_code(language_code) {
+            return Err(Error::InvalidConfiguration);
+        }
+        self.transcription_language = Some(language_code.into());
         Ok(self)
     }
     /// Ask the service to read each picture at its low resolution, which
@@ -498,7 +511,9 @@ fn validate_thinking_level(model: &str, level: Option<ThinkingLevel>) -> Result<
     }
     Ok(())
 }
-fn valid_language_code(value: &str) -> bool {
+/// Whether `value` is a language tag this crate takes: the voice checks a
+/// switch's value with it before passing it on, so the two never differ.
+pub fn valid_language_code(value: &str) -> bool {
     // Bounded language/script/region/variant form, not a registry allowlist or
     // full BCP-47 extension/private-use parser. The provider checks support.
     if value.len() > 63 {
