@@ -2048,13 +2048,19 @@ fn wake<P: PortIo, R: Runtime>(
 /// Lower a shoulder found up with its elbow folded onto the folded
 /// shoulder count, eased at both ends at [`ARM_LOWER_SPEED`] at most, the
 /// head, the base and the elbow held at `head` and `elbow`. Every step it
-/// reads all five joints: a changed status byte, the head, the base or
-/// the elbow moving more than `Limits::tracking`, the shoulder over its
+/// reads all five joints: a changed status byte; the head, the base or
+/// the elbow over its load bound (`Limits::load`, the elbow's standing
+/// load) for `Limits::load_steps` steps, or more than `Limits::tracking`
+/// from where it was found for `Limits::tracking_steps` reads in a row (a
+/// single read off is taken as where it was found); the shoulder over its
 /// load for `Limits::load_steps` steps or farther than
 /// `Standing::TRACKING` from its goal for `Standing::TRACKING_STEPS`, or
 /// a wire that fails for half a second ends it. Once its goal is folded
 /// it waits for the shoulder to come within `Standing::FOUND_SLACK`; one
-/// that stops farther away for half a second ends it too.
+/// that stops farther away for half a second ends it too. With `watching`,
+/// as in [`wake`], each step read is a step of the run and is watched: a
+/// body already running tells systemd it is alive every step, and this
+/// takes some 22 s, over `WatchdogSec=5`.
 #[allow(clippy::too_many_arguments)]
 fn lower_shoulder<P: PortIo, R: Runtime>(
     bus: &mut Bus<'_, P, R>,
@@ -2064,6 +2070,7 @@ fn lower_shoulder<P: PortIo, R: Runtime>(
     head: [u16; 3],
     elbow: u16,
     found: [Sample; 5],
+    mut watching: Option<Watching<'_>>,
 ) -> Result<[Sample; 5], Stop> {
     let shoulder = Joint::BasePitch;
     let (from, to) = (found[shoulder.index()].position, up.folded[0]);
@@ -2072,6 +2079,10 @@ fn lower_shoulder<P: PortIo, R: Runtime>(
     let started = bus.runtime.now();
     let (mut ticks, mut done, mut misses) = (0u32, 0u32, 0u8);
     let (mut written, mut over, mut off, mut still) = (from, 0u8, 0u8, 0u8);
+    // The held joints, judged as the run judges them: steps in a row over
+    // their load bound, and off where they were found by more than
+    // `limits.tracking`.
+    let (mut held_over, mut drifted) = ([0u8; 5], [0u8; 5]);
     let mut closest = u16::MAX;
     let outcome = loop {
         ticks += 1;
@@ -2105,7 +2116,7 @@ fn lower_shoulder<P: PortIo, R: Runtime>(
             }
         };
         misses = 0;
-        report.last = Some(now);
+        let mut now = now;
         let mut surprise = None;
         for joint in Joint::ALL {
             let (was, is) = (found[joint.index()], now[joint.index()]);
@@ -2116,13 +2127,53 @@ fn lower_shoulder<P: PortIo, R: Runtime>(
                     now: is.status,
                 });
             }
-            if joint != shoulder && was.position.abs_diff(is.position) > limits.tracking {
-                surprise.get_or_insert(Stop::Drift {
+            if joint == shoulder {
+                continue;
+            }
+            // A hand pressing a held joint without moving it, as the run
+            // takes one: over its bound for `load_steps` steps.
+            let bound = COMMANDED
+                .iter()
+                .position(|held| *held == joint)
+                .map_or(up.load[1], |index| limits.load[index]);
+            let index = joint.index();
+            held_over[index] = if is.load > bound {
+                held_over[index].saturating_add(1)
+            } else {
+                0
+            };
+            if held_over[index] >= limits.load_steps.max(1) {
+                surprise.get_or_insert(Stop::Load {
                     joint: joint.id(),
-                    found: was.position,
-                    now: is.position,
+                    load: is.load,
                 });
             }
+            // Moved, for `tracking_steps` reads in a row: one read off is
+            // not a hand, and is taken as where it was found, so a hold
+            // never asks for it.
+            if was.position.abs_diff(is.position) > limits.tracking {
+                drifted[index] = drifted[index].saturating_add(1);
+                if drifted[index] >= limits.tracking_steps.max(1) {
+                    surprise.get_or_insert(Stop::Drift {
+                        joint: joint.id(),
+                        found: was.position,
+                        now: is.position,
+                    });
+                } else {
+                    now[index].position = was.position;
+                }
+            } else {
+                drifted[index] = 0;
+            }
+        }
+        report.last = Some(now);
+        if let Some((watch, glimpse)) = watching.as_mut() {
+            report.steps += 1;
+            let template = Glimpse {
+                arm_goals: [written, elbow],
+                ..*glimpse
+            };
+            watch(&glimpse_of(template, report.steps, &now, head));
         }
         let is = now[shoulder.index()];
         report.arm_peak_load[0] = report.arm_peak_load[0].max(is.load);
@@ -2325,6 +2376,27 @@ fn take_hold<P: PortIo, R: Runtime>(
         });
     }
     Ok(now)
+}
+
+/// Whether a shoulder and an elbow `found` so are to be lowered before the
+/// lamp may stand: off the way between folded and stood up, the shoulder
+/// up and the elbow folded, as a power cut leaves a standing lamp and as
+/// it slumps when let go (on lamp-52e6 on 2026-10-16 the elbow fell from
+/// 2,595 to 2,080 in the rest and the shoulder stayed at 2,650), both with
+/// torque on (`profiles`), a clear status and not hot.
+fn shoulder_to_lower(up: Standing, found: &[Sample; 5], profiles: [(u8, u8, u16, u16); 2]) -> bool {
+    let slack = Standing::FOUND_SLACK;
+    let [shoulder, elbow] = ARM.map(|joint| found[joint.index()]);
+    let (_, offs) = on_the_way(up, [shoulder.position, elbow.position]);
+    offs.iter().any(|off| *off > f32::from(slack))
+        && shoulder.position.abs_diff(up.folded[0]) > slack
+        && elbow.position.abs_diff(up.folded[1]) <= slack
+        && [shoulder, elbow]
+            .iter()
+            .zip(profiles)
+            .all(|(sample, profile)| {
+                profile.0 == 1 && sample.status == 0 && sample.temperature < Standing::TEMPERATURE
+            })
 }
 
 /// Where a shoulder and an elbow at `arm` are on the way between folded
@@ -3040,21 +3112,12 @@ fn run_on<P: PortIo, R: Runtime>(
         // and lets the elbow fall folded: woken, such a shoulder is lowered
         // onto its folded count before anything else, and the lamp may then
         // stand as it would have. Any other arm off its way stays as it is.
-        let slack = Standing::FOUND_SLACK;
-        let [shoulder, elbow] = ARM.map(|joint| found[joint.index()]);
-        let lowered = limits.wake
-            && offs.iter().any(|off| *off > f32::from(slack))
-            && shoulder.position.abs_diff(up.folded[0]) > slack
-            && elbow.position.abs_diff(up.folded[1]) <= slack
-            && (0..2).all(|index| {
-                let sample = [shoulder, elbow][index];
-                arm_profiles[index].0 == 1
-                    && sample.status == 0
-                    && sample.temperature < Standing::TEMPERATURE
-            });
-        if lowered {
+        if limits.wake && shoulder_to_lower(up, &found, arm_profiles) {
             let head = COMMANDED.map(|joint| found[joint.index()].position);
-            match lower_shoulder(bus, &mut report, &limits, up, head, elbow.position, found) {
+            let elbow = found[Joint::ElbowPitch.index()].position;
+            // Before the first step: READY=1 has not gone out, so systemd's
+            // watchdog is not armed yet (its start timeout is 90 s).
+            match lower_shoulder(bus, &mut report, &limits, up, head, elbow, found, None) {
                 Ok(now) => found = now,
                 Err(stop) => {
                     if let Some(last) = report.last {
@@ -4557,7 +4620,10 @@ fn run_on<P: PortIo, R: Runtime>(
         } else {
             still_steps.saturating_add(1)
         };
-        if goals != written || arm_goals != arm_written {
+        // A step that lets go again (a hand stopped the lamp coming up)
+        // asks nothing new of the joints first: from a stand older than
+        // the slump, the arm would be sent up into the hand.
+        if slump_again.is_none() && (goals != written || arm_goals != arm_written) {
             match bus.send_goals(goals, standing.map(|_| arm_goals)) {
                 Ok(()) => {
                     unsent = 0;
@@ -5124,10 +5190,12 @@ fn run_on<P: PortIo, R: Runtime>(
                 woke: None,
             });
             left_as_is = true;
+            // Nothing holds the arm up while it is let go.
             let template = Glimpse {
                 released: report.released.len().try_into().unwrap_or(u16::MAX),
                 limp: true,
                 hand: false,
+                stand: 0.0,
                 ..glimpse
             };
             let rest = match (again, by_hand) {
@@ -5171,7 +5239,6 @@ fn run_on<P: PortIo, R: Runtime>(
             left_as_is = false;
             commanded = COMMANDED.map(|joint| f32::from(now[joint.index()].position));
             velocity = [0.0; 3];
-            arm_written = ARM.map(|joint| now[joint.index()].position);
             if let Some(joint) = COMMANDED
                 .into_iter()
                 .find(|joint| now[joint.index()].status != 0)
@@ -5185,7 +5252,93 @@ fn run_on<P: PortIo, R: Runtime>(
             // Torque off and on may change what a servo flags: what it reads
             // now is what later reads are judged against (the wake's and,
             // below, the run's), and where the arm slumped is where it is
-            // now found.
+            // now found. A shoulder left up over an elbow that fell is
+            // lowered first, as after a power cut, so the lamp is folded
+            // and stands again the ordinary way when next asked; without
+            // that, on lamp-52e6 on 2026-10-16, it ran for good with its
+            // shoulder up and its elbow down, never stood again, and its
+            // head pushed at its folded home.
+            // A read that fails is tried again for as long as the run rides
+            // out a failing wire (half a second).
+            let mut profiles = bus.arm_profiles();
+            for _ in 1..WIRE_STEPS {
+                if profiles.is_ok() || standing.is_none() {
+                    break;
+                }
+                report.missed_reads += 1;
+                let due = bus.runtime.now() + TICK;
+                bus.sleep_until(due);
+                profiles = bus.arm_profiles();
+            }
+            let lowered = match standing {
+                Some(up) => match profiles {
+                    Ok(profiles) if shoulder_to_lower(up, &now, profiles) => {
+                        let head = COMMANDED.map(|joint| now[joint.index()].position);
+                        let elbow = now[Joint::ElbowPitch.index()].position;
+                        let glimpse = Glimpse {
+                            limp: false,
+                            ..template
+                        };
+                        lower_shoulder(
+                            bus,
+                            &mut report,
+                            &limits,
+                            up,
+                            head,
+                            elbow,
+                            now,
+                            Some((&mut watch, glimpse)),
+                        )
+                    }
+                    Ok(_) => Ok(now),
+                    Err(detail) => Err(Stop::Bus {
+                        detail: format!("taking the lamp up again: {detail}"),
+                    }),
+                },
+                None => Ok(now),
+            };
+            let now = match lowered {
+                Ok(now) => now,
+                Err(stop) => {
+                    // Stop pushing, the arm included: each goal becomes
+                    // where its joint is now.
+                    let mut hold = None;
+                    if let Some(last) = report.last {
+                        let at = |joint: Joint| last[joint.index()].position;
+                        let (head, arm) = (COMMANDED.map(at), ARM.map(at));
+                        if bus.send_goals(head, Some(arm)).is_ok() {
+                            report.goal_writes += 1;
+                            report.held_at = Some(head);
+                            arm_written = arm;
+                            hold = Some(head);
+                        }
+                    }
+                    // A hand on it while the shoulder came down: as while
+                    // the head comes up, it lets go again, and nothing new
+                    // is asked of the arm before it does (`slump_again`).
+                    // The head, the base and the elbow are held while it
+                    // comes down, so a hand that moves one of them is a
+                    // drift. Only after a hand's slump: after an overload
+                    // the same stop ends the run.
+                    if let (
+                        true,
+                        Some(at),
+                        Stop::Load { .. } | Stop::Tracking { .. } | Stop::Drift { .. },
+                    ) = (by_hand, hold, &stop)
+                    {
+                        (stand, stand_velocity, slumped) = (0.0, 0.0, true);
+                        written = at;
+                        commanded = at.map(f32::from);
+                        velocity = [0.0; 3];
+                        easing = [EASE_STEPS; 3];
+                        slump_again = Some((joint, load));
+                        continue;
+                    }
+                    left_as_is = true;
+                    break stop;
+                }
+            };
+            arm_written = ARM.map(|joint| now[joint.index()].position);
             if let Some(up) = standing {
                 let (lift, off) = on_the_way(up, arm_written);
                 match (0..2).find(|index| off[*index] > f32::from(Standing::FOUND_SLACK)) {
@@ -5222,6 +5375,9 @@ fn run_on<P: PortIo, R: Runtime>(
                     &mut watch,
                     Glimpse {
                         limp: false,
+                        stands: standing.is_some(),
+                        stand,
+                        arm_goals: arm_written,
                         ..template
                     },
                 )),
