@@ -679,3 +679,20 @@ fn with_the_measured_body_lag_the_speaking_level_still_nods_and_sways() {
         "nods {nods} sways {sways} settled {settled}"
     );
 }
+
+/// #933: the product's catalogue carries the speaking section, the same as
+/// the alive catalogue's, base sway included. Without it a lamp installed
+/// from the product never nods, sways or settles while it speaks, whatever
+/// Expression can do (it had none until 17 Oct).
+#[test]
+fn the_products_catalogue_nods_sways_and_settles_as_the_alive_one_does() {
+    let product = Catalogue::from_json(include_str!(
+        "../../../deploy/product/settings/expression.json"
+    ))
+    .unwrap();
+    let alive = Catalogue::from_json(include_str!("../alive-behaviours.json")).unwrap();
+    let speaking = product.speaking.expect("the product's catalogue speaks");
+    assert_eq!(Some(speaking), alive.speaking);
+    assert!(speaking.sway_yaw > 0.0, "the base sways between sentences");
+    assert!(speaking.sway_roll.is_none());
+}
