@@ -4291,6 +4291,17 @@ A usage limit paused me from about 10:27 to 11:40.
 - **#1334 up:** `first_output`'s open test used a 50 ms bound that failed under load. It now uses a FIFO as the program, which the writer thread waits on. Voice 1,896/0.
 - **My slip:** a scratchpad cleanup (`rm -rf $SP/gate-*`) also deleted my gate scripts, which shared the prefix. I recreated the gate as `lampos-gate.sh`, and nothing was pushed in between.
 
+## 2026-10-17, 16:44 ICT: #1334, #1338 and #1342 merged; #1340 and #1341 peer-reviewed; Sunday's two-people table
+
+A usage limit paused me briefly before 16:41.
+
+- **Merged:** #1334 at 16:02 (the first-output open test, a FIFO in place of a 50 ms bound); #1338 at 16:19 (a stop word clears `LAMP_FOLLOWS_ON`'s clock, #1278's optional P3); #1342 at 16:42 (the FIFO write bounded too, Tests' P3). No pull request of mine is open.
+- **Peer reviews:**
+  - **#1341** (Third's setup stop while the hotspot comes up): approve, one P3 (no test reaches the new arm).
+  - **#1340** (Ten's head move reads each start once the joint is still): approve, one P3 (the settling half of its test is on the real clock with about 0.6 s to spare).
+- **#828:** #1291's switch gave no help on lamp-4ace (7 of 20 against 8 of 20), so it stays off. `LAMP_SPOKEN_TO`'s own A/B runs 16:40–17:20.
+- **For Sunday:** the two-people table for `LAMP_SPOKEN_TO` is on #829. Four scenes it should hold (from 02:16, 04:58/15:39 and 06:07 on 16 Oct, and the unplayed busy-room reply), four it must not take away (calls by name, a follow-up, a reply to the lamp's news, the cut-ins), and the rule that decides.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
