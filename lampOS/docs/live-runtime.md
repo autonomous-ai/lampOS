@@ -328,7 +328,14 @@ connection and the line waiting on it (#705, 17 Oct: lamp-cb94 lost a line to
 each of its 57 `barrier_timeout` and 45 `response_timeout` drops, the latter
 after 30 s of silence). What the file sets is kept, and no no-reply wait is
 added unless it is under the response timeout. The cost is that of
-`assume_over`: the next answer's ownership is assumed, not confirmed. Without
+`assume_over`: the next answer's ownership is assumed, not confirmed. The
+response wait is also how long a response asked to stop may go on producing
+before the connection fails under either policy (`gemini/src/session.rs`
+`enforce_barrier`): 12 s with the switch, not 30. A file's own no-reply wait
+of 12 s or more keeps the 30 s response wait, and the worker says once at
+start what it took from the file and what it filled in (`provider patience:
+silent_response assume_over (filled), response 12000 ms (filled), no-reply
+8000 ms (filled)`). Without
 it such a request fails the connection at the response timeout. On lamp-4ace a
 service instructed to stay quiet for speech not meant for it sent nothing at
 all for such a request, and the ten-second timeout ended the process;
