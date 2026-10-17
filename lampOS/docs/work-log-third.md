@@ -3375,3 +3375,13 @@ wait on their owners and a lamp
   start never arms, `legacy_head` needs head pads, install holds
   `--head-touch` to the sleep mute, doc reasons). All three wait on ARM64
   and review. `cargo clean` run after #1209.
+- **2026-10-17 07:23:** merged: **#1194** (log relay, with the reviewer's child test and
+  the Linux own-file and send-first paths), **#1191** (ring resync; El's
+  lamp-06c1 check showed no regression, its real check is lamp-4ace's
+  midnight with `LAMP_STALLS=on`), **#1229** (a stepped test pins that a
+  silent privacy worker ends the loop at 50 ms, the reviewer's #1222 P3).
+  **#1209** (#1176's P3s; a reset line pressed through its first second
+  never arms, `legacy_head` without pads ignored) is green and clean, and
+  waits for El's lamp-06c1 reinstall. Peer-reviewed Tests' **#1222** (no
+  finding; stress 0 of 120 against 2 of 120). Closed **#699** (all three
+  parts merged); #711 closes with #1209.
