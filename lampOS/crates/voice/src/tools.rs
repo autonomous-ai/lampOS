@@ -556,7 +556,13 @@ pub fn answer(settings: &Settings, call: &ToolCall, request: u64, heard: bool) -
                 crate::remember::keep_out(request);
             }
             let began = std::time::Instant::now();
-            let (whom, (told, answered)) = run_call(&route, call, request, heard);
+            let (whom, (mut told, answered)) = run_call(&route, call, request, heard);
+            // The second voice puts no news on its turns, so news asked about
+            // there leaves its harness open (#1390); the key is never the
+            // model's either way.
+            if matches!(route, Route::Tasks(_)) {
+                let _ = crate::agent_tasks::take_news_key(&mut told);
+            }
             // Worded as the Live route's line, which is read on the lamp.
             eprintln!(
                 "lamp-voice second: request {request} asked for {}; {whom} {} in {} ms; the answer was sent",

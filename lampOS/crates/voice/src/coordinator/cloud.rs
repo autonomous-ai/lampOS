@@ -523,6 +523,7 @@ mod tests {
         let reply = super::super::Reply {
             reminder: None,
             say: None,
+            news: Vec::new(),
             owner: turn,
             cloud: CloudRequest::new(1).unwrap(),
             local_input_ended: false,

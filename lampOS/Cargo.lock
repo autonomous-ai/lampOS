@@ -2210,6 +2210,7 @@ dependencies = [
  "lamp-policy",
  "lamp-ring",
  "lamp-schedule",
+ "lamp-tasks",
  "lamp-turn-end-wire",
  "lamp-turn-owner",
  "lamp-voice-processes",

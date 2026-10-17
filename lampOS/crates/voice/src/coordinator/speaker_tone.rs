@@ -224,6 +224,7 @@ pub(super) fn commit_sound_turn(
         local_only: None,
         reminder: None,
         say: None,
+        news: Vec::new(),
         last_provider_audio_at_us: None,
         start: playout_start.gate(),
         need: StartNeed::default(),

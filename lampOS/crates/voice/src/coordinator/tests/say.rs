@@ -35,6 +35,8 @@ struct Test {
     sequence: u64,
     cursor: u64,
     answered: mpsc::Receiver<Answer>,
+    /// The news the last turn ended with as heard (#1390).
+    heard: Vec<String>,
 }
 
 impl Test {
@@ -109,6 +111,7 @@ impl Test {
             sequence: 0,
             cursor: 0,
             answered,
+            heard: Vec::new(),
         }
     }
 
@@ -245,6 +248,7 @@ impl Test {
             .publish_speaker_snapshot(self.snapshot)
             .unwrap();
         current.answer_say(&self.pending, self.snapshot);
+        self.heard = current.heard_news(&self.pending, self.snapshot);
         self.reply = None;
         true
     }
@@ -301,6 +305,108 @@ fn a_say_the_model_left_silent_is_dropped() {
         test.answered.try_recv(),
         Ok(Answer::Done(Outcome::Dropped("no_audio_answer".into())))
     );
+}
+
+/// The news a turn told: two tasks told together, as `tell_together` gives
+/// them, put on the turn by the news branch's own `news_on` (the reviewer
+/// on #1425: with that a no-op, no harness would ever close).
+const NEWS: [&str; 2] = ["s1:147:67", "s1:148:70"];
+fn telling_news(test: &mut Test) {
+    let told = crate::task_news::News {
+        key: NEWS[0].into(),
+        note: "(News from work you handed over.)".into(),
+        until: None,
+        progress: None,
+        finished: None,
+        also: vec![NEWS[1].into()],
+    };
+    news_on(told, &mut test.reply);
+    assert_eq!(test.reply.as_ref().unwrap().news, NEWS);
+}
+
+/// #1390, the reviewer on #1425: the news a turn told reaches the tasks
+/// part (so that its harness may be closed) only as the turn ends heard
+/// whole, on the proof a say's `spoken` takes; every key told together
+/// with it too, and not a moment before.
+#[test]
+fn news_heard_whole_is_handed_on_as_the_turn_ends() {
+    let mut test = Test::new();
+    telling_news(&mut test);
+    let chunk = test.generation(17);
+    test.provider_complete();
+    test.accept(&chunk, 240);
+    assert!(!test.finish_if_settled(), "accepted is not retired");
+    test.retire(&chunk);
+    assert!(test.finish_if_settled());
+    assert_eq!(test.heard, NEWS);
+}
+
+/// #1390, the follow-up to #1425: news the person asked about
+/// (`check_agent_task`) comes from the provider worker as `NewsAnswered`
+/// for the request it was answered in. On that turn it is handed on as the
+/// turn ends heard whole, like news told unasked; for another request, a
+/// turn already over, it is let go.
+#[test]
+fn news_answered_to_a_question_rides_on_its_own_turn() {
+    let mut test = Test::new();
+    let turn = test.reply.as_ref().unwrap().owner.turn();
+    for (request, key) in [(turn, "s1:2:4"), (turn + 1, "s1:3:5"), (turn, "s1:2:4")] {
+        observe_provider_output(
+            &mut test.cloud,
+            &mut test.reply,
+            &ProviderOutput::NewsAnswered {
+                request,
+                key: key.into(),
+            },
+        )
+        .unwrap();
+    }
+    let chunk = test.generation(17);
+    test.provider_complete();
+    test.accept(&chunk, 240);
+    test.retire(&chunk);
+    assert!(test.finish_if_settled());
+    assert_eq!(test.heard, ["s1:2:4"]);
+}
+
+/// A Stop or the person speaking over it cancels the turn: the news goes
+/// with it, never handed on, and its harness stays open.
+#[test]
+fn news_cut_short_is_never_handed_on() {
+    let mut test = Test::new();
+    telling_news(&mut test);
+    let chunk = test.generation(17);
+    test.accept(&chunk, 120);
+    cancel_reply(
+        &mut test.owner,
+        &mut test.reply,
+        &mut test.trace,
+        "user_interrupted",
+    )
+    .unwrap();
+    assert!(test.reply.is_none());
+    assert!(test.heard.is_empty());
+}
+
+/// A turn that ends with no audio, or with a gap in its playback, is no news
+/// heard. (Muting the mic takes the turn from its owner: it is cut short.)
+#[test]
+fn news_not_heard_whole_is_never_handed_on() {
+    let mut silent = Test::new();
+    telling_news(&mut silent);
+    silent.provider_complete();
+    assert!(silent.finish_if_settled());
+    assert!(silent.heard.is_empty());
+
+    let mut gap = Test::new();
+    telling_news(&mut gap);
+    let chunk = gap.generation(17);
+    gap.accept(&chunk, 240);
+    gap.retire(&chunk);
+    gap.reply.as_mut().unwrap().playback_gaps = 1;
+    gap.provider_complete();
+    assert!(gap.finish_if_settled());
+    assert!(gap.heard.is_empty());
 }
 
 /// #939, (c): with the switch, a due reminder or news waits for a skill's
