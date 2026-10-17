@@ -48,6 +48,10 @@ ProtectSystem=strict
 ReadWritePaths=/run/lampos-bus /run/lampos-actions
 ProtectHome=yes
 PrivateTmp=yes
+# No capability is needed (Fourth on #1404): the broker, the ping and the bus. Netlink is for `iw`,
+# which says the Wi-Fi's name.
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 
 [Install]
 WantedBy=lampos.target
