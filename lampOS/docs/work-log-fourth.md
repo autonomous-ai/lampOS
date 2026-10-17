@@ -4331,6 +4331,13 @@ A usage limit paused me briefly before 16:41.
 - **#828:** closed for the second voice: no cost to cut-ins on either lamp (first builder 21:16).
 - Cleaned the shared target dir at 21 GB (26.5 GiB removed).
 
+## 2026-10-17, 22:58 ICT: the app's first steps built locally; #1404 and #1406 reviewed, and a path mismatch between them
+
+- **#1396, the app** (`ecm-sds-mobile` `v3`): two local commits on `fourth/lamp-v2`, not pushed (that repo's `CLAUDE.md` asks for an explicit yes): `lamp` and `lamp-v2` kept apart, so a V2 never claims against V1's Lamp record; a V2 Online on any answered `system.info`; and no chat for V2. My first commit had opened one by making `isAutonomousOs` true for it, caught before the second. `fvm` 4.3.2 installed (no pin in the repo, so it runs Flutter 3.47.2). Against `v3`: the analyzer adds nothing to its 32 issues, and the suite gives 671 passed against 668 (three new tests; the one failure is `v3`'s own `brick` test). Waiting on the backend's `lamp-v2` number, the setup choice, Ten's Light answer, and a yes to push.
+- **#1404** (Ten's `lamp-cloud`): approved at 22:4x. Every reply matches the app's parsers, and two of Ten's questions are answered from the app's client (TLS follows the port; `device` isn't read). **Then a P2 I had missed:** it reads `/etc/lampOS/cloud/account.json`, where setup writes `/etc/lampOS/setup/backend.json` (#1401). So on a product lamp it would never start. Raised on #1404, #1406 and #705.
+- **#1406** (Third's setup link): approved, 170 passed.
+- **#1378:** ARM64 green, waiting on the product yes.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
