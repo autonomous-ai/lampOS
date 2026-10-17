@@ -4309,6 +4309,13 @@ A usage limit paused me briefly before 16:41.
 - **#1352** (Second's lone stop before the answer): P2 with a probe. "Wait, … what about tomorrow?" with a comma's pause, its words back after the person goes on: the answer is stopped and, with the loop's own cancel, the question is dropped. P3: `waited_stop` can outlive its pass.
 - **`LAMP_SPOKEN_TO`'s A/B** (the first builder, lamp-4ace): no difference in cutting in, 12 of 20 unset against 11 of 20 on.
 
+## 2026-10-17, 18:33 ICT: #1355 on both voice routes, reviewed; #1352 and #1360 approved; the release behind 52e6's cut-in drop found
+
+- **#1355:** the second voice gets the same case (`3e1df0379`, its worker reads the same thread). Twelve approved. The reviewer's 17:50 and Twelve's P3s are all in `attention.md`: the window runs from 4 s to 45 s, the #829 part needs `LAMP_SPOKEN_TO`, and what a trailing `?` misses. I had missed the reviewer's 17:50 at first. Mac gate green on the code (1,915 passed). ARM64 green on the first commit. It waits on the reviewer's merge, for Monday.
+- **#1352** re-checked at `2abd2103f`: my P2 and P3 are fixed, and my probe passes. Approved. The reviewer has since found a P1 in its new commit (a sound without echo evidence held), not mine.
+- **#1360** (Second's capture-hold rig): approved, no findings, read only (Linux-only test file). Tests' podman loop is the control.
+- **#828, the cut-in regression on lamp-52e6** (the first builder's 18:14 task, code side): the release `e4f1d32b` is `lamp-voice` at `c1b8c7591`. ARM64 run 38615783378's `lamp-voice` hashes to it. The yield rule and its thresholds are unchanged since 13 Oct, before it. The drop-ins add `LAMP_VOICE_SECOND_CONFIG`, which the release can't read. 52e6's unit sets about twenty switches, not just `busy-near`. I asked the sixth for `systemctl cat lamp-voice`, and offered to read a pair of sessions.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
