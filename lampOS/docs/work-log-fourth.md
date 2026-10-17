@@ -4279,6 +4279,18 @@ A usage limit paused me from about 10:27 to 11:40.
   - By the code, nothing with `on`. I pushed `fourth/head-without-1158` (`d029bbbc6`, not for merging) for a same-hour A/B.
   - **A correction:** I first offered a "fruitless yields" lead, then read `turn_taking.rs`: a fruitless yield is decided by the hearing, not by held answers. I took it out.
 
+## 2026-10-17, 15:46 ICT: #1291 and #1320 merged; #1158 kept; two peer reviews; a flaky test made deterministic
+
+- **#1291 merged at 15:00** (`LAMP_CUT_INS_NOT_TALK`, #828 point 1, off unless set). **#1320 merged at 15:14** (the environment test prints names only). Every pull request of mine from today is merged.
+- **#1158 decided: kept.** lamp-4ace's cross-build (the first builder, 14:47 to 15:20), head against head without #1158's rules, both with `LAMP_SPOKEN_TO=on`: 10 of 20 cut-ins each. `fourth/head-without-1158` is deleted.
+  - The gap with the switch on is the switch's own (the lamp's reply gives way less), and #1291's A/B at 16:00 is the next look.
+  - My same-voice lead didn't apply: lamp-4ace doesn't set the model.
+- **Peer reviews:**
+  - **#1319** (the Seventh's held skill across a reload): approved, with a P3 for a control test, now in and merged.
+  - **#1323** (Nine's typed name): a P2, that the name never reached the workers, which start with a cleared environment; the reviewer found it too. Re-checked at `4adb627d2` and approved, with one doc P3.
+- **#1334 up:** `first_output`'s open test used a 50 ms bound that failed under load. It now uses a FIFO as the program, which the writer thread waits on. Voice 1,896/0.
+- **My slip:** a scratchpad cleanup (`rm -rf $SP/gate-*`) also deleted my gate scripts, which shared the prefix. I recreated the gate as `lampos-gate.sh`, and nothing was pushed in between.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
