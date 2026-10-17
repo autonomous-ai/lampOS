@@ -30,7 +30,7 @@ StateDirectoryMode=0700
 # --push-wait holds Harness's own wait so a result is known within about 10 s of the agent ending (#560).
 # On lamp-75c9 (Ten, 2026-10-16): 8.3 to 10.2 s against 39 to 41 s without, about 1 point more of
 # the lamp's CPU, and one ~130 MB Node `harness wait` held while a task is watched.
-ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --harness-as-person --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
+ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --harness-as-person --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
 Restart=on-failure
 RestartSec=5s
 StandardInput=null

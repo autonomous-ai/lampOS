@@ -304,7 +304,7 @@ answered) with no question text (`answer` empty or the previous answer), and
 from `show`, and the voice says the agent is waiting on the person's computer
 rather than voicing a question it does not have.
 
-## Closing a finished harness (#1390, `serve --close-told`, off unless set)
+## Closing a finished harness (#1390, `serve --close-told`, on in the product unit)
 
 Each hand-over starts a Harness session (a Claude Code process) on the
 person's computer, and until 17 Oct nothing closed it. The office Mac had 52
