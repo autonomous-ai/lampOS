@@ -47,6 +47,17 @@ pub fn take(flags: &[String]) -> (bool, &[String]) {
     }
 }
 
+/// The trace's line for a lost line sent again (`line_resent`).
+pub fn resent_record(request: u64, session: u64, at_us: u64) -> serde_json::Value {
+    serde_json::json!({"kind":"line_resent","turn":request,"provider_session":session,"at_us":at_us,
+        "basis":"lost with its connection before any output or tool call; sent once on the next session"})
+}
+
+/// The trace's line for a lost line not sent again, and why (`resend_refused`).
+pub fn refused_record(request: u64, why: Refused, at_us: u64) -> serde_json::Value {
+    serde_json::json!({"kind":"resend_refused","turn":request,"why":why.name(),"at_us":at_us})
+}
+
 /// What is known of a failed line when the next session is ready.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Lost {
@@ -246,6 +257,19 @@ mod tests {
         open.stage = FailedStage::InputOpen;
         open.ended_us = None;
         assert_eq!(judge(&open), Ok(()));
+    }
+
+    /// The trace's two lines carry the turn and the plain why.
+    #[test]
+    fn the_trace_says_what_was_resent_and_why_one_was_not() {
+        let sent = resent_record(7, 3, 42);
+        assert_eq!(
+            (sent["kind"].as_str(), sent["turn"].as_u64()),
+            (Some("line_resent"), Some(7))
+        );
+        let refused = refused_record(7, Refused::ToolCall, 42);
+        assert_eq!(refused["kind"], "resend_refused");
+        assert_eq!(refused["why"], "a tool was called for it");
     }
 
     /// The failures a second try mends, and those it does not.

@@ -684,3 +684,23 @@ fn the_transcription_language_is_read_after_ask_unclear() {
     .into();
     assert!(parse_flags(dir, &wrong).is_err());
 }
+
+/// `--resend-lost-line` is read where the coordinator puts it, after
+/// `--policy-holds-actions`, on both routes (#705, Step B).
+#[test]
+fn resend_lost_line_is_read_after_policy_holds() {
+    let dir = std::path::Path::new("/run/test");
+    let flags: Vec<String> = [crate::policy_holds::FLAG, crate::resend::FLAG]
+        .map(String::from)
+        .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.policy_holds && files.resend_lost_line);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert!(files.resend_lost_line);
+    let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
+    assert!(!files.resend_lost_line);
+    let wrong: Vec<String> = [crate::resend::FLAG, crate::policy_holds::FLAG]
+        .map(String::from)
+        .into();
+    assert!(parse_flags(dir, &wrong).is_err());
+}
