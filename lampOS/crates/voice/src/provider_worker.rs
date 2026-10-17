@@ -636,6 +636,14 @@ pub enum ProviderOutput {
         session: u64,
         dropped: Option<String>,
     },
+    /// `check_agent_task` answered `request` with a finished task's news, and
+    /// the answer reached the model (#1390): the coordinator puts its `key` on
+    /// that turn, so the tasks part is told it was heard only once the turn
+    /// is heard whole, as news told unasked is.
+    NewsAnswered {
+        request: u64,
+        key: String,
+    },
     TurnFailed {
         request: u64,
         stage: FailedStage,
@@ -955,7 +963,8 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
             | ProviderOutput::Interrupted { request }
             | ProviderOutput::TurnComplete { request, .. }
         | ProviderOutput::Unclear { request, .. }
-        | ProviderOutput::LookAsked { request, .. } => Some(*request),
+        | ProviderOutput::LookAsked { request, .. }
+        | ProviderOutput::NewsAnswered { request, .. } => Some(*request),
         };
         request.is_none_or(|request| request > retired_through)
     });
@@ -1525,6 +1534,9 @@ async fn serve_with_visual<C: Connect>(
                         look_owed_until = Some(Instant::now() + LOOK_OWED_AT_MOST);
                     }
                     output.push_back(Outbound::Output(ProviderOutput::LookAsked { request, session, dropped }));
+                }
+                for news in desk.news_answered() {
+                    output.push_back(Outbound::Output(news));
                 }
                 // Each call answered, for the first-output record when
                 // there is one (#799); let go when there is none.
@@ -2521,6 +2533,9 @@ struct ToolDesk {
     /// worker last took them, with the call's session and why the look is
     /// dropped, if it is: the coordinator takes their look (#941).
     looks: Vec<(u64, u64, Option<String>)>,
+    /// Requests whose `check_agent_task` answer, taken by the model, held a
+    /// finished task's news, with its key, since the worker last took them.
+    news: Vec<(u64, String)>,
 }
 /// The longest a skill tool's look is owed after its answer: it begins
 /// within `LOOK_BEGINS_WITHIN` and waits `STILL_WAIT` for its still.
@@ -2574,6 +2589,9 @@ struct Asked {
     took: Duration,
     /// When the call reached the worker.
     called_us: u64,
+    /// The news key a `check_agent_task` answer held, taken out of what the
+    /// model is told (#1390).
+    news: Option<String>,
 }
 impl ToolDesk {
     fn new(settings: crate::tools::Settings) -> Self {
@@ -2596,6 +2614,7 @@ impl ToolDesk {
             held: None,
             ended: Vec::new(),
             looks: Vec::new(),
+            news: Vec::new(),
         }
     }
     /// The requests ended because they asked again for an action held,
@@ -2874,8 +2893,7 @@ impl ToolDesk {
             .name("lamp-voice-ask".into())
             .spawn(move || {
                 let started = Instant::now();
-                let (whom, (told, answered)) =
-                    crate::tools::run_call(&route, &work, request, heard);
+                let (whom, told, answered, news) = answered(&route, &work, request, heard);
                 let _ = asked.send(Asked {
                     session,
                     request,
@@ -2887,6 +2905,7 @@ impl ToolDesk {
                     answered,
                     took: started.elapsed(),
                     called_us,
+                    news,
                 });
             });
         match spawned {
@@ -3149,6 +3168,11 @@ impl ToolDesk {
                 };
                 self.looks.push((done.request, done.session.get(), dropped));
             }
+            // A finished task's news the model now has: the tasks part is
+            // told it was heard only once that turn is heard whole (#1390).
+            if taken && let Some(key) = &done.news {
+                self.news.push((done.request, key.clone()));
+            }
             self.line(
                 done.session,
                 done.request,
@@ -3193,6 +3217,31 @@ impl ToolDesk {
     fn take_looks(&mut self) -> Vec<(u64, u64, Option<String>)> {
         std::mem::take(&mut self.looks)
     }
+    /// The news answered to the model since the last take, as the
+    /// coordinator is told it (#1390).
+    fn news_answered(&mut self) -> Vec<ProviderOutput> {
+        std::mem::take(&mut self.news)
+            .into_iter()
+            .map(|(request, key)| ProviderOutput::NewsAnswered { request, key })
+            .collect()
+    }
+}
+
+/// One call run where `route` sends it, on the asking thread: who answered,
+/// what the model is told, whether that part answered, and the news key a
+/// `check_agent_task` answer held, taken out of what the model is told. Only
+/// the tasks part's own answer can carry news (#1390).
+pub(crate) fn answered(
+    route: &crate::tools::Route,
+    call: &lamp_gemini::ToolCall,
+    request: u64,
+    heard: bool,
+) -> (&'static str, serde_json::Value, bool, Option<String>) {
+    let (whom, (mut told, answered)) = crate::tools::run_call(route, call, request, heard);
+    let news = matches!(route, crate::tools::Route::Tasks(_))
+        .then(|| crate::agent_tasks::take_news_key(&mut told))
+        .flatten();
+    (whom, told, answered, news)
 }
 
 /// Control upkeep has no PCM queue or credit argument. The callback must be a
@@ -5085,6 +5134,7 @@ mod tests {
             answered,
             took: Duration::from_millis(41),
             called_us: 1_000,
+            news: None,
         };
         desk.asked.send(asked(7, "start_agent_task", true)).unwrap();
         desk.asked
@@ -5151,6 +5201,7 @@ mod tests {
             answered: true,
             took: Duration::from_millis(3),
             called_us: 1,
+            news: None,
         };
         let look = serde_json::json!({"next": "Say only \"Let me take a look.\"", "look": true});
         desk.asked.send(asked(7, look.clone(), true, true)).unwrap();
@@ -5179,6 +5230,43 @@ mod tests {
         assert!(desk.take_looks().is_empty());
     }
 
+    /// #1390: a `check_agent_task` answer holding a finished task's news
+    /// hands its key to the coordinator once the model has the answer, for
+    /// that request; one never sent, or holding no news, hands nothing. The
+    /// key itself was taken out of what the model is told before.
+    #[test]
+    fn an_answer_with_news_hands_its_key_on_once_it_is_sent() {
+        let mut desk = ToolDesk::new(crate::tools::Settings::default());
+        let asked = |request: u64, news: Option<&str>| Asked {
+            session: SessionId::new(2).unwrap(),
+            request,
+            call: lamp_gemini::ToolCall {
+                id: format!("call-{request}"),
+                name: "check_agent_task".into(),
+                args: serde_json::json!({}),
+            },
+            told: serde_json::json!({"state": "idle", "answer": "Lumi."}),
+            whom: "the tasks part",
+            skill: false,
+            heard: true,
+            answered: true,
+            took: Duration::from_millis(3),
+            called_us: 1,
+            news: news.map(str::to_owned),
+        };
+        desk.asked.send(asked(7, Some("s1:2:4"))).unwrap();
+        desk.asked.send(asked(8, Some("s1:3:5"))).unwrap();
+        desk.asked.send(asked(9, None)).unwrap();
+        desk.waiting = 3;
+        // Request 8's connection has gone: the model never had its answer.
+        desk.answer_with(|done| done.request != 8, |_, _| {});
+        assert!(matches!(
+            desk.news_answered().as_slice(),
+            [ProviderOutput::NewsAnswered { request: 7, key }] if key == "s1:2:4"
+        ));
+        assert!(desk.news_answered().is_empty());
+    }
+
     /// The reviewer on #810 (17:23): the time an answer was sent was taken
     /// after its journal line, so a journal slow to take the line (100 ms
     /// in their harness) was counted as the call's. It is taken as it is
@@ -5202,6 +5290,7 @@ mod tests {
                 answered: true,
                 took: Duration::from_millis(40),
                 called_us: 1,
+                news: None,
             })
             .unwrap();
         desk.waiting = 1;

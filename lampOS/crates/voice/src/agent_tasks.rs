@@ -1354,7 +1354,26 @@ fn check(
     if told_before {
         answered["told_before"] = json!(true);
     }
+    // The provider worker takes this out before the model is told it, and
+    // the tasks part hears the news was told once its turn is heard whole
+    // (#1390). Told before or not: one told unasked may have been cut short.
+    if settled {
+        answered[NEWS_KEY] = json!(key);
+    }
     (answered, true)
+}
+
+/// Where a `check_agent_task` answer carries the key of the finished news it
+/// gives (#1390), for the provider worker alone.
+const NEWS_KEY: &str = "news_key";
+
+/// The news key in a `check_agent_task` answer `told`, taken out, so that the
+/// model is never told it (#1390).
+pub fn take_news_key(told: &mut Value) -> Option<String> {
+    told.as_object_mut()?
+        .remove(NEWS_KEY)?
+        .as_str()
+        .map(str::to_owned)
 }
 
 /// What the model is told to do with the last look at the agent.
@@ -2153,6 +2172,20 @@ mod tests {
     /// The tasks part answering one `check`: a page with task 2, the task,
     /// and its observation 4 with `data`.
     fn checked(directory: &Path, told: &Path, state: &str, answer: &str, truncated: bool) -> Value {
+        let (place, _seen) = serving(directory, state, answer, truncated);
+        let (answered, ok) = check(&place, None, told, PEER_WAIT);
+        assert!(ok, "{answered}");
+        answered
+    }
+
+    /// [`checked`]'s tasks part, ready for one `check`: its place, and what
+    /// it was sent, held while it answers.
+    fn serving(
+        directory: &Path,
+        state: &str,
+        answer: &str,
+        truncated: bool,
+    ) -> (Place, mpsc::Receiver<Value>) {
         let _ = std::fs::remove_file(directory.join("request.sock"));
         let _ = std::fs::remove_file(directory.join("voice.sock"));
         let place = Place {
@@ -2164,7 +2197,7 @@ mod tests {
             needs: None,
             staff_note: false,
         };
-        let _seen = tasks_part(
+        let seen = tasks_part(
             directory,
             vec![
                 (
@@ -2182,9 +2215,62 @@ mod tests {
                 ),
             ],
         );
-        let (answered, ok) = check(&place, None, told, PEER_WAIT);
-        assert!(ok, "{answered}");
-        answered
+        (place, seen)
+    }
+
+    /// #1390: an answer with a finished task's news carries its key, told
+    /// before or not (a telling unasked may have been cut short), for the
+    /// provider worker to take out before the model is told; one still
+    /// working carries none.
+    #[test]
+    fn an_answer_with_finished_news_carries_its_key_for_the_worker_alone() {
+        let directory = std::env::temp_dir().join(format!("agent-news-key-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let told = directory.join("told");
+        for _ in 0..2 {
+            let mut answered = checked(&directory, &told, "idle", "Lumi, Sunny and Archie.", false);
+            assert_eq!(take_news_key(&mut answered).as_deref(), Some("s1:2:4"));
+            assert!(answered.get(NEWS_KEY).is_none(), "{answered}");
+            assert_eq!(answered["answer"], "Lumi, Sunny and Archie.");
+        }
+        let mut working = checked(&directory, &told, "working", "", false);
+        assert_eq!(take_news_key(&mut working), None);
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// The reviewer on #1427: through the real routes. The Live worker's
+    /// asking thread (`provider_worker::answered`) takes the key out of what
+    /// its model is told and keeps it; the second voice (`tools::answer`)
+    /// takes it out too, and keeps nothing.
+    #[test]
+    fn the_key_is_never_the_models_on_either_voice() {
+        let directory =
+            std::env::temp_dir().join(format!("agent-news-routes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let call = lamp_gemini::ToolCall {
+            id: "call-1".into(),
+            name: CHECK.into(),
+            args: json!({}),
+        };
+        let (place, _seen) = serving(&directory, "idle", "Lumi, Sunny and Archie.", false);
+        let route = crate::tools::Route::Tasks(place);
+        let (_, told, answered, news) = crate::provider_worker::answered(&route, &call, 1, true);
+        assert!(answered, "{told}");
+        assert_eq!(news.as_deref(), Some("s1:2:4"));
+        assert!(told.get(NEWS_KEY).is_none(), "{told}");
+        assert_eq!(told["answer"], "Lumi, Sunny and Archie.");
+
+        let (place, _seen) = serving(&directory, "idle", "Lumi, Sunny and Archie.", false);
+        let settings = crate::tools::Settings {
+            tasks: Some(place),
+            ..crate::tools::Settings::default()
+        };
+        let told = crate::tools::answer(&settings, &call, 2, true);
+        assert!(told.get(NEWS_KEY).is_none(), "{told}");
+        assert_eq!(told["answer"], "Lumi, Sunny and Archie.");
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     /// On lamp-4ace on 2026-10-15 at 08:02 the story was told unasked at
