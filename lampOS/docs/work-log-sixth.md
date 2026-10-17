@@ -5,12 +5,23 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+## 2026-10-17 — midday: #828's yields fell, maybe our code
+
+- #1264 (Second's listening gaps) on lamp-52e6: 0 self-yields in five
+  stories; the cut-ins gave 4 of 10 on, 5 of 10 off.
+- The installed release `e4f1d32b` against today's `lamp-voice`, on the same
+  lamp: release 17 of 20, today's code 16 of 30. The gap is in the short,
+  soft cut-ins. The first builder takes it as a likely regression since
+  16 Oct, and the bisect is mine.
+- #1255 (a stop is a stop) closed unmerged: Gemini's "Okay." already covers
+  it, and the fix risked cutting real questions.
+
 ## 2026-10-17 — the morning: #1226 merged, #828 on lamp-52e6
 
 - #1226 (09:04): a request going on after an early end (`continues`) keeps
   what the second voice's rule knew of the request begun just before it,
   in the same session, when the rule judged that one. Its P3 (the first
-  half read twice) is #1262.
+  half read twice) is #1262, merged at 11:42.
 - #1047 on lamp-52e6 (06:53, 07:20): the raw-mic cadence gets words back,
   but only the lamp's own story. Stop words were 0 of 6 at volume 45, and
   louder cut-ins only made Gemini yield.
