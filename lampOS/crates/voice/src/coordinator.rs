@@ -3493,7 +3493,9 @@ fn conversation_with_gate(
     // The head tap's "hm?" (#711): its sound, made once for the cycle when
     // the head is read, and when it last played, so it plays at most once
     // in 30 s.
-    let head_cue = if controls.as_ref().is_some_and(HandControls::head_touch) {
+    // Made for an empty "Sorry?" too (`LAMP_UNCLEAR_HUM=on`, #1417).
+    let unclear_hum_on = crate::head_cue::unclear_from_environment();
+    let head_cue = if controls.as_ref().is_some_and(HandControls::head_touch) || unclear_hum_on {
         let level = crate::head_cue::level_from_environment().map_err(io::Error::other)?;
         Some(crate::head_cue::hum(level))
     } else {
@@ -3605,6 +3607,9 @@ fn conversation_with_gate(
     // A turn held as unclear in a conversation, and when (#926): asked again
     // with a written turn once it is over.
     let mut asking = AskAgainState::default();
+    // The lamp's own "Sorry?" that came back empty gets its "hm?" instead
+    // (`LAMP_UNCLEAR_HUM=on`, #1417).
+    let mut unclear_hum = UnclearHum::default();
     // A due reminder's quoted words cannot authorize a later camera turn.
     // Turn IDs increase within this conversation; fence older late words too.
     let mut last_reminder_turn: Option<u64> = None;
@@ -6250,6 +6255,19 @@ fn conversation_with_gate(
             // is told what the lamp's own ears heard, once.
             let said_nothing = current.delivery_outcome() == "no_audio_answer"
                 && matches!(current.cloud.outcome, Some(RequestOutcome::Complete));
+            // The lamp's own "Sorry?" with nothing said leaves the person in
+            // silence (#1417, lamp-4ace 17 Oct 16:26): its "hm?" is owed.
+            if unclear_hum.finished(
+                turn,
+                current.delivery_outcome() == "no_audio_answer",
+                monotonic_us(),
+            ) {
+                record(
+                    trace,
+                    json!({"kind":"unclear_hum_owed","turn":turn,"at_us":monotonic_us(),
+                        "provider_outcome":current.cloud.outcome}),
+                )?;
+            }
             let sound_finished = current.notice.origin().unshown();
             if !sound_finished
                 && let Some(score) = second_look.finished(turn, said_nothing, monotonic_us())
@@ -6691,6 +6709,9 @@ fn conversation_with_gate(
                             |state| rig.publish(state),
                         )?;
                         last_publish = monotonic_us();
+                        if unclear_hum_on && let Some(current) = reply.as_ref() {
+                            unclear_hum.asked(current.owner.turn());
+                        }
                     }
                 }
             }
@@ -7071,6 +7092,68 @@ fn conversation_with_gate(
                 snapshot = now_state;
                 last_hum_us = Some(at_us);
                 last_publish = monotonic_us();
+            }
+        }
+        // The lamp's own "Sorry?" came back with nothing said (#1417): its
+        // "hm?" instead, as a creature that didn't catch you goes "hm?" and
+        // waits, once the lamp is quiet; never over someone, never late.
+        if let (Some(sound), Some(owed_us)) = (head_cue.as_ref(), unclear_hum.owed()) {
+            let at_us = monotonic_us();
+            let decided = match unclear_hum.due(reply.as_ref().map(|c| c.owner.turn()), at_us) {
+                HumDue::Drop(why) => Err(why),
+                HumDue::Now => crate::head_cue::may_hum(&crate::head_cue::Now {
+                    at_us,
+                    began_us: owed_us,
+                    allowed: snapshot.microphone_permission() == Permission::Allowed,
+                    quiet: reply.is_none()
+                        && provider_queue.is_empty()
+                        && speaker_pending.is_none()
+                        && !admission.owns_stream()
+                        && admission.idle_for_reminder()
+                        && !submission_draining
+                        && !paused
+                        && playback_mask.available(at_us),
+                    listening_ready: snapshot.listening_ready(MonoTime::from_micros(at_us)),
+                    reply_owed: look_wanted.is_some(),
+                    last_said_us: last_spoke_us,
+                    last_hum_us,
+                }),
+            };
+            match decided {
+                // Not yet quiet: tried again next pass, within the window.
+                Err("not_quiet" | "listening_not_ready") => {}
+                Err(why) => {
+                    record(
+                        trace,
+                        json!({"kind":"unclear_hum","owed_at_us":owed_us,"at_us":at_us,"plays":false,"why":why}),
+                    )?;
+                    unclear_hum.done();
+                }
+                Ok(()) => {
+                    record(
+                        trace,
+                        json!({"kind":"unclear_hum","owed_at_us":owed_us,"at_us":at_us,"plays":true}),
+                    )?;
+                    unclear_hum.done();
+                    if let Some(choreography) = choreography.as_mut() {
+                        choreography.set_unshown(false);
+                        choreography.set_listening(true);
+                    }
+                    let (now_state, _) = speaker_tone::commit_sound_turn(
+                        owner,
+                        reply,
+                        NoticeDelivery::sound(SpeechOrigin::HeadCue, sound.clone()),
+                        "unclear_hum",
+                        "the lamp's own \"Sorry?\" said nothing: nothing heard, nothing sent to the provider",
+                        0,
+                        rig.playout_start,
+                        trace,
+                        |state| rig.publish(state),
+                    )?;
+                    snapshot = now_state;
+                    last_hum_us = Some(at_us);
+                    last_publish = monotonic_us();
+                }
             }
         }
         if let Some(arrival) = arrival.as_mut() {
@@ -8196,6 +8279,72 @@ impl AskAgainState {
     /// Asked, or dropped.
     fn done(&mut self) {
         *self = Self::default();
+    }
+}
+
+/// The lamp's own "Sorry?" turn (#926), watched to its end (#1417): one that
+/// came back with nothing said owes the person the lamp's "hm?", since
+/// nothing else would follow it. Only that turn: one that was the room's
+/// talk stays silent, and one the model answered owes nothing.
+#[derive(Debug, Default)]
+struct UnclearHum {
+    /// The "Sorry?" turn in hand.
+    asked: Option<u64>,
+    /// When its empty end owed a hum.
+    owed: Option<u64>,
+}
+
+/// What becomes of an owed hum, as the loop sees it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum HumDue {
+    /// In time and nobody has spoken: it may play, if the lamp is quiet.
+    Now,
+    /// Too late, or someone spoke first.
+    Drop(&'static str),
+}
+
+/// A "hm?" later than this after the empty "Sorry?" is about nothing.
+const UNCLEAR_HUM_WITHIN_US: u64 = 2_000_000;
+
+impl UnclearHum {
+    /// The lamp asked "Sorry?" in `turn`.
+    fn asked(&mut self, turn: u64) {
+        *self = Self {
+            asked: Some(turn),
+            owed: None,
+        };
+    }
+
+    /// `turn` finished, with nothing said if `said_nothing`. Whether a hum is
+    /// owed now: only for the "Sorry?" turn, and only when it said nothing.
+    /// Any finish ends the watch: one turn is in hand at a time.
+    fn finished(&mut self, turn: u64, said_nothing: bool, at_us: u64) -> bool {
+        let owes = self.asked.take() == Some(turn) && said_nothing;
+        if owes {
+            self.owed = Some(at_us);
+        }
+        owes
+    }
+
+    fn owed(&self) -> Option<u64> {
+        self.owed
+    }
+
+    /// The owed hum at `at_us`, with `current` the turn in hand: any turn
+    /// begun since is someone speaking first.
+    fn due(&self, current: Option<u64>, at_us: u64) -> HumDue {
+        match self.owed {
+            _ if current.is_some() => HumDue::Drop("another turn began"),
+            Some(owed) if at_us.saturating_sub(owed) > UNCLEAR_HUM_WITHIN_US => {
+                HumDue::Drop("not quiet within 2 s")
+            }
+            _ => HumDue::Now,
+        }
+    }
+
+    /// Played, or dropped.
+    fn done(&mut self) {
+        self.owed = None;
     }
 }
 
