@@ -1116,13 +1116,15 @@ pub async fn run_with_continuation(
         }
     }
     // Each session it opens is told how the conversation went until then.
-    let provider = Supervisor::new(
+    let mut provider = Supervisor::new(
         crate::thread::Recalling::new(config)
             .tools(files.tools.clone())
             .name_signal(files.name_signal)
             .file(THREAD_FILE.get().cloned()),
         recovery,
     )?;
+    // A line lost before any output may be sent once more (#705, Step B).
+    provider.resend_lost_lines(files.resend_lost_line);
     let options = Options {
         reporting,
         tools: files.tools,
@@ -1212,6 +1214,7 @@ async fn serve_with_visual<C: Connect>(
     let mut intake = ProviderIntake::new(boot, monotonic_us());
     intake.handoff.tolerate_outage = typed;
     intake.handoff.wait_for_room = options.wait_for_room;
+    intake.handoff.resend = provider.resends_lost_lines();
     intake.handoff.reminders.enabled = options.tools.schedule_speak;
     // The same-voice check (#829), only beside the rule that plays only for
     // a lamp spoken to.
@@ -1429,6 +1432,13 @@ async fn serve_with_visual<C: Connect>(
                 // while no provider event is being taken.
                 service_link(&mut provider, link_clock.as_mut(), &mut link_status, |link|
                     channels.control.send(WorkerEvent::ProviderLink { link }))?;
+                // A line lost with its connection, sent once more on the
+                // next one, or its outcome now owed (#705, Step B).
+                intake.handoff.resend_upkeep(&provider, monotonic_us());
+                while let Some(gone) = intake.handoff.unresent.pop_front() {
+                    eprintln!("lamp-voice provider: request {}: its lost line is not sent again: {}", gone.request, gone.why.name());
+                    output.push_back(Outbound::Status(ProviderStatus::TurnFailed { request: gone.request, stage: gone.stage, reason: gone.fault }));
+                }
                 // The lamp's actions kept for the Policy's decision (#800),
                 // each let go if its turn was retired meanwhile.
                 desk.release(&provider, |request| intake.handoff.retired(request));
@@ -2263,6 +2273,13 @@ async fn serve_with_visual<C: Connect>(
                         if desk.declined(lineage.request)
                             || desk.quieted(lineage.request)
                             || attention.holds(lineage.request.get()) => {},
+                    // A line sent again starts once more on its new session;
+                    // the coordinator saw it start already (#705, Step B).
+                    Ok(Notice::Event(Event::InputStarted { lineage, .. }))
+                        if intake.handoff.resent_start == Some(lineage.request) =>
+                    {
+                        intake.handoff.resent_start = None;
+                    }
                     Ok(Notice::Event(event)) if reminder_origin=>forward_reminder(event, &mut output, &mut output_sequence, &mut discards)?,
                     Ok(Notice::Event(event))=>forward(event, &mut output, &mut output_sequence, &mut discards)?,
                     Ok(Notice::Unavailable {error})=>{
@@ -2283,6 +2300,13 @@ async fn serve_with_visual<C: Connect>(
                         let request = lineage.request.get();
                         if !typed {
                             return Err(io::Error::other(format!("{}; request {request} was lost at {stage:?} and is not retried", connection_ended(State::Disconnected(error)))).into());
+                        }
+                        // With `--resend-lost-line`, lost before any output it is
+                        // held to be sent once more on the next session (#705,
+                        // Step B); its outcome waits.
+                        if intake.handoff.hold_lost(lineage, stage, error, monotonic_us()) {
+                            eprintln!("lamp-voice provider: request {request} was lost at {stage:?} ({error}); its line is kept to send again once on the next session");
+                            continue;
                         }
                         // Later input for it is swallowed, not sent to a new session.
                         intake.handoff.fail(request);
@@ -3703,6 +3727,87 @@ struct InputHandoff {
     /// Drain it before receiving another command; it is never overwritten.
     undelivered: Option<u64>,
     reminders: reminder_policy::Policy,
+    /// With `--resend-lost-line` (#705, Step B): a line lost with its
+    /// connection before any output is sent once more on the next one
+    /// ([`crate::resend`]). Its input is kept as it is offered.
+    resend: bool,
+    kept: Option<Kept>,
+    /// Held lines that are not sent again after all: their outcome is
+    /// owed to the coordinator, with why.
+    unresent: VecDeque<Unresent>,
+    /// A line sent again: its second `InputStarted` is not handed on, as
+    /// the coordinator saw it start once already.
+    resent_start: Option<RequestId>,
+}
+
+/// The newest line's input, kept as it was offered so that it can be sent
+/// once more if its connection is lost before any output (#705, Step B).
+struct Kept {
+    request: RequestId,
+    generation: u64,
+    /// Its blocks in order, each with its own sequence, up to
+    /// [`crate::resend::KEEP_MOST_SAMPLES`].
+    blocks: Vec<(u64, Vec<i16>)>,
+    samples: usize,
+    overflowed: bool,
+    ended_us: Option<u64>,
+    /// A command of it was refused while its connection was down: nothing
+    /// more of it is offered until it is sent again or given up.
+    refused: bool,
+    /// Its connection was lost and it waits to be sent again.
+    lost: Option<KeptLoss>,
+    /// Sent again: the next of its kept blocks to offer, until all are.
+    replay: Option<usize>,
+    resent: bool,
+}
+
+/// Where and why a kept line's connection was lost, and when.
+#[derive(Clone, Copy)]
+struct KeptLoss {
+    session: SessionId,
+    stage: FailedStage,
+    fault: Fault,
+    at_us: u64,
+}
+
+/// A held line that is not sent again: its `TurnFailed` is owed.
+struct Unresent {
+    request: u64,
+    stage: FailedStage,
+    fault: Fault,
+    why: crate::resend::Refused,
+}
+
+impl Kept {
+    fn new(request: RequestId, generation: u64) -> Self {
+        Self {
+            request,
+            generation,
+            blocks: Vec::new(),
+            samples: 0,
+            overflowed: false,
+            ended_us: None,
+            refused: false,
+            lost: None,
+            replay: None,
+            resent: false,
+        }
+    }
+
+    fn keep(&mut self, sequence: u64, samples: &[i16]) {
+        if self.samples + samples.len() > crate::resend::KEEP_MOST_SAMPLES {
+            self.overflowed = true;
+            return;
+        }
+        self.samples += samples.len();
+        self.blocks.push((sequence, samples.to_vec()));
+    }
+
+    /// Its input waits here: held after a loss, or behind its own blocks
+    /// being sent again.
+    fn waiting(&self) -> bool {
+        self.refused || self.lost.is_some() || self.replay.is_some()
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -3866,6 +3971,205 @@ impl InputHandoff {
         })
     }
 
+    /// With `--resend-lost-line`, a command of the kept line refused because
+    /// its connection is down, or was given up, is kept and not counted a
+    /// failure: the supervisor reports how the line was lost, and it may be
+    /// sent again (#705, Step B).
+    fn keeps_through_outage(
+        &mut self,
+        request: RequestId,
+        error: Error,
+        input: &impl InputSink,
+    ) -> bool {
+        let outage = error == Error::NotConnected
+            || error == Error::Backpressure
+            || (error == Error::StaleRequest && input.belongs_to_replaced_connection(request));
+        match self.kept.as_mut() {
+            Some(kept) if self.tolerate_outage && outage && kept.request == request => {
+                kept.refused = true;
+                kept.replay = None;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// The supervisor lost `lineage`'s turn at `stage`. With
+    /// `--resend-lost-line`, a kept line lost before any output, for a
+    /// reason a second try may mend, and not already sent again, is held:
+    /// its `TurnFailed` waits for [`Self::resend_upkeep`]. Otherwise nothing
+    /// of it is kept.
+    fn hold_lost(
+        &mut self,
+        lineage: lamp_gemini::Lineage,
+        stage: Stage,
+        error: Error,
+        now_us: u64,
+    ) -> bool {
+        let Some(kept) = self
+            .kept
+            .as_mut()
+            .filter(|kept| kept.request == lineage.request)
+        else {
+            return false;
+        };
+        let fault = Fault::from(error);
+        if !self.tolerate_outage
+            || kept.resent
+            || !crate::resend::mendable(fault)
+            // Only a line that had ended: the coordinator waits for its
+            // answer. One still open when lost is abandoned by the
+            // coordinator on the link's change (`abandon_if_changed`), so
+            // sending it again needs that side too, and it fails as before.
+            || stage != Stage::AwaitingResponse
+            || kept.ended_us.is_none()
+        {
+            self.kept = None;
+            return false;
+        }
+        kept.refused = true;
+        kept.replay = None;
+        kept.lost = Some(KeptLoss {
+            session: lineage.session,
+            stage: stage.into(),
+            fault,
+            at_us: now_us,
+        });
+        true
+    }
+
+    /// A held line not sent again after all: it fails, its audio goes, and
+    /// its outcome is owed (`unresent`).
+    fn give_up(&mut self, loss: KeptLoss, why: crate::resend::Refused) {
+        let Some(kept) = self.kept.take() else {
+            return;
+        };
+        self.fail(kept.request.get());
+        self.unresent.push_back(Unresent {
+            request: kept.request.get(),
+            stage: loss.stage,
+            fault: loss.fault,
+            why,
+        });
+    }
+
+    /// Each tick, with `--resend-lost-line`: a held line is judged once a
+    /// later connection is live and has room ([`crate::resend::judge`]), and
+    /// started again on it; then its kept blocks are offered as room allows,
+    /// with the capture time of now, and its End if it had ended. Retired
+    /// meanwhile (a newer line, a cancel), it is dropped and nothing is owed.
+    /// A mute or privacy change since drops its audio at once. Not judged
+    /// within [`crate::resend::RESEND_WITHIN_US`] of its end, it fails.
+    fn resend_upkeep(&mut self, input: &impl InputSink, now_us: u64) {
+        let Some(kept) = self.kept.as_ref() else {
+            return;
+        };
+        if kept.request.get() <= self.retired_through {
+            self.kept = None;
+            return;
+        }
+        let generation_now = self.authority.map(|state| state.microphone_generation());
+        if generation_now != Some(kept.generation) {
+            match kept.lost {
+                Some(loss) => self.give_up(loss, crate::resend::Refused::OtherGeneration),
+                None => self.kept = None,
+            }
+            return;
+        }
+        if let Some(loss) = kept.lost {
+            let since = kept.ended_us.unwrap_or(loss.at_us);
+            if now_us.saturating_sub(since) > crate::resend::RESEND_WITHIN_US {
+                return self.give_up(loss, crate::resend::Refused::TooLate);
+            }
+            let Some(session) = input.live_session().filter(|live| *live != loss.session) else {
+                return;
+            };
+            if !input.has_room() {
+                return;
+            }
+            let lost = crate::resend::Lost {
+                stage: loss.stage,
+                fault: loss.fault,
+                // Lost before any output or tool call: the supervisor's
+                // stage says so, as a tool call is output there.
+                had_output: false,
+                had_tool_call: false,
+                generation: kept.generation,
+                generation_now: generation_now.unwrap_or(kept.generation),
+                samples: kept.samples,
+                overflowed: kept.overflowed,
+                ended_us: kept.ended_us,
+                ready_us: now_us,
+                resent: kept.resent,
+                newer_line: false,
+            };
+            if let Err(why) = crate::resend::judge(&lost) {
+                return self.give_up(loss, why);
+            }
+            let request = kept.request;
+            if input.resend(session, request).is_err() {
+                return self.give_up(loss, crate::resend::Refused::Stage);
+            }
+            eprintln!(
+                "lamp-voice provider: request {}: lost at {:?} ({:?}); sent again on session {} with {} blocks kept",
+                request.get(),
+                loss.stage,
+                loss.fault,
+                session.get(),
+                kept.blocks.len()
+            );
+            self.submitted = Some(SubmittedInput {
+                request,
+                session,
+                open: true,
+                captured: None,
+            });
+            if let Some(kept) = self.kept.as_mut() {
+                kept.lost = None;
+                kept.refused = false;
+                kept.resent = true;
+                kept.replay = Some(0);
+            }
+            self.resent_start = Some(request);
+        }
+        self.replay(input);
+    }
+
+    /// Offer the kept line's blocks again, in order, as room allows, then
+    /// its End if it had ended. Refused again, it is left to the
+    /// supervisor's report, and never sent a third time.
+    fn replay(&mut self, input: &impl InputSink) {
+        let Some(kept) = self.kept.as_mut() else {
+            return;
+        };
+        while let Some(next) = kept.replay {
+            if next == kept.blocks.len() {
+                kept.replay = None;
+                if kept.ended_us.is_some() {
+                    if input.end(kept.request).is_err() {
+                        kept.refused = true;
+                    } else if let Some(submitted) = self.submitted.as_mut() {
+                        submitted.open = false;
+                    }
+                }
+                return;
+            }
+            if !input.has_room() {
+                return;
+            }
+            let (sequence, samples) = &kept.blocks[next];
+            if input
+                .audio(kept.request, *sequence, Instant::now(), samples)
+                .is_err()
+            {
+                kept.refused = true;
+                kept.replay = None;
+                return;
+            }
+            kept.replay = Some(next + 1);
+        }
+    }
+
     /// The provider will not serve this request. Nothing further of it is
     /// submitted, and it is never treated as open again.
     fn fail(&mut self, request: u64) {
@@ -3957,6 +4261,7 @@ impl InputHandoff {
         if !matches!(command, ProviderInput::Audio { .. }) {
             SUBMITTED_AT_US.store(now_us, std::sync::atomic::Ordering::Relaxed);
         }
+        let generation = command.privacy_generation();
         let request = RequestId::new(command.request())?;
         if request.get() <= self.retired_through.max(self.failed_through) {
             // Old PCM retains its old identity and is discarded without reaching
@@ -4043,6 +4348,11 @@ impl InputHandoff {
                     captured: None,
                 });
                 self.cut_off = continues_cut_off.then_some(request);
+                // Kept as it is offered, to be sent again once if its
+                // connection is lost before any output (#705, Step B).
+                if self.resend {
+                    self.kept = Some(Kept::new(request, generation));
+                }
                 self.after_stop = after_stop.then_some(request);
                 self.follows_on = follows_on.then_some(request);
             }
@@ -4064,6 +4374,14 @@ impl InputHandoff {
                     && read_completed_at_us < last_us
                 {
                     return Err(io::Error::other("capture time went backwards").into());
+                }
+                // Kept as it is offered (#705, Step B). Held after a loss,
+                // or behind its own blocks being sent again, it waits here.
+                if let Some(kept) = self.kept.as_mut().filter(|kept| kept.request == request) {
+                    kept.keep(sequence, &samples);
+                    if kept.waiting() {
+                        return Ok(());
+                    }
                 }
                 let age = now_us
                     .checked_sub(read_completed_at_us)
@@ -4090,6 +4408,9 @@ impl InputHandoff {
                     submitted.captured = Some((read_completed_at_us, captured));
                 }
                 if let Err(error) = input.audio(request, sequence, captured, &samples) {
+                    if self.keeps_through_outage(request, error, input) {
+                        return Ok(());
+                    }
                     return self.refused(request, error, input);
                 }
                 if let Some(voices) = self.voices.as_mut() {
@@ -4117,7 +4438,20 @@ impl InputHandoff {
                 if self.follows_on.take() == Some(request) && !sound {
                     self.tell_follows_on(request, input);
                 }
-                if let Err(error) = input.end(request) {
+                // Held after a loss, or behind its own blocks being sent
+                // again, its End is kept too (#705, Step B).
+                let waiting = self
+                    .kept
+                    .as_mut()
+                    .filter(|kept| kept.request == request)
+                    .is_some_and(|kept| {
+                        kept.ended_us = Some(now_us);
+                        kept.waiting()
+                    });
+                if !waiting
+                    && let Err(error) = input.end(request)
+                    && !self.keeps_through_outage(request, error, input)
+                {
                     return self.refused(request, error, input);
                 }
                 if let Some(voices) = self.voices.as_mut() {
@@ -4337,6 +4671,20 @@ trait InputSink {
     fn has_room_for(&self, _commands: usize) -> bool {
         true
     }
+    /// The connection that is live, if any. A sink with no connection to
+    /// tell has none.
+    fn live_session(&self) -> Option<SessionId> {
+        None
+    }
+    /// Start a request lost with its connection once more on `session`
+    /// (#705, Step B). A sink that keeps nothing to send again refuses.
+    fn resend(
+        &self,
+        _session: SessionId,
+        _request: RequestId,
+    ) -> std::result::Result<(), StartRefusal> {
+        Err(StartRefusal::NotConnected)
+    }
 }
 
 /// What the model is told beside a request that was only the lamp's name,
@@ -4463,6 +4811,16 @@ impl<C: Connect> InputSink for Supervisor<C> {
     }
     fn has_room_for(&self, commands: usize) -> bool {
         self.input_has_room_for(commands)
+    }
+    fn live_session(&self) -> Option<SessionId> {
+        Supervisor::live_session(self)
+    }
+    fn resend(
+        &self,
+        session: SessionId,
+        request: RequestId,
+    ) -> std::result::Result<(), StartRefusal> {
+        self.try_resend_for_session(session, request)
     }
 }
 
@@ -6805,6 +7163,20 @@ mod tests {
             )
         }
 
+        /// Typed, with `--resend-lost-line` (#705, Step B).
+        fn start_resending() -> Self {
+            Self::start_supervised(
+                quick_policy(),
+                Options::reporting(Reporting::Typed),
+                BARRIER,
+                false,
+                Continuation::Off,
+                lamp_gemini::MAX_WIRE_BYTES * 2,
+                |config| config,
+                true,
+            )
+        }
+
         fn start_configured(
             policy: RecoveryPolicy,
             options: Options,
@@ -6813,6 +7185,29 @@ mod tests {
             continuation: Continuation,
             capacity: usize,
             configure: impl FnOnce(SessionConfig) -> SessionConfig,
+        ) -> Self {
+            Self::start_supervised(
+                policy,
+                options,
+                barrier,
+                camera,
+                continuation,
+                capacity,
+                configure,
+                false,
+            )
+        }
+
+        #[allow(clippy::too_many_arguments)]
+        fn start_supervised(
+            policy: RecoveryPolicy,
+            options: Options,
+            barrier: BarrierPolicy,
+            camera: bool,
+            continuation: Continuation,
+            capacity: usize,
+            configure: impl FnOnce(SessionConfig) -> SessionConfig,
+            resend: bool,
         ) -> Self {
             let (directory, parent, worker) = intake_channels();
             let boot = BootId::new([9; 16]).unwrap();
@@ -6840,7 +7235,8 @@ mod tests {
                 .unwrap();
             let (dialer, dials) =
                 lamp_gemini::testing::connector_with_capacity(configure(config), capacity);
-            let provider = Supervisor::new(dialer, policy).unwrap();
+            let mut provider = Supervisor::new(dialer, policy).unwrap();
+            provider.resend_lost_lines(resend);
             let visual = if camera {
                 owner
                     .set_camera_permission(real_time(), Permission::Allowed)
@@ -10709,6 +11105,118 @@ mod tests {
             "reason":{"category":"transport"},"detail":"x"}))
             .is_err()
         );
+    }
+
+    /// What the worker hands on once a line is lost after its End, before
+    /// any answer, until it is answered or fails: the statuses by name, the
+    /// answer's audio by its request, and the connection that came next.
+    async fn after_a_lost_line(
+        rig: &mut LiveRig,
+        lost: u64,
+        lost_at: FailedStage,
+    ) -> (Vec<&'static str>, Option<Dial>) {
+        let mut seen = Vec::new();
+        let mut redial: Option<Dial> = None;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !seen.contains(&"turn_failed") && !seen.contains(&"answered") {
+            assert!(Instant::now() < deadline, "{seen:?}");
+            if redial.is_none()
+                && let Ok(mut attempt) = rig.dials.try_recv()
+            {
+                assert!(
+                    rig.service_message(&mut attempt)
+                        .await
+                        .get("setup")
+                        .is_some()
+                );
+                attempt.service.send(json!({"setupComplete": {}})).await;
+                redial = Some(attempt);
+            }
+            if let Some(dial) = redial.as_mut()
+                && let Some(message) = dial.service.try_receive(Duration::from_millis(1)).await
+            {
+                let input = &message["realtimeInput"];
+                for field in ["activityStart", "audio", "activityEnd"] {
+                    if input.get(field).is_some() {
+                        seen.push(field);
+                    }
+                }
+                // Its End there: the service answers it.
+                if input.get("activityEnd").is_some() {
+                    dial.service.send(provider_audio(7, 480)).await;
+                }
+            }
+            rig.publish();
+            match rig.take() {
+                Some(Wire::Output(ProviderOutput::Audio { request, .. })) => {
+                    assert_eq!(request, lost);
+                    seen.push("answered");
+                }
+                Some(Wire::Status(ProviderStatus::Unavailable { .. })) => seen.push("unavailable"),
+                Some(Wire::Status(ProviderStatus::Recovered { .. })) => seen.push("recovered"),
+                Some(Wire::Status(ProviderStatus::TurnFailed { request, stage, .. })) => {
+                    assert_eq!((request, stage), (lost, lost_at));
+                    seen.push("turn_failed");
+                }
+                Some(Wire::Output(ProviderOutput::Started { .. })) => seen.push("started"),
+                Some(other) => panic!("unexpected: {other:?}"),
+                None => tokio::time::sleep(Duration::from_millis(2)).await,
+            }
+        }
+        (seen, redial)
+    }
+
+    /// #705, Step B: with `--resend-lost-line`, a line lost with its
+    /// connection after its End, before any answer, is held, not failed.
+    /// On the next session it is started again, its kept audio and End
+    /// are sent there, and its answer comes as that same request's. The
+    /// coordinator never sees it fail. Without the switch it fails, as
+    /// before, and nothing of it reaches the next session.
+    #[tokio::test]
+    async fn a_line_lost_before_its_answer_is_sent_again_on_the_next_session_with_the_switch() {
+        let mut rig = LiveRig::start_resending();
+        let mut dial = rig.ready().await;
+        dial.service.send(resumable()).await;
+        let lost = rig.speak(&mut dial, false, true).await;
+        dial.service.close(1011, "internal").await;
+        let (seen, _) = after_a_lost_line(&mut rig, lost, FailedStage::AwaitingResponse).await;
+        assert!(!seen.contains(&"turn_failed"), "{seen:?}");
+        // The coordinator saw it start once, before it was lost.
+        assert!(!seen.contains(&"started"), "{seen:?}");
+        let at = |what| {
+            seen.iter()
+                .position(|seen| *seen == what)
+                .unwrap_or_else(|| panic!("no {what}: {seen:?}"))
+        };
+        assert!(
+            at("activityStart") < at("audio")
+                && at("audio") < at("activityEnd")
+                && at("activityEnd") < at("answered"),
+            "{seen:?}"
+        );
+        rig.stop().await;
+
+        let mut rig = LiveRig::start_with(quick_policy(), Options::reporting(Reporting::Typed));
+        let mut dial = rig.ready().await;
+        dial.service.send(resumable()).await;
+        let lost = rig.speak(&mut dial, false, true).await;
+        dial.service.close(1011, "internal").await;
+        let (seen, _) = after_a_lost_line(&mut rig, lost, FailedStage::AwaitingResponse).await;
+        assert!(seen.contains(&"turn_failed"), "{seen:?}");
+        assert!(!seen.contains(&"activityStart"), "{seen:?}");
+        rig.stop().await;
+
+        // With the switch, a line still open when lost fails as before: the
+        // coordinator gives its input up on the link's change.
+        let mut rig = LiveRig::start_resending();
+        let mut dial = rig.ready().await;
+        dial.service.send(resumable()).await;
+        let lost = rig.speak(&mut dial, false, false).await;
+        dial.service.close(1011, "internal").await;
+        let (seen, _) = after_a_lost_line(&mut rig, lost, FailedStage::InputOpen).await;
+        assert!(seen.contains(&"turn_failed"), "{seen:?}");
+        assert!(!seen.contains(&"activityStart"), "{seen:?}");
+        rig.stop().await;
     }
 
     #[tokio::test]
