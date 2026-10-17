@@ -1034,9 +1034,12 @@ pub async fn run_with_continuation(
     if let Some(place) = &files.tools.tasks {
         crate::agent_tasks::start(place);
     }
-    let mut provider_config = ProviderConfig::load(config_path)?;
-    if files.provider_patience {
-        provider_config = provider_config.with_patience();
+    let (provider_config, patience) =
+        ProviderConfig::load_with_patience(config_path, files.provider_patience)?;
+    // What came from the file and what was filled in, so a lamp shows it
+    // without its provider file being opened (the reviewer on #1394).
+    if let Some(line) = patience {
+        eprintln!("lamp-voice provider: {line}");
     }
     let barrier = provider_config.barrier_policy();
     let recovery = if files.keep_link {

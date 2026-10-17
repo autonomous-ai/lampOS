@@ -222,17 +222,62 @@ impl ProviderConfig {
     /// a response asked to stop and silent is taken as over
     /// (`assume_over`), a request with no output for 8 s ends as unanswered
     /// on the same connection, and the first output is waited for 12 s, not
-    /// 30. On lamp-4ace no first output, audio or tool call, of 2,693 took
-    /// more than 4 s. What the file sets is kept; a no-reply wait not under
-    /// its response timeout is not added.
-    pub fn with_patience(mut self) -> Self {
+    /// 30. On lamp-cb94, whose file has no no-reply wait to cut it short, all
+    /// 313 first outputs (260 audio, 47 tool calls, 6 transcripts) came
+    /// within 2.41 s of the line's end; the 45 that had none had none in
+    /// 30 s either. What the file sets is kept, and nothing is filled in that
+    /// would break it: a file's own no-reply wait of 12 s or more keeps the
+    /// 30 s response wait, and no no-reply wait is added unless it is under
+    /// the response wait (the reviewer and Jarvis on #1394). Returns the
+    /// configuration and one line for the journal saying what came from
+    /// where. The result is checked again by the file's own rules.
+    pub fn with_patience(mut self) -> io::Result<(Self, String)> {
+        let silent_filled = self.silent_response.is_none();
         self.silent_response
             .get_or_insert(SilentResponse::AssumeOver);
-        let response = *self.response_timeout_ms.get_or_insert(PATIENT_RESPONSE_MS);
-        if self.no_reply_after_ms.is_none() && PATIENT_NO_REPLY_MS < response {
+        let response_filled = self.response_timeout_ms.is_none()
+            && self
+                .no_reply_after_ms
+                .is_none_or(|no_reply| no_reply < PATIENT_RESPONSE_MS);
+        if response_filled {
+            self.response_timeout_ms = Some(PATIENT_RESPONSE_MS);
+        }
+        let response = self
+            .response_timeout_ms
+            .map_or(Timeouts::default().response.as_millis(), u128::from);
+        let no_reply_filled =
+            self.no_reply_after_ms.is_none() && u128::from(PATIENT_NO_REPLY_MS) < response;
+        if no_reply_filled {
             self.no_reply_after_ms = Some(PATIENT_NO_REPLY_MS);
         }
-        self
+        let from = |filled: bool| if filled { "filled" } else { "file" };
+        let silent = match self.silent_response {
+            Some(SilentResponse::AssumeOver) => "assume_over",
+            _ => "fail",
+        };
+        let response_said = match self.response_timeout_ms {
+            Some(ms) => format!("response {ms} ms ({})", from(response_filled)),
+            None => format!("response {response} ms (default)"),
+        };
+        let no_reply_said = match self.no_reply_after_ms {
+            Some(ms) => format!("no-reply {ms} ms ({})", from(no_reply_filled)),
+            None => "no-reply none".to_owned(),
+        };
+        let line = format!(
+            "provider patience: silent_response {silent} ({}), {response_said}, {no_reply_said}",
+            from(silent_filled)
+        );
+        Ok((self.checked()?, line))
+    }
+    /// The private provider file, with [`Self::with_patience`] when
+    /// `patience` (the worker's `--provider-patience`), and its journal line.
+    pub fn load_with_patience(path: &Path, patience: bool) -> io::Result<(Self, Option<String>)> {
+        let config = Self::load(path)?;
+        if !patience {
+            return Ok((config, None));
+        }
+        let (config, line) = config.with_patience()?;
+        Ok((config, Some(line)))
     }
     /// What a lost connection is replaced with. A configuration that opens a
     /// new conversation on every reconnect never holds a handle, so requiring
@@ -440,10 +485,21 @@ mod tests {
         assert_eq!(take_patience(&flags), (true, &flags[1..]));
         assert_eq!(take_patience(&flags[1..]), (false, &flags[1..]));
 
-        let patient = parsed("").unwrap().with_patience();
-        assert_eq!(patient.barrier_policy(), BarrierPolicy::AssumeAfterQuiet);
-        assert_eq!(patient.response_timeout_ms, Some(PATIENT_RESPONSE_MS));
-        assert_eq!(patient.no_reply_after_ms, Some(PATIENT_NO_REPLY_MS));
+        let patient = |extra: &str| {
+            ProviderConfig {
+                credential_file: "/run/credential".into(),
+                ..parsed(extra).unwrap()
+            }
+            .with_patience()
+        };
+        let (empty, line) = patient("").unwrap();
+        assert_eq!(empty.barrier_policy(), BarrierPolicy::AssumeAfterQuiet);
+        assert_eq!(empty.response_timeout_ms, Some(PATIENT_RESPONSE_MS));
+        assert_eq!(empty.no_reply_after_ms, Some(PATIENT_NO_REPLY_MS));
+        assert_eq!(
+            line,
+            "provider patience: silent_response assume_over (filled), response 12000 ms (filled), no-reply 8000 ms (filled)"
+        );
         // Without it, as before.
         let plain = parsed("").unwrap();
         assert_eq!(plain.barrier_policy(), BarrierPolicy::Require);
@@ -452,34 +508,75 @@ mod tests {
             (None, None)
         );
         // What the file sets is kept.
-        let set = parsed(
+        let (set, line) = patient(
             r#","silent_response":"fail","response_timeout_ms":20000,"no_reply_after_ms":5000"#,
         )
-        .unwrap()
-        .with_patience();
+        .unwrap();
         assert_eq!(set.barrier_policy(), BarrierPolicy::Require);
         assert_eq!(
             (set.response_timeout_ms, set.no_reply_after_ms),
             (Some(20_000), Some(5_000))
         );
-        // A response timeout at or under 8 s gets no no-reply wait.
-        let short = parsed(r#","response_timeout_ms":6000"#)
-            .unwrap()
-            .with_patience();
+        assert_eq!(
+            line,
+            "provider patience: silent_response fail (file), response 20000 ms (file), no-reply 5000 ms (file)"
+        );
+        // lamp-4ace's own 4 s no-reply wait is kept under the filled 12 s.
+        let (four, _) = patient(r#","no_reply_after_ms":4000"#).unwrap();
+        assert_eq!(
+            (four.response_timeout_ms, four.no_reply_after_ms),
+            (Some(12_000), Some(4_000))
+        );
+        // A response wait at or under 8 s gets no no-reply wait.
+        let (short, _) = patient(r#","response_timeout_ms":6000"#).unwrap();
         assert_eq!(
             (short.response_timeout_ms, short.no_reply_after_ms),
             (Some(6_000), None)
         );
-        // The filled-in values pass the file's own rules.
-        let checked = |config: ProviderConfig| {
-            ProviderConfig {
-                credential_file: "/run/credential".into(),
-                ..config
-            }
-            .checked()
-        };
-        assert!(checked(patient).is_ok());
-        assert!(checked(short).is_ok());
+        // The reviewer's and Jarvis's case: a file's own no-reply wait of
+        // 12 s or more keeps the 30 s response wait, so the file still works.
+        for no_reply in [12_000, 15_000, 29_999] {
+            let (kept, line) = patient(&format!(r#","no_reply_after_ms":{no_reply}"#)).unwrap();
+            assert_eq!(
+                (kept.response_timeout_ms, kept.no_reply_after_ms),
+                (None, Some(no_reply))
+            );
+            assert!(line.contains("response 30000 ms (default)"), "{line}");
+        }
+    }
+
+    /// The worker's own load: the switch reaches the file it reads.
+    #[test]
+    fn the_worker_loads_the_file_with_patience_only_when_asked() {
+        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+        let path = std::env::temp_dir().join(format!(
+            "lamp-voice-patience-{}-{:?}.json",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_file(&path);
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&path)
+            .unwrap();
+        std::fs::write(
+            &path,
+            r#"{"endpoint":"wss://example.invalid/live","model":"m","voice":"v","credential_file":"/run/credential"}"#,
+        )
+        .unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let (plain, none) = ProviderConfig::load_with_patience(&path, false).unwrap();
+        assert_eq!(
+            (plain.barrier_policy(), none),
+            (BarrierPolicy::Require, None)
+        );
+        let (patient, line) = ProviderConfig::load_with_patience(&path, true).unwrap();
+        assert_eq!(patient.barrier_policy(), BarrierPolicy::AssumeAfterQuiet);
+        assert_eq!(patient.no_reply_after_ms, Some(PATIENT_NO_REPLY_MS));
+        assert!(line.unwrap().starts_with("provider patience: "));
+        std::fs::remove_file(&path).unwrap();
     }
 
     /// #806: the name typed at setup reaches the model's instruction through
