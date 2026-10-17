@@ -3992,7 +3992,7 @@ impl InputHandoff {
             }
             let request = kept.request;
             if input.resend(session, request).is_err() {
-                return self.give_up(loss, crate::resend::Refused::Stage);
+                return self.give_up(loss, crate::resend::Refused::NotTaken);
             }
             eprintln!(
                 "lamp-voice provider: request {}: lost at {:?} ({:?}); sent again on session {} with {} blocks kept",
@@ -6647,6 +6647,11 @@ mod tests {
         );
     }
 
+    /// A line whose Start never left this side is failed once as not
+    /// delivered and its input is never sent anywhere, with or without
+    /// `--resend-lost-line`: `resend::judge` sends again only a line lost
+    /// at `InputOpen` or `AwaitingResponse` after it reached the service
+    /// (#705, Step B).
     #[test]
     fn outage_before_start_reports_not_delivered_once_and_never_replays_input() {
         let mut owner = controller();
@@ -11103,6 +11108,30 @@ mod tests {
         rig.stop().await;
     }
 
+    /// #705, Step B: an answer begun is never asked for twice. With the
+    /// switch, a line whose answer had begun to arrive when its connection
+    /// was lost fails as before, at `Responding`, and nothing of it is sent
+    /// to the next session: the person heard part of a reply, and a second
+    /// one would be said over it.
+    #[tokio::test]
+    async fn a_line_whose_answer_had_begun_is_never_sent_again() {
+        let mut rig = LiveRig::start_resending();
+        let mut dial = rig.ready().await;
+        dial.service.send(resumable()).await;
+        let lost = rig.speak(&mut dial, false, true).await;
+        dial.service.send(provider_audio(5, 480)).await;
+        assert!(matches!(
+            rig.output().await,
+            ProviderOutput::Audio { request, .. } if request == lost
+        ));
+        dial.service.close(1011, "internal").await;
+        let (seen, _) = after_a_lost_line(&mut rig, lost, FailedStage::Responding).await;
+        assert!(seen.contains(&"turn_failed"), "{seen:?}");
+        assert!(!seen.contains(&"activityStart"), "{seen:?}");
+        assert!(!seen.contains(&"answered"), "{seen:?}");
+        rig.stop().await;
+    }
+
     #[tokio::test]
     async fn typed_reporting_fails_one_turn_and_keeps_serving_after_a_lost_answer() {
         let mut rig = LiveRig::start_with(quick_policy(), Options::reporting(Reporting::Typed));
@@ -12221,6 +12250,10 @@ mod tests {
             assert!(written < 150, "all of it was written after the stop");
         }
 
+        // Kept start, the question still held here when the service closes:
+        // none of it is written or replayed. `--resend-lost-line` does not
+        // change this: it sends again only a line whose End reached a
+        // service, and is off here (#705, Step B).
         #[tokio::test]
         async fn the_service_closing_while_the_question_is_kept_writes_none_of_it_and_replays_none()
         {
