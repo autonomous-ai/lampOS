@@ -30,6 +30,26 @@ pub mod report;
 pub mod ring;
 pub mod speaker;
 
+/// What a check that moves or asks something of a part waits on: the
+/// host's clock on the lamp, or a test's that moves on only when the check
+/// pauses ([`ring`]'s colours, [`head`]'s moves).
+pub(crate) trait Clock {
+    fn now(&self) -> Instant;
+    fn pause(&mut self, pause: Duration);
+}
+
+/// The lamp's clock: the host's.
+pub(crate) struct Host;
+
+impl Clock for Host {
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+    fn pause(&mut self, pause: Duration) {
+        std::thread::sleep(pause);
+    }
+}
+
 /// The whole self-test has two minutes (#812).
 pub const BUDGET: Duration = Duration::from_secs(120);
 /// How long a passive run waits before it checks again the parts it

@@ -1189,6 +1189,41 @@ version fails three tests and this one only the hold test, which is on the
 host clock by design. With 400 ms, both pass. 30 copies at once, three
 rounds: 90 of 90.
 
+## The self-test's head move on a clock its tests step (#1128)
+
+`lamp-selftest`'s head-move tests drive the check against a simulated body
+on its own thread. They took 26 s on Linux (30.6 s once #1340's wait for a
+still joint came in), the slowest on pull requests after the ring check
+(the 17.5 s test alone, run 39014782754). Each move eases out over 0.4 s,
+allows 2 s to reach and 3 s to come back, with a 20 ms step.
+
+The check now reads the crate's `Clock` (`now`, `pause`), as the ring check
+does: `one_move`, `moves` and #1340's `settled`. On the lamp it is the
+host's (`Check::run` passes `Host`), and the same reads happen. The tests
+give it a stepped clock, and the simulated body runs on the host's clock
+until the check first pauses, so its report and first readings come as on a
+lamp. After that it takes one step for each pause, and the clock moves on
+only once it has. The body moves by steps, not by time, so each 20 ms of the
+check is one 20 ms step of the body, without the wait. The body's report
+wait (`REPORT_WITHIN`) and the silent body's 1.5 s stay on the host's clock.
+#1340's own test of `settled` passes the host's clock too, since its
+shaking head drifts by real time.
+
+Stepping it first showed #1329, a real hazard: a move's start was read
+while the head still settled after the last move, and the merged test
+passed by 0.1 count of `NEAR`. Stepped, it failed every time. #1340 waits
+for a still joint first. `settled` has to read the same clock as the move:
+on the host's, the stepped body stands still during the wait and seems
+settled where it isn't. The ten head tests take 6.5 s (3 of 3), and the
+crate passes 59 of 59.
+
+The simulated body counts each request's lease in its own 20 ms steps, from
+the lease's own length, not against the host's clock: stepped, a 200 ms
+lease judged by real time outlasted the whole move, so a check that asked
+once and never renewed passed where a lamp's body would have dropped its
+request (the reviewer's P2 on #1373). With the lease in steps, that check
+fails both move tests again.
+
 ## The kept-note read gets the test's own bound (#1269)
 
 `remember::tests::someone_known_keeps_to_their_own_and_is_answered_from_theirs_then_the_room`

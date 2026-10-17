@@ -11,7 +11,7 @@
 //! the body by anyone else in the last minute. Otherwise it says why and
 //! moves nothing; it never stands a lamp up. Never at first boot. A move
 //! that fails is reported and not tried again in the run.
-use crate::{Check, listen};
+use crate::{Check, Clock, Host, listen};
 use lamp_bus::Bus;
 use lamp_msgs::{
     BodyOffsets, Diagnostic, EXPRESSION_LEASE_US, ExpressionBody, ExpressionLease, Hand,
@@ -52,8 +52,11 @@ const STEP: Duration = Duration::from_millis(20);
 const STEADY: Duration = Duration::from_millis(200);
 /// A servo's turn is 4,096 counts.
 const COUNTS_A_RADIAN: f64 = 4096.0 / TAU;
-/// What one move takes at most, with the margin of a renewal or two.
-const ONE_MOVE: Duration = Duration::from_millis(5_600);
+/// How long a joint may take to hold still before a move reads its start.
+const SETTLE_WITHIN: Duration = Duration::from_secs(1);
+/// What one move takes at most, with the margin of a renewal or two, and
+/// the wait for the joint to hold still first.
+const ONE_MOVE: Duration = Duration::from_millis(6_600);
 
 /// Which joint a move asks of.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -363,6 +366,60 @@ pub fn judge(tried: &[Tried], interrupted: Option<&str>) -> PartResult {
     with_values(PartResult::new(PART, Verdict::Pass, ""))
 }
 
+/// A joint's position and goal once its position has held within half a
+/// count for [`STEADY`], as [`reached`] asks of a goal; `Err` if it does not
+/// within [`SETTLE_WITHIN`], or something ends the check meanwhile.
+fn settled(
+    bus: &Bus,
+    watch: &mut Watch,
+    joint: Joint,
+    clock: &mut impl Clock,
+) -> Result<(f64, f64), String> {
+    let began = clock.now();
+    let mut still: Option<(Instant, f64)> = None;
+    let mut last_seq = None;
+    loop {
+        if let Some(why) = watch.interruption(bus) {
+            return Err(why);
+        }
+        let Some((seq, position, goal)) = read(bus, joint) else {
+            return Err(format!(
+                "{} is not read on {}",
+                joint.name(),
+                JointState::TOPIC
+            ));
+        };
+        if last_seq != Some(seq) {
+            last_seq = Some(seq);
+            match still {
+                Some((held_from, at)) if (position - at).abs() < 0.5 => {
+                    if since(clock, held_from) >= STEADY {
+                        return Ok((position, goal));
+                    }
+                }
+                _ => still = Some((clock.now(), position)),
+            }
+        }
+        if since(clock, began) >= SETTLE_WITHIN {
+            // A body that stopped saying its joints is named as such, as
+            // before a move (the reviewer on #1340).
+            if let Some(age) = newest_age(bus).filter(|age| *age > listen::FAST_FRESH) {
+                return Err(format!(
+                    "lamp-body is not publishing {} (newest {:.1} s old)",
+                    JointState::TOPIC,
+                    age.as_secs_f64()
+                ));
+            }
+            return Err(format!(
+                "{} did not hold still within {} s before its move",
+                joint.name(),
+                SETTLE_WITHIN.as_secs()
+            ));
+        }
+        clock.pause(STEP);
+    }
+}
+
 /// A joint's position and goal, in counts, from the body's newest reading.
 fn read(bus: &Bus, joint: Joint) -> Option<(u64, f64, f64)> {
     let message = bus.latest(JointState::TOPIC).ok()??;
@@ -493,6 +550,11 @@ impl Asker {
     }
 }
 
+/// How long ago `at` was, by `clock`: what `at.elapsed()` is on the lamp.
+fn since(clock: &impl Clock, at: Instant) -> Duration {
+    clock.now().saturating_duration_since(at)
+}
+
 fn ease(share: f64) -> f64 {
     0.5 - 0.5 * (PI * share.clamp(0.0, 1.0)).cos()
 }
@@ -555,6 +617,7 @@ fn one_move(
     watch: &mut Watch,
     joint: Joint,
     sign: f64,
+    clock: &mut impl Clock,
 ) -> Result<Moved, String> {
     // Where it begins, from a reading the body made just now: a kept one
     // from a body that has stopped would make a false start (the eighth
@@ -567,27 +630,25 @@ fn one_move(
             age.unwrap_or_default().as_secs_f64()
         ));
     }
-    let Some((_, start, goal_was)) = read(bus, joint) else {
-        return Err(format!(
-            "{} is not read on {}",
-            joint.name(),
-            JointState::TOPIC
-        ));
-    };
+    // From where the joint holds still, not from where the last move's
+    // return was counted while it was still settling: the next return is
+    // judged against this start (Tests on #1329: the merged test passed by
+    // 0.1 count of `NEAR`, and a head settling a little slower fails).
+    let (start, goal_was) = settled(bus, watch, joint, clock)?;
     let target = joint.counts() * sign;
-    let began = Instant::now();
+    let began = clock.now();
     let mut samples: Vec<Sample> = Vec::new();
     let mut last_seq = None;
     let mut met = None;
-    while began.elapsed() < REACH_WITHIN {
-        let share = ease(began.elapsed().as_secs_f64() / EASE.as_secs_f64());
+    while since(clock, began) < REACH_WITHIN {
+        let share = ease(since(clock, began).as_secs_f64() / EASE.as_secs_f64());
         asker.ask(joint.offsets(target * share))?;
         if let Some((seq, position, commanded)) = read(bus, joint)
             && last_seq != Some(seq)
         {
             last_seq = Some(seq);
             samples.push(Sample {
-                at: began.elapsed(),
+                at: since(clock, began),
                 position,
                 commanded,
             });
@@ -599,18 +660,18 @@ fn one_move(
         if let Some(why) = watch.interruption(bus) {
             return Err(why);
         }
-        std::thread::sleep(STEP);
+        clock.pause(STEP);
     }
     // Let go the way it was asked: eased back. Each request is renewed
     // only if nothing has ended the check.
-    let letting_go = Instant::now();
-    while letting_go.elapsed() < EASE {
+    let letting_go = clock.now();
+    while since(clock, letting_go) < EASE {
         if let Some(why) = watch.interruption(bus) {
             return Err(why);
         }
-        let share = 1.0 - ease(letting_go.elapsed().as_secs_f64() / EASE.as_secs_f64());
+        let share = 1.0 - ease(since(clock, letting_go).as_secs_f64() / EASE.as_secs_f64());
         asker.ask(joint.offsets(target * share))?;
-        std::thread::sleep(STEP);
+        clock.pause(STEP);
     }
     let Some((reached_at, goal)) = met else {
         let moved = samples
@@ -627,7 +688,7 @@ fn one_move(
         return Ok(Moved::NotReached { goal: wanted, gap });
     };
     let mut away = f64::NAN;
-    while letting_go.elapsed() < BACK_WITHIN {
+    while since(clock, letting_go) < BACK_WITHIN {
         // Looked at before a return is taken as done, so nothing that came
         // during it is missed.
         if let Some(why) = watch.interruption(bus) {
@@ -639,11 +700,11 @@ fn one_move(
                 return Ok(Moved::Done {
                     reached: reached_at,
                     goal,
-                    back: letting_go.elapsed(),
+                    back: since(clock, letting_go),
                 });
             }
         }
-        std::thread::sleep(STEP);
+        clock.pause(STEP);
     }
     Ok(Moved::NotBack { goal, away })
 }
@@ -654,7 +715,7 @@ pub struct HeadMove<'a> {
 }
 
 impl HeadMove<'_> {
-    fn moves(&mut self, deadline: Instant) -> PartResult {
+    fn moves(&mut self, deadline: Instant, clock: &mut impl Clock) -> PartResult {
         let mut watch = match Watch::on(self.bus) {
             Ok(watch) => watch,
             Err(why) => return PartResult::new(PART, Verdict::Fail, &why),
@@ -674,10 +735,10 @@ impl HeadMove<'_> {
         };
         let mut tried = Vec::new();
         for (joint, sign) in MOVES {
-            if Instant::now() + ONE_MOVE > deadline {
+            if clock.now() + ONE_MOVE > deadline {
                 return judge(&tried, Some("out of time"));
             }
-            match one_move(self.bus, &mut asker, &mut watch, joint, sign) {
+            match one_move(self.bus, &mut asker, &mut watch, joint, sign, clock) {
                 Ok(moved) => {
                     let failed = matches!(moved, Moved::NotReached { .. } | Moved::NotBack { .. });
                     tried.push(Tried { joint, sign, moved });
@@ -699,7 +760,7 @@ impl Check for HeadMove<'_> {
     }
 
     fn run(&mut self, deadline: Instant) -> PartResult {
-        self.moves(deadline)
+        self.moves(deadline, &mut Host)
     }
 }
 
@@ -983,11 +1044,16 @@ mod tests {
     /// lifting head's goal 40 counts ahead, where the head stops 30 short
     /// (`GLANCE_LIFT_LEAD`), cuts the roll to one count, lets the joints
     /// follow, and says it rests, standing, until stopped.
+    ///
+    /// It runs on the host's clock until the check first pauses, so its
+    /// report and its first readings come as on a lamp. From then on it
+    /// takes one step for each of the check's pauses ([`Stepped`]).
     #[cfg(target_os = "linux")]
     fn body(
         root: std::path::PathBuf,
         fake: Fake,
         stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+        steps: Steps,
     ) -> std::thread::JoinHandle<()> {
         std::thread::spawn(move || {
             let bus = Bus::new(&root).unwrap();
@@ -1014,6 +1080,14 @@ mod tests {
             let (mut deepest_roll, mut folding) = (0.0f64, false);
             let mut step = 0u64;
             while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                let stepped = steps.granted.load(std::sync::atomic::Ordering::SeqCst) > 0;
+                if stepped
+                    && steps.taken.load(std::sync::atomic::Ordering::SeqCst)
+                        >= steps.granted.load(std::sync::atomic::Ordering::SeqCst)
+                {
+                    std::thread::sleep(Duration::from_micros(50));
+                    continue;
+                }
                 while let Ok(Some(message)) = asked.recv(Duration::ZERO) {
                     if let Ok(request) = message.parse::<ExpressionBody>() {
                         let roll = request.offsets.head_roll;
@@ -1028,12 +1102,20 @@ mod tests {
                                 .publish_json(lamp_ipc::monotonic_us(), &report("resting", 0.6, 40))
                                 .unwrap();
                         }
-                        offsets = Some((request.offsets, request.lease.valid_until_us));
+                        // A lease lasts its length in the body's own steps,
+                        // so it lapses on the stepped clock as it does on the
+                        // host's (the reviewer on #1373).
+                        let lasts = request
+                            .lease
+                            .valid_until_us
+                            .saturating_sub(request.lease.issued_us)
+                            / STEP.as_micros() as u64;
+                        offsets = Some((request.offsets, step + lasts));
                     }
                 }
                 let now = lamp_ipc::monotonic_us();
                 let wanted = match offsets {
-                    Some((o, until)) if until > now && !matches!(fake, Fake::TakesNothing) => [
+                    Some((o, until)) if until > step && !matches!(fake, Fake::TakesNothing) => [
                         rest[0] + (o.head_pitch * COUNTS_A_RADIAN).clamp(-50.0, 50.0),
                         rest[1] + (o.head_roll * COUNTS_A_RADIAN).clamp(-1.0, 1.0),
                     ],
@@ -1079,9 +1161,56 @@ mod tests {
                         .unwrap();
                 }
                 step += 1;
-                std::thread::sleep(STEP);
+                if stepped {
+                    steps
+                        .taken
+                        .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                } else {
+                    std::thread::sleep(STEP);
+                }
             }
         })
+    }
+
+    /// The check's pauses granted to the fake body, and the steps it took.
+    #[cfg(target_os = "linux")]
+    #[derive(Clone, Default)]
+    struct Steps {
+        granted: std::sync::Arc<std::sync::atomic::AtomicU64>,
+        taken: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    }
+
+    /// The check's clock in a test: it stands still until the check pauses.
+    /// Each pause is one step of the fake body, and the clock moves on only
+    /// once the body has taken it. A step is the body's 20 ms (`STEP`), as
+    /// on the host's clock, without waiting for it.
+    #[cfg(target_os = "linux")]
+    struct Stepped {
+        at: Instant,
+        steps: Steps,
+    }
+
+    #[cfg(target_os = "linux")]
+    impl Clock for Stepped {
+        fn now(&self) -> Instant {
+            self.at
+        }
+        fn pause(&mut self, pause: Duration) {
+            let granted = self
+                .steps
+                .granted
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                + 1;
+            let until = Instant::now() + Duration::from_secs(5);
+            while self.steps.taken.load(std::sync::atomic::Ordering::SeqCst) < granted {
+                assert!(
+                    Instant::now() < until,
+                    "the fake body never took step {granted}"
+                );
+                std::thread::sleep(Duration::from_micros(50));
+            }
+            self.at += pause;
+        }
     }
 
     #[cfg(target_os = "linux")]
@@ -1090,7 +1219,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let fake_body = body(root.clone(), fake, stop.clone());
+        let steps = Steps::default();
+        let fake_body = body(root.clone(), fake, stop.clone(), steps.clone());
         // A silent body's one reading is let grow old first.
         let settle = if matches!(fake, Fake::Silent) {
             1_500
@@ -1103,7 +1233,12 @@ mod tests {
             bus: &bus,
             occasion: Occasion::OnDemand,
         };
-        let result = check.run(Instant::now() + Duration::from_secs(60));
+        let mut clock = Stepped {
+            at: Instant::now(),
+            steps,
+        };
+        let deadline = clock.at + Duration::from_secs(60);
+        let result = check.moves(deadline, &mut clock);
         stop.store(true, std::sync::atomic::Ordering::Relaxed);
         fake_body.join().unwrap();
         let _ = std::fs::remove_dir_all(&root);
@@ -1151,6 +1286,76 @@ mod tests {
         let late = run_against(Fake::FoldsLettingGoLast, "late");
         assert_eq!(late.verdict, Verdict::NotChecked, "{late:?}");
         assert!(late.reason.contains("began to fold"), "{}", late.reason);
+    }
+
+    /// Tests on #1329: a move's start is read where the joint holds still,
+    /// not where it still moves after the last return. A head pitch
+    /// settling from 1768 toward 1771 gives 1771; one that drifts a count
+    /// every 100 ms never holds still, and gives why within its second.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_moves_start_is_read_once_the_joint_holds_still() {
+        let root = std::path::PathBuf::from(format!("/tmp/hm-settle-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        // A head pitch going to 1771 by a third of the way each 20 ms, or
+        // drifting a count every 100 ms for ever.
+        let head = |root: std::path::PathBuf,
+                    shakes: bool,
+                    stop: std::sync::Arc<std::sync::atomic::AtomicBool>| {
+            std::thread::spawn(move || {
+                let bus = Bus::new(&root).unwrap();
+                let mut joints = bus
+                    .publisher_declared(JointState::TOPIC, &JointState::declaration(), "body")
+                    .unwrap();
+                let (mut pitch, began) = (1768.0f64, std::time::Instant::now());
+                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    // Drifting a count every 100 ms by the clock can never hold
+                    // still for 200 ms, however the readings are seen (the reviewer
+                    // on #1340).
+                    pitch = if shakes {
+                        1771.0 + (began.elapsed().as_millis() / 100) as f64
+                    } else {
+                        pitch + (1771.0 - pitch) * 0.3
+                    };
+                    let radians = |counts: f64| counts / COUNTS_A_RADIAN;
+                    let state = JointState {
+                        name: ["base_yaw", "shoulder", "elbow", "head_roll", "head_pitch"]
+                            .map(str::to_owned)
+                            .to_vec(),
+                        position: [2035.0, 2657.0, 2602.0, 2035.0, pitch]
+                            .map(radians)
+                            .to_vec(),
+                        velocity: Vec::new(),
+                        effort: Vec::new(),
+                        commanded: [2035.0, 2657.0, 2602.0, 2035.0, 1771.0]
+                            .map(radians)
+                            .to_vec(),
+                    };
+                    joints
+                        .publish_json(lamp_ipc::monotonic_us(), &state)
+                        .unwrap();
+                    std::thread::sleep(STEP);
+                }
+            })
+        };
+        let bus = Bus::new(&root).unwrap();
+        let mut watch = Watch::on(&bus).unwrap();
+        for shakes in [false, true] {
+            let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let moving = head(root.clone(), shakes, stop.clone());
+            std::thread::sleep(Duration::from_millis(30));
+            let got = settled(&bus, &mut watch, Joint::Pitch, &mut Host);
+            stop.store(true, std::sync::atomic::Ordering::Relaxed);
+            moving.join().unwrap();
+            if shakes {
+                assert!(got.unwrap_err().contains("did not hold still"));
+            } else {
+                let (start, _) = got.unwrap();
+                assert!((start - 1771.0).abs() < 0.5, "{start}");
+            }
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// A body that said its joints once and stopped is named, not taken for
