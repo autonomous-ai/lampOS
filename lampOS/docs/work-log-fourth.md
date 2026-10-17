@@ -4253,6 +4253,21 @@ A usage limit paused me from about 10:27 to 11:40.
   - Gate: 1,863 passed and 4 failed. The 4 were `coordinator::motor` real-child timeouts under load, which passed 3 of 3 alone.
 - **#828's cut-in regression:** I audited my five merges in `36b872d1c..ef0df3019` (#1092, #1107, #1108, #1148, #1224). None changes anything with every switch off. #1107 has no switch, but acts only after the button or a head touch. The range's one `lamp_audio` change is #1214's.
 
+## 2026-10-17, 13:43 ICT: #1295 and #1297 merged; #1278 and #1291 reworked twice; a Mac Clippy break found
+
+- **#1295 merged** (#1158's P3s, a worker's switches tested through its command). The reviewer's P3, that "nothing else" reaches the worker, is on `fourth/p3s-after` with the Seventh's #1297 doc P3.
+- **#1297 merged at 13:26** (#1284's P3s). A lamp-gemini test shows a late answer's words reach no request: the earlier request they're given to was retired when the closed one started.
+- **#1278** (`LAMP_FOLLOWS_ON`):
+  - El's three P3s are fixed, re-checked by El.
+  - The reviewer's 13:11 P2 is fixed at `051899f25`: the note now goes with the line's End, never to a sound sent on. A Stop clears the clock with or without `LAMP_STOP_TOLD`.
+  - It's rebased onto `lamp-voice`. Voice 1,883/0.
+- **#1291** (`LAMP_CUT_INS_NOT_TALK`): the reviewer's two P2s and three P3s are fixed.
+  - It marks only a line begun while the lamp's answer could be heard (a new Start bit), keeps each request's mark so a split cut-in is kept out whole, and still keeps a busy room busy. The journal takes its reason from the room.
+  - It's stacked on #1278, since both add a Start field.
+- **Found:** today's `lamp-voice` failed workspace Clippy on macOS (`selftest/head.rs`, helpers used only by Linux tests). Ten had already fixed it in #1276.
+- **Answered Ten:** the stop words' counts file keeps the last 16 results plus every one with a stop phrase.
+- **#828's bisect:** none of my merges is in the narrowed range. The first builder cleared #1108's call wait on lamp-4ace.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
