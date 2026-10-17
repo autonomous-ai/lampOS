@@ -10,7 +10,7 @@ folder holds only what install did not write, each file as it is on the lamp.
 |---|---|---|
 | `lamp.env` | `/etc/lampOS/body/lamp.env` | This lamp's poses; install never writes it |
 | `serve.json` | `/etc/lampOS/setup/serve.json` | Setup's own page (`crates/setup/fixtures/serve-own-page.json`) |
-| `reset-plan.json` | `/etc/lampOS/setup/reset-plan.json` | Equal to #1016's `reset-plan-product.json` |
+| `reset-plan.json` | `/etc/lampOS/setup/reset-plan.json` | A copy of `crates/setup/fixtures/reset-plan-product.json`, kept equal by hand: copy it again whenever the product plan gains a path (by 17 Oct it was nine behind, #1401's backend link and the Harness sign-in among them). A product install writes the product plan itself. |
 | `provider.json` | `/etc/lampOS/voice/provider.json` (0600) | The voice's service; no key in it |
 
 ## How it was done
