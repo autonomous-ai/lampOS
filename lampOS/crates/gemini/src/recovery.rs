@@ -690,6 +690,10 @@ impl<C: Connect> Supervisor<C> {
             self.lost.set(None);
         }
     }
+    /// Whether [`Self::resend_lost_lines`] is on.
+    pub fn resends_lost_lines(&self) -> bool {
+        self.resend_lost
+    }
     /// The request whose turn was lost before any output, while it may
     /// still be sent again: the last one lost, not retired since, with
     /// nothing newer started.

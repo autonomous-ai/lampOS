@@ -256,14 +256,22 @@ endpoint before a fresh utterance may be submitted on the recovered session.
 Input is never replayed and no answer is requested twice, with one
 exception under `LAMP_RESEND_LOST_LINE=on` (the provider worker's
 `--resend-lost-line`, [`crate::resend`], #705): a line lost with its
-connection, before any output or tool call for it, is sent once more on the
+connection after it ended, before any output or tool call for it, is sent once more on the
 next ready session, under the same request, if its privacy generation is
 unchanged, it is at most 15 s long, no newer line has begun, the failure is
 one a second try mends (a barrier, write or read timeout, a transport loss,
 a peer close, a go-away, a stalled response; never a quota, a refusal or a
 silent model) and the next session is ready within 5 s of its end. Its
 answer, or the held `TurnFailed` if that try fails too, is the request's one
-outcome; the trace says `line_resent` or `resend_refused` with why. Off
+outcome; the trace says `line_resent` or `resend_refused` with why. A line
+still open when its connection is lost fails as before: the coordinator
+gives its input up on the link's change (`abandon_if_changed`). The worker
+keeps each line's blocks with their own sequence numbers as they are
+offered, starts the line again with `Supervisor::try_resend_for_session`
+(lamp-gemini keeps a request lost before any output open for that, only
+with `resend_lost_lines`), offers the kept blocks again as the queue has
+room with the capture time of then, and its End; the second `Started`
+is not handed on. Off
 unless set, nothing is ever sent twice. Require remains the
 cancellation policy; there is no automatic assumption of an unconfirmed cut-off.
 The library's explicit Legacy entry point remains for existing callers; worker
