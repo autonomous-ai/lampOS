@@ -188,6 +188,18 @@ voice's ring worker ([ring-choreography.md](ring-choreography.md), "The
 lamp's own light"), which is also where each colour's and each level's
 look is decided.
 
+## The app's two calls (#1396)
+
+The Autonomous app's volume slider is answered through the executive too, so
+it stays the speaker's only writer: `lamp-cloud` asks on the same socket for
+`volume_level`, and `volume_to` with `{"volume": 0..100}`, a share of the
+allowed range. They answer in numbers, `{"ok": true, "level": {"volume",
+"raw", "max_volume"}}`, as V1's `volume.*` has them, and a set is read back
+within a point or not done (`Volume::level`, `Volume::to_share`). They are
+never in `tools.json`, so the voice's model is never offered them, and the
+voice never asks them. The journal says their names and whether they were
+done, as for every call.
+
 ## What was taken from V1, and what was not
 
 The owner's rule (2026-10-13): V1 is not the reference; each part of it

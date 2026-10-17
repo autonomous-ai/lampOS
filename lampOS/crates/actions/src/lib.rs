@@ -120,6 +120,11 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
     functions
 }
 
+/// The app's calls (#1396), never offered to the model.
+pub fn is_app_call(name: &str) -> bool {
+    matches!(name, "volume_level" | "volume_to")
+}
+
 /// The list as the voice reads it.
 pub fn catalog_file(functions: &[Function]) -> String {
     json!({"tools": functions}).to_string()
@@ -137,6 +142,34 @@ impl<S: sound::Mixer, L: light::Light> Executive<S, L> {
         let sound = self.sound.is_some();
         let light = self.light.as_mut().is_some_and(|light| light.there());
         catalog(sound, light)
+    }
+
+    /// One of the app's calls (#1396), answered with numbers, not
+    /// sentences: `volume_level`, and `volume_to` with `{"volume": 0..100}`.
+    /// They are never in the model's list, so only a caller on the socket
+    /// that names them (`lamp-cloud`) asks them. `None` for any other name.
+    pub fn app_call(&mut self, name: &str, args: &Value) -> Option<Value> {
+        if !is_app_call(name) {
+            return None;
+        }
+        let Some(volume) = self.sound.as_mut() else {
+            return Some(json!({"ok": false, "error": "this lamp has no volume control"}));
+        };
+        let level = match name {
+            "volume_level" => volume.level(),
+            _ => match args
+                .get("volume")
+                .and_then(Value::as_u64)
+                .filter(|volume| *volume <= 100)
+            {
+                Some(share) => volume.to_share(share as u8),
+                None => Err("volume must be a whole number from 0 to 100".to_owned()),
+            },
+        };
+        Some(match level {
+            Ok(level) => json!({"ok": true, "level": level}),
+            Err(why) => json!({"ok": false, "error": why}),
+        })
     }
 
     /// Carry out one call. A name that is not offered, and anything but the

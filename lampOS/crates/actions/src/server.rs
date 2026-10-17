@@ -99,6 +99,12 @@ fn answer<S: Mixer, L: Light>(
                 };
                 (name.to_owned(), response, None)
             }
+            (Some((name, args)), _) if crate::is_app_call(name) => {
+                let response = executive
+                    .app_call(name, args)
+                    .expect("an app call is answered");
+                (name.to_owned(), response, None)
+            }
             (Some((name, args)), _) => {
                 let outcome = executive.call(name, args);
                 (name.to_owned(), outcome.line(), Some(outcome))

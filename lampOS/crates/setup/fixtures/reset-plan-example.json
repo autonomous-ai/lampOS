@@ -15,6 +15,7 @@
     "/var/lib/lampos-tasks/.harness/logs",
     "/var/lib/lampos-schedule/store",
     "/var/lib/lampos-policy",
+    "/var/lib/lampos-cloud",
     "/var/lib/lampOS/voice/sessions",
     "/var/lib/lampOS/voice/schedule-delivery",
     "/var/lib/lampOS/voice/first-output",

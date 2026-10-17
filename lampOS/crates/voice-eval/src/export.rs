@@ -134,6 +134,7 @@ const PARTS: &[&str] = &[
     "lamp-air",
     "lamp-air-clock",
     "lamp-body",
+    "lamp-cloud",
     "lamp-controls",
     "lamp-ears",
     "lamp-expression",
