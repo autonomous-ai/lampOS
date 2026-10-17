@@ -6,6 +6,7 @@ mod context;
 mod drain;
 mod endless;
 mod pressure;
+mod resend;
 mod soak;
 use crate::{
     Credential, GOOGLE_ENDPOINT, Resumption, Timeouts,
