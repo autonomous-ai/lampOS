@@ -234,7 +234,17 @@ fn catalogue(path: Option<&PathBuf>) -> Result<Catalogue, Box<dyn std::error::Er
     if text.len() > 131_072 {
         return Err("catalogue is over 128 KiB".into());
     }
-    Ok(Catalogue::from_json(&text)?)
+    let catalogue = Catalogue::from_json(&text)?;
+    if catalogue
+        .speaking
+        .is_some_and(|speaking| speaking.sway_roll.is_some())
+    {
+        // #955's head roll: ignored, so the rest of Expression still runs.
+        eprintln!(
+            "lamp-expression: speaking.sway_roll is no longer used and is ignored; no sway between sentences without sway_yaw"
+        );
+    }
+    Ok(catalogue)
 }
 
 fn writer(path: Option<&PathBuf>) -> io::Result<Box<dyn Write>> {

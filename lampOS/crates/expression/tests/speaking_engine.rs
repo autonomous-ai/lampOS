@@ -196,14 +196,14 @@ fn while_it_speaks_it_nods_on_stressed_words_sways_its_base_between_sentences_an
         let pitch =
             |f: fn(f64, f64) -> f64, start: f64| during.iter().map(|o| o.head_pitch).fold(start, f);
         // Visible: about two degrees of nod over the speaking pose, and the
-        // base turned to both sides between sentences (#955: about 52 counts
-        // at most, inside the body's 70).
+        // base turned out after a pause (#955: about 52 counts at most,
+        // inside the body's 70; which pauses sway, and to which side, the
+        // unit tests check).
         assert!(
             pitch(f64::max, f64::MIN) - pitch(f64::min, f64::MAX) > 0.02,
             "{room:?}"
         );
-        assert!(during.iter().any(|o| o.base_yaw > 0.055), "{room:?}");
-        assert!(during.iter().any(|o| o.base_yaw < -0.055), "{room:?}");
+        assert!(during.iter().any(|o| o.base_yaw.abs() > 0.055), "{room:?}");
         // Within the catalogue's limits.
         let limits = catalogue(true).limits;
         assert!(
@@ -278,6 +278,36 @@ fn a_catalogue_without_speaking_plans_its_speech_as_before() {
         .collect();
     // The old clip's roll is at most 0.009 rad, scaled by the level.
     assert!(rolls.iter().all(|roll| roll.abs() <= 0.0091), "{rolls:?}");
+    // And the base does not turn for it.
+    assert!(
+        outputs
+            .iter()
+            .filter_map(|(_, output)| output.body.as_ref())
+            .all(|body| body.offsets.base_yaw == 0.0)
+    );
+}
+
+/// #955's own `speaking` section, with the head roll it asked: read, its
+/// roll ignored, no sway, and the rest of its speech as before.
+#[test]
+fn a_catalogue_with_the_old_head_roll_still_loads_and_does_not_sway() {
+    let text = include_str!("../alive-behaviours.json")
+        .replace("\"sway_yaw\": 0.08", "\"sway_roll\": 0.025")
+        .replace("\"sway_us\": 800000", "\"sway_us\": 600000");
+    let mut old = Catalogue::from_json(&text).unwrap();
+    old.timing.body_lag_us = Some(0);
+    let speaking = old.speaking.unwrap();
+    assert_eq!((speaking.sway_roll, speaking.sway_yaw), (Some(0.025), 0.0));
+    let mut lamp = Lamp::new(old, Room::Quiet);
+    let outputs = answer(&mut lamp, 8);
+    assert_eq!(starts(&outputs, "swaying between sentences"), 0);
+    assert!(starts(&outputs, "nodding on a stressed word") >= 5);
+    assert!(
+        outputs
+            .iter()
+            .filter_map(|(_, output)| output.body.as_ref())
+            .all(|body| body.offsets.base_yaw == 0.0 && body.offsets.head_roll.abs() <= 0.0091)
+    );
 }
 
 /// Three seconds of the answer from 1 s, ticked; then `after` at 4 s, and

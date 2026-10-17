@@ -6,9 +6,10 @@
 //!   jumps over what it has just been, never closer than a gap to the last
 //!   nod, each a little different in size;
 //! - **a sway between sentences:** after a pause in its speech, as the next
-//!   sentence begins, the base turns a little to the other side and stays
-//!   (#955: head roll this small cannot be seen from the front, where the
-//!   person sits; the base turning can);
+//!   sentence begins, now and then (about one sentence in two or three) the
+//!   base turns a little to one side and eases back to centre, the side
+//!   picked afresh each time (#955: head roll this small cannot be seen from
+//!   the front, where the person sits; the base turning can);
 //! - **a settle as it finishes:** one soft nod when an answer of some length
 //!   ends, then rest.
 //!
@@ -26,6 +27,8 @@ const SPEAKING_LEVEL: f32 = 0.12;
 /// The recent level a stressed word is measured against follows the sound
 /// this fast.
 const RECENT_US: f64 = 250_000.0;
+/// About this share of new sentences sways the base.
+const SWAY_SHARE: f64 = 0.4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -39,9 +42,16 @@ pub struct Speaking {
     /// times the recent level.
     pub stress_level: f32,
     pub stress_rise: f32,
-    /// The sway: the base's turn to each side, the pause in the lamp's
-    /// speech that ends a sentence, and how long the base takes to turn.
+    /// The sway: the base's turn out from centre at most, the pause in the
+    /// lamp's speech that ends a sentence, and how long the base takes to
+    /// turn out (and again to turn back). Missing, as in a section written
+    /// for #955's head roll, it is 0: no sway.
+    #[serde(default)]
     pub sway_yaw: f64,
+    /// #955's head roll, which the front cannot see: read so a catalogue
+    /// that still says it starts, and otherwise ignored.
+    #[serde(default, skip_serializing)]
+    pub sway_roll: Option<f64>,
     pub pause_us: u64,
     pub sway_us: u64,
     /// The settle as it finishes, after at least `settle_after_us` of speech.
@@ -99,8 +109,11 @@ pub(crate) struct SpeechMotion {
     spoke_since: Option<u64>,
     nod: Option<(u64, f64)>,
     nods: u64,
-    side: f64,
+    /// A sway out and back: when it began and its size and side, a share
+    /// of `sway_yaw`, negative to the other side.
     sway: Option<(u64, f64)>,
+    /// Back to centre from where a sway was when the answer ended.
+    back: Option<(u64, f64)>,
     sways: u64,
     settle: Option<u64>,
 }
@@ -146,22 +159,17 @@ impl SpeechMotion {
         self.settle = Some(now_us);
     }
 
-    /// The base's turn from the sway now.
+    /// The base's turn from the sway now: out and back in `2 * sway_us`,
+    /// eased at both ends; or, after the answer, eased back to centre.
     fn yaw(&self, rules: &Speaking, now_us: u64) -> f64 {
-        let target = self.side * rules.sway_yaw;
-        match self.sway {
-            Some((at, from)) => {
-                let share = now_us.saturating_sub(at) as f64 / rules.sway_us as f64;
-                from + (target - from) * ease(share.min(1.0))
-            }
-            None => target,
+        let share = |at: u64, length: u64| now_us.saturating_sub(at) as f64 / length as f64;
+        if let Some((at, from)) = self.back {
+            from * (1.0 - ease(share(at, rules.sway_us)))
+        } else if let Some((at, size)) = self.sway {
+            size * rules.sway_yaw * bump(share(at, 2 * rules.sway_us))
+        } else {
+            0.0
         }
-    }
-
-    fn sway_to(&mut self, rules: &Speaking, side: f64, now_us: u64) {
-        let from = self.yaw(rules, now_us);
-        self.side = side;
-        self.sway = Some((now_us, from));
     }
 
     /// One tick. `speaking`: the lamp's answer is under way; `level`: its
@@ -201,13 +209,25 @@ impl SpeechMotion {
             } else {
                 self.quiet_since = None;
                 if self.paused && level >= SPEAKING_LEVEL {
-                    // A new sentence: the base turns over to the other side,
-                    // a little more or less each time.
+                    // A new sentence: now and then the base turns out to a
+                    // side picked afresh and eases back, a little more or
+                    // less each time; never while a turn is still under way,
+                    // so it is back at centre between sways (#1067 review:
+                    // every sentence, side to side, read as a metronome).
                     self.paused = false;
                     self.sways += 1;
-                    let towards = if self.side > 0.0 { -1.0 } else { 1.0 };
-                    let size = 0.75 + 0.25 * fraction(self.sways, 2);
-                    self.sway_to(rules, towards * size, now_us);
+                    if self.sway.is_none()
+                        && self.back.is_none()
+                        && fraction(self.sways, 3) < SWAY_SHARE
+                    {
+                        let side = if fraction(self.sways, 4) < 0.5 {
+                            1.0
+                        } else {
+                            -1.0
+                        };
+                        let size = 0.75 + 0.25 * fraction(self.sways, 2);
+                        self.sway = Some((now_us, side * size));
+                    }
                 }
             }
             let stressed = level >= rules.stress_level && level >= self.recent * rules.stress_rise;
@@ -232,8 +252,10 @@ impl SpeechMotion {
             self.quiet_since = None;
             self.paused = false;
             self.recent = 0.0;
-            if self.side != 0.0 {
-                self.sway_to(rules, 0.0, now_us);
+            if self.sway.is_some() {
+                // The answer ended mid-sway: ease back to centre from there.
+                self.back = Some((now_us, self.yaw(rules, now_us)));
+                self.sway = None;
             }
         }
         let mut out = BodyOffsets::ZERO;
@@ -249,9 +271,15 @@ impl SpeechMotion {
         // it starts centred.
         if self
             .sway
-            .is_some_and(|(at, _)| now_us.saturating_sub(at) >= rules.sway_us)
+            .is_some_and(|(at, _)| now_us.saturating_sub(at) >= 2 * rules.sway_us)
         {
             self.sway = None;
+        }
+        if self
+            .back
+            .is_some_and(|(at, _)| now_us.saturating_sub(at) >= rules.sway_us)
+        {
+            self.back = None;
         }
         if yaw != 0.0 {
             out.base_yaw += yaw;
@@ -288,6 +316,7 @@ mod tests {
             stress_level: 0.35,
             stress_rise: 1.5,
             sway_yaw: 0.08,
+            sway_roll: None,
             pause_us: 350_000,
             sway_us: 800_000,
             settle: head(0.03),
@@ -373,35 +402,76 @@ mod tests {
         );
     }
 
-    #[test]
-    fn after_a_pause_the_next_sentence_turns_the_base_to_the_other_side() {
-        let mut motion = SpeechMotion::default();
-        // Speech, a 0.5 s pause, speech, a 0.5 s pause, speech.
-        let level = |at: u64| {
-            if (2_000_000..2_500_000).contains(&at) || (4_000_000..4_500_000).contains(&at) {
+    /// Ten sentences of 2.5 s, each after a 0.5 s pause, from 1 s, then 2 s
+    /// at rest; `seed` sentences said before (the counter that picks).
+    fn ten_sentences(seed: u64) -> Vec<(u64, BodyOffsets, Vec<&'static str>)> {
+        let mut motion = SpeechMotion {
+            sways: seed,
+            ..SpeechMotion::default()
+        };
+        let mut ticks = run(&mut motion, 1_000_000, 1_500, true, |at| {
+            if (at - 1_000_000) % 3_000_000 >= 2_500_000 {
                 0.0
             } else {
                 0.3
             }
-        };
-        let ticks = run(&mut motion, 1_000_000, 300, true, level);
-        let yaw_at = |at: u64| ticks.iter().find(|(t, _, _)| *t >= at).unwrap().1.base_yaw;
-        assert_eq!(yaw_at(1_900_000), 0.0);
-        let first = yaw_at(3_900_000);
-        let second = yaw_at(6_000_000);
+        });
+        ticks.extend(run(&mut motion, 31_000_000, 100, false, |_| 0.0));
+        ticks
+    }
+
+    #[test]
+    fn some_pauses_turn_the_base_out_to_either_side_and_back_to_centre() {
+        let mut first_sides = Vec::new();
+        let mut sides = Vec::new();
+        for seed in 0..10 {
+            let ticks = ten_sentences(seed);
+            let yaw_at = |at: u64| ticks.iter().find(|(t, _, _)| *t >= at).unwrap().1.base_yaw;
+            // Each sentence after a pause: how far out the base went.
+            let outs: Vec<f64> = (1..10)
+                .map(|k| {
+                    let start = 1_000_000 + k * 3_000_000;
+                    ticks
+                        .iter()
+                        .filter(|(t, _, _)| (start..start + 2_500_000).contains(t))
+                        .map(|(_, out, _)| out.base_yaw)
+                        .fold(
+                            0.0,
+                            |far: f64, yaw| if yaw.abs() > far.abs() { yaw } else { far },
+                        )
+                })
+                .collect();
+            let swayed: Vec<f64> = outs.iter().copied().filter(|out| *out != 0.0).collect();
+            // Not every pause, and each one out by 75-100% of the 0.08.
+            assert!(swayed.len() < 9, "{seed}: {outs:?}");
+            assert!(
+                swayed
+                    .iter()
+                    .all(|out| (0.75 * 0.08 - 1e-9..=0.08).contains(&out.abs())),
+                "{seed}: {outs:?}"
+            );
+            first_sides.extend(swayed.first().map(|out| out.signum()));
+            sides.extend(swayed.iter().map(|out| out.signum()));
+            // Back at centre before each pause ends, and after the answer.
+            for k in 1..10 {
+                assert_eq!(yaw_at(k * 3_000_000 + 900_000), 0.0, "{seed} {k}");
+            }
+            assert_eq!(ticks.last().unwrap().1.base_yaw, 0.0, "{seed}");
+            // Eased out and back, never a jump; only the base.
+            let fastest = ticks
+                .windows(2)
+                .map(|w| (w[1].1.base_yaw - w[0].1.base_yaw).abs())
+                .fold(0.0, f64::max);
+            assert!(fastest < 0.004, "{seed}: {fastest}");
+            assert!(ticks.iter().all(|(_, out, _)| out.head_roll == 0.0));
+        }
+        // Some do sway, to both sides, and the first side is not fixed.
+        assert!(sides.len() >= 10, "{sides:?}");
+        assert!(sides.contains(&1.0) && sides.contains(&-1.0), "{sides:?}");
         assert!(
-            first.abs() >= 0.75 * 0.08 - 1e-9 && first.abs() <= 0.08,
-            "{first}"
+            first_sides.contains(&1.0) && first_sides.contains(&-1.0),
+            "{first_sides:?}"
         );
-        assert!(second.abs() >= 0.75 * 0.08 - 1e-9 && first.signum() != second.signum());
-        // Only the base: the head does not roll for it.
-        assert!(ticks.iter().all(|(_, out, _)| out.head_roll == 0.0));
-        // Eased over, never a jump.
-        let fastest = ticks
-            .windows(2)
-            .map(|w| (w[1].1.base_yaw - w[0].1.base_yaw).abs())
-            .fold(0.0, f64::max);
-        assert!(fastest < 0.007, "{fastest}");
         // A short breath inside a sentence is not a pause.
         let mut breath = SpeechMotion::default();
         let ticks = run(&mut breath, 1_000_000, 150, true, |at| {
@@ -412,6 +482,39 @@ mod tests {
             }
         });
         assert!(ticks.iter().all(|(_, out, _)| out.base_yaw == 0.0));
+    }
+
+    #[test]
+    fn an_answer_that_ends_mid_sway_eases_the_base_back_to_centre_and_no_further_out() {
+        // Seed 0: the first sentence after the pause sways (fraction(1, 3)
+        // is under the share). The answer ends 0.3 s into that sway, still
+        // on its way out.
+        let mut motion = SpeechMotion::default();
+        run(&mut motion, 1_000_000, 125, true, |at| {
+            if at >= 3_000_000 {
+                0.3
+            } else if at >= 2_500_000 {
+                0.0
+            } else {
+                0.3
+            }
+        });
+        let ended = run(&mut motion, 3_500_000, 1, true, |_| 0.3)[0].1.base_yaw;
+        assert!(ended.abs() > 0.005, "{ended}");
+        let after = run(&mut motion, 3_520_000, 60, false, |_| 0.0);
+        assert!(
+            after
+                .windows(2)
+                .all(|w| w[1].1.base_yaw.abs() <= w[0].1.base_yaw.abs()),
+            "{after:?}"
+        );
+        // At centre within one sway_us of the end.
+        assert!(
+            after
+                .iter()
+                .filter(|(at, _, _)| *at >= 3_520_000 + 800_000)
+                .all(|(_, out, _)| out.base_yaw == 0.0)
+        );
     }
 
     #[test]

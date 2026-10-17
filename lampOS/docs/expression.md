@@ -233,10 +233,18 @@ concentrating, asleep, or once someone has cut in, and nothing is owed after.
   100% of `nod`, so no two are alike.
 - **A sway between sentences.** After `pause_us` (0.35 s) of the lamp silent
   (level under 0.06), as the next sentence begins (level back over 0.12),
-  the base turns over `sway_us` (0.8 s), eased, to the other side:
-  `sway_yaw` (0.08 rad, about 52 counts, inside the body's 70-count cap for
-  Expression), 75% to 100% of it each time. It stays there until the next
-  pause, and comes back to centre when the answer ends. Until #955's review
+  now and then (about two sentences in five) the base turns out from centre
+  to one side and back: out over `sway_us` (0.8 s) and back over another,
+  eased at both ends, by `sway_yaw` (0.08 rad, about 52 counts, inside the
+  body's 70-count cap for Expression), 75% to 100% of it each time. Whether
+  a sentence sways, which side and how far are picked afresh each time
+  from a count, so a replay is the same; a sentence that begins while a
+  turn is still under way does not sway, so the base is at centre between
+  sways. An answer that ends mid-sway eases back to centre from there over
+  `sway_us`, never further out. (#1067's review: a sway on every sentence,
+  always to the other side and first to the same one, read as a
+  metronome.) A section still written with #955's `sway_roll` loads, says
+  once on the journal that it is ignored, and does not sway. Until #955's review
   it rolled the head 0.025 rad: filmed from the front on lamp-4ace, head roll
   that small did not show, and on lamp-52e6 roll has a reach of 1 count. The
   base turning does. The body adds it to wherever its own gaze has turned
@@ -260,17 +268,21 @@ held until just before the first word) was already there. It is too short to
 show in stills 4.5 s apart.
 
 Tests: `crates/expression/src/speaking.rs` (a stressed word nods and a steady
-voice does not; nods keep their gap and differ; a pause turns the base
-to the other side for the next sentence, eased, without rolling the head,
-and a short breath does not; a long
-answer settles and a short one does not; held or cut in on, nothing moves;
+voice does not; nods keep their gap and differ; over ten sentences, for
+ten counts, not every pause sways, both sides and both first sides occur,
+each sway is 75% to 100% of `sway_yaw`, eased, without rolling the head,
+and the base is at centre before each pause ends and after the answer; an
+answer that ends mid-sway eases back to centre, never further out; a
+short breath does not sway; a long answer settles and a short one does not; held or cut in on, nothing moves;
 poses outside the limits are refused). `crates/expression/tests/speaking_engine.rs`
 runs an eight-second answer with stressed words every 1.1 s and a half-second
 pause every 3 s through the engine, in a quiet and a busy room. It expects
-5 to 8 nods, the base turned both ways by more than 0.055 rad, over 0.02 rad
+5 to 8 nods, the base turned out by more than 0.055 rad, over 0.02 rad
 of pitch range, the settle, and what speaking adds never stepping more than
 0.007 rad of pitch or of yaw in a 20 ms tick. Without `speaking`, the
-same answer plans none of it. It also checks the fences: a new turn, or a
+same answer plans none of it and never turns the base, and #955's section
+with `sway_roll` loads and plans no sway (`tests/program.rs`: the service
+starts with it and says so once). It also checks the fences: a new turn, or a
 cancelled answer, carries none of the old answer's motion (the offsets equal
 a catalogue without speaking on every tick), and a finished answer is
 settled after.
