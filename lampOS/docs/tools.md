@@ -111,19 +111,25 @@ executive's, its catalog there or not) is also told, after the rest of its
 instruction (`session_tools::NO_LIGHT`):
 
     Your light
-    You cannot change your light right now: it is not ready. If someone asks you to change it, say in a few words that you can't right now. Never say you changed it.
+    You cannot change your light right now: it is not ready. If someone asks you to change it, say so in a few words of your own, not the same way twice. Never say you changed it.
 
 The thread's recall leaves room for it, only for such a session, so it
 always fits and a session with the light keeps its whole recall; a session
-whose instruction is still full says so in the journal. The character
-file's light line says "when it is ready" and what to say when told so
-([character.md](character.md)). Without it, a session opened in the gap
+whose instruction is still full says so in the journal. Missing anything
+but the light alone, it is told each thing it can't do right now in one line
+(`session_tools::not_ready`): the light, the voice's volume, and, with
+`LAMP_SCHEDULE_TOOLS`, setting, listing or changing timers and reminders,
+as with `lamp-actions` down
+and no catalog at all; there a session said "I've turned my voice down
+just a little bit" for "turn your light down a little", having no function
+(the first builder's lamp run on #1513, 18 Oct 16:27–16:32). The character
+file's light and voice line says "when it is ready" and what to say when
+told so ([character.md](character.md)). Without it, a session opened in the gap
 answered "your light is all set to orange now" five times and made no call,
 because its recall held the earlier turns where it had (the first builder's
 lamp run on #1495, lamp-4ace, 18 Oct 13:57). On by default: it corrects a
 wrong answer, and a session given the light's functions is told nothing of
-it. A session with no catalog at all also lacks the volume's and the
-reminders' functions and is told nothing of those yet (a follow-up).
+it.
 
 A call is one line to the socket and one line back, on a connection of its
 own:

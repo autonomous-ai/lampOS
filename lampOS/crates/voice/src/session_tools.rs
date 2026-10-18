@@ -225,12 +225,56 @@ impl Moment {
 /// never says it changed the light: a session opened while the ring was
 /// down said "your light is all set to orange now" five times and made no
 /// call (the first builder's lamp run on #1495, lamp-4ace, 18 Oct 13:57).
-pub const NO_LIGHT: &str = "\n\nYour light\nYou cannot change your light right now: it is not ready. If someone asks you to change it, say in a few words that you can't right now. Never say you changed it.";
+pub const NO_LIGHT: &str = "\n\nYour light\nYou cannot change your light right now: it is not ready. If someone asks you to change it, say so in a few words of your own, not the same way twice. Never say you changed it.";
 
-/// Whether a session given `tools` has none of the light's functions
-/// while the voice takes an executive's: what [`NO_LIGHT`] is said for.
-pub fn light_missing(tools: &[Tool], settings: &Settings) -> bool {
-    settings.exec.is_some() && !names(tools).iter().any(|name| name.starts_with("light_"))
+/// What a session given `tools` is told it can't do right now, while the
+/// voice takes an executive's: the things the character says it can do for
+/// people that it has no function for, the light, the voice's volume and,
+/// with the reminder tools switched on, timers and reminders. The light
+/// alone is [`NO_LIGHT`]. With `lamp-actions` down, a session given none of
+/// them said "I've turned my voice down just a little bit" for "turn your
+/// light down a little", having no function at all (the first builder's
+/// lamp run on #1513, 18 Oct 16:27–16:32). None when it has them all.
+pub fn not_ready(tools: &[Tool], settings: &Settings) -> Option<String> {
+    settings.exec.as_ref()?;
+    let given = names(tools);
+    let has = |prefix: &str| given.iter().any(|name| name.starts_with(prefix));
+    let mut missing = Vec::new();
+    if !has("light_") {
+        missing.push("change your light");
+    }
+    if !has("volume_") {
+        missing.push("change how loud your voice is");
+    }
+    if settings.schedule_tools
+        && !given
+            .iter()
+            .any(|name| crate::tools::is_schedule_tool(name))
+    {
+        missing.push("set, list or change timers and reminders");
+    }
+    let (are, them) = if missing.len() == 1 {
+        ("it is", "it")
+    } else {
+        ("they are", "any of them")
+    };
+    match missing.as_slice() {
+        [] => None,
+        ["change your light"] => Some(NO_LIGHT.to_owned()),
+        _ => Some(format!(
+            "\n\nWhat you can't do right now\nYou cannot {} right now: {are} not ready. If someone asks for {them}, say so in a few words of your own, not the same way twice. Never say you did it.",
+            listed(&missing)
+        )),
+    }
+}
+
+/// "a or b", "a, b or c".
+fn listed(items: &[&str]) -> String {
+    match items {
+        [] => String::new(),
+        [only] => (*only).to_owned(),
+        [rest @ .., last] => format!("{} or {last}", rest.join(", ")),
+    }
 }
 
 /// The journal's line for a session's setup: how many functions it was
@@ -511,5 +555,53 @@ mod tests {
             setup_line(&declared(&plain), &plain),
             "lamp-voice: session functions: 0 declared"
         );
+    }
+
+    /// #1513's follow-up: what a session is told it can't do follows what
+    /// it lacks of the light's, the volume's and, with their switch, the
+    /// reminders' functions; the light alone is #1513's own words; nothing
+    /// for a session with them all, or a voice without an executive.
+    #[test]
+    fn a_session_is_told_each_thing_it_cannot_do_right_now() {
+        let folder = Folder::new("not-ready");
+        let declared = |names: &[&str]| -> Vec<Tool> {
+            names
+                .iter()
+                .map(|name| serde_json::from_value(tool(name)).unwrap())
+                .collect()
+        };
+        let exec = Settings {
+            exec: Some(folder.0.clone()),
+            ..Default::default()
+        };
+        let reminders = Settings {
+            schedule_tools: true,
+            ..exec.clone()
+        };
+        assert_eq!(
+            not_ready(&declared(&["light_on", "volume_up"]), &exec),
+            None
+        );
+        assert_eq!(
+            not_ready(&declared(&["volume_up"]), &exec).as_deref(),
+            Some(NO_LIGHT)
+        );
+        let volume = not_ready(&declared(&["light_on"]), &exec).unwrap();
+        assert!(volume.contains("You cannot change how loud your voice is right now: it is not ready. If someone asks for it,"), "{volume}");
+        let none = not_ready(&[], &reminders).unwrap();
+        assert!(none.contains("You cannot change your light, change how loud your voice is or set, list or change timers and reminders right now: they are not ready."), "{none}");
+        assert_eq!(
+            not_ready(
+                &declared(&["light_on", "volume_up", "set_timer"]),
+                &reminders
+            ),
+            None
+        );
+        // Reminders switched off are not something it was told it can do.
+        assert_eq!(
+            not_ready(&declared(&["light_on", "volume_up"]), &exec),
+            None
+        );
+        assert_eq!(not_ready(&[], &Settings::default()), None);
     }
 }

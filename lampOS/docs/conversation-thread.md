@@ -118,13 +118,16 @@ lamp left alone starts its next session as it always did. The instruction
 may be 16,384 bytes in all (it was 8,192 until the character file grew past
 seven thousand and left the thread room for three short exchanges). The
 thread takes what the character file, the time of day and, for a session
-without the light's functions, the light's line ([character.md](character.md),
-"What the runtime adds to it") leave of that, and when it does not all fit, the latest exchanges that do are told
-and the older ones are left out. With the file lamp-4ace runs (10,128
-bytes on 18 Oct) and the time line, the room is 6,088 bytes with the
-light's functions, and all eight exchanges fit at their longest (5,720
-bytes and the note); without them the light's line leaves 5,914, and the
-oldest is left out.
+without some of its functions, the line of what it can't do right now
+([character.md](character.md), "What the runtime adds to it") leave of
+that, and when it does not all fit, the latest exchanges that do are told
+and the older ones are left out. Eight exchanges at their longest and the
+note take 5,933–5,985 bytes. With the file lamp-4ace runs (10,180 bytes on
+18 Oct, #1549) the room is 6,036 bytes with a plain time line (168) and
+every function, so all eight fit; with lamp-4ace's `LAMP_CLOCK=on` time line
+(222–228 bytes) it is 5,976–5,982, so the oldest may be left out at the
+longest. The line of what it can't do takes 188 bytes for the light alone,
+236 for the light and the volume, and 278 with the reminders too.
 
 ## A session renewed on purpose
 
