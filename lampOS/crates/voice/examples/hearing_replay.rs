@@ -5,12 +5,14 @@
 //! device result: the replayed canceller ran on the host.
 //!
 //! ```text
-//! hearing_replay REPLAY_DIR [--signal aec_only|aec_linear|aec_ns|pre_aec] [--explained PERCENT]
+//! hearing_replay REPLAY_DIR [--signal aec_only|aec_linear|aec_linear_gated|aec_ns|pre_aec] [--explained PERCENT]
 //! ```
 //!
 //! For each replayed capture block (`capture_pair` in `operations.jsonl`),
 //! one replayed signal (`segment-001-<signal>.wav`, the AEC-only output by
-//! default; `aec_linear` is what `LAMP_VAD_INPUT=linear` scores) is scored by
+//! default; `aec_linear` is what `LAMP_VAD_INPUT=linear` scores, and
+//! `aec_linear_gated` is `LAMP_VAD_INPUT=linear-gated`: the linear output on a
+//! block the AEC-only evidence admits, the AEC-only output elsewhere) is scored by
 //! the voice's own detector, one stream as the coordinator runs it, and the
 //! block is judged by `Hearing::EVALUATED` against the AEC-only canceller's
 //! echo evidence, as the duplex rules judge it. `--explained` changes only
@@ -37,7 +39,7 @@ use lamp_audio::{
     duplex::{Confirmation, Heard, Hearing, Interruption},
     evidence::EchoEvidence,
 };
-use lamp_voice::activity::SpeechProbability;
+use lamp_voice::activity::{DetectorInput, SpeechProbability, detector_input};
 use serde_json::Value;
 use std::{
     fs,
@@ -50,7 +52,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>
 fn main() -> Result<()> {
     let usage = || {
         io::Error::other(
-            "usage: hearing_replay REPLAY_DIR [--signal aec_only|aec_linear|aec_ns|pre_aec] [--explained PERCENT]",
+            "usage: hearing_replay REPLAY_DIR [--signal aec_only|aec_linear|aec_linear_gated|aec_ns|pre_aec] [--explained PERCENT]",
         )
     };
     let mut args = std::env::args().skip(1);
@@ -62,7 +64,14 @@ fn main() -> Result<()> {
         let value = args.next().ok_or_else(usage)?;
         match flag.as_str() {
             "--signal"
-                if ["aec_only", "aec_linear", "aec_ns", "pre_aec"].contains(&value.as_str()) =>
+                if [
+                    "aec_only",
+                    "aec_linear",
+                    "aec_linear_gated",
+                    "aec_ns",
+                    "pre_aec",
+                ]
+                .contains(&value.as_str()) =>
             {
                 signal = value;
             }
@@ -87,10 +96,22 @@ fn main() -> Result<()> {
     if segments != 1 {
         return Err(io::Error::other(format!("{segments} segments; only one is read")).into());
     }
-    let samples: Vec<i16> =
-        hound::WavReader::open(directory.join(format!("segment-001-{signal}.wav")))?
-            .into_samples::<i16>()
-            .collect::<std::result::Result<_, _>>()?;
+    let read = |signal: &str| -> Result<Vec<i16>> {
+        Ok(
+            hound::WavReader::open(directory.join(format!("segment-001-{signal}.wav")))?
+                .into_samples::<i16>()
+                .collect::<std::result::Result<_, _>>()?,
+        )
+    };
+    // `aec_linear_gated` reads the AEC-only output and the linear one, and
+    // picks between them block by block.
+    let gated = signal == "aec_linear_gated";
+    let samples = read(if gated { "aec_only" } else { &signal })?;
+    let linear_samples = if gated {
+        Some(read("aec_linear")?)
+    } else {
+        None
+    };
     let mut table = BufWriter::new(fs::File::create(directory.join(&table_name))?);
     writeln!(
         table,
@@ -117,12 +138,29 @@ fn main() -> Result<()> {
             .get(offset..offset + CAPTURE_SAMPLES)
             .ok_or_else(|| io::Error::other("the output is shorter than its records"))?
             .try_into()?;
-        let probability = detector.analyze(&block);
         let read_at = record["meta"]["first_read_started_at_us"]
             .as_u64()
             .ok_or_else(|| io::Error::other("capture_pair without its read time"))?;
         let evidence: Option<EchoEvidence> =
             serde_json::from_value(record["echo_evidence"]["aec_only"].clone())?;
+        let linear: Option<CaptureBlock> = linear_samples
+            .as_ref()
+            .map(|linear| {
+                linear
+                    .get(offset..offset + CAPTURE_SAMPLES)
+                    .ok_or_else(|| {
+                        io::Error::other("the linear output is shorter than its records")
+                    })?
+                    .try_into()
+                    .map_err(|_| io::Error::other("a short linear block"))
+            })
+            .transpose()?;
+        let probability = detector.analyze(detector_input(
+            DetectorInput::LinearGated,
+            evidence.as_ref(),
+            &block,
+            linear.as_ref(),
+        ));
         let (heard, plain) = evidence.map_or((Heard::Unknown, false), |evidence| {
             let heard = hearing.heard(probability, &evidence);
             (heard, hearing.plain(heard, &evidence))

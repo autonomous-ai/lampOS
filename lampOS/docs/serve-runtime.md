@@ -495,6 +495,33 @@ yet) is read as before. `activity::tests::the_detector_hears_the_linear_output_o
 scores a generated "Stop." (Piper `en_US-libritts-high`) with the processed block silenced: speech with
 the switch, silence without it.
 
+With `LAMP_VAD_INPUT=linear-gated` (the second exact value, passed on the
+same way) the detector reads the linear output only on a block the duplex
+rules would take speech in for a person: the room clear of the lamp
+(`Heard::Clear`) or someone plainly over it (`Heard::Over`, at most 75 %
+explained by the render with a fresh alignment), judged by
+`Hearing::EVALUATED` on the block's own evidence at a score of 1
+(`activity::linear_admitted`). Everywhere else (the lamp's own voice that the
+render explains, a block not yet judged, untrusted evidence) it reads the
+processed block, as without the switch. So the lamp alone is scored as the
+processed block scores it, for every reader of the score, while on each
+block a yield can come from the score is the linear output's, as with
+`linear`: the duplex rules need both a speech score and under 75 %
+explained, so a block the gate leaves on the processed block could not have
+been heard as a person over the lamp either way. Only the detector's state
+differs, since one detector runs over whichever block it is given. The
+gate's thresholds are the duplex rules' own; it adds none. `Hearing`'s
+listening-gap form (`silence_heard`, with ears) is not used for the gate, so
+a gap of zeros stays on the processed block. `hearing_replay REPLAY_DIR
+--signal aec_linear_gated` scores a replay this way, from its AEC-only and
+linear outputs and the AEC-only evidence, beside `aec_only` and `aec_linear`
+on the same replay. Tests:
+`activity::tests::linear_gated_reads_the_linear_output_only_where_speech_would_be_a_person`
+and `linear_gated_keeps_the_lamps_own_voice_out_and_a_stop_over_it_in` (the
+generated "Stop." kept in the linear output: with 95 % explained it scores as
+speech with `linear` and as silence with `linear-gated`; at 10 % explained, or
+with the room clear, block for block what `linear` gives).
+
 ## Stop and current limits
 
 After entering the coordinator loop, SIGTERM/SIGINT records a service-stop request,

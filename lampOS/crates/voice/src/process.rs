@@ -865,13 +865,14 @@ fn capture_stages_worker_environment(
 }
 
 // The detector's input (#828), to the one worker that runs it: capture,
-// and only the exact `linear`.
+// and only the exact `linear` or `linear-gated`.
 fn vad_input_worker_environment(
     role: &str,
     value: Option<&std::ffi::OsStr>,
 ) -> Option<(&'static str, &'static str)> {
-    (role == "capture" && value == Some(std::ffi::OsStr::new("linear")))
-        .then_some((crate::activity::INPUT_ENVIRONMENT, "linear"))
+    let value =
+        crate::activity::DetectorInput::parse(value.and_then(std::ffi::OsStr::to_str)).value()?;
+    (role == "capture").then_some((crate::activity::INPUT_ENVIRONMENT, value))
 }
 
 // The capture worker's cores (#705), to capture only, as set: the worker
@@ -975,6 +976,28 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// The detector's input (#828) goes to the capture worker only, and only
+    /// as one of its two exact values.
+    #[test]
+    fn the_detector_input_reaches_capture_only_as_an_exact_value() {
+        for role in ["capture", "provider", "second", "speaker", "ring", "camera"] {
+            for (value, passed) in [
+                ("linear", Some("linear")),
+                ("linear-gated", Some("linear-gated")),
+                ("on", None),
+                ("Linear", None),
+                ("linear-gated ", None),
+            ] {
+                let got = vad_input_worker_environment(role, Some(std::ffi::OsStr::new(value)));
+                let expected = passed
+                    .filter(|_| role == "capture")
+                    .map(|passed| ("LAMP_VAD_INPUT", passed));
+                assert_eq!(got, expected, "role {role}, value {value:?}");
+            }
+            assert_eq!(vad_input_worker_environment(role, None), None);
         }
     }
 
