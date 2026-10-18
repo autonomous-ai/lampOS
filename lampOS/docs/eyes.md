@@ -80,10 +80,13 @@ sees" with what has and has not been shown of it.
   remember is under way, a glance whose frame is like the last one the
   detector ran on is said to hold no face without running the detector;
   the detector still runs at least every 3 s, and at every glance until
-  the picture has been still for 3 s. So someone who walks in and sits
-  down is detected at each glance while they move and for 3 s after: a
-  frame the detector misses (dim light, half turned, at the edge) costs
-  one glance, not 3 s (the reviewer on #1441). With nobody in view the
+  the picture has been still for two glances in a row. So someone who
+  walks in and sits down is detected at each glance while they move and
+  at the two after: a frame the detector misses (dim light, half turned,
+  at the edge) costs one glance, not 3 s (the reviewer on #1441). It was
+  3 s of glances after each change, which on lamp-4ace's empty office kept
+  64 % of the glances detected as "settling" (#1460, 18 Oct, 11:22 to
+  11:42). With nobody in view the
   glances cost lamp-4ace 104 to 130 ms of a core each, 16 or 17 every 10 s
   (02:00 to 05:00 on 18 Oct, 0 faces): about 20 % of one core all night,
   which a look every 3 s brings to about 4 % for a still room and a
@@ -95,8 +98,13 @@ sees" with what has and has not been shown of it.
   (the camera's exposure, the room's light) and what a whole row does (a
   light's flicker, drawn by the rolling shutter as bands across) are not
   a change; and each cell learns its own noise from the empty room's
-  glances (about the last ten), so a screen or a plant that flickers in
-  one place stops counting once learned. Three cells or more past 12
+  glances, so a screen or a plant that flickers in one place stops
+  counting once learned. A cell's noise falls about ten glances back but
+  rises five times slower, so a person moving in one place unseen (their
+  back turned, pacing, fidgeting) is not taken for noise in a few
+  seconds: their first eight seconds of glances are detected, and after
+  that the 3 s look still finds them. The lamp check should try it (the
+  reviewer on #1460). Three cells or more past 12
   greys and four times their own noise are a change. On lamp-4ace's empty
   office the plain rule, against the previous frame, saw 49 cells change
   a frame (#1441, 18 Oct, 10:00 to 10:20), and no glance was skipped;
@@ -108,20 +116,37 @@ sees" with what has and has not been shown of it.
   to 0.14 across the office, may change fewer and wait for the 3 s look. Someone coming into
   view changes the picture, so the glance after it runs the detector, as
   before; the head moving is a change too, and each change past the bar
-  brings back detection at every glance for 3 s (five glances): a head
-  that idles every few seconds keeps today's rate. The whole room's light
-  changing is not a change; the 3 s look still covers it. Any face found, even
+  brings back detection for the changed glance and the two after: a head
+  that idles every few seconds keeps more of today's rate. The whole room's light
+  changing is not a change; the 3 s look still covers it. Nor is a change
+  while the lamp's own light changes: at each glance the eyes read
+  `light/state` from the bus, and a glance whose light differs from one of
+  the two before (the change and the ring's fade) counts a change as the
+  lamp's own (`OwnLight`): not detected, and its noise not learned. The
+  first glance after is compared with the frame from before, so the new
+  light counts once. On lamp-4ace the twenty minutes with the light scene
+  and the battery changed far more cells than a quiet twenty (#1479,
+  18 Oct), but the two ran different builds, so the light's share is for
+  the next run to show. The lamp speaking does not count: people come
+  over or turn to a lamp exactly when it talks (the reviewer on #1479).
+  What it costs: someone who comes in during the light's two glances is
+  seen at the first glance after. Any face found, even
   one too small to follow (but not one `--leave-still-faces` leaves out),
   keeps every glance detected for 4 s. A glance not detected tells the
   body, the bus and the known file what a look with no face tells them,
   as often as today. **The trade the switch makes:** someone in view but
-  not found (their back turned, reading) who has kept still for 3 s and
+  not found (their back turned, reading) who has kept still for two
+  glances and
   then turns slowly to the camera, changing the picture less than the
   bar, is found at the next 3 s look, not the next 600 ms one; the lamp
   check should try it. Tests: `change.rs`'s
-  `noise_is_no_change_and_a_face_or_a_slow_drift_is`,
+  `noise_is_no_change_and_a_face_is_and_the_frames_light_is_not`,
+  `flicker_bands_exposure_and_a_screen_are_no_change_but_a_face_is`,
+  `a_flicker_that_stops_does_not_leave_its_cells_deaf_for_long`,
+  `a_person_moving_in_one_place_is_not_learned_as_noise_in_seconds`,
+  `the_lamps_own_light_changing_is_not_a_change`,
   `an_empty_still_room_is_detected_every_three_seconds_and_a_change_at_once`,
-  `a_walk_in_and_sit_down_is_detected_at_every_glance_until_still_for_three_seconds`,
+  `a_walk_in_and_sit_down_is_detected_at_every_glance_until_still_for_two`,
   `without_the_switch_every_glance_is_detected` and
   `a_face_an_ask_or_a_remember_is_never_an_empty_room`. Raising the bar to
   40 cells, lowering it to 2 greys, waiting 6 s instead of 3, comparing
@@ -155,8 +180,12 @@ sees" with what has and has not been shown of it.
   is then per glance, far under a detection's cost, and the heat
   comparisons read "ms a detected look". With a sight file it also says
   the file's size a frame and what its check, write and rename each took.
+  With `--full-look`, the "sight file" stage also holds the working
+  frame's decode and re-encode at 320 across (`full_look::working`), which
+  those three do not time.
   It goes on to say why each
-  glance was detected (the picture changed, it was settling within 3 s of
+  glance was detected, or not because the lamp's own light changed
+  (the picture changed, it was settling within two glances of
   a change, the 3 s look, the first glance, a face found under 4 s ago, a
   full look asked, or someone being remembered), the most and the mean
   cells changed against the bar of 3, over the empty-room glances it

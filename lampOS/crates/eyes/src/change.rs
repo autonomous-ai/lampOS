@@ -10,10 +10,12 @@
 //! a frame is said to hold no face without the detector, and the detector
 //! still runs at least every [`LOOK_AT_LEAST_US`], whatever the picture,
 //! and at every glance until the picture has stayed still for
-//! [`STILL_FOR_US`]: a person who walks in and sits down is detected at
-//! each glance while they move and for 3 s after, so a frame the detector
-//! misses (dim, half turned) costs a glance, not 3 s (the reviewer on
-//! #1441).
+//! [`SETTLE_GLANCES`] glances in a row: a person who walks in and sits
+//! down is detected at each glance while they move and at the two after,
+//! so a frame the detector misses (dim, half turned) costs a glance, not
+//! 3 s (the reviewer on #1441). It was 3 s of glances after each change;
+//! on lamp-4ace's empty office that kept 64 % of the glances detected as
+//! "settling" (#1460, 18 Oct, 11:22 to 11:42).
 //!
 //! A frame is compared as a grid of [`ACROSS`] by [`DOWN`] cells, each the
 //! mean grey of its pixels: a sensor's noise averages out over a cell's
@@ -30,9 +32,13 @@ pub const GREYS: f32 = 12.0;
 /// this many times over: a cell changed past [`GREYS`] and past this many
 /// times its noise has changed.
 pub const NOISE_TIMES: f32 = 4.0;
-/// How much of a cell's noise each compared glance teaches: about the last
-/// ten glances, six seconds.
-const NOISE_LEARNS: f32 = 0.1;
+/// How much of a cell's noise each compared glance teaches, rising and
+/// falling: it falls about ten glances back (six seconds), and rises five
+/// times slower, so a few seconds of a person moving in one place unseen
+/// do not teach their cells to be noise (the reviewer on #1460: at one
+/// rate, 19 to 22 of such a person's 40 glances were skipped).
+const NOISE_RISES: f32 = 0.02;
+const NOISE_FALLS: f32 = 0.1;
 /// This many changed cells are a changed frame: a face at 0.15 of the
 /// picture's height (`sight::LEAST_SIZE`, the smallest the body turns to)
 /// changes six or more cells from 15 greys of contrast. A smaller face,
@@ -40,8 +46,9 @@ const NOISE_LEARNS: f32 = 0.1;
 pub const CELLS: usize = 3;
 /// The detector runs at least this often, changed or not.
 pub const LOOK_AT_LEAST_US: u64 = 3_000_000;
-/// And at every glance until the picture has been still this long.
-pub const STILL_FOR_US: u64 = 3_000_000;
+/// And at every glance until the picture has been still this many glances
+/// in a row after a change.
+pub const SETTLE_GLANCES: u32 = 2;
 
 /// A frame as the cells' mean greys.
 #[derive(Clone, Debug, PartialEq)]
@@ -131,6 +138,38 @@ pub fn detect(
     change.is_none_or(|change| change.detect(Grid::of(picture), busy, now_us))
 }
 
+/// Whether the lamp's own light is changing, as the eyes see it at each
+/// glance: `light/state` differs from one of the two glances before (a
+/// change and the ring's fade into it, about 1.2 s). The ring lights what
+/// the camera sees, and on lamp-4ace the twenty minutes with the light
+/// scene changed far more cells than a quiet twenty (#1479, 18 Oct; the two
+/// were different builds, so that is a pointer, not a measure). A change
+/// the camera sees then is the lamp's own, not someone coming in; the 3 s
+/// look still runs. The lamp speaking is not counted: people come over or
+/// turn to a lamp exactly when it talks (the reviewer on #1479), and the
+/// ring's speaking face changes no colour.
+#[derive(Debug, Default)]
+pub struct OwnLight {
+    seen: std::collections::VecDeque<Option<lamp_msgs::Light>>,
+}
+
+impl OwnLight {
+    /// This glance's `light/state` (none if unknown): whether a change seen
+    /// now is the lamp's own.
+    pub fn lit(&mut self, light: Option<lamp_msgs::Light>) -> bool {
+        self.seen.push_back(light);
+        if self.seen.len() > 3 {
+            self.seen.pop_front();
+        }
+        let newest = self.seen.back().cloned().flatten();
+        self.seen
+            .iter()
+            .rev()
+            .skip(1)
+            .any(|before| before.is_some() && newest.is_some() && *before != newest)
+    }
+}
+
 /// Nobody has been found for this long: the room counts as empty.
 pub const EMPTY_AFTER_US: u64 = 4_000_000;
 
@@ -177,7 +216,10 @@ pub struct Why {
     pub first: u32,
     /// The picture changed past the bar from the last frame detected.
     pub changed: u32,
-    /// Unchanged, but changed under [`STILL_FOR_US`] ago.
+    /// Changed, but while the lamp's own light was changing
+    /// ([`OwnLight`]): not counted as a change.
+    pub lit: u32,
+    /// Unchanged, but fewer than [`SETTLE_GLANCES`] glances since a change.
     pub settling: u32,
     /// Unchanged and still, but [`LOOK_AT_LEAST_US`] since the last.
     pub every: u32,
@@ -203,7 +245,8 @@ pub struct Why {
 impl Why {
     pub fn line(&self) -> String {
         format!(
-            "; detected: {} changed, {} settling, {} every 3 s, {} first, {} near a face, {} asked, {} remembering; cells changed over {} empty-room glances: most {}, mean {:.1} (bar {CELLS}); plain mean {:.1}, rows taken out {:.1}; the frame's shift {:.1} greys",
+            "; not detected while the lamp's light changed: {}; detected: {} changed, {} settling, {} every 3 s, {} first, {} near a face, {} asked, {} remembering; cells changed over {} empty-room glances: most {}, mean {:.1} (bar {CELLS}); plain mean {:.1}, rows taken out {:.1}; the frame's shift {:.1} greys",
+            self.lit,
             self.changed,
             self.settling,
             self.every,
@@ -226,14 +269,24 @@ impl Why {
 #[derive(Default)]
 pub struct Change {
     last: Option<(Grid, u64)>,
-    changed_at: Option<u64>,
+    /// Unchanged glances in a row since the last change, if there was one.
+    since_change: Option<u32>,
     /// Each cell's noise, learned from empty-room glances; empty until the
     /// first.
     noise: Vec<f32>,
+    /// The lamp's own light is changing, or it speaks, for this glance
+    /// ([`Change::set_lit`]).
+    lit: bool,
     why: Why,
 }
 
 impl Change {
+    /// Whether the lamp's own light is changing for the next glance
+    /// ([`OwnLight::lit`]): a change then is the lamp's, not the room's.
+    pub fn set_lit(&mut self, lit: bool) {
+        self.lit = lit;
+    }
+
     /// Whether the detector runs on this frame. `busy`: why the room is not
     /// empty, if it is not; then it always runs.
     pub fn detect(&mut self, grid: Grid, busy: Option<Busy>, now_us: u64) -> bool {
@@ -268,13 +321,17 @@ impl Change {
             )
         });
         let cells = compared.as_ref().map(|compared| compared.0);
-        let changed = cells.is_some_and(|cells| cells >= CELLS);
-        if changed {
-            self.changed_at = Some(now_us);
-        }
+        let lit = self.lit && cells.is_some_and(|cells| cells >= CELLS);
+        let changed = !self.lit && cells.is_some_and(|cells| cells >= CELLS);
+        self.since_change = if changed {
+            Some(0)
+        } else {
+            self.since_change.map(|still| still.saturating_add(1))
+        };
+        // The changed glance and the [`SETTLE_GLANCES`] still ones after it.
         let moving = self
-            .changed_at
-            .is_some_and(|at| now_us.saturating_sub(at) < STILL_FOR_US);
+            .since_change
+            .is_some_and(|still| still <= SETTLE_GLANCES);
         let due = self
             .last
             .as_ref()
@@ -289,10 +346,16 @@ impl Change {
             why.row_cells += row_cells;
             why.plain_cells += plain_cells;
             why.frame_shift += shift;
-            // The room's own noise, learned only while it is empty and
-            // after the glance is judged.
-            for (noise, residual) in self.noise.iter_mut().zip(residuals) {
-                *noise += NOISE_LEARNS * (residual.abs() - *noise);
+            // The room's own noise, learned only while it is empty, not
+            // from the lamp's own light, and after the glance is judged.
+            for (noise, residual) in self.noise.iter_mut().zip(residuals).filter(|_| !self.lit) {
+                let towards = residual.abs() - *noise;
+                *noise += towards
+                    * if towards > 0.0 {
+                        NOISE_RISES
+                    } else {
+                        NOISE_FALLS
+                    };
             }
         }
         let counted = match busy {
@@ -301,6 +364,7 @@ impl Change {
             Some(Busy::Face) => &mut why.face,
             None if cells.is_none() => &mut why.first,
             None if changed => &mut why.changed,
+            None if lit && !moving && !due => &mut why.lit,
             None if moving => &mut why.settling,
             None if due => &mut why.every,
             None => &mut why.skipped,
@@ -316,7 +380,7 @@ impl Change {
     /// Looks said to hold no face without the detector, since the last
     /// [`Change::take_why`].
     pub fn skipped(&self) -> u32 {
-        self.why.skipped
+        self.why.skipped + self.why.lit
     }
 
     pub fn take_why(&mut self) -> Why {
@@ -332,6 +396,28 @@ mod tests {
     /// noise of up to 4 greys on every pixel, and a box drawn in.
     fn room(seed: u32, drift: f32, face: Option<(usize, usize, usize)>) -> Picture {
         scene(seed, drift, false, 0.0, face)
+    }
+
+    /// `room`, with the wall's top right `lit` 40 greys brighter, as the
+    /// ring's light falls on it.
+    fn scene_lit(seed: u32, lit: bool) -> Picture {
+        let plain = scene(seed, 0.0, false, 0.0, None);
+        let mut rgb = Vec::with_capacity(320 * 240 * 3);
+        for y in 0..240usize {
+            for x in 0..320usize {
+                let at = y * WIDTH + x;
+                let plane = WIDTH * HEIGHT;
+                let lift = if lit && x >= 200 && y < 120 {
+                    40.0
+                } else {
+                    0.0
+                };
+                for p in [2, 1, 0] {
+                    rgb.push((plain.planes[p * plane + at] + lift).min(255.0) as u8);
+                }
+            }
+        }
+        Picture::from_rgb(&rgb, 320, 240).unwrap()
     }
 
     /// `room`, with a light's flicker drawn as bands across, of up to 30
@@ -464,9 +550,9 @@ mod tests {
             }
         }
         // 0 s, 3 s, 6 s; the face at 7.2 s; back to empty at 7.8 s, and
-        // every glance until the picture has been still for 3 s.
-        assert_eq!(detected, [0, 5, 10, 12, 13, 14, 15, 16, 17]);
-        assert_eq!(change.take_why().skipped, 11);
+        // the two still glances after it.
+        assert_eq!(detected, [0, 5, 10, 12, 13, 14, 15]);
+        assert_eq!(change.take_why().skipped, 13);
         assert_eq!(change.take_why().skipped, 0);
         for glance in 20..30u64 {
             let grid = Grid::of(&room(glance as u32, 0.0, None));
@@ -475,11 +561,136 @@ mod tests {
         assert_eq!(change.take_why().skipped, 0);
     }
 
-    /// (b) Someone walks in over four glances and sits still: every
-    /// glance while they move and for 3 s after is detected, so a frame
-    /// the detector misses costs a glance, not 3 s.
+    /// The reviewer on #1479: a cell's noise falls five times faster than
+    /// it rises, so a flicker that stops (a screen switched off) does not
+    /// leave its cells deaf for long: a face at its place twelve glances
+    /// later is seen.
     #[test]
-    fn a_walk_in_and_sit_down_is_detected_at_every_glance_until_still_for_three_seconds() {
+    fn a_flicker_that_stops_does_not_leave_its_cells_deaf_for_long() {
+        let mut change = Change::default();
+        for glance in 0..30u64 {
+            let screen = if glance % 2 == 0 { 40.0 } else { -40.0 };
+            change.detect(
+                Grid::of(&scene(glance as u32, 0.0, false, screen, None)),
+                None,
+                glance * GLANCE_US,
+            );
+        }
+        for glance in 30..42u64 {
+            change.detect(
+                Grid::of(&scene(glance as u32, 0.0, false, 0.0, None)),
+                None,
+                glance * GLANCE_US,
+            );
+        }
+        let before = change.take_why();
+        let face = Grid::of(&scene(42, 0.0, false, 0.0, Some((0, 0, 28))));
+        change.detect(face, None, 42 * GLANCE_US);
+        assert_eq!(change.take_why().changed, 1, "{before:?}");
+    }
+
+    /// #1479 on lamp-4ace: the lamp's own light lights what the camera
+    /// sees. A change while it changes (or while the lamp speaks) is not a
+    /// change; the first glance after is, once, against the frame from
+    /// before, and then the room is still again. A person coming in while
+    /// the light changes is seen at that first glance after.
+    #[test]
+    fn the_lamps_own_light_changing_is_not_a_change() {
+        let mut change = Change::default();
+        let mut detected = Vec::new();
+        for glance in 0..16u64 {
+            // The ring turns warm at glance 3: the wall nearest it, the
+            // top right, is 40 greys brighter from then on.
+            let lit_wall = glance >= 3;
+            change.set_lit(matches!(glance, 3 | 4));
+            let grid = Grid::of(&scene_lit(glance as u32, lit_wall));
+            if change.detect(grid, None, glance * GLANCE_US) {
+                detected.push(glance);
+            }
+        }
+        let why = change.take_why();
+        // 0 first; 3 and 4 lit and not detected; 5 the change, once, and
+        // two settling; then the 3 s look.
+        assert_eq!(detected, [0, 5, 6, 7, 12], "{why:?}");
+        assert_eq!((why.lit, why.changed), (2, 1), "{why:?}");
+        // `light/state` changing makes this glance and the next lit.
+        let warm = |level| {
+            Some(lamp_msgs::Light {
+                on: true,
+                colour: "warm".into(),
+                level,
+            })
+        };
+        let mut own = OwnLight::default();
+        let lit: Vec<bool> = [warm(3), warm(3), warm(4), warm(4), warm(4), None, warm(4)]
+            .into_iter()
+            .map(|light| own.lit(light))
+            .collect();
+        assert_eq!(lit, [false, false, true, true, false, false, false]);
+    }
+
+    /// The reviewer on #1479: someone who walks up while the lamp speaks,
+    /// its light steady, is detected at once, as in a quiet room: the
+    /// voice speaking makes no glance the lamp's own.
+    #[test]
+    fn a_walk_in_while_the_lamp_speaks_is_detected_at_once() {
+        let warm = Some(lamp_msgs::Light {
+            on: true,
+            colour: "warm".into(),
+            level: 3,
+        });
+        let mut own = OwnLight::default();
+        let mut change = Change::default();
+        let mut detected = Vec::new();
+        for glance in 0..20u64 {
+            let face = match glance {
+                10..=13 => Some((40 + 50 * (glance as usize - 10), 60, 60)),
+                14.. => Some((190, 60, 60)),
+                _ => None,
+            };
+            change.set_lit(own.lit(warm.clone()));
+            if change.detect(
+                Grid::of(&room(glance as u32, 0.0, face)),
+                None,
+                glance * GLANCE_US,
+            ) {
+                detected.push(glance);
+            }
+        }
+        assert!(
+            detected.starts_with(&[0, 5, 10, 11, 12, 13]),
+            "{detected:?}"
+        );
+    }
+
+    /// The reviewer on #1460: someone moving in one place unseen (pacing,
+    /// fidgeting, their back turned) is not learned as noise in a few
+    /// seconds: a cell's noise rises five times slower than it falls, so
+    /// their first eight seconds of glances are all detected.
+    #[test]
+    fn a_person_moving_in_one_place_is_not_learned_as_noise_in_seconds() {
+        let mut change = Change::default();
+        let mut detected = Vec::new();
+        for glance in 0..30u64 {
+            let fidget = if glance % 2 == 0 { 25.0 } else { -25.0 };
+            let grid = Grid::of(&scene(glance as u32, 0.0, false, fidget, None));
+            if change.detect(grid, None, glance * GLANCE_US) {
+                detected.push(glance);
+            }
+        }
+        assert!(
+            detected.starts_with(&(0..14).collect::<Vec<_>>()),
+            "{detected:?}"
+        );
+        // Learned in time, as a screen is: the rest are not all detected.
+        assert!(detected.len() < 30, "{detected:?}");
+    }
+
+    /// (b) Someone walks in over four glances and sits still: every
+    /// glance while they move and the two still ones after are detected,
+    /// so a frame the detector misses costs a glance, not 3 s.
+    #[test]
+    fn a_walk_in_and_sit_down_is_detected_at_every_glance_until_still_for_two() {
         let mut change = Change::default();
         let mut detected = Vec::new();
         for glance in 0..30u64 {
@@ -494,8 +705,8 @@ mod tests {
             }
         }
         // Sat down where the fourth step put them (glance 13, 7.8 s): the
-        // last change, so detected to 10.2 s, then every 3 s.
-        assert_eq!(detected, [0, 5, 10, 11, 12, 13, 14, 15, 16, 17, 22, 27]);
+        // last change, so 14 and 15 too, then every 3 s.
+        assert_eq!(detected, [0, 5, 10, 11, 12, 13, 14, 15, 20, 25]);
     }
 
     /// (c) Without the switch every glance is detected; with it, an empty,
@@ -535,15 +746,16 @@ mod tests {
         change.detect(grid, Some(Busy::Asked), 23 * GLANCE_US);
         let why = change.take_why();
         // As `an_empty_still_room_is_…`: 0 first; 5 and 10 every 3 s; the
-        // face in and out at 12 and 13; settling to 17; eleven skipped.
+        // face in and out at 12 and 13; settling at 14 and 15; thirteen
+        // skipped.
         assert_eq!(
             (why.first, why.every, why.changed, why.settling, why.skipped),
-            (1, 2, 2, 4, 11)
+            (1, 2, 2, 2, 13)
         );
         assert_eq!((why.face, why.asked, why.remembering), (3, 1, 0));
         assert_eq!(why.compared, 19);
         assert!(why.most_cells >= CELLS && why.cells >= 2 * CELLS, "{why:?}");
-        assert!(why.line().contains("2 changed, 4 settling, 2 every 3 s"));
+        assert!(why.line().contains("2 changed, 2 settling, 2 every 3 s"));
         assert_eq!(change.take_why(), Why::default());
         assert_eq!(busy(false, false, Some(1)), Some(Busy::Face));
         assert_eq!(busy(true, true, Some(1)), Some(Busy::Asked));

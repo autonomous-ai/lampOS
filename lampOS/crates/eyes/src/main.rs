@@ -474,6 +474,13 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     let mut change = arguments
         .look_on_change
         .then(lamp_eyes::change::Change::default);
+    // With it, the lamp's own light, read from the bus at each glance: a
+    // change while the ring's light changes is the lamp's own.
+    let own_bus = arguments
+        .look_on_change
+        .then(|| lamp_bus::Bus::from_environment().ok())
+        .flatten();
+    let mut own_light = lamp_eyes::change::OwnLight::default();
     // Whether one face has sat still long enough to look half as often.
     let mut steady = lamp_eyes::steady::Steady::default();
     let (mut frames, mut looks, mut with_face, mut unreadable) = (0u32, 0u32, 0u32, 0u32);
@@ -911,6 +918,16 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 who.as_ref().is_some_and(|who| who.taking.is_some()),
                 any_face_at.map(|at| at.elapsed().as_micros() as u64),
             );
+            if let Some(change) = change.as_mut() {
+                let fresh = |topic: &str| {
+                    own_bus
+                        .as_ref()
+                        .and_then(|bus| bus.latest(topic).ok().flatten())
+                        .filter(|message| !message.expired)
+                };
+                let light = fresh("light/state").and_then(|message| message.parse().ok());
+                change.set_lit(own_light.lit(light));
+            }
             let decoded = Picture::from_jpeg(&frame[..used]);
             stage(&mut stage_at, &mut stages[1]);
             let found = decoded.and_then(|picture| {
