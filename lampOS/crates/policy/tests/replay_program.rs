@@ -267,6 +267,7 @@ fn an_earlier_run_is_fitted_again_to_each_models_answers() {
             choice: "answer".into(),
             probability: 0.9,
             by: "typesafe/jev-1.13-20260917".into(),
+            follows_lamp: None,
         };
         // `old` is a run from before the answers were kept.
         let old = Replayed::Chose {

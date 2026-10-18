@@ -69,6 +69,7 @@ fn logged(id: &str, at: u64, heard: &str, room: Room) -> Logged {
         choice: "answer".into(),
         probability: 0.9,
         by: "typesafe/jev-1.13-20260917".into(),
+        follows_lamp: None,
     }
 }
 
@@ -94,12 +95,22 @@ fn the_logged_attention_decisions_are_read_with_their_place_in_the_day() {
         json!({"at_unix_ms": 4, "about": "attention", "judgement": {}}).to_string(),
         attention(5, "Voglio mangiare sushi."),
     ];
-    fs::write(dir.join("decisions-2026-10-15.jsonl"), lines.join("\n")).unwrap();
+    // A line cut inside a character, as a write the power took leaves one
+    // (the reviewer on #1510): not text, counted unread, and the lines
+    // after it still read.
+    let mut file = lines.join("\n").into_bytes();
+    let cut = attention(6, "Lamp ơi");
+    let inside = cut.find('ơ').unwrap() + 1;
+    file.push(b'\n');
+    file.extend_from_slice(&cut.as_bytes()[..inside]);
+    file.push(b'\n');
+    file.extend_from_slice(attention(7, "Lamp, warmer.").as_bytes());
+    fs::write(dir.join("decisions-2026-10-15.jsonl"), file).unwrap();
     let (read, unread) = read(&dir, &["2026-10-14".into(), "2026-10-15".into()]).unwrap();
     fs::remove_dir_all(&dir).unwrap();
-    assert_eq!(unread, 2);
+    assert_eq!(unread, 3);
     let ids: Vec<&str> = read.iter().map(|logged| logged.id.as_str()).collect();
-    assert_eq!(ids, ["2026-10-15#1", "2026-10-15#5"]);
+    assert_eq!(ids, ["2026-10-15#1", "2026-10-15#5", "2026-10-15#7"]);
     assert_eq!(read[0].context.room, Room::Busy);
     assert_eq!(read[1].choice, "stay_quiet");
     assert_eq!(read[1].context.name_heard, None);
@@ -567,4 +578,137 @@ fn labels_that_disagree_at_one_moment_are_refused_and_a_repeat_is_one() {
         pictures_summary(&lines, &repeated)["labels"],
         json!({"given": 1, "matched": 1, "unmatched": 0, "ambiguous": 0, "conflicting": 0})
     );
+}
+
+fn decided(context: Context, choice: &str, by: &str) -> Logged {
+    Logged {
+        id: "2026-10-18#1".into(),
+        at_unix_ms: 1,
+        context,
+        choice: choice.into(),
+        probability: 0.5,
+        by: by.into(),
+        follows_lamp: None,
+    }
+}
+
+/// #705, Ten's step 2 on the Policy's wait: each model decision beside the
+/// rule's on the same context, by kind. The rule's own decisions are left
+/// out, a look up counts as taking the turn, and a kind is certain only
+/// with enough decisions and no disagreement.
+#[test]
+fn the_rule_and_the_model_are_counted_side_by_side_by_kind() {
+    let called = |score: f32| Context {
+        name_heard: Some(score),
+        ..context("hey lamp, warmer", Room::Busy)
+    };
+    let busy = context("we should go", Room::Busy);
+    let quiet = context("make it brighter", Room::Quiet);
+    let mut logged = Vec::new();
+    // Called plainly in a busy room: both take it, three times.
+    for _ in 0..3 {
+        logged.push(decided(called(0.995), "answer", "typesafe/jev-1.13"));
+    }
+    // Busy, not called: the rule stays quiet; the model once answers, once
+    // looks up, once stays quiet.
+    logged.push(decided(busy.clone(), "answer", "typesafe/jev-1.13"));
+    logged.push(decided(busy.clone(), "look_up", "typesafe/jev-1.13"));
+    logged.push(decided(busy.clone(), "stay_quiet", "typesafe/jev-1.13"));
+    // Quiet room: the rule takes it; the model stays quiet once.
+    logged.push(decided(quiet.clone(), "stay_quiet", "typesafe/jev-1.13"));
+    // The rule's own decision is not a model's.
+    logged.push(decided(busy.clone(), "stay_quiet", "rule"));
+    // Fourth and the reviewer on #1510: a model's `stay_quiet` following the
+    // lamp (follows_lamp 0.89) runs the lamp's calls, where the rule's plain
+    // `stay_quiet` holds them: a disagreement, not an agreement. Below the
+    // bar it is the plain one.
+    let after_the_lamp = context("thanks, now a bit louder", Room::Unknown);
+    logged.push(Logged {
+        follows_lamp: Some(0.89),
+        ..decided(after_the_lamp.clone(), "stay_quiet", "typesafe/jev-1.13")
+    });
+    logged.push(Logged {
+        follows_lamp: Some(0.31),
+        ..decided(after_the_lamp.clone(), "stay_quiet", "typesafe/jev-1.13")
+    });
+    let kinds = agreement(&logged);
+    assert_eq!(
+        kinds[&Kind::of(&called(0.995))],
+        Agreement {
+            decisions: 3,
+            agreed: 3,
+            ..Agreement::default()
+        }
+    );
+    assert_eq!(Kind::of(&called(0.995)).name, ">=0.99");
+    assert_eq!(Kind::of(&called(0.95)).name, "0.9-0.99");
+    assert_eq!(
+        kinds[&Kind::of(&busy)],
+        Agreement {
+            decisions: 3,
+            agreed: 1,
+            rule_took_model_quiet: 0,
+            rule_quiet_model_took: 2,
+            model_quiet_following: 0,
+        }
+    );
+    assert_eq!(
+        kinds[&Kind::of(&after_the_lamp)],
+        Agreement {
+            decisions: 2,
+            agreed: 1,
+            rule_took_model_quiet: 0,
+            rule_quiet_model_took: 1,
+            model_quiet_following: 1,
+        }
+    );
+    assert_eq!(
+        kinds[&Kind::of(&quiet)],
+        Agreement {
+            decisions: 1,
+            agreed: 0,
+            rule_took_model_quiet: 1,
+            rule_quiet_model_took: 0,
+            model_quiet_following: 0,
+        }
+    );
+    let printed = agreement_summary(&kinds, 3);
+    assert!(
+        printed.contains("busy false false >=0.99 | 3 3 0 0 0"),
+        "{printed}"
+    );
+    assert!(
+        printed.contains("no disagreement: 1 of 4 kinds, 3 of 9 decisions"),
+        "{printed}"
+    );
+    assert!(printed.contains("up to 63 % is still likely"), "{printed}");
+    assert!(!printed.contains("hey lamp") && !printed.contains("brighter"));
+}
+
+/// The reviewer on #1510: a picture line cut inside a character (a write
+/// the power took) is passed over, and the lines after it still read.
+#[test]
+fn a_picture_line_cut_inside_a_character_does_not_end_the_run() {
+    let dir = std::env::temp_dir().join(format!("policy-pictures-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).unwrap();
+    let picture = |at: u64, heard: &str| {
+        json!({"at_unix_ms": at, "about": "attention_picture", "context": {"heard": heard}})
+            .to_string()
+    };
+    let cut = picture(2, "Lamp ơi");
+    let inside = cut.find('ơ').unwrap() + 1;
+    let mut file = picture(1, "Lamp, warmer.").into_bytes();
+    file.push(b'\n');
+    file.extend_from_slice(&cut.as_bytes()[..inside]);
+    file.push(b'\n');
+    file.extend_from_slice(picture(3, "Lamp, cooler.").as_bytes());
+    fs::write(dir.join("pictures-2026-10-15.jsonl"), file).unwrap();
+    let read = read_pictures(&dir, &["2026-10-15".into()]).unwrap();
+    fs::remove_dir_all(&dir).unwrap();
+    let ats: Vec<u64> = read
+        .iter()
+        .map(|line| line["at_unix_ms"].as_u64().unwrap())
+        .collect();
+    assert_eq!(ats, [1, 3]);
 }
