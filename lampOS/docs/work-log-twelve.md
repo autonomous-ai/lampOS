@@ -273,3 +273,18 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - 03:2x: #1193 merged by the reviewer (ARM64 green on its second attempt, the
   first red only on the `lamp-bus` logging flake). List empty; asked the
   first builder for the next.
+
+## 2026-10-18 — #1471 merged; Fast answers taken
+
+- #1465 fault 1 as #1471: a held action asked for again ends its turn
+  once, and the model is told it will not be done. Built on Tests'
+  failing test, then folded into one commit for the reviewer's P2 (one
+  `--force-with-lease` on twelve/held-call-bound, said on #705). Two held
+  calls made together don't end the turn. ARM64 green at `195426057`.
+  The first builder's lamp check on lamp-4ace: the most asks of one
+  request was 1 (72 at 10:57). Merged as `d3e594bfc`. No spoken line:
+  the first builder chose quiet.
+- Took the Fast answers row (12:2x). Read the voice session events'
+  format on lamp-cb94, read-only under the lock. Posted a reply-time
+  script on #705 for the first builder to run over lamp-4ace's batteries.
+  lamp-cb94 itself: ordinary turns median 1.00 s, p90 1.08 s.
