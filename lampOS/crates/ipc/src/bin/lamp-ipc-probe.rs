@@ -217,8 +217,10 @@ fn connect_when_bound(
     child: &mut ChildGuard,
 ) -> io::Result<()> {
     loop {
-        // A newly bound socket may be visible just before bind finishes chmod.
-        // This private startup directory belongs only to this parent/child pair.
+        // A newly bound socket may be visible just before bind finishes chmod:
+        // `connect` then says `WouldBlock`, "peer is not private yet" (since
+        // 14 Oct). This private startup directory belongs only to this
+        // parent/child pair.
         match endpoint.connect(path) {
             Ok(()) => return Ok(()),
             Err(error)
@@ -227,6 +229,7 @@ fn connect_when_bound(
                     ErrorKind::NotFound
                         | ErrorKind::ConnectionRefused
                         | ErrorKind::PermissionDenied
+                        | ErrorKind::WouldBlock
                 ) => {}
             Err(error) => return Err(error),
         }
