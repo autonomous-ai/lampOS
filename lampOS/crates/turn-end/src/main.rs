@@ -36,10 +36,14 @@ use std::{
     time::Instant,
 };
 
-/// Niceness the worker adds on Linux. Under CPU contention, the fair
-/// scheduler gives each capture, playback and provider thread about nine
-/// times the worker's share; a verdict that arrives late is answered by the
-/// core's silence fallback.
+/// Niceness the worker adds on Linux. It counts only at the ordinary policy:
+/// there, under CPU contention, the fair scheduler gives each capture,
+/// playback and provider thread about nine times the worker's share, and a
+/// verdict that arrives late is answered by the core's silence fallback. A
+/// worker the product's voice starts inherits its real-time round-robin
+/// policy (`CPUSchedulingPolicy=rr`), under which niceness does nothing; it
+/// then shares the voice's priority, and `--no-spin` keeps its idle threads
+/// off the cores (#1608).
 #[cfg(target_os = "linux")]
 const NICE: i32 = 10;
 /// Linux address-space cap: 2.2 times the 113.5 MiB `VmPeak` the self-check
@@ -62,8 +66,14 @@ const CHECK_RUNS: usize = 10;
 pub enum Speed {
     /// 32-bit floats under tract, one thread, wherever the scheduler puts it.
     Exact,
-    /// 8-bit weight multiplications under ONNX Runtime, on the fastest cores.
-    Fast { runtime: PathBuf, threads: usize },
+    /// 8-bit weight multiplications under ONNX Runtime, on the fastest cores;
+    /// its threads spinning while they wait for work (ONNX Runtime's default)
+    /// unless `spin` is false (`--no-spin`, #1608).
+    Fast {
+        runtime: PathBuf,
+        threads: usize,
+        spin: bool,
+    },
 }
 
 impl Speed {
@@ -72,7 +82,25 @@ impl Speed {
             Some(runtime) => runtime,
             None => beside_worker(fast::runtime_asset().map_err(|e| e.to_string())?.file_name)?,
         };
-        Ok(Self::Fast { runtime, threads })
+        Ok(Self::Fast {
+            runtime,
+            threads,
+            spin: true,
+        })
+    }
+
+    /// The same, its threads not spinning; the exact model has none.
+    fn without_spinning(self) -> Self {
+        match self {
+            Self::Fast {
+                runtime, threads, ..
+            } => Self::Fast {
+                runtime,
+                threads,
+                spin: false,
+            },
+            exact => exact,
+        }
     }
 
     fn name(&self) -> &'static str {
@@ -95,14 +123,20 @@ struct Arguments {
     speed: Speed,
 }
 
-const USAGE: &str = "usage: lamp-turn-end --model PATH [--parent PID] [--fast [--runtime LIBRARY]]";
+const USAGE: &str =
+    "usage: lamp-turn-end --model PATH [--parent PID] [--fast [--runtime LIBRARY] [--no-spin]]";
 
 fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Arguments, String> {
     let (mut model, mut parent, mut fast, mut runtime) = (None, None, false, None);
+    let mut spin = true;
     while let Some(argument) = arguments.next() {
         match argument.to_str() {
             Some("--fast") if !fast => {
                 fast = true;
+                continue;
+            }
+            Some("--no-spin") if spin => {
+                spin = false;
                 continue;
             }
             Some("--model" | "--parent" | "--runtime") => {}
@@ -119,13 +153,13 @@ fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Arguments, Str
             _ => return Err(USAGE.into()),
         }
     }
-    if runtime.is_some() && !fast {
-        return Err("--runtime is only used with --fast".into());
+    if (runtime.is_some() || !spin) && !fast {
+        return Err("--runtime and --no-spin are only used with --fast".into());
     }
-    let speed = if fast {
-        Speed::fast(runtime, FAST_THREADS)?
-    } else {
-        Speed::Exact
+    let speed = match (fast, spin) {
+        (false, _) => Speed::Exact,
+        (true, true) => Speed::fast(runtime, FAST_THREADS)?,
+        (true, false) => Speed::fast(runtime, FAST_THREADS)?.without_spinning(),
     };
     Ok(Arguments {
         model: model.ok_or("missing --model")?,
@@ -247,9 +281,13 @@ fn load(model: &Path, speed: &Speed) -> Result<Box<dyn Network>, String> {
         Speed::Exact => SmartTurn::load(model, &SMART_TURN_V3_2)
             .map(|model| Box::new(model) as Box<dyn Network>)
             .map_err(|error| format!("model {}: {error}", model.display())),
-        Speed::Fast { runtime, threads } => {
+        Speed::Fast {
+            runtime,
+            threads,
+            spin,
+        } => {
             keep_on_fast_cores()?;
-            FastTurn::load(model, &SMART_TURN_V3_2, runtime, *threads)
+            FastTurn::load_with(model, &SMART_TURN_V3_2, runtime, *threads, *spin)
                 .map(|model| Box::new(model) as Box<dyn Network>)
                 .map_err(|error| format!("fast model {}: {error}", model.display()))
         }
@@ -321,10 +359,15 @@ fn self_check(path: &Path, speed: &Speed) -> Result<String, String> {
         address_space,
         nice,
     );
-    if let Speed::Fast { runtime, threads } = speed {
+    if let Speed::Fast {
+        runtime,
+        threads,
+        spin,
+    } = speed
+    {
         let asset = fast::runtime_asset().map_err(|error| error.to_string())?;
         line.push_str(&format!(
-            ",\"speed\":\"fast\",\"threads\":{threads},\"cores\":{},\"runtime\":\"{}\",\"runtime_version\":\"{}\",\"runtime_sha256\":\"{}\"",
+            ",\"speed\":\"fast\",\"threads\":{threads},\"spin\":{spin},\"cores\":{},\"runtime\":\"{}\",\"runtime_version\":\"{}\",\"runtime_sha256\":\"{}\"",
             commands::json_cores(cores::allowed()),
             runtime.display(),
             asset.version,
@@ -335,21 +378,35 @@ fn self_check(path: &Path, speed: &Speed) -> Result<String, String> {
     Ok(line)
 }
 
-/// `--check-model PATH [--fast [--runtime LIBRARY]]`.
+/// `--check-model PATH [--fast [--runtime LIBRARY] [--no-spin]]`.
 fn check_model(arguments: &[OsString]) -> Option<ExitCode> {
     let (flag, rest) = arguments.split_first()?;
     if flag != "--check-model" {
         return None;
     }
     let path = PathBuf::from(rest.first()?);
-    let speed = match &rest[1..] {
-        [] => Ok(Speed::Exact),
+    let (options, spin) = match &rest[1..] {
+        [options @ .., last] if last == "--no-spin" => (options, false),
+        options => (options, true),
+    };
+    let speed = match options {
+        [] if spin => Ok(Speed::Exact),
         [fast] if fast == "--fast" => Speed::fast(None, FAST_THREADS),
         [fast, runtime, library] if fast == "--fast" && runtime == "--runtime" => {
             Speed::fast(Some(PathBuf::from(library)), FAST_THREADS)
         }
-        _ => Err("usage: lamp-turn-end --check-model PATH [--fast [--runtime LIBRARY]]".into()),
-    };
+        _ => Err(
+            "usage: lamp-turn-end --check-model PATH [--fast [--runtime LIBRARY] [--no-spin]]"
+                .into(),
+        ),
+    }
+    .map(|speed| {
+        if spin {
+            speed
+        } else {
+            speed.without_spinning()
+        }
+    });
     Some(match speed.and_then(|speed| self_check(&path, &speed)) {
         Ok(line) => {
             println!("{line}");
@@ -452,7 +509,21 @@ mod tests {
             parsed.speed,
             Speed::Fast {
                 runtime: PathBuf::from("/x/lib.so"),
-                threads: 2
+                threads: 2,
+                spin: true,
+            }
+        );
+        // #1608: not spinning only when asked, and only with the fast model.
+        let quiet = parse(arguments(
+            "--model m.onnx --fast --runtime /x/lib.so --no-spin",
+        ))
+        .unwrap();
+        assert_eq!(
+            quiet.speed,
+            Speed::Fast {
+                runtime: PathBuf::from("/x/lib.so"),
+                threads: 2,
+                spin: false,
             }
         );
         // Order does not matter; the library defaults to the worker's own
@@ -475,6 +546,8 @@ mod tests {
             "--model m.onnx --threads 2",
             "--model m.onnx --model n.onnx",
             "--fast",
+            "--model m.onnx --no-spin",
+            "--model m.onnx --fast --runtime /x/lib.so --no-spin --no-spin",
         ] {
             assert!(parse(arguments(wrong)).is_err(), "{wrong}");
         }

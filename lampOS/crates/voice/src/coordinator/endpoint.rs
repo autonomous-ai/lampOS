@@ -20,6 +20,31 @@ use lamp_turn_end_wire::{
 use serde_json::{Value, json};
 use std::{io, path::Path, time::Duration};
 
+/// The switch that starts the fast worker with ONNX Runtime's threads not
+/// spinning while they wait for work (#1608): off unless `on`. The worker
+/// runs at the voice's real-time priority, where a spinning thread holds its
+/// core from everything ordinary there, `lamp-name` among them.
+pub const NO_SPIN_SWITCH: &str = "LAMP_TURN_END_NO_SPIN";
+
+/// The worker's command for `endpoint`, its threads not spinning with
+/// `no_spin` (the fast worker only: the exact model has one thread and no
+/// pool), or none for the silence window alone.
+fn worker_command(
+    endpoint: Endpoint,
+    program: std::path::PathBuf,
+    model: std::path::PathBuf,
+    no_spin: bool,
+) -> Option<WorkerCommand> {
+    match endpoint {
+        Endpoint::Silence => None,
+        Endpoint::SmartTurn => Some(WorkerCommand::smart_turn(program, model)),
+        Endpoint::SmartTurnFast if no_spin => {
+            Some(WorkerCommand::smart_turn_fast(program, model).without_spinning())
+        }
+        Endpoint::SmartTurnFast => Some(WorkerCommand::smart_turn_fast(program, model)),
+    }
+}
+
 pub(super) struct EndpointRig {
     /// Moved into the session's detector when the conversation starts.
     classifier: Option<Box<dyn Classifier>>,
@@ -39,11 +64,8 @@ impl EndpointRig {
             directory.join(WORKER_EXECUTABLE),
             directory.join(SMART_TURN_MODEL_FILE),
         );
-        let command = match options.endpoint {
-            Endpoint::Silence => return None,
-            Endpoint::SmartTurn => WorkerCommand::smart_turn(program, model),
-            Endpoint::SmartTurnFast => WorkerCommand::smart_turn_fast(program, model),
-        };
+        let no_spin = crate::ring_asleep::enabled(std::env::var(NO_SPIN_SWITCH).ok().as_deref());
+        let command = worker_command(options.endpoint, program, model, no_spin)?;
         let mut rig = Self::process(command, Limits::default());
         rig.commit_blocks = options.endpoint_commit_blocks;
         Some(rig)
@@ -217,6 +239,21 @@ impl EndpointRig {
 mod tests {
     use super::*;
     use lamp_turn_end_wire::{Outcome, Submit, Token};
+
+    /// #1608: `--no-spin` only with the switch, and only for the fast worker.
+    #[test]
+    fn the_fast_worker_stops_spinning_only_with_its_switch() {
+        let spins = |endpoint, no_spin| {
+            worker_command(endpoint, "w".into(), "m".into(), no_spin)
+                .map(|command| command.args.iter().any(|arg| arg == "--no-spin"))
+        };
+        assert_eq!(spins(Endpoint::SmartTurnFast, true), Some(true));
+        assert_eq!(spins(Endpoint::SmartTurnFast, false), Some(false));
+        assert_eq!(spins(Endpoint::SmartTurn, true), Some(false));
+        assert_eq!(spins(Endpoint::Silence, true), None);
+        let fast = worker_command(Endpoint::SmartTurnFast, "w".into(), "m".into(), true).unwrap();
+        assert!(fast.args.iter().any(|arg| arg == "--fast"));
+    }
 
     struct Silent;
     impl Classifier for Silent {
