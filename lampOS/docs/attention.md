@@ -1831,10 +1831,14 @@ Off unless `LAMP_GOING_ON_ASKS=on` in the voice's environment (the
 worker's `--going-on-asks`, right after `--remarks`; the first builder's
 decision on #1522, 18 October 2026, 15:14). Only with `LAMP_ATTENTION` and
 `LAMP_BUS=on` (without the bus it says so and changes nothing), and on the
-Live route only (`going_on_asks.rs`). **It needs the Policy deciding for
-real (`lamp-policy --act attention`):** a shadow decision is not read, so
-with the Policy in shadow every such line waits the full 2 s and none is
-held (the reviewer on #1538).
+Live route only (`going_on_asks.rs`). **It holds anything only with the
+Policy deciding for real (`lamp-policy --act attention`).** With the Policy
+in shadow, nothing it decides is acted on: a line's shadow decision ends its
+wait as it comes, and the line is played as without the switch (`a
+conversation with the lamp is going on, and the Policy decided it only in
+shadow`; the journal says `the Policy decided it only in shadow, after N
+ms`). Before, each such line waited the full 2 s (the reviewer on #1538,
+16:21).
 
 On lamp-4ace on 18 October at 14:44, on `3f4f3c5c3`, after Daniel's call
 in the battery's scene 3, every line of the two people's talk was let out
@@ -1931,7 +1935,8 @@ With the switch (`Attention::waits_for_policy`, `Attention::first_output_busy`):
   2 and 5, #705 at 14:58), counted for wanted lines held. Also count the
   journal's `the Policy's decision came after N ms` lines against the
   ~0.45 s tail above, and expect no `no decision of the Policy's came in
-  2000 ms` line, which would mean the Policy is in shadow or down. Not
+  2000 ms` line, which would mean the Policy is down, nor any `only in
+  shadow` line, which would mean it runs without `--act attention`. Not
   tested through the worker's loop: the room microphone's rise read before
   the wait (the rigs have no ears); `waits_for_policy` with a line said
   close is.
@@ -1959,6 +1964,9 @@ asked nothing, held),
 ("And turn yourself up a little." with `volume_up` first, the gate for
 actions off: on `look_up` the call runs and the words after it are held;
 on `stay_quiet` at 0.4, neither),
+`…::with_the_switch_a_shadow_decision_ends_the_wait_and_holds_nothing`
+(a `stay_quiet` in shadow before the line's answer: played at once; 300 ms
+after it: played then, not after 2 s),
 `…::with_the_switch_a_remark_held_as_one_does_not_wait_for_the_policy`
 (with `LAMP_REMARKS`, the umbrella line held with its turn's end at once
 and no decision; without it, played after the 2 s),
@@ -2015,8 +2023,8 @@ day's own bars (the worker's `--spoken-to-by-day`, right after
 (#1378), and on lamp-4ace by its drop-in.
 
 `LAMP_GOING_ON_ASKS=on` (the worker's `--going-on-asks`, right after
-`--remarks`; nothing without `LAMP_ATTENTION` and `LAMP_BUS=on`, and with
-the Policy in shadow every such line waits 2 s: run it with `lamp-policy
+`--remarks`; nothing without `LAMP_ATTENTION` and `LAMP_BUS=on`, and it
+holds nothing while the Policy is in shadow: run it with `lamp-policy
 --act attention`): in a busy room, a line let out only as a conversation
 going on waits up to 2 s for the Policy's decision and plays on `answer`
 or a `stay_quiet` said back to the lamp (above). Off by default; not on any

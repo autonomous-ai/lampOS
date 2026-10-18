@@ -75,6 +75,12 @@ pub const NOT_THE_LAMPS: &str = "a busy room: a conversation with the lamp is go
 pub const LOOKED_UP: &str = "a busy room: a conversation with the lamp is going on, and the Policy chose to turn to whoever spoke without the lamp speaking";
 pub const NO_DECISION: &str =
     "a conversation with the lamp is going on, and no decision of the Policy's came in time";
+/// The Policy decided the line only in shadow (`lamp-policy` without `--act
+/// attention`): nothing it says is acted on, so the line is let out as
+/// without the switch, as soon as that decision comes rather than after
+/// the wait (the reviewer on #1538).
+pub const SHADOW_ONLY: &str =
+    "a conversation with the lamp is going on, and the Policy decided it only in shadow";
 
 /// What the Policy's decision lets the lamp say of a line let out only as a
 /// conversation going on.
@@ -90,6 +96,8 @@ pub enum Says {
     LookUp,
     /// `stay_quiet`: not for the lamp to answer.
     Not,
+    /// Decided only in shadow: nothing to act on ([`SHADOW_ONLY`]).
+    Shadow,
 }
 
 /// The verdict for such a line from what the Policy said, or `None` if
@@ -101,6 +109,7 @@ pub fn verdict(says: Option<Says>) -> crate::attention::Verdict {
         Some(Says::Following) => Verdict::Play(FOLLOWING),
         Some(Says::LookUp) => Verdict::Hold(LOOKED_UP),
         Some(Says::Not) => Verdict::Hold(NOT_THE_LAMPS),
+        Some(Says::Shadow) => Verdict::Play(SHADOW_ONLY),
         None => Verdict::Play(NO_DECISION),
     }
 }
@@ -140,10 +149,18 @@ mod tests {
         assert_eq!(verdict(Some(Says::Following)), Verdict::Play(FOLLOWING));
         assert_eq!(verdict(Some(Says::Not)), Verdict::Hold(NOT_THE_LAMPS));
         assert_eq!(verdict(Some(Says::LookUp)), Verdict::Hold(LOOKED_UP));
+        assert_eq!(verdict(Some(Says::Shadow)), Verdict::Play(SHADOW_ONLY));
         assert_eq!(verdict(None), Verdict::Play(NO_DECISION));
         // Each reason still says the conversation was going on, for the
         // journal's readers that look for it.
-        for why in [ANSWER, FOLLOWING, NOT_THE_LAMPS, LOOKED_UP, NO_DECISION] {
+        for why in [
+            ANSWER,
+            FOLLOWING,
+            NOT_THE_LAMPS,
+            LOOKED_UP,
+            NO_DECISION,
+            SHADOW_ONLY,
+        ] {
             assert!(
                 why.contains("a conversation with the lamp is going on"),
                 "{why}"
