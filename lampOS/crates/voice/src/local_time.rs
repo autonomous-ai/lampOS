@@ -443,8 +443,9 @@ pub fn said_in(zone: &str, there: &[u8], here: Option<(&str, &[u8])>, now: i64) 
     Some(said)
 }
 
-/// The lamp's own zone's name: `/etc/timezone`, as Debian keeps it, or the
-/// zone file `/etc/localtime` links to.
+/// The lamp's own zone's name: where `/etc/localtime` links, the zone file
+/// its time comes from, or `/etc/timezone`'s text, as Debian keeps it, only
+/// when that is no link ([`zone_named`]).
 pub fn zone_here() -> Option<String> {
     zone_named(
         std::fs::read_link("/etc/localtime").ok().as_deref(),
