@@ -898,8 +898,68 @@ fn head_tap() -> lamp_msgs::TouchEvent {
     event
 }
 
-/// Senders flooding `controls/touch` until dropped, or at most 5 s: on a
-/// failed assertion too they are stopped and joined, never left running.
+/// Controls' own recognizer for the head (#711): the head settled, then a
+/// hand on it, stepped every 10 ms of this host's clock. Its states are the
+/// ones `--touch` Controls publishes on `controls/touch_state`, each fresh.
+struct HeldHead {
+    engine: lamp_controls::touch::TouchEngine,
+    next_us: u64,
+    sequence: u64,
+    state: Option<lamp_msgs::TouchState>,
+}
+
+impl HeldHead {
+    fn new() -> Self {
+        let config = lamp_controls::touch::TouchConfig {
+            enabled: true,
+            head_pads: vec!["head-1".into()],
+            ..lamp_controls::touch::TouchConfig::default()
+        };
+        let now = monotonic_us();
+        let mut head = Self {
+            engine: lamp_controls::touch::TouchEngine::new(config, "boot", "controls").unwrap(),
+            next_us: now - 600_000,
+            sequence: 0,
+            state: None,
+        };
+        head.run(now - 10_000, false);
+        head
+    }
+
+    fn run(&mut self, until_us: u64, on: bool) {
+        while self.next_us <= until_us {
+            let at = self.next_us;
+            self.sequence += 1;
+            let sample = lamp_controls::touch::GpioSample {
+                stamp: lamp_msgs::ClockStamp {
+                    clock_id: "boot".into(),
+                    at_us: at,
+                    sequence: self.sequence,
+                },
+                session_id: "gpio".into(),
+                primary: None,
+                reset: None,
+                head_pads: vec![lamp_controls::input::Level {
+                    name: "head-1".into(),
+                    active: on,
+                }],
+            };
+            self.engine.ingest_gpio(at, sample).unwrap();
+            self.state = Some(self.engine.tick(at).state);
+            self.next_us += 10_000;
+        }
+    }
+
+    /// The state with the hand on the head now: its newest 10 ms step.
+    fn now(&mut self) -> &lamp_msgs::TouchState {
+        self.run(monotonic_us(), true);
+        self.state.as_ref().unwrap()
+    }
+}
+
+/// Senders flooding `controls/touch_state`, the head's topic since #1469,
+/// until dropped, or at most 5 s: on a failed assertion too they are
+/// stopped and joined, never left running.
 struct Flood {
     flooding: Arc<std::sync::atomic::AtomicBool>,
     sent: Arc<std::sync::atomic::AtomicU64>,
@@ -907,10 +967,10 @@ struct Flood {
 }
 
 impl Flood {
-    /// Two senders of valid taps through the bus, and two writing messages
-    /// that look right but say another type straight to the subscribers'
-    /// sockets on the topic, each new, which a receive refuses and passes
-    /// over within the one call (as the reviewer's storm did).
+    /// Four senders to the topic's kept message, through the bus, as fast
+    /// as they go: two of Controls' states with a hand held, which the head
+    /// takes; one of the same states from another source, and one from
+    /// Controls that is another type, which it refuses.
     fn start(root: &std::path::Path) -> Self {
         use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
         let flooding = Arc::new(AtomicBool::new(true));
@@ -921,55 +981,23 @@ impl Flood {
                 let (root, flooding, sent) = (root.to_path_buf(), flooding.clone(), sent.clone());
                 thread::spawn(move || {
                     let going = || flooding.load(Ordering::Acquire) && Instant::now() < deadline;
-                    if number % 2 == 1 {
-                        let subscribers: Vec<_> =
-                            std::fs::read_dir(root.join("controls/touch/subs"))
-                                .unwrap()
-                                .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-                                .collect();
-                        assert!(!subscribers.is_empty(), "the head's subscriber");
-                        let socket = std::os::unix::net::UnixDatagram::unbound().unwrap();
-                        let payload = serde_json::to_vec(&head_tap()).unwrap();
-                        let mut header = lamp_bus::Header {
-                            topic: lamp_msgs::TouchEvent::TOPIC.into(),
-                            kind: lamp_bus::Kind::Event,
-                            enc: lamp_bus::JSON.into(),
-                            type_name: Some(lamp_msgs::TouchState::TYPE.into()),
-                            source: "controls".into(),
-                            boot: format!("{number:016x}"),
-                            seq: 0,
-                            at_us: monotonic_us(),
-                            at_unix_ms: 0,
-                            expires_ms: None,
-                        };
-                        while going() {
-                            header.seq += 1;
-                            header.at_unix_ms = std::time::SystemTime::now()
-                                .duration_since(std::time::UNIX_EPOCH)
-                                .unwrap()
-                                .as_millis() as u64;
-                            let mut datagram = serde_json::to_vec(&header).unwrap();
-                            datagram.push(b'\n');
-                            datagram.extend_from_slice(&payload);
-                            for path in &subscribers {
-                                if socket.send_to(&datagram, path).is_ok() {
-                                    sent.fetch_add(1, Ordering::Relaxed);
-                                }
-                            }
-                        }
-                        return;
-                    }
                     let bus = lamp_bus::Bus::new(&root).unwrap();
                     let mut out = bus
                         .publisher_declared(
-                            lamp_msgs::TouchEvent::TOPIC,
-                            &lamp_msgs::TouchEvent::declaration(),
-                            "controls",
+                            lamp_msgs::TouchState::TOPIC,
+                            &lamp_msgs::TouchState::declaration(),
+                            if number == 2 { "replay" } else { "controls" },
                         )
                         .unwrap();
+                    let mut head = HeldHead::new();
                     let tap = head_tap();
                     while going() {
-                        if out.publish_json(1, &tap).is_ok() {
+                        let published = if number == 3 {
+                            out.publish_json(1, &tap)
+                        } else {
+                            out.publish_json(1, head.now())
+                        };
+                        if published.is_ok() {
                             sent.fetch_add(1, Ordering::Relaxed);
                         }
                     }
@@ -1002,15 +1030,19 @@ impl Drop for Flood {
 }
 
 /// #849 review: head requests are optional input, read by the head's own
-/// thread. A flood on `controls/touch` from four senders, half of it of
-/// another type the subscriber refuses inside one receive, never holds back
-/// a permit's expiry or a Stop sent while it goes on: both are measured
-/// during the flood.
+/// thread. Since #1469 that thread reads Controls' state, the newest kept
+/// on `controls/touch_state`, not `controls/touch`, so the flood is on it.
+/// From four senders, half of it what the head refuses (another source,
+/// another type), it never holds back a permit's expiry or a Stop sent
+/// while it goes on: both are measured during the flood. And the head still
+/// finds the held hand in it (Third on #705, 19 October 03:36).
 #[test]
 fn a_flood_of_head_requests_never_holds_back_revocation_or_expiry() {
     let root = std::path::PathBuf::from(format!("/tmp/lrw-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     let head = lamp_voice::ring_head::RingHead::on(&root).unwrap();
+    // Reading the same bus as the ring's own head does.
+    let mut looking = lamp_voice::ring_head::RingHead::on(&root).unwrap();
     // The flood is at full strength before the ring starts: 1,000 sent.
     // Counted after a fixed 100 ms instead, its two bus senders once sent
     // fewer on a loaded Mac, and `sent > 1_000` below failed (Fourth on
@@ -1026,6 +1058,17 @@ fn a_flood_of_head_requests_never_holds_back_revocation_or_expiry() {
         );
         thread::sleep(Duration::from_millis(1));
     }
+    // The head is read, not only not in the way: a look of its whose newest
+    // state is one of Controls' finds the held hand.
+    let until = Instant::now() + Duration::from_secs(2);
+    while looking.tick(monotonic_us()).is_none() {
+        assert!(
+            Instant::now() < until,
+            "the head never found the held hand in the flood"
+        );
+        thread::sleep(Duration::from_millis(2));
+    }
+    drop(looking);
     let mut rig = Rig::start_with_senses(Senses {
         head: Some(head),
         ..Senses::default()
