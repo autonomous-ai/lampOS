@@ -280,15 +280,16 @@ fn the_light_is_offered_when_its_owner_appears_and_withdrawn_when_it_goes() {
         "My light is blue now."
     );
     // Warmer, through the socket as the voice asks it: blue is off the
-    // warmth scale, so it becomes warm, said as what it is now; then a step
-    // cooler, white (the first builder, 17 Oct 14:16).
+    // warmth scale, so it becomes warm, said as what it is now (a warm
+    // white); then a step cooler, white, said from and to (the first
+    // builder, 17 Oct 14:16, and #1367's scene).
     assert_eq!(
         ask(&home, b"{\"op\":\"call\",\"name\":\"light_warmer\"}\n")["result"]["result"],
-        "My light is warm now."
+        "My light is warm white now."
     );
     assert_eq!(
         ask(&home, b"{\"op\":\"call\",\"name\":\"light_cooler\"}\n")["result"]["result"],
-        "My light is a step cooler, white now."
+        "My light is a step cooler, from warm white to white."
     );
     assert_eq!(
         ask(
