@@ -152,6 +152,18 @@ pub struct Subscriber {
     notices: VecDeque<Notice>,
 }
 
+/// The subscriber's socket, for a caller that waits on several at once
+/// with `poll` instead of asking each in turn (#705, the lamp's heat). It is
+/// readable when a datagram is waiting; one read ahead is not
+/// ([`Subscriber::holds`]). The topic's file and its publishers are looked
+/// at only in `recv`, so a caller still calls it at least every
+/// [`Bus::rescan_every`].
+impl std::os::fd::AsFd for Subscriber {
+    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        self.socket.as_fd()
+    }
+}
+
 impl Subscriber {
     pub(crate) fn new(
         bus: &Bus,
@@ -274,6 +286,14 @@ impl Subscriber {
 
     pub fn topic(&self) -> &str {
         &self.topic
+    }
+
+    /// Whether a datagram was already read ahead of the next `recv` (to see
+    /// whether anything was waiting): it is no longer in the socket, so a
+    /// `poll` on [`AsFd`](std::os::fd::AsFd) does not show it. A caller that
+    /// waits on the socket asks this first.
+    pub fn holds(&self) -> bool {
+        self.held.is_some()
     }
 
     /// Datagrams that arrived and were not a message of this topic.

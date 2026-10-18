@@ -37,6 +37,7 @@ fn options(stop: bool, mute: Option<&Path>) -> ControlsOptions {
         mute_record: mute.map(Path::to_path_buf),
         bus_root: None,
         head_touch: false,
+        wait: false,
     }
 }
 
@@ -194,6 +195,7 @@ fn option_validation_does_not_accept_ambiguous_paths() {
             bus_root: Some("relative".into()),
             mute_record: None,
             head_touch: false,
+            wait: false,
         }
         .validate()
         .is_err()
@@ -1235,7 +1237,7 @@ fn the_pump_says_the_latch_on_voice_mute_when_it_changes_and_every_second() {
     let shared = Arc::new(Shared::default());
     shared.latch.store(LATCH_OPEN, Ordering::Release);
     let (pump_shared, pump_root) = (Arc::clone(&shared), root.clone());
-    let worker = thread::spawn(move || pump(pump_root, true, true, sender, &pump_shared));
+    let worker = thread::spawn(move || pump(pump_root, true, true, None, sender, &pump_shared));
     let next = |heard: &mut Subscriber| -> VoiceMute {
         let message = heard
             .recv(Duration::from_secs(2))
@@ -1263,12 +1265,161 @@ fn the_pump_says_the_latch_on_voice_mute_when_it_changes_and_every_second() {
     worker.join().unwrap();
 }
 
-#[test]
-#[ignore = "manual host probe: a head touch on a real bus to the coordinator's poll; no lamp claim"]
-fn head_touch_bus_to_poll_latency() {
+/// With `LAMP_CONTROLS_WAIT=on`: the pipe the owner wakes the pump with, its
+/// write end in `shared` and its read end for the pump.
+fn waking(shared: &Shared) -> std::os::fd::OwnedFd {
+    let (read, write) = wake_pipe().unwrap();
+    shared.wake.set(write).unwrap();
+    read
+}
+
+/// A pump on a bus with no publishers, and how many passes it makes over
+/// `for_ms`, and how long a stop then takes.
+fn idle_pump(wait: bool, for_ms: u64) -> (u64, Duration) {
     let directory = Directory::new();
-    let mut elapsed_us = Vec::with_capacity(100);
-    for round in 0..100 {
+    let root = directory.0.join("bus");
+    let (sender, _input) = mpsc::sync_channel(QUEUE_CAPACITY);
+    let shared = Arc::new(Shared::default());
+    let woken = wait.then(|| waking(&shared));
+    let (pump_shared, pump_root) = (Arc::clone(&shared), root.clone());
+    let worker = thread::spawn(move || pump(pump_root, true, false, woken, sender, &pump_shared));
+    // Past the subscriptions, then counted.
+    thread::sleep(Duration::from_millis(300));
+    let before = shared.passes.load(Ordering::Relaxed);
+    thread::sleep(Duration::from_millis(for_ms));
+    let passes = shared.passes.load(Ordering::Relaxed) - before;
+    let stopping = std::time::Instant::now();
+    shared.stop.store(true, Ordering::Release);
+    shared.wake();
+    worker.thread().unpark();
+    worker.join().unwrap();
+    (passes, stopping.elapsed())
+}
+
+/// #705, the lamp's heat: with nothing coming, the waiting pump wakes about
+/// five times a second (the bus's 200 ms rescan) where the 2 ms tick wakes
+/// hundreds of times; a stop still ends it at once.
+#[test]
+fn with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once() {
+    let (waiting, stop_waiting) = idle_pump(true, 1_000);
+    assert!(waiting <= 10, "{waiting} passes in 1 s");
+    assert!(
+        stop_waiting < Duration::from_millis(100),
+        "{stop_waiting:?}"
+    );
+    let (ticking, _) = idle_pump(false, 1_000);
+    assert!(ticking >= 100, "{ticking} passes in 1 s");
+}
+
+/// An owner with head sleep on (`voice/mute` said) and the wait, its pump
+/// running on a bus in `directory`, as `restore` makes one but on the test
+/// clock, so it runs where the host has no boot id (macOS); and a sender
+/// into its queue, as the pump's.
+fn waiting_owner_with_head_sleep(directory: &Directory) -> (HandControls, SyncSender<Queued>) {
+    let mut options = head_options(Some(directory));
+    options.bus_root = Some(directory.0.join("b"));
+    options.wait = true;
+    assert!(options.head_sleep());
+    let (mut owner, sender) = fixture(options);
+    owner.start_pump(sender.clone()).unwrap();
+    (owner, sender)
+}
+
+/// The reviewer on #1456: with head sleep on, the owner shares its latch on
+/// every poll, and the coordinator polls every 2 to 5 ms. An unchanged latch
+/// does not wake a waiting pump: polled every 2 ms for a second, it passes
+/// no more than its own waits make it.
+#[test]
+fn with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = waiting_owner_with_head_sleep(&directory);
+    thread::sleep(Duration::from_millis(300));
+    let before = owner.shared.passes.load(Ordering::Relaxed);
+    let started = std::time::Instant::now();
+    let mut at_us = START;
+    while started.elapsed() < Duration::from_secs(1) {
+        at_us += 2_000;
+        owner.poll_at(at_us).unwrap();
+        thread::sleep(Duration::from_millis(2));
+    }
+    let passes = owner.shared.passes.load(Ordering::Relaxed) - before;
+    assert!(passes <= 10, "{passes} passes in 1 s");
+}
+
+/// The reviewer on #1456: a mute the owner takes through its poll wakes the
+/// waiting pump, so `voice/mute` says it at once, not at the wait's end
+/// (up to 200 ms later).
+#[test]
+fn with_the_wait_a_mute_taken_through_the_owners_poll_is_said_at_once() {
+    let directory = Directory::new();
+    let bus = Bus::new(directory.0.join("b")).unwrap();
+    let mut heard = bus
+        .subscribe_typed(VoiceMute::TOPIC, "mute_test", VoiceMute::TYPE)
+        .unwrap();
+    let (mut owner, sender) = waiting_owner_with_head_sleep(&directory);
+    let first = heard.recv(Duration::from_secs(2)).unwrap().expect("said");
+    assert!(!first.parse::<VoiceMute>().unwrap().muted);
+    // Just after the pump's pass that said it, well inside its wait.
+    thread::sleep(Duration::from_millis(30));
+    let mute = gesture(ControlIntent::SoftwareMute, 1, 4_000_000);
+    let muted = std::time::Instant::now();
+    let seen = observe(
+        &mut owner,
+        &sender,
+        state(1, 4_000_000, Some(mute)),
+        4_000_000,
+    );
+    assert!(seen.muted && seen.mute_changed);
+    let message = heard.recv(Duration::from_secs(2)).unwrap().expect("said");
+    assert!(message.parse::<VoiceMute>().unwrap().muted);
+    assert!(
+        muted.elapsed() < Duration::from_millis(100),
+        "{:?}",
+        muted.elapsed()
+    );
+}
+
+/// With the wait, a latch the owner changes is said at once: the owner
+/// wakes the pump, which does not wait out its 200 ms.
+#[test]
+fn with_the_wait_a_changed_latch_is_said_at_once() {
+    let directory = Directory::new();
+    let root = directory.0.join("bus");
+    let bus = Bus::new(&root).unwrap();
+    let mut heard = bus
+        .subscribe_typed(VoiceMute::TOPIC, "mute_test", VoiceMute::TYPE)
+        .unwrap();
+    let (sender, _input) = mpsc::sync_channel(QUEUE_CAPACITY);
+    let shared = Arc::new(Shared::default());
+    let woken = Some(waking(&shared));
+    shared.latch.store(LATCH_OPEN, Ordering::Release);
+    let (pump_shared, pump_root) = (Arc::clone(&shared), root.clone());
+    let worker = thread::spawn(move || pump(pump_root, true, true, woken, sender, &pump_shared));
+    let first = heard.recv(Duration::from_secs(2)).unwrap().expect("said");
+    assert!(!first.parse::<VoiceMute>().unwrap().muted);
+    // Well inside its 1 s repeat, so only the wake can say it this soon.
+    thread::sleep(Duration::from_millis(250));
+    shared.latch.store(LATCH_ASLEEP, Ordering::Release);
+    shared.wake();
+    let changed = std::time::Instant::now();
+    let message = heard.recv(Duration::from_secs(2)).unwrap().expect("said");
+    assert!(message.parse::<VoiceMute>().unwrap().asleep());
+    assert!(
+        changed.elapsed() < Duration::from_millis(100),
+        "{:?}",
+        changed.elapsed()
+    );
+    shared.stop.store(true, Ordering::Release);
+    shared.wake();
+    worker.join().unwrap();
+}
+
+/// A head touch published on a real bus to the owner's poll accepting it,
+/// `rounds` times: each round's time, in µs.
+fn head_touch_rounds(wait: bool, rounds: usize) -> Vec<u64> {
+    let directory = Directory::new();
+    let mut elapsed_us = Vec::with_capacity(rounds);
+    for round in 0..rounds {
         // A fresh bus, publishers, listener and pump each round; all of it,
         // and the recognizer's own work, is outside the measured boundary.
         let root = directory.0.join(format!("b{round}"));
@@ -1290,8 +1441,10 @@ fn head_touch_bus_to_poll_latency() {
             lamp_ipc::monotonic_us(),
         )
         .unwrap();
+        let woken = wait.then(|| waking(&shared));
         let (pump_shared, pump_root) = (Arc::clone(&shared), root.clone());
-        let worker = thread::spawn(move || pump(pump_root, true, false, sender, &pump_shared));
+        let worker =
+            thread::spawn(move || pump(pump_root, true, false, woken, sender, &pump_shared));
         let deadline = std::time::Instant::now() + Duration::from_secs(2);
         while bus.subscribers(TouchEvent::TOPIC).unwrap().is_empty() {
             assert!(
@@ -1317,9 +1470,39 @@ fn head_touch_bus_to_poll_latency() {
             thread::yield_now();
         }
         shared.stop.store(true, Ordering::Release);
+        shared.wake();
         worker.thread().unpark();
         worker.join().unwrap();
     }
+    elapsed_us
+}
+
+/// #705, the lamp's heat: with the wait, a head touch reaches the owner as
+/// it is published, not at the wait's 200 ms end. The bound is loose, for a
+/// loaded or emulated runner (2.7 ms under qemu, #1456): only a wait that
+/// the touch's datagram does not end can fail it. The latency itself is
+/// `head_touch_bus_to_poll_latency`'s (ignored), 0.25 ms on a laptop.
+#[test]
+fn with_the_wait_a_head_touch_is_read_as_it_arrives() {
+    let mut waiting = head_touch_rounds(true, 21);
+    waiting.sort_unstable();
+    assert!(
+        waiting[10] < 100_000,
+        "median {} µs: {waiting:?}",
+        waiting[10]
+    );
+}
+
+#[test]
+#[ignore = "manual host probe: a head touch on a real bus to the coordinator's poll; no lamp claim"]
+fn head_touch_bus_to_poll_latency() {
+    for wait in [false, true] {
+        head_touch_latency(wait);
+    }
+}
+
+fn head_touch_latency(wait: bool) {
+    let elapsed_us = head_touch_rounds(wait, 100);
     let first_us = elapsed_us[0];
     let mut repeated = elapsed_us[1..].to_vec();
     repeated.sort_unstable();
@@ -1333,6 +1516,7 @@ fn head_touch_bus_to_poll_latency() {
             "boundary":"touch state then event published on a real bus to the listener's poll accepting the head touch",
             "excludes":["the hand on the pad", "GPIO acquisition and Controls' 20 ms qualification", "the coordinator loop's own tick", "hand::cancel to the speaker (local_hand_stop_dispatch)", "device playback", "acoustic silence"],
             "pump_tick_us":PUMP_TICK.as_micros(),
+            "controls_wait":wait,
             "samples":elapsed_us.len(),
             "first_us":first_us,
             "repeated_median_us":repeated[(count - 1) / 2],
@@ -1464,6 +1648,7 @@ mod live_bus {
             mute_record: Some(directory.file()),
             bus_root: Some(bus_root.clone()),
             head_touch: false,
+            wait: false,
         };
         let clock_id = lamp_controls::runtime::clock_id(None).unwrap();
         let mut owner = HandControls::restore(&options).unwrap().unwrap();
@@ -1639,14 +1824,22 @@ fn the_pump_looks_once_a_pass_when_idle_and_drains_a_burst() {
 #[cfg(target_os = "linux")]
 #[ignore = "a 10 s measure of the idle pump's CPU, on the real clock"]
 fn measure_the_idle_pumps_cpu() {
+    for wait in [false, true] {
+        measure_the_idle_pump(wait);
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn measure_the_idle_pump(wait: bool) {
     let directory = Directory::new();
     let options = ControlsOptions {
         stop: true,
         mute_record: Some(directory.file()),
         bus_root: Some(directory.0.join("b")),
         head_touch: true,
+        wait,
     };
-    let _owner = HandControls::restore(&options).unwrap().unwrap();
+    let owner = HandControls::restore(&options).unwrap().unwrap();
     let ticks = || -> u64 {
         fs::read_dir("/proc/self/task")
             .unwrap()
@@ -1670,9 +1863,11 @@ fn measure_the_idle_pumps_cpu() {
     let used = ticks() - before;
     // Linux's USER_HZ is 100 on the lamps and on this host.
     println!(
-        "idle pump: {used} ticks in 10 s, {:.1}% of a core",
+        "idle pump (LAMP_CONTROLS_WAIT {}): {used} ticks in 10 s, {:.1}% of a core",
+        if wait { "on" } else { "off" },
         used as f64 / 10.0
     );
+    drop(owner);
 }
 
 /// #1505, harm 1: a mute record a newer build wrote (here a field this
