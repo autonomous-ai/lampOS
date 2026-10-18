@@ -1495,6 +1495,11 @@ async fn serve_with_visual<C: Connect>(
             .ok()
     });
     attention.ask_policy_when_going_on(going_on_policy.is_some());
+    // And with it, a busy room ends sooner once the lamp is answering
+    // someone (#1522, 19:08).
+    if let Ok(mut room) = crate::room_told::room().lock() {
+        room.end_busy_once_answered(going_on_policy.is_some());
+    }
     // Its first output, kept while it waits, and let go to be judged.
     let mut kept_for_policy: Option<KeptForPolicy> = None;
     let mut let_go: Option<Notice> = None;
@@ -2459,7 +2464,7 @@ async fn serve_with_visual<C: Connect>(
                         superseded: superseded.map(RequestId::get),
                     })),
                     Ok(Notice::Event(Event::ToolCall { lineage, call })) => {
-                        let held = attention.holds_calls(lineage.request.get());
+                        let held = attention.holds(lineage.request.get());
                         // The lamp's own work, for a question about it
                         // later (#829).
                         if !held
@@ -2486,6 +2491,12 @@ async fn serve_with_visual<C: Connect>(
                                     monotonic_us().saturating_sub(at)
                                         <= crate::policy_holds::IN_CONVERSATION_US
                                 }),
+                                busy_talk: going_on_policy.is_some()
+                                    && options.attention.is_some_and(|now| {
+                                        now().0 == crate::room_told::Room::Busy
+                                    })
+                                    && !attention.names_the_schedule()
+                                    && !attention.answers_the_lamps_question(),
                             });
                         desk.called(&provider, lineage, call, held, turn)
                     }
@@ -2669,6 +2680,13 @@ struct Turn {
     /// [`crate::policy_holds::IN_CONVERSATION_US`] before it: without that
     /// it follows no line of the lamp's (the reviewer on #1054).
     lamp_spoke_lately: bool,
+    /// Said in a busy room with `LAMP_GOING_ON_ASKS`, its words naming no
+    /// timer, reminder or the lamp, and not an answer to the lamp's own
+    /// question: a reply to the lamp sets nothing on the schedule
+    /// (`crate::going_on_asks::names_the_schedule`, #1522). "Ten minutes."
+    /// to "For how long should I set it?" is the person's answer (the
+    /// reviewer on #1594).
+    busy_talk: bool,
 }
 /// One of the lamp's actions kept for the turn's decision.
 struct Parked {
@@ -3103,11 +3121,13 @@ impl ToolDesk {
                     verdict => verdict,
                 });
             let waited = Duration::from_micros(now.saturating_sub(parked.called_us));
-            let on_a_reply = crate::policy_holds::runs_on_a_reply(
-                &crate::tools::route(&self.settings, &parked.call.name),
-                &parked.call.name,
-                self.follows_run,
-            );
+            let route = crate::tools::route(&self.settings, &parked.call.name);
+            // A reply in a busy room that names no timer or reminder sets
+            // nothing on the schedule (#1522).
+            let on_a_reply =
+                crate::policy_holds::runs_on_a_reply(&route, &parked.call.name, self.follows_run)
+                    && !(parked.turn.busy_talk
+                        && crate::policy_holds::sets(&route, &parked.call.name));
             match crate::policy_holds::gate(verdict, parked.turn.name_heard, waited, on_a_reply) {
                 crate::policy_holds::Gate::Wait => self.parked.push(parked),
                 crate::policy_holds::Gate::Run => {
@@ -3469,7 +3489,12 @@ fn forward_origin(
         Event::Audio { lineage, pcm, .. } => {
             unanswered_requests().store(0, std::sync::atomic::Ordering::Relaxed);
             if let Ok(mut room) = crate::room_told::room().lock() {
-                room.spoke(lineage.request.get(), monotonic_us());
+                // A reminder the lamp says on its own answers no one.
+                if heard_input {
+                    room.spoke(lineage.request.get(), monotonic_us());
+                } else {
+                    room.spoke_unasked(lineage.request.get(), monotonic_us());
+                }
             }
             let provider_event_at_us = monotonic_us();
             let source_frames = pcm.len();
