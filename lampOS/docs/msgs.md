@@ -62,6 +62,7 @@ stream. `declaration_of()` recognizes every catalogue without changing
 | `BoardState` | `board/state` | latest | 5 s, means nothing after 15 s | The computer's numbers: each temperature by sensor (°C), load per processor, memory in use and disk free as fractions, uptime, and the Wi-Fi signal and whether the clock is set if they could be asked |
 | `NameHeard` | `name/heard` | event | none | The lamp's name was heard in what its microphone hears: how sure the listener was, from 0 to 1, and how many milliseconds before this was sent the name began. A sign, never proof ([name.md](name.md)) |
 | `NameHeard` | `name/rising` | event | none | The same hearing's first sign, as soon as the score reaches the listener's bar and while the name is still being said: the score so far, and how long ago it reached the bar. Its final word, with the highest score, is on `name/heard`; a first sign with none was a near miss (#782, [name.md](name.md)) |
+| `StopHeard` | `stop/heard` | event | none | "Stop", "wait" or "hold on" was heard in what the microphone hears, by `lamp-name`'s `stop.onnx` with `--stop-least` (off unless set): the score at the step it first reached the bar, and how many milliseconds before this was sent. Said at once; a sign, never proof (#828, [stop-word.md](stop-word.md)) |
 | `Pause` | `lamp/pause` | latest | none | Whether the lamp is paused, as `lamp-keeper pause` or `resume` last said; kept until the next, read with `latest` by each part that honours it ([keeper.md](keeper.md), "Named states and the pause") |
 | `Hand` | `body/hand` | latest | 1 s | Whether a hand is pushing the lamp now, as the body feels it (`pushed`), and when that push began on the body's own clock (`since_us`, 0 when not pushed); said with every step lamp-body passes on the bus, every 80 ms ([body.md](body.md), "A hand on the bus") |
 | `BodyGesture` | `body/gesture` | event | none | What became of one of the body's gestures: its `name` (the clip's, the body's own `idle` and shifts included) and `state`, `began`, `over` (played out, let go, replaced, or the run stopped) or `dropped` (asked and dropped before it began, the anti-tip rule's refusal and #1239's `busy` and `held by a hand` included, or ended for a higher ask, so no `over` follows). Said by lamp-body with `LAMP_BUS=on` where its journal says the same ([body.md](body.md), "On the bus"). Under `lamp-body --arbitration on` (#940), a drop or an end also carries optional `source` (whose it was), `why` (the journal's reason) and `by` (who holds the body instead, a skill or the conversation that named itself), each left out when not known, so the message is unchanged without the switch. Read-only. `body_topics()` lists it |
@@ -84,7 +85,7 @@ added after that table was written and are not in it: this table is where
 they are listed. `lamp/pause` is not one of the first topics either:
 `keeper_topics()` lists it, and `declaration_of()` recognizes it. Nor is
 `memory/rules`: `memory_topics()` lists it; nor `name/rising`, which
-`name_topics()` lists.
+`name_topics()` lists; nor `stop/heard`, which `stop_topics()` lists.
 `first_topics()` has them with the others. The last two are the only
 topics with a lifespan: a kept report of how things are must not outlive
 whoever wrote it.

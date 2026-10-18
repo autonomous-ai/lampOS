@@ -1969,6 +1969,7 @@ dependencies = [
  "lamp-bus",
  "lamp-ipc",
  "lamp-msgs",
+ "sha2",
  "tract-onnx",
 ]
 

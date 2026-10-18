@@ -43,7 +43,7 @@ fn scores(
         let heard = quiet.hear(block).unwrap();
         longest = longest.max(began.elapsed());
         let first = quiet.steps() + 1 - heard.scores.len();
-        all.extend((first..).zip(heard.scores));
+        all.extend((first..).zip(heard.scores.into_iter().map(|score| score.name)));
     }
     (all, longest)
 }

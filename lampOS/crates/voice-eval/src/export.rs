@@ -690,6 +690,7 @@ const BUS_TOPICS: &[&str] = &[
     "selftest/speaker/request",
     "skills/ask",
     "skills/events",
+    "stop/heard",
     "tasks/status",
     "voice/activity",
     "voice/arrival",
