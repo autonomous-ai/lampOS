@@ -382,8 +382,13 @@ fn the_time(places: bool) -> Tool {
 /// in the call's arguments, that place's time and the lamp's beside it, or
 /// that the place is not known: never the lamp's own as the place's.
 pub fn time_now_for(places: bool, args: &Value) -> Value {
-    match args.get("place").and_then(Value::as_str) {
-        Some(place) if places && !place.trim().is_empty() => {
+    match args.get("place") {
+        // A place given as anything but words is no place: never the lamp's
+        // own time in its stead (Jarvis on #1575).
+        Some(place) if places && !place.is_string() && !place.is_null() => {
+            json!({ "error": crate::local_time::PLACE_UNKNOWN })
+        }
+        Some(Value::String(place)) if places && !place.trim().is_empty() => {
             match crate::local_time::now_in(place) {
                 Ok(Some(now)) => json!({ "now": now }),
                 Ok(None) => json!({"error": "My clock could not be read just now."}),
@@ -1759,6 +1764,15 @@ mod tests {
         let unknown = json!({"error": crate::local_time::PLACE_UNKNOWN});
         assert_ne!(time_now_for(false, &nowhere), unknown);
         assert_ne!(time_now_for(true, &json!({})), unknown);
+        // A place that is not words is not the lamp's own time either.
+        for odd in [
+            json!({"city": "London"}),
+            json!(51),
+            json!(["Europe/London"]),
+        ] {
+            assert_eq!(time_now_for(true, &json!({"place": odd})), unknown, "{odd}");
+        }
+        assert_ne!(time_now_for(true, &json!({"place": null})), unknown);
     }
 
     /// #803: marking a bad moment is declared, and routed, only when the
