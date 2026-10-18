@@ -800,8 +800,15 @@ pub fn exchange_up_to(socket: &Path, line: &Value, deadline: Duration, most: u64
     let mut answer = Vec::new();
     let mut reader = BufReader::new(stream.try_clone().ok()?.take(most));
     loop {
-        // The whole answer inside what is left, however it is cut up.
-        stream.set_read_timeout(Some(left()?)).ok()?;
+        // The whole answer inside what is left, however it is cut up. On
+        // macOS a socket whose peer has already answered and closed refuses a
+        // timeout (EINVAL), though its answer waits to be read; its reads
+        // can't block then, so it is read as it is (#1569). Linux takes it.
+        if let Err(error) = stream.set_read_timeout(Some(left()?))
+            && error.raw_os_error() != Some(rustix::io::Errno::INVAL.raw_os_error())
+        {
+            return None;
+        }
         let read = reader.read_until(b'\n', &mut answer).ok()?;
         if answer.last() == Some(&b'\n') {
             break;
