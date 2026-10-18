@@ -104,15 +104,35 @@ checked on the held-out clips (shards 4 and 5), where it took them from 21 to
   - answers exactly as before. `Ready` names the same model.
 - Its address space is capped at 544 MiB in place of 256 MiB: 2.2 times the
   243.5 MiB peak measured with two threads. Core files stay off and the
-  niceness +10.
+  niceness +10, which counts only at the ordinary policy: the product's voice
+  runs at real-time round-robin priority 20 (`CPUSchedulingPolicy=rr`), and
+  the worker it starts inherits that, where niceness does nothing (#1608).
+- By default ONNX Runtime's threads spin for a short spell when they run out
+  of work, before they block ("for a short period before blocking", `ort`
+  rc.14). So the default worker is near idle between verdicts: 30 ms of
+  processor time or less over 3 s of quiet, from 500 ms after a verdict
+  (`fast_worker_answers_is_bounded_and_idles_without_spinning`). The spell
+  after each verdict, and between the parallel steps inside one, is at the
+  voice's real-time priority, where a spinning thread holds its core from
+  everything at ordinary priority there, and `lamp-name` runs on the same two
+  cores (`CPUAffinity=6 7`, nice 5). With `--no-spin` (the voice passes it
+  with `LAMP_TURN_END_NO_SPIN=on`, off unless set) both its intra-op and
+  inter-op threads block at once instead
+  (`session.intra_op.allow_spinning` and `session.inter_op.allow_spinning`
+  at 0). The gain is that short spell; the cost may be a wake-up at each
+  parallel step inside a verdict (the reviewer on #1614). `bench … --fast
+  --no-spin` and `--check-model … --fast --no-spin` measure it, and say
+  `"spin":false`. Not measured on a lamp yet: the check is `bench` with and
+  without it, at `chrt -r 20` as the voice runs it, cold and warm verdict
+  times compared.
 - A missing or different library ends the worker at startup with the
   reason. The core then keeps the silence window on every pause, as for any
   other failed worker, and never restarts it.
 - `WorkerCommand::smart_turn_fast` (`crates/turn-end-wire`) is the command
-  the voice would start it with. Nothing in the voice uses it yet.
+  the voice starts it with for `--endpoint smart-turn-fast`, the product's.
 - `lamp-turn-end --check-model PATH --fast` checks the installation: the
   check signal must give the fast model's recorded 0.9682266 within 0.001.
-- `lamp-turn-end bench PATH [RUNS] [--fast] [--threads N] [--cores fast|all|LIST]`
+- `lamp-turn-end bench PATH [RUNS] [--fast] [--threads N] [--cores fast|all|LIST] [--runtime LIBRARY] [--no-spin]`
   times the features and the model separately for each run on the full
   check signal (an 8 s window, the longest request), under the worker's own
   bounds, then prints one JSON line: the median and worst of each, processor
@@ -636,7 +656,9 @@ warm max 130 ms and 111 ms of CPU per check. The peak memory was unchanged.
 - On the A733, measure the device's `cpu_per_check_ms` before judging
   contention. Under Linux's fair scheduler, niceness +10 gives each capture,
   playback and provider thread about nine times the worker's CPU share when
-  they compete for a core. A late verdict falls back to 1,200 ms.
+  they compete for a core; under the product voice's real-time policy, which
+  the worker inherits, it shares their priority instead (#1608). A late
+  verdict falls back to 1,200 ms.
 
 ## Stress evidence
 

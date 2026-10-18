@@ -44,7 +44,7 @@ struct Bench {
 }
 
 const BENCH_USAGE: &str = "usage: lamp-turn-end bench PATH [RUNS] [--fast] [--threads N] \
-                           [--cores fast|all|LIST] [--runtime LIBRARY]";
+                           [--cores fast|all|LIST] [--runtime LIBRARY] [--no-spin]";
 
 fn parse_bench(arguments: &[OsString]) -> Result<Bench, String> {
     let mut words = arguments
@@ -52,11 +52,13 @@ fn parse_bench(arguments: &[OsString]) -> Result<Bench, String> {
         .map(|word| word.to_str().ok_or(BENCH_USAGE));
     let model = PathBuf::from(words.next().ok_or(BENCH_USAGE)??);
     let (mut runs, mut fast, mut threads, mut cores, mut runtime) = (None, false, None, None, None);
+    let mut spin = true;
     while let Some(word) = words.next() {
         let word = word?;
         let mut value = || words.next().ok_or(BENCH_USAGE).and_then(|value| value);
         match word {
             "--fast" if !fast => fast = true,
+            "--no-spin" if spin => spin = false,
             "--threads" if threads.is_none() => {
                 let count = value()?.parse::<usize>().map_err(|_| "invalid --threads")?;
                 threads = Some(count).filter(|&count| count > 0);
@@ -85,13 +87,13 @@ fn parse_bench(arguments: &[OsString]) -> Result<Bench, String> {
     if runs < 2 {
         return Err("bench needs at least 2 runs: the first is cold".into());
     }
-    if !fast && (threads.is_some() || runtime.is_some()) {
-        return Err("--threads and --runtime are only used with --fast".into());
+    if !fast && (threads.is_some() || runtime.is_some() || !spin) {
+        return Err("--threads, --runtime and --no-spin are only used with --fast".into());
     }
-    let speed = if fast {
-        Speed::fast(runtime, threads.unwrap_or(FAST_THREADS))?
-    } else {
-        Speed::Exact
+    let speed = match (fast, spin) {
+        (false, _) => Speed::Exact,
+        (true, true) => Speed::fast(runtime, threads.unwrap_or(FAST_THREADS))?,
+        (true, false) => Speed::fast(runtime, threads.unwrap_or(FAST_THREADS))?.without_spinning(),
     };
     let cores = cores.unwrap_or(if fast { Cores::Fast } else { Cores::All });
     Ok(Bench {
@@ -135,12 +137,17 @@ pub fn bench(arguments: &[OsString]) -> ExitCode {
     let started = Instant::now();
     let speed = match (&bench.speed, &bench.cores) {
         // `load` would pin to the fastest cores again; honour the choice.
-        (Speed::Fast { runtime, threads }, Cores::All | Cores::List(_)) => {
-            match FastTurn::load(&bench.model, &SMART_TURN_V3_2, runtime, *threads) {
-                Ok(model) => Ok(Box::new(model) as Box<dyn lamp_turn_end::Network>),
-                Err(error) => Err(format!("fast model {}: {error}", bench.model.display())),
-            }
-        }
+        (
+            Speed::Fast {
+                runtime,
+                threads,
+                spin,
+            },
+            Cores::All | Cores::List(_),
+        ) => match FastTurn::load_with(&bench.model, &SMART_TURN_V3_2, runtime, *threads, *spin) {
+            Ok(model) => Ok(Box::new(model) as Box<dyn lamp_turn_end::Network>),
+            Err(error) => Err(format!("fast model {}: {error}", bench.model.display())),
+        },
         _ => load(&bench.model, &bench.speed),
     };
     let mut model = match speed {
@@ -175,10 +182,11 @@ pub fn bench(arguments: &[OsString]) -> ExitCode {
         .collect::<Vec<_>>();
     let [address_space, nice] = bounds();
     let [peak, hwm, rss] = memory_kib();
-    let (threads, runtime) = match &bench.speed {
-        Speed::Exact => (1, json!("tract 0.23.8")),
-        Speed::Fast { threads, .. } => (
+    let (threads, spin, runtime) = match &bench.speed {
+        Speed::Exact => (1, Value::Null, json!("tract 0.23.8")),
+        Speed::Fast { threads, spin, .. } => (
             *threads,
+            json!(spin),
             json!(format!(
                 "onnxruntime {}",
                 fast::runtime_asset().map(|a| a.version).unwrap_or("?")
@@ -189,6 +197,7 @@ pub fn bench(arguments: &[OsString]) -> ExitCode {
         "speed": bench.speed.name(),
         "runtime": runtime,
         "threads": threads,
+        "spin": spin,
         "cores": serde_json::from_str::<Value>(&json_cores(cores::allowed())).unwrap_or(Value::Null),
         "cpus": cpu_description(),
         "runs": bench.runs,
@@ -278,7 +287,10 @@ fn compare(
     csv: Option<&Path>,
 ) -> Result<(), String> {
     let exact = SmartTurn::load(model, &SMART_TURN_V3_2).map_err(|e| e.to_string())?;
-    let Speed::Fast { runtime, threads } = Speed::fast(runtime, FAST_THREADS)? else {
+    let Speed::Fast {
+        runtime, threads, ..
+    } = Speed::fast(runtime, FAST_THREADS)?
+    else {
         unreachable!()
     };
     let mut fast =
@@ -375,9 +387,14 @@ mod tests {
             bench.speed,
             Speed::Fast {
                 runtime: "/x/lib.so".into(),
-                threads: 1
+                threads: 1,
+                spin: true,
             }
         );
+        // #1608: `--no-spin` only with the fast model.
+        let quiet = parse_bench(&words("m.onnx --fast --runtime /x/lib.so --no-spin")).unwrap();
+        assert!(matches!(quiet.speed, Speed::Fast { spin: false, .. }));
+        assert!(parse_bench(&words("m.onnx --no-spin")).is_err());
         let bench = parse_bench(&words("m.onnx --fast --runtime /x/lib.so --cores all")).unwrap();
         assert_eq!(bench.cores, Cores::All);
         assert!(matches!(bench.speed, Speed::Fast { threads: 2, .. }));

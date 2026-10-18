@@ -89,6 +89,22 @@ impl FastTurn {
     /// and opens it with `threads` threads. ONNX Runtime can be loaded once
     /// per process; a second call fails.
     pub fn load(model: &Path, asset: &ModelAsset, runtime: &Path, threads: usize) -> Result<Self> {
+        Self::load_with(model, asset, runtime, threads, true)
+    }
+
+    /// [`Self::load`], with ONNX Runtime's threads spinning while they wait
+    /// for work (its default) or not. A worker the voice starts runs at the
+    /// voice's real-time priority, and a spinning thread at that priority
+    /// holds its core from everything at ordinary priority there, `lamp-name`
+    /// among them on the same two fast cores (#1608). Not spinning, its
+    /// threads sleep as soon as a verdict is done.
+    pub fn load_with(
+        model: &Path,
+        asset: &ModelAsset,
+        runtime: &Path,
+        threads: usize,
+        spin: bool,
+    ) -> Result<Self> {
         if threads == 0 {
             return Err("the fast model needs at least one thread".into());
         }
@@ -114,6 +130,15 @@ impl FastTurn {
             .and_then(|builder| Ok(builder.with_intra_threads(threads)?))
             .and_then(|builder| Ok(builder.with_inter_threads(1)?))
             .and_then(|builder| Ok(builder.with_parallel_execution(false)?))
+            .and_then(|builder| {
+                Ok(if spin {
+                    builder
+                } else {
+                    builder
+                        .with_intra_op_spinning(false)?
+                        .with_inter_op_spinning(false)?
+                })
+            })
             .and_then(|mut builder| builder.commit_from_memory(&encoded))
             .map_err(|error| format!("ONNX Runtime session: {error}"))?;
         Ok(Self {

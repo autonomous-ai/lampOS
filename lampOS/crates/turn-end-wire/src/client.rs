@@ -66,6 +66,14 @@ impl WorkerCommand {
         command.args.push("--fast".into());
         command
     }
+
+    /// The fast worker with ONNX Runtime's threads not spinning while they
+    /// wait for work (`--no-spin`, #1608): at the voice's real-time priority
+    /// a spinning thread holds its core from everything ordinary there.
+    pub fn without_spinning(mut self) -> Self {
+        self.args.push("--no-spin".into());
+        self
+    }
 }
 
 /// Whether the classifier's worker processes are confirmed gone.
