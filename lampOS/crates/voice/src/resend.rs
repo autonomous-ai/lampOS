@@ -47,13 +47,13 @@ pub fn take(flags: &[String]) -> (bool, &[String]) {
     }
 }
 
-/// The trace's line for a lost line sent again (`line_resent`).
+/// The provider worker journal's line for an accepted replay (`line_resent`).
 pub fn resent_record(request: u64, session: u64, at_us: u64) -> serde_json::Value {
     serde_json::json!({"kind":"line_resent","turn":request,"provider_session":session,"at_us":at_us,
         "basis":"lost with its connection before any output or tool call; sent once on the next session"})
 }
 
-/// The trace's line for a lost line not sent again, and why (`resend_refused`).
+/// The provider worker journal's reason a held line is not sent again (`resend_refused`).
 pub fn refused_record(request: u64, why: Refused, at_us: u64) -> serde_json::Value {
     serde_json::json!({"kind":"resend_refused","turn":request,"why":why.name(),"at_us":at_us})
 }
@@ -85,7 +85,7 @@ pub struct Lost {
     pub newer_line: bool,
 }
 
-/// Why a lost line is not sent again, for the trace (`resend_refused`).
+/// Why a lost line is not sent again, for the provider worker journal (`resend_refused`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Refused {
     Output,
@@ -262,7 +262,7 @@ mod tests {
         assert_eq!(judge(&open), Ok(()));
     }
 
-    /// The trace's two lines carry the turn and the plain why.
+    /// The provider worker journal's two lines carry the turn and the plain why.
     #[test]
     fn the_trace_says_what_was_resent_and_why_one_was_not() {
         let sent = resent_record(7, 3, 42);

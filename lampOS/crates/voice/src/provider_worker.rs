@@ -1436,7 +1436,7 @@ async fn serve_with_visual<C: Connect>(
                 // next one, or its outcome now owed (#705, Step B).
                 intake.handoff.resend_upkeep(&provider, monotonic_us());
                 while let Some(gone) = intake.handoff.unresent.pop_front() {
-                    eprintln!("lamp-voice provider: request {}: its lost line is not sent again: {}", gone.request, gone.why.name());
+                    eprintln!("{}", crate::resend::refused_record(gone.request, gone.why, monotonic_us()));
                     output.push_back(Outbound::Status(ProviderStatus::TurnFailed { request: gone.request, stage: gone.stage, reason: gone.fault }));
                 }
                 // The lamp's actions kept for the Policy's decision (#800),
@@ -4111,12 +4111,8 @@ impl InputHandoff {
                 return self.give_up(loss, crate::resend::Refused::NotTaken);
             }
             eprintln!(
-                "lamp-voice provider: request {}: lost at {:?} ({:?}); sent again on session {} with {} blocks kept",
-                request.get(),
-                loss.stage,
-                loss.fault,
-                session.get(),
-                kept.blocks.len()
+                "{}",
+                crate::resend::resent_record(request.get(), session.get(), now_us)
             );
             self.submitted = Some(SubmittedInput {
                 request,
@@ -4144,6 +4140,12 @@ impl InputHandoff {
         };
         while let Some(next) = kept.replay {
             if next == kept.blocks.len() {
+                // The final audio block may have filled the queue. Keep End
+                // pending for a later control tick instead of ending the
+                // replacement connection with local backpressure.
+                if kept.ended_us.is_some() && !input.has_room() {
+                    return;
+                }
                 kept.replay = None;
                 if kept.ended_us.is_some() {
                     if input.end(kept.request).is_err() {
@@ -4853,6 +4855,7 @@ fn push_text(
 #[cfg(test)]
 mod tests {
     mod reminders;
+    mod resend;
 
     use super::*;
     use lamp_turn_owner::{AdmissionState, AdmittedInput, CaptureState, Controller};
@@ -11112,19 +11115,32 @@ mod tests {
         );
     }
 
-    /// What the worker hands on once a line is lost after its End, before
-    /// any answer, until it is answered or fails: the statuses by name, the
-    /// answer's audio by its request, and the connection that came next.
+    /// Observe both the lost line's outcome and a ready replacement. A
+    /// failure alone is not proof that nothing reaches the next connection.
+    /// Replay is answered once, with its real input boundaries recorded.
     async fn after_a_lost_line(
         rig: &mut LiveRig,
         lost: u64,
         lost_at: FailedStage,
-    ) -> (Vec<&'static str>, Option<Dial>) {
+        fault: Fault,
+    ) -> (Vec<&'static str>, Dial) {
+        after_a_lost_line_with_setup_delay(rig, lost, lost_at, fault, Duration::ZERO).await
+    }
+
+    async fn after_a_lost_line_with_setup_delay(
+        rig: &mut LiveRig,
+        lost: u64,
+        lost_at: FailedStage,
+        fault: Fault,
+        setup_delay: Duration,
+    ) -> (Vec<&'static str>, Dial) {
         let mut seen = Vec::new();
         let mut redial: Option<Dial> = None;
-        let deadline = Instant::now() + Duration::from_secs(5);
-        while !seen.contains(&"turn_failed") && !seen.contains(&"answered") {
-            assert!(Instant::now() < deadline, "{seen:?}");
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while !seen.contains(&"recovered")
+            || (!seen.contains(&"turn_failed") && !seen.contains(&"answered"))
+        {
+            assert!(tokio::time::Instant::now() < deadline, "{seen:?}");
             if redial.is_none()
                 && let Ok(mut attempt) = rig.dials.try_recv()
             {
@@ -11134,11 +11150,12 @@ mod tests {
                         .get("setup")
                         .is_some()
                 );
+                rig.pump(setup_delay).await;
                 attempt.service.send(json!({"setupComplete": {}})).await;
                 redial = Some(attempt);
             }
             if let Some(dial) = redial.as_mut()
-                && let Some(message) = dial.service.try_receive(Duration::from_millis(1)).await
+                && let Some(message) = dial.service.try_receive(Duration::ZERO).await
             {
                 let input = &message["realtimeInput"];
                 for field in ["activityStart", "audio", "activityEnd"] {
@@ -11157,17 +11174,39 @@ mod tests {
                     assert_eq!(request, lost);
                     seen.push("answered");
                 }
-                Some(Wire::Status(ProviderStatus::Unavailable { .. })) => seen.push("unavailable"),
-                Some(Wire::Status(ProviderStatus::Recovered { .. })) => seen.push("recovered"),
-                Some(Wire::Status(ProviderStatus::TurnFailed { request, stage, .. })) => {
+                Some(Wire::Status(ProviderStatus::Unavailable { reason })) => {
+                    assert_eq!(reason, fault);
+                    seen.push("unavailable");
+                }
+                Some(Wire::Status(ProviderStatus::Recovered { reason, .. })) => {
+                    assert_eq!(reason, fault);
+                    seen.push("recovered");
+                }
+                Some(Wire::Status(ProviderStatus::TurnFailed {
+                    request,
+                    stage,
+                    reason,
+                })) => {
                     assert_eq!((request, stage), (lost, lost_at));
+                    assert_eq!(reason, fault);
                     seen.push("turn_failed");
                 }
                 Some(Wire::Output(ProviderOutput::Started { .. })) => seen.push("started"),
                 Some(other) => panic!("unexpected: {other:?}"),
-                None => tokio::time::sleep(Duration::from_millis(2)).await,
+                None => {}
             }
+            rig.tick(Duration::from_millis(2)).await;
         }
+        let mut redial = redial.expect("recovery has a connected session");
+        // Let the worker service the new session for several ticks. This
+        // catches input or a second outcome offered after TurnFailed/Ready,
+        // as well as a duplicate replay after the first answer.
+        rig.pump(Duration::from_millis(20)).await;
+        assert!(
+            redial.service.try_receive(Duration::ZERO).await.is_none(),
+            "unexpected later input on the replacement"
+        );
+        assert!(rig.take().is_none(), "another outcome after the lost line");
         (seen, redial)
     }
 
@@ -11184,7 +11223,13 @@ mod tests {
         dial.service.send(resumable()).await;
         let lost = rig.speak(&mut dial, false, true).await;
         dial.service.close(1011, "internal").await;
-        let (seen, _) = after_a_lost_line(&mut rig, lost, FailedStage::AwaitingResponse).await;
+        let (seen, _) = after_a_lost_line(
+            &mut rig,
+            lost,
+            FailedStage::AwaitingResponse,
+            Fault::PeerClosed { code: Some(1011) },
+        )
+        .await;
         assert!(!seen.contains(&"turn_failed"), "{seen:?}");
         // The coordinator saw it start once, before it was lost.
         assert!(!seen.contains(&"started"), "{seen:?}");
@@ -11199,6 +11244,13 @@ mod tests {
                 && at("activityEnd") < at("answered"),
             "{seen:?}"
         );
+        for kind in ["activityStart", "audio", "activityEnd", "answered"] {
+            assert_eq!(
+                seen.iter().filter(|seen| **seen == kind).count(),
+                1,
+                "{seen:?}"
+            );
+        }
         rig.stop().await;
 
         let mut rig = LiveRig::start_with(quick_policy(), Options::reporting(Reporting::Typed));
@@ -11206,7 +11258,13 @@ mod tests {
         dial.service.send(resumable()).await;
         let lost = rig.speak(&mut dial, false, true).await;
         dial.service.close(1011, "internal").await;
-        let (seen, _) = after_a_lost_line(&mut rig, lost, FailedStage::AwaitingResponse).await;
+        let (seen, _) = after_a_lost_line(
+            &mut rig,
+            lost,
+            FailedStage::AwaitingResponse,
+            Fault::PeerClosed { code: Some(1011) },
+        )
+        .await;
         assert!(seen.contains(&"turn_failed"), "{seen:?}");
         assert!(!seen.contains(&"activityStart"), "{seen:?}");
         rig.stop().await;
@@ -11218,7 +11276,13 @@ mod tests {
         dial.service.send(resumable()).await;
         let lost = rig.speak(&mut dial, false, false).await;
         dial.service.close(1011, "internal").await;
-        let (seen, _) = after_a_lost_line(&mut rig, lost, FailedStage::InputOpen).await;
+        let (seen, _) = after_a_lost_line(
+            &mut rig,
+            lost,
+            FailedStage::InputOpen,
+            Fault::PeerClosed { code: Some(1011) },
+        )
+        .await;
         assert!(seen.contains(&"turn_failed"), "{seen:?}");
         assert!(!seen.contains(&"activityStart"), "{seen:?}");
         rig.stop().await;
@@ -11241,7 +11305,13 @@ mod tests {
             ProviderOutput::Audio { request, .. } if request == lost
         ));
         dial.service.close(1011, "internal").await;
-        let (seen, _) = after_a_lost_line(&mut rig, lost, FailedStage::Responding).await;
+        let (seen, _) = after_a_lost_line(
+            &mut rig,
+            lost,
+            FailedStage::Responding,
+            Fault::PeerClosed { code: Some(1011) },
+        )
+        .await;
         assert!(seen.contains(&"turn_failed"), "{seen:?}");
         assert!(!seen.contains(&"activityStart"), "{seen:?}");
         assert!(!seen.contains(&"answered"), "{seen:?}");

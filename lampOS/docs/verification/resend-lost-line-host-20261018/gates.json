@@ -1,0 +1,117 @@
+{
+  "date": "2026-10-18 (+07)",
+  "integration_base": "0f49ed2c4576906411be1dfaa58ecdf2e41086f3",
+  "followup_parent": "541fec889d044aa831b540ad78c7d10bdf1672d0",
+  "gate_checkout_parent": "154df7fae6f6eb0f9e423026e0152fa543a5d51f",
+  "source_note": "The gate ran on the working tree with the listed source hashes. The follow-up uses the identical Rust source; its parent differs only in switches.md.",
+  "rustc": [
+    "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "binary: rustc",
+    "commit-hash: 48a229ceaefd4985c50990b14116b6d856af0985",
+    "commit-date: 2026-09-01",
+    "host: aarch64-apple-darwin",
+    "release: 1.98.1",
+    "LLVM version: 22.1.8"
+  ],
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_BUILD_JOBS": "6",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "one reused external build cache"
+  },
+  "checks": {
+    "fmt": {
+      "command": "cargo fmt --all --check",
+      "exit_code": 0
+    },
+    "clippy": {
+      "command": "cargo clippy --locked --offline -p lamp-gemini -p lamp-memory -p lamp-skills -p lamp-surround -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+      "exit_code": 0
+    },
+    "build": {
+      "command": "cargo build --locked --offline --workspace",
+      "exit_code": 0
+    }
+  },
+  "tests": {
+    "lamp-gemini": {
+      "command": "cargo test --locked --offline -p lamp-gemini -- --test-threads=1",
+      "exit_code": 0,
+      "passed": 278,
+      "failed": 0,
+      "ignored": 2
+    },
+    "lamp-voice": {
+      "command": "cargo test --locked --offline -p lamp-voice -- --test-threads=1",
+      "exit_code": 0,
+      "passed": 1951,
+      "failed": 0,
+      "ignored": 11
+    },
+    "lamp-memory": {
+      "command": "cargo test --locked --offline -p lamp-memory -- --test-threads=1",
+      "exit_code": 0,
+      "passed": 208,
+      "failed": 0,
+      "ignored": 5
+    },
+    "lamp-skills": {
+      "command": "cargo test --locked --offline -p lamp-skills -- --test-threads=1",
+      "exit_code": 0,
+      "passed": 84,
+      "failed": 0,
+      "ignored": 0
+    },
+    "lamp-surround": {
+      "command": "cargo test --locked --offline -p lamp-surround -- --test-threads=1",
+      "exit_code": 0,
+      "passed": 260,
+      "failed": 0,
+      "ignored": 0
+    },
+    "lamp-voice-eval": {
+      "command": "cargo test --locked --offline -p lamp-voice-eval -- --test-threads=1",
+      "exit_code": 0,
+      "passed": 536,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "totals": {
+    "passed": 3317,
+    "failed": 0,
+    "ignored": 18
+  },
+  "source_sha256": {
+    "crates/gemini/src/recovery.rs": "ad600b639b7227ce4fa2d23ba88223197613c03650d1b45deb3e2b32a3e9fc28",
+    "crates/gemini/src/recovery/tests.rs": "84de43b34adc4c17fdd7fe2c7a0afd4b909fc4caa48ef507a8c849d063c34293",
+    "crates/gemini/src/recovery/tests/resend.rs": "6ab27cdcffe0ea8923d7e30f65d5a2756b519d062ad54b3f9be869b06f56c7fe",
+    "crates/voice/src/coordinator.rs": "735f118cb255437c6af0bc810698a4b618b4f40f650626af0c3800e367322c94",
+    "crates/voice/src/lib.rs": "8012cbf0c800d588b983679b1d1b0f75eca432270d6111fdde48d54be96d5bb8",
+    "crates/voice/src/provider_worker.rs": "e2c83077760978bacaf8aa7a983ae1230113b29f64c9dd5d4451bf8c139e5640",
+    "crates/voice/src/provider_worker/tests/policy_holds.rs": "e1b65ba558fe1dc4e8441f75b3347c000edd1d6ae578eecd5692ac8aef60ee51",
+    "crates/voice/src/provider_worker/tests/resend.rs": "2b48d56bd75ccf575f615579298f58720a046aa2f080edcf521b8502222f06b7",
+    "crates/voice/src/resend.rs": "0a6faa4d8b9395c8a119abdb853fcebebdb2e03268d67bd61500f1c065bfca4f"
+  },
+  "controls_parent": "35256bf8c",
+  "controls": [
+    {
+      "name": "end-capacity",
+      "removed_guard": "if kept.ended_us.is_some() && !input.has_room() { return; }",
+      "command": "cargo test --locked --offline -p lamp-voice --lib provider_worker::tests::resend::a_replayed_lines_end_waits_when_its_last_audio_fills_the_queue -- --exact --nocapture",
+      "result": "compiled; regression failed as expected; fixed source restored"
+    },
+    {
+      "name": "single-retry",
+      "removed_guard": "tracked.lineage.request.get() > self.resent_through.get()",
+      "command": "cargo test --locked --offline -p lamp-gemini --lib recovery::tests::resend::a_resent_line_lost_again_cannot_be_resent_on_a_third_connection -- --exact --nocapture",
+      "result": "compiled; regression failed as expected; fixed source restored"
+    }
+  ],
+  "limitations": [
+    "Host fixtures only; no lamp, cloud service, microphone or motor.",
+    "Native ARM64 must qualify the published follow-up head separately.",
+    "The 2 ms queue-capacity target and 4.7-to-5 s recovery observation use controlled time, not measured hardware latency."
+  ]
+}

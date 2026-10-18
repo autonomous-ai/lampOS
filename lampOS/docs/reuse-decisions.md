@@ -1252,3 +1252,29 @@ What was taken and what was not:
 | V1's configuration field names | `llm_base_url`, `llm_model`, `stt_base_url`, `stt_language`, `tts_base_url`, `tts_provider`, `tts_voice` as in `system/domain/device.go` and `hal/models.py`, with V1's fallback (empty STT or TTS URL or key is the LLM's). Each `*_api_key` becomes a mode-0600 `*_credential_file`, as `provider.json` has it, so a V1 `config.json` with inline keys is converted by whatever carries V1's data over. |
 | V1's protocols | Deepgram's websocket with V1's nova query (`hal/drivers/voice/stt/{deepgram,autonomous}.py`), streamed `/chat/completions`, OpenAI `tts-1` and ElevenLabs PCM as `hal/drivers/voice/tts/{openai,elevenlabs}.py` ask, the proxy's `/ai` to `/ai/v1` rule (`_ensure_openai_v1`) and the ElevenLabs voice names (`VOICE_IDS_BY_LANG`). V1's Deepgram default, `flux-general-en`, is not used. |
 | Dependencies added to `lamp-voice` | `tokio-tungstenite` 0.30.0, `futures-util` 0.3.34, `rustls` 0.23 (ring, tls12), `webpki-roots` 1 and `reqwest` 0.13 with `default-features = false` and `rustls-no-provider`, so no OpenSSL on the lamp. All were already in `Cargo.lock` through `lamp-gemini` and `lamp-surround`; the lock gains no package. `tokio` gains the `net`, `sync` and `io-util` features. |
+
+## One lost spoken line retried (#705, Step B, 2026-10-18)
+
+V1's `hal/drivers/voice/_internal/realtime_turn.py::_commit_turn_output`
+rebinds and uploads a captured turn once if its session changes during
+flush/commit. It deliberately does not replay a failure while consuming a
+committed response; `hal/test/test_capture_session_replay.py` checks that
+recovery and audio upload are not repeated after such a failure.
+
+Keep the single retry and the prohibition on repeating a tool-bearing or
+partly answered request. Change the eligibility boundary for this opt-in:
+`LAMP_RESEND_LOST_LINE=on` can retry an ended request on the Rust worker's
+replacement connection when no answer or tool call was observed, even if
+its End had already been sent. The existing supervisor's request/session
+lineage and stage tracking supply that evidence; cancellation and microphone
+generation remain authoritative. This is a deliberate extension beyond V1's
+uncommitted-upload retry, not a claim of behavioral parity.
+
+Reuse the existing Gemini supervisor, bounded input queue and 2 ms worker
+upkeep. Keep at most 15 seconds of PCM and accept a retry only within five
+seconds of End; do not add a transport, service, dependency or retry loop.
+The worker and supervisor both enforce one accepted retry. Queue-full End
+waits without blocking control. The [host verification](verification/resend-lost-line-host-20261018/README.md)
+covers lost connections, output/tool exclusions, repeated loss, capacity and
+cancellation. The switch remains off pending the lamp check; reconnect and
+acoustic latency on hardware have not been measured.
