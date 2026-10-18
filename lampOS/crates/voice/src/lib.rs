@@ -45,6 +45,7 @@ pub mod called;
 pub mod camera_config;
 pub mod camera_inspect;
 pub mod camera_worker;
+pub mod capture_cores;
 pub mod choreography;
 pub mod config;
 pub mod diagnostic_control;
