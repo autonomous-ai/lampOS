@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 use std::{
     fs::File,
     io::{self, Read, Write},
-    os::unix::fs::OpenOptionsExt,
+    os::unix::fs::{DirBuilderExt, OpenOptionsExt},
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -41,6 +41,10 @@ pub const MOST_PRINTS: usize = 5;
 const MOST_NAME_CHARS: usize = 40;
 /// The kept file is never read past this.
 const MOST_FILE_BYTES: u64 = 256 * 1024;
+/// Beside the people file: where records it could not read are kept, never
+/// dropped (#1505). The folder is 0700, each file 0600, and the product
+/// reset empties it, since these are face prints.
+pub const SET_ASIDE: &str = "set-aside";
 
 /// Where the five marks of a face sit in the recogniser's 112 by 112
 /// picture: the eye on the left of the picture, the other eye, the nose and
@@ -176,8 +180,17 @@ impl Recogniser {
     }
 }
 
+/// Read one release forward (#1505): a field a later build added is not
+/// this build's to refuse; the next save writes this build's fields only.
+///
+/// **The rule for the next field** (the reviewer on #1558, as #1512's for
+/// tasks): an optional field that only adds to what is known may come
+/// without a bump. A field that narrows what the lamp may do with a face
+/// (an expiry, "don't greet me by name"), or any new required field, bumps
+/// [`Kept`]'s `version` in the same change: this build would otherwise read
+/// past it and recognise more widely, and its next save would drop it for
+/// good. An older build then sets the whole file aside instead.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Person {
     pub name: String,
     pub prints: Vec<Vec<f32>>,
@@ -185,7 +198,6 @@ pub struct Person {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct Kept {
     version: u32,
     people: Vec<Person>,
@@ -215,26 +227,92 @@ pub struct People {
 }
 
 impl People {
-    /// What the file holds; none at all if there is no file yet. A file
-    /// that is too large or not of this shape is an error, never a guess.
+    /// What the file holds; none at all if there is no file yet. Read one
+    /// release forward (#1505): what this build cannot read is set aside in
+    /// [`SET_ASIDE`] beside it, never dropped, and the eyes start with the
+    /// rest. A file it cannot read at all (too large, not JSON, a `version`
+    /// above 1, no list of people) is moved there whole, and the eyes start
+    /// knowing nobody. A person it cannot read (a field of the wrong type, a
+    /// name or prints this build does not keep, a second of one name, a
+    /// twenty-first) is written there, and the rest saved back without them,
+    /// so a restart does not set them aside again. Each is said in one line,
+    /// with a count and never a name. Only a failure to set aside is an
+    /// error: the eyes do not start rather than lose a record.
     pub fn open(path: PathBuf) -> Result<Self> {
-        let people = match File::open(&path) {
+        let mut bytes = Vec::new();
+        match File::open(&path) {
             Ok(file) => {
-                let mut text = String::new();
-                file.take(MOST_FILE_BYTES + 1).read_to_string(&mut text)?;
-                if text.len() as u64 > MOST_FILE_BYTES {
-                    return Err(format!("{} is too large", path.display()).into());
-                }
-                let kept: Kept = serde_json::from_str(&text)?;
-                if kept.version != 1 || !valid(&kept.people) {
-                    return Err(format!("{} is not a list of people", path.display()).into());
-                }
-                kept.people
+                file.take(MOST_FILE_BYTES + 1).read_to_end(&mut bytes)?;
             }
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Vec::new(),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                return Ok(Self {
+                    path,
+                    people: Vec::new(),
+                });
+            }
             Err(error) => return Err(error.into()),
+        }
+        let whole = |why: &str| -> Result<Self> {
+            let kept = set_aside_whole(&path, why, &bytes)?;
+            eprintln!(
+                "lamp-eyes: {} could not be read ({why}); moved whole to {}, and the eyes start knowing nobody",
+                path.display(),
+                kept.display()
+            );
+            Ok(Self {
+                path: path.clone(),
+                people: Vec::new(),
+            })
         };
-        Ok(Self { path, people })
+        if bytes.len() as u64 > MOST_FILE_BYTES {
+            return whole("too large");
+        }
+        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+            return whole("not JSON");
+        };
+        let list = match (
+            value.get("version").and_then(serde_json::Value::as_u64),
+            value.get("people").and_then(serde_json::Value::as_array),
+        ) {
+            (Some(1), Some(list)) => list,
+            (Some(version), _) if version > 1 => {
+                return whole(&format!("version {version}, from a newer build"));
+            }
+            _ => return whole("not a list of people"),
+        };
+        let mut people: Vec<Person> = Vec::new();
+        let mut aside = Vec::new();
+        for entry in list {
+            match serde_json::from_value::<Person>(entry.clone()) {
+                Ok(person)
+                    if valid(std::slice::from_ref(&person))
+                        && people.len() < MOST_PEOPLE
+                        && !people
+                            .iter()
+                            .any(|other| same_name(&other.name, &person.name)) =>
+                {
+                    people.push(person);
+                }
+                _ => aside.push(entry.clone()),
+            }
+        }
+        let opened = Self { path, people };
+        if !aside.is_empty() {
+            let kept = write_set_aside(
+                &opened.path,
+                "person",
+                &serde_json::to_vec(&serde_json::json!({"version": 1, "people": aside}))?,
+            )?;
+            opened.save(&opened.people)?;
+            eprintln!(
+                "lamp-eyes: {} people's records in {} could not be read; set aside in {}, and {} people are known",
+                aside.len(),
+                opened.path.display(),
+                kept.display(),
+                opened.people.len()
+            );
+        }
+        Ok(opened)
     }
 
     pub fn names(&self) -> Vec<String> {
@@ -335,15 +413,30 @@ impl People {
 
     /// Forgets this name's prints, and writes the file before it answers.
     /// Whether there were any.
+    ///
+    /// The set-aside records too (#1505, the reviewer on #1558): that name's
+    /// entries leave every set-aside file with a list of people, which is
+    /// rewritten 0600 or removed when nothing is left. A set-aside file that
+    /// cannot be searched (no such list) might hold the face, so the answer
+    /// is then an error, never "not known".
     pub fn forget(&mut self, name: &str) -> Result<bool> {
+        let name = name.trim();
         let mut next = self.people.clone();
-        next.retain(|person| !same_name(&person.name, name.trim()));
-        if next.len() == self.people.len() {
-            return Ok(false);
+        next.retain(|person| !same_name(&person.name, name));
+        let mut forgot = next.len() != self.people.len();
+        if forgot {
+            self.save(&next)?;
+            self.people = next;
         }
-        self.save(&next)?;
-        self.people = next;
-        Ok(true)
+        let (aside, unsearched) = forget_set_aside(&self.path, name)?;
+        forgot |= aside;
+        if unsearched > 0 {
+            return Err(format!(
+                "{unsearched} set-aside files of people could not be searched for that name"
+            )
+            .into());
+        }
+        Ok(forgot)
     }
 
     fn save(&self, people: &[Person]) -> Result<()> {
@@ -550,6 +643,208 @@ impl Taking {
     }
 }
 
+/// The set-aside folder beside the people file at `path`: made 0700, or
+/// set so if it is there; a link or anything else that is no folder is
+/// refused, never followed.
+fn set_aside_folder(path: &Path) -> io::Result<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    let folder = path.parent().unwrap_or(Path::new("/")).join(SET_ASIDE);
+    match std::fs::symlink_metadata(&folder) {
+        Ok(metadata) if metadata.is_dir() => {
+            std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o700))?;
+        }
+        Ok(_) => {
+            return Err(io::Error::other(format!(
+                "{} is not a folder",
+                folder.display()
+            )));
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            std::fs::DirBuilder::new().mode(0o700).create(&folder)?;
+        }
+        Err(error) => return Err(error),
+    }
+    Ok(folder)
+}
+
+/// The name a set-aside record is kept under: `people-<why>-<sha256 of its
+/// bytes, 16 hex>.json`. The same bytes set aside twice (a crash, or a
+/// failed save back, before the rest were saved) are one file, so nothing
+/// is counted twice.
+fn set_aside_name(folder: &Path, why: &str, bytes: &[u8]) -> PathBuf {
+    let why: String = why
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+        .collect();
+    let digest = Sha256::digest(bytes);
+    let hex: String = digest[..8].iter().map(|b| format!("{b:02x}")).collect();
+    folder.join(format!("people-{why}-{hex}.json"))
+}
+
+/// A rewrite's temporary file in the set-aside folder (`….json.new`), which a
+/// crash may leave: never counted or searched, so it neither doubles the
+/// count nor makes every later `forget` an error.
+fn is_temporary(file: &Path) -> bool {
+    file.extension().is_some_and(|extension| extension == "new")
+}
+
+/// The folder synced, so what was set aside is there before the people
+/// file is changed.
+fn sync_folder(folder: &Path) -> io::Result<()> {
+    File::open(folder)?.sync_all()
+}
+
+/// The whole people file moved into the set-aside folder, as it was, 0600:
+/// linked there and then unlinked, so nothing of that name is replaced. The
+/// same bytes already set aside are not kept twice.
+fn set_aside_whole(path: &Path, why: &str, bytes: &[u8]) -> io::Result<PathBuf> {
+    use std::os::unix::fs::PermissionsExt;
+    let folder = set_aside_folder(path)?;
+    let kept = set_aside_name(&folder, why, bytes);
+    match std::fs::hard_link(path, &kept) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+        Err(error) => return Err(error),
+    }
+    std::fs::set_permissions(&kept, std::fs::Permissions::from_mode(0o600))?;
+    sync_folder(&folder)?;
+    std::fs::remove_file(path)?;
+    Ok(kept)
+}
+
+/// `bytes` written whole into the set-aside folder, 0600, synced, and the
+/// folder synced; nothing replaced, and the same bytes kept once.
+fn write_set_aside(path: &Path, why: &str, bytes: &[u8]) -> io::Result<PathBuf> {
+    let folder = set_aside_folder(path)?;
+    let kept = set_aside_name(&folder, why, bytes);
+    match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&kept)
+    {
+        Ok(mut file) => {
+            file.write_all(bytes)?;
+            file.sync_all()?;
+        }
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+        Err(error) => return Err(error),
+    }
+    sync_folder(&folder)?;
+    Ok(kept)
+}
+
+/// That name's entries taken out of every set-aside file with a list of
+/// people: the file rewritten 0600, or removed once nothing is left.
+/// Whether any were, and how many set-aside files could not be searched.
+fn forget_set_aside(path: &Path, name: &str) -> io::Result<(bool, usize)> {
+    let folder = path.parent().unwrap_or(Path::new("/")).join(SET_ASIDE);
+    match std::fs::symlink_metadata(&folder) {
+        Ok(metadata) if metadata.is_dir() => {}
+        Ok(_) => {
+            return Err(io::Error::other(format!(
+                "{} is not a folder",
+                folder.display()
+            )));
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok((false, 0)),
+        Err(error) => return Err(error),
+    }
+    let entries = std::fs::read_dir(&folder)?;
+    let (mut forgot, mut unsearched) = (false, 0);
+    for entry in entries {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() || is_temporary(&entry.path()) {
+            continue;
+        }
+        let file = entry.path();
+        let mut bytes = Vec::new();
+        File::open(&file)?
+            .take(MOST_FILE_BYTES + 1)
+            .read_to_end(&mut bytes)?;
+        let Some(mut value) = serde_json::from_slice::<serde_json::Value>(&bytes)
+            .ok()
+            .filter(|value| value.get("people").is_some_and(serde_json::Value::is_array))
+        else {
+            unsearched += 1;
+            continue;
+        };
+        let list = value["people"].as_array_mut().expect("a list");
+        // A record whose name is not a plain string cannot be told apart
+        // by name: it might be this person (the reviewer on #1558).
+        if list
+            .iter()
+            .any(|person| !person.get("name").is_some_and(serde_json::Value::is_string))
+        {
+            unsearched += 1;
+        }
+        let before = list.len();
+        list.retain(|person| {
+            !person
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|other| same_name(other, name))
+        });
+        if list.len() == before {
+            continue;
+        }
+        forgot = true;
+        if list.is_empty() {
+            std::fs::remove_file(&file)?;
+        } else {
+            let mut temporary = file.clone().into_os_string();
+            temporary.push(".new");
+            let temporary = PathBuf::from(temporary);
+            let mut out = std::fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
+                .open(&temporary)?;
+            out.write_all(&serde_json::to_vec(&value)?)?;
+            out.sync_all()?;
+            std::fs::rename(&temporary, &file)?;
+        }
+        sync_folder(&folder)?;
+    }
+    Ok((forgot, unsearched))
+}
+
+/// How many people's records are in the set-aside folder beside the people
+/// file at `path`: each file's list, or one for a file that is no list.
+/// What the eyes' health says while it is more than none (#1505).
+pub fn set_aside_count(path: &Path) -> usize {
+    let folder = path.parent().unwrap_or(Path::new("/")).join(SET_ASIDE);
+    match std::fs::symlink_metadata(&folder) {
+        Ok(metadata) if metadata.is_dir() => {}
+        // Something that is no folder where the folder should be: said, as
+        // one, never followed.
+        Ok(_) => return 1,
+        Err(_) => return 0,
+    }
+    let Ok(entries) = std::fs::read_dir(&folder) else {
+        return 0;
+    };
+    entries
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+        .filter(|entry| !is_temporary(&entry.path()))
+        .map(|entry| {
+            let mut bytes = Vec::new();
+            let read = File::open(entry.path())
+                .and_then(|file| file.take(MOST_FILE_BYTES + 1).read_to_end(&mut bytes));
+            read.ok()
+                .and_then(|_| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+                .and_then(|value| {
+                    value
+                        .get("people")
+                        .and_then(|list| list.as_array().map(Vec::len))
+                })
+                .unwrap_or(1)
+        })
+        .sum()
+}
+
 fn valid(people: &[Person]) -> bool {
     people.len() <= MOST_PEOPLE
         && people.iter().enumerate().all(|(index, person)| {
@@ -639,12 +934,9 @@ mod tests {
     }
 
     /// #1505: the people file as a later build writes it, with a field this
-    /// build doesn't know at its top and in a person. The same file without
-    /// them opens; with them, lamp-eyes refuses it today and doesn't start.
-    /// `el/people-forward` makes it read: this test then stops panicking, and
-    /// becomes a plain test in that pull request (Tests).
+    /// build doesn't know at its top and in a person, opens with everyone
+    /// in it (Tests' forward-read test, made plain by `el/people-forward`).
     #[test]
-    #[should_panic(expected = "unknown field")]
     fn a_file_from_a_later_build_is_read() {
         let path = file("later");
         let mut people = People::open(path.clone()).unwrap();
@@ -812,7 +1104,7 @@ mod tests {
     }
 
     #[test]
-    fn names_prints_and_people_are_bounded_and_a_bad_file_is_refused() {
+    fn names_prints_and_people_are_bounded_and_a_bad_file_is_set_aside() {
         let path = file("bounds");
         let mut people = People::open(path.clone()).unwrap();
         for bad in ["", "  ", "1A", "rm -rf /", "A;", &"a".repeat(41)] {
@@ -843,13 +1135,250 @@ mod tests {
             People::open(path.clone()).unwrap().names().len(),
             MOST_PEOPLE
         );
+        // A person this build does not keep is set aside, never dropped
+        // (#1505), and a file too large is moved there whole.
         std::fs::write(
             &path,
             b"{\"version\":1,\"people\":[{\"name\":\"x;y\",\"prints\":[],\"added_unix_s\":1}]}",
         )
         .unwrap();
-        assert!(People::open(path.clone()).is_err());
+        assert!(People::open(path.clone()).unwrap().names().is_empty());
+        assert_eq!(set_aside_count(&path), 1);
         std::fs::write(&path, vec![b' '; MOST_FILE_BYTES as usize + 1]).unwrap();
-        assert!(People::open(path).is_err());
+        assert!(People::open(path.clone()).unwrap().names().is_empty());
+        assert!(!path.exists(), "moved whole, not copied");
+        assert_eq!(set_aside_count(&path), 2);
+    }
+
+    /// The set-aside folder's files, as names and modes.
+    fn set_aside_files(path: &Path) -> Vec<(String, u32)> {
+        use std::os::unix::fs::PermissionsExt;
+        let folder = path.parent().unwrap().join(SET_ASIDE);
+        let mut found: Vec<(String, u32)> = std::fs::read_dir(&folder)
+            .map(|entries| {
+                entries
+                    .filter_map(|entry| entry.ok())
+                    .map(|entry| {
+                        let mode = entry.metadata().unwrap().permissions().mode() & 0o777;
+                        (entry.file_name().to_string_lossy().into_owned(), mode)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        found.sort();
+        found
+    }
+
+    /// #1505, harm 3: a later build's field, on the file and on a person,
+    /// is no reason to refuse: everyone loads, nothing is set aside, and the
+    /// next save writes this build's fields only.
+    #[test]
+    fn a_later_field_reads_one_release_forward() {
+        let path = file("forward");
+        let one = serde_json::to_string(&print(0.2)).unwrap();
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{"version":1,"later":true,"people":[{{"name":"Ann","prints":[{one}],"added_unix_s":1,"seen_unix_s":9}}]}}"#
+            ),
+        )
+        .unwrap();
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(people.names(), ["Ann"]);
+        assert_eq!(set_aside_count(&path), 0);
+        assert!(set_aside_files(&path).is_empty());
+        people.remember("Bo", vec![print(0.7)], 2).unwrap();
+        let saved = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            !saved.contains("seen_unix_s") && !saved.contains("later"),
+            "{saved}"
+        );
+    }
+
+    /// One person this build cannot read is set aside, in a 0600 file in a
+    /// 0700 folder; the others load and are saved back without them, so a
+    /// restart sets nothing aside again.
+    #[test]
+    fn a_person_it_cannot_read_is_set_aside_and_the_rest_load() {
+        let path = file("one-aside");
+        let good = serde_json::to_string(&print(0.2)).unwrap();
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{"version":1,"people":[{{"name":"Ann","prints":[{good}],"added_unix_s":1}},{{"name":"Cy","prints":"a newer shape","added_unix_s":1}}]}}"#
+            ),
+        )
+        .unwrap();
+        let people = People::open(path.clone()).unwrap();
+        assert_eq!(people.names(), ["Ann"]);
+        assert_eq!(set_aside_count(&path), 1);
+        let files = set_aside_files(&path);
+        assert_eq!(files.len(), 1, "{files:?}");
+        assert!(files[0].0.starts_with("people-person-"), "{files:?}");
+        assert_eq!(files[0].1, 0o600);
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let folder = path.parent().unwrap().join(SET_ASIDE);
+            assert_eq!(
+                std::fs::metadata(&folder).unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+            let kept = std::fs::read_to_string(folder.join(&files[0].0)).unwrap();
+            assert!(
+                kept.contains("Cy") && kept.contains("a newer shape"),
+                "{kept}"
+            );
+        }
+        assert!(!std::fs::read_to_string(&path).unwrap().contains("Cy"));
+        // Opened again: nothing more set aside.
+        assert_eq!(People::open(path.clone()).unwrap().names(), ["Ann"]);
+        assert_eq!(set_aside_files(&path).len(), 1);
+    }
+
+    /// A file it cannot read at all, a newer build's `version` or not JSON,
+    /// is moved whole, and the eyes start knowing nobody.
+    #[test]
+    fn a_whole_file_it_cannot_read_is_moved_and_the_eyes_start() {
+        for (name, text, starts) in [
+            ("newer", r#"{"version":2,"people":[]}"#, "people-version-2"),
+            ("broken", "not json at all", "people-not-JSON-"),
+        ] {
+            let path = file(name);
+            std::fs::write(&path, text).unwrap();
+            let people = People::open(path.clone()).unwrap();
+            assert!(people.names().is_empty(), "{name}");
+            assert!(!path.exists(), "{name}");
+            let files = set_aside_files(&path);
+            assert_eq!(files.len(), 1, "{name}: {files:?}");
+            assert!(files[0].0.starts_with(starts), "{name}: {files:?}");
+            let kept = path.parent().unwrap().join(SET_ASIDE).join(&files[0].0);
+            assert_eq!(std::fs::read_to_string(kept).unwrap(), text, "{name}");
+        }
+    }
+
+    /// "Forget my face" reaches what was set aside (the reviewer on #1558):
+    /// a person set aside alone, and one in a whole file moved aside, are
+    /// forgotten there too, and no set-aside file holds them after.
+    #[test]
+    fn forgetting_a_name_reaches_its_set_aside_records() {
+        let path = file("forget-aside");
+        let good = serde_json::to_string(&print(0.2)).unwrap();
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{"version":1,"people":[{{"name":"Ann","prints":[{good}],"added_unix_s":1}},{{"name":"Cy","prints":"a newer shape","added_unix_s":1}},{{"name":"Di","prints":"a newer shape","added_unix_s":1}}]}}"#
+            ),
+        )
+        .unwrap();
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(set_aside_count(&path), 2);
+        assert!(
+            people.forget("cy").unwrap(),
+            "set aside, and forgotten there"
+        );
+        assert_eq!(set_aside_count(&path), 1);
+        let folder = path.parent().unwrap().join(SET_ASIDE);
+        for (name, _) in set_aside_files(&path) {
+            let kept = std::fs::read_to_string(folder.join(name)).unwrap();
+            assert!(!kept.contains("\"Cy\""), "{kept}");
+        }
+        // The last one in a file: the file goes.
+        assert!(people.forget("Di").unwrap());
+        assert!(set_aside_files(&path).is_empty());
+        // A whole file moved aside, from a newer build.
+        let path = file("forget-whole");
+        std::fs::write(
+            &path,
+            format!(
+                r#"{{"version":2,"people":[{{"name":"Ed","prints":[{good}],"added_unix_s":1}}]}}"#
+            ),
+        )
+        .unwrap();
+        let mut people = People::open(path.clone()).unwrap();
+        assert!(people.names().is_empty());
+        assert!(people.forget("Ed").unwrap());
+        assert!(set_aside_files(&path).is_empty());
+        assert!(!people.forget("Ed").unwrap(), "not known anywhere now");
+    }
+
+    /// A set-aside file that cannot be searched might hold the face: the
+    /// answer is an error, never "not known".
+    #[test]
+    fn a_set_aside_file_that_cannot_be_searched_makes_forget_an_error() {
+        let path = file("forget-unsearched");
+        std::fs::write(&path, "not json").unwrap();
+        let mut people = People::open(path.clone()).unwrap();
+        let refused = people.forget("Fay").unwrap_err().to_string();
+        assert!(refused.contains("could not be searched"), "{refused}");
+        // A set-aside person whose name is no plain string might be anyone,
+        // so it cannot be searched either (the reviewer on #1558).
+        let path = file("forget-nameless");
+        std::fs::write(
+            &path,
+            r#"{"version":1,"people":[{"name":{"given":"Cy"},"prints":[],"added_unix_s":1}]}"#,
+        )
+        .unwrap();
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(set_aside_count(&path), 1);
+        assert!(people.forget("Cy").is_err());
+        assert_eq!(
+            set_aside_count(&path),
+            1,
+            "kept: nothing can be told about it"
+        );
+    }
+
+    /// A temporary file a crash left in `set-aside/` is neither counted nor
+    /// searched; and a linked `set-aside` is not followed by `forget` or the
+    /// count (the reviewer on #1558).
+    #[test]
+    fn a_left_temporary_file_and_a_linked_folder_are_left_alone() {
+        let path = file("aside-temporary");
+        let folder = path.parent().unwrap().join(SET_ASIDE);
+        std::fs::create_dir(&folder).unwrap();
+        std::fs::write(folder.join("people-person-0000.json.new"), "cut sho").unwrap();
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(set_aside_count(&path), 0);
+        assert!(!people.forget("Hal").unwrap());
+
+        let path = file("aside-linked");
+        let elsewhere = path.parent().unwrap().join("elsewhere");
+        std::fs::create_dir(&elsewhere).unwrap();
+        std::fs::write(
+            elsewhere.join("people-person-1111.json"),
+            r#"{"version":1,"people":[{"name":"Ivy","prints":"x","added_unix_s":1}]}"#,
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(&elsewhere, path.parent().unwrap().join(SET_ASIDE)).unwrap();
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(set_aside_count(&path), 1, "said as one, not followed");
+        assert!(people.forget("Ivy").is_err());
+        assert!(elsewhere.join("people-person-1111.json").exists());
+    }
+
+    /// The same record set aside again (a crash, or a failed save back,
+    /// before the rest were saved) is one file, counted once; and a
+    /// set-aside that is a link is refused, never followed.
+    #[test]
+    fn the_same_record_is_set_aside_once_and_a_linked_folder_is_refused() {
+        let path = file("aside-once");
+        let text =
+            r#"{"version":1,"people":[{"name":"Gus","prints":"a newer shape","added_unix_s":1}]}"#;
+        std::fs::write(&path, text).unwrap();
+        People::open(path.clone()).unwrap();
+        // As if the save back never happened.
+        std::fs::write(&path, text).unwrap();
+        People::open(path.clone()).unwrap();
+        assert_eq!(set_aside_files(&path).len(), 1);
+        assert_eq!(set_aside_count(&path), 1);
+
+        let path = file("aside-link");
+        let elsewhere = path.parent().unwrap().join("elsewhere");
+        std::fs::create_dir(&elsewhere).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, path.parent().unwrap().join(SET_ASIDE)).unwrap();
+        std::fs::write(&path, "not json").unwrap();
+        assert!(People::open(path.clone()).is_err());
+        assert!(path.exists(), "nothing moved through the link");
+        assert_eq!(std::fs::read_dir(&elsewhere).unwrap().count(), 0);
     }
 }

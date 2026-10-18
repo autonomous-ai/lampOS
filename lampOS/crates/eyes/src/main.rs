@@ -490,6 +490,10 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     let mut reported_at = Instant::now();
     // How the camera is, for the lamp's health.
     let mut camera = lamp_eyes::bus_out::Camera::Closed;
+    // How many people's records are set aside (#1505), and when last counted.
+    const SET_ASIDE_EVERY: Duration = Duration::from_secs(60);
+    let mut aside = 0;
+    let mut aside_counted: Option<Instant> = None;
     eprintln!("lamp-eyes: ready; the camera stays closed until it is permitted");
     loop {
         // A still is there for the one request it was taken for, and no
@@ -507,7 +511,15 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         if let Some(bus) = bus_out.as_mut() {
             let now = lamp_ipc::monotonic_us();
             bus.tick(now);
-            bus.report(camera, now);
+            // People's records set aside (#1505), counted once a minute: a
+            // reset empties the folder, and a person may clear it by hand.
+            if let Some((_, people_path, _)) = &arguments.who
+                && aside_counted.is_none_or(|at| at.elapsed() >= SET_ASIDE_EVERY)
+            {
+                aside = lamp_eyes::who::set_aside_count(people_path);
+                aside_counted = Some(Instant::now());
+            }
+            bus.report(camera, aside, now);
         }
         // What the voice service asks: one line. Remembering is answered
         // once the prints are taken.

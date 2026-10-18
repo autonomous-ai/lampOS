@@ -156,15 +156,27 @@ pub enum Camera {
 }
 
 /// The eyes' own report (`diagnostics`): well unless the camera cannot be
-/// used when it may be.
-pub fn health(camera: Camera) -> Diagnostic {
-    let (level, message, state) = match camera {
+/// used when it may be, or people's records were set aside because this
+/// build could not read them (`set_aside`, #1505), so that a person whose
+/// face the lamp no longer knows is told why. A count, never a name. The
+/// camera's warning comes first when there are both.
+pub fn health(camera: Camera, set_aside: usize) -> Diagnostic {
+    let (mut level, message, state) = match camera {
         Camera::Closed => (Level::Ok, "", "closed"),
         Camera::Open => (Level::Ok, "", "open"),
         Camera::NotOpening => (Level::Warn, "the camera does not open", "not opening"),
         Camera::Failed => (Level::Warn, "the camera stopped giving pictures", "failed"),
     };
-    Diagnostic::new(level, SOURCE, message).with("camera", state)
+    let mut message = message.to_owned();
+    if set_aside > 0 {
+        if message.is_empty() {
+            message = format!("the eyes set aside {set_aside} people's records they couldn't read");
+        }
+        level = Level::Warn;
+    }
+    Diagnostic::new(level, SOURCE, &message)
+        .with("camera", state)
+        .with("set_aside", set_aside)
 }
 
 pub struct BusOut {
@@ -227,7 +239,7 @@ impl BusOut {
     /// Say how the eyes are. Call from the loop on every turn, whatever
     /// the camera is doing: it is said a little more often than once a
     /// second, as the topic promises, and no more.
-    pub fn report(&mut self, camera: Camera, now_us: u64) {
+    pub fn report(&mut self, camera: Camera, set_aside: usize, now_us: u64) {
         if self
             .reported_at_us
             .is_some_and(|at| now_us.saturating_sub(at) < 950_000)
@@ -235,7 +247,7 @@ impl BusOut {
             return;
         }
         self.reported_at_us = Some(now_us);
-        let _ = self.health.publish_json(now_us, &health(camera));
+        let _ = self.health.publish_json(now_us, &health(camera, set_aside));
     }
 }
 
@@ -372,7 +384,7 @@ mod tests {
         std::fs::remove_dir_all(&root).unwrap();
         out.saw(&[], PICTURE, 7);
         out.tick(2_000_000);
-        out.report(Camera::Open, 2_000_000);
+        out.report(Camera::Open, 0, 2_000_000);
     }
 
     #[test]
@@ -393,12 +405,12 @@ mod tests {
                 "failed",
             ),
         ] {
-            let report = health(camera);
+            let report = health(camera, 0);
             assert_eq!(
                 (report.level, report.name.as_str(), report.message.as_str()),
                 (level, "eyes", message)
             );
-            assert_eq!(report.values.len(), 1);
+            assert_eq!(report.values.len(), 2);
             assert_eq!(
                 (
                     report.values[0].key.as_str(),
@@ -407,6 +419,31 @@ mod tests {
                 ("camera", state)
             );
         }
+    }
+
+    /// #1505: while people's records are set aside, the eyes say so at
+    /// `Warn`, with the count and never a name; the camera's own warning
+    /// comes first.
+    #[test]
+    fn set_aside_records_make_the_eyes_warn_with_a_count() {
+        let report = health(Camera::Open, 2);
+        assert_eq!(report.level, Level::Warn);
+        assert_eq!(
+            report.message,
+            "the eyes set aside 2 people's records they couldn't read"
+        );
+        assert!(
+            report
+                .values
+                .iter()
+                .any(|value| value.key == "set_aside" && value.value == "2"),
+            "{:?}",
+            report.values
+        );
+        let both = health(Camera::Failed, 1);
+        assert_eq!(both.level, Level::Warn);
+        assert_eq!(both.message, "the camera stopped giving pictures");
+        assert_eq!(health(Camera::Open, 0).level, Level::Ok);
     }
 
     #[test]
@@ -427,7 +464,7 @@ mod tests {
             } else {
                 Camera::NotOpening
             };
-            out.report(camera, turn * 5_000);
+            out.report(camera, 0, turn * 5_000);
         }
         let mut said = Vec::new();
         while let Some(message) = hears.recv(std::time::Duration::from_millis(50)).unwrap() {
