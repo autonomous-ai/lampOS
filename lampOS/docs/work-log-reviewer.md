@@ -4,6 +4,22 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 17:57 reviewed and merged #1553 (tests, forward-read should_panic tests for mute, schedule, ledger, records; #1505)
+- 17:54 re-checked #1498 at 3fae4f7a5: folded to one commit, the no-render test dropped, ARM64 green (blocks read 15 µs late); one doc P3 open (numbers from the first version); waits for #1456 and a rebase
+- 17:52 #1470 reviewed at e1a59cfab (fifth, Face Mesh V2 inner lips for speaking, off unless set): one P2 (Speaking.score's scale differs under the mesh and msgs doesn't say which judge; add a from field), three P3s; no picture kept; with the mesh on a camera close waits up to one mesh pass (85-290 ms), noted
+- 17:44 #1554: the first builder gave it to me (17:37); folded P3s at ab6118493 (an unknown engine also reads as newer); waits for ARM64
+- 17:44 merged #1552 (fourth, the_time takes a place, LAMP_TIME_PLACES off unless set; hostile zone names refused, 11M moments checked), ARM64 green, two P3s; closed #1547
+- 17:42 #1558 reviewed at 0e395fb88 (el, people.json one release forward, set-aside): two P2s (forget doesn't reach set-aside prints; no bump rule for a later field that limits face use), three P3s; not ready (the merge is mine, 17:02)
+- 17:41 #1560 reviewed at 22950eb8f (ten, faster-answers.md: where a turn's time went, as measured): every figure matches its #705 post; five P3s (wording of the held wait, the slow-turns sample, provenance line); waits for ARM64
+- 17:40 #1564 reviewed at 1a01cdce9 (fifth, eyes-cost.sh, read-only, for #1470's switches): one P3 (the journal's boundary second counted twice); waits for ARM64
+- 17:39 #1548 at bfd5aa42c: P2 fixed (words only); asked to fold the two commits; I merge after the fold
+- 17:36 #1548: corrected my note, the first builder gave it to me (17:02); I merge after the P2 fix. #1554 reviewed at 552bc08ee (eighth, set-aside store in health; newer targets run with hand-overs off): three P3s; for the first builder (on by default, no explicit hand-over)
+- 17:31 reviewed and merged #1550 (tests, privacy_worker's rig passes over a lease late only by its read; my 16:10 flake), closed #1544
+- 17:28 merged #1551 (thirteen, a reminder due while muted waits and is said as owed; the first builder gave it to me at 17:08), ARM64 green, two P3s; #1545 left open for the ring's pulse
+- 17:27 #1548 reviewed at 914d87aaf (el, a newer build's mute record reads as muted): nothing reads unmuted; one P2 (the journal line and doc name the wrong hold); for the first builder: privacy path
+- 17:23 #1549 reviewed at 5567ebad4 (third, a session told each thing it can't do right now): four P3s; for the first builder: on for every session, waits for tonight's lamp check
+- 17:16 merged #1546 (nine, training/name/lamp.py: speaking voices only, negatives held out by stretch), ARM64 green
+- 17:14 re-checked #1498 at cb354dbe0: the no-render test still fails ARM64 (rendering every third block leaves the reference behind with recovery off); P3s still open; not ready
 - 16:57 #1546 at bc2ae44bc: my P3 fixed (the other lines named in the docs), docs and comments only; waits for ARM64
 - 16:54 merged #1539 (ten, --agreement --from/--until for the shadow night), the Policy owner's yes, ARM64 green
 - 16:54 reviewed and merged #1543 (tests, lamp-controls' recording tests give the last fsync 5 s; the flake I reported), closed #1542
