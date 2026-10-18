@@ -122,8 +122,13 @@ resolved local time and recurrence metadata. They fit Voice's 4,096-byte
 provider budget with its 16-byte reserve, including JSON escaping. If a page
 is shortened, `next_after_id` is the last included item, `complete` is false,
 and another call with that cursor reads more. A complete `pending_only:true`
-page describes the filtered list, not every active reminder. No label is
-silently cut to fit a page.
+page describes the filtered list, not every active reminder: `pending_only`
+is what is due now and not yet said. Such a list also reads one `Status`,
+within the same deadline, and when items are set and not yet due it carries
+`not_yet_due` (how many, in all) and a `next` telling the model to list again
+without it before saying none are set (#1595; [schedule.md](schedule.md)).
+Every `pending_only` page keeps room for the two. No label is silently cut
+to fit a page.
 
 Each accepted model call gets one bounded adapter attempt. The 1,250 ms
 absolute deadline covers all status/get/mutation hops, nonblocking socket
