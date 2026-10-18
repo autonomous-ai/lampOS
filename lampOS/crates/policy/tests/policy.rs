@@ -953,14 +953,22 @@ fn what_the_lamp_did_after_each_decision_is_written_beside_it() {
 
 #[test]
 fn a_lamp_that_spoke_before_it_was_decided_is_written_with_a_time_less_than_nothing() {
-    // A model that takes 300 ms: the lamp is quicker.
+    // A model that takes 600 ms: the lamp is quicker.
     let mut rig = Rig::new("outcome-late", |_| {
-        thread::sleep(ms(300));
+        thread::sleep(ms(600));
         Ok(asked(SEVEN))
     });
     rig.voice(Voice::Listening);
     rig.voice(Voice::Thinking);
     rig.hear("What time is it?");
+    // The lamp begins 150 ms after the model is asked, so the policy has
+    // taken up what was heard by then. A time is when the loop takes a
+    // message up, and each turn it takes what the lamp is doing before what
+    // is heard: begun 150 ms after the piece was sent instead, a loop held
+    // up that long took both in one turn, the lamp's sound first, and the
+    // outcome said `silent` (the workspace sweep, 19 October 03:38; #1569
+    // row 25).
+    rig.shown();
     thread::sleep(ms(150));
     rig.say("It is noon.", 8);
     rig.voice(Voice::Speaking);
@@ -971,11 +979,11 @@ fn a_lamp_that_spoke_before_it_was_decided_is_written_with_a_time_less_than_noth
     assert_eq!(outcome["said"], "It is noon.");
     let after = outcome["spoke_after_ms"].as_i64().unwrap();
     println!("spoke {after} ms after the decision");
-    // Before it, by about the 300 ms the model took less the 150 ms the
-    // lamp waited, and by more on a machine that is slow to run this.
+    // Before it, by about the 450 ms the model took after the lamp began,
+    // and by more on a machine that is slow to run this.
     assert!((-3_000..0).contains(&after), "{after}");
-    // The 150 ms the lamp waited, less what the loop was late in taking
-    // up what was heard: a time is when the loop takes a message up.
+    // At least the 150 ms the lamp waited after the model was asked, which
+    // was after what was heard was taken up.
     let from_heard = outcome["heard_to_sound_ms"].as_i64().unwrap();
     assert!(from_heard >= 100, "{from_heard} {outcome}");
     rig.stop();
