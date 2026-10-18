@@ -463,8 +463,19 @@ that takes the light (`src/ring_light.rs`). Started with
   off the ring, the person's light ends, or that lapses first. A waiter
   subscribes before it asks and bounds its wait. A skill waits for it before
   the step that speaks, never after: its own say is a turn, so its light is
-  reached only once that turn has ended (El on #1166). A boot clock that
-  cannot be read is said once and the ring takes the person's light alone.
+  reached only once that turn has ended (El on #1166). A request the ring
+  holds but doesn't show, because another request or the person's light is
+  over it, is said on `light/outranked` (`lamp_msgs/LightOutranked`: the
+  request's `source`, and `by`, the `claim.source` shown over it or
+  `person` for the person's light), so its asker is told it lost (#940).
+  It is said when the request is taken hidden, when a request shown loses
+  its place, when what is over it changes, and again after each renewal
+  while it stays hidden. A turn's face, a self-test and the privacy switch
+  hide every request alike and are no loss, so nothing is said for them;
+  a request outranked meanwhile is still told. The loser keeps its claim and is
+  shown by itself once what is over it lapses or is given back. A boot
+  clock that cannot be read is said once and the ring takes the person's
+  light alone.
 
 Whoever asks never writes the ring: the actions program publishes the
 light wanted and reads the state back ([actions.md](actions.md)). A bus

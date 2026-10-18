@@ -4,10 +4,13 @@
 //! again while its run keeps the light, and gives it back by asking with a
 //! time already passed. The ring shows it over the person's light until
 //! then, or until the person asks for theirs, and then shows theirs again
-//! by itself.
+//! by itself. When the ring holds the light but shows another over it, it
+//! says so on `light/outranked`: the run says what was over it in its
+//! journal and at its give-back, and keeps asking, so its light comes back
+//! by itself once the other lapses (#940).
 use crate::Call;
-use lamp_bus::{Bus, Publisher};
-use lamp_msgs::{Claim, Light, LightRequest, Priority};
+use lamp_bus::{Bus, Publisher, Subscriber};
+use lamp_msgs::{Claim, Light, LightOutranked, LightRequest, Priority};
 use std::{
     io,
     sync::{Arc, Mutex, MutexGuard, PoisonError, mpsc},
@@ -58,11 +61,42 @@ pub struct Glow {
 }
 
 /// The renewals of a skill's light: the light asked again, their stop, and
-/// their thread.
+/// their thread, which gives back what the light was outranked by.
 struct Renewing {
     held: Arc<Mutex<Light>>,
     stop: mpsc::Sender<()>,
-    thread: JoinHandle<()>,
+    thread: JoinHandle<Vec<String>>,
+}
+
+/// `light/outranked`, subscribed to under a name of its own for each run,
+/// before its light is first asked, so the ring's answer is not missed.
+fn outranked(bus: &Bus) -> Option<Subscriber> {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let number = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    bus.subscribe_typed(
+        LightOutranked::TOPIC,
+        &format!("skills_glow_{number}"),
+        LightOutranked::TYPE,
+    )
+    .map_err(|error| eprintln!("lamp-skills: light/outranked not subscribed to: {error}"))
+    .ok()
+}
+
+/// What `source`'s light was said outranked by since the last look, each
+/// added to `by` once, in the order heard, and said in the journal.
+fn heard(outranked: Option<&mut Subscriber>, source: &str, by: &mut Vec<String>) {
+    let Some(outranked) = outranked else {
+        return;
+    };
+    while let Ok(Some(message)) = outranked.recv(Duration::ZERO) {
+        let Ok(told) = message.parse::<LightOutranked>() else {
+            continue;
+        };
+        if told.source == source && !by.contains(&told.by) {
+            eprintln!("lamp-skills: {source}'s light is outranked by {}", told.by);
+            by.push(told.by);
+        }
+    }
 }
 
 impl Glow {
@@ -104,6 +138,11 @@ impl Glow {
                 "{what}: left alone, since nothing takes light/request (the ring needs {REQUESTS_ENVIRONMENT}=on)"
             );
         }
+        // Listened to before the first ask, and by the renewals after it.
+        let mut told = match self.renewing {
+            Some(_) => None,
+            None => outranked(&self.glows.bus),
+        };
         let until_us = lamp_ipc::monotonic_us() + GLOW_HOLDS_US;
         if let Err(error) = ask_ring(&self.glows, &self.source, &light, until_us) {
             return format!("{what}: light/request not written ({error})");
@@ -117,17 +156,21 @@ impl Glow {
                 let (glows, source, again) =
                     (self.glows.clone(), self.source.clone(), Arc::clone(&held));
                 let thread = std::thread::spawn(move || {
+                    let mut by = Vec::new();
                     // Asked again on the program's clock; each claim
                     // holds on the host's, which the ring reads.
                     while let Err(mpsc::RecvTimeoutError::Timeout) =
                         crate::clock::recv_timeout(&stopped, glows.every)
                     {
+                        heard(told.as_mut(), &source, &mut by);
                         let light = locked(&again).clone();
                         let until_us = lamp_ipc::monotonic_us() + GLOW_HOLDS_US;
                         if let Err(error) = ask_ring(&glows, &source, &light, until_us) {
                             eprintln!("lamp-skills: {source}'s light not asked again: {error}");
                         }
                     }
+                    heard(told.as_mut(), &source, &mut by);
+                    by
                 });
                 self.renewing = Some(Renewing { held, stop, thread });
             }
@@ -145,17 +188,22 @@ impl Glow {
         } = self;
         let Renewing { held, stop, thread } = renewing?;
         drop(stop);
-        let _ = thread.join();
+        let by = thread.join().unwrap_or_default();
         let light = locked(&held).clone();
         // A time already passed: the ring lets it go at once, and shows the
         // person's light again.
         let until_us = lamp_ipc::monotonic_us().saturating_sub(1);
-        Some(match ask_ring(&glows, &source, &light, until_us) {
+        let back = match ask_ring(&glows, &source, &light, until_us) {
             Ok(()) => "light given back: asked again with a time already passed".into(),
             Err(error) => format!(
                 "light not given back at once: light/request not written ({error}); the ring lets it go within {} s",
                 GLOW_HOLDS_US / 1_000_000
             ),
+        };
+        Some(if by.is_empty() {
+            back
+        } else {
+            format!("{back}; outranked by {}", by.join(", "))
         })
     }
 }
@@ -323,6 +371,47 @@ mod tests {
         );
         std::thread::sleep(Duration::from_millis(120));
         assert!(taken(&mut ring).is_empty(), "the renewals have stopped");
+    }
+
+    /// #940: the ring says a run's light was outranked; the run says by
+    /// what at its give-back, each once, and not another's.
+    #[test]
+    fn a_light_outranked_is_said_at_the_give_back_by_what() {
+        let (_dir, glows, mut ring) = on_a_bus(Duration::from_millis(50));
+        let mut says = glows
+            .bus
+            .publisher_declared(
+                LightOutranked::TOPIC,
+                &LightOutranked::declaration(),
+                "ring",
+            )
+            .unwrap();
+        let mut glow = Glow::new(&glows, "desk-tutor", Some(light(true, "blue", 3)));
+        glow.ask(&colour("white", Some(5)));
+        assert_eq!(taken(&mut ring).len(), 1);
+        let told = |source: &str, by: &str| LightOutranked {
+            source: source.into(),
+            by: by.into(),
+        };
+        for (at, (source, by)) in [
+            ("skill:desk-tutor", "skill:stretch-break"),
+            ("skill:stretch-break", "skill:desk-tutor"),
+            ("skill:desk-tutor", "skill:stretch-break"),
+            ("skill:desk-tutor", "person"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            says.publish_json(at as u64 + 1, &told(source, by)).unwrap();
+        }
+        std::thread::sleep(Duration::from_millis(120));
+        assert_eq!(
+            glow.give_back().as_deref(),
+            Some(
+                "light given back: asked again with a time already passed; \
+                 outranked by skill:stretch-break, person"
+            )
+        );
     }
 
     #[test]
