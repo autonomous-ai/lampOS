@@ -31,3 +31,6 @@ lamp-turn-end-wire = { path = "../turn-end-wire" }
 # The export's case files replayed through a real skill (#1119): what it
 # makes from them is what the skill made from the recording they came from.
 lamp-skills = { path = "../skills" }
+# The Policy's copies of the voice's bars, held equal to the voice's own
+# (tests/pinned_copies.rs, Fourth on #1510).
+lamp-policy = { path = "../policy" }

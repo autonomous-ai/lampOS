@@ -46,6 +46,7 @@ pub struct Logged {
 /// The voice's `policy_holds::FOLLOWS_FROM` (`crates/voice`, which this
 /// crate does not link): from this `follows_lamp` up, the voice takes a
 /// `stay_quiet` as `StayQuietFollowing` and runs the lamp's own calls.
+/// Held equal to it by `lamp-voice-eval`'s `tests/pinned_copies.rs`.
 pub const FOLLOWS_FROM: f32 = 0.6;
 
 /// The attention decisions in `dir`'s files for `days` (`2026-10-15`), in
