@@ -30,6 +30,14 @@ const FRAMES: usize = 76;
 const EMBEDDING: usize = 96;
 const CONTEXT: usize = 16;
 
+/// The sound one score is of: the 25 chunks whose frames make its sixteen
+/// embeddings, 2.03 s. A score is of these samples and of nothing before
+/// them, so the models may start afresh this far back of any score and
+/// give the same one (`quiet.rs`).
+pub const WINDOW: usize =
+    STEP * ((FRAMES + FRAMES_A_STEP * (CONTEXT - 1)).div_ceil(FRAMES_A_STEP) - 1) + CHUNK;
+const _: () = assert!(WINDOW == 32_480);
+
 /// The three files, by the names they are installed under.
 pub const FILES: [&str; 3] = ["melspectrogram.onnx", "embedding_model.onnx", "name.onnx"];
 
