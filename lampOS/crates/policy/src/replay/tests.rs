@@ -736,3 +736,53 @@ fn a_kind_reads_back_as_printed() {
         assert_eq!(Kind::parse(refused), None, "{refused:?}");
     }
 }
+
+/// `--agreement --from/--until`: a UTC moment as milliseconds since 1970,
+/// the same as `date -u -d … +%s`, and nothing else.
+#[test]
+fn a_utc_moment_reads_as_milliseconds() {
+    assert_eq!(utc_ms("1970-01-01T00:00:00Z"), Some(0));
+    assert_eq!(utc_ms("2026-10-18T11:00:00Z"), Some(1_792_321_200_000));
+    assert_eq!(utc_ms("2026-10-19T00:00:00Z"), Some(1_792_368_000_000));
+    assert_eq!(utc_ms("2024-02-29T23:59:59Z"), Some(1_709_251_199_000));
+    assert!(utc_ms("2026-10-31T00:00:00Z").is_some());
+    for refused in [
+        "",
+        "2026-10-18",
+        "2026-10-18T11:00:00",
+        "2026-10-18T11:00Z",
+        "2026-13-18T11:00:00Z",
+        "2026-10-18T24:00:00Z",
+        "2026-10-18T11:00:00+07:00",
+        "26-10-18T11:00:00Z",
+        "2026-02-29T00:00:00Z",
+        "2026-02-30T00:00:00Z",
+        "2026-09-31T00:00:00Z",
+    ] {
+        assert_eq!(utc_ms(refused), None, "{refused:?}");
+    }
+}
+
+/// The window keeps `from` and drops `until`, so a night's run and the
+/// next never count one decision twice.
+#[test]
+fn a_window_keeps_its_start_and_drops_its_end() {
+    let at = |ms: u64| Logged {
+        at_unix_ms: ms,
+        ..decided(context("x", Room::Busy), "answer", "typesafe/jev-1.13")
+    };
+    let all = || vec![at(9), at(10), at(15), at(20), at(21)];
+    let times = |lines: &[Logged]| lines.iter().map(|line| line.at_unix_ms).collect::<Vec<_>>();
+    let mut lines = all();
+    within(&mut lines, Some(10), Some(20));
+    assert_eq!(times(&lines), [10, 15]);
+    let mut lines = all();
+    within(&mut lines, None, Some(20));
+    assert_eq!(times(&lines), [9, 10, 15]);
+    let mut lines = all();
+    within(&mut lines, Some(20), None);
+    assert_eq!(times(&lines), [20, 21]);
+    let mut lines = all();
+    within(&mut lines, None, None);
+    assert_eq!(times(&lines), [9, 10, 15, 20, 21]);
+}

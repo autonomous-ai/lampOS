@@ -662,6 +662,67 @@ fn percentile(values: &[u64], percent: usize) -> Option<u64> {
 
 pub mod refit;
 
+/// Keep only the decisions made from `from` and before `until` (ms since
+/// 1970): a night held out from the days its kinds were picked on.
+pub fn within(logged: &mut Vec<Logged>, from: Option<u64>, until: Option<u64>) {
+    logged.retain(|line| {
+        from.is_none_or(|from| line.at_unix_ms >= from)
+            && until.is_none_or(|until| line.at_unix_ms < until)
+    });
+}
+
+/// `2026-10-18T11:00:00Z` as milliseconds since 1970, UTC only: a
+/// window's edge for `lamp-policy-replay --agreement --from/--until`.
+pub fn utc_ms(text: &str) -> Option<u64> {
+    let text = text.strip_suffix('Z')?;
+    let (date, time) = text.split_once('T')?;
+    let number = |part: &str, digits: usize| {
+        (part.len() == digits && part.bytes().all(|b| b.is_ascii_digit()))
+            .then(|| part.parse::<i64>().ok())
+            .flatten()
+    };
+    let mut date = date.split('-');
+    let (year, month, day) = (
+        number(date.next()?, 4)?,
+        number(date.next()?, 2)?,
+        number(date.next()?, 2)?,
+    );
+    let mut time = time.split(':');
+    let (hour, minute, second) = (
+        number(time.next()?, 2)?,
+        number(time.next()?, 2)?,
+        number(time.next()?, 2)?,
+    );
+    // The month's own length, leap years included: a day past it is a typo,
+    // not the next month (the reviewer on #1539).
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        2 if leap => 29,
+        2 => 28,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    if date.next().is_some()
+        || time.next().is_some()
+        || !(1..=12).contains(&month)
+        || !(1..=days_in_month).contains(&day)
+        || hour > 23
+        || minute > 59
+        || second > 59
+    {
+        return None;
+    }
+    // Days from 1970 by the civil calendar (Howard Hinnant's days_from_civil).
+    let y = if month <= 2 { year - 1 } else { year };
+    let era = y.div_euclid(400);
+    let of_era = y - era * 400;
+    let of_year = (153 * (if month > 2 { month - 3 } else { month + 9 }) + 2) / 5 + day - 1;
+    let of_era_days = of_era * 365 + of_era / 4 - of_era / 100 + of_year;
+    let days = era * 146_097 + of_era_days - 719_468;
+    let seconds = days * 86_400 + hour * 3_600 + minute * 60 + second;
+    u64::try_from(seconds).ok().map(|seconds| seconds * 1_000)
+}
+
 /// One kind of attention decision, for [`agreement`]: what the rule
 /// ([`attention::fallback`]) reads, and how plainly the name was heard.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
