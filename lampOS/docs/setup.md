@@ -470,6 +470,90 @@ above, not yet run on a lamp). Setup pressed to `connected` and the marker:
 and #811 (the two settings files, `provider.json`, the voice's sessions
 folder, the lock folders' modes).
 
+## After a setup from the Autonomous app
+
+A checklist to run on the lamp once its setup from the app has finished (the
+first builder on #705, 18 Oct), read from the product's own settings
+(`crates/setup/fixtures/serve-own-page.json`, which install writes as
+`/etc/lampOS/setup/serve.json`) and units. **Read each file as present or
+missing, with its mode and owner, never its contents:** several hold the
+person's key or the account's password.
+
+```sh
+for f in /var/lib/lampos-setup/done /etc/lampOS/voice/credential \
+         /etc/lampOS/policy/jev.key /etc/lampOS/person/name \
+         /etc/localtime /etc/timezone /etc/lampOS/zone.env \
+         /etc/lampOS/setup/backend.json \
+         /etc/wpa_supplicant/wpa_supplicant-wlan0.conf; do
+  sudo stat -c '%a %U %n' "$f" 2>/dev/null || echo "missing $f"
+done
+readlink /etc/localtime
+```
+
+**What setup writes, and what a 5 s reset does with it:**
+
+| Path | After setup | After a reset |
+|---|---|---|
+| `/var/lib/lampos-setup/done` (the marker) | present, written last | removed (the plan's `marker`) |
+| `/etc/lampOS/voice/credential` (the voice's key) | 600 root | wiped |
+| `/etc/lampOS/policy/jev.key` (the Policy's key) | 600 root | wiped |
+| `/etc/lampOS/person/name` (the name typed) | 600 root, when a name was typed | wiped |
+| `/etc/localtime` | a link to the phone's zone under `/usr/share/zoneinfo` | kept (decided on #806, 17 Oct 23:39) |
+| `/etc/timezone` | the phone's zone | kept |
+| `/etc/lampOS/zone.env` | `LAMP_ZONE` and today's offset, 644 | kept |
+| `/etc/lampOS/setup/backend.json` (the app's link) | 600 root, **only when the app's request carried a whole link** | wiped |
+| `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf` | 600 root | wiped |
+
+Setup saves them in this order: the name, the zone, the backend's link, the
+key, then the marker. So a marker means all the others were written. The
+reset plan (`reset-plan-product.json`) also wipes the person's stores
+(memory, faces, tasks and Harness's sign-in, schedule, the Policy's and
+`lamp-cloud`'s folders, the voice's sessions); the zone is the one thing it
+keeps.
+
+**The units the marker starts.** `lampos-setup-done.path` starts
+`lampos.target` once the marker exists. Every part that is `PartOf` it waits
+for the marker (`ConditionPathExists=/var/lib/lampos-setup/done`): actions,
+air and its clock, body, cloud, controls, ears, expression, eyes, health,
+memory, name, policy, schedule, the self-test's timer, the reset's watcher,
+skills, tasks and voice. `lamp-setup` itself stops being started once the
+marker is there; `lamp-update` and `lamp-records` don't wait for it.
+
+```sh
+systemctl is-active lampos.target lamp-voice lamp-setup-reset lamp-policy
+systemctl is-active lamp-setup        # inactive: the marker is there
+systemctl status lamp-cloud --no-pager -n 3
+```
+
+**`lamp-cloud` stays off unless its drop-in is there.** It is enabled and
+starts with the target only when the marker, `backend.json`, the voice's
+credential and `/var/lib/lampos-update/state.json` all exist, and without
+`LAMP_CLOUD=on` it says so and exits 0 (`Restart=on-failure`, so it isn't
+started again). So on a lamp set up from the app but not turned on, expect
+`lamp-cloud` inactive, with the journal line `off: LAMP_CLOUD is not on`.
+Turned on, the drop-in carries both lines (the unit's own header; on
+lamp-4ace, `deploy/lamp-4ace/cloud-on.sh`), and the journal then says
+`online on the broker …`. Don't paste the address. A failing 15 s ping says
+`no backend ping: …`.
+
+**The setup journal, one line for each step** (`journalctl -u lamp-setup -b`;
+the board keeps its journal in RAM, so read it before a reboot, or follow it
+live):
+
+| Step | Line |
+|---|---|
+| The radio looked before the hotspot | `lamp-setup: N networks seen before the hotspot, in M ms`, or `… no networks seen …` |
+| The hotspot is up | `lamp-setup: the lamp's hotspot is up; answering on 0.0.0.0:80` |
+| The app's request named a link that can't be kept | `lamp-setup: the request named a backend link, but <fields> … missing or not valid; setup goes on without it` (field names only) |
+| The link couldn't be written | `lamp-setup: the backend's link could not be saved (…); setup goes on without it` |
+| The run ended | `lamp-setup: run N ended Connected`, or `… ended Failed: …` with the reason |
+| Already set up, at a later boot | `lamp-setup: this lamp is already set up; nothing to serve` |
+
+Then the voice, once the target is up: `journalctl -u lamp-voice -b | grep
+"person's name"` gives `the person's name from /etc/lampOS/person/name is used
+(N characters)`, or `the person's name is not used: …`. It never prints the
+name.
+
 ## Units
 
 `crates/setup/units/` holds the two units, for the image (#811) and the
