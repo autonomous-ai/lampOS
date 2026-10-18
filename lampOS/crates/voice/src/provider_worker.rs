@@ -2058,8 +2058,10 @@ async fn serve_with_visual<C: Connect>(
                             // the check for want of a print: said, never
                             // silently again (#829, lamp-4ace on 18 October,
                             // requests 18 and 19; the reviewer on #1435).
-                            if let Some((_, Some(why))) = judged.filter(|_| late_other.is_none()) {
-                                eprintln!("lamp-voice provider: request {request}: judged without the voice check: {why}");
+                            if let Some((_, Some(why))) = judged.filter(|_| late_other.is_none())
+                                && let Some(voices) = intake.handoff.voices.as_ref()
+                            {
+                                voices.judged_without(request, why);
                             }
                             let going_on = match judged.and_then(|(likeness, _)| likeness) {
                                 _ if late_other.is_some() => false,
