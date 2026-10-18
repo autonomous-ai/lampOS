@@ -547,11 +547,17 @@ fn capture_loop<D: CaptureDevice>(
     let mut echo = EchoProcessor::with_reference(noise_suppression.enabled(), echo_reference);
     // The detector may read the canceller's linear output (#828); the
     // canceller keeps it only then.
-    let vad_linear = crate::activity::reads_linear();
-    if vad_linear {
+    let vad_input = crate::activity::DetectorInput::from_environment();
+    let vad_linear = vad_input.reads_linear();
+    if let Some(value) = vad_input.value() {
         echo = echo.with_linear_output();
         eprintln!(
-            "lamp-voice: capture: the speech detector reads the canceller's linear output (LAMP_VAD_INPUT=linear)"
+            "lamp-voice: capture: the speech detector reads the canceller's linear output{} (LAMP_VAD_INPUT={value})",
+            if value == "linear-gated" {
+                " where the duplex rules would take speech for a person"
+            } else {
+                ""
+            }
         );
     }
     // Blocks the detector scored, and of those on the linear output, since
@@ -905,11 +911,18 @@ fn capture_loop<D: CaptureDevice>(
             // of the block handed on; the letters, `explained` and `heard`
             // still come from `clean`.
             let linear = step.and(echo.linear());
+            // With `linear-gated`, the block's own evidence admits the
+            // linear output, as the frame would carry it.
+            let gate_evidence = reference
+                .evidence_trusted()
+                .then(|| echo.evidence())
+                .flatten();
+            let input =
+                crate::activity::detector_input(vad_input, gate_evidence.as_ref(), &clean, linear);
             vad_said.1 += 1;
-            vad_said.2 += u64::from(vad_linear && linear.is_some());
+            vad_said.2 += u64::from(linear.is_some_and(|linear| std::ptr::eq(input, linear)));
             let from = cost.now();
-            let probability =
-                speech.analyze(crate::activity::detector_input(vad_linear, &clean, linear));
+            let probability = speech.analyze(input);
             cost.stage(Stage::Detector, from);
             reference.note_score(probability);
             if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
@@ -1007,8 +1020,9 @@ fn capture_loop<D: CaptureDevice>(
             if evidence_due(vad_linear, vad_said.0.elapsed()) {
                 let (since, blocks, linear) = vad_said;
                 eprintln!(
-                    "lamp-voice: capture: the speech detector read the linear output on {linear} of {blocks} blocks in the last {} s (LAMP_VAD_INPUT=linear)",
-                    since.elapsed().as_secs()
+                    "lamp-voice: capture: the speech detector read the linear output on {linear} of {blocks} blocks in the last {} s (LAMP_VAD_INPUT={})",
+                    since.elapsed().as_secs(),
+                    vad_input.value().unwrap_or("")
                 );
                 vad_said = (Instant::now(), 0, 0);
             }

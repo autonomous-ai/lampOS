@@ -1,7 +1,7 @@
 //! Local neural speech activity with finite pre-roll and explicit endpointing.
 //! This detector does not identify a speaker or an addressee. Its thresholds
 //! are initial experiment settings, not socially qualified release defaults.
-use lamp_audio::{CAPTURE_RATE, CAPTURE_SAMPLES, CaptureBlock};
+use lamp_audio::{CAPTURE_RATE, CAPTURE_SAMPLES, CaptureBlock, duplex, evidence::EchoEvidence};
 use lamp_turn_end_wire::{
     Availability, Classifier, Outcome, Submit, Token, Verdict, WINDOW_SAMPLES,
 };
@@ -66,22 +66,80 @@ pub const REACH_LEAD_BLOCKS: usize = 20;
 /// the canceller can take a person's "Stop." said over the lamp's own voice
 /// down with the echo. Only the detector: the provider's audio, the residual
 /// and the evidence keep the processed block. Off unless set.
+///
+/// With `linear-gated`, it reads the linear output only on a block the duplex
+/// rules would take for a person if it held speech: the room clear of the
+/// lamp (`Heard::Clear`) or someone plainly over it (`Heard::Over`), judged by
+/// `Hearing::EVALUATED` at a score of 1. Elsewhere, the lamp's own voice that
+/// the render explains, a block not yet judged, or no evidence, it reads the
+/// processed block, as without the switch. The linear output keeps most of
+/// the lamp's voice (3.1–4.1 dB taken out on lamp-4ace's mic2), so `linear`
+/// scored the lamp alone as speech for much of its talk (17 October); the
+/// gate keeps that out, and a stop said over the lamp is scored on the linear
+/// output on just the blocks a yield can come from.
 pub const INPUT_ENVIRONMENT: &str = "LAMP_VAD_INPUT";
 
-/// Whether this worker's detector reads the linear output, read once.
-pub fn reads_linear() -> bool {
-    std::env::var_os(INPUT_ENVIRONMENT).as_deref() == Some(std::ffi::OsStr::new("linear"))
+/// What the detector reads, from `LAMP_VAD_INPUT`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DetectorInput {
+    Processed,
+    Linear,
+    LinearGated,
 }
 
-/// The block the detector reads: the linear output when asked for and there
-/// is one for this block, `clean` otherwise.
+impl DetectorInput {
+    /// This worker's, read once.
+    pub fn from_environment() -> Self {
+        Self::parse(std::env::var(INPUT_ENVIRONMENT).ok().as_deref())
+    }
+
+    /// Only the exact values; anything else is the processed block.
+    pub fn parse(value: Option<&str>) -> Self {
+        match value {
+            Some("linear") => Self::Linear,
+            Some("linear-gated") => Self::LinearGated,
+            _ => Self::Processed,
+        }
+    }
+
+    /// The switch's value, when it is on.
+    pub fn value(self) -> Option<&'static str> {
+        match self {
+            Self::Processed => None,
+            Self::Linear => Some("linear"),
+            Self::LinearGated => Some("linear-gated"),
+        }
+    }
+
+    /// Whether the canceller has to keep its linear output.
+    pub fn reads_linear(self) -> bool {
+        self != Self::Processed
+    }
+}
+
+/// Whether `linear-gated` reads the linear output for a block with this
+/// evidence: the duplex rules would take speech in it for a person.
+pub fn linear_admitted(evidence: Option<&EchoEvidence>) -> bool {
+    evidence.is_some_and(|evidence| {
+        matches!(
+            duplex::Hearing::EVALUATED.heard(1.0, evidence),
+            duplex::Heard::Clear | duplex::Heard::Over
+        )
+    })
+}
+
+/// The block the detector reads: the linear output when asked for, there is
+/// one for this block and, with `linear-gated`, the block is admitted; the
+/// processed block otherwise.
 pub fn detector_input<'a>(
-    linear_on: bool,
+    input: DetectorInput,
+    evidence: Option<&EchoEvidence>,
     clean: &'a CaptureBlock,
     linear: Option<&'a CaptureBlock>,
 ) -> &'a CaptureBlock {
-    match linear {
-        Some(linear) if linear_on => linear,
+    match (input, linear) {
+        (DetectorInput::Linear, Some(linear)) => linear,
+        (DetectorInput::LinearGated, Some(linear)) if linear_admitted(evidence) => linear,
         _ => clean,
     }
 }
@@ -949,24 +1007,138 @@ mod tests {
     fn the_detector_hears_the_linear_output_only_with_the_switch() {
         let speech = blocks();
         let suppressed: CaptureBlock = [0; CAPTURE_SAMPLES];
-        let loudest = |linear_on| {
+        let loudest = |input| {
             let mut detector = SpeechProbability::default();
             speech
                 .iter()
                 .map(|linear| {
-                    detector.analyze(detector_input(linear_on, &suppressed, Some(linear)))
+                    detector.analyze(detector_input(input, None, &suppressed, Some(linear)))
                 })
                 .fold(0.0_f32, f32::max)
         };
-        assert!(loudest(true) >= START_PROBABILITY, "{}", loudest(true));
-        assert!(loudest(false) < SILENCE_PROBABILITY, "{}", loudest(false));
+        let linear = loudest(DetectorInput::Linear);
+        let processed = loudest(DetectorInput::Processed);
+        assert!(linear >= START_PROBABILITY, "{linear}");
+        assert!(processed < SILENCE_PROBABILITY, "{processed}");
         // No linear output for this block (no reference yet, or none kept):
         // the processed block, switch or not.
-        for linear_on in [false, true] {
+        for input in [
+            DetectorInput::Processed,
+            DetectorInput::Linear,
+            DetectorInput::LinearGated,
+        ] {
             assert!(std::ptr::eq(
-                detector_input(linear_on, &suppressed, None),
+                detector_input(input, None, &suppressed, None),
                 &suppressed
             ));
+        }
+    }
+
+    /// Evidence for a block while the lamp speaks: `explained` percent of the
+    /// capture is the render's, with a fresh alignment; or the room clear of
+    /// the lamp.
+    fn evidence(explained: Option<u8>) -> EchoEvidence {
+        use lamp_audio::evidence::{EchoMatch, Level};
+        EchoEvidence {
+            blocks: 1_000,
+            render_active_blocks: if explained.is_some() { 50 } else { 0 },
+            render_quiet_blocks: if explained.is_some() { 0 } else { 50 },
+            capture_level: Level::from_tenths_of_db(-130),
+            residual_level: Level::from_tenths_of_db(-570),
+            echo: explained.map(|capture_explained| EchoMatch {
+                render_level: Level::from_tenths_of_db(-180),
+                capture_explained,
+                residual_explained: 10,
+                residual_playback_floor: 0,
+                alignment_age_blocks: 0,
+            }),
+            silent_at_echo: None,
+        }
+    }
+
+    /// `linear-gated` (#828, the stop rule's false side): the linear output
+    /// is read on a block the duplex rules would take speech in for a
+    /// person (the room clear, or under 75 % explained by the render), and
+    /// the processed block on the lamp's own voice, a block not yet judged
+    /// or one with no evidence. Values other than the exact two are off.
+    #[test]
+    fn linear_gated_reads_the_linear_output_only_where_speech_would_be_a_person() {
+        assert!(linear_admitted(Some(&evidence(None))));
+        assert!(linear_admitted(Some(&evidence(Some(10)))));
+        assert!(linear_admitted(Some(&evidence(Some(75)))));
+        assert!(!linear_admitted(Some(&evidence(Some(76)))));
+        assert!(!linear_admitted(Some(&evidence(Some(95)))));
+        assert!(!linear_admitted(None));
+        let no_match = EchoEvidence {
+            echo: None,
+            ..evidence(Some(95))
+        };
+        assert!(!linear_admitted(Some(&no_match)), "not yet judged");
+        let (clean, linear) = ([0; CAPTURE_SAMPLES], [1; CAPTURE_SAMPLES]);
+        let over = evidence(Some(10));
+        let own = evidence(Some(95));
+        let read = |input, evidence: &EchoEvidence| {
+            std::ptr::eq(
+                detector_input(input, Some(evidence), &clean, Some(&linear)),
+                &linear,
+            )
+        };
+        assert!(read(DetectorInput::LinearGated, &over));
+        assert!(!read(DetectorInput::LinearGated, &own));
+        assert!(read(DetectorInput::Linear, &own));
+        assert!(!read(DetectorInput::Processed, &over));
+        for (value, input) in [
+            (Some("linear"), DetectorInput::Linear),
+            (Some("linear-gated"), DetectorInput::LinearGated),
+            (Some("Linear"), DetectorInput::Processed),
+            (Some("on"), DetectorInput::Processed),
+            (Some(""), DetectorInput::Processed),
+            (None, DetectorInput::Processed),
+        ] {
+            assert_eq!(DetectorInput::parse(value), input, "{value:?}");
+        }
+        assert!(!DetectorInput::Processed.reads_linear());
+        assert!(DetectorInput::LinearGated.reads_linear());
+    }
+
+    /// The lamp's own voice kept in the linear output while the suppressor
+    /// takes it out of the processed block: `linear` scores it as speech,
+    /// `linear-gated` as the processed block does. A stop said over the lamp
+    /// (the render explains little of it) is scored on the linear output,
+    /// the same as `linear`, so the blocks a yield can come from are heard
+    /// alike.
+    #[test]
+    fn linear_gated_keeps_the_lamps_own_voice_out_and_a_stop_over_it_in() {
+        let speech = blocks();
+        let suppressed: CaptureBlock = [0; CAPTURE_SAMPLES];
+        let scores = |input, evidence: &EchoEvidence| {
+            let mut detector = SpeechProbability::default();
+            speech
+                .iter()
+                .map(|linear| {
+                    detector.analyze(detector_input(
+                        input,
+                        Some(evidence),
+                        &suppressed,
+                        Some(linear),
+                    ))
+                })
+                .collect::<Vec<f32>>()
+        };
+        let loudest = |scores: Vec<f32>| scores.into_iter().fold(0.0_f32, f32::max);
+        // The lamp alone: the render explains 95 % of each block.
+        let own = evidence(Some(95));
+        let linear = loudest(scores(DetectorInput::Linear, &own));
+        let gated = loudest(scores(DetectorInput::LinearGated, &own));
+        assert!(linear >= START_PROBABILITY, "{linear}");
+        assert!(gated < SILENCE_PROBABILITY, "{gated}");
+        // A person over the lamp, and the room clear: block for block the
+        // same scores as `linear`.
+        for evidence in [evidence(Some(10)), evidence(None)] {
+            assert_eq!(
+                scores(DetectorInput::LinearGated, &evidence),
+                scores(DetectorInput::Linear, &evidence)
+            );
         }
     }
 }

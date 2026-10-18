@@ -1730,6 +1730,15 @@ on any lamp.
 PATH`, right after `--cut-ins-not-talk`): the room is kept across a
 restart of under five minutes (above). Off by default; not on any lamp.
 
+`LAMP_VAD_INPUT=linear-gated` (passed to the capture worker only): the
+speech detector reads the echo canceller's linear output, which keeps a
+"Stop." said over the lamp that the suppressor takes out, but only on blocks
+the duplex rules would take speech in for a person, the room clear or at
+most 75 % explained by the render. On the lamp's own voice it reads the
+processed block, so the lamp alone is not scored as speech for whom it
+answers, a busy room or a turn's start, as it was with `linear` (#828,
+[serve-runtime.md](serve-runtime.md)). Off by default; not on any lamp.
+
 `LAMP_HEAD_TOUCH=on` (the worker's `--head-touch`, right after the name
 note's flags; nothing without `LAMP_BUS=on` and Controls run with
 `--touch`): a head tap is a call for 2 s (above). Off by default; not on any
