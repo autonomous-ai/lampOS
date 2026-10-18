@@ -4,6 +4,16 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 22:50 merged #1624 (tests, motor tests stepped or restarted on a timed-out start, #1569 rows 19-20), ARM64 green
+- 22:50 merged #1623 (tests, provider-pair rigs' lease 1 s, #1569 row 17), ARM64 green
+- 22:45 merged #1625 (fourth, test: a reminder into a busy room is no answer), ARM64 green
+- 22:33 merged #1619 (tests, a frame the loop reads marks the run heard), ARM64 green; P3 doc line left
+- 22:30 #1625 (fourth, reminder into a busy room test): no finding, mutation fails it; merge on green ARM64
+- 22:28 #1615 (ten, turn-times idle) re-reviewed at 9f164e6cb: the 21:56 findings fixed; new P2, lines the lamp says on its own become the run's first
+- 22:27 #1622 (thirteen, hold across restart): 2 P2s posted; mute path, so handed to the first builder
+- 22:10 merged #1573 (Waiting::closed names every case) after the attribution line left its body; ARM64 green
+- 22:08 merged #1618 (fourth, #1613 rebased: the #1522 rulings behind LAMP_GOING_ON_ASKS), ARM64 green
+- 22:08 merged #1614 (third, LAMP_TURN_END_NO_SPIN, off unless set), ARM64 green
 - 22:01 merged #1616 (twelve carrying #1562: schedule stores one release forward, the set-aside keeps its identity), ARM64 green, two P3s
 - 21:57 #1615 reviewed at 221b5417b (ten, turn-times first_of_run/idle_ms/stalled_ms): P2 (a request cut before its end of speech gets no row, so its stall goes uncounted and the next is marked first), two P3s
 - 21:54 #1617 gated at e962875ec (clippy ok, 40/0); for the first builder
