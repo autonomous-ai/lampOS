@@ -44,6 +44,12 @@ use lamp_ipc::monotonic_us;
 const QUEUE_CAPACITY: usize = 32;
 const POLL_LIMIT: usize = 16;
 const PUMP_TICK: Duration = Duration::from_millis(2);
+/// With [`ControlsOptions::wait`], the longest the pump waits on its
+/// sockets: the default bus rescan (`Bus::rescan_every`, 200 ms, the
+/// product's), so the topics' files and publishers are looked at about as
+/// often as they would be. A bus set to rescan faster (tests use 20 ms) is
+/// still looked at every 200 ms here.
+const WAIT_AT_MOST: Duration = Duration::from_millis(200);
 const RECONNECT_AFTER: Duration = Duration::from_millis(250);
 const FINAL_JOIN_WAIT: Duration = Duration::from_millis(20);
 /// `voice/mute` is said when it changes and at least this often.
@@ -78,6 +84,19 @@ pub struct ControlsOptions {
     /// wakes it, and `voice/mute` says which. `LAMP_HEAD_TOUCH=on`; off
     /// unless set.
     pub head_touch: bool,
+    /// The pump waits on its sockets instead of looking every 2 ms
+    /// (`LAMP_CONTROLS_WAIT=on`, #705, the lamp's heat): a request is read
+    /// as it arrives, and with nothing coming the pump wakes about five
+    /// times a second instead of 500. Off unless set.
+    pub wait: bool,
+}
+
+/// `on` for the pump to wait on its sockets ([`ControlsOptions::wait`]).
+pub const WAIT_ENVIRONMENT: &str = "LAMP_CONTROLS_WAIT";
+
+/// Whether the environment says `LAMP_CONTROLS_WAIT=on`.
+pub fn wait_from_environment() -> bool {
+    std::env::var(WAIT_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
 /// `on` for the head pads' requests ([`ControlsOptions::head_touch`]).
@@ -190,6 +209,12 @@ struct Shared {
     /// The live latch for `voice/mute` (#711): `LATCH_*`, set by the owner
     /// and said by the pump.
     latch: AtomicU8,
+    /// With [`ControlsOptions::wait`], the pipe's end the owner writes a
+    /// byte to, to wake the pump from its wait at once: for a stop, and for
+    /// a latch to be said.
+    wake: std::sync::OnceLock<std::os::fd::OwnedFd>,
+    /// The pump's passes: how often it woke.
+    passes: AtomicU64,
 }
 
 const LATCH_NONE: u8 = 0;
@@ -235,6 +260,14 @@ impl Shared {
         add(&self.rejected, 1);
         self.fence();
     }
+
+    /// Wake a waiting pump at once; nothing without the switch. A full
+    /// pipe already wakes it.
+    fn wake(&self) {
+        if let Some(wake) = self.wake.get() {
+            let _ = rustix::io::write(wake, &[1]);
+        }
+    }
 }
 
 enum Input {
@@ -274,6 +307,7 @@ impl Drop for PumpFinished {
 impl Drop for Pump {
     fn drop(&mut self) {
         self.shared.stop.store(true, Ordering::Release);
+        self.shared.wake();
         if let Some(worker) = self.thread.take() {
             worker.thread().unpark();
             // Never wait indefinitely for a filesystem/syscall inside Bus.
@@ -499,12 +533,27 @@ impl HandControls {
         let shared = Arc::new(Shared::default());
         let mut controls =
             Self::with_restored(options, &clock_id, restored, input, shared, now_us)?;
+        controls.start_pump(sender)?;
+        Ok(Some(controls))
+    }
+
+    /// The one pump, on its own thread: the bus's subscriptions into
+    /// `sender`, and with [`ControlsOptions::wait`] the pipe it is woken by.
+    fn start_pump(&mut self, sender: SyncSender<Queued>) -> io::Result<()> {
+        let options = &self.options;
         let root = options
             .bus_root
             .clone()
             .or_else(|| std::env::var_os(lamp_bus::ROOT_VARIABLE).map(PathBuf::from))
             .unwrap_or_else(|| PathBuf::from(lamp_bus::DEFAULT_ROOT));
-        let pump_shared = Arc::clone(&controls.shared);
+        let pump_shared = Arc::clone(&self.shared);
+        let woken = if options.wait {
+            let (read, write) = wake_pipe()?;
+            let _ = self.shared.wake.set(write);
+            Some(read)
+        } else {
+            None
+        };
         let head_touch = options.head_touch;
         let say_mute = options.head_sleep();
         let (finished, completion) = mpsc::sync_channel(1);
@@ -516,19 +565,19 @@ impl HandControls {
                     shared: Arc::clone(&pump_shared),
                     finished,
                 };
-                pump(root, head_touch, say_mute, sender, &pump_shared);
+                pump(root, head_touch, say_mute, woken, sender, &pump_shared);
             })?;
-        controls._pump = Some(Pump {
+        self._pump = Some(Pump {
             thread: Some(worker),
             finished: completion,
-            shared: Arc::clone(&controls.shared),
+            shared: Arc::clone(&self.shared),
         });
-        Ok(Some(controls))
+        Ok(())
     }
 
     /// The controls from what [`restored_record`] read: the switches, the
     /// count of runs that could not start, the late sleep window and the
-    /// guard's marker. The pump is [`Self::restore`]'s.
+    /// guard's marker. The pump is [`Self::start_pump`]'s.
     fn with_restored(
         options: &ControlsOptions,
         clock_id: &str,
@@ -613,7 +662,13 @@ impl HandControls {
         } else {
             LATCH_MUTED
         };
-        self.shared.latch.store(latch, Ordering::Release);
+        // Woken only for a latch that changed: the owner shares it on every
+        // poll, and the pump says an unchanged one every second by itself
+        // (the reviewer on #1456: a wake each poll kept a waiting pump at
+        // the coordinator's pace with head sleep on).
+        if self.shared.latch.swap(latch, Ordering::AcqRel) != latch {
+            self.shared.wake();
+        }
     }
 
     pub fn health(&self) -> Health {
@@ -1746,10 +1801,49 @@ impl SaidMute {
     }
 }
 
+/// The pipe the owner wakes a waiting pump with: both ends close on exec and
+/// never block. Made with `pipe` and `fcntl`, as `pipe2` is not on every
+/// system the voice builds on (macOS).
+fn wake_pipe() -> io::Result<(std::os::fd::OwnedFd, std::os::fd::OwnedFd)> {
+    let (read, write) = rustix::pipe::pipe()?;
+    for end in [&read, &write] {
+        rustix::io::fcntl_setfd(end, rustix::io::FdFlags::CLOEXEC)?;
+        rustix::fs::fcntl_setfl(end, rustix::fs::OFlags::NONBLOCK)?;
+    }
+    Ok((read, write))
+}
+
+/// With [`ControlsOptions::wait`]: until a subscriber's socket is readable,
+/// the owner writes to the pipe, or [`WAIT_AT_MOST`] passes, and no longer
+/// than none if a subscriber already holds a datagram read ahead. The pipe
+/// is emptied.
+fn wait_on(subscribed: &[(Subscriber, Topic)], woken: &std::os::fd::OwnedFd) {
+    use rustix::event::{PollFd, PollFlags, poll};
+    if subscribed.iter().any(|(subscriber, _)| subscriber.holds()) {
+        return;
+    }
+    let mut fds: Vec<PollFd<'_>> = subscribed
+        .iter()
+        .map(|(subscriber, _)| PollFd::new(subscriber, PollFlags::IN))
+        .collect();
+    fds.push(PollFd::new(woken, PollFlags::IN));
+    let timeout = rustix::time::Timespec {
+        tv_sec: 0,
+        tv_nsec: WAIT_AT_MOST.as_nanos() as _,
+    };
+    if poll(&mut fds, Some(&timeout)).is_err() {
+        // A failed wait is never a busy loop: it waits as the tick does.
+        thread::park_timeout(PUMP_TICK);
+    }
+    let mut drained = [0u8; 64];
+    while matches!(rustix::io::read(woken, &mut drained), Ok(read) if read > 0) {}
+}
+
 fn pump(
     root: PathBuf,
     head_touch: bool,
     say_mute: bool,
+    woken: Option<std::os::fd::OwnedFd>,
     sender: SyncSender<Queued>,
     shared: &Shared,
 ) {
@@ -1761,6 +1855,7 @@ fn pump(
                 at: None,
             };
             'connected: while !shared.stop.load(Ordering::Acquire) {
+                add(&shared.passes, 1);
                 if let Some(publisher) = &mut mute
                     && said.say(publisher, shared).is_err()
                 {
@@ -1773,7 +1868,10 @@ fn pump(
                     Ok(Drained::Closed) => return,
                     Err(_) => break 'connected,
                 }
-                thread::park_timeout(PUMP_TICK);
+                match &woken {
+                    Some(woken) => wait_on(&subscribed, woken),
+                    None => thread::park_timeout(PUMP_TICK),
+                }
             }
         }
         if !shared.stop.load(Ordering::Acquire) {

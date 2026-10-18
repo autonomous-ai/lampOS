@@ -158,6 +158,13 @@ before is not a gap. On a `latest` topic, `recv` with nothing waiting returns
 the file's value if the subscriber has not had it, so the newest value
 arrives though its datagram was dropped.
 
+A program that waits on several topics at once can `poll` their sockets: a
+`Subscriber` is `AsFd`, readable when a datagram waits. One already read
+ahead (to find out whether anything was waiting) is no longer in the socket,
+so it asks `holds()` first, and it still calls `recv` at least every 200 ms,
+since the topic's file and its publishers are looked at only there (the
+voice's controls pump with `LAMP_CONTROLS_WAIT=on`, [controls.md](controls.md)).
+
 A subscriber also learns what no message can say:
 
 | What | When | How it is told |
