@@ -489,3 +489,35 @@ fn bind_mounts_are_refused_even_on_the_same_filesystem() {
     assert_eq!(fs::read(sentinel).unwrap(), b"outside must survive");
     assert!(root.join(id).exists());
 }
+
+/// #1505: a run report as a later build writes it, with a field this build
+/// doesn't know. The same report without it reads; with it, today's build
+/// refuses it, so its cleanup run is refused at `check` and its health says
+/// "no readable cleanup result". `second/records-forward` makes it read: this
+/// test then stops panicking, and becomes a plain test in that pull request
+/// (Tests).
+#[test]
+#[should_panic(expected = "unknown field")]
+fn a_report_from_a_later_build_is_read() {
+    let tree = Tree::new();
+    let config = tree.config();
+    let receipt = RunReport {
+        schema_version: 1,
+        config_fingerprint: config.fingerprint(),
+        at_unix_s: 2_000_000,
+        mode: "apply".into(),
+        enabled: true,
+        roots: Vec::new(),
+        error: None,
+    };
+    receipt.validate().unwrap();
+    let path = tree.0.join("last.json");
+    json_file::write(&path, &receipt).unwrap();
+    let read: RunReport = json_file::read(&path, json_file::REPORT_BYTES).unwrap();
+    assert_eq!(read.at_unix_s, 2_000_000);
+    let mut later: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    later["a_field_from_a_later_build"] = serde_json::json!(true);
+    json_file::write(&path, &later).unwrap();
+    let read: RunReport = json_file::read(&path, json_file::REPORT_BYTES).unwrap();
+    assert_eq!(read.at_unix_s, 2_000_000);
+}

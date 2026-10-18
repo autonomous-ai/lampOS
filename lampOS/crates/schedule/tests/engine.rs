@@ -928,3 +928,25 @@ fn a_bad_default_zone_cannot_create_or_open_a_store() {
     assert!(Engine::open(disk.clone(), "Bad/Zone", &now(0), STORE).is_err());
     assert!(disk.load().unwrap().is_none());
 }
+
+/// #1505: a store as a later build writes it, with a field this build doesn't
+/// know at its top and in a reminder. The same store without them opens; with
+/// them, lamp-schedule refuses it today and exits. `second/schedule-forward`
+/// makes it read: this test then stops panicking, and becomes a plain test in
+/// that pull request (Tests).
+#[test]
+#[should_panic(expected = "Schedule storage is unavailable")]
+fn a_store_from_a_later_build_is_read() {
+    let disk = Disk::default();
+    let mut engine = open(disk.clone(), &now(0));
+    set(&mut engine, &now(0), 600);
+    let revision = engine.revision();
+    drop(engine);
+    assert_eq!(open(disk.clone(), &now(1)).revision(), revision);
+    let mut later: Value =
+        serde_json::from_slice(disk.0.lock().unwrap().bytes.as_ref().unwrap()).unwrap();
+    later["a_field_from_a_later_build"] = json!(true);
+    later["items"][0]["a_field_from_a_later_build"] = json!(true);
+    disk.0.lock().unwrap().bytes = Some(serde_json::to_vec(&later).unwrap());
+    assert_eq!(open(disk, &now(2)).revision(), revision);
+}

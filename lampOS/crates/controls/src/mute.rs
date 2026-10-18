@@ -266,6 +266,26 @@ mod tests {
         }
     }
 
+    /// #1505: a record as a later build writes it, with a field this build
+    /// doesn't know. Today it is refused, and the voice doesn't start on it.
+    /// `el/mute-forward` makes it read, as muted: this test then stops
+    /// panicking, and becomes a plain test in that pull request (Tests).
+    #[test]
+    #[should_panic(expected = "unknown field")]
+    fn a_record_from_a_later_build_is_read_and_stays_muted() {
+        let root = Root::new();
+        let path = root.0.join("mute.json");
+        let mut record = MuteRecord::new("boot").unwrap();
+        record.request_mute(10);
+        record.save(&path).unwrap();
+        let mut later: serde_json::Value =
+            serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        later["a_field_from_a_later_build"] = serde_json::json!(true);
+        fs::write(&path, serde_json::to_vec(&later).unwrap()).unwrap();
+        let read = MuteRecord::load(&path, "boot", 30).unwrap();
+        assert!(read.muted);
+    }
+
     #[test]
     fn failure_before_or_after_replacement_keeps_recovery_evidence() {
         for point in [
