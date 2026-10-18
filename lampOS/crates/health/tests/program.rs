@@ -601,10 +601,15 @@ fn a_part_that_is_expected_and_silent_or_has_gone_quiet_ends_show_with_3() {
         "{journal}"
     );
     // Before anything had reported, both were missing: the first named.
-    assert_eq!(
-        lines[1],
-        "lamp-health: health stale: eyes: has never reported"
-    );
+    // On a machine whose own board isn't well (a disk under 10 % free),
+    // the board's line comes first instead: as `board_level` says, the
+    // test then checks statuses and not every line.
+    if board == Level::Ok {
+        assert_eq!(
+            lines[1],
+            "lamp-health: health stale: eyes: has never reported"
+        );
+    }
 }
 
 #[test]
