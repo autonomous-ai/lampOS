@@ -206,6 +206,75 @@ async fn an_action_in_a_turn_the_policy_judged_not_for_the_lamp_is_not_done_and_
     rig.stop().await;
 }
 
+/// For `long` of the scenario's time, heartbeats kept: the worker's outputs,
+/// and every tool response the service was sent.
+async fn heard_for(
+    rig: &mut LiveRig,
+    dial: &mut Dial,
+    long: Duration,
+) -> (Vec<ProviderOutput>, Vec<serde_json::Value>) {
+    let until = crate::scenario_clock::instant() + long;
+    let (mut out, mut responses) = (Vec::new(), Vec::new());
+    while crate::scenario_clock::instant() < until {
+        rig.publish();
+        while let Some(wire) = rig.take() {
+            if let Wire::Output(output) = wire {
+                out.push(output);
+            }
+        }
+        while let Some(message) = dial.service.try_receive(Duration::ZERO).await {
+            if message.get("toolResponse").is_some() {
+                responses.push(message);
+            }
+        }
+        rig.tick(Duration::from_millis(2)).await;
+    }
+    (out, responses)
+}
+
+/// #1465, lamp-4ace on 18 Oct at 10:57: a follow-up the Policy judged not
+/// for the lamp, and the model asked for the held `volume_up` 72 times in
+/// 49 s, each answered "not done", while the person heard nothing. Bounded
+/// (Twelve's design on #1465): at most two of its held calls are answered,
+/// the turn is ended (`Interrupted`), a third is neither answered nor run,
+/// and nothing of the turn's sound is let out. Fails on `lamp-voice` until
+/// that bound is built: every call is answered.
+#[tokio::test(start_paused = true)]
+async fn a_held_call_asked_again_and_again_ends_its_turn_after_the_second() {
+    let _clock = logical_clock();
+    let mut desk = Desk::new("again");
+    let (mut rig, mut dial, request, told, _) =
+        asked_for_volume(&mut desk, true, Some("stay_quiet")).await;
+    assert_eq!(response(&told)["done"], false, "{told}");
+    let mut answered = 1;
+    let mut out = Vec::new();
+    // The model asks again and again, as it did 72 times.
+    for call in 2..=6 {
+        dial.service.send(volume_up(&format!("v{call}"))).await;
+        let (more, responses) = heard_for(&mut rig, &mut dial, Duration::from_millis(100)).await;
+        answered += responses.len();
+        out.extend(more);
+    }
+    dial.service.send(provider_audio(9, 480)).await;
+    let (more, _) = heard_for(&mut rig, &mut dial, Duration::from_millis(300)).await;
+    out.extend(more);
+    assert!(answered <= 2, "{answered} of its 6 held calls answered");
+    assert!(
+        out.iter().any(
+            |output| matches!(output, ProviderOutput::Interrupted { request: of } if *of == request)
+        ),
+        "the turn was not ended: {out:?}"
+    );
+    assert!(desk.asked.try_recv().is_err(), "a held call was run");
+    assert!(
+        !out.iter().any(
+            |output| matches!(output, ProviderOutput::Audio { request: of, .. } if *of == request)
+        ),
+        "{out:?}"
+    );
+    rig.stop().await;
+}
+
 /// A turn the Policy took as the lamp's (`answer`, or `look_up`): the
 /// action runs, and its answer goes back as it would without the switch.
 #[tokio::test(start_paused = true)]
