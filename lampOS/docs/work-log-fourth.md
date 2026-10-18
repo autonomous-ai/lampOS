@@ -4463,6 +4463,26 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **Corrections to my 15:49 entry:** 4 of #1538's first 9 tests ran through the worker's loop, not 5 (the fifth checks the flag order). And "each caught by a mutation" was true of the worker and attention tests only.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-18, 17:36 ICT: #1552 for #1547; #1538 sent back, ruled and folded; #1520 reviewed
+
+- **#1547** (another city's time given as the lamp's own) is **#1552** (`fourth/time-place`), opened at 17:1x, gate 2573/0.
+  - `the_time` takes a place (an IANA zone, or a city's name alone) behind `LAMP_TIME_PLACES`.
+  - It reads `/usr/share/zoneinfo` with the voice's own reader, and works out a slim file's closing rule for another place only, so the lamp's own time reads as before.
+  - The answer names the place, with the lamp's own time beside it.
+- **#1538 was sent back at 16:48.** I had missed Jarvis's 16:14 peer review and the reviewer's 16:21 pass: my watcher printed only comments naming me. It now prints every comment on my PRs, and my memory says so.
+  - **The first builder's 16:51 ruling:** the Policy's choice decides. A `stay_quiet` under 0.6 is held, and a `look_up`'s words are held while its call runs.
+  - **Done since, in one folded commit on `fourth/going-on-asks-2`** (`496fb65da`, on lamp-voice `3a11b0fd2`):
+    - the rulings in `attention.md`;
+    - a `look_up` holds the words, and its call goes to the action gate (`holds_calls`);
+    - the no-decision row;
+    - only a line whose verdict would reach the Policy's arm waits: not a remark, a question about the lamp's work, someone else's line, or a line said close (my call on the P3);
+    - `--act attention` named in the docs;
+    - 13 tests, with mutations for each new row.
+  - Gate running; then a new PR, and #1538 closed.
+- **#1520** (Twelve's `LAMP_SHORT_DONE`, merged 16:35): post-merge peer read. Its readers' tests passed (lamp-actions 41/0, the voice's `tools::` 29/0, the switches census 2/0). One P3: `is_short` matches function names by prefix.
+- **The A/B** runs on lamp-4ace until about 17:45; I score it when the first builder posts the files.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
