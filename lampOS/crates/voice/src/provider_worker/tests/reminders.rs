@@ -668,6 +668,53 @@ async fn unanswered_reminders_and_sounds_are_not_talk_but_speech_and_actual_audi
     rig.stop().await;
 }
 
+/// Jarvis on #1613 (21:41): with `LAMP_GOING_ON_ASKS`'s minute
+/// (`RoomTold::end_busy_once_answered`), a reminder the lamp rings into a
+/// busy room is no answer. The worker gives its audio to
+/// `RoomTold::spoke_unasked`, so the room stays busy for three minutes from
+/// its talk, not a minute from the reminder. The room is made after the
+/// worker has started, since it sets the room's switches then.
+#[tokio::test]
+async fn a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by() {
+    let _restore = RestoreRoom::quiet();
+    let mut rig = LiveRig::start_with(quick_policy(), options(true));
+    let mut dial = rig.ready().await;
+    let talk_us = monotonic_us();
+    {
+        let mut busy = crate::room_told::RoomTold::new();
+        busy.count_only_talk(true);
+        busy.end_busy_once_answered(true);
+        for request in 1..=3 {
+            busy.heard(request, talk_us);
+            busy.ended(request, talk_us);
+            assert!(busy.unanswered(request, talk_us));
+        }
+        assert_eq!(busy.at(talk_us), Room::Busy);
+        *crate::room_told::room().lock().unwrap() = busy;
+    }
+    let request = rig.reminder(&dial, "Tea");
+    assert!(
+        matches!(rig.output().await, ProviderOutput::Started { request: got, .. } if got == request)
+    );
+    rig.service_message(&mut dial).await;
+    dial.service.send(provider_audio(8, 480)).await;
+    assert!(
+        matches!(rig.output().await, ProviderOutput::Audio { request: got, .. } if got == request)
+    );
+    {
+        let mut room = crate::room_told::room().lock().unwrap();
+        // Taken for an answer, it would end the room a minute after it.
+        assert_eq!(room.at(talk_us + 120_000_000), Room::Busy);
+        assert_eq!(room.at(talk_us + 181_000_000), Room::Quiet);
+    }
+    dial.service.send(idle_complete()).await;
+    assert!(
+        matches!(rig.output().await, ProviderOutput::TurnComplete { request: got, idle: true } if got == request)
+    );
+    rig.end_local_reminder();
+    rig.stop().await;
+}
+
 #[tokio::test]
 async fn room_changes_during_a_reminder_allow_speech_and_completion_but_never_tools() {
     for (before, during, after) in [
