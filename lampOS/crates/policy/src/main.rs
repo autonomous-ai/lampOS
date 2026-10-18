@@ -31,7 +31,7 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "usage: lamp-policy --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR [--endpoint URL] [--model NAME] [--deadline-ms N] [--bus-root ABSOLUTE_DIR] [--progress] [--hello] [--utc-offset-minutes N | --zone system|NAME] [--act progress] [--act hello] [--rules] [--act attention] [--attention-next] [--gate] [--images MODEL [--sight-file ABSOLUTE_PATH]]";
+const USAGE: &str = "usage: lamp-policy --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR [--endpoint URL] [--model NAME] [--deadline-ms N] [--bus-root ABSOLUTE_DIR] [--progress] [--hello] [--utc-offset-minutes N | --zone system|NAME] [--act progress] [--act hello] [--rules] [--act attention] [--attention-next] [--rule-decides KIND[;KIND...]] [--gate] [--images MODEL [--sight-file ABSOLUTE_PATH]]";
 const HELP: &str = "The lamp's policy, in shadow mode: judges whether each thing the voice hears was said to\n\
 the lamp, publishes the decision on the bus (policy/decisions) and writes it down. Nothing\n\
 acts on it. See docs/policy.md.\n\
@@ -69,6 +69,13 @@ acts on it. See docs/policy.md.\n\
                  conversation with the lamp, 3 for each unit of follows_lamp above 0.55 added to the\n\
                  sum, never less than today's. Written on the decision's line as next and counted in\n\
                  the diagnostics (attention_next_differs); never published, never acted on. Off\n\
+                 unless set\n\
+  --rule-decides KIND[;KIND...]\n\
+                 decide the attention questions of these kinds by the rule at once, without\n\
+                 asking the model (#705): kinds as lamp-policy-replay --agreement prints them\n\
+                 (room conversation speaking name, e.g. 'busy false false >=0.99'), named only\n\
+                 once the record shows the model agreeing with the rule on them. The line says\n\
+                 certain; those questions' model answers are no longer logged for fitting. Off\n\
                  unless set\n\
   --gate         also answer a skill that asks (skills/ask) whether the lamp may say hello, tell\n\
                  news or start something itself, with the hello question or a moment question\n\
@@ -112,6 +119,9 @@ struct Arguments {
     /// The second attention judgement, in shadow (`--attention-next`,
     /// #1040): off unless set.
     attention_next: bool,
+    /// The kinds of attention decision the rule makes alone (`--rule-decides`,
+    /// #705): none unless set.
+    rule_decides: Vec<lamp_policy::replay::Kind>,
     /// The images model asked with the eyes' frame (`--images`, #871): off
     /// unless set.
     images: Option<String>,
@@ -128,6 +138,7 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
     let mut zone = None;
     let mut gate = false;
     let mut attention_next = false;
+    let mut rule_decides: Option<Vec<lamp_policy::replay::Kind>> = None;
     let (mut images, mut sight_file) = (None, None);
     let mut arguments = arguments;
     while let Some(option) = arguments.next() {
@@ -210,6 +221,25 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
                 }
                 zone.replace(value).is_some()
             }
+            "--rule-decides" => {
+                let kinds: Option<Vec<_>> = value
+                    .split(';')
+                    .map(lamp_policy::replay::Kind::parse)
+                    .collect();
+                let kinds = kinds.filter(|kinds| !kinds.is_empty()).ok_or(
+                    "--rule-decides is kinds as lamp-policy-replay --agreement prints them, separated by ';' (busy false false >=0.99)",
+                )?;
+                // With the lamp speaking the rule always answers, and a
+                // night's record can't show talk over the lamp's reply that
+                // was not for it: those lines stay the model's (Sixth on
+                // #1524, the 15 Oct "Thailand" case said over the lamp).
+                if kinds.iter().any(|kind| kind.lamp_is_speaking) {
+                    return Err(
+                        "--rule-decides takes no kind with the lamp speaking: those lines are the model's to judge".into(),
+                    );
+                }
+                rule_decides.replace(kinds).is_some()
+            }
             "--deadline-ms" => {
                 let milliseconds = value
                     .parse::<u64>()
@@ -263,6 +293,7 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
         rules,
         gate,
         attention_next,
+        rule_decides: rule_decides.unwrap_or_default(),
         images,
         sight_file,
     }))
@@ -292,6 +323,9 @@ fn questions(arguments: &Arguments) -> String {
     }
     if arguments.attention_next {
         said.push_str(" attention_next=true");
+    }
+    if !arguments.rule_decides.is_empty() {
+        said.push_str(&format!(" rule_decides={}", arguments.rule_decides.len()));
     }
     let acting: Vec<&str> = [
         (arguments.act_progress, "progress"),
@@ -411,6 +445,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             hello,
             pictures,
             attention_next: arguments.attention_next,
+            rule_decides: arguments.rule_decides.clone(),
         },
     )
     .map(|_| ())
@@ -478,6 +513,7 @@ mod tests {
                 rules: false,
                 gate: false,
                 attention_next: false,
+                rule_decides: Vec::new(),
                 images: None,
                 sight_file: None,
             }
@@ -502,6 +538,7 @@ mod tests {
                 rules: false,
                 gate: false,
                 attention_next: false,
+                rule_decides: Vec::new(),
                 images: None,
                 sight_file: None,
             }
@@ -617,6 +654,41 @@ mod tests {
         );
         assert_eq!(of("--help").unwrap(), None);
         assert_eq!(of("-h").unwrap(), None);
+    }
+
+    /// `--rule-decides` (#705): kinds as `--agreement` prints them, said on
+    /// the start line by count; refused when malformed, given twice, or with
+    /// the lamp speaking (Sixth on #1524).
+    #[test]
+    fn the_rule_decides_kinds_are_read_and_a_speaking_kind_is_refused() {
+        let with = |kinds: &[&str]| {
+            let mut words: Vec<String> = ["--key-file", "/k", "--log-dir", "/d"]
+                .map(str::to_owned)
+                .into();
+            for kind in kinds {
+                words.push("--rule-decides".into());
+                words.push((*kind).to_owned());
+            }
+            parse(words.into_iter())
+        };
+        let read = with(&["busy false false >=0.99;quiet false false none"])
+            .unwrap()
+            .unwrap();
+        assert_eq!(read.rule_decides.len(), 2);
+        assert_eq!(read.rule_decides[0].to_string(), "busy false false >=0.99");
+        assert_eq!(questions(&read), " rule_decides=2");
+        assert!(with(&[]).unwrap().unwrap().rule_decides.is_empty());
+        assert_eq!(questions(&with(&[]).unwrap().unwrap()), "");
+        for refused in [
+            &["busy false true none"][..],
+            &["busy false false >=0.99;busy true true none"],
+            &["busy false false 0.99"],
+            &["busy false false >=0.99;"],
+            &[""],
+            &["busy false false >=0.99", "busy false false >=0.99"],
+        ] {
+            assert!(with(refused).is_err(), "{refused:?}");
+        }
     }
 
     #[test]

@@ -712,3 +712,27 @@ fn a_picture_line_cut_inside_a_character_does_not_end_the_run() {
         .collect();
     assert_eq!(ats, [1, 3]);
 }
+
+/// `--rule-decides` takes kinds as `--agreement` prints them, and nothing
+/// else.
+#[test]
+fn a_kind_reads_back_as_printed() {
+    let called = Context {
+        name_heard: Some(0.995),
+        ..context("hey lamp", Room::Busy)
+    };
+    for kind in [Kind::of(&called), Kind::of(&context("so", Room::Quiet))] {
+        assert_eq!(Kind::parse(&kind.to_string()), Some(kind));
+    }
+    assert_eq!(Kind::of(&called).to_string(), "busy false false >=0.99");
+    for refused in [
+        "",
+        "busy false false",
+        "busy no false none",
+        "loud false false none",
+        "busy false false 0.99",
+        "busy false false none extra",
+    ] {
+        assert_eq!(Kind::parse(refused), None, "{refused:?}");
+    }
+}

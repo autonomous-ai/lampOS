@@ -145,7 +145,26 @@ impl Rig {
     where
         F: FnMut(&Value) -> Result<Asked, Failed> + Send + 'static,
     {
-        Self::started(name, script, None, PAUSE, |_| {}, true)
+        let beside = || Beside {
+            attention_next: true,
+            ..Beside::default()
+        };
+        Self::started(name, script, None, PAUSE, |_| {}, beside)
+    }
+
+    /// With these kinds decided by the rule alone (`--rule-decides`, #705).
+    fn rule_decides<F>(name: &str, script: F, kinds: &'static [&'static str]) -> Self
+    where
+        F: FnMut(&Value) -> Result<Asked, Failed> + Send + 'static,
+    {
+        let beside = move || Beside {
+            rule_decides: kinds
+                .iter()
+                .map(|kind| lamp_policy::replay::Kind::parse(kind).unwrap())
+                .collect(),
+            ..Beside::default()
+        };
+        Self::started(name, script, None, PAUSE, |_| {}, beside)
     }
 
     fn with_pause<F>(
@@ -158,7 +177,7 @@ impl Rig {
     where
         F: FnMut(&Value) -> Result<Asked, Failed> + Send + 'static,
     {
-        Self::started(name, script, lease, pause, before, false)
+        Self::started(name, script, lease, pause, before, Beside::default)
     }
 
     fn started<F>(
@@ -167,7 +186,7 @@ impl Rig {
         lease: Option<Duration>,
         pause: Duration,
         before: impl FnOnce(&Self),
-        attention_next: bool,
+        beside: impl FnOnce() -> Beside + Send + 'static,
     ) -> Self
     where
         F: FnMut(&Value) -> Result<Asked, Failed> + Send + 'static,
@@ -230,10 +249,7 @@ impl Rig {
             readied: Arc::clone(&rig.readied),
         };
         rig.running = Some(thread::spawn(move || {
-            let beside = Beside {
-                attention_next,
-                ..Beside::default()
-            };
+            let beside = beside();
             policy::run_beside(
                 &bus,
                 stand_in,
@@ -1692,4 +1708,91 @@ fn every_note_is_a_line_of_counts_and_kinds_and_can_hold_no_text() {
     distinct.sort();
     distinct.dedup();
     assert_eq!(distinct.len(), lines.len());
+}
+
+/// #705, the Policy's wait on a held call: a kind named in `--rule-decides`
+/// is decided by the rule at once and the model is not asked; its line says
+/// `certain` and no failure. A kind not named is asked as before.
+#[test]
+fn a_kind_the_rule_decides_is_not_asked_and_others_are() {
+    // Nothing has said how the room is, the lamp has not spoken, and no name
+    // was heard: `unknown false false none`.
+    let mut rig = Rig::rule_decides(
+        "rule-decides",
+        |_| Ok(asked(SEVEN)),
+        &["unknown false false none"],
+    );
+    let began = Instant::now();
+    rig.hear_as("Turn it up a little.", true, None);
+    let decision = rig.decision();
+    assert_eq!(decision.by, "rule");
+    assert_eq!(decision.took_ms, 0);
+    // The rule in an unknown room, out of conversation, not called: quiet.
+    assert_eq!(decision.choice, "stay_quiet");
+    assert!(began.elapsed() < Duration::from_secs(5));
+    let line = rig.log(1).remove(0);
+    assert_eq!(line["certain"], true);
+    assert!(line.get("failed").is_none(), "{line}");
+    assert!(rig.states.try_recv().is_err(), "the model was asked");
+    rig.stop();
+
+    // Another kind named: this one is asked, as without the switch.
+    let mut rig = Rig::rule_decides(
+        "rule-asks",
+        |_| Ok(asked(SEVEN)),
+        &["busy false false >=0.99"],
+    );
+    rig.hear_as("Turn it up a little.", true, None);
+    rig.shown();
+    let decision = rig.decision();
+    assert_ne!(decision.by, "rule");
+    let line = rig.log(1).remove(0);
+    assert!(line.get("certain").is_none(), "{line}");
+    rig.stop();
+}
+
+/// The reviewer on #1524: a decision the rule makes for a named kind says
+/// nothing of the model. After the model failed, a `certain` line leaves its
+/// failing note standing: no "answering again".
+#[test]
+fn a_rule_decision_leaves_the_models_health_as_it_was() {
+    let mut rig = Rig::rule_decides(
+        "rule-health",
+        |_| Err(Failed::TimedOut),
+        &["unknown true false none"],
+    );
+    // Not in conversation: asked, and the model fails.
+    rig.hear_as("Is it going to rain?", true, None);
+    rig.shown();
+    assert_eq!(rig.decision().by, "rule");
+    // The lamp speaks; a reply to it is the named kind, decided by the rule.
+    rig.voice(Voice::Speaking);
+    rig.say("It will rain tomorrow.", 5);
+    thread::sleep(ms(150));
+    rig.voice(Voice::Listening);
+    thread::sleep(ms(200));
+    rig.hear_as("I should bring an umbrella then.", true, None);
+    let decision = rig.decision();
+    assert_eq!(decision.by, "rule");
+    let log = rig.log(2);
+    assert_eq!(log[0]["failed"], "timed_out");
+    assert_eq!(log[1]["certain"], true);
+    // Nothing was asked or shown for the certain line.
+    assert!(
+        log[1].get("asked").is_none() && log[1].get("state").is_none(),
+        "{}",
+        log[1]
+    );
+    assert!(log[0].get("asked").is_some() && log[0].get("state").is_some());
+    let (_, notes) = rig.stop();
+    let about_the_model: Vec<&Note> = notes
+        .iter()
+        .filter(|note| {
+            matches!(
+                note,
+                Note::ModelFailing { .. } | Note::ModelAnswering { .. }
+            )
+        })
+        .collect();
+    assert_eq!(about_the_model, [&Note::ModelFailing { kind: "timed_out" }]);
 }

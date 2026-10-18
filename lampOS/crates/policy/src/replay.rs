@@ -674,7 +674,42 @@ pub struct Kind {
     pub name: &'static str,
 }
 
+impl std::fmt::Display for Kind {
+    /// As `--agreement` prints it and `lamp-policy --rule-decides` takes it:
+    /// `busy false false >=0.99`.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} {} {}",
+            self.room, self.in_conversation, self.lamp_is_speaking, self.name
+        )
+    }
+}
+
 impl Kind {
+    /// A kind as printed ([`Kind`]'s `Display`), or `None`.
+    pub fn parse(text: &str) -> Option<Self> {
+        let words: Vec<&str> = text.split_whitespace().collect();
+        let [room, conversation, speaking, name] = words.as_slice() else {
+            return None;
+        };
+        let flag = |word: &str| match word {
+            "true" => Some(true),
+            "false" => Some(false),
+            _ => None,
+        };
+        Some(Self {
+            room: ["quiet", "busy", "unknown"]
+                .into_iter()
+                .find(|r| r == room)?,
+            in_conversation: flag(conversation)?,
+            lamp_is_speaking: flag(speaking)?,
+            name: ["none", "<0.5", "0.5-0.9", "0.9-0.99", ">=0.99"]
+                .into_iter()
+                .find(|n| n == name)?,
+        })
+    }
+
     pub fn of(context: &Context) -> Self {
         Self {
             room: match context.room {

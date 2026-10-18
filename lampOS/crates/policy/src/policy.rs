@@ -644,10 +644,13 @@ struct Line<'a> {
     /// What was known. `heard` is what was said, in words.
     context: &'a Context,
     in_conversation: bool,
-    /// What the decision model was shown.
-    state: serde_json::Value,
-    /// The judge that was asked.
-    asked: &'a str,
+    /// What the decision model was shown. Left out on a `certain` line:
+    /// the model was shown nothing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    state: Option<serde_json::Value>,
+    /// The judge that was asked. Left out on a `certain` line: none was.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    asked: Option<&'a str>,
     /// What it answered to each question. Empty if it did not.
     answers: &'a BTreeMap<String, f32>,
     judgement: Judgement,
@@ -672,6 +675,10 @@ struct Line<'a> {
     failed: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     failed_why: Option<String>,
+    /// The rule decided alone, its kind being one `--rule-decides` names:
+    /// the model was not asked. Left out otherwise.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    certain: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     usage: Option<Usage>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -774,6 +781,8 @@ struct Policy<'a> {
     attention_shadow: bool,
     /// The second attention judgement, in shadow ([`Beside::attention_next`]).
     attention_next: bool,
+    /// The kinds the rule decides alone ([`Beside::rule_decides`]).
+    rule_decides: Vec<crate::replay::Kind>,
     /// The hello question, only with `--hello` (`run_with_questions`).
     hello: Option<Hello>,
     /// Skills' asks of an act not judged here yet, to be answered `wait`.
@@ -838,7 +847,7 @@ impl Policy<'_> {
         match self.asker.answers.try_recv() {
             Ok((answer, took, _completed)) => {
                 if let Some((waiting, sent)) = self.asking.take() {
-                    self.decide(waiting, answer, took, sent);
+                    self.decide(waiting, Some(answer), took, sent);
                 }
             }
             Err(mpsc::TryRecvError::Empty) => {}
@@ -848,6 +857,16 @@ impl Policy<'_> {
             let Some(waiting) = self.waiting.pop_front() else {
                 break;
             };
+            // A kind the record showed the model agrees with the rule on is
+            // decided by the rule at once, and the model is not asked
+            // (`--rule-decides`, #705): no wait for its answer.
+            if self
+                .rule_decides
+                .contains(&crate::replay::Kind::of(&waiting.context))
+            {
+                self.decide(waiting, None, Duration::ZERO, now);
+                continue;
+            }
             let sent = if self.asker_gone {
                 Err(mpsc::TrySendError::Disconnected(Ask::Ready))
             } else {
@@ -873,7 +892,7 @@ impl Policy<'_> {
                 }
                 Err(mpsc::TrySendError::Disconnected(_)) => {
                     self.asker_ended(now);
-                    self.decide(waiting, Err(Self::no_asker()), Duration::ZERO, now);
+                    self.decide(waiting, Some(Err(Self::no_asker())), Duration::ZERO, now);
                 }
             }
         }
@@ -899,19 +918,23 @@ impl Policy<'_> {
         }
         if let Some((waiting, sent)) = self.asking.take() {
             let took = now.saturating_duration_since(sent);
-            self.decide(waiting, Err(Self::no_asker()), took, sent);
+            self.decide(waiting, Some(Err(Self::no_asker())), took, sent);
         }
     }
 
     /// Make the decision from the model's answers, or by the rule if there
-    /// are none that can be used, and publish it and write it down.
+    /// are none that can be used, and publish it and write it down. `None`:
+    /// the model was not asked, its kind being one the rule decides
+    /// (`--rule-decides`); that is no failure of the model's.
     fn decide(
         &mut self,
         waiting: Waiting,
-        answer: Result<Asked, Failed>,
+        answer: Option<Result<Asked, Failed>>,
         took: Duration,
         sent: Instant,
     ) {
+        let certain = answer.is_none();
+        let answer = answer.unwrap_or(Err(Failed::Withdrawn));
         let Waiting {
             utterance,
             context,
@@ -945,6 +968,13 @@ impl Policy<'_> {
                     asked.usage,
                 ),
             },
+            Err(_) if certain => (
+                attention::fallback(&context),
+                BTreeMap::new(),
+                RULE.to_owned(),
+                None,
+                None,
+            ),
             Err(failed) => (
                 attention::fallback(&context),
                 BTreeMap::new(),
@@ -964,6 +994,8 @@ impl Policy<'_> {
             self.totals.attention_next_differs += 1;
         }
         match &failed {
+            // Not asked: says nothing of whether the model answers.
+            _ if certain => {}
             Some(failed) => {
                 if self.model.wrong(1) {
                     (self.say)(Note::ModelFailing {
@@ -1011,8 +1043,8 @@ impl Policy<'_> {
             shadow: self.attention_shadow,
             context: &context,
             in_conversation: context.in_conversation(),
-            state: attention::state(&context),
-            asked: &self.judge_name,
+            state: (!certain).then(|| attention::state(&context)),
+            asked: (!certain).then_some(self.judge_name.as_str()),
             answers: &answers,
             judgement,
             next,
@@ -1022,6 +1054,7 @@ impl Policy<'_> {
             connection,
             failed: failed.as_ref().map(Failed::kind),
             failed_why: failed.as_ref().map(Failed::to_string),
+            certain,
             usage,
             request: utterance.request,
             seen,
@@ -1553,6 +1586,10 @@ pub struct Beside {
     /// decision's line as `next` and counted, never published and never
     /// acted on.
     pub attention_next: bool,
+    /// The kinds of attention decision the rule makes alone, without asking
+    /// the model (`--rule-decides`, #705): the record showed the model
+    /// agreeing with the rule on them. Empty: every decision is asked.
+    pub rule_decides: Vec<crate::replay::Kind>,
 }
 
 /// [`run`], with whatever [`Beside`] gives. With nothing, it is [`run`].
@@ -1602,6 +1639,7 @@ fn run_inner<D: Decider + Send + 'static>(
         hello,
         pictures,
         attention_next,
+        rule_decides,
     } = beside;
     let mut heard = Ear::new(bus, HEARD, Speech::TYPE)?;
     let mut said = Ear::new(bus, SAID, Speech::TYPE)?;
@@ -1673,6 +1711,7 @@ fn run_inner<D: Decider + Send + 'static>(
         progress,
         attention_shadow: SHADOW && !options.act_attention,
         attention_next,
+        rule_decides,
         hello,
         not_judged: Vec::new(),
         pictures,
