@@ -79,6 +79,26 @@ plainly not the conversation's is no part of it
   that ends, or answers something that is not an answer to the line asked,
   is started again after 5 s. Without the child the rule is as without the
   model.
+- **At ordinary priority** (#1445). The voice runs at real-time
+  round-robin priority 20 (`CPUSchedulingPolicy=rr` in lamp-4ace's unit and
+  the product's), and a process it starts takes that policy. Before it
+  loads its model, the child takes the ordinary policy at nice 10
+  (`lamp_same_voice::ordinary_priority`, `NICE`). One that can't, ends, and
+  after three such starts the check is off. **Why:** on lamp-4ace on
+  18 October at 08:34, with the model set, the provider worker missed its
+  controller's heartbeat (`provider controller heartbeat expired`) before
+  the child was ready, and the restart guard muted the lamp. The child's
+  load is 15.5 s of one core there. At the voice's priority it shares the
+  voice's own threads' time and starves everything at ordinary priority.
+  That is the likely cause, read from the code, and is not yet shown on
+  the lamp. The same steps at 06:36 started cleanly. Tests:
+  `the_child_takes_the_ordinary_policy_a_little_below_ordinary_priority`
+  (Linux only; a test cannot take a real-time policy without privilege,
+  so the step from it is not shown) and, through the worker's own loop,
+  `a_child_still_loading_its_model_takes_nothing_from_the_worker` (a real
+  child that never gets ready: every line is taken and answered as without
+  the check; with the ask made to wait for the child, the service sees
+  nothing more from the worker).
 - **Only what was said with the lamp quiet.** The coordinator marks a
   `Start` that was admitted while a reply was in hand (`over_the_lamp`).
   Such a line, and a turn the lamp began itself, is never judged: with the

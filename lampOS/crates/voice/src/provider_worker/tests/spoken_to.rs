@@ -1171,6 +1171,54 @@ async fn with_the_switch_and_a_voice_check_another_voice_is_no_part_of_the_conve
     );
 }
 
+/// A stand-in `lamp-same-voice` that never gets ready, as one still
+/// loading its model: it says nothing and sleeps.
+fn loading_child() -> std::path::PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = std::env::temp_dir().join(format!(
+        "lamp-same-voice-loading-{}-{:x}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .subsec_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join(crate::same_voice::EXECUTABLE);
+    std::fs::write(&path, "#!/bin/sh\nexec sleep 10\n").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+    path
+}
+
+/// The first builder on #1445: while the same-voice child loads its model
+/// (15.5 s on lamp-4ace), the worker's loop goes on. Here a real child
+/// process never gets ready: each line is taken, the coordinator's
+/// heartbeats are read, and every line is answered as without the check,
+/// another voice's too. A worker that waited on the child would never take
+/// a block (`voice_line`'s "was never taken").
+#[tokio::test(start_paused = true)]
+async fn a_child_still_loading_its_model_takes_nothing_from_the_worker() {
+    let _clock = logical_clock();
+    let mut options = options(true, quiet_going_on, crate::tools::Settings::default());
+    options.voices = Some(Box::new(crate::same_voice::Prints::start(
+        loading_child(),
+        "model".into(),
+    )));
+    let mut rig = LiveRig::start_with(quick_policy(), options);
+    let mut dial = rig.ready().await;
+    for (voice, text) in [
+        (1, "Hey Lamp, how much is one hundred dollars in euros?"),
+        (-1, "Anyway, if we drop the trip we save almost half."),
+        (1, "And what about in yen?"),
+    ] {
+        assert!(
+            line(&mut rig, &mut dial, false, voice, 300, text).await,
+            "{text}"
+        );
+    }
+    rig.stop().await;
+}
+
 /// What the model does with Samantha's "Yes, give me five minutes.", let
 /// out as the conversation going on after one line left alone.
 #[derive(Clone, Copy, Debug)]
