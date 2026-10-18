@@ -3479,7 +3479,7 @@ fn released_after_cleanup(
     only_by_stop_first: bool,
 ) -> io::Result<bool> {
     if !only_by_stop_first {
-        controls.disarm_after_cleanup()?;
+        controls.disarm_after_clean_stop()?;
         return Ok(true);
     }
     // From the look through the save, no press can be queued (#1607).

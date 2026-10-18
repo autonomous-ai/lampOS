@@ -346,6 +346,10 @@ pub struct HandControls {
     /// The late sleep window ([`Self::allow_late_sleep`]), given to the head
     /// pads' receiver once the first Controls state is applied.
     late_sleep: Option<LateSleep>,
+    /// When the conversation last read the press queue ([`Self::poll`]), on
+    /// the wall clock: a clean stop's floor for the next start's late sleep
+    /// ([`Self::disarm_after_clean_stop`]).
+    polled_at: Option<SystemTime>,
     /// Run while a release holds the press queue, after its look and before
     /// its save (a test presses then).
     #[cfg(test)]
@@ -641,6 +645,7 @@ impl HandControls {
             could_not_start: 0,
             restored_after_fault: false,
             late_sleep: None,
+            polled_at: None,
             #[cfg(test)]
             while_held: None,
             _pump: None,
@@ -835,6 +840,7 @@ impl HandControls {
 
     fn poll_with_clock(&mut self, mut now: impl FnMut() -> u64) -> io::Result<Observation> {
         let now_us = now();
+        self.polled_at = Some(SystemTime::now());
         let mut observation = Observation::default();
         let generation = self.shared.discontinuities.load(Ordering::Acquire);
         if generation != self.seen_generation || generation == u64::MAX {
@@ -1192,15 +1198,39 @@ impl HandControls {
         if pressed {
             self.arm_guard()?;
         }
+        // Best effort: without it the floor is the save's own write, a
+        // moment after the look.
+        self.set_record_time(looked);
+        Ok(!pressed)
+    }
+
+    /// The guard released after a clean stop's cleanup (#960), as
+    /// [`Self::disarm_after_cleanup`], with the record's time set to the
+    /// conversation's last read of the press queue ([`Self::poll`]): the
+    /// next start's floor for a hold made after it ([`restored_record`]). A
+    /// head hold reached during the teardown, which no voice read, is then
+    /// taken by the next start; at the save's own time it was lost (the
+    /// reviewer on #1632). Best effort, as at a release's look; a hold
+    /// whose state was still on its way at that last read, tens of ms, is
+    /// the gap left. One the conversation took is refused by the record's
+    /// watermark, however early the floor.
+    pub fn disarm_after_clean_stop(&mut self) -> io::Result<()> {
+        self.disarm_after_cleanup()?;
+        if let Some(polled) = self.polled_at {
+            self.set_record_time(polled);
+        }
+        Ok(())
+    }
+
+    /// The mute record's file time set to `at`, best effort: the next
+    /// start's floor for a late sleep ([`restored_record`]).
+    fn set_record_time(&self, at: SystemTime) {
         if let Some(path) = &self.options.mute_record {
-            // Best effort: without it the floor is the save's own write,
-            // a moment after the look.
             let _ = std::fs::File::options()
                 .write(true)
                 .open(path)
-                .and_then(|file| file.set_modified(looked));
+                .and_then(|file| file.set_modified(at));
         }
-        Ok(!pressed)
     }
 
     /// For a new owner (#1607): a hand held on the head to put the lamp to

@@ -1023,8 +1023,14 @@ older than its freshness, so after a fault A or B would have brought the lamp
 back listening against the person's sleep. Now the start reads the record
 (`restored_record`): its watermark (`through_us`), and its file's time, which
 is when the voice before last looked for input. A release sets the file's
-time to its look (`HandControls::release_if_still_quiet`); otherwise it is
-the last save's write. From those it makes a one-shot window
+time to its look (`HandControls::release_if_still_quiet`), and a clean stop
+(#960) to the conversation's last read of the press queue
+(`HandControls::disarm_after_clean_stop`), so a head hold reached during its
+teardown, which no voice read, is the next start's (the reviewer on #1632;
+before, the save after the teardown was the floor and such a hold was
+lost); otherwise it is the last save's write. Each is best effort, and a
+hold the voice before took is refused by the watermark however early the
+floor. From those it makes a one-shot window
 (`lamp_controls::touch_receiver::LateSleep`). A retained head **Hold asking
 for Sleep**, from the same Controls session and source reader and sequence,
 is then taken however old it is, and the lamp sleeps as for a fresh hold, if:
