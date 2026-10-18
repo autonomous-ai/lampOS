@@ -1099,3 +1099,33 @@ fn reopened_private_sqlite_store_preserves_completion_and_exact_ack_intent() {
         Some(proof(&prepared))
     );
 }
+
+/// #1505: a ledger as a later build writes it, with a field this build doesn't
+/// know at its top and in an entry. The same ledger without them opens; with
+/// them it is refused today, and the voice's due reminders are never said
+/// until the file is fixed. `second/ledger-forward` makes it read: this test
+/// then stops panicking, and becomes a plain test in that pull request (Tests).
+#[test]
+#[should_panic(expected = "invalid_snapshot")]
+fn a_ledger_from_a_later_build_is_read() {
+    let (_engine, pending) = timer();
+    let disk = Disk::default();
+    let mut ledger = ledger(disk.clone());
+    ledger.prepare(&pending, correlation(1)).unwrap();
+    let revision = ledger.revision();
+    drop(ledger);
+    assert_eq!(
+        DeliveryLedger::open(disk.clone(), LEDGER)
+            .unwrap()
+            .revision(),
+        revision
+    );
+    let mut later = disk.json();
+    later["a_field_from_a_later_build"] = json!(true);
+    later["entries"][0]["a_field_from_a_later_build"] = json!(true);
+    disk.replace(&later);
+    assert_eq!(
+        DeliveryLedger::open(disk, LEDGER).unwrap().revision(),
+        revision
+    );
+}
