@@ -77,16 +77,17 @@ pub const MOST_SAMPLES: usize = RATE * 3;
 pub const ASKED_AT: usize =
     LEAST_SAMPLES + crate::activity::PRE_ROLL_BLOCKS * lamp_audio::CAPTURE_SAMPLES;
 const _: () = assert!(ASKED_AT <= MOST_SAMPLES);
-/// Two prints with a cosine under this are plainly two voices. With both
-/// clips 1.5 s or longer and the lamp quiet, on lamp-4ace's recordings of
-/// three synthetic voices (`docs/verification/same-voice-20261015`), it
-/// took none of 37 same-voice pairs for two voices and caught 19 of 29
-/// pairs of two. Those were whole clips, up to 6.2 s, where a line's first
-/// 1.8 s ([`ASKED_AT`]) are judged here (the reviewer on #1030, the Seventh
-/// on #1445). Cut as the worker prints them, it took none of the 37 and
-/// caught 22 of the 29 (`docs/verification/same-voice-early-20261018`). A
-/// minute of two real people is to set it.
-pub const DIFFERENT_BELOW: f32 = 0.25;
+/// Two prints with a cosine under this are taken for two voices: the
+/// equal-error bar of lamp-4ace's labelled set, 89 clips of three played
+/// voices on mic2 with the lamp quiet, cut as the worker prints them
+/// (`docs/verification/same-voice-20261018`, the first builder on #1445,
+/// 12:2x). There it is wrong about 1 in 13 times each way (7.5% at 0.455),
+/// and no same-voice pair fell under 0.27. The bar of 0.25 before it, set
+/// on clean clips off the lamp, let 43% of different voices pass as the
+/// same. With the lamp's voice in a print it is at chance, so the check
+/// stays off, and is at most one weak sign beside a face, lips and the
+/// name (#829).
+pub const DIFFERENT_BELOW: f32 = 0.45;
 /// A child that has ended is started again after this long.
 pub const RESTART_AFTER: Duration = Duration::from_secs(5);
 /// A child that ends this many times in a row before it is ready is not
@@ -796,10 +797,11 @@ mod tests {
             let print = match samples[0] {
                 1 => Ok(vec![1.0, 0.0, 0.0]),
                 -1 => Ok(vec![0.0, 1.0, 0.0]),
-                // A's voice with something else in it: 0.30 against A's.
-                2 => Ok(vec![0.3, 0.0, 0.954]),
-                // A's voice, a little off: 0.90 against A's, under 0 against
-                // the mixed one.
+                // A's voice with something else in it: 0.50 against A's,
+                // over the bar.
+                2 => Ok(vec![0.5, 0.0, 0.866]),
+                // A's voice, a little off: 0.90 against A's, 0.07 against
+                // the mixed one, under the bar.
                 3 => Ok(vec![0.9, 0.0, -0.436]),
                 _ => Err("refused: none".into()),
             };
@@ -1167,12 +1169,12 @@ exec sleep 30"#,
         let mut voices = Voices::new(StandIn::default());
         said(&mut voices, 1, 1, 48_000);
         voices.decided(1, true, false);
-        // A's line with something else in it: still A's, at 0.30, and kept.
+        // A's line with something else in it: still A's, at 0.50, and kept.
         said(&mut voices, 2, 2, 48_000);
         assert!(
             voices
                 .likeness(2)
-                .is_some_and(|likeness| (likeness - 0.3).abs() < 0.01)
+                .is_some_and(|likeness| (likeness - 0.5).abs() < 0.01)
         );
         voices.decided(2, true, true);
         // A's next line is far from that one but near A's first: the
