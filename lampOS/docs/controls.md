@@ -1041,7 +1041,11 @@ state from a new Controls session (Controls restarted) counts its events
 from nothing, so its first mute is a press though its number is below the
 old session's (Fourth on #1632). A state the full queue drops never reached
 the owner, so its number is forgotten and the next state from its topic
-counts as a press (the reviewer on #1632). Controls and the head pads each republish
+counts as a press (the reviewer on #1632). A state the receiver refuses
+(stale, or on another clock) never reaches the latch either, but its number
+stays seen, so a routine copy queued after it does not count at the look.
+That fails safe the same way: the next start takes a button's mute back by
+its watermark (the reviewer on #1637). Controls and the head pads each republish
 their state every 100 ms with nothing new, so counting every queued input
 would have kept the guard on any teardown longer than a republish, and
 muted the next start with nobody having pressed. A routine state and a pet,
