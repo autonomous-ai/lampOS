@@ -156,21 +156,55 @@ mod tests {
         let bus = Bus::new(&root).unwrap();
         let mut head = RingHead::on(&root).unwrap();
         assert_eq!(head.tick(lamp_ipc::monotonic_us()), None);
-        let (state, _) =
-            crate::hand_controls::test_head_touch("boot", lamp_ipc::monotonic_us() - 60_000);
-        let held_us = state.sources[0].held_us;
-        assert!(held_us.is_some());
         let mut said = bus
             .publisher_declared(TouchState::TOPIC, &TouchState::declaration(), "controls")
             .unwrap();
-        said.publish_json(1, &state).unwrap();
-        // Looked at every 50 ms by the head's thread: the hand's time.
-        soon(held_us, || head.tick(lamp_ipc::monotonic_us()));
-        // Controls' state holds 300 ms from its stamp: past that the hand is
-        // gone, though the head's thread has nothing newer (#849 review).
-        let stamped = state.stamp.at_us;
-        assert_eq!(head.tick(stamped + TOUCH_STATE_TTL_US - 1), held_us);
-        assert_eq!(head.tick(stamped + TOUCH_STATE_TTL_US), None);
+        // Controls' state holds 300 ms from its stamp, and the bus marks it
+        // expired 300 ms after it is sent, so each check below must run
+        // inside that. An attempt in which the host stalled past it says
+        // nothing either way, and is made again with a new state, up to five
+        // times (#1569).
+        let window = Duration::from_micros(TOUCH_STATE_TTL_US);
+        let mut attempts = 0;
+        let state = loop {
+            attempts += 1;
+            assert!(
+                attempts <= 5,
+                "the hand's time was not read inside the state's 300 ms in 5 of 5 attempts"
+            );
+            // The hand's last 10 ms tick is 30 ms after `touched`: stamped now.
+            let (state, _) =
+                crate::hand_controls::test_head_touch("boot", lamp_ipc::monotonic_us() - 30_000);
+            let held_us = state.sources[0].held_us;
+            assert!(held_us.is_some());
+            let sent = std::time::Instant::now();
+            said.publish_json(1, &state).unwrap();
+            // Looked at every 50 ms by the head's thread: the hand's time, as
+            // the ring asks inside the state's 300 ms.
+            let stamped = state.stamp.at_us;
+            let mut seen = head.tick(stamped);
+            while seen != held_us && sent.elapsed() < window {
+                thread::sleep(Duration::from_millis(2));
+                seen = head.tick(stamped);
+            }
+            // Past 300 ms from its stamp the hand is gone, though the head's
+            // thread has nothing newer (#849 review).
+            let edges = (
+                head.tick(stamped + TOUCH_STATE_TTL_US - 1),
+                head.tick(stamped + TOUCH_STATE_TTL_US),
+            );
+            if sent.elapsed() >= window {
+                // Nothing yet, or the right hand: a wrong one still fails.
+                assert!(
+                    seen.is_none() || seen == held_us,
+                    "{seen:?}, not {held_us:?}"
+                );
+                continue;
+            }
+            assert_eq!(seen, held_us);
+            assert_eq!(edges, (held_us, None));
+            break state;
+        };
         // Not from anyone but Controls.
         let mut other = bus
             .publisher_declared(TouchState::TOPIC, &TouchState::declaration(), "replay")
