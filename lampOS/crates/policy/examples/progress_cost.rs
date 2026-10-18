@@ -125,6 +125,7 @@ fn main() -> io::Result<()> {
             deadline: Duration::from_secs(1),
             pause: Duration::from_millis(300),
             act_attention: false,
+            report_every: policy::REPORT_EVERY,
         };
         let progress = progress::Options::new(
             Duration::from_secs(1),

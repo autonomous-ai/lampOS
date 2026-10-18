@@ -128,6 +128,9 @@ impl Rig {
             deadline: WAIT,
             pause: ms(10),
             act_attention: false,
+            // A report every 20 ms, not the lamp's second, so that a wait for
+            // the next one takes no real time (#1128).
+            report_every: ms(20),
         };
         let worker = thread::spawn(move || {
             let result = policy::run_with_local(
@@ -159,20 +162,31 @@ impl Rig {
                 },
             )
             .unwrap();
-        // The next actual heartbeat follows a full loop with these cues.
-        // This is a readiness handshake, not a timing measurement.
+        // A readiness handshake, not a timing measurement: a report from a
+        // loop turn that began after these cues were published, so took
+        // them. A report goes at most once a turn, at its end, so the first
+        // one to a subscription made now was sent after the cues, and the
+        // turn that ends with any later one began after it. The rig's 20 ms
+        // reports make the old "next report" one that may be sent in the
+        // turn the cues landed in (#1128).
+        let mut after_cues = bus
+            .subscribe_typed(Diagnostic::TOPIC, "test_after_cues", Diagnostic::TYPE)
+            .unwrap();
         let until = Instant::now() + WAIT;
+        let mut reports = 0;
         loop {
-            let report: Diagnostic = health
+            let report: Diagnostic = after_cues
                 .recv(until.saturating_duration_since(Instant::now()))
                 .unwrap()
                 .expect("cue receipt heartbeat")
                 .parse()
                 .unwrap();
-            if report
-                .values
-                .iter()
-                .any(|v| v.key == "log_written" && v.value.parse::<u64>().unwrap_or(0) >= 1)
+            reports += 1;
+            if reports >= 2
+                && report
+                    .values
+                    .iter()
+                    .any(|v| v.key == "log_written" && v.value.parse::<u64>().unwrap_or(0) >= 1)
             {
                 break;
             }

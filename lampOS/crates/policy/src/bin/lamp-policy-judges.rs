@@ -194,6 +194,7 @@ fn run<D: Decider + Send + 'static>(
             deadline: args.request,
             pause: PAUSE,
             act_attention: false,
+            report_every: policy::REPORT_EVERY,
         },
         &stop,
         &mut |note| {
