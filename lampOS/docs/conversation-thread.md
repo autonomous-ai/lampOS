@@ -314,6 +314,19 @@ does not erase that talk when it comes back, and is told it:
 - A file that cannot be read changes nothing. A coarse filesystem clock or
   the wall clock stepped back can only miss a reload (`ponytail:` in
   `thread.rs`).
+- **A file read but not one this build can read** (#1505: a later build's
+  field, since `Kept` stays strict, or no thread file at all) is **set
+  aside, not silently forgotten**: renamed beside itself as
+  `thread.json.unreadable-<unix_ms>` (in `/run`, so a power cycle ends it),
+  and said once with serde's reason and the file's size, never its words.
+  The thread then starts empty, as before, and the reload counts as no
+  thread taken, so nothing more is said. The line gives the error's kind and
+  place, never its message, which could quote the file. A thread is ten
+  minutes of context, so losing it once costs little; losing it without a
+  word did not say why the lamp forgot. The set-aside file is never told to
+  a session and `forget` does not reach it, but its words stay in `/run`
+  until the next reboot, where before the next turn wrote over them; the
+  reset removes it by its reboot (`/run` is memory), not by name.
 
 - Each exchange keeps its `whose` in the file, so one a person made on the
   second route comes back to the Live route as that person's. Who is at the
