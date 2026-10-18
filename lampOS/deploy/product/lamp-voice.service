@@ -58,6 +58,8 @@ Environment=LAMP_EXPRESSION_OUT=on
 Environment=LAMP_FAINT_HOLD_MS=400
 Environment=LAMP_TOOLS=on
 Environment=LAMP_CLOCK=on
+# The time of another place, named, and the lamp's own beside it (#1547; lamp-4ace 18 Oct 19:41, 8 of 8 right).
+Environment=LAMP_TIME_PLACES=on
 # Tell the time only once the kernel says the clock is set: no battery clock (#811, #830).
 Environment=LAMP_KERNEL_CLOCK=on
 Environment=LAMP_SESSION_FACT=on
