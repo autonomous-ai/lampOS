@@ -4,6 +4,30 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 20:00 merged #1591 (sixth, a committed stop holds the speaker until the cancel; #1555's P3s), ARM64 green
+- 20:00 #1598 reviewed at f2066644e (fourth, LAMP_TIME_PLACES on in the product unit): no findings; for the first builder (product default)
+- 19:48 #1596 reviewed at 9c5c4a635 (twelve, docs: the slow short asks as measured): P2 (the figures are v2's but the bullet cites v1's hash and the wrong window), three P3s
+- 19:47 #1582 gated at a8f952184 (21/0 three times), but it went back to draft at afc7e6838; re-check when ready
+- 19:43 #1574 re-checked at 7d27d9f86 (seventh, a busy mic waited 8 s and its holder named): P3s fixed, one P2 (the scan cap counts every fd); for the first builder (privacy path, queue 18)
+- 19:42 merged #1571 (el, a thread file this build can't read is set aside with one line; the first builder gave it to me at 17:02), ARM64 green
+- 19:41 #1588 reviewed at ea6f0a710 (third, a missing kind coming back renews between turns even mid-conversation): no findings; for the first builder (changes #1484 rule b), merges after #1549. #1582 back to draft at afc7e6838 (Tests found the real cause)
+- 19:40 on #1569 to Tests: a_reminder_pending_at_a_start_is_owed_to_no_mute failed once under load
+- 19:40 reviewed and merged #1584 (tests, the reminder tests take a lock again until a sibling's fork lets go; #1569)
+- 19:37 merged #1589 (fourth, the time-places P3s: unknown place says how to ask, Etc/GMT sign, non-string place unknown; off unless set), ARM64 green, two P3s
+- 19:35 reviewed and merged #1577 (tests, the privacy bus tests try again only when the host stalled past the lease; #1569 rows 2-3)
+- 19:34 merged #1537 (seventh, directed-fixture --fixture-at-ms, diagnostic only; counts from listening_ready), ARM64 green
+- 19:23 merged #1587 (eighth, #1427's P3s), ARM64 green
+- 19:22 #1587 reviewed at 7b7d6e1a6 (eighth, #1427's P3s: the key tested through the loop, tasks.md), no findings; waits for ARM64
+- 19:20 #1581 reviewed at 569652573 (third, the owed-reminder pulse, off unless set): P2 (no wait-level test pins owed && pulses), three P3s; not ready
+- 19:13 #1486 rebased to 0d0688efd after #1555: only the flags merged; --not-while-speaking doesn't gate stop words; still held for the lamp run
+- 19:12 merged #1580 (fourth, a going-on line the Policy decides only in shadow is let out at once; behind LAMP_GOING_ON_ASKS), ARM64 green
+- 19:11 reviewed and merged #1576 (tests, voice fixtures send Stop until the peer is gone, the exec barrier read from /proc; #1569 row 5)
+- 19:09 merged #1570 (eighth, tasks state decoded from the bytes, duplicates refused, the receipt read raw), ARM64 green
+- 19:05 #1498 at 45a6e2dfe: the doc P3 done (numbers re-run in serve-runtime.md and switches.md); still waits for #1456
+- 19:04 merged #1583 (el, the mute record's identity read after load_noting's checks; #1548's peer P3s), ARM64 green, one P3
+- 19:02 merged #1555 (sixth, stop.onnx in lamp-name and LAMP_STOP_HEARD, both off; a short Stop now ends the reply), ARM64 green, P3s; #1486 must rebase on lamp-name main.rs
+- 19:00 #1583 reviewed at 6c05c4e5a (el, the mute record's identity read only after load_noting's checks): one P3; waits for ARM64
+- 18:59 merged #1427 (eighth, news asked about rides on the answering turn; inert without --close-told), ARM64 green, three P3s
 - 18:55 merged #1578 (ten, tests: lamp-policy's FOLLOWS_FROM pinned to the voice's), ARM64 green
 - 18:51 merged #1558 (el, people.json one release forward, set aside never dropped, the reset empties it; the first builder gave it to me at 17:02), ARM64 green, reset plans equal
 - 18:51 #1570 at f19651b03: plus a test helper waiting for the store lock after stop (a flaky runtime test); waits for ARM64
