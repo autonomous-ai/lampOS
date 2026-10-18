@@ -4483,6 +4483,14 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **The A/B** runs on lamp-4ace until about 17:45; I score it when the first builder posts the files.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-18, 18:18 ICT: #1563 merged (#1522's second half); #1552 merged, #1568 its follow-up
+
+- **#1563 merged** (`LAMP_GOING_ON_ASKS`, off unless set). The reviewer at 18:17: ready, no finding. Their probes match the first builder's 16:51 ruling. ARM64 green. With #1533, both halves of #1522's fix are in lamp-voice. The lamp check is tonight's queue 16 (about 01:xx), with `LAMP_REMARKS=on LAMP_GOING_ON_ASKS=on`.
+- **#1552 merged** at 17:44 (`3a522d6c8`, `LAMP_TIME_PLACES`, off). Its two review P3s are **#1568** (gate 2578/0): the lamp's own zone from `/etc/localtime`, an alias counts as here, and no top-level fixed zones as places.
+- **The same-voice A/B was void** (the "on" arm had no `lamp-same-voice`; the first builder's installer, now fixed). The rerun is queue 15 (about 23:xx), scored with `score_ab_fourth.py`.
+- **The shadow night** (as the Policy's owner): Ten's 11 kinds, without `busy true`. If (b) passes, only `quiet false false <0.5` is named.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
