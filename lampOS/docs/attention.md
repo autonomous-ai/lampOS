@@ -2018,6 +2018,9 @@ set a timer for five minutes.": set),
 call, each line held by the Policy; every line in a busy room, held, and
 both questions to the lamp answered, with `LAMP_REMARKS` or without),
 `room_told::tests::with_the_switch_held_talk_keeps_a_room_busy_and_a_reminder_or_a_restart_ends_nothing`,
+`provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by`
+(through the worker's loop: a reminder's audio in a busy room is no answer,
+so the room is busy two minutes after its talk; Jarvis on #1613),
 `going_on_asks::tests::only_a_line_naming_a_timer_a_reminder_or_the_lamp_names_the_schedule`,
 `…::with_the_switch_a_shadow_decision_ends_the_wait_and_holds_nothing`
 (a `stay_quiet` in shadow before the line's answer: played at once; 300 ms
