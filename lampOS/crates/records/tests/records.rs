@@ -628,9 +628,11 @@ fn bind_mounts_are_refused_even_on_the_same_filesystem() {
 }
 
 /// #1505: a run report as a later build writes it, with a field this build
-/// doesn't know. It reads as the same report without it, so its cleanup run
-/// is not refused at `check` and its health does not say "no readable
-/// cleanup result".
+/// doesn't know, reads as the same report without it. This shows only that
+/// the type reads. That `check` does not refuse it is shown by
+/// `real_cli_sets_aside_a_newer_report_and_refuses_unknown_values_before_cleanup`
+/// (its first run), and that health reads such a receipt as ok by
+/// `real_reporter_reloads_switch_and_policy_and_requires_a_matching_receipt`.
 #[test]
 fn a_report_from_a_later_build_is_read() {
     let tree = Tree::new();
