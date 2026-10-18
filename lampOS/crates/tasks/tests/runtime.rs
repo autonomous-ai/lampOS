@@ -1166,6 +1166,27 @@ fn targets_for_a_newer_build_keep_the_part_running_with_hand_overs_off() {
     );
 }
 
+/// The store once the stopped service's owner has let its folder go: its
+/// thread may still hold the lock for a moment after `stop` returns, and a
+/// start then fails with "tasks directory is already owned" (seen once in
+/// twelve full runs of this file).
+fn released(s: &Running) -> Store {
+    let start = Instant::now();
+    loop {
+        match Store::open(&s.config.dir) {
+            Ok(store) => return store,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                assert!(
+                    start.elapsed() < Duration::from_secs(5),
+                    "the store stayed owned"
+                );
+                thread::sleep(Duration::from_millis(5));
+            }
+            Err(error) => panic!("{error}"),
+        }
+    }
+}
+
 /// #1505: a store a newer build wrote is set aside, and until someone looks
 /// (the kept file removed, or put back by hand), the part says so: across a
 /// restart too, and not once it is gone.
@@ -1173,7 +1194,7 @@ fn targets_for_a_newer_build_keep_the_part_running_with_hand_overs_off() {
 fn a_store_set_aside_is_said_until_its_file_is_gone() {
     let mut s = Running::new(false);
     s.stop();
-    let mut store = Store::open(&s.config.dir).unwrap();
+    let mut store = released(&s);
     let mut newer: Value = serde_json::from_slice(&store.load().unwrap().unwrap()).unwrap();
     newer["schema"] = json!(2);
     store.commit(&serde_json::to_vec(&newer).unwrap()).unwrap();
@@ -1198,10 +1219,12 @@ fn a_store_set_aside_is_said_until_its_file_is_gone() {
     assert!(kept.starts_with("tasks.sqlite3.newer-2-"), "{kept}");
     // Restarted: the store opens well now, and the kept file is still said.
     s.stop();
+    drop(released(&s));
     s.start();
     assert_eq!(said(&s).2.as_deref(), Some(kept.as_str()));
     // Someone looked: the file is gone, and it is said no more.
     s.stop();
+    drop(released(&s));
     std::fs::remove_file(s.config.dir.join(&kept)).unwrap();
     s.start();
     let (level, message, kept) = said(&s);

@@ -479,6 +479,8 @@ now reads the state of the release after it:
 
 - **A field it doesn't know is passed over**, on the stored types: the
   state, a task, its dispatch, read, observations, speech, close and audits.
+  The state is decoded from its stored bytes, never through a JSON value, so
+  a field written twice is still refused, not read with the last of the two.
   What a build writes is only what
   it knows, so if it saves that state, the newer fields are dropped, as if
   that release had never run. For #1425's `told`, a task told under it is
