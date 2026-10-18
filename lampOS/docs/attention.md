@@ -1848,8 +1848,14 @@ With the switch (`Attention::waits_for_policy`, `Attention::first_output_busy`):
   lamp that the Policy doesn't read as said back to it is held (17 of the
   33 lines said to the lamp on 16 October scored 0.6 or more; `policy_holds`).
   A reply to the lamp's own question is judged the same way. A line that
-  waits is that much later: a held tool turn waits 0.18 s median and 0.47 s
-  p90 on Jev on lamp-4ace (Ten's table, #705, 18 October, 15:1x).
+  waits is that much later. **Expected, from lamp-4ace's numbers of 18
+  October** (Ten's read on #1538): the Policy's decision lands about 1.25 s
+  after the end of the person's speech (median; 1.66 s p90), and a busy
+  room's first audio 1.22 s after it (median; 2.49 s p90). So most lines
+  wait little or nothing, a slow Jev against a fast reply waits up to about
+  0.45 s, and only a Policy that doesn't answer makes a line wait the full
+  2 s. The journal's `the Policy's decision came after N ms` lines are held
+  against these.
 - **Not shown:** none of it has run on a lamp. Its battery is scene 3, the
   scene-4 gap, and the first speaker's own follow-ups (Fourth's A/B scenes
   2 and 5, #705 at 14:58), counted for wanted lines held.
