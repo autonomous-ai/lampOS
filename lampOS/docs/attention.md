@@ -1732,12 +1732,16 @@ restart of under five minutes (above). Off by default; not on any lamp.
 
 `LAMP_VAD_INPUT=linear-gated` (passed to the capture worker only): the
 speech detector reads the echo canceller's linear output, which keeps a
-"Stop." said over the lamp that the suppressor takes out, but only on blocks
-the duplex rules would take speech in for a person, the room clear or at
-most 75 % explained by the render. On the lamp's own voice it reads the
-processed block, so the lamp alone is not scored as speech for whom it
-answers, a busy room or a turn's start, as it was with `linear` (#828,
-[serve-runtime.md](serve-runtime.md)). Off by default; not on any lamp.
+"Stop." said over the lamp that the suppressor takes out, but only where
+speech would plainly be a person, the room clear or at most 20 % explained
+by the render. Elsewhere, the lamp's own voice included, it reads the
+processed block, so the lamp alone gives the processed block's false yields
+and is not scored as speech for whom the lamp answers, a busy room or a
+turn's start, as it was with `linear`. On the #828 tables it yielded to 11 of
+19 lines said over the lamp, against 10 processed and 14 with `linear`
+(13 false yields with `linear`, 1 with this or processed); with
+`LAMP_LISTEN_GAPS=on` a gap of the lamp's silence stays on the processed
+block ([serve-runtime.md](serve-runtime.md)). Off by default; not on any lamp.
 
 `LAMP_HEAD_TOUCH=on` (the worker's `--head-touch`, right after the name
 note's flags; nothing without `LAMP_BUS=on` and Controls run with
