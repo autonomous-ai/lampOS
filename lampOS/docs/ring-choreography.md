@@ -300,6 +300,32 @@ with the device closed before the wait returns, so the next cycle's ring
 worker is again the only writer. If the device cannot be opened it says so
 once in the journal and the ring stays dark, as before.
 
+**A reminder owed while it waits (#1545, `LAMP_REMINDER_PULSE=on`).** While
+a reminder is owed and the wait is the privacy switch's or the person's mute
+(`Waiting::pulses`: not the restart guard or a switch that can't be read;
+Thirteen on #1545), and the lamp is not asleep (the sleep a hand held on the
+head chose, whose face this is, even with the switch closed too; the
+reviewer on #1581; `pulse_shown`), one soft arc of the asleep face's own
+warmth goes once around the ring over it, in 4 s (#1494's pulse's look): the
+first at the due time, on the wait's first look that finds it owed, so
+someone who glances up then sees it, and then one on each minute from then
+(`ring_asleep::Pulses::around`). It is a sixth of the ring wide and never
+above the face's peak (`lamp_ring::asleep::owed_pixels`), so the writer
+still shows nothing but this face, its pulse and black. It stops when
+nothing is owed (said when the microphones open, or cancelled), and none
+starts half an hour after it was owed, so a mute that lasts the night does
+not pulse all night; the journal and the health still say it is owed. The
+minute and the half-hour count from the due time whatever holds the pulse
+back meanwhile (asleep, a switch that can't be read, a lapse of the offer):
+one missed is not made up, and none of these starts the half-hour again
+(Thirteen and the reviewer on #1581). A new muted cycle starts its own. The
+wait tells the painter on each look (`Asleep::owed`: since when, while it
+may show); it needs `LAMP_RING_ASLEEP=on`, without which the ring is dark
+while muted and there is nothing to pulse over. Switched on without the face
+(`LAMP_RING_ASLEEP` off, no ring, or the Controls privacy route), the journal
+says so once as the service starts, with the reason, rather than pulse
+nothing (`pulse_without_face`; the first builder on #1545).
+
 **A tap on the head while muted (#711, First on #711, 17 Oct 10:18).** A
 tap still gets an answer, but nothing moves and nothing is heard: the ring
 shows the asleep face for about a second (`TAP_SHOWS`, 1 s). It comes at

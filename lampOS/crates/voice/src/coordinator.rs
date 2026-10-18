@@ -874,19 +874,78 @@ fn tap_face_allowed(head_touch: bool, asleep_on: bool, privacy_controls: bool) -
     head_touch && !asleep_on && !privacy_controls
 }
 
+/// What the journal says, once, when `LAMP_REMINDER_PULSE=on` has no
+/// asleep face to draw on (#1545, the first builder, 18 Oct 18:03): the
+/// pulse is drawn over that face, so rather than pulse nothing, it says
+/// why there is no pulse.
+fn pulse_without_face(
+    pulse_on: bool,
+    ring: bool,
+    asleep_on: bool,
+    privacy_controls: bool,
+) -> Option<String> {
+    let why = match (pulse_on, ring, asleep_on, privacy_controls) {
+        (false, ..) | (true, true, true, false) => return None,
+        (true, false, ..) => "there is no ring",
+        (true, true, false, _) => "LAMP_RING_ASLEEP is off",
+        (true, true, true, true) => "the Controls privacy route has the ring while muted",
+    };
+    Some(format!(
+        "lamp-voice: LAMP_REMINDER_PULSE is on but {why}, so an owed reminder does not pulse"
+    ))
+}
+
+/// Whether an owed reminder's pulse may show on this look of the muted wait
+/// (#1545): something `owed`, and the wait the privacy switch's or the
+/// person's mute (`Waiting::pulses`: not the restart guard or a switch that
+/// can't be read, Thirteen on #1545), and not the sleep a hand held on the
+/// head chose, even with the switch closed too, which `Waiting::of` reads
+/// first (the reviewer on #1581).
+fn pulse_shown(owed: Option<bool>, waiting: crate::bus_out::Waiting, asleep: bool) -> bool {
+    owed.is_some() && waiting.pulses() && !asleep
+}
+
 /// The privacy wait (`wait`) of one muted cycle, with what the service does
 /// meanwhile: each state into the trace and the slide's last state kept;
 /// at each look, the reminders, the controls and a tap's face (#711). The
 /// face is stopped, black and closed, before this returns. The wait is a
 /// parameter so a test can run these very closures without a worker (the
 /// reviewer on #1288).
+#[cfg(test)]
 fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     trace: &mut SessionState,
     cues: &mut Option<CueSink>,
     controls: &RefCell<Option<HandControls>>,
     reminders: &RefCell<Option<crate::reminders::Reminders>>,
     tap_face: Option<crate::ring_asleep::TapFace<F>>,
+    health: Option<crate::bus_out::WaitHealth>,
+    wait: impl FnOnce(
+        &mut dyn FnMut(crate::privacy::PrivacyState, BootId, u64) -> Result<()>,
+        &mut dyn FnMut() -> Result<bool>,
+    ) -> Result<crate::service_privacy::WaitOutcome>,
+) -> Result<crate::service_privacy::WaitOutcome> {
+    muted_wait_pulsing(
+        trace, cues, controls, reminders, tap_face, health, None, wait,
+    )
+}
+
+/// The muted wait, and with `pulse` (the asleep face's [`Asleep::owed`],
+/// `LAMP_REMINDER_PULSE=on`) on each look since when a reminder has been
+/// owed, while its pulse may show ([`pulse_shown`]). That time is kept for
+/// the attempt, from the look that first finds it owed, so a pulse held
+/// back for a while neither restarts the half-hour nor comes at once when
+/// it may show again (Thirteen and the reviewer on #1581).
+///
+/// [`Asleep::owed`]: crate::ring_asleep::Asleep::owed
+#[allow(clippy::too_many_arguments)]
+fn muted_wait_pulsing<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
+    trace: &mut SessionState,
+    cues: &mut Option<CueSink>,
+    controls: &RefCell<Option<HandControls>>,
+    reminders: &RefCell<Option<crate::reminders::Reminders>>,
+    tap_face: Option<crate::ring_asleep::TapFace<F>>,
     mut health: Option<crate::bus_out::WaitHealth>,
+    pulse: Option<std::sync::Arc<crate::ring_asleep::Owed>>,
     wait: impl FnOnce(
         &mut dyn FnMut(crate::privacy::PrivacyState, BootId, u64) -> Result<()>,
         &mut dyn FnMut() -> Result<bool>,
@@ -900,6 +959,7 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     // "cannot be read" (#1376): only past the wait's own grace.
     let unread_since = std::cell::Cell::new(None::<u64>);
     let tap_face = RefCell::new(tap_face);
+    let owed_since = std::cell::Cell::new(None::<Instant>);
     let outcome = wait(
         &mut |state, boot, at_us| {
             slide.set(Some(state));
@@ -956,6 +1016,22 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
                     &mut trace.borrow_mut(),
                     json!({"kind":"reminder_owed_while_muted", "at_us":now}),
                 )?;
+            }
+            if let Some(pulse) = &pulse {
+                owed_since.set(match owed {
+                    // Its attempt's first look owed: its due time.
+                    Some(true) => Some(Instant::now()),
+                    // Still owed: kept, or from now in a new muted cycle.
+                    Some(false) => owed_since.get().or_else(|| Some(Instant::now())),
+                    // Nothing offered: kept through a lapse of the offer,
+                    // and a new attempt's first look starts it again.
+                    None => owed_since.get(),
+                });
+                pulse.tell(
+                    owed_since
+                        .get()
+                        .filter(|_| pulse_shown(owed, waiting, asleep)),
+                );
             }
             // No session runs while it waits, so the wait says how the
             // voice is: its microphones off, and why (#1371).
@@ -1805,6 +1881,14 @@ fn run_source(
                     privacy_controls,
                 )
             });
+            if let Some(line) = pulse_without_face(
+                crate::ring_asleep::pulse_enabled_from_environment(),
+                options.ring_channel_ceiling.is_some(),
+                crate::ring_asleep::enabled_from_environment(),
+                privacy_controls,
+            ) {
+                eprintln!("{line}");
+            }
             service::supervise(
                 &mut trace,
                 &mut cues,
@@ -1817,13 +1901,23 @@ fn run_source(
                     let tap_face = tap_face_ceiling.map(|ceiling| {
                         crate::ring_asleep::TapFace::new(move || tapped_face(ceiling))
                     });
-                    let outcome = muted_wait(
+                    // A reminder owed while it waits pulses on the asleep
+                    // face (#1545, `LAMP_REMINDER_PULSE=on`).
+                    #[cfg(target_os = "linux")]
+                    let pulse = asleep
+                        .as_ref()
+                        .filter(|_| crate::ring_asleep::pulse_enabled_from_environment())
+                        .map(crate::ring_asleep::Asleep::owed);
+                    #[cfg(not(target_os = "linux"))]
+                    let pulse = None;
+                    let outcome = muted_wait_pulsing(
                         trace,
                         cues,
                         &controls,
                         &reminders,
                         tap_face,
                         crate::bus_out::WaitHealth::from_environment(),
+                        pulse,
                         |on_state, gate| {
                             crate::service_privacy_controls::wait_selected(
                                 &executable,

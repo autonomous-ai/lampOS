@@ -1309,3 +1309,186 @@ fn a_reminder_pending_at_a_start_is_owed_to_no_mute() {
         "{kinds:?}"
     );
 }
+
+/// One muted wait of `looks` looks with the fixture's reminder, for #1545's
+/// pulse: before each look, `between` may change the switch the wait reads
+/// (`Unavailable` is read as one that can't be read at once) and act on
+/// the fixture. After each, what the asleep face was told: since when the
+/// reminder has been owed, while its pulse may show.
+fn told_the_face(
+    fixture: &mut RoundtripFixture,
+    looks: usize,
+    mut between: impl FnMut(&mut RoundtripFixture, usize) -> Option<crate::privacy::PrivacyState>,
+) -> Vec<Option<Instant>> {
+    use crate::service_privacy::WaitOutcome;
+    let reminders = RefCell::new(Some(fixture.lend_parent()));
+    let controls = RefCell::new(None);
+    let mut trace = SessionState::default();
+    let owed = std::sync::Arc::new(crate::ring_asleep::Owed::default());
+    let mut told = Vec::new();
+    muted_wait_pulsing(
+        &mut trace,
+        &mut None,
+        &controls,
+        &reminders,
+        None::<crate::ring_asleep::TapFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
+        None,
+        Some(owed.clone()),
+        |on_state, gate| {
+            for look in 0..looks {
+                if let Some(switch) = between(fixture, look) {
+                    on_state(switch, crate::process::new_boot().unwrap(), 1)?;
+                }
+                fixture.tick();
+                gate()?;
+                told.push(owed.showing());
+            }
+            Ok(WaitOutcome::Allowed)
+        },
+    )
+    .unwrap();
+    fixture.return_parent(reminders.into_inner().unwrap());
+    told
+}
+
+/// #1545's pulse (`LAMP_REMINDER_PULSE`): the muted wait tells the asleep
+/// face a reminder is owed on each look while a mute holds the microphones,
+/// with one time for the attempt; nothing while the switch is first read,
+/// when nothing is offered, or once it is cancelled; and nothing while the
+/// switch can't be read, a wait that is closed but does not pulse (the
+/// reviewer and Thirteen on #1581).
+#[test]
+fn the_muted_wait_tells_the_asleep_face_a_reminder_is_owed_only_while_it_may_pulse() {
+    use crate::privacy::PrivacyState::{Muted, Unavailable};
+    let muted_at_first = |_: &mut RoundtripFixture, look: usize| (look == 0).then_some(Muted);
+    // Muted with one offered: told on every look, the same time.
+    let mut fixture = RoundtripFixture::new();
+    let _offer = fixture.offer();
+    let muted = told_the_face(&mut fixture, 4, muted_at_first);
+    assert!(muted[0].is_some(), "{muted:?}");
+    assert!(muted.iter().all(|since| *since == muted[0]), "{muted:?}");
+    // The switch first read, not yet closed: nothing.
+    let mut fixture = RoundtripFixture::new();
+    let _offer = fixture.offer();
+    let reading = told_the_face(&mut fixture, 4, |_, _| None);
+    assert!(reading.iter().all(Option::is_none), "{reading:?}");
+    // Muted with nothing offered (cancelled before the wait): nothing.
+    let mut fixture = RoundtripFixture::new();
+    fixture.cancel();
+    let none = told_the_face(&mut fixture, 4, muted_at_first);
+    assert!(none.iter().all(Option::is_none), "{none:?}");
+    // Cancelled while muted: told, then not.
+    let mut fixture = RoundtripFixture::new();
+    let _offer = fixture.offer();
+    let cancelled = told_the_face(&mut fixture, 6, |fixture, look| {
+        if look == 2 {
+            fixture.cancel();
+        }
+        (look == 0).then_some(Muted)
+    });
+    assert!(cancelled[0].is_some(), "{cancelled:?}");
+    assert_eq!(cancelled.last(), Some(&None), "{cancelled:?}");
+    // A switch that can't be read: closed and owed, but no pulse.
+    let mut fixture = RoundtripFixture::new();
+    let _offer = fixture.offer();
+    let unread = told_the_face(&mut fixture, 4, |_, look| {
+        (look == 0).then_some(Unavailable)
+    });
+    assert!(unread.iter().all(Option::is_none), "{unread:?}");
+}
+
+/// Thirteen and the reviewer on #1581: a pulse held back for a while (here
+/// a switch that can't be read, mid-mute) keeps the attempt's time, so it
+/// neither starts the half-hour again nor pulses at once when it may show.
+#[test]
+fn a_pulse_held_back_keeps_the_time_it_was_owed_from() {
+    use crate::privacy::PrivacyState::{Muted, Unavailable};
+    let mut fixture = RoundtripFixture::new();
+    let _offer = fixture.offer();
+    let told = told_the_face(&mut fixture, 6, |_, look| match look {
+        0 | 4 => Some(Muted),
+        2 => Some(Unavailable),
+        _ => None,
+    });
+    let since = told[0];
+    assert!(since.is_some(), "{told:?}");
+    assert_eq!(told, [since, since, None, None, since, since]);
+}
+
+/// The reviewer on #1581: the pulse is for something owed under the switch
+/// or a mute, never under the sleep a hand held on the head chose, even
+/// with the switch closed too.
+#[test]
+fn an_owed_reminder_pulses_under_the_switch_or_a_mute_and_never_asleep() {
+    use crate::bus_out::Waiting::{self, *};
+    let all: [Waiting; 7] = [
+        Switch,
+        Muted,
+        Asleep,
+        RestartGuard,
+        Unreadable,
+        Opening,
+        Reading,
+    ];
+    for waiting in all {
+        for owed in [None, Some(true), Some(false)] {
+            for asleep in [false, true] {
+                let shown = owed.is_some() && matches!(waiting, Switch | Muted) && !asleep;
+                assert_eq!(
+                    pulse_shown(owed, waiting, asleep),
+                    shown,
+                    "{owed:?} {waiting:?} asleep {asleep}"
+                );
+            }
+        }
+    }
+}
+
+/// Thirteen on #1545: the pulse is for the switch and the person's mute, not
+/// a hand on the head (whose face the asleep face is), the restart guard, a
+/// switch that can't be read, or a wait not closed.
+#[test]
+fn only_the_switch_and_a_mute_let_an_owed_reminder_pulse() {
+    use crate::bus_out::Waiting::*;
+    for waiting in [Switch, Muted] {
+        assert!(waiting.pulses(), "{waiting:?}");
+    }
+    for waiting in [Asleep, RestartGuard, Unreadable, Opening, Reading] {
+        assert!(!waiting.pulses(), "{waiting:?}");
+    }
+}
+
+#[test]
+fn a_pulse_switched_on_without_the_asleep_face_says_why_once() {
+    // (pulse on, ring, LAMP_RING_ASLEEP on, Controls privacy route)
+    for quiet in [
+        (false, true, true, false),
+        (false, false, false, true),
+        (true, true, true, false),
+    ] {
+        let (pulse, ring, asleep, controls) = quiet;
+        assert_eq!(
+            pulse_without_face(pulse, ring, asleep, controls),
+            None,
+            "{quiet:?}"
+        );
+    }
+    for (said, why) in [
+        ((true, false, true, false), "there is no ring"),
+        ((true, true, false, false), "LAMP_RING_ASLEEP is off"),
+        ((true, true, false, true), "LAMP_RING_ASLEEP is off"),
+        ((true, true, true, true), "the Controls privacy route"),
+    ] {
+        let (pulse, ring, asleep, controls) = said;
+        let line = pulse_without_face(pulse, ring, asleep, controls).expect("said");
+        assert!(
+            line.starts_with("lamp-voice: LAMP_REMINDER_PULSE is on but "),
+            "{line}"
+        );
+        assert!(line.contains(why), "{said:?}: {line}");
+        assert!(
+            line.ends_with("so an owed reminder does not pulse"),
+            "{line}"
+        );
+    }
+}

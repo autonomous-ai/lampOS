@@ -2,7 +2,9 @@
 //! authority. A faint warm glow at the bottom of the ring that breathes
 //! slowly, as a sleeping thing does. It says only that the lamp is on and
 //! cannot hear (muted, or the privacy switch closed), so it needs no permit:
-//! [`AsleepRing`] can show this picture and black, and nothing else.
+//! [`AsleepRing`] can show this picture and black, and nothing else but the
+//! same picture with one soft arc of its own warmth going around, when a
+//! reminder is owed (#1545): no channel of either is above [`PEAK`].
 
 use crate::{EncodedFrame, FrameSink, PIXEL_COUNT, Rgb, encode};
 use std::io;
@@ -33,7 +35,34 @@ pub fn asleep_pixels(breath: f32) -> [Rgb; PIXEL_COUNT] {
     pixels
 }
 
-/// A ring writer that shows only the asleep face or black. Opening it sends
+/// The asleep face with one soft arc going around the ring, `around` of the
+/// way (0 to 1) clockwise from [`BOTTOM`] back to it: a sixth of the ring
+/// wide, at most [`PEAK`] at its middle, eased at its edges. Where the arc
+/// and the face meet, the brighter of the two is shown, so no channel is
+/// above [`PEAK`]'s, and outside the arc the face is as [`asleep_pixels`].
+pub fn owed_pixels(breath: f32, around: f32) -> [Rgb; PIXEL_COUNT] {
+    let mut pixels = asleep_pixels(breath);
+    let head = (BOTTOM as f32 + around.clamp(0.0, 1.0) * PIXEL_COUNT as f32) % PIXEL_COUNT as f32;
+    let half = PIXEL_COUNT as f32 / 12.0;
+    for (index, pixel) in pixels.iter_mut().enumerate() {
+        let apart = (index as f32 - head).rem_euclid(PIXEL_COUNT as f32);
+        let apart = apart.min(PIXEL_COUNT as f32 - apart);
+        if apart >= half {
+            continue;
+        }
+        let near = 0.5 + 0.5 * (std::f32::consts::PI * apart / half).cos();
+        let scale = |channel: u8| (f32::from(channel) * near).round() as u8;
+        *pixel = Rgb::new(
+            pixel.red.max(scale(PEAK.red)),
+            pixel.green.max(scale(PEAK.green)),
+            pixel.blue.max(scale(PEAK.blue)),
+        );
+    }
+    pixels
+}
+
+/// A ring writer that shows only the asleep face, the face with an owed
+/// reminder's arc over it ([`owed_pixels`], #1545), or black. Opening it sends
 /// black; [`AsleepRing::shutdown`] sends black again. It holds no authority
 /// and grants none: the voice uses it only while no turn can run, and closes
 /// it before its ring worker opens the device again.
@@ -51,6 +80,18 @@ impl<S: FrameSink> AsleepRing<S> {
     pub fn show(&mut self, breath: f32, ceiling: crate::ChannelCeiling) -> io::Result<()> {
         self.sink
             .write_frame(&encode(&asleep_pixels(breath), ceiling))
+    }
+
+    /// The asleep face with a reminder's soft arc `around` of the way
+    /// around ([`owed_pixels`]), under `ceiling`.
+    pub fn show_owed(
+        &mut self,
+        breath: f32,
+        around: f32,
+        ceiling: crate::ChannelCeiling,
+    ) -> io::Result<()> {
+        self.sink
+            .write_frame(&encode(&owed_pixels(breath, around), ceiling))
     }
 
     /// Black, then the writer is gone.
@@ -122,5 +163,39 @@ mod tests {
                 ChannelCeiling::new(120).unwrap()
             )
         );
+    }
+
+    /// #1545: a reminder's arc goes around in the face's own warmth, never
+    /// above its peak, a sixth of the ring wide; at its start and end it is
+    /// at the bottom, where the face is.
+    #[test]
+    fn an_owed_arc_goes_around_warm_and_never_above_the_peak() {
+        for step in 0..=20 {
+            let around = step as f32 / 20.0;
+            let pixels = owed_pixels(0.5, around);
+            let lit: Vec<usize> = (0..PIXEL_COUNT)
+                .filter(|&index| pixels[index] != Rgb::BLACK)
+                .collect();
+            for pixel in pixels {
+                assert!(
+                    pixel.red <= PEAK.red && pixel.green <= PEAK.green && pixel.blue <= PEAK.blue
+                );
+                assert!(
+                    pixel.red >= pixel.green && pixel.green >= pixel.blue,
+                    "{pixel:?}"
+                );
+            }
+            // The face's five and the arc's at most five more.
+            assert!(lit.len() <= 10, "{around}: {lit:?}");
+        }
+        // Half way, the arc is at the top, far from the face.
+        let half = owed_pixels(0.5, 0.5);
+        assert_eq!(half[0], PEAK);
+        assert_eq!(half[BOTTOM], asleep_pixels(0.5)[BOTTOM]);
+        // Outside the arc the face is unchanged.
+        let quarter = owed_pixels(0.5, 0.25);
+        for index in [BOTTOM - 2, BOTTOM, BOTTOM + 2] {
+            assert_eq!(quarter[index], asleep_pixels(0.5)[index]);
+        }
     }
 }

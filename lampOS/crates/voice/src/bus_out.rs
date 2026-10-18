@@ -540,6 +540,14 @@ pub enum Waiting {
 pub const WAIT_UNREADABLE_AFTER_US: u64 = 1_000_000;
 
 impl Waiting {
+    /// Whether an owed reminder may pulse on the asleep face (#1545): only
+    /// while the switch or the person's mute holds the microphones, not a
+    /// hand on the head, whose face the asleep face is then, nor a fault
+    /// (Thirteen on #1545).
+    pub fn pulses(self) -> bool {
+        matches!(self, Self::Switch | Self::Muted)
+    }
+
     /// Whether the microphones are held closed: by the switch, a mute, a
     /// hand, the restart guard or a switch that cannot be read. Not while
     /// the switch is first read or has read open, which every start of the
