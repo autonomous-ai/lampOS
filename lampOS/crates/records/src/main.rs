@@ -28,6 +28,7 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lamp_records::json_file::REPORT_BYTES;
     fn args(value: &str) -> io::Result<Command> {
         arguments(
             &value
@@ -188,7 +189,119 @@ mod tests {
         assert!(!json_file::temporary_path(&path).unwrap().exists());
         fs::remove_dir_all(dir).unwrap();
     }
+
+    #[test]
+    fn failure_receipt_cannot_overwrite_an_unknown_supported_value() {
+        use std::{fs, os::unix::fs::PermissionsExt};
+        let dir = fs::canonicalize(env::temp_dir())
+            .unwrap()
+            .join(format!("lamp-records-unrecognized-{}", std::process::id()));
+        fs::create_dir(&dir).unwrap();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+        let path = dir.join("last.json");
+        let config = Config::customer_default();
+        let mut result = synthetic(&config, 10, None);
+        let mut unknown = serde_json::to_value(&result).unwrap();
+        unknown["mode"] = "later_mode".into();
+        let bytes = serde_json::to_vec(&unknown).unwrap();
+        fs::write(&path, &bytes).unwrap();
+        persist(&config, &path, &mut result);
+        assert!(result.error.is_some());
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// The privacy case of #1505: with cleanup on, a newer build's report at
+    /// the result path is set aside and one `check --apply` still removes a
+    /// session past `max_age_seconds`. Only the live set is injected; the
+    /// real guard needs Linux systemd and the voice's unit, so the binary
+    /// cannot remove a session in a test
+    /// (`real_cli_apply_with_unknown_service_cannot_delete_any_fixture_record`).
+    #[test]
+    fn cleanup_on_sets_aside_a_newer_report_and_still_removes_an_expired_session() {
+        use std::{
+            collections::BTreeSet,
+            fs::{self, File, FileTimes, OpenOptions},
+            io::Write,
+            os::unix::fs::{OpenOptionsExt, PermissionsExt},
+        };
+        if super::test_openat2::store_cannot_run_here() {
+            return;
+        }
+        fn private_dir(path: &Path) {
+            fs::create_dir(path).unwrap();
+            fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        let dir = fs::canonicalize(env::temp_dir())
+            .unwrap()
+            .join(format!("lamp-records-newer-cleanup-{}", std::process::id()));
+        private_dir(&dir);
+        let mut config = Config::customer_default();
+        config.enabled = true;
+        config.roots[0].path = dir.join("sessions");
+        config.bus_root = dir.join("bus");
+        private_dir(&config.roots[0].path);
+        // Last written 100 s after the epoch: far past the age limit.
+        let id = format!("{:032x}", 1);
+        let session = config.roots[0].path.join(&id);
+        private_dir(&session);
+        private_dir(&session.join("metadata"));
+        let old = FileTimes::new().set_modified(UNIX_EPOCH + Duration::from_secs(100));
+        for name in ["events-0.jsonl", "health.json"] {
+            let mut file = OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .mode(0o600)
+                .open(session.join("metadata").join(name))
+                .unwrap();
+            file.write_all(b"recorded").unwrap();
+            file.set_times(old).unwrap();
+        }
+        for path in [session.join("metadata"), session.clone()] {
+            File::open(path).unwrap().set_times(old).unwrap();
+        }
+        let config_path = dir.join("records.json");
+        json_file::write(&config_path, &config).unwrap();
+        let report_path = dir.join("last.json");
+        let mut newer = serde_json::to_value(synthetic(&config, 17, None)).unwrap();
+        newer["schema_version"] = 2.into();
+        newer["mode"] = "later_mode".into();
+        newer["roots"] = serde_json::json!([{"later_kind": "new_enum_value"}]);
+        let bytes = serde_json::to_vec_pretty(&newer).unwrap();
+        fs::write(&report_path, &bytes).unwrap();
+        let code = check_with(
+            config_path,
+            true,
+            Some(report_path.clone()),
+            |config, now, apply| run::execute_with(config, now, apply, |_, _| Ok(BTreeSet::new())),
+        )
+        .unwrap();
+        assert_eq!(code, 0);
+        assert!(!session.exists(), "the expired session must be removed");
+        let archives: Vec<_> = fs::read_dir(&dir)
+            .unwrap()
+            .map(Result::unwrap)
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("last.json.newer-2-")
+            })
+            .collect();
+        assert_eq!(archives.len(), 1);
+        assert_eq!(fs::read(archives[0].path()).unwrap(), bytes);
+        let receipt: RunReport = json_file::read(&report_path, REPORT_BYTES).unwrap();
+        assert!(receipt.enabled);
+        assert_eq!(receipt.config_fingerprint, config.fingerprint());
+        assert_eq!(receipt.roots[0].removed, vec![id]);
+        fs::remove_dir_all(dir).unwrap();
+    }
 }
+
+#[cfg(test)]
+#[path = "../tests/support/openat2.rs"]
+mod test_openat2;
 
 #[cfg(test)]
 mod application_schedule_tests;

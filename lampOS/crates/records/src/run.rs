@@ -1,6 +1,6 @@
 //! Inventory, protect, plan, then apply to that inventory only.
 use crate::{
-    Disk, RootReport, RunReport,
+    Disk, REPORT_SCHEMA_VERSION, RootReport, RunReport,
     config::{Config, RootConfig},
     guard, plan,
     store::{Inventory, Removal, Store},
@@ -182,8 +182,24 @@ pub fn root_with(
 }
 
 pub fn execute(config: &Config, now_unix_s: u64, apply: bool) -> RunReport {
+    execute_with(config, now_unix_s, apply, |root, observations| {
+        guard::live_sessions(&root.unit, &root.path, observations)
+    })
+}
+
+/// `execute` with live protection injected, for disposable-tree tests only,
+/// as with `root_with`. The CLI calls `execute`, never this.
+pub fn execute_with(
+    config: &Config,
+    now_unix_s: u64,
+    apply: bool,
+    mut protect: impl FnMut(
+        &RootConfig,
+        &mut crate::ProcessObservations,
+    ) -> io::Result<BTreeSet<String>>,
+) -> RunReport {
     let mut report = RunReport {
-        schema_version: 1,
+        schema_version: REPORT_SCHEMA_VERSION,
         config_fingerprint: config.fingerprint(),
         at_unix_s: now_unix_s,
         mode: if apply { "apply" } else { "dry_run" }.into(),
@@ -214,7 +230,7 @@ pub fn execute(config: &Config, now_unix_s: u64, apply: bool) -> RunReport {
                 now_unix_s,
                 apply,
                 &mut store,
-                || guard::live_sessions(&root.unit, &root.path, &mut observations),
+                || protect(root, &mut observations),
                 deadline,
             ),
             Err(error) => {
