@@ -185,12 +185,26 @@ clock. `LAMP_CAPTURE_CORES=6-7` (off unless set, Linux only) keeps capture
 on the big cores: at its start the worker calls `sched_setaffinity` on its
 own thread, before the threads it starts, and logs one line with the cores
 and what `sched_getaffinity` reads back ("it took" or "it did not take").
-Unset, nothing is called. A value that is not a cpu-list (`6-7`, `6,7`,
-`6`), or that names a core not online, is logged and the default kept; the
-voice never stops for it. The supervisor passes it to the capture worker
-only. The risk: the eyes' detector also runs best on the big cores, and
-capture at `RR 20` always wins over it there, so the eyes lose about 7 % of
-one big core. The eyes are unchanged.
+If the read-back differs (a cpuset allowing only part of the list), the
+mask read before the change is set back and the line says so, so the
+default is really kept. Unset, nothing is called. A value that is not a
+cpu-list (`6-7`, `6,7`, `6`), or that names a core not online, is logged
+and the default kept; the voice never stops for it. The supervisor passes
+it to the capture worker only. The risk is the big cores' other tenants,
+not the eyes (`lamp-eyes` has no `CPUAffinity`). With `--endpoint
+smart-turn-fast`, `lamp-turn-end` keeps itself and its two ONNX Runtime
+threads on cores 6-7 (`keep_on_fast_cores`, `FAST_THREADS = 2`) at the
+unit's `RR 20`. During a verdict (about 148 ms on lamp-4ace) both big
+cores run RR 20 threads of the same priority, and a capture thread held to
+6-7 cannot preempt them or move to a small core: it can wait up to an RR
+slice (100 ms), longer than the 40 ms the microphone buffers
+(`buffer_blocks: 4`), so it overruns just as the person stops talking.
+Unpinned, the scheduler moves it to a small core. A single big core (`6`
+or `7`) does not help, since the verdict holds both. `lamp-name`
+(`CPUAffinity=6 7`) is what loses capture's ~7 % of a big core. So the
+switch is not turned on beside `smart-turn-fast` until talking turns with
+`LAMP_STALLS=on` show no held passes and no overruns; a quiet-room
+off/on/off never runs a verdict and cannot show it.
 
 A minute of what the harness itself does, concentrated (138 rounds of a
 log-in, a 16 MiB log read, a Python start and an 8 MiB synced write to the
