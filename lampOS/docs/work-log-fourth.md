@@ -4588,6 +4588,25 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **The log's worktree** is in my scratchpad now: the old `/private/tmp` one had lost its `.git` file.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-19, 04:06 ICT: #1637 merged; #1636's fixes in; the cut-in note gating; the stop-words reader; the Monday scorer for both switches
+
+- **Merged:** #1637 (02:55), with my approval: a new Controls session's mute now counts as a press.
+- **#1636** (the narrower own-voice rule):
+  - The reviewer's 02:48 three P2s and P3 are fixed at `eda24bc9b`, as the first builder ruled at 03:07:
+    - only a question counts (`remarks::questions`: a `?`, a question word first, or the lamp's name);
+    - a statement in the conversation's voice ends the conversation;
+    - her own question after "Pepper" stays held;
+    - the journal says why for a line with no print yet.
+  - Four mutations, gate 2650/0. Monday's 07:20 A/B runs on that head.
+  - The reviewer's 03:41 P2 (a statement whose print is late) and P3 (the costs written down) are drafted. They go after 08:40, folded into one commit on a new PR.
+- **The stop-words reader for queue 22m** (#828): it pairs each cut-in with its reply by the story's words, not the clock, since the lamp's and this Mac's are about 9 s apart. Tonight's 00:46 run gives 1/10 heard, as the first builder's read has it. The first builder runs it at about 05:25.
+- **The cut-in note** (#828, the first builder at 03:15): `LAMP_CUT_IN_TOLD=on`, on `fourth/cut-in-told` at `cd8320f31`, gate running.
+  - A spoken cut-in over the lamp's audible answer is told the model, so it answers what was said rather than go on.
+  - Tests: through the worker's loop, and with the name heard too, both notes go out as one. Four mutations.
+- **The Monday scorer** reads the Policy's wait and choice, and remark holds.
+- **A slip:** I edited a test file while the cut-in gate ran in the same checkout. I stopped that gate, amended, and gated again.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
