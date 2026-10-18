@@ -5568,7 +5568,7 @@ fn conversation_with_gate(
             }
             // Before the canceller, or its linear output, for the stop
             // words, when they asked; otherwise they hear `samples`.
-            let words_block = frame.raw.take().or_else(|| frame.linear.take());
+            let words_block = stop_words_block(&mut frame);
             let observation = ObservedAudio {
                 sequence: frame.frame_sequence,
                 captured_at_us: frame.read_completed_at_us,
@@ -8058,6 +8058,15 @@ fn record_asker_first(
             "margin":crate::asker_first::MARGIN,"acted":acted,"judged":judged,
             "boundary":"speech well under the asker's, judged on its own blocks (its upper tenth under the asker's middle less the margin), while its answer was awaited; acted: it took no turn, else recorded only or the answer began first; levels on the face's scale, 7.5 to a decibel"}),
     )
+}
+
+/// What the stop words hear of a frame, taken out of it: the block before
+/// the canceller (`raw`), else the canceller's linear output (`linear`), as
+/// the capture worker was asked (`LAMP_STOP_WORDS_SOURCE`). `None`, and they
+/// hear the frame's `samples`: with `processed`, and with `linear` on a block
+/// the canceller did not run for.
+fn stop_words_block(frame: &mut MicrophoneFrame) -> Option<Vec<i16>> {
+    frame.raw.take().or_else(|| frame.linear.take())
 }
 
 /// One block for a yield's words (#828, `LAMP_STOP_WORDS=heard`): its held
@@ -10684,6 +10693,48 @@ mod tests {
         assert!(serde_json::from_value::<WorkerEvent>(report.clone()).is_err());
         report["noise_suppression"] = json!(false);
         assert!(serde_json::from_value::<WorkerEvent>(report).is_err());
+    }
+
+    #[test]
+    fn the_stop_words_hear_the_raw_block_else_the_linear_output_else_the_samples() {
+        let frame = |raw: Option<Vec<i16>>, linear: Option<Vec<i16>>| MicrophoneFrame {
+            raw,
+            linear,
+            epoch: 1,
+            dsp_epoch: 1,
+            privacy_generation: 2,
+            frame_sequence: 1,
+            read_completed_at_us: 1,
+            probability: 0.0,
+            echo: None,
+            reference: Default::default(),
+            samples: vec![3; 160],
+            timing: CaptureTiming {
+                first_read_started_at_us: 1,
+                last_read_started_at_us: 1,
+                successful_reads: 1,
+                alsa_status_monotonic_us: None,
+                status_observed_at_us: 1,
+                available_frames: 0,
+                delayed_frames: 0,
+                processing_completed_at_us: 1,
+                aec_queue_delay_ms: 0,
+                reference: crate::wire::ReferenceTiming::default(),
+            },
+        };
+        // #1635's P3 (the reviewer): with the linear output left out of the
+        // choice, `linear` heard `processed` while each reply's counts said
+        // `linear`.
+        for (raw, linear, heard) in [
+            (Some(vec![1; 160]), None, Some(vec![1; 160])),
+            (None, Some(vec![2; 160]), Some(vec![2; 160])),
+            (None, None, None),
+        ] {
+            let mut frame = frame(raw, linear);
+            assert_eq!(stop_words_block(&mut frame), heard);
+            assert!(frame.raw.is_none() && frame.linear.is_none());
+            assert_eq!(frame.samples, vec![3; 160]);
+        }
     }
 
     #[test]

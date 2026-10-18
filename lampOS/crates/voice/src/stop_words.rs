@@ -95,9 +95,11 @@ pub enum Source {
     /// The canceller's linear stage, before its residual-echo suppressor
     /// (`linear`, `--linear-blocks`, #828): the microphone less the echo
     /// its adaptive filter predicts. It keeps the person's word the
-    /// suppressor takes away with the lamp's voice, and most of that voice
-    /// is gone. A block the canceller did not run for has none, and the
-    /// stop words hear the block handed on, as the microphone recorded it.
+    /// suppressor takes away with the lamp's voice, and much of that voice
+    /// too: on lamp-4ace's mic2 the linear stage took only 3.1 to 4.1 dB of
+    /// it out (#828, 17 October 08:01), far less than on the scripted rig.
+    /// A block the canceller did not run for has none, and the stop words
+    /// hear the block handed on, as the microphone recorded it.
     Linear,
 }
 
