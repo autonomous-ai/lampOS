@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "usage: lamp-policy-replay --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,YYYY-MM-DD...] --models NAME[,NAME...] [--labels ABSOLUTE_FILE] [--only-labelled] [--endpoint URL] [--deadline-ms 10000] [--pace-ms 500] [--most N]\n       lamp-policy-replay --again ABSOLUTE_FILE --labels ABSOLUTE_FILE [--refit [--cost-ratio N]]\n       lamp-policy-replay --pictures --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,...] [--labels ABSOLUTE_FILE]";
+const USAGE: &str = "usage: lamp-policy-replay --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,YYYY-MM-DD...] --models NAME[,NAME...] [--labels ABSOLUTE_FILE] [--only-labelled] [--endpoint URL] [--deadline-ms 10000] [--pace-ms 500] [--most N]\n       lamp-policy-replay --again ABSOLUTE_FILE --labels ABSOLUTE_FILE [--refit [--cost-ratio N]]\n       lamp-policy-replay --pictures --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,...] [--labels ABSOLUTE_FILE]\n       lamp-policy-replay --agreement --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,...]";
 const HELP: &str = "Asks each attention decision in the decisions logs of the days given again, of each\n\
 model given in turn (at most four), as it was asked on the day, and prints one line per\n\
 decision and a summary: each model's choice, probability and time, and the kinds of what\n\
@@ -27,6 +27,9 @@ lines, and counts on the other half, 200 times, beside the day's weights on the 
 an ignored request, in the fit and in the counts' cost.\n\
 --pictures counts the lines lamp-policy --images wrote (pictures-YYYY-MM-DD.jsonl), a label\n\
 taken for the line nearest it within 3 s, and asks nothing.\n\
+--agreement sets each decision a model made beside what the rule would have said of the same\n\
+context, counted by kind (room, conversation, the lamp speaking, the name's score), and names\n\
+the kinds of at least 20 decisions with no disagreement; it asks nothing (#705).\n\
 What was heard is sent to the decision model's service again, as on the day.";
 
 #[derive(Debug, PartialEq)]
@@ -47,7 +50,16 @@ enum Run {
         days: Vec<String>,
         labels: Option<PathBuf>,
     },
+    /// The rule beside the model on these days' decisions (#705).
+    Agreement {
+        log: PathBuf,
+        days: Vec<String>,
+    },
 }
+
+/// A kind is named certain with at least this many decisions and no
+/// disagreement.
+const AGREEMENT_LEAST: u32 = 20;
 
 #[derive(Debug, PartialEq)]
 struct Arguments {
@@ -94,6 +106,7 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Option<Run>, String> {
     let (mut key, mut log, mut days, mut models, mut labels) = (None, None, None, None, None);
     let mut again = None;
     let mut pictures = false;
+    let mut agreement = false;
     let mut only_labelled = false;
     let mut refit = false;
     let mut cost = None;
@@ -113,6 +126,10 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Option<Run>, String> {
         }
         if option == "--pictures" {
             pictures = true;
+            continue;
+        }
+        if option == "--agreement" {
+            agreement = true;
             continue;
         }
         if option == "--refit" {
@@ -158,6 +175,15 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Option<Run>, String> {
             }
             _ => return Err(format!("{option} is not an option")),
         }
+    }
+    if agreement {
+        if seen.len() != 3 || pictures {
+            return Err("--agreement takes --log-dir and --days only".into());
+        }
+        return Ok(Some(Run::Agreement {
+            log: log.ok_or("--log-dir is required")?,
+            days: days.ok_or("--days is required")?,
+        }));
     }
     if pictures {
         if key.is_some() || models.is_some() || again.is_some() || only_labelled || refit {
@@ -211,6 +237,16 @@ fn pictures(log: &Path, days: &[String], labels: Option<&PathBuf>) -> io::Result
     };
     let lines = replay::read_pictures(log, days)?;
     println!("{}", replay::pictures_summary(&lines, &labels));
+    Ok(())
+}
+
+fn agreement(log: &Path, days: &[String]) -> io::Result<()> {
+    let (logged, unread) = replay::read(log, days)?;
+    println!(
+        "{}",
+        replay::agreement_summary(&replay::agreement(&logged), AGREEMENT_LEAST)
+    );
+    println!("lines that could not be read as a decision: {unread}");
     Ok(())
 }
 
@@ -290,6 +326,7 @@ fn main() -> ExitCode {
                 cost,
             } => again(lines, labels, *refit, *cost),
             Run::Pictures { log, days, labels } => pictures(log, days, labels.as_ref()),
+            Run::Agreement { log, days } => agreement(log, days),
         } {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
@@ -311,7 +348,9 @@ mod tests {
     fn of(line: &str) -> Result<Option<Arguments>, String> {
         match parse(line.split_whitespace().map(str::to_owned))? {
             Some(Run::Ask(arguments)) => Ok(Some(arguments)),
-            Some(Run::Again { .. } | Run::Pictures { .. }) => Err("another run".into()),
+            Some(Run::Again { .. } | Run::Pictures { .. } | Run::Agreement { .. }) => {
+                Err("another run".into())
+            }
             None => Ok(None),
         }
     }
@@ -389,7 +428,22 @@ mod tests {
                 labels: None
             })
         );
+        assert_eq!(
+            parse(
+                "--agreement --log-dir /d --days 2026-10-17,2026-10-18"
+                    .split_whitespace()
+                    .map(str::to_owned)
+            )
+            .unwrap(),
+            Some(Run::Agreement {
+                log: "/d".into(),
+                days: vec!["2026-10-17".into(), "2026-10-18".into()],
+            })
+        );
         for refused in [
+            "--agreement --log-dir /d",
+            "--agreement --log-dir /d --days 2026-10-15 --models m",
+            "--agreement --pictures --log-dir /d --days 2026-10-15",
             "--again /r",
             "--again /r --labels /l --days 2026-10-15",
             "--pictures --log-dir /d --days 2026-10-15 --models m",

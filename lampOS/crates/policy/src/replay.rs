@@ -37,7 +37,16 @@ pub struct Logged {
     pub choice: String,
     pub probability: f64,
     pub by: String,
+    /// The model's `follows_lamp` answer, if it gave one: the voice lets a
+    /// `stay_quiet` from it at [`FOLLOWS_FROM`] or more run the lamp's own
+    /// calls ([`agreement`]).
+    pub follows_lamp: Option<f32>,
 }
+
+/// The voice's `policy_holds::FOLLOWS_FROM` (`crates/voice`, which this
+/// crate does not link): from this `follows_lamp` up, the voice takes a
+/// `stay_quiet` as `StayQuietFollowing` and runs the lamp's own calls.
+pub const FOLLOWS_FROM: f32 = 0.6;
 
 /// The attention decisions in `dir`'s files for `days` (`2026-10-15`), in
 /// order, and how many lines could not be read as one.
@@ -51,9 +60,11 @@ pub fn read(dir: &Path, days: &[String]) -> io::Result<(Vec<Logged>, usize)> {
             Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
             Err(error) => return Err(error),
         };
-        for (index, line) in BufReader::new(file).lines().enumerate() {
+        // Split on bytes: a line cut inside a character (a write the power
+        // took) is not text, and is counted unread, not the end of the run.
+        for (index, line) in BufReader::new(file).split(b'\n').enumerate() {
             let line = line?;
-            let Ok(value) = serde_json::from_str::<Value>(&line) else {
+            let Ok(value) = serde_json::from_slice::<Value>(&line) else {
                 unread += 1;
                 continue;
             };
@@ -77,6 +88,7 @@ fn logged(value: &Value, id: String) -> Option<Logged> {
         choice: value["judgement"]["choice"].as_str()?.to_owned(),
         probability: value["judgement"]["probability"].as_f64()?,
         by: value["by"].as_str().unwrap_or("rule").to_owned(),
+        follows_lamp: value["answers"]["follows_lamp"].as_f64().map(|v| v as f32),
     })
 }
 
@@ -415,14 +427,17 @@ pub fn summary(lines: &[Value], models: &[String]) -> Value {
 pub fn read_pictures(dir: &Path, days: &[String]) -> io::Result<Vec<Value>> {
     let mut read = Vec::new();
     for day in days {
-        let text = match fs::read_to_string(dir.join(format!("pictures-{day}.jsonl"))) {
-            Ok(text) => text,
+        let bytes = match fs::read(dir.join(format!("pictures-{day}.jsonl"))) {
+            Ok(bytes) => bytes,
             Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
             Err(error) => return Err(error),
         };
+        // Split on bytes, as `read` does: a line cut inside a character is
+        // passed over, not the end of the run (the reviewer on #1510).
         read.extend(
-            text.lines()
-                .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            bytes
+                .split(|byte| *byte == b'\n')
+                .filter_map(|line| serde_json::from_slice::<Value>(line).ok())
                 .filter(|line| line["about"] == "attention_picture"),
         );
     }
@@ -646,6 +661,132 @@ fn percentile(values: &[u64], percent: usize) -> Option<u64> {
 }
 
 pub mod refit;
+
+/// One kind of attention decision, for [`agreement`]: what the rule
+/// ([`attention::fallback`]) reads, and how plainly the name was heard.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Kind {
+    pub room: &'static str,
+    pub in_conversation: bool,
+    pub lamp_is_speaking: bool,
+    /// The name's score in the lamp's own microphone: `none` (not heard,
+    /// or nothing listening), `<0.5`, `0.5-0.9`, `0.9-0.99` or `>=0.99`.
+    pub name: &'static str,
+}
+
+impl Kind {
+    pub fn of(context: &Context) -> Self {
+        Self {
+            room: match context.room {
+                Room::Quiet => "quiet",
+                Room::Busy => "busy",
+                Room::Unknown => "unknown",
+            },
+            in_conversation: context.in_conversation(),
+            lamp_is_speaking: context.lamp_is_speaking,
+            name: match context.name_heard {
+                None => "none",
+                Some(score) if score < 0.5 => "<0.5",
+                Some(score) if score < 0.9 => "0.5-0.9",
+                Some(score) if score < 0.99 => "0.9-0.99",
+                Some(_) => ">=0.99",
+            },
+        }
+    }
+}
+
+/// How often the rule and the model agreed on one kind of decision, about
+/// whether the lamp takes the turn (an answer or a look up) or stays quiet.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Agreement {
+    pub decisions: u32,
+    pub agreed: u32,
+    /// The rule would have taken the turn, the model stayed quiet.
+    pub rule_took_model_quiet: u32,
+    /// The rule would have stayed quiet, the model took the turn.
+    pub rule_quiet_model_took: u32,
+    /// Of the model's turns taken, how many were a `stay_quiet` the voice
+    /// takes as following the lamp ([`FOLLOWS_FROM`]): it runs the lamp's
+    /// own calls on them, where the rule's plain `stay_quiet` would hold
+    /// them (Fourth and the reviewer on #1510).
+    pub model_quiet_following: u32,
+}
+
+/// The decisions a model made (not the rule's own), each set beside what
+/// the rule would have said of the same context, counted by [`Kind`]: where
+/// the two never disagreed over enough decisions, the rule could decide
+/// without asking the model (#705, Ten's step 2 on the Policy's wait, with
+/// Fourth's conditions: the certain kinds come from the record, and run in
+/// shadow first). Nothing of what was heard is in it.
+pub fn agreement(logged: &[Logged]) -> BTreeMap<Kind, Agreement> {
+    let mut kinds: BTreeMap<Kind, Agreement> = BTreeMap::new();
+    for line in logged.iter().filter(|line| line.by != "rule") {
+        let rule_takes = attention::fallback(&line.context).choice != attention::Choice::StayQuiet;
+        // A following `stay_quiet` is the lamp's turn for its calls, as the
+        // voice takes it.
+        let following = line.choice == "stay_quiet"
+            && line
+                .follows_lamp
+                .is_some_and(|follows| follows >= FOLLOWS_FROM);
+        let model_takes = line.choice != "stay_quiet" || following;
+        let counted = kinds.entry(Kind::of(&line.context)).or_default();
+        counted.decisions += 1;
+        counted.model_quiet_following += u32::from(following);
+        match (rule_takes, model_takes) {
+            (true, false) => counted.rule_took_model_quiet += 1,
+            (false, true) => counted.rule_quiet_model_took += 1,
+            _ => counted.agreed += 1,
+        }
+    }
+    kinds
+}
+
+/// [`agreement`] as printed lines: one per kind, most decisions first, and
+/// then the kinds with at least `least` decisions and no disagreement.
+pub fn agreement_summary(kinds: &BTreeMap<Kind, Agreement>, least: u32) -> String {
+    let mut rows: Vec<(&Kind, &Agreement)> = kinds.iter().collect();
+    rows.sort_by(|a, b| b.1.decisions.cmp(&a.1.decisions).then(a.0.cmp(b.0)));
+    let mut out = String::from(
+        "room conversation speaking name | decisions agreed rule_took_model_quiet rule_quiet_model_took model_quiet_following\n",
+    );
+    for (kind, counted) in &rows {
+        out.push_str(&format!(
+            "{} {} {} {} | {} {} {} {} {}\n",
+            kind.room,
+            kind.in_conversation,
+            kind.lamp_is_speaking,
+            kind.name,
+            counted.decisions,
+            counted.agreed,
+            counted.rule_took_model_quiet,
+            counted.rule_quiet_model_took,
+            counted.model_quiet_following
+        ));
+    }
+    let total: u32 = rows.iter().map(|(_, counted)| counted.decisions).sum();
+    let certain: Vec<_> = rows
+        .iter()
+        .filter(|(_, counted)| counted.decisions >= least && counted.agreed == counted.decisions)
+        .collect();
+    // With n agreeing and none against, a true disagreement rate up to
+    // 1 - 0.05^(1/n) is still likely at 95 %: a list for the shadow night,
+    // not proof (the reviewer on #1510).
+    let bound = 1.0 - 0.05_f64.powf(1.0 / f64::from(least.max(1)));
+    out.push_str(&format!(
+        "\nkinds with at least {least} decisions and no disagreement: {} of {} kinds, {} of {total} decisions (with {least} of {least} agreeing, a disagreement rate up to {:.0} % is still likely at 95 %: for the shadow night, not proof)\n",
+        certain.len(),
+        rows.len(),
+        certain.iter().map(|(_, counted)| counted.decisions).sum::<u32>(),
+        bound * 100.0
+    ));
+    for (kind, counted) in certain {
+        out.push_str(&format!(
+            "  {} {} {} {}: {}\n",
+            kind.room, kind.in_conversation, kind.lamp_is_speaking, kind.name, counted.decisions
+        ));
+    }
+    out
+}
 
 #[cfg(test)]
 mod tests;

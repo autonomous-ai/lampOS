@@ -1123,7 +1123,26 @@ through them as they are.
         [--labels ABSOLUTE_FILE] [--only-labelled] [--endpoint URL] \
         [--deadline-ms 10000] [--pace-ms 500] [--most N] > replay.jsonl
     lamp-policy-replay --again replay.jsonl --labels ABSOLUTE_FILE [--refit [--cost-ratio N]]
+    lamp-policy-replay --agreement --log-dir /var/lib/lampos-policy --days 2026-10-17,2026-10-18
 
+- **`--agreement`** (#705, the Policy's wait on a held call) asks nothing.
+  For each decision a model made, it says what the rule (`fallback`) would
+  have said of the same context, and counts the two by kind: the room,
+  whether the lamp was in conversation, whether it was speaking, and the
+  name's score (`none`, `<0.5`, `0.5-0.9`, `0.9-0.99`, `>=0.99`). Taking the
+  turn means `answer` or `look_up`, or a `stay_quiet` whose `follows_lamp`
+  is 0.6 or more (the voice's `FOLLOWS_FROM`): the voice runs the lamp's own
+  calls on it, where the rule's plain `stay_quiet` holds them (Fourth and
+  the reviewer on #1510). It prints one line per kind (decisions, agreed,
+  the rule took it and the model stayed quiet, the other way round, and how
+  many of the model's were a following `stay_quiet`), then the kinds with at
+  least 20 decisions and no disagreement: where the rule could decide
+  without asking, once a night in shadow has borne it out (Fourth's
+  conditions on #705). 20 of 20 agreeing still leaves a true disagreement
+  rate up to about 14 % likely at 95 %, so the list is for the shadow night,
+  not proof. A line cut inside a character is counted unread here and when
+  asking, and passed over by `--pictures` (which counts no unread lines),
+  so no mode ends on one. Counts only, no words.
 - **Where:** on the lamp, where the logs are. They hold what was heard, so
   they stay there. What is heard is sent to the model's service again, as on
   the day. The day of a file is UTC's.

@@ -86,6 +86,7 @@ fn run(n: usize, seed: u64, models: &[(&str, Answering)]) -> Vec<Value> {
                 choice: "stay_quiet".into(),
                 probability: 0.3,
                 by: "typesafe/jev-1.13-20260917".into(),
+                follows_lamp: None,
             };
             line(&logged, Some(should), &replayed)
         })
