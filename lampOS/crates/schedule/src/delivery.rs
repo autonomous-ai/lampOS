@@ -15,9 +15,15 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use std::{collections::BTreeSet, fmt, io, io::Write};
 
+mod saved;
+
 pub const MAX_ENTRIES: usize = 128;
 pub const MAX_SESSION_BYTES: usize = 80;
 const KIND: &str = "lamp_schedule_delivery_ledger";
+// Harmless additive metadata may keep this version. New enum values, required
+// fields, larger bounds, or fields that change admission/completion/ack meaning
+// must advance it. An exact saved Ack request remains strict even at this version.
+const SCHEMA: u32 = 1;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Error {
@@ -365,20 +371,19 @@ pub enum Evidence {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct StoreFence {
     store_id: String,
     revision: u64,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct RetirementRecord {
     attempt: u64,
+    #[serde(deserialize_with = "saved::Retirement::deserialize")]
     proof: QualifiedRetirement,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct Entry {
+    #[serde(deserialize_with = "saved::View::deserialize")]
     view: DeliveryView,
     first_attempt: u64,
     prepared_revision: u64,
@@ -387,7 +392,6 @@ struct Entry {
     previous: Option<RetirementRecord>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct State {
     kind: String,
     schema: u32,
@@ -402,7 +406,7 @@ impl State {
     fn check(&self) -> Result<(), Error> {
         let invalid = || error("invalid_snapshot");
         if self.kind != KIND
-            || self.schema != 1
+            || self.schema != SCHEMA
             || !identity(&self.ledger_id)
             || self.next_attempt == 0
             || self.next_attempt - 1 > self.revision
@@ -530,23 +534,48 @@ pub struct DeliveryLedger<P: Persistence> {
     persistence: P,
     state: State,
     failed: bool,
+    set_aside: Option<String>,
 }
 impl<P: Persistence> DeliveryLedger<P> {
     pub fn open(mut persistence: P, new_ledger_id: &str) -> Result<Self, Error> {
-        let state = match persistence.load().map_err(|_| error("storage"))? {
+        // Inspect the envelope before reading enum variants from a newer build.
+        // Decode supported state from the original bytes, retaining duplicate
+        // known-field errors rather than normalizing JSON through Value.
+        #[derive(Deserialize)]
+        struct Header {
+            kind: String,
+            schema: u64,
+        }
+        let mut newer = None;
+        let existing = match persistence.load().map_err(|_| error("storage"))? {
             Some(bytes) => {
                 if bytes.is_empty() || bytes.len() > MAX_STATE_BYTES {
                     return Err(error("invalid_snapshot"));
                 }
-                let state: State =
+                let header: Header =
                     serde_json::from_slice(&bytes).map_err(|_| error("invalid_snapshot"))?;
-                state.check()?;
-                state
+                if header.kind != KIND {
+                    return Err(error("invalid_snapshot"));
+                }
+                if header.schema > u64::from(SCHEMA) {
+                    newer = Some(header.schema);
+                    None
+                } else {
+                    let state: State =
+                        serde_json::from_slice(&bytes).map_err(|_| error("invalid_snapshot"))?;
+                    state.check()?;
+                    Some(state)
+                }
             }
+            None => None,
+        };
+        let mut set_aside = None;
+        let state = match existing {
+            Some(state) => state,
             None => {
                 let state = State {
                     kind: KIND.into(),
-                    schema: 1,
+                    schema: SCHEMA,
                     ledger_id: new_ledger_id.into(),
                     revision: 0,
                     next_attempt: 1,
@@ -555,7 +584,21 @@ impl<P: Persistence> DeliveryLedger<P> {
                 };
                 state.check()?;
                 let bytes = bounded_json(&state, MAX_STATE_BYTES)?;
+                if let Some(schema) = newer {
+                    let since = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_or(0, |since| since.as_secs());
+                    let kept = persistence
+                        .set_aside(&format!("newer-{schema}-{since}"))
+                        .map_err(|_| error("storage"))?;
+                    set_aside = Some(kept);
+                }
                 persistence.commit(&bytes).map_err(|_| error("storage"))?;
+                if let (Some(schema), Some(kept)) = (newer, &set_aside) {
+                    eprintln!(
+                        "schedule delivery: ledger was written by a newer build (schema {schema}, this build reads {SCHEMA}); it is set aside as {kept}, and this build starts with an empty ledger"
+                    );
+                }
                 state
             }
         };
@@ -563,7 +606,12 @@ impl<P: Persistence> DeliveryLedger<P> {
             persistence,
             state,
             failed: false,
+            set_aside,
         })
+    }
+    /// The preserved newer-schema database, if this open began a fresh ledger.
+    pub fn set_aside(&self) -> Option<&str> {
+        self.set_aside.as_deref()
     }
     pub fn failed(&self) -> bool {
         self.failed

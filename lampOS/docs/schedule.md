@@ -576,9 +576,32 @@ and an explicit absolute
 `LAMP_SCHEDULE_DELIVERY_DIR` on persistent storage. Provision its parent for the
 Voice service user; the final directory/database are private 0700/0600. This is
 a separate tagged ledger, never Schedule's item database or an audio session
-directory. It retains no reminder text. Reusing a directory with a different
-schema, a changed store identity, or ambiguous storage failure refuses new
-sound. Never delete this ledger to clear an operational fault.
+directory. It retains no reminder text. A changed store identity, wrong ledger
+kind, or ambiguous storage failure refuses new sound. Never delete this ledger
+to clear an operational fault.
+
+The saved delivery ledger reads harmless added fields at schema 1, including
+nested entries and proof metadata. Known fields and their proof bindings still
+validate; missing required fields, duplicate known fields and unknown `kind`
+or `op` values are refused with the stored bytes unchanged. Public Voice IPC
+types remain strict. An exact saved Ack request and its guard also remain
+strict: their fields must not be silently removed before retransmission.
+New enum values, required fields, larger storage bounds, changes to those exact
+requests, or fields that change admission, completion or acknowledgement meaning
+require a schema bump. Ignored harmless fields disappear on the next save.
+
+On a newer `schema`, the consumer closes and durably renames the whole database
+to `schedule.sqlite3.newer-<schema>-<unix-seconds>` under its existing directory
+lock, without replacing an earlier archive. It writes one journal line naming
+that file and creates an empty schema-1 ledger. A preservation failure refuses
+startup. No entry or completion proof from the newer ledger is interpreted.
+Current pending reminders can be offered again after the normal fresh Schedule
+observation, single-consumer claim and Voice admission checks. A reminder heard
+before rollback but not acknowledged in Schedule may therefore be heard twice;
+this follows the existing preference for a possible repeat over a lost reminder.
+Already acknowledged reminders are absent from Schedule and are not replayed
+from the preserved file. This work occurs at consumer startup; it adds no wait
+or I/O to Voice's audio path.
 
 One child, started by Voice's internal `schedule-consumer` entry, owns all Bus,
 Schedule socket and ledger work. It survives mute/unmute audio cycles. A fixed

@@ -17,6 +17,15 @@ pub const LATE_AFTER_MS: u64 = 1000;
 pub trait Persistence {
     fn load(&self) -> io::Result<Option<Vec<u8>>>;
     fn commit(&mut self, bytes: &[u8]) -> io::Result<()>;
+    /// Durably retain the current store under another name, without replacing
+    /// anything, and start an empty one. Backends without that operation refuse
+    /// newer schemas; they must never overwrite them with an empty snapshot.
+    fn set_aside(&mut self, _label: &str) -> io::Result<String> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "this persistence cannot set a newer schedule aside",
+        ))
+    }
 }
 
 impl Persistence for Store {
@@ -25,6 +34,9 @@ impl Persistence for Store {
     }
     fn commit(&mut self, bytes: &[u8]) -> io::Result<()> {
         self.commit(bytes)
+    }
+    fn set_aside(&mut self, label: &str) -> io::Result<String> {
+        self.set_aside(label)
     }
 }
 
