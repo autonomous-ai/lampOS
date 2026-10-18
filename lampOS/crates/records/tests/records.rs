@@ -14,7 +14,7 @@ use lamp_records::{
 use std::{
     collections::BTreeSet,
     fs::{self, File, FileTimes, OpenOptions},
-    io::Write,
+    io::{Read, Write},
     os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt, symlink},
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -198,6 +198,86 @@ fn real_cli_apply_with_unknown_service_cannot_delete_any_fixture_record() {
 }
 
 #[test]
+fn real_cli_sets_aside_a_newer_report_and_refuses_unknown_values_before_cleanup() {
+    let tree = Tree::new();
+    let mut config = tree.config();
+    config.enabled = false;
+    session(&config.roots[0].path, 1, 100);
+    let untouched = entries(&config.roots[0].path);
+    let config_path = tree.0.join("records.json");
+    let report_path = tree.0.join("last.json");
+    json_file::write(&config_path, &config).unwrap();
+    let current = RunReport {
+        schema_version: 1,
+        config_fingerprint: config.fingerprint(),
+        at_unix_s: 17,
+        mode: "apply".into(),
+        enabled: false,
+        roots: vec![],
+        error: None,
+    };
+    let run = || {
+        Command::new(env!("CARGO_BIN_EXE_lamp-records"))
+            .arg("check")
+            .arg(&config_path)
+            .arg("--apply")
+            .arg("--report")
+            .arg(&report_path)
+            .output()
+            .unwrap()
+    };
+    let mut later = serde_json::to_value(&current).unwrap();
+    later["extra"] = serde_json::json!({"kind": "new_detail"});
+    json_file::write(&report_path, &later).unwrap();
+    assert!(run().status.success());
+    later["schema_version"] = 2.into();
+    later["mode"] = "later_mode".into();
+    later["roots"] = serde_json::json!([{"later_kind": "new_enum_value"}]);
+    let bytes = serde_json::to_vec_pretty(&later).unwrap();
+    fs::write(&report_path, &bytes).unwrap();
+    let output = run();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let journal = String::from_utf8(output.stderr).unwrap();
+    assert_eq!(journal.lines().count(), 1);
+    assert!(journal.contains("cleanup result is newer than this build (schema 2)"));
+    let archives: Vec<_> = fs::read_dir(&tree.0)
+        .unwrap()
+        .map(Result::unwrap)
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with("last.json.newer-2-")
+        })
+        .collect();
+    assert_eq!(archives.len(), 1);
+    assert_eq!(fs::read(archives[0].path()).unwrap(), bytes);
+    let replacement: RunReport = json_file::read(&report_path, json_file::REPORT_BYTES).unwrap();
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap(),
+        serde_json::to_value(&replacement).unwrap()
+    );
+    assert_eq!(replacement.schema_version, 1);
+    assert!(!replacement.enabled);
+    assert_eq!(replacement.config_fingerprint, config.fingerprint());
+    config.enabled = true;
+    json_file::write(&config_path, &config).unwrap();
+    let mut unknown = serde_json::to_value(current).unwrap();
+    unknown["mode"] = "later_mode".into();
+    let bytes = serde_json::to_vec(&unknown).unwrap();
+    fs::write(&report_path, &bytes).unwrap();
+    let refused = run();
+    assert_eq!(refused.status.code(), Some(64));
+    assert!(refused.stdout.is_empty());
+    assert_eq!(fs::read(&report_path).unwrap(), bytes);
+    assert_eq!(entries(&config.roots[0].path), untouched);
+}
+
+#[test]
 fn diagnostic_is_delivered_over_the_real_local_bus_without_record_contents() {
     let tree = Tree::new();
     let bus = lamp_bus::Bus::new(tree.0.join("bus")).unwrap();
@@ -328,7 +408,7 @@ fn real_reporter_reloads_switch_and_policy_and_requires_a_matching_receipt() {
             .arg(&config_path)
             .arg(&result_path)
             .args(["--seconds", "30"])
-            .stderr(Stdio::inherit()),
+            .stderr(Stdio::piped()),
     )
     .unwrap();
 
@@ -346,7 +426,11 @@ fn real_reporter_reloads_switch_and_policy_and_requires_a_matching_receipt() {
     let missing = expect_status(&mut listener, &mut reporter, Level::Error, true, 0);
     assert_eq!(field(&missing, "roots"), Some("0"));
 
-    json_file::write(&result_path, &receipt(&config, 111)).unwrap();
+    let mut additive = serde_json::to_value(receipt(&config, 111)).unwrap();
+    additive["later"] = true.into();
+    additive["roots"][0]["later"] = true.into();
+    additive["roots"][0]["disk"]["later"] = true.into();
+    json_file::write(&result_path, &additive).unwrap();
     let healthy = expect_status(&mut listener, &mut reporter, Level::Ok, true, 111);
     assert_eq!(field(&healthy, "roots"), Some("1"));
     assert_eq!(field(&healthy, "disk_free_at_cleanup_pct"), Some("50.00"));
@@ -361,6 +445,49 @@ fn real_reporter_reloads_switch_and_policy_and_requires_a_matching_receipt() {
     let healthy = expect_status(&mut listener, &mut reporter, Level::Ok, true, 222);
     assert_eq!(field(&healthy, "disk_free_at_cleanup_pct"), Some("50.00"));
 
+    let mut future = serde_json::to_value(&current).unwrap();
+    future["schema_version"] = 2.into();
+    future["mode"] = "later_mode".into();
+    future["roots"][0]["processes"] = serde_json::json!({"later_kind": "new_enum_value"});
+    let future_bytes = serde_json::to_vec_pretty(&future).unwrap();
+    fs::write(&result_path, &future_bytes).unwrap();
+    for _ in 0..2 {
+        let missing = expect_status(&mut listener, &mut reporter, Level::Error, true, 0);
+        assert_eq!(field(&missing, "roots"), Some("0"));
+        assert!(
+            !result_path.exists(),
+            "reporting must not manufacture a cleanup receipt"
+        );
+    }
+    let archives: Vec<_> = fs::read_dir(&tree.0)
+        .unwrap()
+        .map(Result::unwrap)
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with("last.json.newer-2-")
+        })
+        .collect();
+    assert_eq!(archives.len(), 1);
+    assert_eq!(fs::read(archives[0].path()).unwrap(), future_bytes);
+    for reason in [
+        serde_json::json!("later_reason"),
+        serde_json::json!({"kind": "later_reason"}),
+    ] {
+        let mut unknown = serde_json::to_value(&current).unwrap();
+        unknown["roots"][0]["processes"] = serde_json::json!({
+            "gone": 1, "zombie": 0, "exiting": 0, "kernel_threads": 0,
+            "examples": [{"pid": 42, "reason": reason, "later": true}]
+        });
+        let bytes = serde_json::to_vec(&unknown).unwrap();
+        fs::write(&result_path, &bytes).unwrap();
+        expect_status(&mut listener, &mut reporter, Level::Error, true, 0);
+        assert_eq!(fs::read(&result_path).unwrap(), bytes);
+    }
+    json_file::write(&result_path, &current).unwrap();
+    expect_status(&mut listener, &mut reporter, Level::Ok, true, 222);
+
     config.enabled = false;
     json_file::write(&config_path, &config).unwrap();
     let disabled = expect_status(&mut listener, &mut reporter, Level::Ok, false, 0);
@@ -374,7 +501,17 @@ fn real_reporter_reloads_switch_and_policy_and_requires_a_matching_receipt() {
     assert!(unchanged.enabled);
     assert_eq!(unchanged.config_fingerprint, current.config_fingerprint);
     assert_eq!(unchanged.roots[0].before_bytes, 222);
+    let mut stderr = reporter.0.stderr.take().unwrap();
     drop(reporter);
+    let mut journal = String::new();
+    stderr.read_to_string(&mut journal).unwrap();
+    assert_eq!(
+        journal
+            .lines()
+            .filter(|line| line.contains("cleanup result is newer than this build"))
+            .count(),
+        1
+    );
 }
 
 fn distribution(samples: &mut [f64]) -> serde_json::Value {
@@ -491,13 +628,12 @@ fn bind_mounts_are_refused_even_on_the_same_filesystem() {
 }
 
 /// #1505: a run report as a later build writes it, with a field this build
-/// doesn't know. The same report without it reads; with it, today's build
-/// refuses it, so its cleanup run is refused at `check` and its health says
-/// "no readable cleanup result". `second/records-forward` makes it read: this
-/// test then stops panicking, and becomes a plain test in that pull request
-/// (Tests).
+/// doesn't know, reads as the same report without it. This shows only that
+/// the type reads. That `check` does not refuse it is shown by
+/// `real_cli_sets_aside_a_newer_report_and_refuses_unknown_values_before_cleanup`
+/// (its first run), and that health reads such a receipt as ok by
+/// `real_reporter_reloads_switch_and_policy_and_requires_a_matching_receipt`.
 #[test]
-#[should_panic(expected = "unknown field")]
 fn a_report_from_a_later_build_is_read() {
     let tree = Tree::new();
     let config = tree.config();
