@@ -10,6 +10,8 @@
 //! - [`quiet`]: with `--quiet-below`, the models rest while the last
 //!   2.03 s held no sound, and give the same scores when it comes.
 //! - [`said`]: when a run of scores is one hearing, and what is said of it.
+//! - [`not_self`]: with `--not-while-speaking on`, a hearing that began
+//!   while the lamp itself spoke is not said.
 //! - [`rescue`]: with `--rescue-model`, a second name model rescues a call
 //!   the installed one half heard.
 //!
@@ -23,6 +25,7 @@
 #![deny(clippy::print_stderr, clippy::print_stdout, clippy::dbg_macro)]
 
 pub mod hear;
+pub mod not_self;
 pub mod quiet;
 pub mod rescue;
 pub mod said;
