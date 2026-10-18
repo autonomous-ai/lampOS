@@ -1113,3 +1113,18 @@ fn first_install_power_cuts_at_every_phase_recover_to_no_installed_set() {
         }
     }
 }
+
+/// #1505: `update.json` as a later build writes it, with a field this build
+/// doesn't know. The worker reads it with `from_slice::<update::State>` at
+/// open, so today it is refused and lamp-surround doesn't start. No fix yet,
+/// and no unit starts lamp-surround on a lamp: whoever makes it read one
+/// release forward flips this to a plain test (Tests).
+#[test]
+#[should_panic(expected = "unknown field")]
+fn state_from_a_later_build_is_read() {
+    let bytes = serde_json::to_vec(&State::default()).unwrap();
+    serde_json::from_slice::<State>(&bytes).unwrap();
+    let mut later: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    later["a_field_from_a_later_build"] = serde_json::json!(true);
+    serde_json::from_slice::<State>(&serde_json::to_vec(&later).unwrap()).unwrap();
+}

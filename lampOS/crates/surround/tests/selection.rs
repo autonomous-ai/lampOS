@@ -357,3 +357,32 @@ async fn selection_lock_contention_and_shared_trust_directory_are_rejected() {
     let _lock = atomic::DirectoryLock::acquire(&state(&f)).unwrap();
     assert!(selector.select(None, &first).is_err());
 }
+
+/// #1505: the selection pointer as a later build writes it, with a field this
+/// build doesn't know. The same pointer without it is read; with it, release
+/// operations fail today. No fix yet, and no unit starts lamp-surround on a
+/// lamp: whoever makes it read one release forward flips this to a plain test
+/// (Tests).
+#[tokio::test]
+#[should_panic(expected = "unknown field")]
+async fn a_pointer_from_a_later_build_is_read() {
+    let f = Fixture::new();
+    let first = stage(&f, 1).await;
+    let selector = Selector::open(f.config.clone(), state(&f), true).unwrap();
+    let a = selector.select(None, &first).unwrap();
+    drop(selector);
+    let path = state(&f).join("current.json");
+    assert_eq!(
+        Selector::open(f.config.clone(), state(&f), true)
+            .unwrap()
+            .current()
+            .unwrap(),
+        Some(a.clone())
+    );
+    let mut later: Value =
+        serde_json::from_slice(&atomic::read(&path, 1 << 20).unwrap().unwrap()).unwrap();
+    later["a_field_from_a_later_build"] = json!(true);
+    atomic::write(&path, &serde_json::to_vec(&later).unwrap(), 1 << 20).unwrap();
+    let read = Selector::open(f.config.clone(), state(&f), true).unwrap();
+    assert_eq!(read.current().unwrap(), Some(a));
+}

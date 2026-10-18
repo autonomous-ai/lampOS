@@ -163,3 +163,24 @@ fn private_debug_hides_endpoint_paths_and_model() {
         assert!(!debug.contains(private));
     }
 }
+
+/// #1505: a generation's `document.json` as a later build writes it, with a
+/// field this build doesn't know at its top and in the provider. The same
+/// document without them reads; with them, `read_document` refuses it today,
+/// and a candidate checked at open stops lamp-surround starting. No fix yet,
+/// and no unit starts lamp-surround on a lamp: whoever makes it read one
+/// release forward flips this to a plain test (Tests).
+#[test]
+#[should_panic(expected = "invalid provider configuration")]
+fn a_document_from_a_later_build_is_read() {
+    let dir = private_dir();
+    let path = dir.path().join("document.json");
+    let doc = ProviderDocument::new(payload()).unwrap();
+    write_document(&path, &doc).unwrap();
+    assert!(read_document(&path).unwrap().is_some());
+    let mut later: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    later["a_field_from_a_later_build"] = serde_json::json!(true);
+    later["provider"]["a_field_from_a_later_build"] = serde_json::json!(true);
+    fs::write(&path, serde_json::to_vec(&later).unwrap()).unwrap();
+    assert!(read_document(&path).unwrap().is_some());
+}
