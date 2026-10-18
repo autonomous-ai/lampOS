@@ -74,3 +74,4 @@ list".
 - #1545 closed by the first builder (#1551, #1565, #1581 merged). #1592: the reviewer's 3 P2 and 5 P3 fixed at `73f7f53ed`, and ARM64 green.
 - #1592: the first builder's 20:48 items in at `c54e64e41` (the release asks again for a press in flight, the count never written through a link, the heard and restore lines tested, the 08:34 claim corrected). #1607 next.
 - #1592 merged by the first builder as `a6de297d6` (folded to one commit `6acd9c048`, ARM64 39135324549 green; approved by the reviewer, Seventh and Jarvis). `LAMP_GUARD_NEVER_LISTENED` stays off on the product until #1607.
+- **#1607** (a head hold in the restart window is lost; and the press between A's re-check and the save): taken. Branch `thirteen/hold-across-restart`.
