@@ -19,5 +19,9 @@ rustix = { version = "=1.1.5", features = ["fs"] }
 gpiocdev = "=0.8.0"
 i2cdev = "=0.6.2"
 
+# The program test signals its child itself (`tests/program.rs`).
+[dev-dependencies]
+rustix = { version = "=1.1.5", features = ["fs", "process"] }
+
 [lints]
 workspace = true
