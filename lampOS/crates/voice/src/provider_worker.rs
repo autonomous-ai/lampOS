@@ -7141,6 +7141,45 @@ mod tests {
         snapshot: Snapshot,
         dials: UnboundedReceiver<Dial>,
         worker: JoinHandle<Result<()>>,
+        /// Held for the rig's life, and let go last (#1422).
+        _one: OneThread,
+    }
+
+    /// One test at a time drives the worker's state that is one for the
+    /// whole process: the conversation (`crate::thread::THREAD`) and the
+    /// room (`crate::room_told::room()`), which every worker reads and
+    /// writes. Held by each rig for its life and by `OwnRoom`, and taken
+    /// again freely by the test's thread while it holds it (#1422: a test
+    /// that read the lamp's question from the thread failed 1 in 3 parallel
+    /// runs, when another test's rig wrote its own lines between).
+    pub(super) struct OneThread {
+        /// The lock itself, on the first hold of a thread's test.
+        _lock: Option<std::sync::MutexGuard<'static, ()>>,
+    }
+
+    static ONE_THREAD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    thread_local! {
+        /// How many of this thread's tests' holds are open.
+        static HELD: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    }
+
+    /// The lock, or another hold on it if this thread has it already.
+    pub(super) fn one_thread() -> OneThread {
+        let held = HELD.with(|held| held.replace(held.get() + 1));
+        OneThread {
+            _lock: (held == 0).then(|| {
+                ONE_THREAD
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+            }),
+        }
+    }
+
+    impl Drop for OneThread {
+        fn drop(&mut self) {
+            HELD.with(|held| held.set(held.get().saturating_sub(1)));
+        }
     }
     fn real_time() -> MonoTime {
         MonoTime::from_micros(monotonic_us())
@@ -7260,6 +7299,7 @@ mod tests {
             configure: impl FnOnce(SessionConfig) -> SessionConfig,
             resend: bool,
         ) -> Self {
+            let one = one_thread();
             let (directory, parent, worker) = intake_channels();
             let boot = BootId::new([9; 16]).unwrap();
             let mut owner = Controller::new(boot, real_time());
@@ -7314,6 +7354,7 @@ mod tests {
                 worker: tokio::spawn(serve_with_visual(
                     worker, boot, provider, options, visual, None,
                 )),
+                _one: one,
             };
             rig.publish();
             rig

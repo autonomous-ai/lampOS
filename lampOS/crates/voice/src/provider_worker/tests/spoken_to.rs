@@ -589,18 +589,14 @@ pub(super) struct OwnRoom {
     /// Held while the test runs: the thread is one for the whole process
     /// (`crate::thread::THREAD`), so two of these tests at once wrote over
     /// each other's conversation, and one failed in half the parallel runs
-    /// of the six (the eighth, 01:0x on #705).
-    _one: std::sync::MutexGuard<'static, ()>,
+    /// of the six (the eighth, 01:0x on #705). Every rig holds it too
+    /// (#1422).
+    _one: super::OneThread,
 }
-
-/// One test at a time holds the process's thread.
-static ONE_THREAD: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 impl OwnRoom {
     pub(super) fn fresh() -> Self {
-        let one = ONE_THREAD
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let one = super::one_thread();
         Self {
             _one: one,
             room: Some(std::mem::take(
