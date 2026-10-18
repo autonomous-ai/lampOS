@@ -68,7 +68,7 @@ pub fn on<L: Light>(light: &mut L) -> Outcome {
         None => Outcome::Failed(UNREAD.into()),
         Some(now) if now.on && !light.covered() => Outcome::Done("My light is already on.".into()),
         Some(now) => {
-            let said = format!("My light is on, {}.", now.colour);
+            let said = format!("My light is on, {}.", spoken(&now.colour));
             set(light, Wanted { on: true, ..now }, said)
         }
     }
@@ -92,7 +92,7 @@ pub fn colour<L: Light>(light: &mut L, name: &str) -> Outcome {
     match light.shown() {
         None => Outcome::Failed(UNREAD.into()),
         Some(now) if now.on && now.colour == name && !light.covered() => {
-            Outcome::Done(format!("My light is already {name}."))
+            Outcome::Done(format!("My light is already {}.", spoken(name)))
         }
         Some(now) => set(
             light,
@@ -101,7 +101,7 @@ pub fn colour<L: Light>(light: &mut L, name: &str) -> Outcome {
                 colour: name.to_owned(),
                 level: now.level,
             },
-            format!("My light is {name} now."),
+            format!("My light is {} now.", spoken(name)),
         ),
     }
 }
@@ -174,8 +174,8 @@ pub fn dimmer<L: Light>(light: &mut L) -> Outcome {
 /// light a little warmer" had no tool that does it).
 pub const WARMTH: [&str; 3] = ["white", "warm", "orange"];
 
-/// A colour of the warmth scale as an answer says it: `warm` is a warm
-/// white. Said bare, "a step cooler, warm now" came back as "Okay, warmed
+/// A colour as every answer says it: `warm` is a warm white, so the lamp
+/// calls one colour by one name (El on #1476). Said bare, "a step cooler, warm now" came back as "Okay, warmed
 /// it up a step" (the first builder's light scene on lamp-4ace, 18 Oct, on
 /// #1367): the model heard the colour's name as the way it went.
 fn spoken(colour: &str) -> &str {
@@ -501,6 +501,20 @@ pub(crate) mod tests {
         let mut dark = Fake::showing(light(false, "blue", 4));
         assert_eq!(said(colour(&mut dark, "blue")), "My light is blue now.");
         assert_eq!(dark.shown, Some(light(true, "blue", 4)));
+        // Warm is said as a warm white in every answer, as after a step (El
+        // on #1476): one colour, one name.
+        let mut warm = Fake::showing(light(false, "blue", 2));
+        assert_eq!(
+            said(colour(&mut warm, "warm")),
+            "My light is warm white now."
+        );
+        assert_eq!(warm.shown, Some(light(true, "warm", 2)));
+        assert_eq!(
+            said(colour(&mut warm, "warm")),
+            "My light is already warm white."
+        );
+        let mut off_warm = Fake::showing(light(false, "warm", 2));
+        assert_eq!(said(on(&mut off_warm)), "My light is on, warm white.");
         // A word that is not one of the ten is refused before anything is
         // read or asked.
         let mut lamp = Fake::showing(light(true, "warm", 2));
