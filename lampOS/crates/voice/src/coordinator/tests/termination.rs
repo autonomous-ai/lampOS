@@ -407,12 +407,16 @@ fn peer(
                 }),
                 SubmitResult::Queued
             );
+            // This peer stands in for the worker, so the worker's 500 ms
+            // (`DEFAULT_FINISH_WAIT`) is not what is tested here: a loaded
+            // host's disk took longer, 8 of 72 runs 12 at a time. It waits
+            // the most a recorder takes (#1569).
             let report = recorder.finish(
                 EndMeta {
                     at_us: monotonic_us(),
                     reason: EndReason::PrivacyClosed,
                 },
-                DEFAULT_FINISH_WAIT,
+                crate::diagnostics::MAX_FINISH_WAIT,
             );
             assert!(report.valid, "{report:?}");
             channels
