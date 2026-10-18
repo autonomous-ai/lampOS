@@ -624,7 +624,11 @@ fn filled_real_pipe_write_uses_the_single_absolute_host_deadline() {
     }
     let (dummy_read, _dummy_write) = private_pipe().unwrap();
     let mut channel = Channel::new(File::from(dummy_read), duplicate).unwrap();
-    let end = deadline();
+    // The test's own deadline, not the fixtures' `HOST_WAIT` (4 s): the write
+    // waits the whole of it on the full pipe, and the second write finds it
+    // already past. Any length checks the same; a short one costs no time
+    // (#1128).
+    let end = Instant::now() + Duration::from_millis(200);
     assert_eq!(
         channel
             .write_until(
