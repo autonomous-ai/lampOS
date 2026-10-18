@@ -587,6 +587,34 @@ fn stepped_fixture(
     let (dir, motor, controller) = start_fixture(mode, dir, prepared);
     (scope, dir, motor, controller)
 }
+/// `fixture(mode)`, made again when its child's start was timed out by the
+/// parent's own pause: the supervisor measures the child's progress from its
+/// stamps against the parent's clock, and a loaded host's pause between the
+/// child saying it is ready and the parent reading it fails the start
+/// (#1569). For a mode the stepped clock can't run: a child that hangs on
+/// purpose. Any other failure, or three timed-out starts, fails as `wait`.
+fn ready_fixture(mode: &str) -> (crate::process::SessionDirectory, OptionalMotor, Controller) {
+    for _ in 0..3 {
+        let (dir, mut m, mut c) = fixture(mode);
+        let until = Instant::now() + Duration::from_secs(2);
+        let mut last = 0;
+        while !m.is_ready() && m.failure().is_none() && Instant::now() < until {
+            if monotonic_us() - last >= 10_000 {
+                m.publish(c.snapshot(time()).unwrap());
+                last = monotonic_us();
+            }
+            m.poll(|_| {});
+            pause();
+        }
+        if !m.is_ready() && m.failure() == Some("motor worker progress timed out") {
+            cleanup(m, c, dir);
+            continue;
+        }
+        wait(&mut m, &mut c, OptionalMotor::is_ready);
+        return (dir, m, c);
+    }
+    panic!("the motor child's start was timed out in 3 of 3 attempts");
+}
 fn start_fixture(
     mode: &str,
     dir: crate::process::SessionDirectory,
@@ -1087,7 +1115,7 @@ fn crash_and_stalled_control_never_allow_replacement_or_false_cleanup() {
 }
 #[test]
 fn stale_snapshot_does_not_revoke_newer_idle_authority() {
-    let (dir, mut m, mut c) = fixture("normal");
+    let (_scope, dir, mut m, mut c) = stepped_fixture("normal");
     wait(&mut m, &mut c, OptionalMotor::is_ready);
     let old = c.snapshot(time()).unwrap();
     let current = c.snapshot(time()).unwrap();
@@ -1232,7 +1260,7 @@ fn motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch() {
 #[test]
 fn unresolved_cleanup_removes_the_service_mute_restart_token() {
     use crate::service_privacy::{self, PhysicalMute};
-    let (dir, mut m, mut c) = fixture("hang");
+    let (dir, mut m, mut c) = ready_fixture("hang");
     wait(&mut m, &mut c, OptionalMotor::is_ready);
     let outcome: super::super::Result<()> = Err(Box::new(PhysicalMute {
         observed_at_us: monotonic_us(),
@@ -1247,7 +1275,7 @@ fn unresolved_cleanup_removes_the_service_mute_restart_token() {
 }
 #[test]
 fn frozen_config_and_executable_are_exact_and_source_changes_are_not_adopted() {
-    let (dir, mut m, mut c) = fixture("normal");
+    let (_scope, dir, mut m, mut c) = stepped_fixture("normal");
     wait(&mut m, &mut c, OptionalMotor::is_ready);
     let p = m.prepared.as_ref().unwrap();
     let bytes = fs::read(&p.config_file.path).unwrap();
