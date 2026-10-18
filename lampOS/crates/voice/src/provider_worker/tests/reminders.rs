@@ -817,6 +817,7 @@ async fn reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn
         exec: Some(home.path.clone()),
         memory: Some(memory_path),
         clock: true,
+        places: false,
         tasks: Some(crate::agent_tasks::Place {
             directory: home.path.clone(),
             target: "office".into(),
