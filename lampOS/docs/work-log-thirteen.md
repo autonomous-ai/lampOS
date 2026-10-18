@@ -59,3 +59,10 @@ list".
 
 - `lamp-bus` `logging::tests::a_slow_log_follower_does_not_hold_a_fast_one_and_loss_remains_visible` failed once in ARM64 (38928613480) and passed on re-run.
 - On lamp-cb94, `ears/level`'s bus header `at_us` is on another clock than `voice/state`'s (about 3,486 s apart).
+
+## 2026-10-18 — readings on lamp-cb94, #1533's review, and #1545
+
+- #1504 and #1533 peer-reviewed (no P1/P2; #1533's two P3s folded at `5a0c71a7b`).
+- On lamp-cb94, read-only: Twelve's connect check, and Jarvis's endpoint (v2, v3) and speaking-up scripts. The endpoint delay is set by its basis (`model_complete` ~400 ms, fallback ~600 ms), not the room.
+- One reminder (item 2) was pending 23 h. I first read it as a stuck voice and was wrong twice. An idle voice logs nothing, and the overnight lines came from the process before. The session's last events show the cause: `physical_mute` at 09:39:02, then `service_cycle_muted`. The reminder came due 21 min into the mute, and `muted_wait` never says or names a due reminder. Corrected on #705 each time.
+- **#1545** (First's product call: wait while muted, say it on unmute, a journal line and health while owed, a pulse under a switch): taken. Branch `thirteen/reminder-stall`.
