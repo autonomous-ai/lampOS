@@ -664,7 +664,7 @@ impl Judges {
                 at,
                 judgement.choice,
                 Instant::now(),
-                (waiting.utterance.began, waiting.utterance.ended),
+                waiting.utterance.sent,
                 &policy.begun,
             ),
             number,

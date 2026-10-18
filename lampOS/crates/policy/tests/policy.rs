@@ -283,6 +283,15 @@ impl Rig {
     }
 
     fn hear_as(&mut self, text: &str, finished: bool, request: Option<u64>) {
+        self.hear_at(text, finished, request, lamp_ipc::monotonic_us());
+    }
+
+    /// Heard, with the stamp `at_us` the voice sent it with (#1652).
+    fn hear_sent(&mut self, text: &str, at_us: u64) {
+        self.hear_at(text, false, None, at_us);
+    }
+
+    fn hear_at(&mut self, text: &str, finished: bool, request: Option<u64>, at_us: u64) {
         self.spoken.push(text.to_owned());
         let piece = Speech {
             text: text.to_owned(),
@@ -290,7 +299,7 @@ impl Rig {
             locale: None,
             request,
         };
-        let sent = self.heard.publish_json(0, &piece).unwrap();
+        let sent = self.heard.publish_json(at_us, &piece).unwrap();
         assert_eq!((sent.delivered, sent.dropped), (1, 0), "{text:?}");
     }
 
@@ -303,11 +312,26 @@ impl Rig {
             locale: None,
             request: Some(request),
         };
-        assert_eq!(self.said.publish_json(0, &piece).unwrap().delivered, 1);
+        assert_eq!(
+            self.said
+                .publish_json(lamp_ipc::monotonic_us(), &piece)
+                .unwrap()
+                .delivered,
+            1
+        );
     }
 
+    /// The voice's state, stamped as the voice stamps it: now.
     fn voice(&mut self, state: Voice) {
-        let sent = self.state.publish_json(0, &VoiceState { state }).unwrap();
+        self.voice_sent(state, lamp_ipc::monotonic_us());
+    }
+
+    /// The voice's state, with the stamp `at_us` it was sent with (#1652).
+    fn voice_sent(&mut self, state: Voice, at_us: u64) {
+        let sent = self
+            .state
+            .publish_json(at_us, &VoiceState { state })
+            .unwrap();
         assert_eq!(sent.delivered, 1);
     }
 
@@ -986,6 +1010,62 @@ fn a_lamp_that_spoke_before_it_was_decided_is_written_with_a_time_less_than_noth
     // was after what was heard was taken up.
     let from_heard = outcome["heard_to_sound_ms"].as_i64().unwrap();
     assert!(from_heard >= 100, "{from_heard} {outcome}");
+    rig.stop();
+}
+
+/// #1652: each turn the policy's loop takes what the lamp is doing before
+/// what is heard, so a turn held up past the gap between the two took the
+/// lamp's sound first, and the outcome said `silent` (#1569 row 25). Here the
+/// piece comes in after the lamp's sound, though stamped 150 ms before it, as
+/// such a turn takes them: by the stamps, the lamp spoke, 150 ms after what
+/// was heard.
+#[test]
+fn a_piece_taken_up_after_the_lamps_sound_but_sent_before_it_is_answered_by_it() {
+    let mut rig = Rig::new("outcome-held-up", |_| {
+        thread::sleep(ms(300));
+        Ok(asked(SEVEN))
+    });
+    rig.voice(Voice::Listening);
+    rig.voice(Voice::Thinking);
+    let heard_at = lamp_ipc::monotonic_us();
+    thread::sleep(ms(150));
+    rig.say("It is noon.", 8);
+    rig.voice(Voice::Speaking);
+    // Turns of the loop pass, each waiting at most 20 ms: the lamp's sound
+    // is taken up before the piece is sent.
+    thread::sleep(ms(100));
+    rig.hear_sent("What time is it?", heard_at);
+    rig.decision();
+    let outcome = &rig.outcomes(1)[0];
+    assert_eq!(outcome["lamp"], "spoke", "{outcome}");
+    assert_eq!(outcome["request"], 8, "{outcome}");
+    let from_heard = outcome["heard_to_sound_ms"].as_i64().unwrap();
+    assert!((150..1_000).contains(&from_heard), "{from_heard} {outcome}");
+    rig.stop();
+}
+
+/// #1652: the lamp's sound stamped longer ago than the outcome's window,
+/// before what was heard, is no answer to it though it is taken up after,
+/// here after the decision too: the outcome says `silent`, as for one taken
+/// up before. A second utterance's decision closes it, not the window.
+#[test]
+fn a_sound_stamped_before_what_was_heard_is_no_answer_to_it() {
+    let mut rig = Rig::new("outcome-old-sound", |_| Ok(asked(SEVEN)));
+    rig.voice(Voice::Listening);
+    rig.voice(Voice::Thinking);
+    rig.hear("What time is it?");
+    // Turns of the loop pass, each waiting at most 20 ms: what was heard is
+    // taken up, and decided, before the lamp's sound is sent.
+    thread::sleep(ms(100));
+    rig.voice_sent(Voice::Speaking, lamp_ipc::monotonic_us() - 7_000_000);
+    rig.decision();
+    rig.voice(Voice::Listening);
+    rig.hear("Is it lunch yet?");
+    rig.voice(Voice::Thinking);
+    rig.decision();
+    let outcome = &rig.outcomes(1)[0];
+    assert_eq!(outcome["lamp"], "silent", "{outcome}");
+    assert_eq!(outcome["overtaken"], true, "{outcome}");
     rig.stop();
 }
 

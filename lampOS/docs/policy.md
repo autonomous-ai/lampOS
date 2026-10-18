@@ -499,8 +499,26 @@ again from once someone has said which outcomes were right. And a
 measurement, on every turn the lamp takes, of whether a decision comes
 early enough to be acted on.
 
-Every time here is when the policy's loop took the message up, which is
-within 20 ms of its arriving, and within 5 ms while a question is out.
+**The times come from the messages' own stamps** (#1652). The lamp's first
+sound, its words and what was heard are each timed by the stamp its
+message was sent with: the publisher's `at_us`, on the same monotonic
+clock. They are not timed by when the policy's loop took the message up.
+
+- **Why:** each turn the loop takes what the lamp is doing before what is
+  heard. A turn held up past the gap between the two took the lamp's sound
+  first, and a real answer was written `silent` (#1569 row 25).
+- **A sound stamped before the utterance began** is no answer to it, even
+  if it is taken up after.
+- **A message with no stamp, or one stamped ahead of the clock,** is timed
+  from when it was taken up, within 20 ms of its arriving (5 ms while a
+  question is out).
+- **What the policy decides** keeps the take-up times, and the decision's
+  own time is when it was made.
+- **How much earlier the times are now:** in the policy's own tests, the
+  lamp's state was taken up 4.5 ms after its stamp (median; 21.8 ms at the
+  90th percentile), and what was heard 0.2 ms after. So `spoke_after_ms`
+  and `heard_to_sound_ms` are that much smaller than before #1652 on a
+  loop that isn't held up.
 
 Which answer belongs to which utterance is told by time alone (the turn's
 number that what is heard carries is not used here): the lamp's first
