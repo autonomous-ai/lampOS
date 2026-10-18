@@ -781,6 +781,7 @@ impl Setup {
             turn_taking: self.turn_taking,
             // As lamp-4ace.
             playout_start: PlayoutStart::new(350).unwrap(),
+            fixture_at_ms: None,
             endpoint: None,
             call_wait_blocks: None,
             cut_keeps_name: self.cut_keeps_name,
@@ -1658,8 +1659,8 @@ fn without_the_option_every_message_and_record_is_what_it_was() {
             )
             .unwrap()
         );
-        let mut with = run_start_record(&on, lifetime, false, false, None, false);
-        let without = run_start_record(&options, lifetime, false, false, None, false);
+        let mut with = run_start_record(&on, lifetime, false, false, None, None, false);
+        let without = run_start_record(&options, lifetime, false, false, None, None, false);
         assert!(without.get("early_end_ms").is_none());
         assert_eq!(with["early_end_ms"], 200);
         with.as_object_mut().unwrap().remove("early_end_ms");

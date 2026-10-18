@@ -96,6 +96,7 @@ fn run_with_notice_policy(
         noise_suppression: NoiseSuppression::On,
         turn_taking: policy,
         playout_start: PlayoutStart::default(),
+        fixture_at_ms: None,
         endpoint: None,
         call_wait_blocks: None,
         cut_keeps_name: false,

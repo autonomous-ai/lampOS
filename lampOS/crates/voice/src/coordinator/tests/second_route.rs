@@ -938,6 +938,7 @@ fn run(script: Script) -> Run {
         noise_suppression: NoiseSuppression::On,
         turn_taking: script.turn_taking,
         playout_start: PlayoutStart::default(),
+        fixture_at_ms: None,
         endpoint: None,
     };
     if script.second {

@@ -930,6 +930,7 @@ fn after_a_new_cycle_the_last_cycle_s_written_turn_number_spoken_asks_for_the_st
         ProviderSource::Fixture {
             wav: Path::new("absent.wav"),
             sha256: "",
+            at_ms: None,
         },
         Lifetime::Serve,
         &mut SessionState::default(),

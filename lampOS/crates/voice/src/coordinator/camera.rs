@@ -634,6 +634,7 @@ mod tests {
             noise_suppression: NoiseSuppression::On,
             turn_taking: TurnTaking::VadOnly,
             playout_start: PlayoutStart::default(),
+            fixture_at_ms: None,
             endpoint: None,
             call_wait_blocks: None,
             cut_keeps_name: false,

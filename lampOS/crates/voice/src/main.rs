@@ -570,15 +570,18 @@ fn run() -> Result<()> {
         #[cfg(target_os = "linux")]
         [command, wav, sha256, seconds, output, flags @ ..] if command == "directed-fixture" => {
             let options = lamp_voice::fixture_provider::FixtureOptions::parse(flags)?;
-            lamp_voice::coordinator::run_fixture(Path::new(wav), sha256, seconds.parse()?, Path::new(output), options)?;
+            let seconds = seconds.parse()?;
+            options.check_seconds(seconds)?;
+            lamp_voice::coordinator::run_fixture(Path::new(wav), sha256, seconds, Path::new(output), options)?;
         }
-        [command, role, dir, parent, worker, flag, wav, sha256]
-            if command == "worker" && role == "provider" && flag == "--fixture" => {
+        [command, role, dir, parent, worker, flag, wav, sha256, timed @ ..]
+            if command == "worker" && role == "provider" && flag == "--fixture"
+                && (timed.is_empty() || timed == [lamp_voice::fixture_provider::TIMED_FLAG]) => {
             let parent = parse_boot(parent)?;
             let worker = parse_boot(worker)?;
             let mut channels = WorkerChannels::bind(Path::new(dir), role, parent, worker, true)?;
             channels.connect(Path::new(dir), role, true)?;
-            lamp_voice::fixture_provider::run(channels, parent, Path::new(wav), sha256)?;
+            lamp_voice::fixture_provider::run(channels, parent, Path::new(wav), sha256, !timed.is_empty())?;
         }
         #[cfg(target_os = "linux")]
         [command, config, output, flags @ ..] if command == "serve" => {
@@ -700,7 +703,7 @@ fn run() -> Result<()> {
                 _=>return Err(io::Error::other("worker is not integrated yet").into()),
             }
         },
-        _=>return Err(io::Error::new(io::ErrorKind::InvalidInput,"usage: lamp-voice serve PRIVATE_CONFIG.json NEW_OUTPUT [directed options except --diagnostics] | camera-inspect PRIVATE_CAMERA_CONFIG.json SECONDS NEW_REPORT.json | provider-check PRIVATE_CONFIG.json | directed PRIVATE_CONFIG.json SECONDS NEW_OUTPUT [--controls-stop] [--controls-mute ABS_PRIVATE_RECORD] [--controls-bus-root ABS_PATH] [--camera-config ABS_PATH] [--motor-worker ABS_PATH --motor-config ABS_PATH] [--head-qualification-plan ABS_PATH --head-qualification-channel ABS_PRIVATE_DIR] [--failure-notice-dir ABS_PATH --failure-notice-language TAG] [--diagnostics] [--noise-suppression on|off] [--microphone mic1|mic2] [--turn-taking v1-baseline|vad-only|duplex] [--reference-clock fixed|capture] [--reference-recovery off|bounded] [--echo-reference as-given|steady] [--provider-continuation off|kept-start] [--playout-start-ms 0..500 | --playout-continuity] [--cue-socket ABS_PATH] [--ring-channel-ceiling 0..120] [--end-silence-ms 300..2000] [--early-end-ms 100..1000, with --provider-continuation kept-start] | directed-fixture REPLY.wav SHA256 SECONDS NEW_OUTPUT --diagnostics [--noise-suppression on|off] [--microphone mic1|mic2] [--turn-taking v1-baseline|vad-only|duplex] [--reference-clock fixed|capture] [--reference-recovery off|bounded] [--playout-start-ms 0..500 | --playout-continuity] [--cue-socket ABS_PATH] [--ring-channel-ceiling 0..120] | worker ROLE DIR CONTROLLER_BOOT WORKER_BOOT").into()),
+        _=>return Err(io::Error::new(io::ErrorKind::InvalidInput,"usage: lamp-voice serve PRIVATE_CONFIG.json NEW_OUTPUT [directed options except --diagnostics] | camera-inspect PRIVATE_CAMERA_CONFIG.json SECONDS NEW_REPORT.json | provider-check PRIVATE_CONFIG.json | directed PRIVATE_CONFIG.json SECONDS NEW_OUTPUT [--controls-stop] [--controls-mute ABS_PRIVATE_RECORD] [--controls-bus-root ABS_PATH] [--camera-config ABS_PATH] [--motor-worker ABS_PATH --motor-config ABS_PATH] [--head-qualification-plan ABS_PATH --head-qualification-channel ABS_PRIVATE_DIR] [--failure-notice-dir ABS_PATH --failure-notice-language TAG] [--diagnostics] [--noise-suppression on|off] [--microphone mic1|mic2] [--turn-taking v1-baseline|vad-only|duplex] [--reference-clock fixed|capture] [--reference-recovery off|bounded] [--echo-reference as-given|steady] [--provider-continuation off|kept-start] [--playout-start-ms 0..500 | --playout-continuity] [--cue-socket ABS_PATH] [--ring-channel-ceiling 0..120] [--end-silence-ms 300..2000] [--early-end-ms 100..1000, with --provider-continuation kept-start] | directed-fixture REPLY.wav SHA256 SECONDS NEW_OUTPUT --diagnostics [--fixture-at-ms 1..60000, below SECONDS x 1000, diagnostic only: start the fixture that many ms after listening_ready, with no admitted turn] [--noise-suppression on|off] [--microphone mic1|mic2] [--turn-taking v1-baseline|vad-only|duplex] [--reference-clock fixed|capture] [--reference-recovery off|bounded] [--playout-start-ms 0..500 | --playout-continuity] [--cue-socket ABS_PATH] [--ring-channel-ceiling 0..120] | worker ROLE DIR CONTROLLER_BOOT WORKER_BOOT").into()),
     }
     Ok(())
 }

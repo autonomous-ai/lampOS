@@ -216,6 +216,21 @@ correctness scoring. This provider has no ASR or addressee classifier: an
 erroneous VAD admission can reserve/cancel the fixture and is experiment evidence,
 not a reason to fabricate an input or replay until success.
 
+`--fixture-at-ms N` (1–60000; diagnostic only, never run by a product unit)
+starts the fixture N ms after `listening_ready`, with no admitted turn: once
+that time has come and the lamp is at rest, the coordinator admits the
+fixture's own written turn (`input_admitted` with `admission_basis`
+`fixture_at_ms`, after a `fixture_timed_start` record) and the worker
+(`--timed`) plays the whole reply for it, through the same speaker permits,
+render recording, events and diagnostics. A turn admitted before N is handled
+as today but gets no fixture audio, so what the microphone hears cannot move
+the start; if that turn is still open at N, the fixture starts as soon as it is
+over. Takes on different microphones then line up on `listening_ready`, where
+the run's SECONDS start and a voice-eval plan's first step follows. `run_start`
+records `fixture_at_ms`. A value of 0, over 60000, at or past SECONDS × 1000,
+not a whole number, missing or given twice is refused with a usage error.
+Unset, nothing changes.
+
 A fixture packet contains at most 960 samples, with at most one input and one
 output step per tick. Priority control is drained before and after input receipt
 because authority and data use separate sockets. Either full 16-message control

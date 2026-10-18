@@ -1398,6 +1398,7 @@ fn run_in(script: Script, trace: &mut SessionState) -> Run {
         noise_suppression: NoiseSuppression::On,
         turn_taking: script.turn_taking,
         playout_start: PlayoutStart::default(),
+        fixture_at_ms: None,
         endpoint: None,
         call_wait_blocks: None,
         cut_keeps_name: false,

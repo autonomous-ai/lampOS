@@ -139,9 +139,40 @@ impl Fixture {
 pub struct FixtureOptions {
     pub directed: DirectedOptions,
     pub cue_socket: Option<PathBuf>,
+    /// `--fixture-at-ms N` (diagnostic only, never a product unit): the
+    /// fixture starts N ms after `listening_ready`, with no admitted turn.
+    /// None, the default: it answers the first admitted turn, as always.
+    pub at_ms: Option<u64>,
 }
+
+/// The longest `--fixture-at-ms`.
+pub const MAX_AT_MS: u64 = 60_000;
+/// The provider worker's flag for a timed fixture: only its own written turn
+/// plays the reply, and a heard turn gets none.
+pub const TIMED_FLAG: &str = "--timed";
+
 impl FixtureOptions {
     pub fn parse(arguments: &[String]) -> io::Result<Self> {
+        let mut at_ms = None;
+        let mut rest = Vec::with_capacity(arguments.len());
+        let mut arguments = arguments.iter();
+        while let Some(argument) = arguments.next() {
+            if argument != "--fixture-at-ms" {
+                rest.push(argument.clone());
+                continue;
+            }
+            let value = arguments
+                .next()
+                .and_then(|value| value.parse::<u64>().ok())
+                .filter(|ms| (1..=MAX_AT_MS).contains(ms));
+            if at_ms.is_some() || value.is_none() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "usage: --fixture-at-ms takes one whole number of ms, 1 to 60000 (diagnostic only)",
+                ));
+            }
+            at_ms = value;
+        }
         let SessionOptions {
             directed,
             cue_socket,
@@ -149,7 +180,7 @@ impl FixtureOptions {
             failure_notices,
             motor,
             controls,
-        } = SessionOptions::parse(arguments)?;
+        } = SessionOptions::parse(&rest)?;
         if controls.enabled() {
             return Err(invalid(
                 "hand controls are for Gemini voice sessions, never reply fixtures",
@@ -180,7 +211,23 @@ impl FixtureOptions {
         Ok(Self {
             directed,
             cue_socket,
+            at_ms,
         })
+    }
+
+    /// `--fixture-at-ms` must come inside the run: N at or past SECONDS
+    /// x 1000 would never start, and the take would read as untimed.
+    pub fn check_seconds(&self, seconds: u64) -> io::Result<()> {
+        if self
+            .at_ms
+            .is_some_and(|ms| ms >= seconds.saturating_mul(1_000))
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "usage: --fixture-at-ms must be below SECONDS x 1000 (diagnostic only)",
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -230,6 +277,9 @@ pub struct FixtureProvider {
     last_now_us: u64,
     saw_allowed: bool,
     stopped: bool,
+    /// `--timed` (`--fixture-at-ms`): only the first written turn plays the
+    /// reply; a heard turn gets none, so what is heard cannot move it.
+    timed: bool,
 }
 impl FixtureProvider {
     pub fn new(fixture: Fixture, boot: BootId, now_us: u64) -> Self {
@@ -251,6 +301,7 @@ impl FixtureProvider {
             last_now_us: now_us,
             saw_allowed: false,
             stopped: false,
+            timed: false,
         }
     }
     pub fn stop(&mut self) {
@@ -293,7 +344,8 @@ impl FixtureProvider {
             if owner.turn() <= self.retired_through || owner.turn() < self.highest_seen {
                 return Err(invalid("fixture authority resurrected a retired owner"));
             }
-            if owner.turn() > self.reminder_refused_through {
+            // A timed fixture keeps the reply for its own written turn.
+            if !self.timed && owner.turn() > self.reminder_refused_through {
                 self.first_owner.get_or_insert(owner);
             }
             self.highest_seen = owner.turn();
@@ -497,7 +549,25 @@ impl FixtureProvider {
                     audio: self.first_owner == Some(owner),
                 });
             }
-            // The fixture answers what it hears. It has no written turns.
+            // The fixture answers what it hears. Only a timed one
+            // (`--fixture-at-ms`) has a written turn: its own start.
+            ProviderInput::Written { session, .. } if self.timed => {
+                if session != 1 || self.input.is_some() || self.reply.is_some() {
+                    return Err(invalid("fixture timed start out of order"));
+                }
+                self.first_owner.get_or_insert(owner);
+                self.event(ProviderOutput::Started {
+                    request,
+                    session: 1,
+                    waiting_for_barrier: false,
+                })?;
+                self.reply = Some(Reply {
+                    owner,
+                    offset: 0,
+                    stage: 0,
+                    audio: self.first_owner == Some(owner),
+                });
+            }
             ProviderInput::Written { .. } => {
                 return Err(invalid("the fixture provider takes no written request"));
             }
@@ -794,13 +864,250 @@ mod reminder_tests {
     }
 }
 
+#[cfg(test)]
+mod timed_tests {
+    use super::*;
+    use lamp_turn_owner::{AdmissionState, AdmittedInput, CaptureState, Controller};
+
+    fn args(flags: &[&str]) -> Vec<String> {
+        flags.iter().map(|flag| (*flag).to_owned()).collect()
+    }
+
+    #[test]
+    fn fixture_at_ms_is_a_whole_number_of_ms_up_to_a_minute() {
+        let parsed = FixtureOptions::parse(&args(&["--diagnostics", "--fixture-at-ms", "3000"]));
+        assert_eq!(parsed.unwrap().at_ms, Some(3_000));
+        let unset = FixtureOptions::parse(&args(&["--diagnostics"])).unwrap();
+        assert_eq!(unset.at_ms, None);
+        assert_eq!(
+            FixtureOptions::parse(&args(&["--fixture-at-ms", "60000", "--diagnostics"]))
+                .unwrap()
+                .at_ms,
+            Some(MAX_AT_MS)
+        );
+        for bad in [
+            vec!["--diagnostics", "--fixture-at-ms", "0"],
+            vec!["--diagnostics", "--fixture-at-ms", "60001"],
+            vec!["--diagnostics", "--fixture-at-ms", "-5"],
+            vec!["--diagnostics", "--fixture-at-ms", "3.5"],
+            vec!["--diagnostics", "--fixture-at-ms", "soon"],
+            vec!["--diagnostics", "--fixture-at-ms"],
+            vec![
+                "--fixture-at-ms",
+                "100",
+                "--fixture-at-ms",
+                "200",
+                "--diagnostics",
+            ],
+        ] {
+            let error = FixtureOptions::parse(&args(&bad)).unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::InvalidInput, "{bad:?}");
+            assert!(error.to_string().contains("usage"), "{bad:?}: {error}");
+        }
+    }
+
+    #[test]
+    fn fixture_at_ms_at_or_past_the_run_is_refused() {
+        let at = |ms: &str| {
+            FixtureOptions::parse(&args(&["--diagnostics", "--fixture-at-ms", ms])).unwrap()
+        };
+        assert!(at("2999").check_seconds(3).is_ok());
+        for (ms, seconds) in [("3000", 3), ("3001", 3), ("1", 0)] {
+            let error = at(ms).check_seconds(seconds).unwrap_err();
+            assert_eq!(
+                error.kind(),
+                io::ErrorKind::InvalidInput,
+                "{ms} in {seconds} s"
+            );
+            assert!(error.to_string().contains("usage"), "{error}");
+        }
+        let unset = FixtureOptions::parse(&args(&["--diagnostics"])).unwrap();
+        assert!(unset.check_seconds(0).is_ok());
+    }
+
+    fn provider(now_us: u64, boot: BootId, timed: bool) -> FixtureProvider {
+        let mut provider = FixtureProvider::new(
+            Fixture {
+                info: FixtureInfo {
+                    wav_sha256: String::new(),
+                    pcm_sha256: String::new(),
+                    rate: 24_000,
+                    channels: 1,
+                    frames: 240,
+                    rail_samples: 0,
+                },
+                samples: vec![1; 240],
+            },
+            boot,
+            now_us,
+        );
+        provider.pending = None;
+        provider.timed = timed;
+        provider
+    }
+
+    /// What was sent, by kind, with each audio packet's frames.
+    fn drain(provider: &mut FixtureProvider, now_us: u64) -> Vec<(&'static str, usize)> {
+        let mut sent = Vec::new();
+        while provider
+            .send_one(now_us, |event| {
+                sent.push(match event {
+                    ProviderOutput::Started { .. } => ("started", 0),
+                    ProviderOutput::Audio { samples, .. } => ("audio", samples.len()),
+                    ProviderOutput::TurnComplete { .. } => ("complete", 0),
+                    _ => ("other", 0),
+                });
+                Ok(())
+            })
+            .unwrap()
+        {}
+        sent
+    }
+
+    #[test]
+    fn a_timed_fixture_plays_for_its_written_turn_and_not_for_a_heard_one() {
+        let now_us = 10_000;
+        let at = MonoTime::from_micros(now_us);
+        let boot = BootId::new([7; 16]).unwrap();
+        let mut owner = Controller::new(boot, at);
+        owner
+            .set_microphone_permission(at, Permission::Allowed)
+            .unwrap();
+        let until = MonoTime::from_micros(now_us + 100_000);
+        owner
+            .set_capture(at, CaptureState::RetainingUntil(until))
+            .unwrap();
+        owner
+            .set_admission(at, AdmissionState::OpenUntil(until))
+            .unwrap();
+        let mut fixture = provider(now_us, boot, true);
+        // A turn heard first: answered as any later turn is, with no audio.
+        let heard = owner.admit(at, AdmittedInput::NewTurn).unwrap();
+        let state = owner.snapshot(at).unwrap();
+        fixture.install(now_us, state).unwrap();
+        let generation = state.microphone_generation();
+        fixture
+            .submit(
+                now_us,
+                ProviderInput::Start {
+                    request: heard.turn(),
+                    session: 1,
+                    privacy_generation: generation,
+                    continues: false,
+                    continues_cut_off: false,
+                    over_the_lamp: false,
+                    after_stop: false,
+                    follows_on: false,
+                    over_the_lamps_voice: false,
+                },
+            )
+            .unwrap();
+        fixture
+            .submit(
+                now_us,
+                ProviderInput::Audio {
+                    request: heard.turn(),
+                    privacy_generation: generation,
+                    sequence: 1,
+                    read_completed_at_us: now_us,
+                    samples: vec![0; lamp_audio::CAPTURE_SAMPLES],
+                },
+            )
+            .unwrap();
+        fixture
+            .submit(
+                now_us,
+                ProviderInput::End {
+                    request: heard.turn(),
+                    privacy_generation: generation,
+                    sound: false,
+                    cut_in: false,
+                },
+            )
+            .unwrap();
+        let sent = drain(&mut fixture, now_us);
+        assert!(!sent.iter().any(|(kind, _)| *kind == "audio"));
+        assert_eq!(sent.last().map(|(kind, _)| *kind), Some("complete"));
+        owner.input_ended(at, heard).unwrap();
+        owner.complete_turn(at, heard).unwrap();
+        fixture
+            .install(now_us, owner.snapshot(at).unwrap())
+            .unwrap();
+        // The fixture's own timed turn plays the whole reply.
+        let timed = owner.admit(at, AdmittedInput::NewTurn).unwrap();
+        let state = owner.snapshot(at).unwrap();
+        fixture.install(now_us, state).unwrap();
+        fixture
+            .submit(
+                now_us,
+                ProviderInput::Written {
+                    request: timed.turn(),
+                    session: 1,
+                    privacy_generation: state.microphone_generation(),
+                    text: String::new(),
+                    look: false,
+                },
+            )
+            .unwrap();
+        let sent = drain(&mut fixture, now_us);
+        assert_eq!(sent.first().map(|(kind, _)| *kind), Some("started"));
+        assert_eq!(sent.iter().map(|(_, frames)| frames).sum::<usize>(), 240);
+        assert_eq!(sent.last().map(|(kind, _)| *kind), Some("complete"));
+    }
+
+    #[test]
+    fn an_untimed_fixture_still_refuses_a_written_turn() {
+        let now_us = 10_000;
+        let at = MonoTime::from_micros(now_us);
+        let boot = BootId::new([7; 16]).unwrap();
+        let mut owner = Controller::new(boot, at);
+        owner
+            .set_microphone_permission(at, Permission::Allowed)
+            .unwrap();
+        let until = MonoTime::from_micros(now_us + 100_000);
+        owner
+            .set_capture(at, CaptureState::RetainingUntil(until))
+            .unwrap();
+        owner
+            .set_admission(at, AdmissionState::OpenUntil(until))
+            .unwrap();
+        let mut fixture = provider(now_us, boot, false);
+        let turn = owner.admit(at, AdmittedInput::NewTurn).unwrap();
+        let state = owner.snapshot(at).unwrap();
+        fixture.install(now_us, state).unwrap();
+        assert!(
+            fixture
+                .submit(
+                    now_us,
+                    ProviderInput::Written {
+                        request: turn.turn(),
+                        session: 1,
+                        privacy_generation: state.microphone_generation(),
+                        text: String::new(),
+                        look: false,
+                    },
+                )
+                .is_err()
+        );
+        // With no turn at all, an untimed fixture sends nothing.
+        assert!(drain(&mut provider(now_us, boot, false), now_us).is_empty());
+    }
+}
+
 /// Separate worker, still using the ordinary provider IPC protocol. Control is
 /// drained before every input/output step; PCM never bypasses the speaker worker.
-pub fn run(mut channels: WorkerChannels, boot: BootId, wav: &Path, sha256: &str) -> io::Result<()> {
+pub fn run(
+    mut channels: WorkerChannels,
+    boot: BootId,
+    wav: &Path,
+    sha256: &str,
+    timed: bool,
+) -> io::Result<()> {
     let started_us = monotonic_us();
     let fixture = Fixture::load(wav, sha256)?;
     let loaded_us = monotonic_us();
     let mut provider = FixtureProvider::new(fixture, boot, loaded_us);
+    provider.timed = timed;
     // Unit fixtures may expose a legacy data Ready, but the actual worker uses
     // exactly the coordinated control-plane readiness gate as the live model.
     provider.pending = None;

@@ -1010,6 +1010,8 @@ struct Lamp {
     reply_shape: Option<fn(u64) -> i16>,
     /// `LAMP_LISTEN_GAPS`, for this run's thread (#828).
     listen_gaps: bool,
+    /// `directed-fixture --fixture-at-ms` (diagnostic only).
+    fixture_at_ms: Option<u64>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1146,6 +1148,7 @@ fn run_policy_with_peers_held(
         noise_suppression: NoiseSuppression::On,
         turn_taking,
         playout_start: PlayoutStart::default(),
+        fixture_at_ms: lamp.fixture_at_ms,
         endpoint: Some(endpoint),
         call_wait_blocks: None,
         cut_keeps_name: lamp.cut_keeps_name,
@@ -1697,6 +1700,7 @@ fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
         noise_suppression: NoiseSuppression::On,
         turn_taking: TurnTaking::V1Baseline,
         playout_start: PlayoutStart::default(),
+        fixture_at_ms: None,
         endpoint: Some(endpoint),
         call_wait_blocks: None,
         cut_keeps_name: false,
@@ -3092,4 +3096,54 @@ fn a_long_answers_sentence_end_is_held_quiet_once_only_with_the_switch() {
     );
     assert_eq!(on.seen.chunk_sums, off.seen.chunk_sums);
     assert!(on.seen.chunk_sums.len() > 250);
+}
+
+/// `directed-fixture --fixture-at-ms 3000` (diagnostic only), through the
+/// loop with nobody heard: the fixture's own turn starts within a block of
+/// `listening_ready` + 3000 ms, and never while the lamp is muted.
+#[test]
+fn a_timed_fixture_starts_3000_ms_after_listening_ready_and_never_muted() {
+    let _one = one_session();
+    let run = |mute_at: Option<u64>| {
+        run_policy_with_peers(
+            TurnTaking::V1Baseline,
+            6,
+            |_| QUIET,
+            EndpointRig::double(delayed(0.0, Duration::ZERO)),
+            None,
+            mute_at,
+            PeerMode::Stepped,
+            Lamp {
+                fixture_at_ms: Some(3_000),
+                ..Lamp::default()
+            },
+        )
+    };
+    let heard = run(None);
+    heard.result.as_ref().unwrap();
+    let ready = heard.events("listening_ready")[0]["at_us"]
+        .as_u64()
+        .unwrap();
+    let started = heard.events("fixture_timed_start");
+    assert_eq!(started.len(), 1, "{started:?}");
+    let at = started[0]["at_us"].as_u64().unwrap();
+    assert!(
+        (ready + 3_000_000..=ready + 3_010_000).contains(&at),
+        "started {} us after listening_ready",
+        at - ready
+    );
+    let admitted = heard.events("input_admitted");
+    assert!(
+        admitted
+            .iter()
+            .all(|row| row["admission_basis"] == "fixture_at_ms"),
+        "{admitted:?}"
+    );
+    // Muted at 1.5 s, before it is due: no start.
+    let muted = run(Some(150));
+    assert!(
+        muted.events("fixture_timed_start").is_empty(),
+        "{:?}",
+        muted.result
+    );
 }
