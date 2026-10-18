@@ -49,6 +49,16 @@ every result on a lamp below names it. Newest first.
 - #1485 merged (docs): the same-voice numbers in
   `verification/same-voice-20261018`. The labelled set gives 7.5 % at 0.455
   with the lamp quiet; 0.25 lets 43 % of other voices through.
+- #1504 merged: `LAMP_VAD_INPUT=linear-gated` reads the canceller's linear
+  output only where speech is plainly a person (the room clear, or at most
+  20 % explained, `Hearing::plain`). On the first builder's #828 tables it
+  keeps the processed block's 1 false yield (`linear` 13) and yields to 11 of
+  19 lines over the lamp (processed 10, `linear` 14). A first gate at the
+  duplex 75 % gave `linear`'s false yields (the reviewer). Off; on lamp-4ace
+  for Monday's "Stop." recording.
+- #828's echo row: the canceller takes ~52 dB of the lamp's own voice on
+  lamp-4ace mic2 (four 14 Oct sessions, unfloored); the row went 0.60 → 0.65.
+  Both microphones waits on mic1's replay having its render.
 
 ## 2026-10-17 — evening: #828 confounded, go-aways are the lamp's own
 
