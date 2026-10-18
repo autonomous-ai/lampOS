@@ -44,7 +44,7 @@ StandardError=journal
 SyslogIdentifier=lamp-cloud
 NoNewPrivileges=yes
 ProtectSystem=strict
-# The bus (the microphones and health) and lamp-actions' socket (the volume).
+# The bus (the microphones, health and the light) and lamp-actions' socket (the volume).
 ReadWritePaths=/run/lampos-bus /run/lampos-actions
 ProtectHome=yes
 PrivateTmp=yes

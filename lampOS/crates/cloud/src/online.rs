@@ -6,7 +6,7 @@
 //! that fails, or that the broker refuses, is tried again after a wait that
 //! doubles to a minute, and said once in the journal, not on every try.
 use crate::account::Account;
-use crate::answer::{Lamp, answer};
+use crate::answer::{Lamp, QUIET_WHEN_DONE, answer};
 use crate::wire::{Command, Identity, parse};
 use rumqttc::v5::mqttbytes::QoS;
 use rumqttc::v5::mqttbytes::v5::{ConnectProperties, Packet};
@@ -46,7 +46,7 @@ pub fn options(account: &Account) -> MqttOptions {
 }
 
 /// The reply to one message on `fa_channel`, or nothing for one that is no
-/// command.
+/// command or a preview done (`QUIET_WHEN_DONE`).
 pub fn reply(
     identity: &Identity,
     lamp: &mut impl Lamp,
@@ -55,7 +55,13 @@ pub fn reply(
 ) -> Option<String> {
     let reply = match parse(payload).ok()? {
         Command::Info => identity.info(now),
-        Command::Data { kind, data } => identity.data(now, &kind, &answer(lamp, &kind, &data)),
+        Command::Data { kind, data } => {
+            let answered = answer(lamp, &kind, &data);
+            if answered.is_ok() && QUIET_WHEN_DONE.contains(&kind.as_str()) {
+                return None;
+            }
+            identity.data(now, &kind, &answered)
+        }
         Command::Other(cmd) => identity.refused(now, &cmd),
     };
     Some(reply.to_string())
@@ -353,6 +359,35 @@ mod tests {
         }
     }
 
+    /// V1's preview (`docs/mqtt.md`): a drag sends five a second, so one
+    /// done is not answered and one that fails is.
+    #[test]
+    fn a_preview_done_is_not_answered_and_one_that_fails_is() {
+        let mut lamp = Fake {
+            shown: Some(crate::light::first()),
+            ..Fake::default()
+        };
+        let preview = |color: &str| {
+            format!(r#"{{"cmd":"data","kind":"led.resting.preview","data":{{"color":{color}}}}}"#)
+        };
+        let now = "2026-10-18T10:00:00Z";
+        assert_eq!(
+            reply(&identity(), &mut lamp, preview("[20,0,10]").as_bytes(), now),
+            None
+        );
+        assert_eq!(lamp.previews.len(), 1);
+        let failed: serde_json::Value = serde_json::from_str(
+            &reply(&identity(), &mut lamp, preview("[1,2]").as_bytes(), now).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(failed["status"], "failure");
+        assert_eq!(failed["kind"], "led.resting.preview");
+        assert_eq!(failed["error"], "color must be [r, g, b]");
+        // A save is answered, as every other kind.
+        let saved = br#"{"cmd":"data","kind":"led.resting.set","data":{"mode":"off"}}"#;
+        assert!(reply(&identity(), &mut lamp, saved, now).is_some());
+    }
+
     fn identity() -> Identity {
         Identity {
             device: "lamp".into(),
@@ -380,7 +415,7 @@ mod tests {
             let mut lamp = Fake {
                 raw: 60,
                 ceiling: 80,
-                set: Vec::new(),
+                ..Fake::default()
             };
             let mut say = |line: &str| said.lock().unwrap().push(line.to_owned());
             run(accounts, me, &mut lamp, &mut say, first).await;

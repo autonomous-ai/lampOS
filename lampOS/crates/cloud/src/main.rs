@@ -4,7 +4,7 @@
 //! and `lamp-update`'s state (`build`), so it runs as `lampos` and no file
 //! is widened. A login a ping rotated is kept in its own state folder.
 use lamp_cloud::account::{self, Account};
-use lamp_cloud::lamp::{self, Places, Real, Wifi};
+use lamp_cloud::lamp::{self, Places, Real, Ring, Wifi};
 use lamp_cloud::wire::Identity;
 use lamp_cloud::{beat, online, ping};
 use std::path::PathBuf;
@@ -88,6 +88,7 @@ fn main() -> ExitCode {
         device_id: account.device_id.clone(),
         build,
         wifi: Wifi::default(),
+        ring: Ring::default(),
     };
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -107,6 +108,7 @@ fn main() -> ExitCode {
         device_id: lamp.device_id.clone(),
         build: lamp.build.clone(),
         wifi: Wifi::default(),
+        ring: Ring::default(),
     };
     runtime.block_on(async move {
         let looks = async move {

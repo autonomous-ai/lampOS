@@ -1774,8 +1774,10 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "lamp-bus",
+ "lamp-ipc",
  "lamp-msgs",
  "lamp-setup",
+ "lamp-voice",
  "reqwest",
  "rumqttc",
  "rustls",

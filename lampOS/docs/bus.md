@@ -354,9 +354,9 @@ of each, and its kind and period as a declaration, are in
 | `voice/link` | Whether the provider can be reached | latched | Voice, with `LAMP_BUS=on` and `LAMP_VOICE_LINK=on` (#830): unavailable once down for 5 s, reason `transport` | Once a second |
 | `lamp/online` | Whether the lamp can reach the internet, worked out from the parts' links | latched | Health, with `--online on` (#830) | Once a second |
 | `room/state` | Quiet or busy | latched | Voice, later the situation | When it changes, and once a second |
-| `light/command`, `light/state` | The light asked for, and the light shown | latched | The executive; the ring's owner | When it changes, and once a second |
+| `light/command`, `light/state` | The light asked for, and the light shown | latched | The executive and `lamp-cloud` (the app's Light row); the ring's owner | When it changes, and once a second |
 | `light/test`, `light/drawn` | A self-test's colour, shown for 2 s at most; the light the ring actually drew | latched | The self-test; the ring's owner | Asked once a colour; drawn when it changes, and once a second |
-| `light/request` | A light asked for that lapses, with its asker, priority and time (#940) | event | Skills and other parts | Asked, and asked again to keep it, at most 30 s ahead |
+| `light/request` | A light asked for that lapses, with its asker, priority and time (#940) | event | Skills and other parts (`lamp-cloud`'s preview, [cloud.md](cloud.md)) | Asked, and asked again to keep it, at most 30 s ahead |
 | `light/reached` | A requested light the ring has shown at rest for 350 ms, with its asker (#1146) | event | The ring's owner, with `LAMP_LIGHT_REQUESTS=on` | When a request's light has been shown 350 ms, and again after each renewal while it is; never inside a turn |
 | `diagnostics` | Each part's health: ok, warning, error or stale | stream | Every part | Once a second |
 | `policy/decisions` | What the policy decided, with the probability and each judgement behind it, and whether it is only watching ([policy.md](policy.md)) | stream | The policy | With each thing heard |
@@ -410,11 +410,11 @@ that owns it:
 | `voice/timing`, `voice/activity`, `voice/playout` | the voice, with `LAMP_EXPRESSION_OUT=on` ([expression.md](expression.md), "What the voice says, as built") | Expression |
 | `policy/decisions` | the policy ([policy.md](policy.md)) | nothing yet |
 | `body/joint_states` | the body ([body.md](body.md), "On the bus") | nothing yet; recorded to measure how the lamp moves |
-| `light/command` | the actions program ([actions.md](actions.md)) | the voice's ring worker |
-| `light/state` | the voice's ring worker ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | the actions program |
+| `light/command` | the actions program ([actions.md](actions.md)); `lamp-cloud`, the app's Light row ([cloud.md](cloud.md)) | the voice's ring worker |
+| `light/state` | the voice's ring worker ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | the actions program; `lamp-cloud` |
 | `light/test` | the self-test (#812) | the voice's ring worker |
 | `light/drawn` | the voice's ring worker, from its own write receipts ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | the self-test |
-| `light/request` | `lamp-skills`, a skill's light, with `LAMP_LIGHT_REQUESTS=on` ([skills.md](skills.md)) | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` |
+| `light/request` | `lamp-skills`, a skill's light, with `LAMP_LIGHT_REQUESTS=on` ([skills.md](skills.md)); `lamp-cloud`, the app's preview ([cloud.md](cloud.md)) | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` |
 | `light/reached` | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | nothing yet; `lamp-skills`, to wait for a skill's light before its look (#1146) |
 | `diagnostics` | every part that says how it is: the voice, the eyes, the body, the policy, and the board through the health program | the health program |
 | `lamp/health`, `board/state` | the health program ([health.md](health.md)) | `lamp-health`, the command |

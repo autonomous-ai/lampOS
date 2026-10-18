@@ -1,7 +1,9 @@
 //! The device API: the `data` kinds this lamp answers, each carried out by
 //! the part of the lamp that already owns it (#1396). Everything else is
 //! refused plainly, in V1's shape, so the app shows it.
+use crate::light;
 use crate::wire::not_here;
+use lamp_msgs::Light;
 use serde::Serialize;
 use serde_json::{Value, json};
 
@@ -40,7 +42,24 @@ pub trait Lamp {
     fn mic(&mut self) -> Result<Mic, String>;
     /// `lamp/health`'s level and message.
     fn health(&mut self) -> Result<Value, String>;
+    /// The person's own light as the ring shows it (`light/state`).
+    fn light(&mut self) -> Result<Light, String>;
+    /// Asks for the person's light (`light/command`), after giving back a
+    /// preview still shown, and reads back what the ring shows.
+    fn set_light(&mut self, light: &Light) -> Result<Light, String>;
+    /// Shows `light` over the person's for [`PREVIEW_HOLDS`] unless asked
+    /// again, without keeping it (`light/request`), until the person asks
+    /// for a light at the lamp.
+    fn preview_light(&mut self, light: &Light) -> Result<(), String>;
 }
+
+/// How long a preview is shown after the last one, as V1's: an abandoned
+/// screen never leaves a colour behind.
+pub const PREVIEW_HOLDS: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// The kinds answered only when they fail, as V1's: a drag sends a preview
+/// five times a second, and a reply to each would flood `fd_channel`.
+pub const QUIET_WHEN_DONE: [&str; 1] = ["led.resting.preview"];
 
 /// Why `mic.set` is refused: only the person at the lamp may unmute it.
 pub const MIC_SET_REFUSED: &str =
@@ -70,6 +89,20 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         "mic.get" => lamp.mic().map(|mic| Some(json!(mic))),
         "mic.set" => Err(MIC_SET_REFUSED.to_owned()),
         "lamp.health" => lamp.health().map(Some),
+        // The app's Light row (Fourth on #1396, the first builder's 10:2x on
+        // #705): the person's own light, in V1's shape (`crate::light`).
+        "led.resting.get" => lamp.light().map(|shown| Some(light::snapshot(&shown))),
+        "led.resting.set" => {
+            let now = lamp.light().ok();
+            let wanted = light::chosen(data, now.as_ref())?;
+            lamp.set_light(&wanted)
+                .map(|shown| Some(light::snapshot(&shown)))
+        }
+        "led.resting.preview" => {
+            let now = lamp.light().ok();
+            let wanted = light::previewed(data, now.as_ref())?;
+            lamp.preview_light(&wanted).map(|()| None)
+        }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -87,6 +120,10 @@ pub mod tests {
         pub raw: u8,
         pub ceiling: u8,
         pub set: Vec<u8>,
+        /// The person's light the ring shows; none while it is not running.
+        pub shown: Option<Light>,
+        pub lights: Vec<Light>,
+        pub previews: Vec<Light>,
     }
 
     impl Lamp for Fake {
@@ -121,13 +158,28 @@ pub mod tests {
         fn health(&mut self) -> Result<Value, String> {
             Ok(json!({"level": "ok", "message": ""}))
         }
+        fn light(&mut self) -> Result<Light, String> {
+            self.shown
+                .clone()
+                .ok_or("the ring is not running".to_owned())
+        }
+        fn set_light(&mut self, light: &Light) -> Result<Light, String> {
+            self.lights.push(light.clone());
+            self.shown = Some(light.clone());
+            self.light()
+        }
+        fn preview_light(&mut self, light: &Light) -> Result<(), String> {
+            self.previews.push(light.clone());
+            Ok(())
+        }
     }
 
     fn lamp() -> Fake {
         Fake {
             raw: 60,
             ceiling: 80,
-            set: Vec::new(),
+            shown: Some(crate::light::first()),
+            ..Fake::default()
         }
     }
 
@@ -163,6 +215,72 @@ pub mod tests {
         );
     }
 
+    /// The app's Light row (the first builder's 10:2x on #705): V1's
+    /// envelopes, `docs/mqtt.md`'s own examples, on the person's light.
+    #[test]
+    fn the_light_row_reads_sets_and_previews_the_persons_light() {
+        let mut lamp = lamp();
+        let got = answer(&mut lamp, "led.resting.get", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(got["mode"], "default");
+        assert_eq!(got["effective"]["color"], json!([51, 28, 0]));
+        // A drag: each preview is shown, none kept, and none answered.
+        assert_eq!(
+            answer(
+                &mut lamp,
+                "led.resting.preview",
+                &json!({"color": [20, 0, 10]})
+            ),
+            Ok(None)
+        );
+        assert_eq!(lamp.previews, [Light::new(true, "pink", 1).unwrap()]);
+        assert!(lamp.lights.is_empty());
+        // Save: kept, and the light read back in V1's snapshot.
+        let saved = answer(
+            &mut lamp,
+            "led.resting.set",
+            &json!({"mode": "custom", "color": [8, 4, 1]}),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(lamp.lights, [Light::new(true, "warm", 1).unwrap()]);
+        assert_eq!(saved["mode"], "default");
+        answer(
+            &mut lamp,
+            "led.resting.set",
+            &json!({"mode": "custom", "color": [0, 0, 200]}),
+        )
+        .unwrap();
+        let off = answer(&mut lamp, "led.resting.set", &json!({"mode": "off"}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(off["mode"], "off");
+        assert_eq!(
+            off["light"],
+            json!({"on": false, "colour": "blue", "level": 4})
+        );
+        // Bad input is refused before anything is asked; a ring that is not
+        // running is said.
+        let asked = lamp.lights.len();
+        for (kind, data) in [
+            (
+                "led.resting.set",
+                json!({"mode": "custom", "color": [1, 2]}),
+            ),
+            ("led.resting.set", json!({"mode": "bright"})),
+            ("led.resting.preview", json!({"color": [1, 2, 300]})),
+        ] {
+            assert!(answer(&mut lamp, kind, &data).is_err(), "{kind} {data}");
+        }
+        assert_eq!((lamp.lights.len(), lamp.previews.len()), (asked, 1));
+        lamp.shown = None;
+        assert_eq!(
+            answer(&mut lamp, "led.resting.get", &Value::Null),
+            Err("the ring is not running".to_owned())
+        );
+    }
+
     #[test]
     fn a_volume_out_of_range_is_refused_before_anything_is_asked() {
         let mut lamp = lamp();
@@ -191,7 +309,7 @@ pub mod tests {
             "add_channel",
             "skills.install_store",
             "face.enroll",
-            "led.resting.set",
+            "led.state.set",
             "system.reboot",
         ] {
             assert_eq!(
