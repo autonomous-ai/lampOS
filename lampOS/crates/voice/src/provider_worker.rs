@@ -166,6 +166,10 @@ pub struct Files {
     /// Whether a spoken cut-in over the lamp's answer is told to the model
     /// (`--cut-in-told`, `LAMP_CUT_IN_TOLD`, [`crate::cut_in_told`], #828).
     pub cut_in_told: bool,
+    /// Whether a misheard cut-in gets the lamp's "hm?" rather than a model
+    /// turn, and the model is told with the next request (`--misheard-hum`,
+    /// `LAMP_MISHEARD_HUM`, [`crate::misheard_hum`], #828).
+    pub misheard_hum: bool,
     /// Whether an answer is played only when the lamp was spoken to
     /// (`--spoken-to`, #829).
     pub spoken_to: bool,
@@ -313,6 +317,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (remarks, flags) = crate::remarks::take(flags);
     let (going_on_asks, flags) = crate::going_on_asks::take(flags);
     let (cut_in_told, flags) = crate::cut_in_told::take(flags);
+    let (misheard_hum, flags) = crate::misheard_hum::take(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
@@ -357,6 +362,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         remarks,
         going_on_asks,
         cut_in_told,
+        misheard_hum,
     };
     Ok((continuation, sight, files, visual))
 }
@@ -648,6 +654,13 @@ pub enum ProviderOutput {
     Unclear {
         request: u64,
         why: String,
+        /// Whether the lamp hums its "hm?" for `request` rather than ask the
+        /// model: it ended as a cut-in over the lamp's answer
+        /// (`ProviderInput::End { cut_in: true }`), with `LAMP_MISHEARD_HUM`
+        /// ([`crate::misheard_hum`]). Sent only when true, so the wire is
+        /// as before without the switch.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        cut_in: bool,
     },
     /// A skill's function the model called for `request` was answered with
     /// `"look": true` (a skill's look step, #941): the coordinator takes
@@ -898,6 +911,8 @@ pub(crate) struct Options {
     pub(crate) remarks: bool,
     /// A spoken cut-in over the lamp's answer is told ([`crate::cut_in_told`]).
     pub(crate) cut_in_told: bool,
+    /// A misheard cut-in's next request is told so ([`crate::misheard_hum`]).
+    pub(crate) misheard_hum: bool,
     /// The bus the Policy's decisions are read from when, in a busy room, a
     /// line let out only as a conversation going on waits for its decision
     /// ([`crate::going_on_asks`], #1522). `None`: it is let out at once.
@@ -954,6 +969,7 @@ impl Options {
             remarks: false,
             going_on_asks: None,
             cut_in_told: false,
+            misheard_hum: false,
             policy_holds: None,
             follows_run: false,
             wait_for_room: false,
@@ -1233,6 +1249,7 @@ pub async fn run_with_continuation(
         follows_run: files.policy_holds && files.follows_run,
         remarks: files.attention && files.remarks,
         cut_in_told: files.cut_in_told,
+        misheard_hum: files.attention && files.ask_unclear && files.misheard_hum,
         going_on_asks: match (files.attention && files.going_on_asks, &files.bus_root) {
             (true, Some(root)) => Some(root.clone()),
             (true, None) => {
@@ -1329,6 +1346,7 @@ async fn serve_with_visual<C: Connect>(
     intake.handoff.resend = provider.resends_lost_lines();
     intake.handoff.reminders.enabled = options.tools.schedule_speak;
     intake.handoff.cut_in_told = options.cut_in_told;
+    intake.handoff.misheard_hum = options.misheard_hum;
     // The same-voice check (#829), only beside the rule that plays only for
     // a lamp spoken to.
     intake.handoff.voices = options
@@ -1781,6 +1799,21 @@ async fn serve_with_visual<C: Connect>(
                         ),
                         Err(error) => eprintln!(
                             "lamp-voice provider: request {}: the model could not be told the person cut in over it: {error}",
+                            request.get()
+                        ),
+                    }
+                }
+                // The first request after a misheard cut-in's "hm?": the
+                // model is told it didn't catch what was said (#828, the
+                // first builder at 05:07 on 19 October).
+                if let Some(request) = intake.handoff.take_misheard() {
+                    match add_note(&provider, &mut intake.handoff.noted, request, crate::misheard_hum::NOTE) {
+                        Ok(()) => eprintln!(
+                            "lamp-voice provider: request {}: the model is told it didn't catch the cut-in before it",
+                            request.get()
+                        ),
+                        Err(error) => eprintln!(
+                            "lamp-voice provider: request {}: the model could not be told it didn't catch the cut-in before it: {error}",
                             request.get()
                         ),
                     }
@@ -2409,7 +2442,8 @@ async fn serve_with_visual<C: Connect>(
                             if verdict.is_some()
                                 && let Some(why) = attention.unclear(request)
                             {
-                                output.push_back(Outbound::Output(ProviderOutput::Unclear { request, why: why.to_owned() }));
+                                let cut_in = intake.handoff.misheard_held(request, monotonic_us());
+                                output.push_back(Outbound::Output(ProviderOutput::Unclear { request, why: why.to_owned(), cut_in }));
                             }
                             // A request whose answer is held is not talk
                             // between people (#829), but one held as another
@@ -4119,6 +4153,12 @@ struct InputHandoff {
     /// model has been told so.
     cut_in_told: bool,
     cut_in: Option<RequestId>,
+    /// Whether a misheard cut-in's next request is told so
+    /// ([`crate::misheard_hum`]); when the newest such cut-in was held; and
+    /// the request to tell, until the model has been told.
+    misheard_hum: bool,
+    misheard_at_us: Option<u64>,
+    misheard: Option<RequestId>,
     /// A request begun soon after the lamp's words finished, until its End:
     /// the model is then told it may follow on ([`crate::follows_on::NOTE`]),
     /// unless the End says it was a sound.
@@ -4295,6 +4335,27 @@ impl InputHandoff {
         self.visual_turn()
             .filter(|turn| turn.request == request)
             .map(|_| request)
+    }
+
+    /// The open request that is the first after a misheard cut-in's "hm?",
+    /// once: the model is to be told so beside what it hears
+    /// ([`crate::misheard_hum`]).
+    fn take_misheard(&mut self) -> Option<RequestId> {
+        let request = self.misheard.take()?;
+        self.visual_turn()
+            .filter(|turn| turn.request == request)
+            .map(|_| request)
+    }
+
+    /// `request` was held as misheard at `at_us`. Whether the lamp hums for
+    /// it: a cut-in over the lamp's answer, with the switch. Then the next
+    /// request is told so.
+    fn misheard_held(&mut self, request: u64, at_us: u64) -> bool {
+        let hum = self.misheard_hum && self.ended_cut_in == Some(request);
+        if hum {
+            self.misheard_at_us = Some(at_us);
+        }
+        hum
     }
 
     /// The open request that is the first after a Stop, once: the model is
@@ -4849,6 +4910,13 @@ impl InputHandoff {
                 // after a stop, which is told that instead (#828).
                 self.cut_in =
                     (self.cut_in_told && over_the_lamps_voice && !after_stop).then_some(request);
+                // The first request begun after a misheard cut-in was held,
+                // soon enough to be the answer to it (#828).
+                self.misheard = self
+                    .misheard_at_us
+                    .take()
+                    .filter(|held| crate::misheard_hum::answers_the_hum(*held, monotonic_us()))
+                    .map(|_| request);
                 self.follows_on = follows_on.then_some(request);
             }
             ProviderInput::Audio {
@@ -8364,6 +8432,7 @@ mod tests {
             remarks: false,
             going_on_asks: None,
             cut_in_told: false,
+            misheard_hum: false,
             policy_holds: None,
             follows_run: false,
             wait_for_room: false,
@@ -8393,6 +8462,7 @@ mod tests {
                 remarks: false,
                 going_on_asks: None,
                 cut_in_told: false,
+                misheard_hum: false,
                 policy_holds: None,
                 follows_run: false,
                 wait_for_room: false,
@@ -8447,6 +8517,7 @@ mod tests {
                 remarks: false,
                 going_on_asks: None,
                 cut_in_told: false,
+                misheard_hum: false,
                 policy_holds: None,
                 follows_run: false,
                 wait_for_room: false,
@@ -9437,6 +9508,7 @@ mod tests {
                 remarks: false,
                 going_on_asks: None,
                 cut_in_told: false,
+                misheard_hum: false,
                 policy_holds: None,
                 follows_run: false,
                 wait_for_room: false,
@@ -12897,6 +12969,7 @@ mod tests {
                     remarks: false,
                     going_on_asks: None,
                     cut_in_told: false,
+                    misheard_hum: false,
                     policy_holds: None,
                     follows_run: false,
                     wait_for_room: false,
@@ -12971,6 +13044,7 @@ mod tests {
                     remarks: false,
                     going_on_asks: None,
                     cut_in_told: false,
+                    misheard_hum: false,
                     policy_holds: None,
                     follows_run: false,
                     wait_for_room: false,

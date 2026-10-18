@@ -63,6 +63,7 @@ pub mod listen_gaps;
 pub mod local_time;
 pub mod marked;
 pub mod mic_holder;
+pub mod misheard_hum;
 pub mod person;
 pub use lamp_ipc::log_relay;
 pub mod head_cue;
