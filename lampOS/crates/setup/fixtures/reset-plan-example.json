@@ -4,6 +4,7 @@
   "wipe": [
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
+    "/var/lib/lampos-eyes/set-aside",
     "/var/lib/lampos-tasks/store",
     "/var/lib/lampos-tasks/targets.json",
     "/var/lib/lampos-tasks/.harness/auth",

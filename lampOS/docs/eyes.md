@@ -577,8 +577,32 @@ this room" until someone asks to be recognised.
 - **Kept.** `--people FILE` (on lamp-4ace `/var/lib/lampos-eyes/people.json`,
   in a directory of mode 0700 and a file of mode 0600). Per person: the
   name, up to five prints and when they were added. At most 20 people. No
-  picture is kept, and no print leaves the lamp. A file that is too large
-  or not of this shape stops the eyes rather than being guessed at.
+  picture is kept, and no print leaves the lamp. **Read one release
+  forward** (#1505, harm 3): a field a later build added, on the file or on
+  a person, is read past, and the next save writes this build's fields.
+  What this build cannot read is **set aside, never dropped or guessed
+  at**, in `set-aside/` beside the file (a folder of mode 0700, files of
+  mode 0600): a person it cannot read (a field of the wrong type, a name
+  or prints it does not keep, a second of one name, a twenty-first) is
+  written there and the rest saved back without them; a file it cannot read
+  at all (too large, not JSON, a `version` above 1, no list of people) is
+  moved there whole, and the eyes start knowing nobody. One journal line says each, with a
+  count and never a name. While anything is there, the eyes' health is
+  `Warn`, "the eyes set aside N people's records they couldn't read"
+  (counted once a minute), so a person the lamp no longer knows is told
+  why. The product reset empties `set-aside/` with the file: these are face
+  prints. Only a failure to set aside, or to save back the rest, stops the
+  eyes. A set-aside file is named by a hash of its bytes, so the same
+  record set aside again after a crash is kept once; an existing
+  `set-aside` is set to 0700 and a link there is refused; a file moved there
+  is linked and then unlinked, never replacing one, and set to 0600.
+- **The rule for the next field** (the reviewer on #1558, as #1512's for
+  tasks): an optional field that only adds to what is known may come
+  without a bump. A field that narrows what the lamp may do with a face (an
+  expiry, "don't greet me by name"), or any new required field, bumps the
+  file's `version` in the same change, so an older build sets the file
+  aside whole instead of recognising more widely and then dropping the
+  field at its next save.
 - **Asked.** One line of JSON on `--who-socket` (on lamp-4ace
   `/run/lampos-eyes/who.sock`) and one line back:
   - `{"remember":"Minh"}` takes five prints over the next looks while that
@@ -587,7 +611,14 @@ this room" until someone asks to be recognised.
     away, or two at the lamp, it gives them four seconds and then answers
     `too_far` or `two_faces`.
   - `{"forget":"Minh"}` answers `{"forgot":true}` once the file no longer
-    has it.
+    has it, nor any set-aside file with a list of people (#1505: each is
+    rewritten 0600, or removed when nothing is left in it). A set-aside
+    file that cannot be searched might hold the face, so the answer is then
+    `{"error":"storage"}`, never `{"forgot":false}`: one with no list of
+    people, or with a person whose `name` is no plain string. A rewrite's
+    temporary file a crash left there (`….json.new`) is neither searched nor
+    counted, and a `set-aside` that is a link is never followed (`forget`
+    refuses, health counts it as one).
   - `{"list":true}` answers the names.
   - `{"who":true}` answers who is at the lamp now, or `null`.
   - Remembering someone already known replaces their prints.
@@ -798,9 +829,11 @@ under the name `eyes`, for the lamp's health ([health.md](health.md)):
 | `ok` | | The camera is open, or closed because seeing is not permitted now. Closed is the eyes working as they should |
 | `warn` | `the camera does not open` | Permitted, and the camera cannot be opened; it is tried again |
 | `warn` | `the camera stopped giving pictures` | It was open and failed, until it is open again |
+| `warn` | `the eyes set aside N people's records they couldn't read` | While anything is in `set-aside/` beside the people file (#1505), counted once a minute; a camera warning is said first |
 
-The one fact beside it is `camera`: `open`, `closed`, `not opening` or
-`failed`. It is said on every turn of the loop that is due, whatever the
+The facts beside it are `camera` (`open`, `closed`, `not opening` or
+`failed`) and `set_aside`, the count of people's records set aside (0 when
+none). It is said on every turn of the loop that is due, whatever the
 camera is doing, and the sign that the eyes are there is now given the
 same way: before 2026-10-14 it was not given while the camera was not
 permitted, so the eyes read as gone from the bus whenever they were not
