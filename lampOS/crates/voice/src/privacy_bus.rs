@@ -552,42 +552,54 @@ pub(crate) mod tests {
     #[test]
     fn selected_endpoints_bind_and_read_a_real_bus() {
         static NEXT: AtomicU64 = AtomicU64::new(0);
-        let root = Root(PathBuf::from(format!(
-            "/tmp/vpb-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        )));
-        std::fs::create_dir(&root.0).unwrap();
-        let bus = lamp_controls::privacy::selected_bus(Bus::new(&root.0).unwrap());
-        // Use the production endpoint constructors and names. A name rejected
-        // by the transport must fail here before a native/device handoff.
-        let _switch = switch_subscriber(&bus).unwrap();
-        let mut reader =
-            LeaseReader::with_clock(&root.0, INDICATOR_SUBSCRIBER, "host_fixture".into()).unwrap();
-        let mut publisher = bus
-            .publisher_declared(
-                MicrophonePrivacy::TOPIC,
-                &MicrophonePrivacy::declaration(),
-                "voice",
-            )
-            .unwrap();
-        let at = lamp_ipc::monotonic_us();
-        let lease = MicrophonePrivacy {
-            stamp: ClockStamp {
-                clock_id: "host_fixture".into(),
-                at_us: at,
-                sequence: 1,
-            },
-            session_id: publisher.boot().to_owned(),
-            controller_boot: "1".repeat(32),
-            microphone_generation: 1,
-            observed_us: at,
-            expires_at_us: at + PRIVACY_FRESH_US,
-            permitted: false,
-            physical_muted: Some(true),
-        };
-        publisher.publish_json(at, &lease).unwrap();
-        assert_eq!(reader.poll().unwrap(), Some(lease));
+        // The lease is fresh for PRIVACY_FRESH_US on the host's clock. An
+        // attempt in which the host stalled that long between the publish and
+        // the read says nothing either way, so it is made again on a new bus,
+        // up to five times (#1569).
+        for _ in 0..5 {
+            let root = Root(PathBuf::from(format!(
+                "/tmp/vpb-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            )));
+            std::fs::create_dir(&root.0).unwrap();
+            let bus = lamp_controls::privacy::selected_bus(Bus::new(&root.0).unwrap());
+            // Use the production endpoint constructors and names. A name rejected
+            // by the transport must fail here before a native/device handoff.
+            let _switch = switch_subscriber(&bus).unwrap();
+            let mut reader =
+                LeaseReader::with_clock(&root.0, INDICATOR_SUBSCRIBER, "host_fixture".into())
+                    .unwrap();
+            let mut publisher = bus
+                .publisher_declared(
+                    MicrophonePrivacy::TOPIC,
+                    &MicrophonePrivacy::declaration(),
+                    "voice",
+                )
+                .unwrap();
+            let at = lamp_ipc::monotonic_us();
+            let lease = MicrophonePrivacy {
+                stamp: ClockStamp {
+                    clock_id: "host_fixture".into(),
+                    at_us: at,
+                    sequence: 1,
+                },
+                session_id: publisher.boot().to_owned(),
+                controller_boot: "1".repeat(32),
+                microphone_generation: 1,
+                observed_us: at,
+                expires_at_us: at + PRIVACY_FRESH_US,
+                permitted: false,
+                physical_muted: Some(true),
+            };
+            publisher.publish_json(at, &lease).unwrap();
+            let read = reader.poll();
+            if lamp_ipc::monotonic_us() - at < PRIVACY_FRESH_US {
+                assert_eq!(read.unwrap(), Some(lease));
+                return;
+            }
+        }
+        panic!("the host stalled past the lease's freshness in 5 of 5 attempts");
     }
 
     /// Messages that look right but say another type, written straight to
@@ -644,76 +656,99 @@ pub(crate) mod tests {
     #[test]
     fn the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire() {
         static NEXT: AtomicU64 = AtomicU64::new(0);
-        let root = Root(PathBuf::from(format!(
-            "/tmp/vpw-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        )));
-        std::fs::create_dir(&root.0).unwrap();
-        let bus = lamp_controls::privacy::selected_bus(Bus::new(&root.0).unwrap());
-        let reader =
-            LeaseReader::with_clock(&root.0, INDICATOR_SUBSCRIBER, "host_fixture".into()).unwrap();
-        let mut publisher = bus
-            .publisher_declared(
-                MicrophonePrivacy::TOPIC,
-                &MicrophonePrivacy::declaration(),
-                "voice",
-            )
-            .unwrap();
-        let at = lamp_ipc::monotonic_us();
-        let lease = MicrophonePrivacy {
-            stamp: ClockStamp {
-                clock_id: "host_fixture".into(),
-                at_us: at,
-                sequence: 1,
-            },
-            session_id: publisher.boot().to_owned(),
-            controller_boot: "1".repeat(32),
-            microphone_generation: 1,
-            observed_us: at,
-            expires_at_us: at + PRIVACY_FRESH_US,
-            permitted: false,
-            physical_muted: Some(true),
-        };
-        publisher.publish_json(at, &lease).unwrap();
-        // Watched from once its publisher is there, as the writer starts
-        // after Voice's privacy worker.
-        let watch = LeaseWatch::start(reader).unwrap();
-        let deadline = std::time::Instant::now() + Duration::from_secs(1);
-        while watch.latest().unwrap() != Some(lease.clone()) {
-            assert!(std::time::Instant::now() < deadline, "the lease is found");
-            thread::sleep(Duration::from_millis(1));
-        }
-        let going = Arc::new(AtomicBool::new(true));
-        let flood = refused_flood(&root.0, going.clone(), &lease);
-        let mut slowest = Duration::ZERO;
-        let mut stale = None;
-        for _ in 0..200 {
-            let asked = std::time::Instant::now();
-            let answer = watch.latest();
-            slowest = slowest.max(asked.elapsed());
-            if lamp_ipc::monotonic_us() > lease.expires_at_us + 1_000 {
-                stale = Some(answer.as_ref().map(Option::is_some).unwrap_or(false));
+        // The lease is fresh for PRIVACY_FRESH_US on the host's clock. An
+        // attempt in which the host stalled that long before the watch found
+        // it says nothing either way, so it is made again on a new bus, up to
+        // five times (#1569).
+        for _ in 0..5 {
+            let root = Root(PathBuf::from(format!(
+                "/tmp/vpw-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            )));
+            std::fs::create_dir(&root.0).unwrap();
+            let bus = lamp_controls::privacy::selected_bus(Bus::new(&root.0).unwrap());
+            let reader =
+                LeaseReader::with_clock(&root.0, INDICATOR_SUBSCRIBER, "host_fixture".into())
+                    .unwrap();
+            let mut publisher = bus
+                .publisher_declared(
+                    MicrophonePrivacy::TOPIC,
+                    &MicrophonePrivacy::declaration(),
+                    "voice",
+                )
+                .unwrap();
+            let at = lamp_ipc::monotonic_us();
+            let lease = MicrophonePrivacy {
+                stamp: ClockStamp {
+                    clock_id: "host_fixture".into(),
+                    at_us: at,
+                    sequence: 1,
+                },
+                session_id: publisher.boot().to_owned(),
+                controller_boot: "1".repeat(32),
+                microphone_generation: 1,
+                observed_us: at,
+                expires_at_us: at + PRIVACY_FRESH_US,
+                permitted: false,
+                physical_muted: Some(true),
+            };
+            publisher.publish_json(at, &lease).unwrap();
+            // Watched from once its publisher is there, as the writer starts
+            // after Voice's privacy worker.
+            let watch = LeaseWatch::start(reader).unwrap();
+            // Found while it is fresh. A refusal or a miss within that time fails;
+            // past it, the host stalled and the attempt says nothing.
+            let found = loop {
+                let latest = watch.latest();
+                if latest
+                    .as_ref()
+                    .is_ok_and(|found| found.as_ref() == Some(&lease))
+                {
+                    break true;
+                }
+                if lamp_ipc::monotonic_us() - at >= PRIVACY_FRESH_US {
+                    break false;
+                }
+                latest.unwrap();
+                thread::sleep(Duration::from_millis(1));
+            };
+            if !found {
+                continue;
             }
-            thread::sleep(Duration::from_millis(1));
+            let going = Arc::new(AtomicBool::new(true));
+            let flood = refused_flood(&root.0, going.clone(), &lease);
+            let mut slowest = Duration::ZERO;
+            let mut stale = None;
+            for _ in 0..200 {
+                let asked = std::time::Instant::now();
+                let answer = watch.latest();
+                slowest = slowest.max(asked.elapsed());
+                if lamp_ipc::monotonic_us() > lease.expires_at_us + 1_000 {
+                    stale = Some(answer.as_ref().map(Option::is_some).unwrap_or(false));
+                }
+                thread::sleep(Duration::from_millis(1));
+            }
+            going.store(false, Ordering::Release);
+            let sent = flood.join().unwrap();
+            // The first refused message already ends the reader, and its socket
+            // with it: the flood stops reaching anything soon after.
+            assert!(sent > 0, "{sent}");
+            assert!(slowest < Duration::from_millis(5), "{slowest:?}");
+            // Past its freshness the lease is gone, whatever the thread found.
+            assert_eq!(stale, Some(false));
+            let deadline = std::time::Instant::now() + Duration::from_secs(3);
+            while watch.latest().is_ok() {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "refused input ends it"
+                );
+                thread::sleep(Duration::from_millis(1));
+            }
+            thread::sleep(Duration::from_millis(20));
+            assert!(watch.latest().is_err(), "for good");
+            return;
         }
-        going.store(false, Ordering::Release);
-        let sent = flood.join().unwrap();
-        // The first refused message already ends the reader, and its socket
-        // with it: the flood stops reaching anything soon after.
-        assert!(sent > 0, "{sent}");
-        assert!(slowest < Duration::from_millis(5), "{slowest:?}");
-        // Past its freshness the lease is gone, whatever the thread found.
-        assert_eq!(stale, Some(false));
-        let deadline = std::time::Instant::now() + Duration::from_secs(3);
-        while watch.latest().is_ok() {
-            assert!(
-                std::time::Instant::now() < deadline,
-                "refused input ends it"
-            );
-            thread::sleep(Duration::from_millis(1));
-        }
-        thread::sleep(Duration::from_millis(20));
-        assert!(watch.latest().is_err(), "for good");
+        panic!("the host stalled past the lease's freshness in 5 of 5 attempts");
     }
 }
