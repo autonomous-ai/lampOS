@@ -522,10 +522,17 @@ rows, the detector's state across a switch not modelled):
 | `linear` | 13 (5.1 a minute) | 14 of 19 |
 | gated at 75 % | 13 | 14 of 19 |
 | gated at 50 % | 4 | 12 of 19 |
-| **gated at 20 % (`linear-gated`)** | **1** | **11 of 19** |
+| gated at 20 % (`linear-gated`), worked out per block | 1 | 11 of 19 |
+| **`linear-gated` replayed (`--signal aec_linear_gated`, one detector)** | **2 (0.8 a minute)** | **10 of 19** |
 
-So the switch keeps the processed block's false yields and catches one line
-more on these sets, not `linear`'s four. That is the false side made ready; Monday's real "Stop." measures the catch. For the
+The last row is the figure to quote: one detector over the switched stream,
+as the lamp runs it (`hearing_replay` built after #1504; the first builder,
+18 October 15:26), counted from the replay's own `Yield` steps, on which
+count the processed block gives 1 and 10 of 19 and `linear` 12 and 14 of 19. It loses the one line the per-block mix gained, and gives
+one false yield more than the processed block (both-a). So on these played
+sets the switch is today's catch with about today's false yields, not
+`linear`'s 12; it is the third side of Monday's real "Stop.", which these sets
+cannot stand in for (a real voice, its level, the owner's room). For the
 score's other readers (the busy room, the re-centre's quiet test, the frame's
 `vad`, a turn start) the lamp alone is the processed block's score too, but
 for blocks the gate opens. The gate's thresholds are the duplex rules' own;

@@ -1853,9 +1853,9 @@ speech would plainly be a person, the room clear or at most 20 % explained
 by the render. Elsewhere, the lamp's own voice included, it reads the
 processed block, so the lamp alone gives the processed block's false yields
 and is not scored as speech for whom the lamp answers, a busy room or a
-turn's start, as it was with `linear`. On the #828 tables it yielded to 11 of
-19 lines said over the lamp, against 10 processed and 14 with `linear`
-(13 false yields with `linear`, 1 with this or processed); with
+turn's start, as it was with `linear`. Replayed on the #828 tables it yielded
+to 10 of 19 lines said over the lamp, as processed, against 14 with `linear`
+(false yields: 2 with this, 1 processed, 12 with `linear`); with
 `LAMP_LISTEN_GAPS=on` a gap of the lamp's silence stays on the processed
 block ([serve-runtime.md](serve-runtime.md)). Off by default; not on any lamp.
 
