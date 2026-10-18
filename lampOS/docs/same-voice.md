@@ -169,11 +169,22 @@ script; [verification](verification/same-voice-20261018/README.md), #1485).
 That set is 89 clips of Daniel, Samantha and Karen played on mic2 with the
 lamp quiet, cut as the worker prints them: 950 same-voice pairs (median
 0.62, lowest 0.27) and 2,966 of two (median 0.23, highest 0.69). Its equal
-error is **7.5% at 0.455**, wrong about 1 in 13 times each way. The bar of
+error is **7.5% at 0.455**, wrong about 1 in 13 times each way. Its lines
+are all 1.5 to 3 s of speech (the Sixth's scene list on #1445), so none is
+under 1.5 s, though the worker judges a line from 1.5 s as sent, about
+0.6 s of speech with its pre-roll and end silence (below). The bar of
 0.25 before it let 1,269 of the 2,966 pairs of two (43%) pass as one
-voice. Even at 0.45 **the check stays off**: it is at chance with the
-lamp's voice in a print, and if it's used at all it's one weak sign
-beside facing, lips (#720) and the name (the first builder, #1445).
+voice. **The older recordings with the lamp quiet disagree** (below): their
+same-voice median is 0.47 (lowest 0.10), so about half their same-voice
+pairs fall under 0.45, and their equal error is 14.3% at 0.295. On the 19
+of them cut again as the worker prints them, 0.45 takes 39 of the 75
+same-voice pairs for two voices, 31 of them among the 38 with a line under
+1.5 s, and 1 of the 96 pairs of two for one voice
+(`verification/same-voice-early-20261018`). The labelled set is the
+cleaner measurement, but only of lines 1.5 s or longer. Even at 0.45
+**the check stays off**: it is at chance with the lamp's voice in a
+print, and if it's used at all it's one weak sign beside facing, lips
+(#720) and the name (the first builder, #1445).
 
 How the bar of 0.25 had come about, and why it was wrong: it was set on
 synthetic voices off the lamp. With both
@@ -225,8 +236,10 @@ speakers, both judged right.)
   question is only let through while a conversation is going on. And it
   needn't be a second person (the Seventh on #1415): a TV's line of 1.5 s
   or more, or the asker's own line shouted or whispered, can fall under
-  the bar too. At 0.45, about 1 in 13 of one voice's own pairs does, on
-  the labelled set with the lamp quiet. Before, one
+  the bar too. At 0.45, about 1 in 13 of one voice's own pairs does on
+  the labelled set, whose lines are 1.5 s or longer, with the lamp quiet.
+  With a line under 1.5 s it is most of them: 31 of 38 on the older
+  recordings (below). Before, one
   false "another voice" held one line; now it holds every unnamed line
   after it until the lamp speaks. **So before `LAMP_SAME_VOICE_MODEL`
   goes on anywhere,** #829's battery on lamp-4ace gets a TV line and a
@@ -248,13 +261,18 @@ speakers, both judged right.)
     1.19 s line arrives as about 1.8 to 2.1 s, and is judged. At 0.16 it
     is held as another voice, which is the scene's own expectation for B's
     follow-up without a face or the name, and with this rule the
-    conversation ends there. A's own short follow-up, in A's voice, stays
-    answered unless the model takes it for another. On lamp-4ace's October
-    recordings, cut as the worker prints them, 8 of the 38 same-voice
-    pairs with a line under 1.5 s fall under 0.25 at 1.8 s, and 7 at 3 s
-    (`verification/same-voice-early-20261018`). Seven of the eight are one
-    clip, `cut-q-03` (1.45 s), against its own voice's long lines, and with
-    this rule each such hold ends the conversation (the reviewer on #1445).
+    conversation ends there. A's own short follow-up, in A's voice, is
+    answered only if the model takes it for A's, and at 0.45 it mostly
+    doesn't. On lamp-4ace's October recordings, cut as the worker prints
+    them (`verification/same-voice-early-20261018`), **0.45 takes 31 of
+    the 38 same-voice pairs with a line under 1.5 s for two voices** at
+    1.8 s (33 at 3 s), and 8 of the 37 longer ones (12 at 3 s). The bar of
+    0.25 before it took 8 and none at 1.8 s (7 and none at 3 s), seven of
+    the eight one clip, `cut-q-03` (1.45 s), against its own voice's long
+    lines. So with the check on, A's own short follow-up would be held as
+    another voice most of the time, and with this rule each such hold ends
+    the conversation (the reviewers on #1445 and #1508). The labelled set
+    that set the bar has no line under 1.5 s, so it says nothing of these.
     The clean cut of 15 October gave 7.7%. Judging the bar
     on a line's own speech instead would keep a 1.19 s line unjudged, and
     would put a 1.58 s one such as the umbrella line just under it.
@@ -291,12 +309,13 @@ speakers, both judged right.)
   October recordings the first 1.8 s told the voices apart no worse than
   the first 3 s at the bar's own pairs and over all pairs together
   (above), but not for short lines: with a line under 1.5 s, an equal
-  error of 21.7% against 18.2%, and 8 same-voice pairs under 0.25 against
-  7. A line of 1.5 to 1.8 s as sent (0.6 to 0.9 s of
-  speech) is still asked for at its End, and on the lamp is likely judged
-  without the check. If the child on the A733 takes longer than a line's
-  head start and Gemini's time together, the journal says so and the
-  next step is to wait for the print at the verdict up to a bound. Tests:
+  error of 21.7% against 18.2%, 8 same-voice pairs under 0.25 against 7,
+  and 31 under 0.45 against 33. A line of 1.5 to 1.8 s as sent (0.6 to
+  0.9 s of speech) is still asked for at its End, and on the lamp is
+  likely judged without the check. If the child on the A733 takes
+  longer than a line's head start and Gemini's time together, the journal
+  says so and the next step is to wait for the print at the verdict up to
+  a bound. Tests:
   `with_a_voice_check_whose_prints_take_the_lamps_time_the_scene_is_judged_with_it`
   (the scene at the lamp's lengths with a stand-in child that answers a
   line asked for while it is heard at once and one asked at its end after
