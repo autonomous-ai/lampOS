@@ -359,8 +359,9 @@ const AREAS: [&str; 8] = [
 ];
 /// What the model is told when it asks the time of a place this lamp has no
 /// zone file for: never the lamp's own time in its place.
-pub const PLACE_UNKNOWN: &str =
-    "I don't know the time in that place: it is not a time zone I know.";
+/// It says how to ask again: a city that is no zone's name ("Beijing",
+/// "Hanoi") is asked again by its zone (Jarvis on #1575).
+pub const PLACE_UNKNOWN: &str = "I don't know the time in that place: it is not a time zone I know. Call again with the place's IANA time zone, such as Asia/Shanghai for Beijing or Asia/Ho_Chi_Minh for Hanoi.";
 
 /// Whether `zone` may name a file under [`ZONES`]: an IANA zone name such
 /// as `Europe/London` or `America/Argentina/Buenos_Aires`, with no way out
@@ -410,6 +411,16 @@ pub fn zone_file(zones: &std::path::Path, place: &str) -> Option<(String, Vec<u8
 /// A zone's place as people say it: its last part, underscores as spaces
 /// (`America/New_York` is "New York").
 pub fn place_name(zone: &str) -> String {
+    // `Etc/GMT-7` is seven hours ahead: POSIX turns the sign, so it is said
+    // as people write it, "UTC+7" (Jarvis on #1575).
+    if let Some(hours) = zone.strip_prefix("Etc/GMT") {
+        return match hours.as_bytes().first() {
+            None | Some(b'0') => "UTC".to_owned(),
+            Some(b'-') => format!("UTC+{}", &hours[1..]),
+            Some(b'+') => format!("UTC-{}", &hours[1..]),
+            _ => zone.to_owned(),
+        };
+    }
     zone.rsplit('/').next().unwrap_or(zone).replace('_', " ")
 }
 
@@ -459,11 +470,15 @@ pub fn zone_here() -> Option<String> {
 /// not the text, so a text left from the image would name another zone
 /// (the reviewer on #1552).
 fn zone_named(link: Option<&std::path::Path>, text: Option<&str>) -> Option<String> {
-    match link {
-        Some(link) => {
-            let zone = link.to_str()?.split_once("zoneinfo/")?.1;
-            zone_name_ok(zone).then(|| zone.to_owned())
-        }
+    // A link that names no zone (one outside a `zoneinfo` folder) leaves
+    // the text to name it (Jarvis on #1575).
+    let linked = link
+        .and_then(|link| link.to_str())
+        .and_then(|link| link.split_once("zoneinfo/"))
+        .map(|(_, zone)| zone)
+        .filter(|zone| zone_name_ok(zone));
+    match linked {
+        Some(zone) => Some(zone.to_owned()),
         None => text
             .map(|text| text.trim().to_owned())
             .filter(|zone| zone_name_ok(zone)),
@@ -878,6 +893,20 @@ mod tests {
         );
         assert_eq!(zone_named(None, Some("../x")), None);
         assert_eq!(zone_named(None, None), None);
+        // A link outside a zone folder leaves the text to name the zone.
+        let elsewhere = std::path::Path::new("/opt/zones/hcm");
+        assert_eq!(
+            zone_named(Some(elsewhere), Some("Asia/Ho_Chi_Minh\n")).as_deref(),
+            Some("Asia/Ho_Chi_Minh")
+        );
+        assert_eq!(zone_named(Some(elsewhere), None), None);
+        // The `Etc/GMT` zones are said as people write them: POSIX's sign
+        // is turned.
+        assert_eq!(place_name("Etc/GMT-7"), "UTC+7");
+        assert_eq!(place_name("Etc/GMT+5"), "UTC-5");
+        assert_eq!(place_name("Etc/GMT"), "UTC");
+        assert_eq!(place_name("Etc/GMT0"), "UTC");
+        assert_eq!(place_name("Etc/UTC"), "UTC");
         let _ = std::fs::remove_dir_all(&dir);
     }
 

@@ -327,7 +327,12 @@ time, from its opening note, and nothing said whose it was.
   name for the same zone file (`Asia/Saigon`), the answer ends "That is
   the time here too." A place it has no zone for answers
   `{"error":"I don't know the time in that place: it is not a time zone I
-  know."}`, never the lamp's own time.
+  know. Call again with the place's IANA time zone, such as Asia/Shanghai
+  for Beijing or Asia/Ho_Chi_Minh for Hanoi."}`, never the lamp's own time:
+  a city no zone is named after ("Beijing", "Hanoi") is asked again by its
+  zone. So is a `place` that is not words. `Etc/GMT-7`, whose sign POSIX
+  turns, is said "UTC+7". A `/etc/localtime` link outside a zone folder
+  leaves `/etc/timezone` to name the lamp's zone (Jarvis on #1575).
 - **The opening note says whose time it gives:** "… This is the time where
   you are, in Ho Chi Minh. For the time anywhere else, call the_time with
   that place, never this time."
@@ -337,6 +342,13 @@ time, from its opening note, and nothing said whose it was.
   in the call the model already made for a question about the time. Not
   yet timed on the lamp; the check below measures first audio with and
   without it.
+- **Beside `lamp-local-time`** (#820, #1380), which resolves zone names with
+  a zone database of its own: the voice reads the system's zone files and
+  works out a slim file's closing rule itself (`rule_offset`). Jarvis's 64
+  moments across 2026's changes (London, New York, Sydney, Lord Howe,
+  Kathmandu; fat and slim files) match Python's `zoneinfo`, but the two can
+  differ where the system's zone data and the bundled one do. A later move
+  to the shared crate would end that, if the voice's size allows.
 - **Not shown on a lamp:** "what time is it in London / New York / Tokyo /
   here", five times each, checked against `TZ=… date`, with first audio
   with and without it.
