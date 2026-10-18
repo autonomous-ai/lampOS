@@ -99,13 +99,26 @@ sees" with what has and has not been shown of it.
   light's flicker, drawn by the rolling shutter as bands across) are not
   a change; and each cell learns its own noise from the empty room's
   glances, so a screen or a plant that flickers in one place stops
-  counting once learned. A cell's noise falls about ten glances back but
+  counting once learned. A cell's noise falls about twenty glances back but
   rises five times slower, so a person moving in one place unseen (their
   back turned, pacing, fidgeting) is not taken for noise in a few
   seconds: their first eight seconds of glances are detected, and after
   that the 3 s look still finds them. The lamp check should try it (the
   reviewer on #1460). Three cells or more past 12
-  greys and four times their own noise are a change. On lamp-4ace's empty
+  greys and eight times their own noise are a change. Rising slower than
+  it falls, the noise settles low, near 0.4 of a steady noise's spread:
+  at four times it (as it was), about 48 of 768 cells pass on noise
+  alone in a simulation of steady noise, which is consistent with
+  lamp-4ace's empty office (33 cells a glance after eleven minutes, #1479,
+  18 Oct) but not yet shown to be its cause: the 10 s line's new numbers
+  will show it; at eight times, with rates of 0.01
+  up and 0.05 down, under one does, a person moving in one place stays a
+  change for fourteen glances, and a cell is deaf for about 26 glances
+  after a learned flicker stops (the 3 s look still runs). A test with
+  every cell moving by a spread of 8 greys a glance counts 99 of 100
+  glances changed by the old rule and at most 5 by this one. The 10 s line
+  says the learned noise's median and p90 over the cells, and how far a
+  glance's cells move, to check it on the lamp. On lamp-4ace's empty
   office the plain rule, against the previous frame, saw 49 cells change
   a frame (#1441, 18 Oct, 10:00 to 10:20), and no glance was skipped;
   this is the rule that followed (#705). A sensor's noise averages out over a
