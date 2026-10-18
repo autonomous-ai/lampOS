@@ -148,6 +148,47 @@ impl Fbank {
     }
 }
 
+/// The niceness the child takes: a little below ordinary, as `lamp-name`
+/// runs at 5, so that its long work gives way to the lamp's other parts.
+pub const NICE: i32 = 10;
+
+/// The voice runs at real-time round-robin priority (its units'
+/// `CPUSchedulingPolicy=rr`), and a process it starts takes that policy.
+/// A print is long work on the lamp (the model loads in 15.5 s on
+/// lamp-4ace): at the voice's priority it shares the voice's own threads'
+/// time and starves everything at ordinary priority, and on lamp-4ace on
+/// 18 October the provider worker missed its controller's heartbeat while
+/// the child loaded (#1445). So the child takes the ordinary policy at
+/// [`NICE`] before anything else. Lowering its own priority needs no
+/// privilege; one already nicer than [`NICE`] stays so. The only unsafe
+/// calls here: the standard library and rustix do not wrap them.
+#[cfg(target_os = "linux")]
+#[allow(unsafe_code)]
+pub fn ordinary_priority() -> io::Result<()> {
+    let ordinary = libc::sched_param { sched_priority: 0 };
+    // SAFETY: the calling thread's own policy, with a valid parameter that
+    // outlives the call.
+    if unsafe { libc::sched_setscheduler(0, libc::SCHED_OTHER, &ordinary) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: the calling thread's own niceness; no memory is passed.
+    if unsafe { libc::setpriority(libc::PRIO_PROCESS, 0, NICE) } != 0 {
+        let error = io::Error::last_os_error();
+        // Already nicer than that: raising it again would need privilege,
+        // and lower is no harm.
+        if !matches!(error.raw_os_error(), Some(libc::EACCES | libc::EPERM)) {
+            return Err(error);
+        }
+    }
+    Ok(())
+}
+
+/// Elsewhere the voice does not run at real-time priority.
+#[cfg(not(target_os = "linux"))]
+pub fn ordinary_priority() -> io::Result<()> {
+    Ok(())
+}
+
 /// The speaker model, ready to run on any number of frames.
 pub struct Voice {
     plan: Arc<TypedRunnableModel>,
@@ -350,6 +391,25 @@ mod tests {
             let mean: f32 = rows.iter().map(|row| row[band]).sum::<f32>() / rows.len() as f32;
             assert!(mean.abs() < 1e-3);
         }
+    }
+
+    /// #1445: the child leaves the voice's real-time policy for the
+    /// ordinary one, at [`NICE`] or nicer. A test cannot take a real-time
+    /// policy without privilege, so the step from it is not shown here.
+    #[cfg(target_os = "linux")]
+    #[test]
+    #[allow(unsafe_code)]
+    fn the_child_takes_the_ordinary_policy_a_little_below_ordinary_priority() {
+        std::thread::spawn(|| {
+            ordinary_priority().unwrap();
+            // SAFETY: reads the calling thread's own policy.
+            assert_eq!(unsafe { libc::sched_getscheduler(0) }, libc::SCHED_OTHER);
+            // SAFETY: reads the calling thread's own niceness.
+            let nice = unsafe { libc::getpriority(libc::PRIO_PROCESS, 0) };
+            assert!(nice >= NICE, "{nice}");
+        })
+        .join()
+        .unwrap();
     }
 
     /// A request as the voice writes it.

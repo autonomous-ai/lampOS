@@ -33,6 +33,10 @@ fn main() -> ExitCode {
 /// The model loaded, then each request answered until the voice closes
 /// standard input.
 fn serve(model: &Path) -> Result<(), String> {
+    // Before the model loads: never at the voice's real-time priority
+    // (#1445). A child that cannot leave it ends, and the check is off.
+    lamp_same_voice::ordinary_priority()
+        .map_err(|error| format!("the ordinary priority could not be taken: {error}"))?;
     let loaded = Instant::now();
     let voice = Voice::load(model)?;
     let loaded_ms = loaded.elapsed().as_millis();

@@ -18,5 +18,9 @@ hound.workspace = true
 tract-onnx = { version = "=0.23.8", default-features = false }
 rustfft = "=6.4.1"
 
+# The child leaves the voice's real-time policy (#1445).
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
 [lints]
 workspace = true

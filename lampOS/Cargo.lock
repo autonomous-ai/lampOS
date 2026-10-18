@@ -2033,6 +2033,7 @@ name = "lamp-same-voice"
 version = "0.1.0"
 dependencies = [
  "hound",
+ "libc",
  "rustfft",
  "tract-onnx",
 ]
