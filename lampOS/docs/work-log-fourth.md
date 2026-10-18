@@ -4394,6 +4394,16 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **Peer review:** Tests' #1451 (my crate's `program()` helper, macOS's first-exec check): approved.
 - **#1422:** `fourth/thread-lock` (local): every worker test rig holds one re-entrant lock on the process's conversation and room. Its runs (ten on `lamp-voice`, twenty with the fix) are going. A `reminders::transport` test fails 1 in 3 parallel runs on `lamp-voice` itself, unrelated.
 
+## 2026-10-18, 11:08 ICT: #1445 merged and #1444 closed; the bar's 0.14; #1461 and #1467
+
+- **#1445 merged** (10:07), carrying #1444's two commits, so #1444 is closed. On lamp-4ace the prints came 228–376 ms after their asks (1.80 s of sound), well inside every line's head start, so the faster-print plan is dropped.
+- **The 0.14** (the first builder, 09:5x): two of one speaker's lines were held as another voice. The pre-roll fits request 50 (its print overlaps the reply by about 0.2 s, after I corrected his window by the double-counted 0.3 s) but not 49. The Sixth found the cause in the code: the conversation's voice was one print, the last answered line's, and 48's middling print became it. The first builder's decision (10:3x): keep the last four answered prints and judge by the highest. The pre-roll trim waits on the Sixth's labelled lines (recorded at about 10:45).
+- **#1467:** that rule, plus Eighth's two holes in my #1445 late print (#829, 10:43). A call amid another's conversation now begins its own; a new conversation drops any late voice of the one before; the verdict a late voice decides now says so. Tests with mutations: the named-call scene with every print late gives `[true; 4]`, and `[true, true, true, false]` without the fix. Mac gate 1,964 passed, 0 failed.
+- **#1461:** the reviewer's two P3s on #1445 (the leaky stand-in, temp folders, the bar's line), no findings, merging on green.
+- **#1396:** El's contract test is #1455. I answered on `hw_switch_muted` (null reads as not blocked) and added `available`, which I'd left out.
+- **#1422:** the fix is local on `fourth/thread-lock`. On `lamp-voice`, the target test failed 4 of 10 parallel worker-test runs; with the lock, 0 of 9 whole-lib runs. Other real-time tests fail in parallel runs on both sides; a fair comparison comes before the PR.
+- **Still with the user:** whether my draft PR into the app's repository stands.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
