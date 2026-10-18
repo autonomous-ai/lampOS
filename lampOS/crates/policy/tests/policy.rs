@@ -1044,21 +1044,21 @@ fn a_piece_taken_up_after_the_lamps_sound_but_sent_before_it_is_answered_by_it()
     rig.stop();
 }
 
-/// #1652: the lamp's sound stamped longer ago than the outcome's window,
-/// before what was heard, is no answer to it though it is taken up after,
-/// here after the decision too: the outcome says `silent`, as for one taken
-/// up before. A second utterance's decision closes it, not the window.
+/// #1652: the lamp's sound stamped before what was heard began is no answer
+/// to it, though it is taken up after the decision: the open watch drops it,
+/// as `Watch::new` drops one taken up before (the reviewer on #1657). The
+/// outcome says `silent`. A second utterance's decision closes it, not the
+/// window.
 #[test]
 fn a_sound_stamped_before_what_was_heard_is_no_answer_to_it() {
     let mut rig = Rig::new("outcome-old-sound", |_| Ok(asked(SEVEN)));
     rig.voice(Voice::Listening);
     rig.voice(Voice::Thinking);
+    let heard_at = lamp_ipc::monotonic_us();
     rig.hear("What time is it?");
-    // Turns of the loop pass, each waiting at most 20 ms: what was heard is
-    // taken up, and decided, before the lamp's sound is sent.
-    thread::sleep(ms(100));
-    rig.voice_sent(Voice::Speaking, lamp_ipc::monotonic_us() - 7_000_000);
     rig.decision();
+    // After the decision: a sound stamped 2 s before what was heard.
+    rig.voice_sent(Voice::Speaking, heard_at - 2_000_000);
     rig.voice(Voice::Listening);
     rig.hear("Is it lunch yet?");
     rig.voice(Voice::Thinking);
