@@ -79,7 +79,11 @@ every result on a lamp below names it. Newest first.
   embeddings and publishes `stop/heard`; with `LAMP_STOP_HEARD=on` the voice
   yields on it as heard plainly, and quiet after it ends the reply. Both
   off. Replays (first builder): 6 of 28 played stops at 0.9, about 4 false
-  an hour. Lamp check: tonight's queue 13.
+  an hour. Lamp check (queue 13): the listener heard none of the played
+  stops at 0.9 on lamp-4ace (`stops=0`), at 9.6–9.8 ms a step; the switch
+  stays off until the lamp's own stream is scored and Monday's real "Stop.".
+- #1591 merged: #1555's P3s (the speaker held from a committed stop to its
+  cancel; the stop docs name the tests).
 
 ## 2026-10-17 — evening: #828 confounded, go-aways are the lamp's own
 
