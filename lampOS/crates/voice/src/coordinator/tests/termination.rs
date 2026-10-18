@@ -187,7 +187,12 @@ fn isolated_signal_child() {
     };
     let output = PathBuf::from(std::env::var(OUTPUT).unwrap());
     let termination = Termination::install().unwrap();
-    let (mut owner, current, _) = active_reply();
+    // Each mode takes its reply only once its workers are up, just before it
+    // says it is ready: [`active_reply`]'s capture and admission last 500 ms
+    // of the real clock, and starting four fixture processes took 312 to
+    // 587 ms with the module's tests in parallel. Taken first, a run whose
+    // start took 484 ms or more found its turn gone and ended `StaleOwner`
+    // (6 of 20; #1569 row 22).
     let mut trace = SessionState::from(vec![
         json!({"kind":"run_start","at_us":monotonic_us(),"scope":"synthetic_signal_test"}),
     ]);
@@ -201,10 +206,11 @@ fn isolated_signal_child() {
         if mode == "serve-muted" {
             return muted_signal_child(output, termination, trace);
         }
-        return service_signal_child(output, termination, owner, current, trace);
+        return service_signal_child(output, termination, trace);
     }
     let mut cues = None;
     if mode == "startup" {
+        let (mut owner, _, _) = active_reply();
         println!("LAMP_SIGNAL_READY");
         io::stdout().flush().unwrap();
         let result = loop {
@@ -225,11 +231,12 @@ fn isolated_signal_child() {
         return;
     }
     let dir = SessionDirectory::create().unwrap();
-    let boot = owner.snapshot(now()).unwrap().boot();
     let (mut capture, capture_peer) = Worker::sleeping_fixture(&dir.path, "capture");
     let (mut speaker, speaker_peer) = Worker::sleeping_fixture(&dir.path, "speaker");
     let (provider, provider_peer) = Worker::sleeping_fixture(&dir.path, "provider");
     let (privacy, privacy_peer) = Worker::sleeping_fixture(&dir.path, "privacy");
+    let (mut owner, current, _) = active_reply();
+    let boot = owner.snapshot(now()).unwrap().boot();
     let capture_recorder = synthetic_recorder(&output, boot, StreamKind::Capture);
     let render_recorder = synthetic_recorder(&output, boot, StreamKind::Render);
     let capture_start = DiagnosticStarted {
@@ -599,13 +606,7 @@ fn a_speaker_that_misses_the_finish_deadline_is_named_and_the_microphone_is_clos
     );
 }
 
-fn service_signal_child(
-    output: PathBuf,
-    termination: Termination,
-    mut owner: Controller,
-    current: Reply,
-    mut trace: SessionState,
-) {
+fn service_signal_child(output: PathBuf, termination: Termination, mut trace: SessionState) {
     let dir = SessionDirectory::create().unwrap();
     let (mut capture, capture_peer, capture_input) =
         Worker::cooperative_fixture(&dir.path, "capture");
@@ -669,6 +670,8 @@ fn service_signal_child(
         follows_on: false,
         paused: Box::new(|| false),
     };
+    // Its reply only now, its workers up (see `isolated_signal_child`).
+    let (mut owner, current, _) = active_reply();
     let mut reply = Some(current);
     let mut cues = None;
     println!("LAMP_SIGNAL_READY");
