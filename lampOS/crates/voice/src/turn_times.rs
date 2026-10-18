@@ -192,10 +192,15 @@ pub fn turns(events: &[(PathBuf, Value)], first: &[(PathBuf, Value)]) -> Vec<Tur
             entry.endpoint_us = entry.endpoint_us.min(at);
         }
     }
-    // A request admitted and ended before any end of speech (#1615 review,
-    // 21:56): still the run's first if it came first, and its stall counts.
+    // A request the microphone heard (`prefix_first_host_read_us`), admitted
+    // and ended before any end of speech (#1615 review, 21:56): still the
+    // run's first if it came first, and its stall counts. The lamp's own
+    // lines (its hello, a reminder, a look, back online, the head-tap hum)
+    // are admitted with no heard audio and are no row, so the person's first
+    // request after them is still the run's first (#1615 review, 22:27).
     for (folder, event) in events {
         if event["kind"] == "input_admitted"
+            && number(event, "prefix_first_host_read_us").is_some()
             && let (Some(turn), Some(at)) = (number(event, "turn"), number(event, "at_us"))
         {
             let entry = by_turn
@@ -796,7 +801,9 @@ mod tests {
         let at = |value: Value| (one.clone(), value);
         let events = vec![
             at(json!({"kind":"listening_ready","at_us":10 * S})),
-            at(json!({"kind":"input_admitted","turn":1,"at_us":370 * S})),
+            at(
+                json!({"kind":"input_admitted","turn":1,"at_us":370 * S,"prefix_first_host_read_us":369 * S + 500_000}),
+            ),
             at(
                 json!({"kind":"capture_gap","stalled_us":135_000,"dropped_frames":2,"at_us":370 * S + 600_000}),
             ),
@@ -849,6 +856,55 @@ mod tests {
             (json!(1), json!(1), json!(135.0))
         );
         assert_eq!(by["rest"]["turns"], 1);
+    }
+
+    /// #1615 review, 22:27: the lamp's own line (its hello after five
+    /// minutes away) is admitted with no heard audio and is no row, so the
+    /// person's request after it is the run's first, its idle runs from the
+    /// run's `listening_ready`, and its stall counts there, not in `rest`.
+    #[test]
+    fn the_lamps_own_line_is_no_row_and_the_persons_next_request_is_the_runs_first() {
+        const S: u64 = 1_000_000;
+        let one = PathBuf::from("/s/one/metadata");
+        let at = |value: Value| (one.clone(), value);
+        let events = vec![
+            at(json!({"kind":"listening_ready","at_us":10 * S})),
+            at(
+                json!({"kind":"input_admitted","turn":1,"at_us":370 * S,"prefix_first_host_read_us":null}),
+            ),
+            at(json!({"kind":"turn_finished","turn":1,"at_us":372 * S,"outcome":"completed"})),
+            at(
+                json!({"kind":"input_admitted","turn":2,"at_us":374 * S,"prefix_first_host_read_us":373 * S + 600_000}),
+            ),
+            at(
+                json!({"kind":"capture_gap","stalled_us":135_000,"dropped_frames":2,"at_us":374 * S + 600_000}),
+            ),
+            at(json!({"kind":"local_endpoint","turn":2,"at_us":375 * S})),
+            at(json!({"kind":"speaker_first_write","turn":2,"at_us":376 * S})),
+            at(json!({"kind":"turn_finished","turn":2,"at_us":378 * S,"outcome":"completed"})),
+        ];
+        let turns = turns(&events, &[]);
+        let rows: Vec<Value> = turns.iter().map(Turn::row).collect();
+        assert_eq!(rows.len(), 1, "the hello is no row: {rows:?}");
+        let request = &rows[0];
+        assert_eq!(
+            (
+                request["cut"].clone(),
+                request["first_of_run"].clone(),
+                request["idle_ms"].clone(),
+                request["stalled_ms"].clone()
+            ),
+            (json!(false), json!(true), json!(364_000.0), json!(135.0))
+        );
+        let by = &summary(&turns)["by_idle"];
+        assert_eq!(
+            (
+                by["first_of_run"]["turns"].clone(),
+                by["first_of_run"]["longest_stall_ms"].clone(),
+                by["rest"]["turns"].clone()
+            ),
+            (json!(1), json!(135.0), json!(0))
+        );
     }
 
     /// #1615 review, 21:56: a gap goes to one turn only, the latest admitted
