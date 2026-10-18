@@ -1201,8 +1201,22 @@ not held (the first builder, 05:57), nor is any other call:
   0.9 or more on `name/heard`, as the Policy counts it; known here only with
   `LAMP_ATTENTION`, which follows the turn, and without it the Policy's
   decision alone, which weighs the name itself): the action is not run. The model is told `{"done": false, "next": "Not done: it was not
-  clear that was said to you. Say nothing at all."}`, and none of the turn's
-  sound is let out after it.
+  clear that was said to you. Do not call it again for this request. Say
+  nothing at all."}` (`policy_holds::HELD`), and none of the turn's sound
+  is let out after it.
+- **Asked for again** (#1465): on lamp-4ace on 18 October at 10:57 a
+  follow-up's `volume_up` was held and the model asked for it 72 times in
+  49 s, each held, while the lamp said nothing for most of a minute. A held
+  call of the same turn made after the model was told is answered `{"done":
+  false, "next": "Not done, and it will not be done for this request."}`
+  (`policy_holds::HELD_AGAIN`), and the turn is ended there, once: handed on
+  as interrupted, so the coordinator lets it go (its playback with it) and
+  listens for the next line, and the session's cut stops the service's
+  generation. Calls made together with the first, in one message, are not
+  asking again: each is answered `HELD`. A call that comes once the
+  coordinator has retired the turn is answered as any call of a retired
+  turn (below, or by the session itself), never run. The journal line is
+  `request N asked again for an action held (volume_up); the turn is ended`.
 - **`answer` or `look_up`, or the name heard:** it runs.
 - **No decision within 2 s** of the call: it runs, as without the switch.
   While it waits nothing else does: the call is kept aside and looked at on
@@ -1255,7 +1269,9 @@ once; another turn's `stay_quiet` holding nothing; listing reminders not
 held; the flag's place; a
 kept call whose turn is cancelled, one the service withdrew, and one
 withdrawn while the output is full, never run; a timer on `stay_quiet` not
-set). The worker tests run on a logical clock of their own (#1128): the
+set; a held call asked for again and again, told it will not be done and
+its turn ended once, and two held calls made together both told `HELD`,
+#1465). The worker tests run on a logical clock of their own (#1128): the
 scenario clock for the worker's leases, heartbeat bound and the 2 s wait,
 and a paused Tokio clock for the session and the scripted service, moved
 together 2 ms at a time by the rig's `tick`. The ten take about 1.7 s, not
