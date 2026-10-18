@@ -1083,6 +1083,8 @@ struct Ran {
     told: Vec<Snapshot>,
     /// Every chunk the speaker was sent.
     chunks: Vec<SpeakerChunk>,
+    /// The loop's controls, as it left them.
+    controls: Option<HandControls>,
 }
 
 /// How the loop's time passes. On the host's clock, each fixture worker's
@@ -1170,19 +1172,23 @@ fn run_loop_with(
     fault_first: bool,
     clocking: Clocking,
 ) -> Ran {
-    run_loop_ringed(controls, start, fault_first, clocking, false)
+    run_loop_ringed(controls, start, fault_first, clocking, false, false)
 }
 
 /// As [`run_loop_with`], and with a ring worker when `ringed`, so the
 /// trace holds the frames the ring was asked to draw (`ring_requested`).
-/// The ring's side answers none: a frame only has to be asked for.
+/// The ring's side answers none: a frame only has to be asked for. With
+/// `capture_frame` (stepped only), the capture's side has given one frame
+/// before the loop first reads it.
 fn run_loop_ringed(
     controls: impl FnOnce() -> HandControls,
     start: impl FnOnce() -> (Controller, Option<Reply>),
     fault_first: bool,
     clocking: Clocking,
     ringed: bool,
+    capture_frame: bool,
 ) -> Ran {
+    assert!(!capture_frame || clocking == Clocking::Stepped);
     let directory = SessionDirectory::create().unwrap();
     // The stepped clock cannot rely on the scheduler running each child
     // before logical time advances: its fixture's echo proves it ready.
@@ -1352,6 +1358,42 @@ fn run_loop_ringed(
     // (the reviewer and the seventh on #1207).
     let (mut owner, mut reply) = start();
     let mut controls = Some(controls());
+    if capture_frame && let Some(shared) = &stepped {
+        let at = monotonic_us();
+        // The peers are in the order made above: the capture's is second.
+        shared.borrow_mut()[1]
+            .peer
+            .data
+            .send(crate::wire::MicrophoneFrame {
+                raw: None,
+                epoch: 1,
+                dsp_epoch: 1,
+                privacy_generation: owner.snapshot(now()).unwrap().microphone_generation(),
+                frame_sequence: 1,
+                read_completed_at_us: at,
+                probability: 0.0,
+                echo: None,
+                reference: Default::default(),
+                samples: vec![0; 160],
+                timing: crate::wire::CaptureTiming {
+                    first_read_started_at_us: at,
+                    last_read_started_at_us: at,
+                    successful_reads: 1,
+                    alsa_status_monotonic_us: None,
+                    status_observed_at_us: at,
+                    available_frames: 0,
+                    delayed_frames: 0,
+                    processing_completed_at_us: at,
+                    aec_queue_delay_ms: 0,
+                    reference: crate::wire::ReferenceTiming {
+                        playback_epoch: 1,
+                        clock_started_at_us: Some(at),
+                        ..crate::wire::ReferenceTiming::default()
+                    },
+                },
+            })
+            .unwrap();
+    }
     let error = conversation_with_controls(
         &mut rig,
         &mut owner,
@@ -1419,6 +1461,7 @@ fn run_loop_ringed(
         left,
         told,
         chunks,
+        controls,
     }
 }
 
@@ -1494,6 +1537,42 @@ fn quiet_owner() -> Controller {
 }
 
 /// A tap whose last step is 20 ms old when the loop first polls it.
+/// The first builder's 21:37 on #705, for #1592: a frame the capture gives
+/// marks the run heard where the conversation reads it (`heard_a_frame`), so
+/// its fault keeps the guard. The same run with no frame releases it.
+#[test]
+fn a_frame_the_conversation_reads_marks_the_run_heard() {
+    use std::os::unix::fs::PermissionsExt;
+    let directory = std::env::temp_dir().join(format!("lv-heard-loop-{}", monotonic_us()));
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let record = directory.join("mute.json");
+    for frame in [true, false] {
+        let guard = || {
+            let mut controls =
+                HandControls::with_test_guard("test-hand-clock", monotonic_us(), &record).unwrap();
+            controls.arm_active().unwrap();
+            controls
+        };
+        let mut ran = run_loop_ringed(
+            guard,
+            || (quiet_owner(), None),
+            false,
+            Clocking::Stepped,
+            false,
+            frame,
+        );
+        let released = ran
+            .controls
+            .as_mut()
+            .unwrap()
+            .release_never_listened()
+            .unwrap();
+        assert_eq!(released, !frame, "frame {frame}: {}", ran.error);
+    }
+    let _ = fs::remove_dir_all(&directory);
+}
+
 fn head_tap() -> HandControls {
     HandControls::with_test_tap("test-hand-clock", monotonic_us() - 420_000).unwrap()
 }
@@ -1725,6 +1804,7 @@ fn only_the_hums_own_ring_frames_are_marked_listening() {
         false,
         Clocking::Stepped,
         true,
+        false,
     );
     let cue = hummed
         .trace
@@ -1740,7 +1820,14 @@ fn only_the_hums_own_ring_frames_are_marked_listening() {
         current.playback = None;
         (owner, Some(current))
     };
-    let refused = run_loop_ringed(head_tap, still_thinking, false, Clocking::Stepped, true);
+    let refused = run_loop_ringed(
+        head_tap,
+        still_thinking,
+        false,
+        Clocking::Stepped,
+        true,
+        false,
+    );
     let cue = refused
         .trace
         .iter()
