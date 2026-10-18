@@ -119,22 +119,43 @@ plainly not the conversation's is no part of it
   quiet that ends the line; a shorter line is asked for at its end. Asked
   for at 3 s, scene 3's two short lines were printed too late on
   lamp-4ace (below).
-- **The conversation's voice** is the last voice the lamp answered that was
-  long enough to know. A print that comes after its answer was let out
-  still becomes it, unless the line was let out as the conversation going
-  on without being judged and its print is another voice's: then the
-  conversation's voice is kept and the conversation is over, as for a line
-  held (below). A line answered as the conversation going on that is
-  too short to know keeps it. One too short to know that began a
-  conversation of its own (answered for its name, a face or anything but
-  the conversation) leaves no voice known.
-- **The rule.** A cosine under 0.25 (`DIFFERENT_BELOW`) between the line's
-  print and the conversation's is another voice: no conversation is going
-  on for that line, and only the name, a face, or close and turned to the
+- **The conversation's voice** is the prints of the lines the lamp
+  answered in it that were long enough to know, the last four (`KEPT`). A
+  line answered as the conversation going on adds its print. One that
+  began a conversation of its own (answered for its name, a face or
+  anything but the conversation) starts them afresh with its own. A print
+  that comes after its answer was let out still counts, unless the line
+  was let out as the conversation going on without being judged and its
+  print is another voice's: then the conversation's prints stay as they
+  were and the conversation is over, as for a line held (below). A line
+  answered as the conversation going on that is too short to know keeps
+  them. One too short to know that began a conversation of its own leaves
+  no voice known.
+- **The rule.** A line's **highest** cosine against the conversation's
+  prints, under 0.25 (`DIFFERENT_BELOW`), is another voice: no
+  conversation is going on for that line, and only the name, a face, or close and turned to the
   lamp, let its answer out. The same voice, or no verdict, is as without
   the model. Each verdict is a journal line with its cosine: "another voice
   than the conversation's (cosine 0.12)", "the conversation's voice
   (cosine 0.91)".
+- **Why the highest of several, not the last one alone** (the first
+  builder's decision on #1445, 10:3x, after the Sixth's finding there).
+  On lamp-4ace on 18 October at 09:44, with only the last answered line
+  kept, request 48 (0.50 against 41, the same speaker) became the
+  conversation's voice. The same speaker's 49 and 50 then fell to 0.14 and
+  0.24 against it and were held as another voice. Neither was the pre-roll
+  alone: 49 began 3.4 s after the lamp's reply. A middling print most
+  likely had something else in it, and kept as the only reference it set
+  the bar for every line after it. With the highest of the last four, one
+  mixed print can't. **Its cost:** another voice now passes if it is near
+  any of the four, not only the last. So a kept print mixed towards the
+  other person's voice would let that person's next line through as the
+  conversation going on. Tests:
+  `a_mixed_print_among_the_conversations_does_not_make_its_own_voice_another`
+  (A's mixed print kept, then A's next line, far from it but near A's
+  first, is the conversation's voice; B is still another; judged against
+  the newest print alone it fails) and
+  `the_conversation_keeps_its_last_prints_and_a_new_one_begins_afresh`.
 
 **Its cost**, in the "would a person do this?" sense: B's direct follow-up
 to the lamp's answer to A ("And what about tomorrow?", when 1.5 s or
