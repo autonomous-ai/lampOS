@@ -363,6 +363,30 @@ impl Store {
         result
     }
 
+    /// The newest store kept aside in the owned folder
+    /// (`tasks.sqlite3.newer-<schema>-<unix seconds>`), by its name, if any is
+    /// still there: names only, of this folder's own files.
+    pub fn kept_aside(&self) -> io::Result<Option<String>> {
+        let prefix = format!("{DATABASE}.newer-");
+        let mut newest: Option<(u64, String)> = None;
+        for entry in fs::read_dir(&self.path)? {
+            let name = entry?.file_name();
+            let Some(name) = name.to_str() else { continue };
+            let Some(rest) = name.strip_prefix(&prefix) else {
+                continue;
+            };
+            let since = rest
+                .rsplit('-')
+                .next()
+                .and_then(|s| s.parse::<u64>().ok())
+                .unwrap_or(0);
+            if newest.as_ref().is_none_or(|(at, _)| since >= *at) {
+                newest = Some((since, name.to_owned()));
+            }
+        }
+        Ok(newest.map(|(_, name)| name))
+    }
+
     fn rename_and_start_empty(&mut self, kept: &str) -> io::Result<String> {
         self.check_files()?;
         // The connection is closed before its file is renamed, so no write
@@ -488,5 +512,22 @@ mod tests {
         for bad in ["", "../x", "a b", "x/y"] {
             assert!(store.set_aside(bad).is_err(), "{bad:?}");
         }
+        // The kept store is said until it is gone; the newest of two.
+        assert_eq!(
+            store.kept_aside().unwrap().as_deref(),
+            Some("tasks.sqlite3.newer-2-1760770000")
+        );
+        store.set_aside("newer-3-1760780000").unwrap();
+        assert_eq!(
+            store.kept_aside().unwrap().as_deref(),
+            Some("tasks.sqlite3.newer-3-1760780000")
+        );
+        for kept in [
+            "tasks.sqlite3.newer-2-1760770000",
+            "tasks.sqlite3.newer-3-1760780000",
+        ] {
+            fs::remove_file(dir.join(kept)).unwrap();
+        }
+        assert_eq!(store.kept_aside().unwrap(), None);
     }
 }

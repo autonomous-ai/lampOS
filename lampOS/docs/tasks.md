@@ -516,15 +516,43 @@ now reads the state of the release after it:
   - an optional field whose absence would let an older build launch, close
     or speak more than the newer one would, such as "never close this one".
 
-  Any other new optional field (`#[serde(default)]`) needs nothing more. Not
-  yet shown: `lamp-health` saying a store was set aside (only the
-  journal says so).
+  Any other new optional field (`#[serde(default)]`) needs nothing more.
+- **Said until someone looks** (#1505, the first builder's addition). While
+  a kept `tasks.sqlite3.newer-*` file is in the store's folder, the `tasks`
+  diagnostic is a warning, "Tasks set aside a store from a newer build;
+  its tasks are not followed", with `set_aside` naming the newest. It's
+  read at open and again once a minute, so it holds across restarts and
+  ends within a minute of the file being removed or put back. Health and
+  the self-test show it as any part's warning. Nothing clears it on its
+  own.
+- **Task targets written for a newer build** (`targets.json` with a
+  `version` above 1, or a field this build doesn't know) stay strict: a
+  later target field may narrow what a task may do, so it's never passed
+  over. But `lamp-tasks` no longer stops on them, since a stopped part says
+  nothing: it runs with **hand-overs off**. Every `prepare` is refused,
+  code `targets_newer`, and nothing reaches Harness. The `tasks` warning
+  says "The task targets were written for a newer build (version N);
+  hand-overs are off until they match this build", every second, with
+  `targets_newer`. A version-1 file with a field or an engine this build
+  doesn't know says so instead ("from a newer build, or mistyped"), not a
+  version. Nothing is set aside or rewritten, since a person or Harness's
+  pairing wrote the file. A file that isn't a targets file at all still
+  stops the part, as before. Hand-overs off isn't the part off: tasks
+  handed over before are still watched, told and, with `--close-told`,
+  closed, each by the target it was stored with.
+- **The warnings' order:** not ready, then bus failures, then targets for
+  a newer build, then a store set aside, then the last hand-over failed.
 
 Tests: `engine::tests::the_next_releases_state_opens_and_keeps_its_tasks`
 (a field this build doesn't know on every stored type, a close under way,
 and a receipt for a later request; what this build knows of the task kept
 when it saves again; the target refused),
 `engine::tests::a_receipt_that_does_not_hold_is_dropped_and_the_store_opens`,
+`engine::tests::a_store_kept_aside_is_in_the_summary_until_it_is_gone`,
+`engine::tests::with_targets_for_a_newer_build_a_task_offered_is_refused`,
+`runtime::tests::targets_for_a_newer_build_are_told_apart_and_never_read`,
+`tests/runtime.rs`: `targets_for_a_newer_build_keep_the_part_running_with_hand_overs_off`,
+`a_store_set_aside_is_said_until_its_file_is_gone`,
 `engine::tests::a_dropped_receipt_names_only_a_plain_op`,
 `engine::tests::a_newer_schema_is_set_aside_whole_and_a_new_store_begins`,
 `engine::tests::a_request_from_a_later_release_is_still_refused`,
