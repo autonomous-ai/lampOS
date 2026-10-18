@@ -2062,6 +2062,21 @@ after `--name-note`; nothing without `LAMP_NAME_NOTE=on`): in a busy room
 the name note waits for a face turned to the lamp. Off by default. On
 lamp-4ace since 11:52 on 2026-10-14.
 
+`LAMP_NAME_NOTE_HEARD_AS=on` (the worker's `--name-note-heard-as`, right
+after the name note's flags; nothing without `LAMP_NAME_NOTE=on`): the name
+note says the name may have sounded like another word ("even if it sounded
+to you like another word, such as "Mom", "man" or "ma'am"",
+`called::NOTE_HEARD_AS`). On lamp-4ace on 19 October, Samantha's "Hey Lamp,
+tell me a story about a brave little robot…" came back in ten takes as "Hey
+man" 4 times, "Hey Mom" twice, "Hey ma'am" once, and with no greeting 3
+times. lamp-name heard the name each time, and four "Hey Mom" requests in
+one arm went unanswered (#829, the first builder at 04:00 and 05:22): the
+model's own ears heard someone else's name. Off by default; not on any
+lamp. Tests:
+`provider_worker::tests::review_2026_10_14::review_sound_with_the_heard_as_line_the_name_note_says_it_may_sound_like_another_word`
+`called::tests::the_heard_as_line_is_passed_only_with_the_note_and_only_for_on`
+and `provider_worker::tests::going_on_asks::the_heard_as_line_is_read_after_the_name_note`.
+
 `LAMP_NAME_IN_PASSING=ignored` (the worker's `--name-in-passing-ignored`,
 right after `--attention-near`; nothing without `LAMP_ATTENTION`): "the
 lamp" spoken of in what was heard is no call (above). Off by default; not

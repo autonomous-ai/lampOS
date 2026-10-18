@@ -40,12 +40,30 @@ pub const BUSY_ENVIRONMENT: &str = "LAMP_NAME_NOTE_BUSY";
 /// The provider worker's flag for that, after [`FLAG`].
 pub const BUSY_FLAG: &str = "--name-note-busy-face";
 
+/// `on` for the note to say the name may have been heard as another word.
+/// On lamp-4ace on 19 October Samantha's "Hey Lamp, tell me a story about a
+/// brave little robot…" came back in ten takes as "Hey man" 4 times, "Hey
+/// Mom" twice, "Hey ma'am" once and with no greeting 3 times; lamp-name heard
+/// the name each time, and four "Hey Mom" requests in one arm got no answer
+/// (#829, the first builder at 04:00 and 05:22). The model's own ears heard
+/// someone else's name, and took the line as said to them.
+pub const HEARD_AS_ENVIRONMENT: &str = "LAMP_NAME_NOTE_HEARD_AS";
+/// The provider worker's flag for that, after [`FLAG`] and [`BUSY_FLAG`].
+pub const HEARD_AS_FLAG: &str = "--name-note-heard-as";
+/// [`NOTE`], saying too that the name may have sounded like another word.
+pub const NOTE_HEARD_AS: &str = "(For you to know, not to answer: your own ears caught your name, Lamp, just now, even if it sounded to you like another word, such as \"Mom\", \"man\" or \"ma'am\". If what is being said is something a lamp on a desk could answer or chat about, it is said to you. Other people's own business still is not yours.)";
+
 /// The provider worker's arguments for those switches in the environment.
 pub fn arguments_from_environment() -> Vec<String> {
-    arguments(
+    let mut flags = arguments(
         std::env::var(ENVIRONMENT).ok().as_deref(),
         std::env::var(BUSY_ENVIRONMENT).ok().as_deref(),
-    )
+    );
+    flags.extend(heard_as_arguments(
+        &flags,
+        std::env::var(HEARD_AS_ENVIRONMENT).ok().as_deref(),
+    ));
+    flags
 }
 
 fn arguments(note: Option<&str>, busy: Option<&str>) -> Vec<String> {
@@ -54,6 +72,28 @@ fn arguments(note: Option<&str>, busy: Option<&str>) -> Vec<String> {
         (Some("on"), _) => vec![FLAG.to_owned()],
         _ => Vec::new(),
     }
+}
+
+/// [`HEARD_AS_FLAG`] after the note's own flags, only when the note is sent.
+fn heard_as_arguments(note_flags: &[String], heard_as: Option<&str>) -> Vec<String> {
+    if !note_flags.is_empty() && heard_as == Some("on") {
+        vec![HEARD_AS_FLAG.to_owned()]
+    } else {
+        Vec::new()
+    }
+}
+
+/// Take a leading [`HEARD_AS_FLAG`] off a worker's flags, after [`take`].
+pub fn take_heard_as(flags: &[String]) -> (bool, &[String]) {
+    match flags {
+        [flag, rest @ ..] if flag == HEARD_AS_FLAG => (true, rest),
+        _ => (false, flags),
+    }
+}
+
+/// The note the model is given, with the name heard as another word or not.
+pub fn note(heard_as: bool) -> &'static str {
+    if heard_as { NOTE_HEARD_AS } else { NOTE }
 }
 
 /// Whether the environment switches it on, for the coordinator, which
@@ -136,6 +176,35 @@ impl Called {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #829: the heard-as line goes only with the note, after its flags,
+    /// and only for `on`.
+    #[test]
+    fn the_heard_as_line_is_passed_only_with_the_note_and_only_for_on() {
+        let note_flags = arguments(Some("on"), None);
+        assert_eq!(heard_as_arguments(&note_flags, Some("on")), [HEARD_AS_FLAG]);
+        for value in [None, Some(""), Some("off"), Some("ON")] {
+            assert!(
+                heard_as_arguments(&note_flags, value).is_empty(),
+                "{value:?}"
+            );
+        }
+        assert!(heard_as_arguments(&arguments(None, None), Some("on")).is_empty());
+        let flags: Vec<String> = [FLAG, BUSY_FLAG, HEARD_AS_FLAG, "--next"]
+            .map(str::to_owned)
+            .into();
+        let (on, busy, rest) = take(&flags);
+        assert!(on && busy);
+        let (heard_as, rest) = take_heard_as(rest);
+        assert!(heard_as);
+        assert_eq!(rest, ["--next"]);
+        let (heard_as, rest) = take_heard_as(&flags[3..]);
+        assert!(!heard_as);
+        assert_eq!(rest, ["--next"]);
+        assert_eq!(note(false), NOTE);
+        assert_eq!(note(true), NOTE_HEARD_AS);
+        assert!(NOTE_HEARD_AS.contains("\"Mom\""));
+    }
 
     const SECOND: u64 = 1_000_000;
 

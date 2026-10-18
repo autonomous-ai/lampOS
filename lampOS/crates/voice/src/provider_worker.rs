@@ -97,6 +97,10 @@ static NAME_NOTE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool:
 /// (`crate::called::BUSY_ENVIRONMENT`).
 static NAME_NOTE_BUSY_FACE: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
+/// Whether the note says the name may have sounded like another word
+/// (`crate::called::HEARD_AS_ENVIRONMENT`, #829).
+static NAME_NOTE_HEARD_AS: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 /// Whether the rule for whom the lamp answers is in its busy form
 /// (`crate::attention::BUSY_FLAG`).
 static ATTENTION_BUSY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -185,6 +189,9 @@ pub struct Files {
     /// Whether, in a busy room, that waits for someone turned to the lamp
     /// (`--name-note-busy-face`).
     pub name_note_busy_face: bool,
+    /// Whether the note says the name may have sounded like another word
+    /// (`--name-note-heard-as`, `LAMP_NAME_NOTE_HEARD_AS`, #829).
+    pub name_note_heard_as: bool,
     /// Whether a tap on the lamp's head counts as a call (`--head-touch`).
     pub head_touch: bool,
     /// The lamp's bus, if how the room is gets published on it
@@ -290,6 +297,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (addressed, flags) = crate::addressed::take(flags);
     let (name_signal, flags) = crate::attention::take_name(flags);
     let (name_note, name_note_busy_face, flags) = crate::called::take(flags);
+    let (name_note_heard_as, flags) = crate::called::take_heard_as(flags);
     let (head_touch, flags) = crate::attention::take_head_touch(flags);
     let (bus_root, flags) = crate::bus_out::take_root(flags)?;
     let (first_output, flags) = crate::first_output::take(flags)?;
@@ -333,6 +341,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         name_signal,
         name_note,
         name_note_busy_face,
+        name_note_heard_as,
         head_touch,
         bus_root,
         first_output,
@@ -1082,6 +1091,10 @@ pub async fn run_with_continuation(
         files.name_note_busy_face,
         std::sync::atomic::Ordering::Relaxed,
     );
+    NAME_NOTE_HEARD_AS.store(
+        files.name_note && files.name_note_heard_as,
+        std::sync::atomic::Ordering::Relaxed,
+    );
     ATTENTION_BUSY.store(
         files.attention && files.attention_busy,
         std::sync::atomic::Ordering::Relaxed,
@@ -1731,7 +1744,7 @@ async fn serve_with_visual<C: Connect>(
                                     "lamp-voice provider: request {request}: the lamp's name was heard in a busy room and {why} ({rise}); the model is not told"
                                 );
                             }
-                            Ok(()) => match add_note(&provider, &mut intake.handoff.noted, open, crate::called::NOTE) {
+                            Ok(()) => match add_note(&provider, &mut intake.handoff.noted, open, crate::called::note(NAME_NOTE_HEARD_AS.load(std::sync::atomic::Ordering::Relaxed))) {
                                 Ok(()) => eprintln!(
                                     "lamp-voice provider: request {request}: the model is told the lamp's name was heard"
                                 ),
