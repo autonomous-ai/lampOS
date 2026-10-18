@@ -4,6 +4,67 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 12:23 merged #1464 (lamp-cloud answers the app's Light row, off unless LAMP_CLOUD=on)
+- 12:20 #1473 reviewed at c6541b123: not a first-builder case (msgs fields optional, body motion unchanged); one P2 (with both switches off, a dropped clip changes skills' done text and journal), two P3s; ARM64 green
+- 12:19 #1483 reviewed at 1b135c2c6 (docs: don't set LAMP_CAPTURE_CORES): no findings; merge on green ARM64. #1469 re-checked at cb19e850a: P2 fixed (50/s held, was 200), mute flips in the same step; the first builder merges after the lamp check
+- 12:17 merged #1467 (the conversation's voice is its last four answered prints, judged by the highest; off unless LAMP_SAME_VOICE_MODEL); four P3s
+- 12:08 #1482 reviewed at 3f8de3a57 (every worker rig holds the one thread lock; tests only): no findings; merge on green ARM64
+- 12:07 #1481 reviewed at 309eb6ac1 (#1468's P3s: the reset wipes the light folder, a test holds it): no findings; merge on green ARM64
+- 12:06 #1471 reviewed at 1b78ff20b: on by default approved by the first builder (11:4x), the merge is theirs after followups.sh on lamp-4ace; one P2 (its first commit, the failing test alone, would land red: fold into one), P3s (a turn end can cut speech mid-word; two held calls in one message say 'asked again'; traced as provider_interrupted)
+- 12:06 #1466 reviewed at bc62900e7: no P1/P2; its switch LAMP_LIGHT_REQUESTS is on in the product unit, so on by default in practice: sent to the first builder
+- 12:05 #1464 rebased over #1468 (21518fc1f, no changes of its own, clean); merge on green ARM64
+- 12:03 #1479 ready (eyes settle after two still glances; noise rises slower than it falls); review started
+- 12:02 merged #1454 (LAMP_CAPTURE_STAGES, the capture worker's per-stage CPU line; off unless set)
+- 11:53 #1464 ready but conflicts in switches.md after #1468; rebase asked
+- 11:52 merged #1468 (LAMP_LIGHT_KEEP keeps the person's light across a restart, off unless set; the reset wipes it); four P3s
+- 11:52 #1476 reviewed at b31bfa97b (light tool words): no P1/P2; on by default, so sent to the first builder
+- 11:49 #1475 ready (#1459's P1 found on lamp-4ace: turn-end leaves capture's cores; a list taking every fast core refused); review started
+- 11:49 #1473 (body/gesture tells the dropped gesture's asker why; msgs fields added) and #1474 (LAMP_FOLLOWS_RUN: a reply runs every held call but a cancel) ready; reviews started
+- 11:47 #1469 reviewed at 5c1dbdfea: for the first builder (on by default, no lamp of its own; the first builder claimed the merge after the lamp check); mute flips still go out in the same step; one P2 (a held contact is sent at every 5 ms pin read: about 200/s while touched, was 50), two P3s
+- 11:46 #1456 re-checked at 21be56e59: P1, P2, P3s fixed (builds on macOS; head-sleep passes 5 vs about 400; mute faster); new P2 (the new test reads Linux's /proc boot id, fails on macOS), one P3; the first builder holds the merge for the lamp-4ace run after the 13:30 install
+- 11:44 #1454 rebased over #1459 (df247fef5, both capture switches kept, clean); merge on green ARM64
+- 11:34 #1454 green at da7abd9b7 but conflicts in process.rs after #1459 (both add to the capture role's env list); rebase asked
+- 11:33 #1471 ready (a held action asked again ends its turn; #1465); review started
+- 11:20 merged #1463 (voice-eval's relay-clock tests wait for EOF, bounded; tests only); closed #1462
+- 11:18 merged #1459 (LAMP_CAPTURE_CORES, off unless set; the risk beside lamp-turn-end documented); two P3s; two commits kept (the first passed its gate at b9b4a5d66)
+- 11:17 #1469 ready (lamp-controls sends states on change and every 100 ms; carries the privacy reading); review started
+- 11:15 #1454 folded to da7abd9b7 (one commit, the same net diff, clean); merge on green ARM64. #1468 ready (LAMP_LIGHT_KEEP); review started. #1467 moved to 3a1858bf2
+- 11:11 #1464 reviewed at c1b4b3137: not a first-builder case (msgs only adds Light::TINTS, same values); one P2 (the app's preview is a Person-priority request, so 'make your light blue' says done but the ring keeps the app's colour until 10 s after the drag); one P3; ARM64 green
+- 11:08 #1458 merged by the first builder. #1466 (light/outranked, msgs addition) and #1467 (the conversation's voice is its last four prints) ready; reviews started
+- 11:05 #1454 ready at 825be9138 (P1, P2 and P3s fixed; own switch LAMP_CAPTURE_STAGES); asked to fold four commits into one (the first fails a test)
+- 10:56 merged #1434 (LAMP_RESEND_LOST_LINE, Step B, off unless set; the first builder's 09:4x privacy yes: resend any lost line); one P3 (room for one queue command, two sent)
+- 10:55 merged #1460 (lamp-eyes' change test takes out row shifts and learns cell noise; behind --look-on-change); two P3s (a fidgeting unseen person learned as noise, up to 2.4 s late; --full-look's decode untimed)
+- 10:53 merged #1461 (#1445's P3s: stand-in children end with their tests; tests and doc)
+- 10:53 #1464 ready (lamp-cloud answers the app's Light row; touches crates/msgs and ring_face); review started
+- 10:51 #1456 reviewed at 98bca91c9: not a first-builder case (bus change additive; mute faster with the switch: 0.5-0.9 ms vs 1.8-2.7 ms); P1 (lamp-voice no longer builds on macOS: pipe_with), P2 (share_latch wakes the pump on every owner poll, about 365 passes a second with head sleep), P3s; ARM64 green
+- 10:42 #1459 reviewed at b9b4a5d66: code sound, off unless set; one P2 (the risk named is wrong: lamp-turn-end's two RR 20 threads and lamp-name sit on cores 6-7, so capture pinned there can wait up to a 100 ms RR slice, past its 40 ms buffer, right as the person stops), one P3; ARM64 green
+- 10:42 merged #1457 (the same-voice check's three journal lines through a journal a test reads; text unchanged)
+- 10:39 #1458 re-checked at 294c98e1e: P3 fixed (one APP_CALLS list, held equal both ways); for the first builder
+- 10:36 #1461 reviewed at 84b799cb0 (#1445's P3s: stand-in children end with their tests): no findings; merge on green ARM64. #1460 ready (eyes change test ignores row shift and learns cell noise); review started
+- 10:32 merged #1455 (a test holds lamp-cloud's reply fields the app reads)
+- 10:25 merged #1453 (setup.md's checklist after an app setup; docs only)
+- 10:24 #1459 ready (LAMP_CAPTURE_CORES pins the capture worker); review started. #1454 moved to 6b73dbb90; re-check started
+- 10:20 #1454 reviewed at 7b634c687: P1 (a stalls test fails, red on ARM64: the cost line sits between done() and finish_tick); P2 (LAMP_STALLS is on in the product unit, so every lamp gets it); P3 docs
+- 10:18 #1458 reviewed at 9a810e1e2 (the voice runs the app's two volume calls by nobody): no P1/P2, one P3; on by default, so sent to the first builder
+- 10:13 #1455 at de287bbd8: a second commit pins mic.get's available as a boolean (test and doc only); merge on green ARM64
+- 10:08 #1456 ready (LAMP_CONTROLS_WAIT: the controls pump polls its sockets; touches lamp-bus and the mute latch's pump); review started
+- 10:08 #1453 re-checked at bee85d867: the three P2s and two P3s fixed; one wording P3; merge on green ARM64
+- 10:07 merged #1445 (print asked at 1.8 s; the same-voice child leaves the real-time class; carries #1444's two commits), on the first builder's 09:5x word (off by default)
+- 10:06 #1451 merged earlier; #1455 reviewed at cb5f79efa (lamp-cloud's app-read fields held by a test): no findings, merge on green ARM64
+- 10:06 merged #1451 (same_voice's test programs warmed before timed starts; tests only); closed #1450
+- 10:03 #1454 ready (with LAMP_STALLS=on the capture worker says each stage's CPU a minute); review started
+- 10:02 merged #1452 (lamp-eyes' 10 s line says why each glance was detected; diagnostics, switch on only; Eighth approved); one P3
+- 10:00 #1453 reviewed at bb5dc5a79: paths, modes, reset, save order and 19 units right; three P2s (lamp-setup stays active 600 s after the marker; 'already set up' never prints at a later boot; a failing ping says 'the backend's ping fails'), two P3s
+- 09:54 #1453 ready (setup.md's checklist after an app setup; docs only); review started
+- 09:46 #1452 ready (lamp-eyes' 10 s line says why each glance was detected; diagnostics, switch on only); review started
+- 09:43 #1446 merged by the first builder
+- 09:39 #1446 ready at 0a8345bb1 (P2 fixed, lamp run 09:23 passed); on by default, so sent to the first builder to merge
+- 09:32 merged #1449 (lamp-cloud's after-kill look tested with a child that outlives it; #1423's P3)
+- 09:31 merged #1448 (the capture hold rig runs one worker at a time; tests only); closed #1447
+- 09:30 #1434 re-checked at 801c058de: three P2s fixed; new P2 (any note refuses the resend, the name note included, so a line with the lamp's name is never resent while room talk can be); the dropped 'spoken to the lamp' guard still needs the first builder's word (asked 01:12 UTC, no answer)
+- 09:30 merged #1440 (lamp-name --quiet-below, off unless set)
+- 09:16 #1449 reviewed at acbdc08c3: no findings (#1423's P3 answered with a test); merge on green ARM64
+- 09:14 #1440 rebased over #1441's row (aaf87876c, both rows kept, clean); #1448 P3 fixed at cbc722277 (the lock is the last field); both merge on green ARM64
 - 09:08 merged #1421 (LAMP_UNCLEAR_HUM, off unless set); closed #1417
 - 09:07 #1448 reviewed at a997723f2: tests only (Linux); one P3 (the lock is the first field, dropped before the worker's channels); merge on green ARM64
 - 09:02 #1440 ready and green but conflicts with #1441's row in switches.md (adjacent rows); rebase asked
