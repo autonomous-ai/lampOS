@@ -34,6 +34,16 @@ pub fn apply_from_environment() {
 /// What pinning to `value` did, as the line to log; `None`, and nothing
 /// touched, when the variable is unset. Any fault keeps the default cores.
 pub fn apply(value: Option<&str>) -> Option<String> {
+    apply_with(value, get, set)
+}
+
+/// `apply` over the thread's affinity as `get` and `set` see it, `set`
+/// returning what reads back after it; the tests fake a narrowing cpuset.
+fn apply_with(
+    value: Option<&str>,
+    get: impl Fn() -> Result<BTreeSet<usize>, String>,
+    set: impl Fn(&BTreeSet<usize>) -> Result<BTreeSet<usize>, String>,
+) -> Option<String> {
     let value = value?;
     let Some(cores) = parse(value) else {
         return Some(format!(
@@ -52,19 +62,39 @@ pub fn apply(value: Option<&str>) -> Option<String> {
             text(&online)
         ));
     }
-    Some(match pin(&cores) {
-        Ok(back) => format!(
-            "pinned to cores {} ({ENVIRONMENT}); read back {}: {}",
+    let fault =
+        |error: String| format!("{ENVIRONMENT}={value}: {error}; keeping the default cores");
+    let before = match get() {
+        Ok(before) => before,
+        Err(error) => return Some(fault(error)),
+    };
+    let back = match set(&cores) {
+        Ok(back) => back,
+        Err(error) => return Some(fault(error)),
+    };
+    if back == cores {
+        return Some(format!(
+            "pinned to cores {} ({ENVIRONMENT}); read back {}: it took",
             text(&cores),
-            text(&back),
-            if back == cores {
-                "it took"
-            } else {
-                "it did not take"
-            }
+            text(&back)
+        ));
+    }
+    // A cpuset allowing part of the list has narrowed the thread already:
+    // set back the mask from before, so the default is really kept.
+    let restored = match set(&before) {
+        Ok(again) if again == before => format!("restored cores {}", text(&again)),
+        Ok(again) => format!(
+            "restoring cores {} read back {}",
+            text(&before),
+            text(&again)
         ),
-        Err(error) => format!("{ENVIRONMENT}={value}: {error}; keeping the default cores"),
-    })
+        Err(error) => format!("restoring cores {}: {error}", text(&before)),
+    };
+    Some(format!(
+        "pinned to cores {} ({ENVIRONMENT}); read back {}: it did not take; {restored}",
+        text(&cores),
+        text(&back)
+    ))
 }
 
 fn text(cores: &BTreeSet<usize>) -> String {
@@ -75,27 +105,39 @@ fn text(cores: &BTreeSet<usize>) -> String {
         .join(",")
 }
 
-/// Sets this thread's affinity and reads it back.
+/// This thread's affinity.
 #[cfg(target_os = "linux")]
-fn pin(cores: &BTreeSet<usize>) -> Result<BTreeSet<usize>, String> {
-    use nix::sched::{CpuSet, sched_getaffinity, sched_setaffinity};
-    use nix::unistd::Pid;
-    let mut set = CpuSet::new();
-    for &core in cores {
-        set.set(core)
-            .map_err(|error| format!("core {core}: {error}"))?;
-    }
+fn get() -> Result<BTreeSet<usize>, String> {
+    use nix::sched::{CpuSet, sched_getaffinity};
     // Pid 0 is the calling thread.
-    let this = Pid::from_raw(0);
-    sched_setaffinity(this, &set).map_err(|error| format!("sched_setaffinity: {error}"))?;
-    let back = sched_getaffinity(this).map_err(|error| format!("sched_getaffinity: {error}"))?;
+    let back = sched_getaffinity(nix::unistd::Pid::from_raw(0))
+        .map_err(|error| format!("sched_getaffinity: {error}"))?;
     Ok((0..CpuSet::count())
         .filter(|&core| back.is_set(core).unwrap_or(false))
         .collect())
 }
 
+/// Sets this thread's affinity and reads it back.
+#[cfg(target_os = "linux")]
+fn set(cores: &BTreeSet<usize>) -> Result<BTreeSet<usize>, String> {
+    use nix::sched::{CpuSet, sched_setaffinity};
+    let mut mask = CpuSet::new();
+    for &core in cores {
+        mask.set(core)
+            .map_err(|error| format!("core {core}: {error}"))?;
+    }
+    sched_setaffinity(nix::unistd::Pid::from_raw(0), &mask)
+        .map_err(|error| format!("sched_setaffinity: {error}"))?;
+    get()
+}
+
 #[cfg(not(target_os = "linux"))]
-fn pin(_: &BTreeSet<usize>) -> Result<BTreeSet<usize>, String> {
+fn get() -> Result<BTreeSet<usize>, String> {
+    Err("core affinity is Linux's".to_owned())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn set(_: &BTreeSet<usize>) -> Result<BTreeSet<usize>, String> {
     Err("core affinity is Linux's".to_owned())
 }
 
@@ -124,6 +166,34 @@ mod tests {
             let line = apply(Some(bad)).unwrap();
             assert!(line.contains("keeping the default cores"), "{line}");
         }
+    }
+
+    #[test]
+    fn a_cpuset_allowing_part_of_the_list_gets_the_mask_from_before_back() {
+        use std::cell::RefCell;
+        let set_of = |cores: &[usize]| cores.iter().copied().collect::<BTreeSet<_>>();
+        // A cpuset allowing cores 0-6: asked for 0 and 7, the thread is held to 0.
+        let allowed = set_of(&[0, 1, 2, 3, 4, 5, 6]);
+        let mask = RefCell::new(allowed.clone());
+        let line = apply_with(
+            Some("0,7"),
+            || Ok(mask.borrow().clone()),
+            |cores| {
+                let narrowed: BTreeSet<_> = cores.intersection(&allowed).copied().collect();
+                *mask.borrow_mut() = narrowed.clone();
+                Ok(narrowed)
+            },
+        )
+        .unwrap();
+        if line.contains("not all online") {
+            return; // A machine with fewer than eight cores.
+        }
+        assert_eq!(
+            line,
+            "pinned to cores 0,7 (LAMP_CAPTURE_CORES); read back 0: it did not take; \
+             restored cores 0,1,2,3,4,5,6"
+        );
+        assert_eq!(*mask.borrow(), allowed);
     }
 
     #[cfg(target_os = "linux")]
