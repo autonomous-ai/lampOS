@@ -778,3 +778,49 @@ fn host_first_and_repeated_actions_to_durable_schedule_receipts_are_measured() {
     );
     assert_eq!(failures, 0);
 }
+
+/// #1595, lamp-4ace on 18 Oct at 19:40: "cancel my timer" 15 s after a
+/// two-minute timer was set listed with `pending_only`, which holds only
+/// items already due, so the list was empty, the model said nothing was
+/// set, and the timer rang. A just-set timer is in the plain list; a list of
+/// what is due says how many are set and not yet due, and tells the model
+/// to list again; cancelled by its id, it is gone and never comes due.
+#[test]
+fn a_just_set_timer_is_listed_counted_beside_a_due_only_list_and_cancelled_for_good() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(Adapter::new(schedule.socket.clone()).unwrap()));
+    let timer = actions.call("set_timer", json!({"text":"Tea","seconds":120}));
+    assert_eq!(timer["result"]["status"], "committed");
+    let id = timer["result"]["id"].as_u64().unwrap();
+    *schedule.clock.0.lock().unwrap() = sample(15_000);
+    let all = actions.call("list_reminders", json!({}));
+    assert_eq!(all["result"]["items"][0]["id"], id);
+    assert!(all["result"].get("not_yet_due").is_none(), "{all}");
+    let due = actions.call("list_reminders", json!({"pending_only":true}));
+    assert_eq!(due["result"]["items"], json!([]), "{due}");
+    assert_eq!(due["result"]["not_yet_due"], 1, "{due}");
+    assert_eq!(due["result"]["next"], lamp_actions::schedule::NOT_YET_DUE);
+    assert!(due["result"].to_string().len() <= MAX_RESULT_BYTES);
+    assert_eq!(
+        actions.call("cancel_reminder", json!({"id":id}))["result"]["cancelled"],
+        true
+    );
+    // Past its time it is neither due nor set.
+    *schedule.clock.0.lock().unwrap() = sample(130_000);
+    wait(|| ask(&schedule.socket, json!({"op":"status"}))["items"] == 0);
+    let after = actions.call("list_reminders", json!({"pending_only":true}));
+    assert_eq!(after["result"]["items"], json!([]));
+    assert!(after["result"].get("not_yet_due").is_none(), "{after}");
+    // The schema says what pending_only means, and cancel lists without it.
+    let listing = catalog()
+        .into_iter()
+        .find(|f| f.name == "list_reminders")
+        .unwrap();
+    let said = serde_json::to_string(&listing.parameters).unwrap();
+    assert!(said.contains("due now and not yet said"), "{said}");
+    let cancel = catalog()
+        .into_iter()
+        .find(|f| f.name == "cancel_reminder")
+        .unwrap();
+    assert!(cancel.description.contains("without pending_only"));
+}
