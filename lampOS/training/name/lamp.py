@@ -13,7 +13,8 @@ Three commands, run on a laptop or the office Mac, never on the lamp:
         from each English locale; calls and negatives spread over them, about 15 minutes in all.
 
     python lamp.py train --front DIR --plays PLAYED.tsv RECORD.jsonl... [--negatives RECORD.jsonl...]
-                         [--compare NAME.onnx...] [--folds 3] [--out name.onnx]
+                         [--compare NAME.onnx...] [--rescue NAME.onnx [--gates 0.1,0.3,0.5]]
+                         [--folds 3] [--out name.onnx]
         DIR holds the two fixed models (the installed melspectrogram.onnx and embedding_model.onnx).
         PLAYED.tsv: one line a played line, `UNIX_MS<TAB>VOICE<TAB>KIND<TAB>TEXT`, KIND one of
         bare, hey, oi (calls) or near, mid, other (not calls); UNIX_MS when it began to play.
@@ -28,8 +29,14 @@ Three commands, run on a laptop or the office Mac, never on the lamp:
         recording. Then one model on every voice, `--out`.
         --compare scores the same steps with other name models (the installed one, the bare-name
         one) for a table side by side.
+        --rescue: the two models together, a table for each gate G in --gates. A step's score is
+        the given model's (the installed one), or, where that model reached G at this step or in
+        the 1 s before it in the same recording, the higher of it and the trained folds' held-out
+        score: the installed model as the gate, the trained one only to rescue a call it half
+        heard (#1546, the first builder's 19:44). The tables count what `lamp-name` would say if
+        it ran both on each step and kept the rule on that score.
 
-    python lamp.py dry-run --front DIR WAV...
+    python lamp.py dry-run --front DIR [--compare NAME.onnx...] [--rescue NAME.onnx] WAV...
         The same pipeline on speech files and made-up plays, to show it runs end to end; its
         numbers mean nothing.
 
@@ -61,6 +68,8 @@ KINDS = CALLS | {"near", "mid", "other"}
 # to 4 s, is neither: its own follow-on words, and the lamp's answer.
 CALL_FROM, CALL_TO, CALL_AFTER = 0.35, 1.6, 4.0
 LEASTS = (0.5, 0.9, 0.98)
+# --rescue: the gate looks back this many steps, this one included (1 s at 80 ms a step).
+RESCUE_STEPS = 13
 
 FOLLOW_ONS = [
     "what time is it?", "are you there?", "make the light a little warmer.", "tell me a joke.",
@@ -243,6 +252,16 @@ def onnx_scores(path: str, x: np.ndarray) -> np.ndarray:
     return np.array([session.run(None, {name: x[i : i + 1].astype(np.float32)})[0].item() for i in range(len(x))])
 
 
+def rescued(gate: np.ndarray, trained: np.ndarray, segment: np.ndarray, least: float) -> np.ndarray:
+    """`gate`'s score, or where `gate` reached `least` at this step or in the RESCUE_STEPS - 1
+    before it within the same segment (one recording), the higher of it and `trained`'s."""
+    reached = gate.copy()
+    for k in range(1, RESCUE_STEPS):
+        same = segment[k:] == segment[:-k]
+        reached[k:] = np.where(same, np.maximum(reached[k:], gate[:-k]), reached[k:])
+    return np.where(reached >= least, np.maximum(gate, trained), gate)
+
+
 def report(title: str, scores: np.ndarray, y: np.ndarray, which: np.ndarray, plays, negative_hours: float, neg_scores,
            neg_sources: np.ndarray) -> None:
     """Per voice: the share of calls whose highest own-step score reaches each bar; then hearings an
@@ -281,18 +300,21 @@ def report(title: str, scores: np.ndarray, y: np.ndarray, which: np.ndarray, pla
 def train(args) -> None:
     front = FrontEnd(Path(args.front))
     plays = played(args.plays)
-    xs, ys, whichs, offset = [], [], [], 0
-    for path in args.records:
+    xs, ys, whichs, segments = [], [], [], []
+    for n, path in enumerate(args.records):
         samples, start = recording(path)
         x, times = steps_of(front, samples, start)
         y, which = label(times, plays)
         xs.append(x), ys.append(y), whichs.append(np.where(which >= 0, which, -1))
-    x, y, which = np.concatenate(xs), np.concatenate(ys), np.concatenate(whichs)
-    neg_x = [x[(y == 0)]]
-    for path in args.negatives:
+        segments.append(np.full(len(x), n))
+    x, y, which, segment = np.concatenate(xs), np.concatenate(ys), np.concatenate(whichs), np.concatenate(segments)
+    neg_x, neg_segments = [x[(y == 0)]], []
+    for n, path in enumerate(args.negatives):
         samples, start = recording(path)
         neg_x.append(steps_of(front, samples, start)[0])
+        neg_segments.append(np.full(len(neg_x[-1]), n))
     extra = np.concatenate(neg_x[1:]) if len(neg_x) > 1 else np.zeros((0, 16, 96), np.float32)
+    extra_segment = np.concatenate(neg_segments) if neg_segments else np.zeros(0, int)
     voice_of = np.array([plays[i][1] if i >= 0 else "" for i in which])
     voices = sorted({voice for _, voice, kind in plays if kind in CALLS})
     folds = [voices[k :: args.folds] for k in range(args.folds)]
@@ -327,6 +349,15 @@ def train(args) -> None:
         s = onnx_scores(path, x)
         se = onnx_scores(path, extra) if len(extra) else np.zeros(0)
         report(f"{path}, on the same steps:", s, y, which, plays, hours, np.concatenate([s[y == 0], se]), neg_sources)
+    if args.rescue:
+        gate = onnx_scores(args.rescue, x)
+        gate_extra = onnx_scores(args.rescue, extra) if len(extra) else np.zeros(0)
+        for least in args.gates:
+            both = rescued(gate, held, segment, least)
+            both_extra = rescued(gate_extra, held_extra, extra_segment, least)
+            report(f"Rescue at G={least}: {args.rescue}, or where it reached {least} within the 1 s before, "
+                   "the higher of it and the trained folds' held-out score:",
+                   both, y, which, plays, hours, np.concatenate([both[y == 0], both_extra]), neg_sources)
     final = Flat(args.seed).fit(np.concatenate([x[y >= 0], extra]), np.concatenate([y[y >= 0], np.zeros(len(extra), np.int8)]))
     final.export(Path(args.out))
     check = onnx_scores(args.out, x[:200])
@@ -359,7 +390,8 @@ def dry_run(args) -> None:
                 out.write(json.dumps({"header": {"at_unix_ms": at_ms}, "payload_b64": block}) + "\n")
                 sequence += 1
     train(argparse.Namespace(front=args.front, plays=str(played_tsv), records=[str(record)], negatives=[],
-                             compare=args.compare, folds=3, out=str(folder / "name.onnx"), seed=0))
+                             compare=args.compare, rescue=args.rescue, gates=args.gates, folds=3, out=str(folder / "name.onnx"),
+                             seed=0))
     print(f"(dry run in {folder})")
 
 
@@ -374,12 +406,16 @@ def main() -> None:
     s.add_argument("records", nargs="+")
     s.add_argument("--negatives", nargs="*", default=[])
     s.add_argument("--compare", nargs="*", default=[])
+    s.add_argument("--rescue", default=None)
+    s.add_argument("--gates", type=lambda text: [float(g) for g in text.split(",")], default=[0.1, 0.3, 0.5])
     s.add_argument("--folds", type=int, default=3)
     s.add_argument("--out", default="name-lamp.onnx")
     s.add_argument("--seed", type=int, default=0)
     s = sub.add_parser("dry-run")
     s.add_argument("--front", required=True)
     s.add_argument("--compare", nargs="*", default=[])
+    s.add_argument("--rescue", default=None)
+    s.add_argument("--gates", type=lambda text: [float(g) for g in text.split(",")], default=[0.1, 0.3, 0.5])
     s.add_argument("wavs", nargs="+")
     args = p.parse_args()
     {"lines": lambda: lines(args.voices), "train": lambda: train(args), "dry-run": lambda: dry_run(args)}[args.command]()
