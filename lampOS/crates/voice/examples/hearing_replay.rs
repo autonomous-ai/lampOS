@@ -13,7 +13,9 @@
 //! default; `aec_linear` is what `LAMP_VAD_INPUT=linear` scores, and
 //! `aec_linear_gated` is `LAMP_VAD_INPUT=linear-gated`: the linear output on a
 //! block the AEC-only evidence admits, judged by this replay's `Hearing`, the
-//! AEC-only output elsewhere) is scored by
+//! AEC-only output elsewhere; a recording keeps no reference trust, so the
+//! gate reads every block's evidence where the device takes only trusted
+//! evidence) is scored by
 //! the voice's own detector, one stream as the coordinator runs it, and the
 //! block is judged by `Hearing::EVALUATED` against the AEC-only canceller's
 //! echo evidence, as the duplex rules judge it. `--explained` changes only
