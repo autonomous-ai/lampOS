@@ -843,6 +843,101 @@ fn a_short_word_heard_plainly_stops_the_reply_though_nothing_follows_it() {
 }
 
 #[test]
+fn a_stop_heard_by_the_listener_ends_the_reply_though_only_quiet_follows() {
+    // `lamp-name` hears "Stop" over the lamp and says so on `stop/heard`
+    // (#828), on a real bus in a temporary directory. The session loop's
+    // own pieces are taken in its order: the hearing forces a yield while
+    // the reply sounds, the quiet after it commits the yield, and the
+    // committed stop cancels the reply as the hand's Stop does. The loop
+    // itself reads `LAMP_BUS` and `LAMP_STOP_HEARD` from the environment,
+    // which a test cannot set safely beside others running.
+    let root = std::path::PathBuf::from(format!("/tmp/lvc-stop-heard-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut stop_in = crate::bus_out::NameIn::on_topic(&root, lamp_msgs::StopHeard::TOPIC).unwrap();
+    let mut says = bus
+        .publisher_declared(
+            lamp_msgs::StopHeard::TOPIC,
+            &lamp_msgs::StopHeard::declaration(),
+            "name",
+        )
+        .unwrap();
+    let mut h = Harness::new(TurnTaking::Duplex, 400);
+    let old = h.old();
+    h.blocks(20, 0.99, Some(evidence(0, OWN)));
+    says.publish_json(
+        1,
+        &lamp_msgs::StopHeard {
+            score: 0.95,
+            ago_ms: 0,
+        },
+    )
+    .unwrap();
+    // The datagram is in the voice's socket before it looks.
+    std::thread::sleep(Duration::from_millis(20));
+    let clock = monotonic_us();
+    let (began, score) = stop_in.newest_scored(clock).expect("the stop was heard");
+    let sounding = reply_sounding(&h.mask, &h.reply, clock);
+    let yields = sounding && h.mask.force_yield();
+    record(
+        &mut h.trace,
+        json!({"kind":"stop_heard","at_us":clock,"began_us":began,
+            "score":score,"sounding":sounding,"yields":yields}),
+    )
+    .unwrap();
+    // Then nobody speaks while the lamp's sound dies away, and after it.
+    let mut after = vec![h.block(0.99, Some(evidence(0, OWN)))];
+    let mut committed = false;
+    for quiet in 1..=69u8 {
+        after.push(h.block(0.1, Some(evidence(quiet.min(40), None))));
+        if h.mask.take_stop_committed() {
+            committed = true;
+            break;
+        }
+    }
+    assert!(committed, "the forced yield never committed");
+    // The yield began at the first block after the hearing, and the
+    // speaker was offered nothing until the block that committed it.
+    let yielded = h.events("duplex_yield");
+    assert_eq!(yielded.len(), 1);
+    assert_eq!(yielded[0]["frame_sequence"], 21);
+    assert_eq!(dispatched(&after[1..after.len() - 1]), 0);
+    assert_eq!(h.events("duplex_commit").len(), 1);
+    assert!(h.events("duplex_resume").is_empty());
+    let heard = h.events("stop_heard");
+    assert_eq!(heard.len(), 1);
+    assert_eq!(heard[0]["yields"], true);
+    // The loop's cancellation for a spoken stop.
+    let observed_at_us = monotonic_us();
+    let cancellation = hand::cancel(
+        &mut h.owner,
+        &mut h.reply,
+        &mut h.parent.control,
+        &mut h.pending,
+        &mut h.provider_queue,
+        &mut h.admission,
+        &mut h.detector,
+        false,
+        observed_at_us,
+        monotonic_us,
+    )
+    .unwrap();
+    record_cancelled_reply(
+        cancellation.reply.expect("the reply was cut"),
+        &mut h.trace,
+        crate::receipt_history::SPOKEN_STOP,
+        cancellation.speaker_told_at_us,
+    )
+    .unwrap();
+    assert!(h.reply.is_none());
+    assert_eq!(cancellation.cancelled_turn, Some(old.turn()));
+    let finished = h.events("turn_finished");
+    assert_eq!(finished.len(), 1);
+    assert_eq!(finished[0]["turn"], json!(old.turn()));
+}
+
+#[test]
 fn the_lamps_own_first_word_does_not_stop_it_or_become_a_turn() {
     // The start of a reply as lamp-4ace heard one: two blocks the render
     // explains, then twenty-five it does not, all scored as speech.
