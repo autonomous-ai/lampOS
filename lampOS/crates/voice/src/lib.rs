@@ -54,6 +54,7 @@ pub mod expression_out;
 pub mod first_output;
 pub mod fixture_provider;
 pub mod follows_on;
+pub mod going_on_asks;
 pub mod hand_controls;
 pub mod head_qualification;
 pub mod known_faces;

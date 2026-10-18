@@ -154,6 +154,11 @@ pub struct Files {
     /// `LAMP_REMARKS`, [`crate::remarks`], #829). Only with the attention
     /// rule.
     pub remarks: bool,
+    /// Whether, in a busy room, a line let out only as a conversation going
+    /// on waits for the Policy's decision (`--going-on-asks`,
+    /// `LAMP_GOING_ON_ASKS`, [`crate::going_on_asks`], #1522). Only with the
+    /// attention rule and the bus.
+    pub going_on_asks: bool,
     /// Whether an answer is played only when the lamp was spoken to
     /// (`--spoken-to`, #829).
     pub spoken_to: bool,
@@ -295,6 +300,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (staff_note, flags) = crate::staff_note::take(flags);
     let (provider_patience, flags) = crate::config::take_patience(flags);
     let (remarks, flags) = crate::remarks::take(flags);
+    let (going_on_asks, flags) = crate::going_on_asks::take(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
@@ -336,6 +342,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         staff_note,
         provider_patience,
         remarks,
+        going_on_asks,
     };
     Ok((continuation, sight, files, visual))
 }
@@ -864,6 +871,10 @@ pub(crate) struct Options {
     pub(crate) name_in_passing_ignored: bool,
     /// A remark to the room is held in a busy room ([`crate::remarks`]).
     pub(crate) remarks: bool,
+    /// The bus the Policy's decisions are read from when, in a busy room, a
+    /// line let out only as a conversation going on waits for its decision
+    /// ([`crate::going_on_asks`], #1522). `None`: it is let out at once.
+    pub(crate) going_on_asks: Option<std::path::PathBuf>,
     /// The bus the Policy's decisions are read from when the lamp's actions
     /// wait for them ([`crate::policy_holds`], #800). `None`: they run at
     /// once.
@@ -914,6 +925,7 @@ impl Options {
             ask_unclear: false,
             name_in_passing_ignored: false,
             remarks: false,
+            going_on_asks: None,
             policy_holds: None,
             follows_run: false,
             wait_for_room: false,
@@ -1187,6 +1199,16 @@ pub async fn run_with_continuation(
         name_in_passing_ignored: files.attention && files.name_in_passing_ignored,
         follows_run: files.policy_holds && files.follows_run,
         remarks: files.attention && files.remarks,
+        going_on_asks: match (files.attention && files.going_on_asks, &files.bus_root) {
+            (true, Some(root)) => Some(root.clone()),
+            (true, None) => {
+                eprintln!(
+                    "lamp-voice provider: a line going on in a busy room cannot wait for the Policy without the bus (LAMP_BUS=on): it is let out at once"
+                );
+                None
+            }
+            (false, _) => None,
+        },
         policy_holds: match (files.policy_holds, &files.bus_root) {
             (true, Some(root)) => Some(root.clone()),
             (true, None) => {
@@ -1453,6 +1475,20 @@ async fn serve_with_visual<C: Connect>(
     attention.ask_again_when_unclear(options.attention.is_some() && options.ask_unclear);
     attention.ignore_name_in_passing(options.name_in_passing_ignored);
     attention.hold_remarks(options.remarks);
+    // In a busy room, a line going on waits for the Policy (#1522).
+    let mut going_on_policy = options.going_on_asks.as_deref().and_then(|root| {
+        crate::policy_holds::Verdicts::on(root)
+            .inspect_err(|why| {
+                eprintln!(
+                    "lamp-voice provider: the Policy's decisions cannot be read from the bus, so a line going on in a busy room is let out at once: {why}"
+                );
+            })
+            .ok()
+    });
+    attention.ask_policy_when_going_on(going_on_policy.is_some());
+    // Its first output, kept while it waits, and let go to be judged.
+    let mut kept_for_policy: Option<KeptForPolicy> = None;
+    let mut let_go: Option<Notice> = None;
     attention.speak_when_spoken_to(spoken_to);
     attention.judge_by_day(SPOKEN_TO_BY_DAY.load(std::sync::atomic::Ordering::Relaxed));
     // With it, only talk between people makes the room busy (#829).
@@ -1507,6 +1543,32 @@ async fn serve_with_visual<C: Connect>(
                 while let Some(gone) = intake.handoff.unresent.pop_front() {
                     eprintln!("{}", crate::resend::refused_record(gone.request, gone.why, monotonic_us()));
                     output.push_back(Outbound::Status(ProviderStatus::TurnFailed { request: gone.request, stage: gone.stage, reason: gone.fault }));
+                }
+                // A line going on in a busy room, kept for the Policy's
+                // decision (#1522), is let go to be judged once it comes,
+                // after the wait, or once its turn is no longer in hand.
+                if let Some(kept) = kept_for_policy.as_ref() {
+                    let request = kept.request;
+                    let says = going_on_policy.as_mut().and_then(|policy| {
+                        policy.take();
+                        policy.says(request)
+                    });
+                    let waited = Duration::from_micros(monotonic_us().saturating_sub(kept.since_us));
+                    let gone = !attention.awaits_verdict(request) || intake.handoff.retired(request);
+                    if says.is_some() || gone || waited >= crate::policy_holds::WAIT {
+                        let ms = waited.as_millis();
+                        // Given whatever ended the wait, so that the line
+                        // let go is judged, never kept again.
+                        attention.policy_said(request, says);
+                        if says.is_some() {
+                            eprintln!("lamp-voice provider: request {request}: the Policy's decision came after {ms} ms");
+                        } else if gone {
+                            eprintln!("lamp-voice provider: request {request}: its turn ended while it waited for the Policy's decision ({ms} ms)");
+                        } else {
+                            eprintln!("lamp-voice provider: request {request}: no decision of the Policy's came in {ms} ms");
+                        }
+                        let_go = kept_for_policy.take().map(|kept| kept.notice);
+                    }
                 }
                 // The lamp's actions kept for the Policy's decision (#800),
                 // each let go if its turn was retired meanwhile.
@@ -2016,7 +2078,10 @@ async fn serve_with_visual<C: Connect>(
                 }
                 stall_pass.done();
             },
-            notice=next_notice(&mut provider, coordinated), if !upstream_ended && output.len() < OUTPUT_HIGH_WATER=>{
+            // Nothing more is taken from the service while a line's first
+            // output waits for the Policy's decision (#1522), as while the
+            // output is full.
+            notice=next_or_let_go(&mut provider, &mut let_go, coordinated), if !upstream_ended && output.len() < OUTPUT_HIGH_WATER && kept_for_policy.is_none()=>{
                 if let Ok(notice) = &notice
                     && reminder_notice(&intake.handoff, notice, &provider)
                 {
@@ -2025,6 +2090,48 @@ async fn serve_with_visual<C: Connect>(
                 let reminder_origin = notice.as_ref().ok()
                     .and_then(reminder_policy::lineage)
                     .is_some_and(|lineage| intake.handoff.reminders.is_reminder(lineage));
+                // #1522, with `LAMP_GOING_ON_ASKS=on`: what the Policy said
+                // of the line in hand is given before its first output is
+                // judged, and in a busy room a line going on waits for it,
+                // before anything of that output is counted.
+                if !reminder_origin
+                    && let (Some(policy), Some(now), Ok(Notice::Event(event))) =
+                        (going_on_policy.as_mut(), options.attention, &notice)
+                    && let Some(request) = first_output_of(event)
+                    && attention.awaits_verdict(request)
+                    && !attention.policy_given(request)
+                {
+                    policy.take();
+                    if let Some(says) = policy.says(request) {
+                        attention.policy_said(request, Some(says));
+                    } else {
+                        let (room, going_on) = now();
+                        let turned = eyes.as_ref().and_then(crate::bus_out::someone_turned_to_lamp);
+                        // Whether it answers the lamp's own question, read as
+                        // the judging reads it below: such a line never waits.
+                        let lamp_asked = crate::thread::THREAD
+                            .lock()
+                            .is_ok_and(|thread| thread.lamp_asked_with(request, attention.holds_remarks()));
+                        attention.lamp_asked(lamp_asked);
+                        // And whether it was said close to the lamp, as the
+                        // near rule reads it below: such a line never waits
+                        // (the reviewer and Jarvis on #1538).
+                        if attention_near
+                            && ears_bus.is_some()
+                            && let Some((began, ended)) = attention.window()
+                        {
+                            let rise = rise_in(&ears_levels, (began, ended), monotonic_us());
+                            attention.set_near(rise.is_some_and(|rise| rise >= crate::attention::NEAR_RISE_DB));
+                        }
+                        if attention.waits_for_policy(request, room, going_on, turned)
+                            && let Ok(first) = notice
+                        {
+                            eprintln!("lamp-voice provider: request {request}: its answer waits for the Policy's decision: a conversation with the lamp is going on, in a busy room");
+                            kept_for_policy = Some(KeptForPolicy { request, since_us: monotonic_us(), notice: first });
+                            continue;
+                        }
+                    }
+                }
                 if let Ok(Notice::Event(Event::Audio { lineage, .. })) = &notice {
                     desk.sound(lineage.request.get());
                 }
@@ -2338,7 +2445,7 @@ async fn serve_with_visual<C: Connect>(
                         superseded: superseded.map(RequestId::get),
                     })),
                     Ok(Notice::Event(Event::ToolCall { lineage, call })) => {
-                        let held = attention.holds(lineage.request.get());
+                        let held = attention.holds_calls(lineage.request.get());
                         // The lamp's own work, for a question about it
                         // later (#829).
                         if !held
@@ -3213,6 +3320,43 @@ fn service_link<C: Connect>(
         provider.maintain();
         Ok(())
     }
+}
+
+/// A line's first output kept for the Policy's decision
+/// ([`crate::going_on_asks`], #1522): its request, since when, and the
+/// notice, judged once it is let go.
+struct KeptForPolicy {
+    request: u64,
+    since_us: u64,
+    notice: Notice,
+}
+
+/// The request whose answer this is the first of, as the attention rule
+/// judges it: its sound, its words, or a call that answers.
+fn first_output_of(event: &Event) -> Option<u64> {
+    match event {
+        Event::Audio { lineage, .. } | Event::OutputTranscript { lineage, .. } => {
+            Some(lineage.request.get())
+        }
+        Event::ToolCall { lineage, call } if crate::attention::answers(&call.name) => {
+            Some(lineage.request.get())
+        }
+        _ => None,
+    }
+}
+
+/// The next notice: a first output kept for the Policy's decision once let
+/// go (#1522), else the provider's. Cancellation safe as [`next_notice`]:
+/// the kept notice is taken only as it is returned.
+async fn next_or_let_go<C: Connect>(
+    provider: &mut Supervisor<C>,
+    let_go: &mut Option<Notice>,
+    coordinated: bool,
+) -> std::result::Result<Notice, Failure> {
+    if let Some(notice) = let_go.take() {
+        return Ok(notice);
+    }
+    next_notice(provider, coordinated).await
 }
 
 /// Select one API for the entire worker lifetime. Both futures are cancellation
@@ -8030,6 +8174,7 @@ mod tests {
             ask_unclear: false,
             name_in_passing_ignored: false,
             remarks: false,
+            going_on_asks: None,
             policy_holds: None,
             follows_run: false,
             wait_for_room: false,
@@ -8057,6 +8202,7 @@ mod tests {
                 ask_unclear: false,
                 name_in_passing_ignored: false,
                 remarks: false,
+                going_on_asks: None,
                 policy_holds: None,
                 follows_run: false,
                 wait_for_room: false,
@@ -8109,6 +8255,7 @@ mod tests {
                 ask_unclear: false,
                 name_in_passing_ignored: false,
                 remarks: false,
+                going_on_asks: None,
                 policy_holds: None,
                 follows_run: false,
                 wait_for_room: false,
@@ -9031,6 +9178,7 @@ mod tests {
                 ask_unclear: false,
                 name_in_passing_ignored: false,
                 remarks: false,
+                going_on_asks: None,
                 policy_holds: None,
                 follows_run: false,
                 wait_for_room: false,
@@ -12440,6 +12588,7 @@ mod tests {
                     ask_unclear: false,
                     name_in_passing_ignored: false,
                     remarks: false,
+                    going_on_asks: None,
                     policy_holds: None,
                     follows_run: false,
                     wait_for_room: false,
@@ -12512,6 +12661,7 @@ mod tests {
                     ask_unclear: false,
                     name_in_passing_ignored: ignored,
                     remarks: false,
+                    going_on_asks: None,
                     policy_holds: None,
                     follows_run: false,
                     wait_for_room: false,
@@ -12893,6 +13043,9 @@ mod tests {
     /// A session renewed when the executive's catalog changed (#1472):
     /// tests only.
     mod catalog;
+    /// A line going on in a busy room waits for the Policy (#1522): tests
+    /// only.
+    mod going_on_asks;
     /// A name told is a name kept (`LAMP_NAMES=checked`): tests only.
     mod names;
     /// The Policy holds the lamp's actions (#800): tests only.
