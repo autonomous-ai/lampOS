@@ -388,6 +388,25 @@ impl<M: Model> Drop for Pass<M> {
 mod tests {
     use super::*;
 
+    /// #1505: a tidy job's input as a later build stores it in `jobs.input`,
+    /// with a field this build doesn't know. The same input without it reads;
+    /// with it, `days.rs` reads it with this same `from_str` and fails that
+    /// request ("stored tidy input is invalid"). No fix yet: whoever makes it
+    /// read one release forward flips this to a plain test (Tests).
+    #[test]
+    #[should_panic(expected = "unknown field")]
+    fn an_input_from_a_later_build_is_read() {
+        let input = input();
+        let text = serde_json::to_string(&input).unwrap();
+        assert_eq!(serde_json::from_str::<Input>(&text).unwrap(), input);
+        let mut later: serde_json::Value = serde_json::from_str(&text).unwrap();
+        later["a_field_from_a_later_build"] = serde_json::json!(true);
+        assert_eq!(
+            serde_json::from_str::<Input>(&later.to_string()).unwrap(),
+            input
+        );
+    }
+
     fn input() -> Input {
         Input {
             job: "room-day-1".into(),

@@ -638,6 +638,29 @@ mod tests {
         directory.join("people.json")
     }
 
+    /// #1505: the people file as a later build writes it, with a field this
+    /// build doesn't know at its top and in a person. The same file without
+    /// them opens; with them, lamp-eyes refuses it today and doesn't start.
+    /// `el/people-forward` makes it read: this test then stops panicking, and
+    /// becomes a plain test in that pull request (Tests).
+    #[test]
+    #[should_panic(expected = "unknown field")]
+    fn a_file_from_a_later_build_is_read() {
+        let path = file("later");
+        let mut people = People::open(path.clone()).unwrap();
+        people.remember("A", vec![print(0.3)], 1).unwrap();
+        assert_eq!(
+            People::open(path.clone()).unwrap().names(),
+            vec!["A".to_owned()]
+        );
+        let mut later: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        later["a_field_from_a_later_build"] = serde_json::json!(true);
+        later["people"][0]["a_field_from_a_later_build"] = serde_json::json!(true);
+        std::fs::write(&path, serde_json::to_vec(&later).unwrap()).unwrap();
+        assert_eq!(People::open(path).unwrap().names(), vec!["A".to_owned()]);
+    }
+
     #[test]
     fn nobody_is_known_until_asked_and_a_forgotten_face_is_gone_from_the_file() {
         let path = file("forget");

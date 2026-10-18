@@ -1389,6 +1389,43 @@ mod tests {
         assert_eq!(finished[0].0, 2);
     }
 
+    /// #1505: the thread file as a later build writes it, with a field this
+    /// build doesn't know in an exchange. The same file without it is told
+    /// again; with it, today's build silently starts an empty thread.
+    /// `el/thread-forward` makes it read: this test then stops panicking, and
+    /// becomes a plain test in that pull request (Tests).
+    #[test]
+    #[should_panic(expected = "a later build's thread read as empty")]
+    fn a_thread_from_a_later_build_is_read() {
+        let mut thread = Thread::new();
+        let start = Instant::now() + Duration::from_secs(3_600);
+        let wall = UNIX_EPOCH + Duration::from_secs(1_800_000_000);
+        thread.person("My name is Sam.", true, start);
+        thread.lamp(3, "Nice to meet you, Sam.", start + Duration::from_secs(1));
+        let text = thread
+            .save(
+                start + Duration::from_secs(2),
+                wall + Duration::from_secs(2),
+            )
+            .unwrap();
+        let other = Instant::now() + Duration::from_secs(9_000);
+        let later = wall + Duration::from_secs(10);
+        assert!(
+            Thread::load(&text, other, later)
+                .recall(other, ROOM)
+                .is_some()
+        );
+        let mut kept: serde_json::Value = serde_json::from_str(&text).unwrap();
+        kept[0]["a_field_from_a_later_build"] = serde_json::json!(true);
+        let text = serde_json::to_string(&kept).unwrap();
+        assert!(
+            Thread::load(&text, other, later)
+                .recall(other, ROOM)
+                .is_some(),
+            "a later build's thread read as empty"
+        );
+    }
+
     #[test]
     fn a_saved_thread_is_told_again_by_the_process_that_reads_it_back() {
         let mut thread = Thread::new();

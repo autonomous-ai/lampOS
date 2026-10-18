@@ -322,6 +322,29 @@ mod tests {
         }
     }
 
+    /// #1505: settings as a later build saves them, with a field this build
+    /// doesn't know. The same state without it reopens; with it, it is
+    /// refused today (`invalid_state`). No fix yet, and no unit starts
+    /// lamp-settings on a lamp: whoever makes it read one release forward
+    /// flips this to a plain test (Tests).
+    #[test]
+    #[should_panic(expected = "invalid_state")]
+    fn a_state_from_a_later_build_is_read() {
+        let memory = Memory::default();
+        let mut engine = Engine::open(memory.clone(), Catalog::first_three()).unwrap();
+        let change = mutation(&engine, "r1", 2);
+        engine.mutate(change).unwrap();
+        let snapshot = engine.snapshot();
+        let reopened = Engine::open(memory.clone(), Catalog::first_three()).unwrap();
+        assert_eq!(reopened.snapshot(), snapshot);
+        let mut later: serde_json::Value =
+            serde_json::from_slice(memory.0.lock().unwrap().bytes.as_ref().unwrap()).unwrap();
+        later["a_field_from_a_later_build"] = serde_json::json!(true);
+        memory.0.lock().unwrap().bytes = Some(serde_json::to_vec(&later).unwrap());
+        let read = Engine::open(memory, Catalog::first_three()).unwrap();
+        assert_eq!(read.snapshot(), snapshot);
+    }
+
     #[test]
     fn missing_state_gets_defaults_and_reopening_preserves_identity() {
         let memory = Memory::default();
