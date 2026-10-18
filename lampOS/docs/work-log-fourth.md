@@ -4491,6 +4491,19 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **The shadow night** (as the Policy's owner): Ten's 11 kinds, without `busy true`. If (b) passes, only `quiet false false <0.5` is named.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-18, 19:21 ICT: #1575, #1580 merged; #1589 up; #1522's battery and the three fixes it asked for
+
+- **Merged:**
+  - #1575: #1568 folded; Jarvis approved it with 64 of 64 DST rows matching.
+  - #1580 (19:12): a shadow decision ends the going-on wait.
+- **#1589** (Jarvis's five P3s on #1575): an unknown place says to ask again by its zone; a place not in words is unknown; `Etc/GMT` is said as UTC with the sign people use; a link outside zoneinfo leaves `/etc/timezone`; a `tools.md` note. Gate 2593/0.
+- **#1522's battery with both fixes on** (the first builder, 18:44). Scene 3 and scene 4's talk were held, but two day lines were lost and a timer was set from talk. The first builder's three rulings, built on `fourth/going-on-lookup` (`5f6a14848`, on lamp-voice), gate running:
+  1. **A `look_up` plays** in a conversation going on.
+  2. **No timer from talk:** in a busy room a following reply sets nothing on the schedule unless it names a timer, a reminder or the lamp.
+  3. **A busy room ends a minute after its talk once the lamp has answered**, not three. I read from the code that `busy` counts unanswered lines, no level or voices, and Eighth agreed. The first builder's "clear on every played line" would have undone scene 3's fix; they agreed to the narrower form at 19:12.
+  - Tests for each, and mutations for the timer and the busy end.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
