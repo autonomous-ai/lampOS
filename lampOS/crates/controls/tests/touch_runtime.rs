@@ -886,9 +886,16 @@ fn served_reading(
     (primary, head): (bool, bool),
 ) -> TouchState {
     let mut last = None;
+    // The pins are read at the first 2 ms step at or after each boundary of
+    // theirs, so every 5 ms is truly 200 readings a second (the reviewer on
+    // #1469: reading only on steps that land on one was every 10 ms).
+    let mut next = from.next_multiple_of(pins_us);
     for at in (from..to).step_by(2_000) {
-        if at % pins_us == 0 {
+        if at >= next {
             rig.gpio(at, primary, false, head);
+            while next <= at {
+                next += pins_us;
+            }
         }
         let errors = rig.service.counts.publish_errors;
         let state = rig.step(at).state;
