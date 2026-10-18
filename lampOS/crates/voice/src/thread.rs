@@ -55,6 +55,10 @@ const EXCHANGES: usize = 8;
 const PEOPLE: usize = 4;
 const PERSON_BYTES: usize = 300;
 const LAMP_BYTES: usize = 400;
+/// The end of what the lamp said that is kept beside it, for whether it
+/// asked ([`Thread::lamp_asked_by_its_end`]): a read-back longer than
+/// [`LAMP_BYTES`] keeps its question here.
+const TAIL_BYTES: usize = 160;
 /// What a person said counts as the question to an answer that begins within
 /// this long of it.
 const ASKED_WITHIN: Duration = Duration::from_secs(20);
@@ -85,6 +89,13 @@ struct Exchange {
     at: Instant,
     person: String,
     lamp: String,
+    /// The end of what the lamp said, at most [`TAIL_BYTES`]. Not kept in
+    /// the file: an older build reads the file with `deny_unknown_fields`,
+    /// and would drop the whole thread after a rollback (#1505). A thread
+    /// read back from the file takes its kept start for it, so after a
+    /// restart a read-back longer than [`LAMP_BYTES`] is known to have
+    /// asked only once the lamp speaks again (Fourth on #1499).
+    tail: String,
     /// Handed on to the lamp's memory, or not for it to have.
     journalled: bool,
     /// The memory id of the known person it was with; `None`: the room's.
@@ -178,6 +189,19 @@ fn add(to: &mut String, text: &str, most: usize) {
             continue;
         }
         to.push(c);
+    }
+}
+
+/// `text` added to the end of `to`, as [`add`] does, and only the newest
+/// `most` bytes of the two kept, cut at a character.
+fn keep_end(to: &mut String, text: &str, most: usize) {
+    add(to, text, usize::MAX);
+    if to.len() > most {
+        let mut from = to.len() - most;
+        while !to.is_char_boundary(from) {
+            from += 1;
+        }
+        to.drain(..from);
     }
 }
 
@@ -378,6 +402,7 @@ impl Thread {
                 request: u64::MAX - index as u64,
                 at,
                 person,
+                tail: lamp.clone(),
                 lamp,
                 // The process that wrote the file handed it on.
                 journalled: true,
@@ -491,6 +516,7 @@ impl Thread {
                 at: now,
                 person,
                 lamp: String::new(),
+                tail: String::new(),
                 journalled: false,
                 whose,
                 written,
@@ -498,6 +524,7 @@ impl Thread {
         }
         if let Some(last) = self.exchanges.back_mut() {
             add(&mut last.lamp, text, LAMP_BYTES);
+            keep_end(&mut last.tail, text, TAIL_BYTES);
             self.changed = true;
         }
     }
@@ -581,6 +608,29 @@ impl Thread {
             .filter(|exchange| exchange.request != request)
             .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
             .is_some_and(|exchange| exchange.lamp.trim_end().ends_with('?'))
+    }
+
+    /// [`Self::lamp_asked`], or with `by_its_end` (`LAMP_REMARKS`)
+    /// [`Self::lamp_asked_by_its_end`] too. This also reaches the rule's
+    /// other uses of `lamp_asked`: a short sound that answers the lamp
+    /// (`SOUND_ANSWERS`) and the unclear check (#926).
+    pub fn lamp_asked_with(&self, request: u64, by_its_end: bool) -> bool {
+        self.lamp_asked(request) || by_its_end && self.lamp_asked_by_its_end(request)
+    }
+
+    /// [`Self::lamp_asked`] by how the lamp's newest line before `request`
+    /// ended as it was said, not by what is kept of it: its last sentence
+    /// ends with `?` or begins as a question does
+    /// ([`crate::remarks::lamp_asked`], `LAMP_REMARKS`). A read-back longer
+    /// than [`LAMP_BYTES`] lost its `?`, and Gemini's transcript of the
+    /// lamp's words often has none.
+    pub fn lamp_asked_by_its_end(&self, request: u64) -> bool {
+        self.exchanges
+            .iter()
+            .rev()
+            .filter(|exchange| exchange.request != request)
+            .find(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
+            .is_some_and(|exchange| crate::remarks::lamp_asked(&exchange.tail))
     }
 
     /// Whether the lamp said something to someone so lately that a
@@ -1045,6 +1095,50 @@ mod tests {
     }
 
     const ROOM: usize = 8_192;
+
+    /// A read-back longer than the 400 bytes kept loses its "?" in what is
+    /// kept, and Gemini's transcript may drop it too: by its end the lamp
+    /// still asked (#705, 13:0x: "No, not now." after "Shall I start it?"
+    /// had `lamp_asked` unset, six times in a night).
+    #[test]
+    fn the_lamps_question_is_known_by_its_end_past_what_is_kept() {
+        let now = Instant::now();
+        for (asked, last) in [
+            (true, "Shall I start it?"),
+            (true, "Shall I start it"),
+            (false, "It is done."),
+        ] {
+            let mut thread = Thread::new();
+            thread.person("Ask Claude Code to write a long poem.", true, now);
+            // In pieces, as the transcript comes: more than 400 bytes.
+            for _ in 0..12 {
+                thread.lamp(
+                    1,
+                    "I can ask Claude Code to write a long poem for you. ",
+                    now,
+                );
+            }
+            thread.lamp(1, last, now);
+            assert!(
+                !thread.lamp_asked(2),
+                "the kept words end before the question"
+            );
+            assert_eq!(thread.lamp_asked_by_its_end(2), asked, "{last}");
+            assert!(
+                !thread.lamp_asked_with(2, false),
+                "without the switch, as before"
+            );
+            assert_eq!(
+                thread.lamp_asked_with(2, true),
+                asked,
+                "{last}, with the switch"
+            );
+            assert!(
+                !thread.lamp_asked_by_its_end(1),
+                "a request's own words are not before it"
+            );
+        }
+    }
 
     #[test]
     fn it_keeps_what_was_asked_and_answered_and_not_the_talk_around_it() {

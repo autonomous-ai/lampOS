@@ -25,6 +25,7 @@ fn options(
         name_signal: false,
         sounds_checked: false,
         name_in_passing_ignored: false,
+        remarks: false,
         policy_holds: None,
         follows_run: false,
         wait_for_room: false,

@@ -150,6 +150,10 @@ pub struct Files {
     /// Whether "the lamp" said in passing is no call
     /// (`--name-in-passing-ignored`, #829).
     pub name_in_passing_ignored: bool,
+    /// Whether a remark to the room is held in a busy room (`--remarks`,
+    /// `LAMP_REMARKS`, [`crate::remarks`], #829). Only with the attention
+    /// rule.
+    pub remarks: bool,
     /// Whether an answer is played only when the lamp was spoken to
     /// (`--spoken-to`, #829).
     pub spoken_to: bool,
@@ -290,6 +294,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (resend_lost_line, flags) = crate::resend::take(flags);
     let (staff_note, flags) = crate::staff_note::take(flags);
     let (provider_patience, flags) = crate::config::take_patience(flags);
+    let (remarks, flags) = crate::remarks::take(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
@@ -330,6 +335,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         resend_lost_line,
         staff_note,
         provider_patience,
+        remarks,
     };
     Ok((continuation, sight, files, visual))
 }
@@ -856,6 +862,8 @@ pub(crate) struct Options {
     /// "The lamp" said in passing is no call for the rule
     /// ([`crate::attention::called_by_name`], #829).
     pub(crate) name_in_passing_ignored: bool,
+    /// A remark to the room is held in a busy room ([`crate::remarks`]).
+    pub(crate) remarks: bool,
     /// The bus the Policy's decisions are read from when the lamp's actions
     /// wait for them ([`crate::policy_holds`], #800). `None`: they run at
     /// once.
@@ -905,6 +913,7 @@ impl Options {
             sounds_checked: false,
             ask_unclear: false,
             name_in_passing_ignored: false,
+            remarks: false,
             policy_holds: None,
             follows_run: false,
             wait_for_room: false,
@@ -1177,6 +1186,7 @@ pub async fn run_with_continuation(
         ask_unclear: files.attention && files.ask_unclear,
         name_in_passing_ignored: files.attention && files.name_in_passing_ignored,
         follows_run: files.policy_holds && files.follows_run,
+        remarks: files.attention && files.remarks,
         policy_holds: match (files.policy_holds, &files.bus_root) {
             (true, Some(root)) => Some(root.clone()),
             (true, None) => {
@@ -1442,6 +1452,7 @@ async fn serve_with_visual<C: Connect>(
     attention.check_sounds(sounds_checked);
     attention.ask_again_when_unclear(options.attention.is_some() && options.ask_unclear);
     attention.ignore_name_in_passing(options.name_in_passing_ignored);
+    attention.hold_remarks(options.remarks);
     attention.speak_when_spoken_to(spoken_to);
     attention.judge_by_day(SPOKEN_TO_BY_DAY.load(std::sync::atomic::Ordering::Relaxed));
     // With it, only talk between people makes the room busy (#829).
@@ -2144,7 +2155,11 @@ async fn serve_with_visual<C: Connect>(
                                 }
                                 addressed_said = Some(said);
                             }
-                            let lamp_asked = crate::thread::THREAD.lock().is_ok_and(|thread| thread.lamp_asked(request));
+                            // With `LAMP_REMARKS`, by how the lamp's line ended as it
+                            // was said, too ([`crate::thread::Thread::lamp_asked_with`]).
+                            let lamp_asked = crate::thread::THREAD
+                                .lock()
+                                .is_ok_and(|thread| thread.lamp_asked_with(request, attention.holds_remarks()));
                             attention.lamp_asked(lamp_asked);
                             // #829: a line in another voice than the
                             // conversation's is no part of it. Judged once,
@@ -8024,6 +8039,7 @@ mod tests {
             sounds_checked: false,
             ask_unclear: false,
             name_in_passing_ignored: false,
+            remarks: false,
             policy_holds: None,
             follows_run: false,
             wait_for_room: false,
@@ -8050,6 +8066,7 @@ mod tests {
                 sounds_checked: false,
                 ask_unclear: false,
                 name_in_passing_ignored: false,
+                remarks: false,
                 policy_holds: None,
                 follows_run: false,
                 wait_for_room: false,
@@ -8101,6 +8118,7 @@ mod tests {
                 sounds_checked: false,
                 ask_unclear: false,
                 name_in_passing_ignored: false,
+                remarks: false,
                 policy_holds: None,
                 follows_run: false,
                 wait_for_room: false,
@@ -9022,6 +9040,7 @@ mod tests {
                 sounds_checked: false,
                 ask_unclear: false,
                 name_in_passing_ignored: false,
+                remarks: false,
                 policy_holds: None,
                 follows_run: false,
                 wait_for_room: false,
@@ -12430,6 +12449,7 @@ mod tests {
                     sounds_checked: false,
                     ask_unclear: false,
                     name_in_passing_ignored: false,
+                    remarks: false,
                     policy_holds: None,
                     follows_run: false,
                     wait_for_room: false,
@@ -12501,6 +12521,7 @@ mod tests {
                     sounds_checked: false,
                     ask_unclear: false,
                     name_in_passing_ignored: ignored,
+                    remarks: false,
                     policy_holds: None,
                     follows_run: false,
                     wait_for_room: false,
