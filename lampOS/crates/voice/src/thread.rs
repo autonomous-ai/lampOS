@@ -908,22 +908,19 @@ impl Recalling {
             given.record(&tools);
         }
         eprintln!("{}", crate::session_tools::setup_line(&tools, &self.tools));
-        // Without the light's functions it is told it can't change the
-        // light, in the room `recalled` kept for it.
-        let config = if crate::session_tools::light_missing(&tools, &self.tools) {
-            let told = format!(
-                "{}{}",
-                config.instruction_text(),
-                crate::session_tools::NO_LIGHT
-            );
-            config.clone().instruction(&told).unwrap_or_else(|_| {
-                eprintln!(
-                    "lamp-voice: the session is not told it can't change its light: its instruction is full"
-                );
-                config
-            })
-        } else {
-            config
+        // Without the light's, the volume's or the reminders' functions it
+        // is told what it can't do right now, in the room kept for it.
+        let config = match crate::session_tools::not_ready(&tools, &self.tools) {
+            Some(line) => {
+                let told = format!("{}{line}", config.instruction_text());
+                config.clone().instruction(&told).unwrap_or_else(|_| {
+                    eprintln!(
+                        "lamp-voice: the session is not told what it can't do right now: its instruction is full"
+                    );
+                    config
+                })
+            }
+            None => config,
         };
         if self.name_signal && tools.len() < lamp_gemini::MAX_TOOLS {
             tools.push(crate::attention::name_tool());
@@ -947,19 +944,16 @@ impl Recalling {
     }
 
     /// What a session opened now is given: its functions declared once;
-    /// from the thread's recall, the room the light's line needs when they
-    /// lack the light, and none otherwise, so a session with the light keeps
-    /// its whole recall; the recall (`recall(keep)`, none when there is no
-    /// thread); and those same functions. One read decides the line, the
-    /// room and what the session is sent (the reviewer and Jarvis on
-    /// #1513).
+    /// from the thread's recall, the room the line of what it can't do
+    /// right now needs ([`crate::session_tools::not_ready`]), and none when
+    /// it can do it all, so a session with its functions keeps its whole
+    /// recall; the recall (`recall(keep)`, none when there is no thread);
+    /// and those same functions. One read decides the line, the room and
+    /// what the session is sent (the reviewer and Jarvis on #1513).
     fn opened(&self, recall: impl FnOnce(usize) -> Option<SessionConfig>) -> SessionConfig {
         let tools = crate::tools::declared(&self.tools);
-        let keep = if crate::session_tools::light_missing(&tools, &self.tools) {
-            crate::session_tools::NO_LIGHT.len()
-        } else {
-            0
-        };
+        let keep =
+            crate::session_tools::not_ready(&tools, &self.tools).map_or(0, |line| line.len());
         let config = recall(keep).unwrap_or_else(|| self.config.clone());
         self.equipped_with(config, tools)
     }
@@ -1174,9 +1168,15 @@ mod tests {
             format!("You are a lamp.{}", crate::session_tools::NO_LIGHT)
         );
         assert!(told(&recalling).contains("Never say you changed it."));
-        // The catalog gone too: still told.
+        // The catalog gone (lamp-actions down): told it can't change its
+        // light or its voice either (the first builder's lamp run on #1513:
+        // "I've turned my voice down" with no function at all).
         std::fs::remove_file(folder.join(crate::tools::CATALOG_FILE)).unwrap();
-        assert!(told(&recalling).ends_with(crate::session_tools::NO_LIGHT));
+        assert!(told(&recalling).ends_with(
+            "You cannot change your light or change how loud your voice is right now: \
+             they are not ready. If someone asks for any of them, say so in a few words \
+             of your own, not the same way twice. Never say you did it."
+        ));
         catalog(&["volume_up", "light_colour"]);
         assert_eq!(told(&recalling), "You are a lamp.");
         assert_eq!(told(&Recalling::new(config)), "You are a lamp.");
@@ -1202,13 +1202,38 @@ mod tests {
         // Through `opened`, as `connect` opens a session.
         let open = |recalling: &Recalling| {
             recalling.opened(|keep| {
-                assert!(keep == 0 || keep == crate::session_tools::NO_LIGHT.len());
+                assert!(
+                    keep == 0 || keep == crate::session_tools::NO_LIGHT.len(),
+                    "{keep}"
+                );
                 Some(recalling.recalled_keeping(&thread, now, None, keep))
             })
         };
         assert_eq!(
             open(&near_full).instruction_text(),
             format!("{long}{}", crate::session_tools::NO_LIGHT)
+        );
+        // The catalog gone: the longer line's room is kept, and it fits too
+        // (the reviewer on #1549).
+        std::fs::remove_file(folder.join(crate::tools::CATALOG_FILE)).unwrap();
+        let line = crate::session_tools::not_ready(&[], &near_full.tools).unwrap();
+        assert!(line.len() > crate::session_tools::NO_LIGHT.len());
+        let longer = "x".repeat(lamp_gemini::MAX_INSTRUCTION_BYTES - line.len() - recall + 20);
+        let near_full_longer = Recalling::new(
+            recalling.config.clone().instruction(&longer).unwrap(),
+        )
+        .tools(crate::tools::Settings {
+            exec: Some(folder.clone()),
+            ..Default::default()
+        });
+        assert_eq!(
+            near_full_longer
+                .opened(|keep| {
+                    assert_eq!(keep, line.len());
+                    Some(near_full_longer.recalled_keeping(&thread, now, None, keep))
+                })
+                .instruction_text(),
+            format!("{longer}{line}")
         );
         // With the light, nothing is kept: its recall has all its room.
         catalog(&["volume_up", "light_colour"]);

@@ -287,15 +287,31 @@ with `date` for each. Not yet shown on the lamp: that the model uses it.
 **The conversation so far**, when the previous session ended in the middle
 of one: [conversation-thread.md](conversation-thread.md).
 
-**That the light can't be changed right now**, when the session is given
-none of the light's functions (#1513, [tools.md](tools.md)), last:
+**What it can't do right now**, when the session is given none of the
+light's functions, or the volume's, or (with the reminder tools switched
+on) the reminders' (#1513 and its follow-up, [tools.md](tools.md)), last.
+The light alone:
 
 ```text
 Your light
-You cannot change your light right now: it is not ready. If someone asks you to change it, say in a few words that you can't right now. Never say you changed it.
+You cannot change your light right now: it is not ready. If someone asks you to change it, say so in a few words of your own, not the same way twice. Never say you changed it.
 ```
 
-The file's light line says "You have a function for each when it is ready"
-and what to say when told the light can't be changed: without it, a
-session opened while the ring was down said "your light is all set to
-orange now" five times and made no call (lamp-4ace, 18 Oct 13:57).
+Anything but the light alone gets one line naming each (with "it is" for
+one), as with `lamp-actions` down:
+
+```text
+What you can't do right now
+You cannot change your light, change how loud your voice is or set, list or change timers and reminders right now: they are not ready. If someone asks for any of them, say so in a few words of your own, not the same way twice. Never say you did it.
+```
+
+Both ask for the lamp's own words, not the same way twice: #1513's run got
+"I'm sorry, I can't change my light right now", its line's own words, four
+times. The file's light and voice line says "You have a function for each
+when it is ready" and to say so in its own words when told it can't right
+now, and its reminders line the same; these two sentences are in every
+session, 161 bytes. Without the runtime's line, a session opened while
+the ring was down said "your light is all set to orange now" five times and
+made no call (lamp-4ace, 18 Oct 13:57), and with `lamp-actions` down one said
+"I've turned my voice down" for "turn your light down a little", having no
+function at all (the first builder's lamp run on #1513).
