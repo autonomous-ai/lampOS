@@ -293,17 +293,24 @@ and the job fails without moving the head.
     the previous build is, and the build is refused from then on.
     **What a part not well said of itself goes into the outcome** (#1505):
     the unit that failed on the new build (read before it is put back), and
-    each unit still not well on the old one, gets how often systemd started
-    it again since this round restarted it (`NRestarts`, which a restart
-    asked for flushes) and its own last journal line since that restart
-    (`journalctl -u <unit> --since @<the restart> -o json`, systemd's own
-    lines skipped, control characters gone, at most 200 characters): "build
-    812 put back: lamp-tasks.service ended and systemd is starting it again
-    (systemd started it again once; its last line: "tasks: storage: Tasks
-    storage is unavailable; …")". **Only in the outcome**, which goes to
-    `lamp-update`'s own journal: the refusal kept in `state.json` holds the
-    reason alone, since a part's line can carry what a person said. Asked
-    only of a unit found not well; a round that switches asks nothing.
+    the first unit found not well on the old one (the watch stops there),
+    each gets how often systemd started it again since this round restarted
+    it (`NRestarts`, which a restart asked for flushes) and its own last
+    journal line since that restart: `journalctl -u <unit> --since @<the
+    restart> -o json`, only entries of the unit's own processes
+    (`_SYSTEMD_UNIT`, so not systemd's, systemd-coredump's or journald's
+    lines about it), not its main process from before the restart (the old
+    build's last words as it stopped), control characters gone, at most 200
+    characters, and within 5 s (`JOURNAL_WITHIN`: killed after, and then no
+    line, so a put-back never waits on the journal). "build 812 put back:
+    lamp-tasks.service ended and systemd is starting it again (systemd
+    started it again once; its last line: "tasks: storage: Tasks storage is
+    unavailable; …")". **Only in the outcome as printed**, to `lamp-update`'s
+    own journal (`Outcome::told`): the refusal in `state.json` and the line
+    in `log.jsonl` (`Outcome::kept`) hold the reason alone, since a part's
+    line can carry what a person said and those files outlive the journal.
+    Asked only of a unit found not well, never when systemd itself could not
+    be asked; a round that switches asks nothing.
 11. **After.** Switched or put back, the folders this program made that no
     unit or link names now, nor any unit or link as it was before the last
     switch, are removed: the lamp keeps its build and the one before. A folder it did
@@ -404,10 +411,13 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   made two builds ago removed and the one installed by hand kept; a part
   whose folder is gone installed afresh; a voice that is well put back only
   5 s after the last word; a part put back saying its restarts and last
-  line in the outcome and never in the kept refusal; the old build not well
-  either, each unit's line in `after`; no line asked of a good switch, and
-  none said when there is none; the journal line picked from `journalctl
-  -o json` (the program's own last, systemd's skipped, cleaned and cut).
+  line in the outcome and never in `state.json` or `log.jsonl`; the old
+  build not well either, the first unit not well's line after `after`; no
+  line asked of a good switch, none said when there is none, and none asked
+  when systemd itself cannot be asked; the journal line picked from
+  `journalctl -o json` (the unit's own last, others' and the old main
+  process's skipped, cleaned and cut); a command bounded in time and read
+  whole however much it prints.
 - With product parts (task #811, `cargo test -p lamp-update --test round`,
   19 rounds): a lamp with both kinds switched in one round, the voice by its
   unit and the eyes by their link, the eyes' unit byte for byte the same; a
