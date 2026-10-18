@@ -36,6 +36,7 @@ impl Test {
             sent: false,
             failed: false,
             by_skill: false,
+            owed_told: None,
         };
         Self {
             parent,

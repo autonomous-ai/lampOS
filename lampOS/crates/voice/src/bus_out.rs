@@ -543,8 +543,10 @@ impl Waiting {
 
 /// The voice's report while it waits: well, saying the microphones are
 /// off and why ([`lamp_msgs::MICROPHONES_OFF`]); a warning for a mute
-/// nobody chose and a switch that cannot be read.
-pub fn waiting_health(waiting: Waiting) -> lamp_msgs::Diagnostic {
+/// nobody chose and a switch that cannot be read. With `owed`, a due
+/// reminder waits for them to open, and the report says so ([`OWED`], and
+/// `reminder` `owed`), at the same level (#1545).
+pub fn waiting_health(waiting: Waiting, owed: bool) -> lamp_msgs::Diagnostic {
     use lamp_msgs::{Diagnostic, Level, MICROPHONES_OFF};
     let (level, why) = match waiting {
         Waiting::Switch => (Level::Ok, "(the privacy switch)"),
@@ -556,16 +558,32 @@ pub fn waiting_health(waiting: Waiting) -> lamp_msgs::Diagnostic {
         ),
         Waiting::Unreadable => (Level::Warn, "until the privacy switch can be read"),
         Waiting::Reading => (Level::Ok, "(reading the privacy switch)"),
-        Waiting::Opening => return Diagnostic::ok(SOURCE).with("link", "connecting"),
+        Waiting::Opening => {
+            let opening = Diagnostic::ok(SOURCE).with("link", "connecting");
+            return if owed {
+                opening.with("reminder", "owed")
+            } else {
+                opening
+            };
+        }
     };
-    Diagnostic::new(level, SOURCE, &format!("{MICROPHONES_OFF} {why}")).with("link", "closed")
+    let report = if owed {
+        Diagnostic::new(level, SOURCE, &format!("{MICROPHONES_OFF} {why}; {OWED}"))
+            .with("reminder", "owed")
+    } else {
+        Diagnostic::new(level, SOURCE, &format!("{MICROPHONES_OFF} {why}"))
+    };
+    report.with("link", "closed")
 }
+
+/// What the waiting voice's report adds while a due reminder waits.
+pub const OWED: &str = "a reminder is owed, to be said when they open";
 
 /// The voice's health while it waits (#1371), as a running voice says it:
 /// a little more often than once a second, and at once when why changes.
 pub struct WaitHealth {
     health: Publisher,
-    reported: Option<(u64, Waiting)>,
+    reported: Option<(u64, Waiting, bool)>,
 }
 
 impl WaitHealth {
@@ -589,16 +607,18 @@ impl WaitHealth {
         })
     }
 
-    /// Call on every look of the wait.
-    pub fn report(&mut self, now_us: u64, waiting: Waiting) {
-        if self
-            .reported
-            .is_some_and(|(at, said)| said == waiting && now_us.saturating_sub(at) < 950_000)
-        {
+    /// Call on every look of the wait, with whether a due reminder is owed
+    /// ([`waiting_health`]): at once when either changes.
+    pub fn report(&mut self, now_us: u64, waiting: Waiting, owed: bool) {
+        if self.reported.is_some_and(|(at, said, was_owed)| {
+            said == waiting && was_owed == owed && now_us.saturating_sub(at) < 950_000
+        }) {
             return;
         }
-        self.reported = Some((now_us, waiting));
-        let _ = self.health.publish_json(now_us, &waiting_health(waiting));
+        self.reported = Some((now_us, waiting, owed));
+        let _ = self
+            .health
+            .publish_json(now_us, &waiting_health(waiting, owed));
     }
 }
 
@@ -869,8 +889,11 @@ mod tests {
             of(Some(Allowed), false, true, false, false),
             Waiting::Opening
         );
-        assert_eq!(waiting_health(Waiting::Reading).level, lamp_msgs::Level::Ok);
-        let switch = waiting_health(Waiting::Switch);
+        assert_eq!(
+            waiting_health(Waiting::Reading, false).level,
+            lamp_msgs::Level::Ok
+        );
+        let switch = waiting_health(Waiting::Switch, false);
         assert_eq!(switch.level, lamp_msgs::Level::Ok);
         assert_eq!(
             switch.message,
@@ -878,14 +901,53 @@ mod tests {
         );
         assert!(switch.message.starts_with(lamp_msgs::MICROPHONES_OFF));
         assert_eq!(
-            waiting_health(Waiting::RestartGuard).level,
+            waiting_health(Waiting::RestartGuard, false).level,
             lamp_msgs::Level::Warn
         );
         assert_eq!(
-            waiting_health(Waiting::Unreadable).level,
+            waiting_health(Waiting::Unreadable, false).level,
             lamp_msgs::Level::Warn
         );
-        assert!(waiting_health(Waiting::Opening).message.is_empty());
+        assert!(waiting_health(Waiting::Opening, false).message.is_empty());
+        // #1545: a due reminder waiting is said beside why, at the same
+        // level, and marked; the opening report carries the mark only.
+        let owed = waiting_health(Waiting::Muted, true);
+        assert_eq!(owed.level, lamp_msgs::Level::Ok);
+        assert_eq!(
+            owed.message,
+            "the microphones are off (muted); a reminder is owed, to be said when they open"
+        );
+        let unread = waiting_health(Waiting::Unreadable, true);
+        assert_eq!(unread.level, lamp_msgs::Level::Warn);
+        assert!(unread.message.ends_with(OWED));
+        let opening = waiting_health(Waiting::Opening, true);
+        assert!(opening.message.is_empty());
+        let marked = |report: &lamp_msgs::Diagnostic| {
+            report
+                .values
+                .iter()
+                .any(|fact| fact.key == "reminder" && fact.value == "owed")
+        };
+        assert!(marked(&owed) && marked(&unread) && marked(&opening));
+        assert!(!marked(&waiting_health(Waiting::Muted, false)));
+    }
+
+    /// #1545: a reminder coming due, or said, in the wait is told at once,
+    /// not a second later.
+    #[test]
+    fn a_reminder_owed_in_the_wait_is_said_at_once() {
+        let (bus, root) = bus("owed");
+        let mut health = WaitHealth::on(&bus).unwrap();
+        health.report(0, Waiting::Switch, false);
+        let first = health.reported;
+        health.report(2_000, Waiting::Switch, true);
+        assert_ne!(health.reported, first);
+        assert_eq!(health.reported, Some((2_000, Waiting::Switch, true)));
+        health.report(4_000, Waiting::Switch, true);
+        assert_eq!(health.reported, Some((2_000, Waiting::Switch, true)));
+        health.report(6_000, Waiting::Switch, false);
+        assert_eq!(health.reported, Some((6_000, Waiting::Switch, false)));
+        let _ = std::fs::remove_dir_all(root);
     }
 
     /// #1371: an hour in the privacy wait, looked at every 2 ms, is said
@@ -901,7 +963,7 @@ mod tests {
         let mut now = 0;
         while now <= hour_us {
             let before = health.reported;
-            health.report(now, Waiting::Switch);
+            health.report(now, Waiting::Switch, false);
             if health.reported != before {
                 said.push(now);
             }
@@ -920,9 +982,9 @@ mod tests {
             )
             .unwrap();
         let mut health = WaitHealth::on(&bus).unwrap();
-        health.report(0, Waiting::Switch);
-        health.report(2_000, Waiting::Switch);
-        health.report(4_000, Waiting::Opening);
+        health.report(0, Waiting::Switch, false);
+        health.report(2_000, Waiting::Switch, false);
+        health.report(4_000, Waiting::Opening, false);
         let mut heard = Vec::new();
         while let Some(message) = hears.recv(Duration::from_millis(50)).unwrap() {
             heard.push(message.parse::<lamp_msgs::Diagnostic>().unwrap().message);

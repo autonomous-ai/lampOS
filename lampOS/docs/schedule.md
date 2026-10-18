@@ -662,6 +662,29 @@ new one is not behind it when it comes due. Only an item set without
 speaking (from an app, or an agent's `schedule` call) can wait behind an
 overdue one while nobody is seen or heard (Nine and the reviewer on #1103).
 
+**Due while the microphones are off (#1545).** A muted lamp opens no
+session (`service_waiting_for_privacy`), so a reminder that comes due while
+the privacy switch is closed, or the lamp is muted or asleep, is not said
+then: saying it would open a session while the person has said "don't
+listen" (the first builder's call on #1545). It waits, still offered by the
+consumer, and the muted wait says it is owed. The journal says once for
+each attempt
+`lamp-voice: a reminder is due while the microphones are off: it waits until they open`,
+the session's trace gets `reminder_owed_while_muted`, and the voice's
+health while it waits adds "a reminder is owed, to be said when they open"
+and `reminder` `owed` to why the microphones are off (`bus_out::OWED`).
+When they open, it is the first turn the voice's loop may take, said as any
+late reminder is, and resolved `said`; one that waited an hour or more
+follows the one-hour rule above. One cancelled meanwhile is withdrawn and
+never said, and the health stops saying it at once. On lamp-cb94 on 17
+October one came due 21 minutes into a mute, and nothing said it was owed.
+The ring's soft pulse a minute while one is owed waits for #1494's pattern
+to be on the lamp. Tests:
+`coordinator::tests::reminders::a_reminder_due_while_muted_is_owed_once_and_no_turn_begins`,
+`on_unmute_the_owed_reminder_is_offered_to_the_first_turn`,
+`a_reminder_cancelled_while_muted_is_never_said` and
+`a_reminder_owed_over_an_hour_waits_for_someone_after_unmute`.
+
 Admission requires current microphone retention/privacy, ready provider, no
 reply, queued input, speaker receipt or draining/prospective utterance, and one
 second of fresh local silence. A promised camera look and the existing
