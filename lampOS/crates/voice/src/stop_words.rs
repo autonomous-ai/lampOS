@@ -68,23 +68,62 @@ pub fn listen() -> Listen {
     listen_for(std::env::var(ENVIRONMENT).ok().as_deref())
 }
 
-/// Where the coordinator reads what the stop words hear: `raw`, the
-/// microphone's block before the canceller, or the canceller's output as
-/// the provider hears it (unset, or `processed`). On lamp-4ace on 16
-/// October at 22:44 the canceller's output carried 16 to 18 speech starts
-/// and no words over a reply: the canceller takes out a short "Stop." said
-/// over the lamp with its echo (`lamp_audio::duplex`; the first builder on
-/// #1047). Raw blocks carry the lamp's own words too, which
-/// [`stop_over`] already leaves out.
+/// Where the coordinator reads what the stop words hear ([`Source`]):
+/// `raw`, `linear`, or the canceller's output as the provider hears it
+/// (unset, or `processed`). On lamp-4ace on 16 October at 22:44 the
+/// canceller's output carried 16 to 18 speech starts and no words over a
+/// reply: the canceller takes out a short "Stop." said over the lamp with
+/// its echo (`lamp_audio::duplex`; the first builder on #1047). Raw blocks
+/// carry the lamp's own words too, which [`stop_over`] already leaves out.
 pub const SOURCE_ENVIRONMENT: &str = "LAMP_STOP_WORDS_SOURCE";
 
-/// Whether the stop words hear the raw blocks.
-pub fn raw_source() -> bool {
-    raw_source_for(std::env::var(SOURCE_ENVIRONMENT).ok().as_deref())
+/// The blocks the stop words hear ([`SOURCE_ENVIRONMENT`]). Anything but
+/// [`Source::Processed`] is asked of the capture worker, which sends it
+/// beside each cancelled block.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Source {
+    /// The canceller's output, as the provider hears it: unset, `processed`
+    /// or any other value.
+    #[default]
+    Processed,
+    /// The block as the microphone recorded it, before the canceller (`raw`,
+    /// `--raw-blocks`, #1047). Over the lamp it is mostly the lamp's own
+    /// voice: the speech-to-text returned the lamp's story, and a "Lamp,
+    /// stop." said over it was never written (the first builder on #828,
+    /// 19 October 01:29).
+    Raw,
+    /// The canceller's linear stage, before its residual-echo suppressor
+    /// (`linear`, `--linear-blocks`, #828): the microphone less the echo
+    /// its adaptive filter predicts. It keeps the person's word the
+    /// suppressor takes away with the lamp's voice, and most of that voice
+    /// is gone. A block the canceller did not run for has none, and the
+    /// stop words hear the block handed on, as the microphone recorded it.
+    Linear,
 }
 
-fn raw_source_for(value: Option<&str>) -> bool {
-    value == Some("raw")
+impl Source {
+    /// The value the environment names, as the counts file and the
+    /// journal write it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Processed => "processed",
+            Self::Raw => "raw",
+            Self::Linear => "linear",
+        }
+    }
+}
+
+/// What the stop words hear, as the environment asks.
+pub fn source() -> Source {
+    source_for(std::env::var(SOURCE_ENVIRONMENT).ok().as_deref())
+}
+
+fn source_for(value: Option<&str>) -> Source {
+    match value {
+        Some("raw") => Source::Raw,
+        Some("linear") => Source::Linear,
+        _ => Source::Processed,
+    }
 }
 
 /// Where the coordinator reads whether a stop heard over the lamp is held
@@ -141,8 +180,8 @@ pub const FINALIZE_AFTER_STILL_BLOCKS: u8 = 10;
 /// after it is said.
 pub const FLUSH_AFTER_STILL_BLOCKS: u8 = 20;
 
-/// With the raw blocks ([`raw_source`]), blocks sent while the lamp sounds
-/// after which the words are asked for, whatever the detector heard: 50,
+/// With the raw or linear blocks ([`Source`]), blocks sent while the lamp
+/// sounds after which the words are asked for, whatever the detector heard: 50,
 /// half a second. Over the lamp the canceller's output, which the detector
 /// scores, holds no speech, so a pause after speech never came and no
 /// words were asked for (the first builder at 02:29 and 02:57 on #1047).
@@ -285,6 +324,9 @@ pub struct StopWords {
     /// sent since they last were.
     cadence: bool,
     since_asked: u16,
+    /// What the coordinator hands on ([`Self::with_source`]), for the
+    /// counts file.
+    source: Source,
     /// With `always`: a stop heard is held for the lamp's own words
     /// ([`Self::with_hold`]), and the one held.
     hold: bool,
@@ -330,6 +372,7 @@ impl StopWords {
             heard: Vec::new(),
             cadence: false,
             since_asked: 0,
+            source: Source::Processed,
             hold: false,
             held: None,
             ahead_at: 0,
@@ -348,10 +391,18 @@ impl StopWords {
 
     /// With `on`, listening to everything, the words are asked for every
     /// [`CADENCE_BLOCKS`] sent as well as at each pause after speech: for
-    /// the raw blocks, whose speech the detector does not score.
+    /// the raw or linear blocks, whose speech the detector does not score.
     pub fn with_cadence(mut self, on: bool) -> Self {
         self.cadence = on && self.always;
         self
+    }
+
+    /// Hearing `source`'s blocks: anything but the canceller's output is
+    /// asked for on the cadence too ([`Self::with_cadence`]), and the
+    /// counts file says which it was.
+    pub fn with_source(mut self, source: Source) -> Self {
+        self.source = source;
+        self.with_cadence(source != Source::Processed)
     }
 
     /// Everything heard while the lamp speaks ([`Listen::Always`]). A yield
@@ -567,6 +618,7 @@ impl StopWords {
                     "blocks_sent": self.sent,
                     "pauses_asked": self.flushes,
                     "asked_every_ms": self.cadence.then_some(u64::from(CADENCE_BLOCKS) * 10),
+                    "source": self.source.as_str(),
                     "results": self.results,
                     "stop_heard": self.stop_heard,
                     "held": self.hold.then(|| self.holds.iter().map(|(waited_ms, acted)| {
@@ -1431,12 +1483,25 @@ async fn serve<C, F>(
 mod tests {
     use super::*;
 
-    /// #1047: `raw` only; anything else hears the canceller's output.
+    /// #1047 and #828: `raw` and `linear` as written; anything else, and
+    /// unset, hears the canceller's output as before.
     #[test]
-    fn the_source_is_raw_only_when_asked() {
-        assert!(raw_source_for(Some("raw")));
-        for value in [None, Some(""), Some("processed"), Some("RAW"), Some("mic1")] {
-            assert!(!raw_source_for(value), "{value:?}");
+    fn the_source_is_raw_or_linear_only_when_asked() {
+        assert_eq!(source_for(Some("raw")), Source::Raw);
+        assert_eq!(source_for(Some("linear")), Source::Linear);
+        for value in [
+            None,
+            Some(""),
+            Some("processed"),
+            Some("RAW"),
+            Some("Linear"),
+            Some("aec_linear"),
+            Some("mic1"),
+        ] {
+            assert_eq!(source_for(value), Source::Processed, "{value:?}");
+        }
+        for source in [Source::Processed, Source::Raw, Source::Linear] {
+            assert_eq!(source_for(Some(source.as_str())), source);
         }
     }
     use std::sync::{Arc, Mutex};
@@ -1684,6 +1749,43 @@ mod tests {
         assert!(!yields.cadence);
     }
 
+    /// #828: the raw and the linear blocks are asked for on the cadence,
+    /// the canceller's output is not, and each reply's counts say which
+    /// was heard.
+    #[test]
+    fn the_source_sets_the_cadence_and_is_in_each_replys_counts() {
+        for (source, cadence) in [
+            (Source::Processed, false),
+            (Source::Raw, true),
+            (Source::Linear, true),
+        ] {
+            let words =
+                StopWords::always(Box::new(Scripted(Arc::new(Mutex::new(Script::default())))))
+                    .with_source(source);
+            assert_eq!((words.source, words.cadence), (source, cadence));
+        }
+        let dir =
+            std::env::temp_dir().join(format!("lamp-voice-stop-source-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("stop-words.json");
+        let mut words = StopWords::always_counted(
+            Box::new(Scripted(Arc::new(Mutex::new(Script::default())))),
+            Some(path.clone()),
+        )
+        .with_source(Source::Linear);
+        let mut at = 0u64;
+        for _ in 0..3 {
+            at += 10_000;
+            words.block(true, true, false, None, None, at, &block(1));
+        }
+        words.block(false, false, false, None, None, at + 10_000, &block(1));
+        let written: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(written["reply"]["source"], "linear", "{written}");
+        assert_eq!(written["reply"]["asked_every_ms"], 500, "{written}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     /// #1047, the first builder at 02:05: with the journal unreadable on
     /// the lamp, each reply's counts go to a file at its end: what was
     /// sent and asked for, what the stream heard and whether it stopped
@@ -1715,6 +1817,7 @@ mod tests {
         assert_eq!(written["reply"]["blocks_sent"], 31, "{written}");
         assert_eq!(written["reply"]["results"], 1, "{written}");
         assert_eq!(written["reply"]["stop_heard"], true, "{written}");
+        assert_eq!(written["reply"]["source"], "processed", "{written}");
         assert_eq!(
             written["reply"]["heard"],
             serde_json::json!([{"n": 1, "text": "Stop.", "stopped_the_lamp": true}])

@@ -12,6 +12,7 @@ use crate::{
         hold::{self, CaptureHold},
     },
     stage_cost::Stage,
+    stop_words::Source,
     transport::{ReferenceChannels, WorkerChannels},
     wire::{
         CaptureTiming, ClockPrimed, Control, MicrophoneFrame, ReferenceControl, ReferenceFault,
@@ -423,7 +424,7 @@ pub fn capture_with_noise_suppression(
         ReferenceClock::Fixed,
         ReferenceRecovery::Off,
         lamp_audio::Reference::AsGiven,
-        false,
+        Source::Processed,
     )
 }
 
@@ -448,7 +449,7 @@ pub fn capture_with_options(
         options.reference_clock,
         options.reference_recovery,
         options.echo_reference.reference(),
-        options.raw_blocks,
+        options.stop_words,
     )
 }
 
@@ -467,7 +468,7 @@ pub fn capture_on<D: CaptureDevice>(
     reference_clock: ReferenceClock,
     reference_recovery: ReferenceRecovery,
     echo_reference: lamp_audio::Reference,
-    raw_blocks: bool,
+    stop_words: Source,
 ) -> Result<()> {
     // The worker inherits the unit's RR 20 and all cores; with
     // LAMP_CAPTURE_CORES its thread (and the ones it starts) keep to those
@@ -492,7 +493,7 @@ pub fn capture_on<D: CaptureDevice>(
         reference_recovery,
         echo_reference,
         hold::blocks_for(device, reference_clock),
-        raw_blocks,
+        stop_words,
         device,
     );
     // Invalidate input authority and close hardware before any filesystem acknowledgement wait.
@@ -528,8 +529,9 @@ fn capture_loop<D: CaptureDevice>(
     reference_recovery: ReferenceRecovery,
     echo_reference: lamp_audio::Reference,
     hold_blocks: usize,
-    // Each frame also carries the block before the canceller (#1047).
-    raw_blocks: bool,
+    // What each frame also carries for the stop words: the block before
+    // the canceller (#1047) or the canceller's linear output (#828).
+    stop_words: Source,
     // The ALSA name opened: whose it is when busy at start (#1567).
     device: &str,
 ) -> Result<EndReason> {
@@ -565,8 +567,17 @@ fn capture_loop<D: CaptureDevice>(
     // canceller keeps it only then.
     let vad_input = crate::activity::DetectorInput::from_environment();
     let vad_linear = vad_input.reads_linear();
-    if let Some(value) = vad_input.value() {
+    // So may the stop words (`--linear-blocks`, #828).
+    let words_linear = stop_words == Source::Linear;
+    if vad_input.value().is_some() || words_linear {
         echo = echo.with_linear_output();
+    }
+    if words_linear {
+        eprintln!(
+            "lamp-voice: capture: the stop words are sent the canceller's linear output (LAMP_STOP_WORDS_SOURCE=linear)"
+        );
+    }
+    if let Some(value) = vad_input.value() {
         eprintln!(
             "lamp-voice: capture: the speech detector reads the canceller's linear output{} (LAMP_VAD_INPUT={value})",
             if value == "linear-gated" {
@@ -579,6 +590,9 @@ fn capture_loop<D: CaptureDevice>(
     // Blocks the detector scored, and of those on the linear output, since
     // the last minute's line: a run with the switch shows it took.
     let mut vad_said = (Instant::now(), 0u64, 0u64);
+    // Blocks sent, and of those with the linear output for the stop words,
+    // since the last minute's line: the rest went without it.
+    let mut words_said = (Instant::now(), 0u64, 0u64);
     let evidence_skip = crate::quiet_pace::evidence_skipped();
     echo.skip_evidence_while_render_silent(evidence_skip);
     let mut evidence_said = (Instant::now(), echo.evidence_skipped());
@@ -924,7 +938,7 @@ fn capture_loop<D: CaptureDevice>(
                 continue;
             };
             // As the microphone recorded it, for the stop words, when asked.
-            let raw = raw_blocks.then(|| frame.samples.to_vec());
+            let raw = (stop_words == Source::Raw).then(|| frame.samples.to_vec());
             // The canceller has this block's reference, or the block goes on
             // as the microphone recorded it. Nothing is put in its place.
             let from = cost.now();
@@ -938,6 +952,14 @@ fn capture_loop<D: CaptureDevice>(
             // of the block handed on; the letters, `explained` and `heard`
             // still come from `clean`.
             let linear = step.and(echo.linear());
+            // The same, for the stop words, when asked. A block the
+            // canceller did not run for goes without, and the coordinator
+            // hands on what it sends instead, as the microphone recorded it.
+            let words_linear_block = linear
+                .filter(|_| words_linear)
+                .map(|linear| linear.to_vec());
+            words_said.1 += u64::from(words_linear);
+            words_said.2 += u64::from(words_linear_block.is_some());
             // With `linear-gated`, the block's own trusted evidence, as the
             // frame would carry it, admits the linear output. Nothing is
             // judged with any other value.
@@ -1032,6 +1054,7 @@ fn capture_loop<D: CaptureDevice>(
                 reference: reference.trust(),
                 samples: clean.to_vec(),
                 raw,
+                linear: words_linear_block,
             })?;
             cost.stage(Stage::Encode, from);
             cost.block();
@@ -1057,6 +1080,14 @@ fn capture_loop<D: CaptureDevice>(
                     vad_input.value().unwrap_or("")
                 );
                 vad_said = (Instant::now(), 0, 0);
+            }
+            if evidence_due(words_linear, words_said.0.elapsed()) {
+                let (since, blocks, linear) = words_said;
+                eprintln!(
+                    "lamp-voice: capture: the stop words were sent the linear output on {linear} of {blocks} blocks in the last {} s (LAMP_STOP_WORDS_SOURCE=linear)",
+                    since.elapsed().as_secs()
+                );
+                words_said = (Instant::now(), 0, 0);
             }
         }
         // A change of trust found while draining reference is not kept

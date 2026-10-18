@@ -326,6 +326,13 @@ pub struct MicrophoneFrame {
     /// word said over the lamp (#1047, `LAMP_STOP_WORDS_SOURCE=raw`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub raw: Option<Vec<i16>>,
+    /// The canceller's linear output for this block, before its
+    /// residual-echo suppressor, only from a capture worker asked for it
+    /// (`--linear-blocks`) and only when the canceller ran for the block:
+    /// for the stop words' speech-to-text, which the raw block gives mostly
+    /// the lamp's own voice (#828, `LAMP_STOP_WORDS_SOURCE=linear`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub linear: Option<Vec<i16>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

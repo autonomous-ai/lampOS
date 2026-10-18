@@ -370,6 +370,7 @@ impl CapturePeer {
             };
             let frame = MicrophoneFrame {
                 raw: None,
+                linear: None,
                 epoch: 1,
                 dsp_epoch: 1,
                 privacy_generation: self.generation,
