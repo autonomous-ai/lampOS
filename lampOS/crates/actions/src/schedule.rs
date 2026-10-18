@@ -17,6 +17,10 @@ use std::{
 
 pub const DEFAULT_SOCKET: &str = "/run/lampos-schedule/call.sock";
 pub const DEADLINE: Duration = Duration::from_millis(1250);
+/// Told beside a list asked `pending_only` that left out items set but not
+/// yet due (#1595).
+pub const NOT_YET_DUE: &str = "Timers or reminders are set that are not due yet, so they are not in this list. List again without pending_only before saying none are set, or to find one to cancel.";
+
 /// Voice reserves 16 bytes in its provider's 4096-byte tool-result allowance.
 pub const MAX_RESULT_BYTES: usize = 4096 - 16;
 pub const NAMES: [&str; 6] = [
@@ -67,13 +71,13 @@ pub fn catalog() -> Vec<Function> {
         ),
         function(
             NAMES[3],
-            "Read one bounded page of active timers and reminders. If next_after_id is present, use it as after_id to read more; never describe an incomplete page as the whole list.",
-            json!({"pending_only":{"type":"boolean"},"after_id":{"type":"integer","minimum":0}}),
+            "Read one bounded page of active timers and reminders. To say what is set, or to find one to cancel, leave pending_only out. If next_after_id is present, use it as after_id to read more; never describe an incomplete page as the whole list. If not_yet_due is more than 0, timers or reminders are set: list again without pending_only before saying none are.",
+            json!({"pending_only":{"type":"boolean","description":"true lists only items that are due now and not yet said; leave it out to list everything that is set."},"after_id":{"type":"integer","minimum":0}}),
             json!([]),
         ),
         function(
             NAMES[4],
-            "Cancel the selected timer or whole reminder series only when asked. Use an ID from the current list.",
+            "Cancel the selected timer or whole reminder series only when asked. Use an ID from the current list, read without pending_only.",
             json!({"id":id}),
             json!(["id"]),
         ),
@@ -171,7 +175,29 @@ impl Adapter {
                 },
                 deadline,
             )?;
-            return page(&reply, after_id, pending_only);
+            let mut listed = page(&reply, after_id, pending_only)?;
+            if pending_only {
+                // #1595: a list of what is due leaves out what is set and not
+                // yet due, and "nothing due" read as "nothing set" let a timer
+                // the person asked to cancel ring. Said as a count, best
+                // effort: the list itself stands if the count can't be read.
+                if let Some(waiting) = self
+                    .ask(&Request::Status {}, deadline)
+                    .ok()
+                    .and_then(|status| {
+                        Some(
+                            status["items"]
+                                .as_u64()?
+                                .saturating_sub(status["pending"].as_u64()?),
+                        )
+                    })
+                    .filter(|waiting| *waiting > 0)
+                {
+                    listed["not_yet_due"] = json!(waiting);
+                    listed["next"] = json!(NOT_YET_DUE);
+                }
+            }
+            return Ok(listed);
         }
         // Snooze obtains guard and delivery from the SAME Get reply. Other
         // mutations use Status. No conflict or uncertain mutation is retried.
@@ -614,7 +640,12 @@ fn page(reply: &Value, after_id: u64, pending_only: bool) -> Result<Value, Failu
     let mut items = Vec::new();
     for value in &checked {
         items.push(value.clone());
-        let probe = json!({"items":items,"next_after_id":u64::MAX,"pending_only":pending_only,"complete":false});
+        let mut probe = json!({"items":items,"next_after_id":u64::MAX,"pending_only":pending_only,"complete":false});
+        if pending_only {
+            // Room kept for the count of what is not yet due (#1595).
+            probe["not_yet_due"] = json!(u64::MAX);
+            probe["next"] = json!(NOT_YET_DUE);
+        }
         if probe.to_string().len() > MAX_RESULT_BYTES {
             items.pop();
             break;

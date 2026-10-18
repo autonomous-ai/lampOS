@@ -438,6 +438,22 @@ is `daily` or `weekly`; weekday uses its full lowercase English name. IDs
 must come from a current list, never a guess. Omit optional values rather
 than passing null; unknown or null fields are refused before IPC.
 
+**`pending_only` means due, not set (#1595).** An item is pending only once
+its time has come and it is not yet said (`engine.rs`, `tick`), so a list
+asked `pending_only` leaves out every timer and reminder still to come. On
+lamp-4ace on 18 October at 19:40, "cancel my timer" 15 s after a two-minute
+timer was set got "I don't have any timers or reminders set right now", and
+the timer rang (likely a `pending_only` list; the call's arguments are not
+journalled). So the schema now says what it means ("true lists only items
+that are due now and not yet said; leave it out to list everything that is
+set"), `cancel_reminder` says to list without it, and a list asked
+`pending_only` that left items out carries `not_yet_due` (their count, from
+`Status`) and a `next` telling the model to list again before saying none
+are set (`lamp_actions::schedule::NOT_YET_DUE`). The count is best effort: a
+`Status` that can't be read leaves the list as it was. Test:
+`a_just_set_timer_is_listed_counted_beside_a_due_only_list_and_cancelled_for_good`
+(`crates/actions/tests/schedule.rs`, against the real Schedule service).
+
 The declarations use Gemini's small `parameters` schema subset, omitting
 `additionalProperties`, `maxLength`, and regex patterns. Runtime validation
 enforces the stricter contract above. First must qualify the declarations on
