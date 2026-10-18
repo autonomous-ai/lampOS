@@ -1953,20 +1953,26 @@ async fn serve_with_visual<C: Connect>(
                 {
                     let live = provider.live_session();
                     let moment = crate::session_tools::Moment {
+                        turn_owned: intake
+                            .handoff
+                            .authority
+                            .is_some_and(|state| state.owner().is_some()),
                         turn_open: intake.handoff.visual_turn().is_some(),
                         output_owed: !output.is_empty(),
                         going_on: (given.going_on)(),
+                        ready_again: watch.ready_again(&change, Instant::now()),
                         look_owed: look_owed(look_owed_until),
                         live_already_asked: live.is_none() || live == catalog_asked,
-                        may_renew: watch.may_renew(Instant::now()),
+                        may_renew: watch.may_renew(&change, Instant::now()),
                     };
                     if moment.due() && provider.renew_when_idle() {
                         catalog_asked = live;
-                        watch.renewed(Instant::now());
+                        watch.renewed(&change, Instant::now());
                         renewed_at = Instant::now();
                         given.open_fresh();
                         eprintln!(
-                            "lamp-voice provider: the executive's functions changed ({change}); a new session is opened between turns"
+                            "lamp-voice provider: {}",
+                            crate::session_tools::renewal_line(&change, moment.going_on)
                         );
                     }
                 }
