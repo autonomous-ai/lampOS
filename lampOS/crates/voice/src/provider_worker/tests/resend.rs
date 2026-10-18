@@ -287,3 +287,187 @@ async fn a_line_lost_to_a_barrier_timeout_is_replayed_once_after_reconnect() {
     assert!(dial.service.try_receive(Duration::ZERO).await.is_none());
     rig.stop().await;
 }
+
+/// Tests on #1434 (07:15): with the switch off, a line keeps nothing, and a
+/// command refused while the link is down goes through `refused()` and
+/// fails the line at once, as before Step B; no outcome is held.
+#[test]
+fn with_the_switch_off_nothing_is_kept_and_a_refusal_fails_at_once() {
+    let mut owner = controller();
+    let mut handoff = InputHandoff {
+        tolerate_outage: true,
+        ..InputHandoff::default()
+    };
+    assert!(!handoff.resend);
+    let sink = RecordingSink::default();
+    let request = authorize(&mut owner, &mut handoff);
+    handoff
+        .submit(start(request, &handoff), NOW, &sink)
+        .unwrap();
+    handoff
+        .submit(audio(request, 1, 7, &handoff), NOW, &sink)
+        .unwrap();
+    assert!(handoff.kept.is_none());
+    sink.disconnected.set(true);
+    handoff
+        .submit(audio(request, 2, 7, &handoff), NOW, &sink)
+        .unwrap();
+    assert!(handoff.kept.is_none());
+    assert_eq!(handoff.failed_through, request);
+    assert!(handoff.submitted.is_none());
+    handoff.resend_upkeep(&sink, NOW + 10_000_000);
+    assert!(handoff.unresent.is_empty());
+}
+
+/// A held line, lost after its End to a mendable fault, on a link that
+/// never comes back: its kept end.
+fn held() -> (Controller, InputHandoff, RecordingSink, u64) {
+    let (owner, mut handoff, _, request) = replaying();
+    let kept = handoff.kept.as_mut().unwrap();
+    kept.resent = false;
+    kept.replay = None;
+    kept.refused = true;
+    kept.lost = Some(KeptLoss {
+        session: SessionId::new(2).unwrap(),
+        stage: FailedStage::AwaitingResponse,
+        fault: Fault::Transport,
+        at_us: NOW,
+    });
+    (owner, handoff, RecordingSink::default(), request)
+}
+
+/// The reviewer on #1434 (07:14): `give_up` is reached. No session within
+/// 5 s of the line's end: its held `TurnFailed` is owed, `TooLate`, and
+/// nothing was offered. Retired meanwhile (a newer line's owner, or a
+/// cancel): dropped, and nothing is owed.
+#[test]
+fn a_held_line_fails_after_five_seconds_and_is_dropped_owing_nothing_when_retired() {
+    let (_owner, mut handoff, sink, request) = held();
+    handoff.resend_upkeep(&sink, NOW + crate::resend::RESEND_WITHIN_US);
+    assert!(handoff.kept.is_some(), "held up to the bound");
+    assert!(handoff.unresent.is_empty());
+    handoff.resend_upkeep(&sink, NOW + crate::resend::RESEND_WITHIN_US + 1);
+    assert!(handoff.kept.is_none());
+    let owed = handoff
+        .unresent
+        .pop_front()
+        .expect("its TurnFailed is owed");
+    assert_eq!(
+        (owed.request, owed.stage, owed.why),
+        (
+            request,
+            FailedStage::AwaitingResponse,
+            crate::resend::Refused::TooLate
+        )
+    );
+    assert!(sink.calls.borrow().is_empty());
+
+    let (_owner, mut handoff, sink, request) = held();
+    handoff.retired_through = request;
+    handoff.resend_upkeep(&sink, NOW + 1_000);
+    assert!(handoff.kept.is_none());
+    assert!(handoff.unresent.is_empty());
+    assert!(sink.calls.borrow().is_empty());
+}
+
+/// A next session that is live, has room and takes a resend.
+struct LiveSink {
+    inner: RecordingSink,
+    resent: Cell<bool>,
+}
+
+impl InputSink for LiveSink {
+    fn start(
+        &self,
+        session: SessionId,
+        request: RequestId,
+    ) -> std::result::Result<(), StartRefusal> {
+        self.inner.start(session, request)
+    }
+
+    fn audio(
+        &self,
+        request: RequestId,
+        sequence: u64,
+        captured: Instant,
+        samples: &[i16],
+    ) -> lamp_gemini::Result<()> {
+        self.inner.audio(request, sequence, captured, samples)
+    }
+
+    fn end(&self, request: RequestId) -> lamp_gemini::Result<()> {
+        self.inner.end(request)
+    }
+
+    fn retire(&self, request: RequestId) {
+        self.inner.retire(request);
+    }
+
+    fn has_room(&self) -> bool {
+        true
+    }
+
+    fn live_session(&self) -> Option<SessionId> {
+        SessionId::new(3).ok()
+    }
+
+    fn resend(
+        &self,
+        _session: SessionId,
+        _request: RequestId,
+    ) -> std::result::Result<(), StartRefusal> {
+        self.resent.set(true);
+        Ok(())
+    }
+}
+
+/// The reviewer on #1434 (07:14): what went with a line goes no further.
+/// The rest of a line cut off by a pause (`continues_cut_off`), one told of
+/// a stop, or one a note or the eyes' picture went with, is half of what the
+/// lost session heard: with a next session live, it is not sent again, its
+/// held `TurnFailed` is owed (`Attached`), and nothing is offered. The same
+/// line with nothing attached is sent again.
+#[test]
+fn a_held_line_that_went_with_something_is_not_sent_again_alone() {
+    let live = || LiveSink {
+        inner: RecordingSink::default(),
+        resent: Cell::new(false),
+    };
+    // Attached at its Start (continues, continues_cut_off, after_stop).
+    let (_owner, mut handoff, _, request) = held();
+    handoff.kept.as_mut().unwrap().attached = true;
+    let sink = live();
+    handoff.resend_upkeep(&sink, NOW + 1_000);
+    assert!(!sink.resent.get());
+    let owed = handoff
+        .unresent
+        .pop_front()
+        .expect("its TurnFailed is owed");
+    assert_eq!(
+        (owed.request, owed.why),
+        (request, crate::resend::Refused::Attached)
+    );
+    assert!(sink.inner.calls.borrow().is_empty());
+    // A note told beside it (`noted`).
+    let (_owner, mut handoff, _, request) = held();
+    handoff.noted = Some((request, "(a note)".into()));
+    let sink = live();
+    handoff.resend_upkeep(&sink, NOW + 1_000);
+    assert!(!sink.resent.get());
+    assert_eq!(
+        handoff.unresent.pop_front().map(|owed| owed.why),
+        Some(crate::resend::Refused::Attached)
+    );
+    // The eyes' picture went with it.
+    let (_owner, mut handoff, _, request) = held();
+    handoff.pictured(RequestId::new(request).unwrap());
+    let sink = live();
+    handoff.resend_upkeep(&sink, NOW + 1_000);
+    assert!(!sink.resent.get());
+    // Nothing attached: sent again.
+    let (_owner, mut handoff, _, _) = held();
+    let sink = live();
+    handoff.resend_upkeep(&sink, NOW + 1_000);
+    assert!(sink.resent.get());
+    assert!(handoff.unresent.is_empty());
+}

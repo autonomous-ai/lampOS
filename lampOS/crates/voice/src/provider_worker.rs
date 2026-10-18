@@ -1874,8 +1874,11 @@ async fn serve_with_visual<C: Connect>(
                     visual.send_receipt(|receipt| channels.control.send(WorkerEvent::VisualContext { receipt: receipt.clone() }))?;
                 }
                 // What the lamp's eyes see, with what the person is saying.
-                if let Some(sight) = sight.as_mut() {
-                    sight.offer(intake.handoff.visual_turn().map(|turn| turn.request), &provider);
+                if let Some(sight) = sight.as_mut()
+                    && let Some(request) =
+                        sight.offer(intake.handoff.visual_turn().map(|turn| turn.request), &provider)
+                {
+                    intake.handoff.pictured(request);
                 }
                 queue_undelivered(&mut intake.handoff, &mut output);
                 // receive_inputs can observe a newer authority too.
@@ -3736,6 +3739,9 @@ struct Kept {
     /// Sent again: the next of its kept blocks to offer, until all are.
     replay: Option<usize>,
     resent: bool,
+    /// It went with something the next session would not have
+    /// ([`crate::resend::Lost::attached`]).
+    attached: bool,
 }
 
 /// Where and why a kept line's connection was lost, and when.
@@ -3755,6 +3761,16 @@ struct Unresent {
     why: crate::resend::Refused,
 }
 
+impl InputHandoff {
+    /// The eyes' picture went with `request`: a kept line of it is not
+    /// sent again ([`crate::resend::Refused::Attached`]).
+    fn pictured(&mut self, request: RequestId) {
+        if let Some(kept) = self.kept.as_mut().filter(|kept| kept.request == request) {
+            kept.attached = true;
+        }
+    }
+}
+
 impl Kept {
     fn new(request: RequestId, generation: u64) -> Self {
         Self {
@@ -3768,6 +3784,7 @@ impl Kept {
             lost: None,
             replay: None,
             resent: false,
+            attached: false,
         }
     }
 
@@ -4078,7 +4095,17 @@ impl InputHandoff {
                 ended_us: kept.ended_us,
                 ready_us: now_us,
                 resent: kept.resent,
+                // A newer Start replaces `kept`, so a kept line is always the
+                // newest: `judge`'s `NewerLine` cannot come from here (Tests
+                // on #1434).
                 newer_line: false,
+                // A note told beside it, its first part, or the eyes'
+                // picture would not be on the next session.
+                attached: kept.attached
+                    || self
+                        .noted
+                        .as_ref()
+                        .is_some_and(|(noted, _)| *noted == kept.request.get()),
             };
             if let Err(why) = crate::resend::judge(&lost) {
                 return self.give_up(loss, why);
@@ -4330,7 +4357,11 @@ impl InputHandoff {
                 // Kept as it is offered, to be sent again once if its
                 // connection is lost before any output (#705, Step B).
                 if self.resend {
-                    self.kept = Some(Kept::new(request, generation));
+                    let mut kept = Kept::new(request, generation);
+                    // Half of an utterance, or told of a stop: the next
+                    // session would hear it without what went before.
+                    kept.attached = continues || continues_cut_off || after_stop;
+                    self.kept = Some(kept);
                 }
                 self.after_stop = after_stop.then_some(request);
                 self.follows_on = follows_on.then_some(request);

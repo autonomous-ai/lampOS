@@ -83,6 +83,11 @@ pub struct Lost {
     pub resent: bool,
     /// The person has begun a newer line since.
     pub newer_line: bool,
+    /// Something went with it that the next session would not have: the
+    /// line before it that it goes on from (`continues`,
+    /// `continues_cut_off`), a note (the stop, its name heard, only its
+    /// name, following on), or the eyes' picture (the reviewer on #1434).
+    pub attached: bool,
 }
 
 /// Why a lost line is not sent again, for the provider worker journal (`resend_refused`).
@@ -98,6 +103,8 @@ pub enum Refused {
     TooLate,
     Stage,
     Fault,
+    /// It went with a note, a picture or the line before it.
+    Attached,
     /// The next session refused to take it (`try_resend_for_session`).
     NotTaken,
 }
@@ -115,6 +122,9 @@ impl Refused {
             Self::TooLate => "the next session was not ready within 5 s of its end",
             Self::Stage => "it was not delivered, or had begun to be answered",
             Self::Fault => "a second try does not mend this failure",
+            Self::Attached => {
+                "it went with a note, a picture or the line before it, which the next session would not have"
+            }
             Self::NotTaken => "the next session did not take it",
         }
     }
@@ -155,6 +165,9 @@ pub fn judge(lost: &Lost) -> Result<(), Refused> {
     }
     if lost.newer_line {
         return Err(Refused::NewerLine);
+    }
+    if lost.attached {
+        return Err(Refused::Attached);
     }
     if !matches!(
         lost.stage,
@@ -202,6 +215,7 @@ mod tests {
             ready_us: 14_700_000,
             resent: false,
             newer_line: false,
+            attached: false,
         }
     }
 
@@ -230,6 +244,7 @@ mod tests {
         assert_eq!(refused(|l| l.had_tool_call = true), Refused::ToolCall);
         assert_eq!(refused(|l| l.generation_now = 5), Refused::OtherGeneration);
         assert_eq!(refused(|l| l.newer_line = true), Refused::NewerLine);
+        assert_eq!(refused(|l| l.attached = true), Refused::Attached);
         assert_eq!(
             refused(|l| l.stage = FailedStage::NotDelivered),
             Refused::Stage

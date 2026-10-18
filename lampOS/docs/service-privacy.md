@@ -110,7 +110,20 @@ Unmute creates fresh controller/worker/provider identities. Old PCM, prospective
 input, request IDs, permits and queued output are not replayed. A line
 kept to be sent again after a lost connection (`LAMP_RESEND_LOST_LINE=on`,
 #705) is tied to its privacy generation: a mute or a privacy change drops it,
-and it is never sent across one. No preservation
+and it is never sent across one. With that switch on, two more things are
+true (the reviewer on #1434):
+- **Each line's audio is held** in the provider worker's memory, up to 15 s
+  (480 KB), from its Start until its turn ends, its answer comes, a newer line
+  begins, or a mute; with the switch off nothing is held.
+- **A lost line's audio goes to the service a second time**, whoever it was
+  said to. A line lost with its connection has no attention verdict yet (that
+  comes at a reply's first output), so the lamp cannot tell room talk from a
+  line for it; the model judges the second copy as it judged the first, and
+  room talk is answered with silence as before. A line that went with
+  something (the line before it, a note, the eyes' picture), had any output or
+  tool call, or came before a mute, is never sent again. Whether a stricter
+  local test (its name heard, a face turned, near) is wanted before it is
+  turned on is the first builder's call (#705, 18 Oct). No preservation
 of Gemini conversational memory across physical mute is claimed. There is no
 periodic context reset or timer-based reopen. A later stable unmute must satisfy
 the new runtime's ordinary readiness checks again.
