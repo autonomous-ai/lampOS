@@ -2337,22 +2337,12 @@ async fn serve_with_visual<C: Connect>(
                             }
                             // A request whose answer is held is not talk
                             // between people (#829), but one held as another
-                            // voice is: the clearest sign of it (the reviewer
-                            // on #1030).
-                            if matches!(verdict, Some(crate::attention::Verdict::Hold(_)))
-                                && !other_voice
-                                && let Ok(mut told) = crate::room_told::room().lock()
-                            {
-                                told.held(request);
-                            }
-                            // And that one line ends the conversation: the
-                            // two people are talking (the battery's scene 3,
-                            // #829, 17 October).
-                            if matches!(verdict, Some(crate::attention::Verdict::Hold(_)))
-                                && other_voice
-                                && let Ok(mut told) = crate::room_told::room().lock()
-                            {
-                                told.another_voice_held(request);
+                            // voice is, and ends the conversation (the
+                            // reviewer on #1030; the battery's scene 3, 17
+                            // October); so is a remark to the room, which two
+                            // in a row end (#1522; `RoomTold::judged`).
+                            if let Ok(mut told) = crate::room_told::room().lock() {
+                                told.judged(request, verdict, other_voice);
                             }
                             if let (Some(log), Some(verdict)) = (first_output.as_mut(), verdict) {
                                 let (play, reason) = match verdict {

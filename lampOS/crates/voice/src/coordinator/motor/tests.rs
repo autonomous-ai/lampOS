@@ -781,7 +781,10 @@ fn fixture_preflight_marker_without_exit_times_out_and_reaps() {
             quoted(pid_file.to_str().unwrap())
         ),
     );
-    let error = preflight(&script, crate::process::WORKER_STARTUP_TIMEOUT).unwrap_err();
+    // The test's own bound for a child that never exits, not the 3 s worker
+    // startup bound, which it doesn't test: a second is room for a warmed-up
+    // `sh` to start and write its pid (#1128).
+    let error = preflight(&script, Duration::from_secs(1)).unwrap_err();
     assert_eq!(error.kind(), io::ErrorKind::TimedOut);
     assert_preflight_reaped(&pid_file);
     fs::remove_dir_all(&dir.path).unwrap();

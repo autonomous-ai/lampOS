@@ -1749,12 +1749,36 @@ tomorrow", "I need more light", "It's too dark in here" and "I'd like a
 poem about the sea" all play, and so does a bare answer ("Yes go ahead",
 "No, not now.", "Sure"), whatever the lamp asked.
 
+**Two remarks held end the conversation (#1522).** A line held as a
+remark is talk between people, not a line the lamp's own rule held: left
+unanswered it keeps a busy room busy, as talk does (busy ends three minutes
+after the last), and counts toward the two that end a conversation with
+`LAMP_SPOKEN_TO` (`RoomTold::judged`, `talked_past_the_lamp`). On lamp-4ace
+on 18 October at 14:44, on `3f4f3c5c3`, the lamp answered every line of
+the two people's talk in scene 3, "Okay, I will book the car for eight."
+with the time, and then spoke their words back in scene 4's opening, 6 s
+on: each line was let out as `a conversation with the lamp is going on`,
+re-armed by the lamp's own reply 2 to 7 s before. With the switch, the
+call and "And what about tomorrow?" are answered, the umbrella and "Yes,
+and we should leave a bit early." are held as remarks and end the
+conversation, and the car line and scene 4's lines ("Did you see the
+report from the client?", "I know.", "We need to cut something before
+Friday.") are held as a busy room's talk, until the name, a face or the
+lamp's own question shows the next line is for it. It needs
+`LAMP_SPOKEN_TO` (lamp-4ace's and the product's units have it). Test:
+`attention::tests::with_remarks_two_remarks_held_end_a_conversation_its_own_replies_kept_going`,
+with the switch off as on the lamp (all nine answered).
+
 **The lamp's question, known by its end.** With the switch, the lamp
 asked also when the end of its newest line before the request, as it was
 said, has a `?` anywhere, or its last sentence asks without one: a
 helping verb and a person ("Shall I start it", "Would you like…", "Is
-there anything else"), a question word with a helping verb within two
-words after it ("Which one would you like", "What time should I set it
+there anything else"), a question word with a helping verb within four
+words after it ("is" or "are" within two, so not "How nice it is to see
+you"). Known misses: "is" or "are" said third or later as the only helping
+verb ("Which of these is better", "What kind of tea is it"), the price of
+keeping "How nice it is to see you" out; they matter only when the
+transcript drops the `?` ("Which one would you like", "What time should I set it
 for"), "how about", "or would", "Want me to…", or "let me know" (`Thread::lamp_asked_with`,
 `remarks::lamp_asked`). Not "Will do." or "Should be sunny tomorrow." The
 thread keeps only the first 400 bytes of what the lamp said, so a
@@ -1952,9 +1976,9 @@ speech would plainly be a person, the room clear or at most 20 % explained
 by the render. Elsewhere, the lamp's own voice included, it reads the
 processed block, so the lamp alone gives the processed block's false yields
 and is not scored as speech for whom the lamp answers, a busy room or a
-turn's start, as it was with `linear`. On the #828 tables it yielded to 11 of
-19 lines said over the lamp, against 10 processed and 14 with `linear`
-(13 false yields with `linear`, 1 with this or processed); with
+turn's start, as it was with `linear`. Replayed on the #828 tables it yielded
+to 10 of 19 lines said over the lamp, as processed, against 14 with `linear`
+(false yields: 2 with this, 1 processed, 12 with `linear`); with
 `LAMP_LISTEN_GAPS=on` a gap of the lamp's silence stays on the processed
 block ([serve-runtime.md](serve-runtime.md)). Off by default; not on any lamp.
 

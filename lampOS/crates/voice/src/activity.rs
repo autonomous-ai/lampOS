@@ -76,7 +76,8 @@ pub const REACH_LEAD_BLOCKS: usize = 20;
 /// the switch. The linear output keeps most of the lamp's voice (3.1–4.1 dB
 /// taken out on lamp-4ace's mic2), and the lamp's own voice misjudged as a
 /// person was 30 to 75 % explained, so a gate at the duplex rules' 75 % gave
-/// `linear`'s false yields; at 20 % the #828 tables gave `clean`'s (#1504).
+/// `linear`'s false yields; at 20 %, replayed on the #828 tables, it gave 2
+/// against `clean`'s 1 and `linear`'s 12, and `clean`'s 10 of 19 yields.
 pub const INPUT_ENVIRONMENT: &str = "LAMP_VAD_INPUT";
 
 /// What the detector reads, from `LAMP_VAD_INPUT`.

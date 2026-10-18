@@ -2512,6 +2512,76 @@ mod tests {
         }
     }
 
+    /// #1522, lamp-4ace on 18 October at 14:44, as the worker judges each
+    /// line (`provider_worker`: the room and the conversation from
+    /// `RoomTold` and the thread, the verdict told back with
+    /// `RoomTold::judged`), in a busy room with `LAMP_SPOKEN_TO`: the
+    /// battery's scene 3 after the call, then scene 4's opening, two people
+    /// talking with no name, 6 s on. Without `LAMP_REMARKS` every line is
+    /// let out as the conversation going on, re-armed by the lamp's own
+    /// replies, as on the lamp. With it, the follow-up is answered, the two
+    /// remarks are held and end the conversation, and the rest is held.
+    fn scene_three_and_four(remarks: bool) -> Vec<bool> {
+        const S: u64 = 1_000_000;
+        let start = std::time::Instant::now();
+        let at = |us: u64| start + std::time::Duration::from_micros(us);
+        let mut thread = crate::thread::Thread::new();
+        let mut room = crate::room_told::RoomTold::new();
+        room.count_only_talk(true);
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(true);
+        attention.hold_remarks(remarks);
+        let lines = [
+            (0, "Hey Lamp, what's the weather in Hanoi today?"),
+            (6, "And what about tomorrow?"),
+            (12, "I should bring an umbrella then."),
+            (15, "Yes, and we should leave a bit early."),
+            (18, "Okay, I will book the car for eight."),
+            // Scene 4's opening, 6 s after scene 3 ended.
+            (27, "Did you see the report from the client?"),
+            (30, "Yes, I read it this morning."),
+            (33, "I know."),
+            (36, "We need to cut something before Friday."),
+        ];
+        let mut played = Vec::new();
+        for (request, (at_s, line)) in (17..).zip(lines) {
+            let began = 100 * S + at_s * S;
+            room.heard(request, began);
+            attention.began_at(request, 4, began);
+            attention.heard(line);
+            thread.person(line, true, at(began));
+            room.ended(request, began + S);
+            attention.ended(request, began + S);
+            let going_on = !room.talked_past_the_lamp() && thread.going_on(at(began + S));
+            attention.lamp_asked(thread.lamp_asked_with(request, remarks));
+            let verdict = attention
+                .first_output_busy(request, Room::Busy, going_on, true, Some(false))
+                .unwrap();
+            room.judged(request, Some(verdict), false);
+            let play = matches!(verdict, Verdict::Play(_));
+            if play {
+                thread.lamp(request, "Here is what I found.", at(began + 2 * S));
+                room.spoke(request, began + 2 * S);
+            } else {
+                room.left_unanswered(request, began + 2 * S);
+            }
+            played.push(play);
+        }
+        played
+    }
+
+    #[test]
+    fn with_remarks_two_remarks_held_end_a_conversation_its_own_replies_kept_going() {
+        // As on lamp-4ace at 14:44: every line answered.
+        assert_eq!(scene_three_and_four(false), [true; 9]);
+        // The call and the follow-up answered; the umbrella and "leave a bit
+        // early" held as remarks, which end it; the car and scene 4 held.
+        assert_eq!(
+            scene_three_and_four(true),
+            [true, true, false, false, false, false, false, false, false]
+        );
+    }
+
     /// Outside a busy room, or let out for its name, a remark plays as
     /// before.
     #[test]

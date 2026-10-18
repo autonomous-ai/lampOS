@@ -50,8 +50,11 @@ repository.
 | All | 5.9% (0.290) | 12.8% (0.270) | 10.5% (0.260) |
 | The shorter line 1.5 to 3 s (16 same, 29 different) | 0 errors | 6.6% | 4.8% |
 | The shorter line under 1.5 s (38 same, 67 different) | 7.7% | 18.2% | 21.7% |
-| At the product's bar, 0.25: same voice taken for another | 2 | 7 | 8 |
+| At the bar of 0.25 (the product's when this was run): same voice taken for another | 2 | 7 | 8 |
 | At 0.25: another voice taken for the same | 17 | 20 | 16 |
+| At the bar of 0.45 (since #1467): same voice taken for another | 29 | 45 | 39 |
+| … of them, the shorter line under 1.5 s (of 38) | 29 | 33 | 31 |
+| At 0.45: another voice taken for the same | 1 | 1 | 1 |
 
 - **At the bar's own pairs, both lines 1.5 s or longer** (37 of the same
   voice, 29 of two): `full` gives 15 October's figures, none of the 37

@@ -453,6 +453,20 @@ fn words_of_an_older_change_are_not_told_under_a_newer_decision() {
     assert!(offered(&mut news, ms(300)).is_none());
 }
 
+/// Until the queued note is let go, looked at as the coordinator's tick
+/// looks, within `WAIT`. A note lives a minute (`PROGRESS_FRESH_MS`), so only
+/// the task's status lets it go here (#1128).
+fn let_go(news: &mut TaskNews, what: &str) {
+    let until = Instant::now() + WAIT;
+    while news.waiting().is_some() {
+        assert!(
+            Instant::now() < until,
+            "{what}: still queued after {WAIT:?}"
+        );
+        thread::sleep(ms(5));
+    }
+}
+
 /// #765 review: a note queued while the lamp waits for its moment is
 /// withdrawn once the task leaves the watch, finishes, or moves on.
 #[test]
@@ -469,18 +483,15 @@ fn queued_progress_is_withdrawn_when_its_task_goes_finishes_or_moves_on() {
     // Gone from the watch.
     queued(&mut place, &mut news, 1);
     place.leave();
-    thread::sleep(ms(600));
-    assert!(news.waiting().is_none());
+    let_go(&mut news, "gone");
     // Finished.
     queued(&mut place, &mut news, 2);
     place.work_as(AgentState::Idle, 2);
-    thread::sleep(ms(600));
-    assert!(news.waiting().is_none());
+    let_go(&mut news, "finished");
     // Moved on to a newer change.
     queued(&mut place, &mut news, 3);
     place.work(4);
-    thread::sleep(ms(600));
-    assert!(news.waiting().is_none());
+    let_go(&mut news, "moved on");
 }
 
 /// #765 review: the task finished while the coordinator waited for quiet,

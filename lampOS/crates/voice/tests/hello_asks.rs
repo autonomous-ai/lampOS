@@ -228,7 +228,9 @@ fn a_policy_that_only_watches_or_does_not_answer_leaves_it_to_the_rule() {
     assert_eq!(hello, Hello::ByRule);
     assert!(waited < Duration::from_secs(1), "{waited:?}");
     assert_eq!(arrival.take_told().unwrap()["answer"], "shadow");
-    // Nobody answering: the rule after two seconds.
+    // Nobody answering: the rule once two seconds have passed on the voice's
+    // clock, and not a moment before. The clock is stepped, as speak_up's
+    // own test steps it, not waited out on the host's (#1128).
     let root = PathBuf::from(format!("/tmp/lvha-none-{}", std::process::id()));
     let _ = fs::remove_dir_all(&root);
     fs::create_dir_all(&root).unwrap();
@@ -240,9 +242,12 @@ fn a_policy_that_only_watches_or_does_not_answer_leaves_it_to_the_rule() {
     lonely.seen(true, now);
     now += 3 * S;
     lonely.seen(true, now);
-    let (hello, waited) = answered(&mut lonely, now);
-    assert_eq!(hello, Hello::ByRule);
-    assert!(waited >= Duration::from_micros(ASK_FOR_US), "{waited:?}");
+    assert_eq!(lonely.hello(true, QUIET, now), Hello::NotYet);
+    assert_eq!(
+        lonely.hello(true, QUIET, now + ASK_FOR_US - 1),
+        Hello::NotYet
+    );
+    assert_eq!(lonely.hello(true, QUIET, now + ASK_FOR_US), Hello::ByRule);
     assert_eq!(lonely.take_told().unwrap()["answer"], "none");
     let _ = fs::remove_dir_all(&root);
 }

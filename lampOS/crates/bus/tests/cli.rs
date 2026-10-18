@@ -385,7 +385,9 @@ fn record_then_replay_gives_a_subscriber_the_messages_again_at_their_spacing() {
             "servos",
             "gemini/transcript",
             "--seconds",
-            "2.5",
+            // Counted from when every topic is bound, and all is sent as soon
+            // as both sockets are seen: room enough (#1128).
+            "0.75",
         ],
     );
     until("the recorder's sockets", || {
@@ -913,8 +915,10 @@ fn hz_measures_a_topic_while_a_publisher_runs_and_is_status_1_when_nothing_comes
     let kept = run(&root, &["hz", "room/state", "--seconds", "0.3"]);
     assert_eq!(kept.status.code(), Some(1));
     assert!(text(&kept.stdout).starts_with("room/state messages=0 "));
-    // One message is a message and not yet a rate.
-    let listening = Running::start(&root, &["hz", "room/state", "--seconds", "1.5"]);
+    // One message is a message and not yet a rate. The tool's seconds start
+    // once it listens, and the message goes as soon as its socket is seen,
+    // so half a second is room enough (#1128).
+    let listening = Running::start(&root, &["hz", "room/state", "--seconds", "0.5"]);
     until("the tool's socket", || {
         root.sockets("room/state").len() == 1
     });

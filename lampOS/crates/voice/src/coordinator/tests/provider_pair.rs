@@ -72,6 +72,16 @@ impl Paired {
 
     /// The worker's session configured as `--provider-continuation` does it.
     async fn with(capacity: usize, continuation: Continuation) -> Self {
+        Self::with_patience(capacity, continuation, None).await
+    }
+
+    /// As [`Self::with`], with the kept start's patience set by the test, not
+    /// the lamp's `KEPT_START_PATIENCE`, where only what follows it is checked.
+    async fn with_patience(
+        capacity: usize,
+        continuation: Continuation,
+        patience: Option<Duration>,
+    ) -> Self {
         let directory = SessionDirectory::create().unwrap();
         let (channels, child) = pair(&directory, "provider");
         let (mut owner, reply) = current_input();
@@ -84,6 +94,12 @@ impl Paired {
         .resumption(Resumption::Retain)
         .barrier_policy(BarrierPolicy::Require);
         let config = continuation.apply(config).unwrap();
+        let config = match patience {
+            Some(patience) => config
+                .successor_start(lamp_gemini::SuccessorStart::AfterFirstOutput { patience })
+                .unwrap(),
+            None => config,
+        };
         let (sender, dials) = tokio::sync::mpsc::unbounded_channel();
         let provider = Supervisor::new(
             ScriptedConnector {
@@ -726,8 +742,16 @@ mod continuation_or_discard {
 
     impl Paired {
         async fn kept() -> (Self, Dial, CloudAvailability) {
-            let mut rig =
-                Self::with(lamp_gemini::MAX_WIRE_BYTES * 2, Continuation::KeptStart).await;
+            Self::kept_with(None).await
+        }
+        /// As [`Self::kept`], with the kept start's own patience.
+        async fn kept_with(patience: Option<Duration>) -> (Self, Dial, CloudAvailability) {
+            let mut rig = Self::with_patience(
+                lamp_gemini::MAX_WIRE_BYTES * 2,
+                Continuation::KeptStart,
+                patience,
+            )
+            .await;
             let dial = rig.ready().await;
             let mut selected = CloudAvailability::default();
             selected
@@ -1052,7 +1076,11 @@ mod continuation_or_discard {
 
     #[tokio::test]
     async fn abandoned_with_no_first_answer_only_the_start_is_written_and_late_output_is_nobodys() {
-        let (mut rig, mut dial, selected) = Paired::kept().await;
+        // What follows the patience is checked here, not its length
+        // (`provider_worker`'s own test holds that): 500 ms, not the lamp's
+        // 2.5 s (#1128).
+        let (mut rig, mut dial, selected) =
+            Paired::kept_with(Some(Duration::from_millis(500))).await;
         rig.first_committed(&mut dial, &selected).await;
         let session = dial.session.get();
         let given_up = rig.continued(session);

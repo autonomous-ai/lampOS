@@ -958,6 +958,67 @@ async fn with_the_switch_and_a_voice_check_a_line_held_as_another_voice_counts_a
     assert_eq!(scene(false).await, (true, true));
 }
 
+/// Voice prints as [`TwoVoices`] makes them, but the other voice's at a
+/// cosine of 0.35 against the first's: between the bar of 0.25 set off the
+/// lamp and the labelled set's 0.45 (#1485).
+struct NearVoices(std::collections::VecDeque<(u64, std::result::Result<Vec<f32>, String>)>);
+
+impl crate::same_voice::Printer for NearVoices {
+    fn ask(&mut self, request: u64, samples: &[i16]) -> bool {
+        let print = if samples[0] > 0 {
+            vec![1.0, 0.0]
+        } else {
+            vec![0.35, 0.937]
+        };
+        self.0.push_back((request, Ok(print)));
+        true
+    }
+    fn answer(&mut self) -> Option<(u64, std::result::Result<Vec<f32>, String>)> {
+        self.0.pop_front()
+    }
+}
+
+/// The bar is the labelled set's 0.45 (`DIFFERENT_BELOW`, #1485; the
+/// reviewer on #1508), through the worker's own loop: after A's call, an
+/// unnamed follow-up in a voice at 0.35 against A's is held as another
+/// voice's. At the bar of 0.25 before it, it was A's and answered, as A's
+/// own follow-up is. On the logical clock, as its sibling above is.
+#[tokio::test(start_paused = true)]
+async fn with_the_switch_and_a_voice_check_a_voice_at_0_35_against_the_conversations_is_held() {
+    let _clock = logical_clock();
+    const CALL: &str = "Hey Lamp, what is the weather like in Hanoi today?";
+    const FOLLOW_UP: &str = "And what about tomorrow?";
+    let follow_up_by = |voice: i16| async move {
+        let _mark = OwnMark::kept();
+        let _room = OwnRoom::fresh();
+        let mut options = options(true, attention_now, crate::tools::Settings::default());
+        options.voices = Some(Box::new(NearVoices(Default::default())));
+        let mut rig = LiveRig::start_configured(
+            quick_policy(),
+            options,
+            BARRIER,
+            false,
+            Continuation::Off,
+            lamp_gemini::MAX_WIRE_BYTES * 2,
+            |config| {
+                config
+                    .timeouts(lamp_gemini::Timeouts {
+                        unanswered: Some(Duration::from_millis(100)),
+                        ..Default::default()
+                    })
+                    .unwrap()
+            },
+        );
+        let mut dial = rig.ready().await;
+        assert!(voice_line(&mut rig, &mut dial, false, 1, 150, CALL, true).await);
+        let played = voice_line(&mut rig, &mut dial, false, voice, 150, FOLLOW_UP, true).await;
+        rig.stop().await;
+        played
+    };
+    assert!(!follow_up_by(-1).await);
+    assert!(follow_up_by(1).await);
+}
+
 /// #829, the battery's two-people scene 3 on lamp-4ace (17 October), line by
 /// line through the worker's own loop, with the room and the conversation as
 /// the worker keeps them. Each line is as long as the lamp sends it: its

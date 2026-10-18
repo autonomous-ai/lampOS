@@ -300,6 +300,31 @@ impl RoomTold {
         }
     }
 
+    /// What the rule's verdict on `request` tells the room, as the worker
+    /// gives it: a request whose answer is held is not talk between people
+    /// ([`Self::held`]); one held as another voice is, and ends the
+    /// conversation ([`Self::another_voice_held`]); and one held as a remark
+    /// to the room (`LAMP_REMARKS`, [`crate::remarks::REMARK`]) is talk, so
+    /// left unanswered it counts toward [`TALK_ENDS_CONVERSATION`]. On
+    /// lamp-4ace on 18 October at 14:44 the lamp answered every line of two
+    /// people's talk and spoke their words back, its "conversation going on"
+    /// re-armed by its own replies (#1522): two remarks held in a row end it.
+    pub fn judged(
+        &mut self,
+        request: u64,
+        verdict: Option<crate::attention::Verdict>,
+        other_voice: bool,
+    ) {
+        match verdict {
+            Some(crate::attention::Verdict::Hold(_)) if other_voice => {
+                self.another_voice_held(request)
+            }
+            Some(crate::attention::Verdict::Hold(why)) if why == crate::remarks::REMARK => {}
+            Some(crate::attention::Verdict::Hold(_)) => self.held(request),
+            _ => {}
+        }
+    }
+
     /// The lamp is speaking in `request`.
     pub fn spoke(&mut self, request: u64, now_us: u64) {
         if self.open.is_some_and(|(open, _)| open == request) {
