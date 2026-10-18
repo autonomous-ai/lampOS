@@ -74,6 +74,11 @@ reason first:
   `connecting`, said once more as the wait ends, until the session's own
   report.
 
+While a due reminder waits for the microphones to open, each of these
+adds "; a reminder is owed, to be said when they open" and the fact
+`reminder` `owed`, at the same level, and the opening report keeps the fact;
+it is said at once when one comes due or is cancelled (#1545, schedule.md).
+
 `lamp-health show` says it on its first line, `The lamp is well; the
 microphones are off (the privacy switch).` A muted voice is no longer stale,
 so `lamp-keeper --act` (error or stale for 30 s) no longer restarts a voice

@@ -231,6 +231,7 @@ impl RoundtripFixture {
             sent: false,
             failed: false,
             by_skill: false,
+            owed_told: None,
         });
         self.worker = Some(worker);
         self.parent().poll(monotonic_us());
@@ -281,8 +282,45 @@ impl RoundtripFixture {
             }
             assert!(self.worker.as_mut().unwrap().send(&message).unwrap());
         }
-        self.parent().poll(monotonic_us());
-        assert!(!self.parent().failed);
+        // A parent lent to the muted wait ([`Self::lend_parent`]) is polled
+        // by the wait itself.
+        if let Some(parent) = self.parent.as_mut() {
+            parent.poll(monotonic_us());
+            assert!(!parent.failed);
+        }
+    }
+
+    /// The parent, for a test to hand to the muted wait as the coordinator
+    /// does; [`Self::tick`] goes on offering to it meanwhile, and
+    /// [`Self::return_parent`] gives it back.
+    pub(crate) fn lend_parent(&mut self) -> Reminders {
+        self.parent.take().expect("parent not lent already")
+    }
+    pub(crate) fn return_parent(&mut self, parent: Reminders) {
+        assert!(self.parent.is_none(), "parent lent once");
+        self.parent = Some(parent);
+    }
+
+    /// The person cancels the due item through Schedule, as the app does.
+    pub(crate) fn cancel(&self) {
+        let socket = &self.schedule.as_ref().unwrap().socket;
+        let deadline = || Instant::now() + Duration::from_secs(2);
+        let item = exchange(socket, &Request::Get { id: 1 }, deadline()).unwrap();
+        let revision = item["revision"].as_u64().unwrap();
+        let cancelled = exchange(
+            socket,
+            &Request::Cancel {
+                guard: Guard {
+                    store_id: STORE_ID.into(),
+                    revision,
+                    request_id: "roundtrip-cancel".into(),
+                },
+                id: 1,
+            },
+            deadline(),
+        )
+        .unwrap();
+        assert_eq!(cancelled["ok"], true, "{cancelled}");
     }
 
     pub(crate) fn offer(&mut self) -> Offer {

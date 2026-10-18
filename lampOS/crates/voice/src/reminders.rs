@@ -278,6 +278,9 @@ pub(crate) struct Reminders {
     failed: bool,
     /// `LAMP_SCHEDULE_SPEAK=skill`: a due reminder waits for a skill to ask.
     by_skill: bool,
+    /// The attempt last said to be owed while the microphones are off
+    /// ([`Self::owed_while_muted`]), so the journal says it once for each.
+    owed_told: Option<PreparedToken>,
 }
 impl Reminders {
     pub fn from_environment() -> io::Result<Option<Self>> {
@@ -297,6 +300,7 @@ impl Reminders {
             sent: false,
             failed: false,
             by_skill,
+            owed_told: None,
         }))
     }
 
@@ -425,6 +429,26 @@ impl Reminders {
             .as_ref()
             .filter(|offer| offer.fresh(now_us))
             .cloned()
+    }
+    /// Whether a due reminder is owed while the microphones are off, as the
+    /// muted wait asks at each look (#1545): `Some(true)` the first time for
+    /// its attempt, which the journal says once, `Some(false)` after, and
+    /// `None` when nothing is offered. A muted lamp opens no session, so the
+    /// reminder waits, still offered, and is said once they open, by the
+    /// rules of any due reminder (an hour late or more, only with someone
+    /// at the lamp). On lamp-cb94 on 17 October one came due 21 minutes
+    /// into a mute and nothing anywhere said it was owed (the first builder,
+    /// #1545).
+    pub fn owed_while_muted(&mut self, now_us: u64) -> Option<bool> {
+        let offer = self.offer(now_us)?;
+        if self.owed_told.as_ref() == Some(&offer.token) {
+            return Some(false);
+        }
+        eprintln!(
+            "lamp-voice: a reminder is due while the microphones are off: it waits until they open"
+        );
+        self.owed_told = Some(offer.token);
+        Some(true)
     }
     pub fn active_valid(&self, owner: TurnOwner, now_us: u64) -> bool {
         let Some(active) = &self.active else {
