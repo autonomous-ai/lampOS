@@ -71,7 +71,7 @@ pub fn catalog() -> Vec<Function> {
         ),
         function(
             NAMES[3],
-            "Read one bounded page of active timers and reminders. To say what is set, or to find one to cancel, leave pending_only out. If next_after_id is present, use it as after_id to read more; never describe an incomplete page as the whole list. If not_yet_due is more than 0, timers or reminders are set: list again without pending_only before saying none are.",
+            "Read one bounded page of active timers and reminders. To say what is set, or to find one to cancel, leave pending_only out. If next_after_id is present, use it as after_id to read more; never describe an incomplete page as the whole list. If not_yet_due, how many are set and not yet due in all, is more than 0, timers or reminders are set: list again without pending_only before saying none are.",
             json!({"pending_only":{"type":"boolean","description":"true lists only items that are due now and not yet said; leave it out to list everything that is set."},"after_id":{"type":"integer","minimum":0}}),
             json!([]),
         ),
