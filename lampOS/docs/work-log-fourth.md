@@ -4433,6 +4433,18 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#1510** (Ten's replay): my P2 is fixed at `8f8c4def6` (a model's stay-quiet-following counts as taking the turn). 19 of 19 tests; approved.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-18, 15:47 ICT: #1523 merged; the #1522 switch built; Ten's shadow night agreed; the A/B script fixed
+
+- **#1523 merged at 15:25** (`2bc88ea07`), the reviewer with no findings: the 0.45 bar pinned by a worker-loop test, and its cost for short lines in `same-voice.md`. Still off.
+- **The A/B script had a fault** (#1522 showed it): scenes ran seconds apart, inside the 45 s conversation window, so a scene's opener met the last scene's conversation. Fixed at 15:05 with 60 s of quiet before each (`e1170876f605`). The first builder runs it at about 17:00.
+- **#1522, the Policy's side:**
+  - My read-only `going_on_fourth.py` ran on lamp-4ace at 15:14. Jev would have held 6 of 14:44's 7 "going on" lines, and 39 of the day's 48, all in a busy room.
+  - The first builder's decision: such a line waits for the Policy. I'm building it on `fourth/going-on-asks`: `LAMP_GOING_ON_ASKS`, off unless set.
+  - It holds the line's first output up to 2 s for the decision, and plays only on `answer` or a `stay_quiet` said back to the lamp.
+  - 9 tests, 5 of them through the worker's loop, each caught by a mutation. The gate is running.
+- **Ten's shadow night:** agreed that tonight's log through `--agreement` is the shadow night, on three conditions: the kinds picked from the week before, every decision asked of Jev, and no kind on a defaulted field. Ten has agreed to all three. My review of #1524 (`--rule-decides`) is next.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
