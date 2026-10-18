@@ -34,6 +34,8 @@ struct Data {
     failure: Option<Failure>,
     attempts: usize,
     writes: usize,
+    kept: Vec<(String, Vec<u8>)>,
+    refuse_set_aside: bool,
 }
 #[derive(Clone, Default)]
 struct Disk(Arc<Mutex<Data>>);
@@ -71,6 +73,16 @@ impl Persistence for Disk {
             return Err(io::Error::other("authored postcommit sync failure"));
         }
         Ok(())
+    }
+    fn set_aside(&mut self, label: &str) -> io::Result<String> {
+        let mut data = self.0.lock().unwrap();
+        if data.refuse_set_aside {
+            return Err(io::Error::other("authored preservation failure"));
+        }
+        let name = format!("schedule.sqlite3.{label}");
+        let bytes = data.bytes.take().unwrap();
+        data.kept.push((name.clone(), bytes));
+        Ok(name)
     }
 }
 fn now(ms: u64) -> ClockSample {
@@ -934,8 +946,7 @@ fn initial_commit_failure_never_returns_a_usable_ledger() {
 }
 
 #[test]
-fn strict_snapshot_rejects_engine_json_unknown_missing_duplicate_and_invalid_fields_without_writes()
-{
+fn snapshot_rejects_wrong_kind_missing_duplicate_and_invalid_fields_without_writes() {
     let (_, pending) = timer();
     let disk = Disk::default();
     let mut first = ledger(disk.clone());
@@ -944,10 +955,9 @@ fn strict_snapshot_rejects_engine_json_unknown_missing_duplicate_and_invalid_fie
     let mut variants = Vec::new();
     for (field, value) in [
         ("kind", json!("schedule")),
-        ("schema", json!(2)),
+        ("schema", json!(0)),
         ("next_attempt", json!(0)),
         ("ledger_id", json!("bad")),
-        ("unexpected", json!(true)),
     ] {
         let mut next = valid.clone();
         next[field] = value;
@@ -1101,12 +1111,9 @@ fn reopened_private_sqlite_store_preserves_completion_and_exact_ack_intent() {
 }
 
 /// #1505: a ledger as a later build writes it, with a field this build doesn't
-/// know at its top and in an entry. The same ledger without them opens; with
-/// them it is refused today, and the voice's due reminders are never said
-/// until the file is fixed. `second/ledger-forward` makes it read: this test
-/// then stops panicking, and becomes a plain test in that pull request (Tests).
+/// know at its top and in an entry. It opens as the same ledger without them,
+/// so the voice's due reminders do not wait for the file to be fixed.
 #[test]
-#[should_panic(expected = "invalid_snapshot")]
 fn a_ledger_from_a_later_build_is_read() {
     let (_engine, pending) = timer();
     let disk = Disk::default();
@@ -1128,4 +1135,275 @@ fn a_ledger_from_a_later_build_is_read() {
         DeliveryLedger::open(disk, LEDGER).unwrap().revision(),
         revision
     );
+}
+
+#[test]
+fn later_metadata_preserves_completed_delivery_and_exact_ack_without_replay() {
+    let (mut schedule, pending) = timer();
+    let disk = Disk::default();
+    let mut first = ledger(disk.clone());
+    let old = first.prepare(&pending, correlation(1)).unwrap();
+    let prepared = first
+        .retry_interrupted(&old, &pending, &retirement(&old), correlation(2))
+        .unwrap();
+    let completed = first.complete(&prepared, &proof(&prepared)).unwrap();
+    let ack = first.plan_ack(&completed, &pending).unwrap();
+    let response = schedule.answer(ack.request.clone(), &now(1000)).unwrap();
+    first
+        .reconcile(
+            pending.key(),
+            &Evidence::Ack(AckEvidence::from_reply(&ack, &response).unwrap()),
+        )
+        .unwrap();
+    let expected = first.entries().unwrap();
+    let mut snapshot = disk.json();
+    for path in [
+        "",
+        "/schedule",
+        "/entries/0",
+        "/entries/0/view",
+        "/entries/0/view/prepared",
+        "/entries/0/view/prepared/key",
+        "/entries/0/view/prepared/correlation",
+        "/entries/0/view/completion",
+        "/entries/0/view/completion/correlation",
+        "/entries/0/view/ack",
+        "/entries/0/view/ack/key",
+        "/entries/0/view/resolution",
+        "/entries/0/previous",
+        "/entries/0/previous/proof",
+        "/entries/0/previous/proof/correlation",
+        "/entries/0/previous/proof/basis",
+    ] {
+        snapshot.pointer_mut(path).unwrap()["later_metadata"] = json!({"version": 2});
+    }
+    disk.replace(&snapshot);
+    let before = disk.bytes();
+    let writes = disk.writes();
+    let mut reopened = ledger(disk.clone());
+    assert_eq!(reopened.entries().unwrap(), expected);
+    assert_eq!(disk.bytes(), before);
+    assert_eq!(disk.writes(), writes);
+    assert!(reopened.set_aside().is_none());
+    assert!(reopened.pending_ack(pending.key()).unwrap().is_none());
+    assert!(reopened.prepare(&pending, correlation(3)).is_err());
+    assert_eq!(reopened.compact_resolved().unwrap(), 1);
+    assert!(
+        !String::from_utf8(disk.bytes())
+            .unwrap()
+            .contains("later_metadata")
+    );
+    assert_eq!(disk.json()["ledger_id"], LEDGER);
+}
+
+#[test]
+fn later_metadata_does_not_strand_an_unfinished_due_delivery() {
+    let (mut schedule, pending) = timer();
+    let disk = Disk::default();
+    let mut first = ledger(disk.clone());
+    let old = first.prepare(&pending, correlation(1)).unwrap();
+    let mut snapshot = disk.json();
+    snapshot["later_metadata"] = json!(true);
+    snapshot["entries"][0]["view"]["later_metadata"] = json!(true);
+    disk.replace(&snapshot);
+    let mut reopened = ledger(disk);
+    let prepared = reopened
+        .retry_interrupted(&old, &pending, &retirement(&old), correlation(2))
+        .unwrap();
+    let completed = reopened.complete(&prepared, &proof(&prepared)).unwrap();
+    let ack = reopened.plan_ack(&completed, &pending).unwrap();
+    let response = schedule.answer(ack.request.clone(), &now(1000)).unwrap();
+    assert!(AckEvidence::from_reply(&ack, &response).is_ok());
+    assert!(
+        schedule
+            .answer(
+                Request::Get {
+                    id: pending.key().id
+                },
+                &now(1000)
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn unknown_saved_enum_values_and_changed_exact_requests_are_refused_without_writes() {
+    let (_, pending) = timer();
+    let disk = Disk::default();
+    let mut first = ledger(disk.clone());
+    let old = first.prepare(&pending, correlation(1)).unwrap();
+    let prepared = first
+        .retry_interrupted(&old, &pending, &retirement(&old), correlation(2))
+        .unwrap();
+    let completed = first.complete(&prepared, &proof(&prepared)).unwrap();
+    first.plan_ack(&completed, &pending).unwrap();
+    let valid = disk.json();
+    for (path, value) in [
+        ("/entries/0/previous/proof/basis/kind", json!("later_kind")),
+        (
+            "/entries/0/view/resolution",
+            json!({"kind": "later_kind", "revision": 3}),
+        ),
+        ("/entries/0/view/ack/request/op", json!("later_op")),
+        (
+            "/entries/0/view/ack/request",
+            json!({"op": "ack", "guard": valid["entries"][0]["view"]["ack"]["request"]["guard"], "id": pending.key().id, "delivery": pending.key().delivery, "later_field": true}),
+        ),
+    ] {
+        let mut snapshot = valid.clone();
+        *snapshot.pointer_mut(path).unwrap() = value;
+        disk.replace(&snapshot);
+        let before = disk.bytes();
+        let writes = disk.writes();
+        assert_eq!(
+            DeliveryLedger::open(disk.clone(), LEDGER)
+                .err()
+                .unwrap()
+                .code,
+            "invalid_snapshot",
+            "{path}"
+        );
+        assert_eq!(disk.bytes(), before);
+        assert_eq!(disk.writes(), writes);
+        assert!(disk.0.lock().unwrap().kept.is_empty());
+    }
+}
+
+/// The ledger saves the exact Ack request and refuses one with a field it
+/// doesn't know (the test above). So a field added to `Request::Ack` or
+/// `Guard` needs a `delivery::SCHEMA` bump: without one, an older build
+/// refuses the whole ledger instead of setting it aside. These are the keys
+/// it saves today, so a new one fails here first (Ten on #1559).
+#[test]
+fn the_saved_ack_request_has_exactly_these_keys() {
+    use std::collections::BTreeSet;
+    fn keys(value: &Value) -> BTreeSet<&str> {
+        value
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect()
+    }
+    let (_, pending) = timer();
+    let disk = Disk::default();
+    let mut ledger = ledger(disk.clone());
+    let (_, ack) = prepare_ack(&mut ledger, &pending);
+    assert!(matches!(ack.request, Request::Ack { .. }));
+    let request = serde_json::to_value(&ack.request).unwrap();
+    assert_eq!(
+        keys(&request),
+        BTreeSet::from(["op", "guard", "id", "delivery"])
+    );
+    assert_eq!(
+        keys(&request["guard"]),
+        BTreeSet::from(["store_id", "revision", "request_id"])
+    );
+    assert_eq!(disk.json()["entries"][0]["view"]["ack"]["request"], request);
+}
+
+#[test]
+fn newer_schema_is_preserved_once_and_current_pending_reminders_can_complete() {
+    let (mut schedule, pending) = timer();
+    let disk = Disk::default();
+    let mut first = ledger(disk.clone());
+    prepare_ack(&mut first, &pending);
+    let mut snapshot = disk.json();
+    snapshot["schema"] = json!(u64::MAX);
+    snapshot["entries"][0]["view"]["ack"]["request"]["op"] = json!("later_op");
+    disk.replace(&snapshot);
+    let newer_bytes = disk.bytes();
+    let mut reopened = DeliveryLedger::open(disk.clone(), OTHER).unwrap();
+    let kept = reopened.set_aside().unwrap().to_owned();
+    assert!(kept.contains("newer-18446744073709551615-"));
+    assert_eq!(disk.0.lock().unwrap().kept, [(kept, newer_bytes)]);
+    assert_eq!(disk.json()["ledger_id"], OTHER);
+    assert_eq!(disk.json()["schema"], 1);
+    assert!(reopened.entries().unwrap().is_empty());
+    assert!(reopened.view(pending.key()).unwrap().is_none());
+    let (_, ack) = prepare_ack(&mut reopened, &pending);
+    let response = schedule.answer(ack.request.clone(), &now(1000)).unwrap();
+    assert!(AckEvidence::from_reply(&ack, &response).is_ok());
+    drop(reopened);
+    let current = ledger(disk.clone());
+    assert!(current.set_aside().is_none());
+    assert_eq!(disk.0.lock().unwrap().kept.len(), 1);
+}
+
+#[test]
+fn failed_preservation_or_wrong_ledger_kind_never_overwrites_a_newer_snapshot() {
+    for wrong_kind in [false, true] {
+        let disk = Disk::default();
+        let _ = ledger(disk.clone());
+        let mut snapshot = disk.json();
+        snapshot["schema"] = json!(2);
+        if wrong_kind {
+            snapshot["kind"] = json!("other_store");
+        } else {
+            disk.0.lock().unwrap().refuse_set_aside = true;
+        }
+        disk.replace(&snapshot);
+        let before = disk.bytes();
+        let writes = disk.writes();
+        assert!(DeliveryLedger::open(disk.clone(), OTHER).is_err());
+        assert_eq!(disk.bytes(), before);
+        assert_eq!(disk.writes(), writes);
+        assert!(disk.0.lock().unwrap().kept.is_empty());
+    }
+}
+
+#[test]
+fn failed_fresh_commit_keeps_the_newer_ledger_and_returns_no_usable_owner() {
+    for failure in [Failure::Before, Failure::After] {
+        let disk = Disk::default();
+        let _ = ledger(disk.clone());
+        let mut snapshot = disk.json();
+        snapshot["schema"] = json!(2);
+        disk.replace(&snapshot);
+        let newer_bytes = disk.bytes();
+        disk.fail(failure);
+        assert_eq!(
+            DeliveryLedger::open(disk.clone(), OTHER)
+                .err()
+                .unwrap()
+                .code,
+            "storage"
+        );
+        assert_eq!(disk.0.lock().unwrap().kept[0].1, newer_bytes);
+        let reopened = DeliveryLedger::open(disk.clone(), OTHER).unwrap();
+        assert!(reopened.set_aside().is_none());
+        assert!(reopened.entries().unwrap().is_empty());
+        assert_eq!(disk.0.lock().unwrap().kept.len(), 1);
+        assert_eq!(disk.json()["ledger_id"], OTHER);
+    }
+}
+
+#[test]
+fn real_sqlite_preserves_newer_ledger_before_starting_a_reopenable_current_one() {
+    let root = tempfile::tempdir().unwrap();
+    let directory = root.path().join("consumer-ledger");
+    let bytes =
+        br#"{"kind":"lamp_schedule_delivery_ledger","schema":2,"later_metadata":{"keep":"whole"}}"#;
+    let mut store = Store::open(&directory).unwrap();
+    store.commit(bytes).unwrap();
+    drop(store);
+    let reopened = DeliveryLedger::open(Store::open(&directory).unwrap(), LEDGER).unwrap();
+    let kept = reopened.set_aside().unwrap().to_owned();
+    let archived = rusqlite::Connection::open_with_flags(
+        directory.join(&kept),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap();
+    let preserved: Vec<u8> = archived
+        .query_row("SELECT snapshot FROM state WHERE singleton=1", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(preserved, bytes);
+    drop(archived);
+    drop(reopened);
+    let current = DeliveryLedger::open(Store::open(&directory).unwrap(), OTHER).unwrap();
+    assert!(current.set_aside().is_none());
+    assert!(current.entries().unwrap().is_empty());
+    assert!(directory.join(kept).is_file());
 }
