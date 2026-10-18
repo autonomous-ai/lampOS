@@ -46,6 +46,10 @@ struct FakeHost {
     failing_enables: u32,
     /// `harness service install` refuses, as for a user it cannot serve.
     harness_refuses: bool,
+    /// `harness service uninstall` refuses.
+    harness_off_refuses: bool,
+    /// What `harness-off` finds Harness still has afterwards.
+    harness_left: Vec<String>,
 }
 
 impl Host for FakeHost {
@@ -91,6 +95,21 @@ impl Host for FakeHost {
         fs::create_dir_all(&unit).unwrap();
         fs::write(unit.join("harnessd.service"), "[Service]\n").unwrap();
         Ok(())
+    }
+
+    fn harness_off(&mut self, user: &str, home: &str) -> Result<Vec<String>, String> {
+        self.calls.push(format!("harness-off {user} {home}"));
+        if self.harness_off_refuses {
+            return Err("harness service uninstall: no user manager".into());
+        }
+        // What `harness_at_boot` left, gone: the CLI's unit and the linger.
+        let _ = fs::remove_file(self.root.join("var/lib/systemd/linger").join(user));
+        let _ = fs::remove_file(
+            self.root
+                .join(home.trim_start_matches('/'))
+                .join(".config/systemd/user/harnessd.service"),
+        );
+        Ok(self.harness_left.clone())
     }
 
     fn utc_offset_minutes(&mut self, zone: &str) -> Result<i32, String> {
@@ -176,6 +195,8 @@ impl Lamp {
             calls: Vec::new(),
             failing_enables: 0,
             harness_refuses: false,
+            harness_off_refuses: false,
+            harness_left: Vec::new(),
         };
         Self {
             _dir: dir,
@@ -1796,6 +1817,137 @@ fn harness_is_set_to_start_at_boot_once_when_it_is_there() {
     lamp.host.harness_refuses = true;
     let refused = lamp.install().unwrap_err();
     assert!(refused.contains("no user manager"), "{refused}");
+}
+
+impl Lamp {
+    /// A lamp with Harness at [`install::HARNESS`].
+    fn with_harness() -> Self {
+        let lamp = Lamp::new(188, &[]);
+        let harness = lamp.on(install::HARNESS);
+        fs::create_dir_all(harness.parent().unwrap()).unwrap();
+        fs::write(&harness, "#!/bin/sh\n").unwrap();
+        lamp
+    }
+
+    fn harness_off(&mut self) -> Result<Vec<String>, String> {
+        let said = &mut self.said;
+        install::harness_off(
+            &self.root,
+            &self.config.records,
+            &mut self.host,
+            &mut |line: &str| said.push(line.to_owned()),
+        )
+    }
+
+    /// What install's Harness at boot leaves: the linger, the CLI's unit
+    /// and install's record.
+    fn harness_left_on(&self) -> [bool; 3] {
+        [
+            self.on("var/lib/systemd/linger/lampos").exists(),
+            self.on("var/lib/lampos-tasks/.config/systemd/user/harnessd.service")
+                .exists(),
+            self.on("var/lib/lampos-update/harness-at-boot").exists(),
+        ]
+    }
+
+    fn harness_offs(&self) -> usize {
+        self.host
+            .calls
+            .iter()
+            .filter(|call| *call == "harness-off lampos /var/lib/lampos-tasks")
+            .count()
+    }
+}
+
+/// #811, the first builder's yes on #705 (18 Oct 11:1x): `harness-off`
+/// after a first install leaves no `lampos` linger, no Harness unit and no
+/// record, and Harness itself in place; run again it does nothing; an
+/// install afterwards sets Harness up again.
+#[test]
+fn harness_off_after_a_first_install_leaves_no_linger() {
+    let mut lamp = Lamp::with_harness();
+    lamp.install().unwrap();
+    assert_eq!(lamp.harness_left_on(), [true, true, true]);
+    assert_eq!(lamp.harness_off().unwrap(), Vec::<String>::new());
+    assert_eq!(lamp.harness_left_on(), [false, false, false]);
+    assert_eq!(lamp.harness_offs(), 1);
+    assert!(lamp.on(install::HARNESS).exists(), "Harness itself stays");
+
+    // Again: no record, so nothing is asked and nothing changes.
+    let before = tree(&lamp.root);
+    assert_eq!(lamp.harness_off().unwrap(), Vec::<String>::new());
+    assert_eq!(lamp.harness_offs(), 1);
+    assert_eq!(tree(&lamp.root), before);
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("nothing to undo"))
+    );
+
+    // An install afterwards sets it up again, once.
+    let done = lamp.install().unwrap();
+    assert!(
+        done.changed
+            .iter()
+            .any(|line| line == "Harness starts at boot as lampos")
+    );
+    assert_eq!(lamp.harness_left_on(), [true, true, true]);
+}
+
+/// A refused uninstall keeps the record (and the linger, the CLI's to
+/// undo first), so a later run tries again and finishes.
+#[test]
+fn a_refused_harness_off_keeps_its_record_and_a_later_run_finishes() {
+    let mut lamp = Lamp::with_harness();
+    lamp.install().unwrap();
+    lamp.host.harness_off_refuses = true;
+    let refused = lamp.harness_off().unwrap_err();
+    assert!(refused.contains("no user manager"), "{refused}");
+    assert_eq!(lamp.harness_left_on(), [true, true, true]);
+    lamp.host.harness_off_refuses = false;
+    lamp.harness_off().unwrap();
+    assert_eq!(lamp.harness_left_on(), [false, false, false]);
+    assert_eq!(lamp.harness_offs(), 2);
+}
+
+/// What Harness still has afterwards is said and returned, never stopped,
+/// and the record goes all the same: install's part is undone. Without
+/// Harness on the lamp nothing can be undone, and the record is kept.
+#[test]
+fn what_harness_still_has_is_said_and_without_harness_the_record_is_kept() {
+    let mut lamp = Lamp::with_harness();
+    lamp.install().unwrap();
+    let left = "harnessd still runs as lampos: pid 4242".to_owned();
+    lamp.host.harness_left = vec![left.clone()];
+    assert_eq!(lamp.harness_off().unwrap(), std::slice::from_ref(&left));
+    assert!(lamp.said.contains(&left));
+    assert!(!lamp.on("var/lib/lampos-update/harness-at-boot").exists());
+
+    let mut lamp = Lamp::with_harness();
+    lamp.install().unwrap();
+    fs::remove_file(lamp.on(install::HARNESS)).unwrap();
+    let missing = lamp.harness_off().unwrap_err();
+    assert!(missing.contains("Harness is not at"), "{missing}");
+    assert_eq!(lamp.harness_offs(), 0);
+    assert!(lamp.on("var/lib/lampos-update/harness-at-boot").exists());
+}
+
+/// `harness service status --json` as Harness 0.4.17 writes it
+/// (`cli/src/lib/serviceCommand.ts`): nothing left once it is neither
+/// installed, registered nor running.
+#[test]
+fn what_harness_service_status_still_has_is_read_from_its_json() {
+    let gone = r#"{"supported":true,"platform":"systemd","file":"/x","target":"/y","installed":false,"current":false,"registered":false,"running":false,"pid":null,"state":"inactive","lastExit":null,"failed":false,"linger":true,"unreachable":null}"#;
+    assert!(install::service_left(gone).is_empty());
+    let running = gone
+        .replace(r#""registered":false"#, r#""registered":true"#)
+        .replace(r#""running":false"#, r#""running":true"#)
+        .replace(r#""pid":null"#, r#""pid":4242"#);
+    assert_eq!(
+        install::service_left(&running),
+        ["Harness still has its service: installed false, registered true, running true, pid 4242"]
+    );
+    assert_eq!(install::service_left("nonsense").len(), 1);
 }
 
 /// A lamp root holding V1's config with this text, if any.

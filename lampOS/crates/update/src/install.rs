@@ -378,6 +378,14 @@ pub trait Host {
     /// the Harness CLI's own `harness service install` as `user` with that
     /// `HOME`. Never a unit of this program's writing.
     fn harness_at_boot(&mut self, user: &str, home: &str) -> Result<(), String>;
+    /// Undoes [`Host::harness_at_boot`] (`lamp-update harness-off`): as
+    /// `user` with that `HOME`, the Harness CLI's own `harness service
+    /// uninstall`, then `harness stop`, since the uninstall starts the daemon
+    /// again the usual way (Harness 0.4.17, Nine on #705); then `loginctl
+    /// disable-linger`. Then what is left of it, a line each: the service
+    /// Harness still has, or a daemon still running as `user`. Never stopped
+    /// here: stopping Harness is Harness's own.
+    fn harness_off(&mut self, user: &str, home: &str) -> Result<Vec<String>, String>;
 }
 
 /// The machine itself: only with the root `/`.
@@ -408,19 +416,42 @@ impl Host for System {
         // A user manager for the user from boot, with no login: the
         // daemon's user unit needs it, a system user as any other.
         run(Command::new("loginctl").args(["enable-linger", user]))?;
-        let output = Command::new("id")
-            .args(["-u", user])
+        run(harness_as(user, home)?.args(["service", "install"]))
+    }
+
+    fn harness_off(&mut self, user: &str, home: &str) -> Result<Vec<String>, String> {
+        run(harness_as(user, home)?.args(["service", "uninstall"]))?;
+        // `harness stop` with no daemon running says so and ends with 0.
+        run(harness_as(user, home)?.arg("stop"))?;
+        // Asked while the user's manager is still there: it ends with the
+        // linger.
+        let mut left = match harness_as(user, home)?
+            .args(["service", "status", "--json"])
             .output()
-            .map_err(|error| format!("id: {error}"))?;
-        let uid = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-        if uid.is_empty() || !uid.bytes().all(|b| b.is_ascii_digit()) {
-            return Err(format!("id -u {user} gave no user id"));
+        {
+            Ok(output) if output.status.success() => {
+                service_left(&String::from_utf8_lossy(&output.stdout))
+            }
+            _ => vec!["`harness service status --json` did not answer".to_owned()],
+        };
+        run(Command::new("loginctl").args(["disable-linger", user]))?;
+        // `pgrep` ends with 1 when it finds nothing; only its list is read.
+        if let Ok(output) = Command::new("pgrep")
+            .args(["-u", user, "-f", "harnessd"])
+            .output()
+        {
+            let pids: Vec<String> = String::from_utf8_lossy(&output.stdout)
+                .split_whitespace()
+                .map(str::to_owned)
+                .collect();
+            if !pids.is_empty() {
+                left.push(format!(
+                    "harnessd still runs as {user}: pid {}",
+                    pids.join(", ")
+                ));
+            }
         }
-        run(Command::new("runuser")
-            .args(["-u", user, "--", "env"])
-            .arg(format!("HOME={home}"))
-            .arg(format!("XDG_RUNTIME_DIR=/run/user/{uid}"))
-            .args([HARNESS, "service", "install"]))
+        Ok(left)
     }
 
     fn utc_offset_minutes(&mut self, zone: &str) -> Result<i32, String> {
@@ -432,6 +463,48 @@ impl Host for System {
         offset_minutes(String::from_utf8_lossy(&output.stdout).trim())
             .ok_or_else(|| format!("date gave no offset for {zone}"))
     }
+}
+
+/// The Harness CLI as `user`, with `home` as its `HOME` and the user's
+/// own runtime folder, which its per-user service needs.
+fn harness_as(user: &str, home: &str) -> Result<Command, String> {
+    let output = Command::new("id")
+        .args(["-u", user])
+        .output()
+        .map_err(|error| format!("id: {error}"))?;
+    let uid = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    if uid.is_empty() || !uid.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(format!("id -u {user} gave no user id"));
+    }
+    let mut command = Command::new("runuser");
+    command
+        .args(["-u", user, "--", "env"])
+        .arg(format!("HOME={home}"))
+        .arg(format!("XDG_RUNTIME_DIR=/run/user/{uid}"))
+        .arg(HARNESS);
+    Ok(command)
+}
+
+/// What `harness service status --json` still says of Harness's service:
+/// nothing when it is not installed, registered or running, else one line.
+/// Its fields are the CLI's own (`cli/src/lib/serviceCommand.ts`).
+pub fn service_left(json: &str) -> Vec<String> {
+    let Ok(status) = serde_json::from_str::<serde_json::Value>(json) else {
+        return vec!["`harness service status --json` said nothing readable".to_owned()];
+    };
+    let flag = |name: &str| status[name].as_bool() == Some(true);
+    if !flag("installed") && !flag("registered") && !flag("running") {
+        return Vec::new();
+    }
+    let pid = status["pid"]
+        .as_u64()
+        .map_or(String::new(), |pid| format!(", pid {pid}"));
+    vec![format!(
+        "Harness still has its service: installed {}, registered {}, running {}{pid}",
+        flag("installed"),
+        flag("registered"),
+        flag("running")
+    )]
 }
 
 fn run(command: &mut Command) -> Result<(), String> {
@@ -1116,6 +1189,44 @@ fn device_key(config: &Install) -> Option<String> {
 /// there, and the next install tries again. A file already there that is not
 /// the pinned one is the lamp's own (lamp-52e6's own `name.onnx`): kept, and
 /// said.
+/// `lamp-update harness-off`: undoes what [`install`] did for Harness at
+/// boot, and nothing else (#811; the first builder's yes on #705, 18 Oct
+/// 11:1x). With install's record of it, [`Host::harness_off`] runs, and the
+/// record goes last, so a failure keeps it and a later run tries again.
+/// Without the record it changes nothing. Harness itself
+/// ([`HARNESS`]), the person's sign-in under [`HARNESS_HOME`] (a reset's to
+/// wipe) and the `lampos` user stay. What Harness still has is returned and
+/// said; it is never stopped here. An install afterwards sets it up again.
+pub fn harness_off(
+    root: &Path,
+    records: &str,
+    host: &mut dyn Host,
+    say: &mut dyn FnMut(&str),
+) -> Result<Vec<String>, String> {
+    let on = |path: &str| root.join(path.trim_start_matches('/').trim_end_matches('/'));
+    let folder = on(records);
+    let done = folder.join(HARNESS_DONE);
+    if !done.exists() {
+        say("Harness was not set to start at boot by install: nothing to undo");
+        return Ok(Vec::new());
+    }
+    let _lock = Records::new(folder)
+        .lock()
+        .map_err(|error| format!("another lamp-update is running: {error}"))?;
+    if !on(HARNESS).exists() {
+        return Err(format!(
+            "Harness is not at {HARNESS}: its service cannot be undone, and {} is kept",
+            done.display()
+        ));
+    }
+    let left = host.harness_off(USER, HARNESS_HOME)?;
+    std::fs::remove_file(&done).map_err(|error| format!("{}: {error}", done.display()))?;
+    for line in &left {
+        say(line);
+    }
+    Ok(left)
+}
+
 fn place_models(
     config: &Install,
     channel: &mut dyn Channel,

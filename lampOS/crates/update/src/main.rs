@@ -22,6 +22,7 @@ lamp-update check|once|serve --channel-url URL [--channel NAME] [--key-file PATH
                              [--apply on|off] [--every-s N] [--quiet-wait-s N] [--watch-s N]
                              [--keep-free-mb N] [--root DIR] [--bus-root DIR]
 lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setup on|off]
+lamp-update harness-off
 lamp-update check-units --cat FILE [--product DIR]
 lamp-update manifest --binaries DIR --deploy DIR --channel NAME --sequence N --commit SHA --files-url URL
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
@@ -39,6 +40,11 @@ install lampOS on a blank lamp (docs/install.md): the newest build's binary of e
         product part, in its folder with its current link; the product units, tmpfiles,
         users and zone; enables the lamp and starts nothing. Run again, it changes
         nothing. As root, on the lamp itself.
+harness-off undoes install's Harness at boot, and only that: as lampos, the Harness CLI's
+        `harness service uninstall` and `harness stop`, then `loginctl disable-linger
+        lampos`, then install's record of it. Harness itself, its sign-in and the
+        lampos user stay; what Harness still has is said, never stopped. Without the
+        record it changes nothing. As root, on the lamp itself.
 
   --channel-url   the channel's folder, https://.../ or file:///.../, ending in /
   --channel       the channel followed (lamp-voice)
@@ -92,6 +98,7 @@ fn main() -> ExitCode {
         }
         "check" | "once" | "serve" => return on_the_lamp(command, &options),
         "install" => install(&options),
+        "harness-off" => harness_off(&options),
         "check-units" => return check_units(&options),
         "manifest" => make_manifest(&options),
         "sign" => sign(&options),
@@ -244,6 +251,26 @@ fn install(options: &BTreeMap<String, String>) -> Result<(), String> {
             "build {} installed: {} changes; nothing started",
             done.sequence,
             done.changed.len()
+        );
+    }
+    Ok(())
+}
+
+fn harness_off(options: &BTreeMap<String, String>) -> Result<(), String> {
+    known(options, &[])?;
+    let mut say = |line: &str| eprintln!("lamp-update: {line}");
+    let left = install::harness_off(
+        Path::new("/"),
+        lamp_update::install::RECORDS,
+        &mut System,
+        &mut say,
+    )?;
+    if left.is_empty() {
+        println!("Harness does not start at boot as lampos");
+    } else {
+        println!(
+            "Harness does not start at boot as lampos; {} left, said above, is Harness's own to stop",
+            left.len()
         );
     }
     Ok(())

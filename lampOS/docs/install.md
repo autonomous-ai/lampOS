@@ -485,6 +485,24 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    records nothing, so the next install asks again, and is said; it is taken to the Harness team, not worked around. How a
    home lamp's Harness signs in is theirs too.
 
+   **Undone by `lamp-update harness-off`** (as root, #811; the first
+   builder's yes on #705, 18 Oct): with that record, as `lampos` with the
+   same `HOME` and `XDG_RUNTIME_DIR`, the Harness CLI's own `harness service
+   uninstall`, then `harness stop`, since the uninstall starts the daemon
+   again the usual way (`cli/src/lib/serviceCommand.ts`; the verbs read from
+   Harness 0.4.17 on lamp-75c9, Nine on #705); then `harness service status
+   --json` and `loginctl disable-linger lampos`; then the record goes, last,
+   so a failure keeps it and a later run tries again. Without the record it
+   changes nothing; without Harness at `/usr/local/bin/harness` it refuses
+   and keeps the record. Harness itself, the sign-in under
+   `/var/lib/lampos-tasks/.harness` (a reset's to wipe) and the `lampos`
+   user stay. What Harness still has afterwards, its service or a `harnessd`
+   running as `lampos` (`pgrep -u lampos -f harnessd`), is said with its pid
+   and never stopped. An install afterwards sets it up again. Shown only in
+   tests (`crates/update/tests/install.rs`, the three `harness_off` tests
+   and the status reading); its lamp check waits for a lamp with Harness at
+   `/usr/local/bin` (lamp-4ace has none).
+
 Run again with nothing new and nothing owed, it writes nothing and asks
 nothing of systemd.
 With a newer build, it installs the new folders beside the old and moves
