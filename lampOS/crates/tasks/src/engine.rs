@@ -326,9 +326,9 @@ struct State {
     next_claim_id: u64,
     saved_at: Audit,
     tasks: Vec<Task>,
-    /// Read apart from the rest ([`read_state`]): one this build cannot read
-    /// is dropped, never refused.
-    #[serde(default)]
+    /// Read on its own ([`receipt_or_none`]): one this build cannot read is
+    /// dropped, never refused.
+    #[serde(default, deserialize_with = "receipt_or_none")]
     last_receipt: Option<Receipt>,
 }
 
@@ -359,34 +359,46 @@ fn receipt_op(receipt: &Value) -> &str {
 /// is dropped when it is one this build cannot read (a `told` before
 /// #1425), since it only answers a retry of that very request.
 fn read_state(bytes: &[u8]) -> Result<Stored, Error> {
-    let mut value: Value = serde_json::from_slice(bytes).map_err(|_| storage())?;
-    if let Some(schema) = value
-        .get("schema")
-        .and_then(Value::as_u64)
-        .filter(|schema| *schema > u64::from(SCHEMA))
-    {
+    // Only `schema`, read strictly from the bytes: a duplicate `schema` is
+    // refused, every other field passed over here.
+    #[derive(Deserialize)]
+    struct Schema {
+        #[serde(default)]
+        schema: Option<u64>,
+    }
+    let Schema { schema } = serde_json::from_slice(bytes).map_err(|_| storage())?;
+    if let Some(schema) = schema.filter(|schema| *schema > u64::from(SCHEMA)) {
         return Ok(Stored::Newer(schema));
     }
-    let receipt = value
-        .as_object_mut()
-        .and_then(|state| state.remove("last_receipt"))
-        .unwrap_or(Value::Null);
-    let mut state: State = serde_json::from_value(value).map_err(|_| storage())?;
-    state.last_receipt = if receipt.is_null() {
-        None
-    } else {
-        match serde_json::from_value::<Receipt>(receipt.clone()) {
-            Ok(receipt) => Some(receipt),
-            Err(_) => {
-                eprintln!(
-                    "tasks: the last receipt is not one this build reads (op {}); dropped",
-                    receipt_op(&receipt)
-                );
-                None
-            }
-        }
-    };
+    // The state from the bytes themselves, never through a `Value`, which
+    // would keep the last of two duplicate keys where the bytes are refused
+    // (my #1512; Second's #1562 reads its store this way).
+    let state: State = serde_json::from_slice(bytes).map_err(|_| storage())?;
     Ok(Stored::State(Box::new(state)))
+}
+
+/// The last receipt as stored, or none when this build cannot read it: taken
+/// as its own JSON text, then read strictly as a [`Receipt`] (a field written
+/// twice in it is not read, as in the state), and dropped with one line
+/// naming its `op` only ([`receipt_op`]).
+fn receipt_or_none<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Receipt>, D::Error> {
+    let Some(raw) = Option::<Box<serde_json::value::RawValue>>::deserialize(deserializer)? else {
+        return Ok(None);
+    };
+    Ok(match serde_json::from_str::<Receipt>(raw.get()) {
+        Ok(read) => Some(read),
+        Err(_) => {
+            // The name only, read leniently: it is never acted on.
+            let receipt: Value = serde_json::from_str(raw.get()).unwrap_or(Value::Null);
+            eprintln!(
+                "tasks: the last receipt is not one this build reads (op {}); dropped",
+                receipt_op(&receipt)
+            );
+            None
+        }
+    })
 }
 
 fn token(value: &str, max: usize) -> bool {
@@ -3956,6 +3968,53 @@ mod tests {
         assert_eq!(refused.code, "targets_newer");
         assert!(engine.state.tasks.is_empty());
         assert_eq!(engine.summary()["targets_newer"], 2);
+    }
+
+    /// A stored state with a field twice is refused, as before #1512, and
+    /// not read with the last of the two: it is decoded from its bytes, never
+    /// through a JSON value (found reading Second's #1562).
+    #[test]
+    fn a_stored_state_with_a_field_twice_is_refused() {
+        let (mut engine, memory) = opened();
+        accepted(&mut engine, 0);
+        let text = String::from_utf8(memory.0.borrow().bytes.clone().unwrap()).unwrap();
+        for doubled in [
+            text.replacen('{', "{\"next_task_id\":1,", 1),
+            text.replacen('{', "{\"schema\":1,", 1),
+            text.replacen("\"tasks\":[{", "\"tasks\":[{\"id\":9,", 1),
+        ] {
+            assert_ne!(doubled, text);
+            let memory = Memory::default();
+            memory.0.borrow_mut().bytes = Some(doubled.into_bytes());
+            assert_eq!(
+                Engine::open(memory, targets(), STORE, RESTART, &clock(1))
+                    .err()
+                    .unwrap()
+                    .code,
+                "storage"
+            );
+        }
+    }
+
+    /// A receipt with a field written twice is dropped, not read with the
+    /// last of the two, and the store opens (the reviewer on #1570).
+    #[test]
+    fn a_receipt_with_a_field_twice_is_dropped() {
+        let (mut engine, memory) = opened();
+        let id = accepted(&mut engine, 0);
+        let observation = observe(&mut engine, id, "result", 0);
+        engine
+            .handle(&claim(&engine, id, observation), &clock(0), true)
+            .unwrap();
+        let text = String::from_utf8(memory.0.borrow().bytes.clone().unwrap()).unwrap();
+        let doubled = text.replacen("\"last_receipt\":{", "\"last_receipt\":{\"at\":null,", 1);
+        assert_ne!(doubled, text);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(doubled.into_bytes());
+        let engine = Engine::open(memory, targets(), STORE, RESTART, &clock(1))
+            .expect("the store opens without the receipt");
+        assert!(engine.state.last_receipt.is_none());
+        assert_eq!(engine.state.tasks.len(), 1);
     }
 
     /// The receipt's journal line names a plain `op` only: anything else is

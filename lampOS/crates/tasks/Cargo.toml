@@ -8,7 +8,9 @@ publish.workspace = true
 [dependencies]
 lamp-ipc = { path = "../ipc" }
 serde.workspace = true
-serde_json.workspace = true
+# `raw_value`: the stored receipt is read as its own text, so a field
+# written twice in it is refused, never kept as the last (#1570).
+serde_json = { workspace = true, features = ["raw_value"] }
 sha2.workspace = true
 lamp-bus = { path = "../bus" }
 lamp-msgs = { path = "../msgs" }
