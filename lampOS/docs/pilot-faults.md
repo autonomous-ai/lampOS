@@ -337,9 +337,30 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   ended twice on such a message ("stale, reordered or wrong-boot runtime
   message") after a plain restart. The first message on a worker's control
   channel may now be up to 1 s old (`FIRST_CONTROL_MAX_AGE_US`); later control
-  messages and every data message keep the 100 ms bound, and a refused message
-  names its socket (for example `capture.c.p: stale, …`). A receiver held up
-  later in its run is #784's (`HELD_UP_US`), separate from this.
+  messages and every data message but the provider's input (below) keep the
+  100 ms bound, and a refused message names its socket (for example
+  `capture.c.p: stale, …`). A receiver held up later in its run is #784's
+  (`HELD_UP_US`), separate from this.
+- **The provider's input, late in order.** On lamp-4ace at 05:08 on 19 Oct
+  the voice ended on `provider.d.w: stale, reordered or wrong-boot runtime
+  message (sequence 3916 after 3915, sent 100181 us before now, bound 100000
+  us, same boot true)`, and came back muted by the restart guard. The
+  provider worker reads its input one message at a time, and none while a
+  command waits for room in Gemini's input queue; with each look under the
+  100 ms bound, no look counted as the receiver held up, and the backlog
+  behind grew past the bound (which of its waits held it at 05:08 the journal
+  does not say): the first
+  late message was taken as a held-up sender's, the second ended the voice.
+  Nothing on that channel carries authority of its own: every Start, Audio,
+  End, Called, Written and Reminder is submitted only under the newest
+  snapshot from the worker's control channel (`provider.c.w`, a lease with
+  its own expiry and heartbeat), with its privacy generation and its turn's
+  owner. So the provider's input (`Channel::taking_late`) now takes a
+  message that comes late, in order and from the parent's boot, and says the
+  first of a run (`taken late, in order: the receiver was behind`) and the
+  run when the next is on time. A message from another boot, out of order or
+  after one missing is still refused, and every other channel keeps its
+  bound.
 - **A late privacy observation while the voice waits to open.** lamp-4ace's
   power cut at 18:15 ended the voice at 13.56 s with "invalid or stale
   privacy observation while waiting", while every other part was starting.

@@ -40,6 +40,11 @@ pub struct Channel {
     held_up_us: u64,
     /// The last message was taken late because its sender was held up.
     sender_held_up: bool,
+    /// An in-order message from the peer's boot is taken however late
+    /// ([`Self::taking_late`]); the run of late ones taken, and the oldest.
+    take_late: bool,
+    late_run: u64,
+    late_oldest_us: u64,
     #[cfg(test)]
     probe: probe::Slot,
 }
@@ -75,6 +80,9 @@ impl Channel {
             last_look_us: None,
             held_up_us: 0,
             sender_held_up: false,
+            take_late: false,
+            late_run: 0,
+            late_oldest_us: 0,
             #[cfg(test)]
             probe: probe::Slot::new(sender, peer),
         })
@@ -94,6 +102,22 @@ impl Channel {
 
     fn with_first_grace(mut self) -> Self {
         self.first_grace = true;
+        self
+    }
+
+    /// For a channel whose messages carry no authority of their own: each is
+    /// checked against fresh authority when it is used. The provider's input
+    /// (`provider.d.w`): every Start, Audio, End and the rest is submitted
+    /// only under the newest snapshot from its control channel, with its
+    /// privacy generation and its turn's owner. A message there that comes
+    /// late, in order and from the peer's boot, is taken, and said: the
+    /// worker reads it one at a time, and none while a command waits for
+    /// room in Gemini's queue; each look was under the bound, and the backlog
+    /// behind grew 0.2 ms past it and ended the voice (lamp-4ace, 19 Oct
+    /// 05:08). A message from another
+    /// boot, or out of order, is still refused.
+    fn taking_late(mut self) -> Self {
+        self.take_late = true;
         self
     }
     pub fn connect(&mut self, path: &Path) -> io::Result<()> {
@@ -194,7 +218,18 @@ impl Channel {
         let late_but_next =
             || next && !self.sender_held_up && now.saturating_sub(packet.sent_at_us) < HELD_UP_US;
         match on_time {
-            Ok(()) => self.sender_held_up = false,
+            Ok(()) => {
+                self.sender_held_up = false;
+                self.back_on_time();
+            }
+            Err(_) if self.take_late && self.incoming.is_in_order(&packet) => {
+                self.incoming
+                    .accept(&packet, now, u64::MAX)
+                    .map_err(|error| {
+                        io::Error::new(error.kind(), format!("{}: {error}", self.name))
+                    })?;
+                self.taken_late(now.saturating_sub(packet.sent_at_us), max_age_us);
+            }
             Err(_) if late_but_next() => {
                 self.incoming
                     .accept(&packet, now, HELD_UP_US)
@@ -215,6 +250,37 @@ impl Channel {
         self.probe
             .record(probe::Direction::Receive, packet.boot, packet.sequence);
         Ok(Some(packet.payload))
+    }
+
+    /// A late message taken ([`Self::taking_late`]): the first of a run is
+    /// said, and the run when it ends.
+    fn taken_late(&mut self, age_us: u64, bound_us: u64) {
+        self.late_run += 1;
+        self.late_oldest_us = self.late_oldest_us.max(age_us);
+        if self.late_run == 1 {
+            eprintln!(
+                "lamp-voice: {}: a message {} us old (bound {bound_us} us) taken late, in order: the receiver was behind",
+                self.name, age_us
+            );
+        }
+    }
+
+    /// An on-time message after a run of late ones: the run is said.
+    fn back_on_time(&mut self) {
+        if self.late_run > 0 {
+            eprintln!(
+                "lamp-voice: {}: on time again after {} late messages, the oldest {} us",
+                self.name, self.late_run, self.late_oldest_us
+            );
+            self.late_run = 0;
+            self.late_oldest_us = 0;
+        }
+    }
+
+    /// Late messages taken in the run now going on.
+    #[cfg(test)]
+    pub(crate) fn late_run(&self) -> u64 {
+        self.late_run
     }
 }
 
@@ -255,10 +321,17 @@ impl WorkerChannels {
         } else {
             (parent, worker)
         };
+        let data = Channel::bind(&dir.join(format!("{role}.d.{side}")), sender, peer, 100_000)?;
         Ok(Self {
             control: Channel::bind(&dir.join(format!("{role}.c.{side}")), sender, peer, 100_000)?
                 .with_first_grace(),
-            data: Channel::bind(&dir.join(format!("{role}.d.{side}")), sender, peer, 100_000)?,
+            // The provider's input is checked against fresh authority when it
+            // is used, so a late one is taken (lamp-4ace, 19 Oct 05:08).
+            data: if role == "provider" && worker_side {
+                data.taking_late()
+            } else {
+                data
+            },
         })
     }
     /// The peer must already have bound both sockets; startup retries are bounded
@@ -425,6 +498,103 @@ mod tests {
             ..message(2)
         };
         assert!(!order.is_next(&other));
+    }
+
+    /// The provider's input and its output, bound as the worker and its
+    /// parent bind them, connected.
+    fn provider(dir: &Path) -> (WorkerChannels, WorkerChannels) {
+        let (parent, worker) = (new_boot().unwrap(), new_boot().unwrap());
+        let mut parent_side = WorkerChannels::bind(dir, "provider", parent, worker, false).unwrap();
+        let mut worker_side = WorkerChannels::bind(dir, "provider", parent, worker, true).unwrap();
+        parent_side.connect(dir, "provider", false).unwrap();
+        worker_side.connect(dir, "provider", true).unwrap();
+        (parent_side, worker_side)
+    }
+
+    /// Lamp-4ace, 19 Oct 05:08: the provider read its input one message at
+    /// a time, each look under the 100 ms bound, and the second message in a
+    /// row to come late, 0.2 ms past it, in order and from the parent's
+    /// boot, ended the voice. On the provider's input such a message is
+    /// taken, two in a row too, and the run ends with the next on time. Its
+    /// output to the parent keeps the bound: the second late one there is
+    /// refused as before.
+    #[test]
+    fn the_providers_input_takes_a_message_late_in_order_and_its_output_does_not() {
+        let dir = SessionDirectory::create().unwrap();
+        let (mut parent, mut worker) = provider(&dir.path);
+        let start = monotonic_us();
+        let at = |ms: u64| start + ms * 1_000;
+        assert_eq!(worker.data.receive_with::<u32>(|| at(0)).unwrap(), None);
+        parent.data.send_with(1u32, || at(0)).unwrap();
+        assert_eq!(worker.data.receive_with::<u32>(|| at(1)).unwrap(), Some(1));
+        for (message, ms) in [(2u32, 1), (3, 2), (4, 3)] {
+            parent.data.send_with(message, || at(ms)).unwrap();
+        }
+        // Each look under the bound since the last, the queue never empty.
+        assert_eq!(worker.data.receive_with::<u32>(|| at(60)).unwrap(), Some(2));
+        assert_eq!(
+            worker.data.receive_with::<u32>(|| at(103)).unwrap(),
+            Some(3)
+        );
+        assert_eq!(
+            worker.data.receive_with::<u32>(|| at(104)).unwrap(),
+            Some(4)
+        );
+        assert_eq!(worker.data.late_run(), 2);
+        parent.data.send_with(5u32, || at(105)).unwrap();
+        assert_eq!(
+            worker.data.receive_with::<u32>(|| at(106)).unwrap(),
+            Some(5)
+        );
+        assert_eq!(worker.data.late_run(), 0, "on time again");
+        // The output, the same way round: the second late one is refused.
+        assert_eq!(parent.data.receive_with::<u32>(|| at(0)).unwrap(), None);
+        worker.data.send_with(1u32, || at(0)).unwrap();
+        assert_eq!(parent.data.receive_with::<u32>(|| at(1)).unwrap(), Some(1));
+        for (message, ms) in [(2u32, 1), (3, 2), (4, 3)] {
+            worker.data.send_with(message, || at(ms)).unwrap();
+        }
+        assert_eq!(parent.data.receive_with::<u32>(|| at(60)).unwrap(), Some(2));
+        assert_eq!(
+            parent.data.receive_with::<u32>(|| at(103)).unwrap(),
+            Some(3)
+        );
+        let refused = parent.data.receive_with::<u32>(|| at(104)).unwrap_err();
+        assert!(
+            refused.to_string().starts_with("provider.d.p: "),
+            "{refused}"
+        );
+    }
+
+    /// On the provider's input, a late message from another boot, out of
+    /// order, or after one missing, is still refused: only lateness is
+    /// taken. Each look is under the bound, so none is a held-up receiver's.
+    #[test]
+    fn the_providers_input_still_refuses_another_boot_or_another_order() {
+        let late = |boot: Option<BootId>, sequence: u64| {
+            let dir = SessionDirectory::create().unwrap();
+            let (mut parent, mut worker) = provider(&dir.path);
+            let start = monotonic_us();
+            let at = |ms: u64| start + ms * 1_000;
+            assert_eq!(worker.data.receive_with::<u32>(|| at(0)).unwrap(), None);
+            parent.data.send_with(1u32, || at(0)).unwrap();
+            assert_eq!(worker.data.receive_with::<u32>(|| at(1)).unwrap(), Some(1));
+            parent.data.send_with(2u32, || at(2)).unwrap();
+            let data = encode(&Envelope {
+                boot: boot.unwrap_or(parent.data.sender),
+                sequence,
+                sent_at_us: at(3),
+                payload: 3u32,
+            })
+            .unwrap();
+            parent.data.endpoint.try_send(&data).unwrap();
+            assert_eq!(worker.data.receive_with::<u32>(|| at(60)).unwrap(), Some(2));
+            worker.data.receive_with::<u32>(|| at(104))
+        };
+        assert_eq!(late(None, 3).unwrap(), Some(3), "in order: taken");
+        assert!(late(Some(new_boot().unwrap()), 3).is_err(), "another boot");
+        assert!(late(None, 2).is_err(), "the same again");
+        assert!(late(None, 4).is_err(), "one missing before it");
     }
 
     /// #1178, lamp-cb94: a send to a peer that has closed its socket (a

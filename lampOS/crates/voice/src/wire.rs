@@ -671,6 +671,13 @@ impl ReceiveOrder {
         }
     }
 
+    /// The next message in order from the same boot, the first included.
+    pub fn is_in_order<T>(&self, packet: &Envelope<T>) -> bool {
+        packet.boot == self.boot
+            && self.sequence.checked_add(1) == Some(packet.sequence)
+            && packet.sent_at_us >= self.sent_at_us
+    }
+
     pub fn accept<T>(
         &mut self,
         packet: &Envelope<T>,
