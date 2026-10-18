@@ -4,6 +4,27 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 03:49 merged #1645 (nine's #1519 rebased by the first builder: lamp-eyes learned noise, off unless set), ARM64 green
+- 03:48 #1644 (first builder carrying #1559, ledger forward-read): no finding; their own merge
+- 03:44 #1646: ARM64 red, a Linux-only test (tests.rs:1887) lacks the new wait field; fix asked
+- 03:41 #1636 re-reviewed at eda24bc9b: the 02:48 findings fixed; new P2 (a statement whose print is late doesn't clear the mark); fold after Monday's 07:20 A/B
+- 03:40 #1646 (#1456 rebased by the first builder): no finding, press rules hold in both pump modes; merge on green ARM64
+- 03:39 #1643 (first builder carrying #1557, records forward-read): ready, one P3; their own merge
+- 03:37 merged #1642 (tests, ring flood waits for its 1,000 before the ring starts, #1569 row 24), ARM64 green
+- 03:29 merged #1641 (tests, fixture worker test warms lamp-voice before timing, #1569 row 23), ARM64 green
+- 03:27 merged #1479 (nine, lamp-eyes settle) after the first builder's lamp run; merged tree gated; #1519 to rebase
+- 03:27 merged #1486 (nine, lamp-name --not-while-speaking, off unless set) after the first builder's lamp run; merged tree gated
+- 03:20 merged #1639 (tests, #1635's P3s: the stop-words pick tested, docs), ARM64 green
+- 03:19 merged #1640 (third, docs: a refused state's number stays seen, #1637's note), ARM64 green
+- 03:17 merged #1638 (tests, signal children take their reply once workers are up, #1569 row 22), 0 of 15 parallel failures, ARM64 green
+- 02:52 #1637 (third, what counts as a press, #1632's P3s): no blocking finding; handed to the first builder (mute path)
+- 02:49 #1636 (fourth, same-voice question goes on): 3 P2s (held lines never clear the mark; asks() matches most statements; condition a untested), not ready
+- 02:39 merged #1635 (tests for sixth, LAMP_STOP_WORDS_SOURCE=linear, off unless set), ARM64 green; three P3s (the source pick untested, doc lines)
+- 02:17 #1632 re-reviewed at 3f04b4787: the 01:19 P2 fixed, two P3s; handed to the first builder (mute path)
+- 02:03 merged #1634 (tests, #1620's red test as should_panic), ARM64 green; one parallel serve_sigterm failure noted for #1569
+- 01:40 #1633 (tests carrying twelve's #1603 P3s): no finding, room mutation caught; the model's tool text changes, so the first builder's merge
+- 01:20 #1632 (third carrying #1622, head hold across restart): the 22:27 findings fixed; a P2 left (any queued state counts as a press, so a release may never happen on a lamp); the first builder's merge
+- 00:31 merged #1630 (third, lamp-policy-replay --probe-connections, hand-run; never sends a rule-decided line), ARM64 green
 - 00:10 merged #1629 (third, policy hedge, off unless --hedge-after-ms), ARM64 green
 - 00:08 #1630 re-reviewed at be34df97e: both P2s and the P3s fixed (a rule-decided line is never sent, shown by probe); merge on green ARM64
 - 00:06 merged #1631 (fourth, #1627's P3s: same-voice.md numbers labelled, test runs scene 1 off too), ARM64 green
