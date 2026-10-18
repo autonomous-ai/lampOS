@@ -80,6 +80,7 @@ impl Place {
                 deadline: ms(900),
                 pause: ms(300),
                 act_attention: false,
+                report_every: policy::REPORT_EVERY,
             };
             let hello = hello::Options {
                 quiet_for: ms(400),

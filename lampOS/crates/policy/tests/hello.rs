@@ -165,6 +165,9 @@ impl Rig {
             deadline: ms(900),
             pause: ms(300),
             act_attention: false,
+            // A report every 20 ms, not the lamp's second, so that a wait for
+            // the next one takes no real time (#1128).
+            report_every: ms(20),
         };
         let hello = hello::Options {
             quiet_for: ms(400),
@@ -706,6 +709,9 @@ fn without_the_switch_arrivals_are_not_listened_to_and_the_report_is_as_before()
             deadline: ms(900),
             pause: ms(300),
             act_attention: false,
+            // A report every 20 ms, not the lamp's second, so that a wait for
+            // the next one takes no real time (#1128).
+            report_every: ms(20),
         };
         thread::spawn(move || {
             let progress = Progress::start(Never, progress::Options::new(ms(900), None)).unwrap();

@@ -1443,3 +1443,36 @@ and that another thread's move never reaches it. So every other test starts
 its workers on the host's clock as before, and the other seven
 `ring_startup_tests` start the ring on it. A test build whose clock ignored
 the move fails it.
+
+## The Policy's test rigs ask for a report every 20 ms (#1128)
+
+The Policy says how it is on the bus once a second (`Diagnostic`, from
+`second()`), and in the same look it looks again for its decisions'
+publisher and for a part listening for the lamp's name. The judges rig
+(`tests/judges.rs`) waited for the next of those reports after publishing
+its cues, so each of its seven tests waited about a second. Several of the
+`policy`, `hello` and `progress` tests wait for a report, too.
+
+`policy::Options` now has `report_every`. `lamp-policy`, `lamp-policy-judges`
+and the examples pass `policy::REPORT_EVERY`, the lamp's second, so the lamp
+is unchanged. The four rigs in `crates/policy/tests` pass 20 ms. The voice's
+`hello_asks` and `progress_news` never wait for a report, so they keep the
+lamp's second.
+
+At 20 ms the judges rig's handshake had to become strict. It took the first
+report with `log_written` of 1 or more after its cues, and at 20 ms that
+report can be sent at the end of the very turn the cues landed in, after
+that turn had read the voice and the room. The rig now subscribes after
+publishing the cues and takes the second report on that subscription, with
+`log_written` still 1 or more. A report goes at most once a turn, at its
+end, so the first one there was sent after the cues, and the turn that ends
+with the second began after them. With no handshake at all, the judges tests
+still passed 140 of 140 (four at a time), so none of them is sensitive to it
+today. The strict one keeps the guarantee the second-long wait gave.
+
+On this Mac, one at a time: `judges` 7.4 s to 0.6 s, `policy` 21.0 s to
+15.9 s, `progress` 9.0 s to 7.6 s, `hello` 6.9 s to 5.1 s. The rest of
+those is the lamp's own real-time windows (the pause, `NAME_BEFORE`,
+`WORDS_FOR`), which this leaves alone. No test pins the period:
+`the_policy_says_how_it_is_once_a_second_and_that_it_decides_without_a_model`
+passes at 20 ms, so it checks what the report says, not how often.

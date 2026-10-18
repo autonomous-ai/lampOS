@@ -86,6 +86,7 @@ fn main() -> io::Result<()> {
             deadline: Duration::from_secs(1),
             pause: Duration::from_millis(300),
             act_attention: false,
+            report_every: policy::REPORT_EVERY,
         };
         // Acting, and with no twenty minutes between hellos: each sample
         // is asked, not held by the rule.

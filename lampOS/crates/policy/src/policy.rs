@@ -70,7 +70,8 @@ const TICK: Duration = Duration::from_millis(20);
 /// The same wait while a question is out: the answer is taken up at most
 /// this long after it came.
 const TICK_WHILE_ASKING: Duration = Duration::from_millis(5);
-const EVERY_SECOND: Duration = Duration::from_secs(1);
+/// How often the lamp's Policy says how it is ([`Options::report_every`]).
+pub const REPORT_EVERY: Duration = Duration::from_secs(1);
 /// No more messages than this are taken from one topic in one turn of the
 /// loop, so that a flood on one cannot keep the others from being read.
 const MOST_AT_ONCE: usize = 64;
@@ -89,6 +90,12 @@ pub struct Options {
     /// hold the lamp's actions by (`LAMP_POLICY_HOLDS_ACTIONS=on`). Speech
     /// is not held. Off unless set: shadow.
     pub act_attention: bool,
+    /// How often the Policy says how it is on the bus, and looks again
+    /// for its decisions' publisher and for a part listening for the
+    /// lamp's name. The lamp's is [`REPORT_EVERY`]. Tests give less, so
+    /// that a rig that waits for a report after its cues does not wait a
+    /// second (#1128).
+    pub report_every: Duration,
 }
 
 /// What was counted from start to stop.
@@ -749,7 +756,8 @@ struct Policy<'a> {
     spoke_from: Option<Instant>,
     record: Record,
     out: Option<Publisher>,
-    /// Where the policy says how it is itself, once a second.
+    /// Where the policy says how it is itself: every `report_every`, once a
+    /// second on the lamp.
     reports: Option<Publisher>,
     model: Trouble,
     log: Trouble,
@@ -1896,7 +1904,7 @@ fn run_inner<D: Decider + Send + 'static>(
         policy.not_judged_turn();
         policy.progress_turn(now);
         policy.after(now);
-        if now.saturating_duration_since(shown) >= EVERY_SECOND {
+        if now.saturating_duration_since(shown) >= options.report_every {
             shown = now;
             policy.second();
         }

@@ -220,6 +220,9 @@ impl Rig {
             deadline: ms(900),
             pause,
             act_attention: false,
+            // A report every 20 ms, not the lamp's second, so that a wait for
+            // the next one takes no real time (#1128).
+            report_every: ms(20),
         };
         let stand_in = StandIn {
             script,

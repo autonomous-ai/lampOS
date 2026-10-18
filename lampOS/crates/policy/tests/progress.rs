@@ -161,6 +161,9 @@ impl Rig {
             deadline: ms(900),
             pause: ms(300),
             act_attention: false,
+            // A report every 20 ms, not the lamp's second, so that a wait for
+            // the next one takes no real time (#1128).
+            report_every: ms(20),
         };
         let progress = progress::Options {
             deadline: ms(900),
@@ -655,6 +658,9 @@ fn without_the_switch_the_tasks_topic_is_not_listened_to_and_the_report_is_as_be
             deadline: ms(900),
             pause: ms(300),
             act_attention: false,
+            // A report every 20 ms, not the lamp's second, so that a wait for
+            // the next one takes no real time (#1128).
+            report_every: ms(20),
         };
         thread::spawn(move || policy::run(&bus, Attention, &options, &stop, &mut |_| {}))
     };

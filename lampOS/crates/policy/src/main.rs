@@ -346,6 +346,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         deadline: arguments.deadline,
         pause: PAUSE,
         act_attention: arguments.act_attention,
+        report_every: policy::REPORT_EVERY,
     };
     // Nothing sets the flag: the process runs until it is killed.
     let stop = AtomicBool::new(false);

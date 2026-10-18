@@ -339,6 +339,7 @@ fn a_change_then_a_say_now_from_the_acting_policy_then_one_note_to_tell() {
             deadline: ms(900),
             pause: ms(300),
             act_attention: false,
+            report_every: policy::REPORT_EVERY,
         };
         let progress = progress::Options {
             act: true,
