@@ -22,12 +22,15 @@ every result on a lamp below names it. Newest first.
   a recording without them has its hold guessed, which on last night's
   rehearsal replayed 1.3 s and then stopped one frame off. A mic1 recording
   with #1430 replayed whole on lamp-4ace (60 s, 6,001 blocks).
-- #1443 (open): `hearing_replay --signal aec_linear --explained N` scores the
+- #1443 merged at 08:32: `hearing_replay --signal aec_linear --explained N` scores the
   linear output through the duplex rules. On the mic2 rehearsal (played
   lines) the lamp alone made no yield at 75–90 %, and "Stop." yielded on the
   linear output where today's input lost it. The owner's recording decides.
-- #1442 (open): `LAMP_SECOND_WARM` opens the backup voice's connections while
-  the person speaks, about 0.3 s of connect saved (#779).
+- #1442 (draft): `LAMP_SECOND_WARM` opens the backup voice's connections while
+  the person speaks, about 0.3 s of connect saved. Parked with #779, which
+  the owner put in the backlog.
+- #1448 (open, #1447): `capture_hold_worker` failed 2–4 of 11 on a loaded
+  Linux laptop; its rigs now run one worker at a time.
 
 ## 2026-10-17 — evening: #828 confounded, go-aways are the lamp's own
 
