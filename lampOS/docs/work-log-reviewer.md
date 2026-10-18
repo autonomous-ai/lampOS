@@ -4,6 +4,31 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 15:59 reviewed and merged #1531 (tests, lamp-name's lease test halves; #1128), ARM64 green
+- 15:59 reviewed and merged #1530 (tests, progress_news waits for its note to be let go; #1128), ARM64 green
+- 15:58 reviewed and merged #1535 (tests, hello_asks steps the clock to the 2 s edge; #1128), ARM64 green
+- 15:53 #1498 reviewed at 3ba19de04 (seventh, LAMP_CAPTURE_WAIT, stacked on #1456): one P2 (the mic is polled a block's time after the last read, not after the block was there, so a whole-block mic locks to the speaker's 10 ms render), two P3s; waits for the fix, #1456 and a rebase (conflicts in audio_workers.rs, process.rs, serve-runtime.md)
+- 15:53 #1475 closed unmerged by Seventh on the first builder's 15:43 decision (two failed lamp runs with capture pinned; LAMP_CAPTURE_CORES stays unset, the saving goes through #1498)
+- 15:51 re-checked #1524 at 9c878faaf (rebased onto lamp-voice): all P3s and a peer P2 fixed, lamp-policy 246/0; no ARM64 run on this head yet, and waits for the Policy owner's yes
+- 15:51 merged #1534 (eighth, docs: tasks.md's newer-schema bullet; my #1512 P3), ARM64 green
+- 15:50 reviewed and merged #1529 (tests, provider_pair's abandoned-turn test on 500 ms patience; #1128), ARM64 green
+- 15:50 reviewed and merged #1528 (tests, motor preflight on the test's own 1 s; #1128), ARM64 green
+- 15:47 #1520 folded to a0c093290 with both P3s in, but conflicts in light.rs with #1495 (merged 15:37); asked to rebase
+- 15:45 #1518 folded to 54846130e, same tree as 99bc47c5f; waits for ARM64
+- 15:41 reviewed and merged #1527 (tests, records' full-pipe test on a 200 ms deadline; #1128), lamp-records 155/0, ARM64 green
+- 15:41 reviewed and merged #1526 (tests, three bus CLI tests' windows under a second; #1128), lamp-bus 100/0, ARM64 green
+- 15:38 re-checked #1115 at 3246d9373: my two P3s answered (misread hold tested, body.md), lamp-body 445/0; the first builder's merge after step 4
+- 15:37 merged #1525 (tests, lamp-skills host-clock tests; #1128), ARM64 green; #1128 stays open for the other slow tests
+- 15:36 #1525 reviewed at 567957072 (tests, lamp-skills' host-clock tests load the skill at start, not 2 s of reload after; #1128), no findings, lamp-skills 85/0; waits for ARM64
+- 15:34 re-checked #1513 at 402a2a62a: four P3s fixed, one commit, two new P3s (connect untested; conversation-thread.md's byte count); the first builder's merge after the lamp check
+- 15:33 #1534 reviewed at 1079d97fd (eighth, tasks.md points the newer-schema bullet at the bump rule; my #1512 P3), no findings; waits for ARM64
+- 15:33 re-checked #1518 at 99bc47c5f: P2 fixed (the fold line's baseline is the last folded step), lamp-body 454/0; ready once folded
+- 15:31 #1532 reviewed at dd9568819 (sixth, docs: linear-gated's replayed figure 10 of 19 and 2 false); numbers re-run from the first builder's tables, no findings; waits for ARM64
+- 15:25 merged #1523 (fourth, the same-voice bar of 0.45 pinned by a test, its short-line cost in same-voice.md; #1508's P3s), ARM64 green
+- 15:23 #1524 reviewed at 5fb628996 (ten, lamp-policy --rule-decides, off unless set): no P1/P2, four P3s; waits for a rebase onto lamp-voice (it still carries #1510's old commit), retarget, ARM64 and the Policy owner's review
+- 15:23 re-checked #1520 at 73bbcc4a8: P2 fixed (Outcome::Already, off byte for byte), two P3s (volume_down while muted still Done; tests cover 2 of 11 Already sites); ready once folded to one commit
+- 15:16 merged #1521 (sixth, docs: linear-gated's replay gates without reference trust; #1504's P3s), ARM64 green; no issue to close
+- 15:14 merged #1509 (el, a put-back round says each unit's restarts and last journal line; both P2s fixed at 1f0adafaf, ARM64 39109431032 green); noted on #1505, left open for #1512 and the rest
 - 15:12 re-checked #1519 at 255dbe310: P3 fixed (doc comment and eyes.md), one commit on #1479, waits for #1479
 - 15:11 merged #1499 (eighth, remarks held in a busy room, LAMP_REMARKS off unless set) and #1510 (ten, lamp-policy-replay --agreement); noted on #829, left open for its other scenes
 - 15:08 #1523 reviewed at e28c88e62 (#1508's P3s: the 0.45 bar pinned by a test, its short-line cost in the docs): no findings; merge on green ARM64
