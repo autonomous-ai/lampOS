@@ -4377,6 +4377,15 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **The evidence for 1.8 s** (`docs/verification/same-voice-early-20261018`): 15 October's 19 lamp-quiet clips were cut again from lamp-4ace's capture as the worker prints them. At 0.25, the first 1.8 s and the first 3 s each take none of the 37 same-voice pairs for two voices and catch 22 of 29; the first 1.5 s takes 6. The `full` cut reproduces 15 October's numbers.
 - **Not shown:** the child's time on the A733. The next lamp run with `43d42ce91` gives it.
 
+## 2026-10-18, 09:24 ICT: the P1 on #1445 (the voice muted on lamp-4ace), its fix and the review's P2
+
+- **The P1** (the first builder, 08:36): on lamp-4ace with the model set, `43d42ce91`'s first start ended in `provider controller heartbeat expired` before the same-voice child was ready, and the restart guard muted the lamp (unmuted by him at once). **The likely cause** (my 08:42; the first builder agreed at 08:44): both voice units run `SCHED_RR` 20, a spawned process inherits it, and the child loaded its model (15.5 s of one of four cores) at the voice's own real-time priority. Not #1444's or #1445's own lines: nothing of theirs runs on the worker's thread before a line is heard (the reviewer and the Seventh agree).
+- **The fix, on #1445 as the first builder asked:** `lamp-same-voice serve` takes `SCHED_OTHER` at nice 10 before loading. Tests: the real child read while it waits for a FIFO model; and a real child that never gets ready, through the worker's loop, takes nothing from it (mutation: an ask that waits fails it). Linux checks in my container: Clippy for x86_64 and ARM64 clean, tests pass, but no `SCHED_RR` could be taken there even `--privileged`, so the step down from real time is for the lamp's `chrt -p`.
+- **The Seventh's P2** (a late print adopted as the conversation's voice unchecked): compared first now, and another voice's ends the conversation at the next verdict. Scene 3 with every print late: `[true, true, false, false, false]`; `[true; 5]` without. The P2 had also been given to the Seventh at 09:13; mine was already done and I said so at 09:22.
+- **#1445 at `e7351fcb1`**, Mac gate 1,957 passed, 0 failed. Tests are building a journal sink on it for #1444's lines (my yes, 08:56).
+- **Disk:** my old `lamp-fourth-controls-target` (9.1 GB) and this run's target are removed from the podman VM.
+- **Held locally, not pushed:** `fourth/print-fixed-plan` (the child makes a plan for 1.8 s: 1.6× faster prints on the Mac, but 66 MB more at load and about 0.8 s more loading), until the lamp's print times are known.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
