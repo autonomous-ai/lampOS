@@ -715,8 +715,12 @@ async fn a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by() {
     rig.stop().await;
 }
 
-#[tokio::test]
+// On the test's logical clock (#1128): the rig's heartbeat gives the turn
+// 100 ms of input, and on the host's clock one of this test's awaits outlasted
+// it, so the turn was revoked and its end was `StaleOwner` (#1569).
+#[tokio::test(start_paused = true)]
 async fn room_changes_during_a_reminder_allow_speech_and_completion_but_never_tools() {
+    let _clock = logical_clock();
     for (before, during, after) in [
         (Room::Quiet, Room::Busy, Room::Unknown),
         (Room::Busy, Room::Unknown, Room::Quiet),
