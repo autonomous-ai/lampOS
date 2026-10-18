@@ -221,6 +221,18 @@ impl Moment {
     }
 }
 
+/// What a session given none of the light's functions is told, so that it
+/// never says it changed the light: a session opened while the ring was
+/// down said "your light is all set to orange now" five times and made no
+/// call (the first builder's lamp run on #1495, lamp-4ace, 18 Oct 13:57).
+pub const NO_LIGHT: &str = "\n\nYour light\nYou cannot change your light right now: it is not ready. If someone asks you to change it, say in a few words that you can't right now. Never say you changed it.";
+
+/// Whether a session given `tools` has none of the light's functions
+/// while the voice takes an executive's: what [`NO_LIGHT`] is said for.
+pub fn light_missing(tools: &[Tool], settings: &Settings) -> bool {
+    settings.exec.is_some() && !names(tools).iter().any(|name| name.starts_with("light_"))
+}
+
 /// The journal's line for a session's setup: how many functions it was
 /// given, the executive's among them by kind, and, when it has none of
 /// the light's, that the ring is not up (#1472).

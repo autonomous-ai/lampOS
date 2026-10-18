@@ -117,11 +117,14 @@ With nothing said in the last ten minutes the thread adds nothing, so a
 lamp left alone starts its next session as it always did. The instruction
 may be 16,384 bytes in all (it was 8,192 until the character file grew past
 seven thousand and left the thread room for three short exchanges). The
-thread takes what the character file and the time of day
-([character.md](character.md), "What the runtime adds to it") leave of
-that, and when it does not all fit, the latest exchanges that do are told
-and the older ones are left out. With the file lamp-4ace runs (about 7,100
-bytes) all eight exchanges fit at their longest.
+thread takes what the character file, the time of day and, for a session
+without the light's functions, the light's line ([character.md](character.md),
+"What the runtime adds to it") leave of that, and when it does not all fit, the latest exchanges that do are told
+and the older ones are left out. With the file lamp-4ace runs (10,128
+bytes on 18 Oct) and the time line, the room is 6,088 bytes with the
+light's functions, and all eight exchanges fit at their longest (5,720
+bytes and the note); without them the light's line leaves 5,914, and the
+oldest is left out.
 
 ## A session renewed on purpose
 
