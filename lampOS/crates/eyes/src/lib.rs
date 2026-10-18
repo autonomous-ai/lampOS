@@ -15,8 +15,11 @@
 //! `--full-look`, [`full_look`] makes one larger still for a request the
 //! lamp said it would look for, after its head has settled. [`permit`] says
 //! whether the camera may be open. [`steady`] says when one face has sat
-//! still long enough for the eyes to look half as often.
+//! still long enough for the eyes to look half as often. With
+//! `--look-on-change on`, [`change`] says when a frame of an empty room is
+//! like the last one the detector ran on, and needs no detector.
 pub mod bus_out;
+pub mod change;
 pub mod faces;
 pub mod facing;
 pub mod full_look;
