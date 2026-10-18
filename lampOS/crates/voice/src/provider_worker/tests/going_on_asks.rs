@@ -532,3 +532,28 @@ fn cut_in_told_is_read_after_going_on_asks() {
         .into();
     assert!(parse_flags(dir, &wrong).is_err());
 }
+
+/// #829: `--name-note-heard-as` comes right after the name note's flags, on
+/// both routes' parsers, as the coordinator passes them.
+#[test]
+fn the_heard_as_line_is_read_after_the_name_note() {
+    let dir = std::path::Path::new("/run/test");
+    let flags =
+        |list: &[&str]| -> Vec<String> { list.iter().map(|flag| (*flag).to_owned()).collect() };
+    let with = flags(&[crate::called::FLAG, crate::called::HEARD_AS_FLAG]);
+    let (_, _, files, _) = parse_flags(dir, &with).unwrap();
+    assert!(files.name_note && files.name_note_heard_as);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &with).unwrap();
+    assert!(files.name_note_heard_as);
+    let busy = flags(&[
+        crate::called::FLAG,
+        crate::called::BUSY_FLAG,
+        crate::called::HEARD_AS_FLAG,
+    ]);
+    let (_, _, files, _) = parse_flags(dir, &busy).unwrap();
+    assert!(files.name_note && files.name_note_busy_face && files.name_note_heard_as);
+    let (_, _, files, _) = parse_flags(dir, &with[..1]).unwrap();
+    assert!(!files.name_note_heard_as);
+    let wrong = flags(&[crate::called::HEARD_AS_FLAG, crate::called::FLAG]);
+    assert!(parse_flags(dir, &wrong).is_err());
+}

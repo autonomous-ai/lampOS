@@ -329,3 +329,97 @@ async fn review_sound_a_cut_in_that_names_the_lamp_is_told_both_notes_together()
     );
     rig.stop().await;
 }
+
+/// The heard-as line on (`NAME_NOTE_HEARD_AS`, the worker's
+/// `--name-note-heard-as`) for one test, and off again when dropped.
+struct HeardAsOn;
+impl HeardAsOn {
+    fn set() -> Self {
+        NAME_NOTE_HEARD_AS.store(true, std::sync::atomic::Ordering::Relaxed);
+        Self
+    }
+}
+impl Drop for HeardAsOn {
+    fn drop(&mut self) {
+        NAME_NOTE_HEARD_AS.store(false, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// A request heard as "Hey Mom, …" whose name lamp-name heard as it began:
+/// what the service is given as text beside it, up to its end.
+async fn told_beside_hey_mom() -> Vec<String> {
+    let _clock = logical_clock();
+    let _turn = one_at_a_time().await;
+    let root = Root::new();
+    let mut rig = LiveRig::start_with(quick_policy(), in_a_busy_room());
+    let mut dial = rig.ready().await;
+    let began = monotonic_us();
+    let request = rig.speak(&mut dial, false, false).await;
+    dial.service
+        .send(heard(
+            "Hey Mom, tell me a story about a brave little robot.",
+        ))
+        .await;
+    assert!(matches!(
+        rig.output().await,
+        ProviderOutput::Transcript { request: None, .. }
+    ));
+    name_heard(&mut rig, &root.0, began + 200_000).await;
+    let owner = rig.snapshot.owner().unwrap();
+    rig.owner.input_ended(real_time(), owner).unwrap();
+    rig.publish();
+    rig.parent
+        .data
+        .send(ProviderInput::End {
+            request,
+            privacy_generation: rig.snapshot.microphone_generation(),
+            sound: false,
+            cut_in: false,
+        })
+        .unwrap();
+    let mut told = Vec::new();
+    loop {
+        let message = rig.service_message(&mut dial).await;
+        if let Some(text) = message["realtimeInput"]["text"].as_str() {
+            told.push(text.to_owned());
+        }
+        if message["realtimeInput"].get("activityEnd").is_some() {
+            break;
+        }
+    }
+    rig.stop().await;
+    told
+}
+
+/// #829 (the first builder at 05:22 on 19 October): the model's ears heard
+/// "Hey Lamp" as "Hey Mom", "Hey man" or "Hey ma'am" in 7 of 10 takes, while
+/// lamp-name heard the name. With `LAMP_NAME_NOTE_HEARD_AS`, the name's note
+/// says the name may have sounded like another word; without it, the note
+/// is as before.
+#[tokio::test(start_paused = true)]
+async fn review_sound_with_the_heard_as_line_the_name_note_says_it_may_sound_like_another_word() {
+    let _note = NameNoteOn::set();
+    {
+        let _heard_as = HeardAsOn::set();
+        let told = told_beside_hey_mom().await;
+        assert!(
+            told.iter()
+                .any(|text| text.contains(crate::called::NOTE_HEARD_AS)),
+            "{told:?}"
+        );
+        assert!(
+            told.iter().all(|text| !text.contains(crate::called::NOTE)),
+            "{told:?}"
+        );
+    }
+    let told = told_beside_hey_mom().await;
+    assert!(
+        told.iter().any(|text| text.contains(crate::called::NOTE)),
+        "{told:?}"
+    );
+    assert!(
+        told.iter()
+            .all(|text| !text.contains(crate::called::NOTE_HEARD_AS)),
+        "{told:?}"
+    );
+}
