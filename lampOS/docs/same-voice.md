@@ -183,9 +183,11 @@ to be run. A minute of two real people at the lamp is to set it.
   journal. B's late print then became the conversation's voice, since a
   print that comes after its answer still does. The journal now says so
   for each such line ("its voice print was not back at its answer:
-  judged without the check"). The fix waits on the child's time on the
-  A733: ask once a line has 1.5 s of its own speech, or wait for the print
-  at the verdict up to a bound. Tests:
+  judged without the check"), and how long each print took from its ask
+  ("its voice print came N ms after it was asked (S s of sound)"), so a
+  run with the check on times the child on the lamp. The fix waits on
+  that time: ask once a line has 1.5 s of its own speech, or wait for the
+  print at the verdict up to a bound. Tests:
   `with_a_voice_check_whose_prints_come_late_the_scene_is_judged_without_it`
   (the scene at the lamp's lengths with a stand-in child that answers a
   line asked at its end after its verdict, as on the lamp) and

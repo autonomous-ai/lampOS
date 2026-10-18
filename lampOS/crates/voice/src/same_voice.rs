@@ -345,6 +345,7 @@ fn child(
         let Ok((request, samples)) = jobs.recv() else {
             return Ended::Closed;
         };
+        let asked = Instant::now();
         let mut frame = Vec::with_capacity(12 + samples.len() * 2);
         frame.extend(request.to_le_bytes());
         frame.extend((samples.len() as u32).to_le_bytes());
@@ -354,6 +355,16 @@ fn child(
             return Ended::Failed(error.to_string(), true);
         }
         let answer = next(timing.answer_within).and_then(|line| answer(&line, request));
+        // From its ask to its answer, so that a run with the check on times
+        // the child on the lamp (#829: a short line's print lost to
+        // Gemini's first output on the A733, which had never been timed).
+        if answer.is_ok() {
+            eprintln!(
+                "lamp-voice provider: request {request}: its voice print came {} ms after it was asked ({:.2} s of sound)",
+                asked.elapsed().as_millis(),
+                samples.len() as f32 / RATE as f32
+            );
+        }
         let failed = answer.as_ref().err().cloned();
         if told
             .send((request, answer.map_err(|why| format!("no print: {why}"))))
