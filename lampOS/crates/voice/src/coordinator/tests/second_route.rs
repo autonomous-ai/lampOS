@@ -59,6 +59,8 @@ enum Live {
     /// The turn is unclear (heard as another language, #1417): no audio,
     /// then completion.
     Unclear,
+    /// As `Unclear`, said of a cut-in over the lamp's answer (#828).
+    UnclearCutIn,
     /// A skill's tool answered with a look, then as `FailThenLate`: the
     /// second route takes the turn.
     LookFail(Fault, usize),
@@ -734,10 +736,11 @@ impl Peers {
                             self.audio(index, request, packets, LIVE);
                             self.finish(index, request);
                         }
-                        Live::Unclear => {
+                        Live::Unclear | Live::UnclearCutIn => {
                             self.peers[index].queued.push_back(ProviderOutput::Unclear {
                                 request,
                                 why: "fixture".into(),
+                                cut_in: answer == Live::UnclearCutIn,
                             });
                             self.finish(index, request);
                         }
@@ -761,6 +764,7 @@ impl Peers {
                                     queued.push_back(ProviderOutput::Unclear {
                                         request,
                                         why: "fixture".into(),
+                                        cut_in: false,
                                     });
                                     self.finish(index, request);
                                 }
@@ -1765,4 +1769,85 @@ fn an_empty_sorry_in_the_loop_hums_with_the_switch_and_only_then() {
         .collect();
     assert_eq!(hums, [true, true], "{:?}", rows(&again, "unclear_hum"));
     assert_eq!(rows(&again, "unclear_hum_attempted").len(), 2);
+}
+
+/// #828, the first builder at 05:07 on 19 October: with
+/// `LAMP_MISHEARD_HUM=on`, a cut-in the worker held as misheard gets the
+/// lamp's "hm?" as a sound turn of its own, with the listening face, and no
+/// written "Sorry?" turn goes to the model; within 100 ms of the hold. A
+/// line held as unclear that was no cut-in is asked again as before, and so
+/// is a misheard cut-in without the switch.
+#[test]
+fn with_the_switch_a_misheard_cut_in_hums_and_sends_no_model_turn() {
+    let _one = super::pilot_faults::one_session();
+    let with = |on: bool, live: Live| {
+        TEST_MISHEARD_HUM.with(|hum| hum.set(on));
+        let run = run(Script {
+            second: false,
+            written: Written::Said(6),
+            mute_at_frame: Some(900),
+            ..Script::question(live)
+        });
+        TEST_MISHEARD_HUM.with(|hum| hum.set(false));
+        run
+    };
+    let rows = |run: &Run, kind: &str| -> Vec<Value> {
+        run.trace
+            .iter()
+            .filter(|event| event["kind"] == kind)
+            .cloned()
+            .collect()
+    };
+    let asked = |run: &Run| {
+        run.trace
+            .iter()
+            .filter(|event| {
+                event["kind"] == "input_admitted" && event["admission_basis"] == "asked_again"
+            })
+            .count()
+    };
+
+    let hummed = with(true, Live::UnclearCutIn);
+    let unclear = rows(&hummed, "provider_turn_unclear");
+    assert_eq!(unclear.len(), 1);
+    assert_eq!(unclear[0]["hum"], true, "{unclear:?}");
+    assert_eq!(asked(&hummed), 0, "no model turn for the misheard line");
+    let owed = rows(&hummed, "unclear_hum_owed");
+    assert_eq!(owed.len(), 1, "{owed:?}");
+    assert_eq!(owed[0]["after"], "misheard_cut_in");
+    let played = rows(&hummed, "unclear_hum");
+    assert_eq!(played.len(), 1, "{played:?}");
+    assert_eq!(played[0]["plays"], true, "{played:?}");
+    assert_eq!(played[0]["misheard_turn"], unclear[0]["turn"]);
+    let held_us = unclear[0]["at_us"].as_u64().unwrap();
+    let hum_us = played[0]["at_us"].as_u64().unwrap();
+    assert!(
+        hum_us.saturating_sub(held_us) < 100_000,
+        "the hum {} us after the hold",
+        hum_us.saturating_sub(held_us)
+    );
+    // Its ring frames show the listening face, as the empty Sorry?'s hum's do.
+    let hum = rows(&hummed, "input_admitted")
+        .into_iter()
+        .find(|row| row["admission_basis"] == "unclear_hum")
+        .expect("the hum's own turn");
+    let faces: Vec<bool> = rows(&hummed, "ring_requested")
+        .iter()
+        .filter(|row| row["owner"] == hum["owner"])
+        .map(|row| row["frame"]["listening"] == true)
+        .collect();
+    assert!(faces.len() > 1, "{faces:?}");
+    assert!(faces.iter().all(|listening| *listening), "{faces:?}");
+
+    // A line held as unclear that was no cut-in: asked again, as before.
+    let other = with(true, Live::Unclear);
+    assert_eq!(asked(&other), 1);
+    assert!(rows(&other, "unclear_hum_owed").is_empty());
+    assert!(rows(&other, "unclear_hum").is_empty());
+
+    // The switch off: the misheard cut-in is asked again, as before.
+    let off = with(false, Live::UnclearCutIn);
+    assert_eq!(asked(&off), 1);
+    assert!(rows(&off, "unclear_hum_owed").is_empty());
+    assert!(rows(&off, "unclear_hum").is_empty());
 }

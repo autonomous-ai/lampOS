@@ -20,6 +20,7 @@ fn checked(on: bool) -> Options {
         remarks: false,
         going_on_asks: None,
         cut_in_told: false,
+        misheard_hum: false,
         policy_holds: None,
         follows_run: false,
         wait_for_room: false,
@@ -235,7 +236,9 @@ async fn in_conversation_ended(
                 rig.stop().await;
                 return (true, unclear);
             }
-            ProviderOutput::Unclear { request: got, why } if got == request => {
+            ProviderOutput::Unclear {
+                request: got, why, ..
+            } if got == request => {
                 assert!(unclear.is_none(), "said unclear twice");
                 unclear = Some(why);
             }
@@ -283,5 +286,125 @@ async fn a_cut_in_heard_as_a_fragment_is_asked_again_and_stop_is_answered() {
     assert_eq!(
         in_conversation_ended(true, "vestido", false).await,
         (true, None)
+    );
+}
+
+/// #828, the first builder at 05:07 on 19 October: in a conversation, a
+/// cut-in heard as `text`, and then the next request. What the worker said
+/// of the cut-in (`Unclear`'s why and whether it was a cut-in), and what the
+/// service was given as text beside the next request, up to its end.
+async fn cut_in_then_next(misheard_hum: bool, text: &str) -> (Option<(String, bool)>, Vec<String>) {
+    let options = Options {
+        attention: Some(talking),
+        ask_unclear: true,
+        misheard_hum,
+        ..checked(false)
+    };
+    let mut rig = LiveRig::start_with(quick_policy(), options);
+    let mut dial = rig.ready().await;
+    let request = rig.speak(&mut dial, false, false).await;
+    let owner = rig.snapshot.owner().unwrap();
+    rig.owner.input_ended(real_time(), owner).unwrap();
+    rig.publish();
+    rig.parent
+        .data
+        .send(ProviderInput::End {
+            request,
+            privacy_generation: rig.snapshot.microphone_generation(),
+            sound: false,
+            cut_in: true,
+        })
+        .unwrap();
+    let ended = rig.service_message(&mut dial).await;
+    assert!(
+        ended["realtimeInput"].get("activityEnd").is_some(),
+        "{ended}"
+    );
+    dial.service.send(heard(text)).await;
+    assert!(matches!(
+        rig.output().await,
+        ProviderOutput::Transcript { request: None, .. }
+    ));
+    dial.service.send(provider_audio(9, 480)).await;
+    dial.service.send(idle_complete()).await;
+    let mut unclear = None;
+    loop {
+        match rig.output().await {
+            ProviderOutput::Unclear {
+                request: got,
+                why,
+                cut_in,
+            } if got == request => unclear = Some((why, cut_in)),
+            ProviderOutput::TurnComplete { request: done, .. } if done == request => break,
+            ProviderOutput::Audio { request: got, .. } if got == request => {}
+            other => panic!("{other:?}"),
+        }
+    }
+    // The person says it again, after the lamp's "hm?".
+    let next = rig.speak(&mut dial, false, false).await;
+    let owner = rig.snapshot.owner().unwrap();
+    rig.owner.input_ended(real_time(), owner).unwrap();
+    rig.publish();
+    rig.parent
+        .data
+        .send(ProviderInput::End {
+            request: next,
+            privacy_generation: rig.snapshot.microphone_generation(),
+            sound: false,
+            cut_in: false,
+        })
+        .unwrap();
+    let mut told = Vec::new();
+    loop {
+        let message = rig.service_message(&mut dial).await;
+        if let Some(text) = message["realtimeInput"]["text"].as_str() {
+            told.push(text.to_owned());
+        }
+        if message["realtimeInput"].get("activityEnd").is_some() {
+            break;
+        }
+    }
+    rig.stop().await;
+    (unclear, told)
+}
+
+/// #828, the first builder at 05:07 on 19 October: of 59 "Sorry?" turns the
+/// model was asked for after a misheard cut-in, it said "Sorry?" 13 times
+/// and went back to its story about 40. With `LAMP_MISHEARD_HUM`, a misheard
+/// cut-in is said unclear as a cut-in, for the coordinator's "hm?" in place
+/// of a model turn, and the next request is told it wasn't caught. A cut-in
+/// heard right is answered as before and the next request told nothing;
+/// without the switch the cut-in is said unclear as before, and the next
+/// request is told nothing.
+#[tokio::test]
+async fn with_the_switch_a_misheard_cut_in_is_said_as_one_and_the_next_request_is_told() {
+    let (unclear, told) = cut_in_then_next(true, "vestido").await;
+    assert_eq!(
+        unclear,
+        Some((crate::not_speech::CUT_IN_FRAGMENT.to_owned(), true))
+    );
+    assert!(
+        told.iter()
+            .any(|text| text.contains(crate::misheard_hum::NOTE)),
+        "{told:?}"
+    );
+
+    let (unclear, told) = cut_in_then_next(true, "Okay, okay, that is enough.").await;
+    assert_eq!(unclear, None);
+    assert!(
+        told.iter()
+            .all(|text| !text.contains(crate::misheard_hum::NOTE)),
+        "{told:?}"
+    );
+
+    let (unclear, told) = cut_in_then_next(false, "vestido").await;
+    assert_eq!(
+        unclear,
+        Some((crate::not_speech::CUT_IN_FRAGMENT.to_owned(), true))
+    );
+    assert!(
+        told.iter()
+            .all(|text| !text.contains(crate::misheard_hum::NOTE)),
+        "{told:?}"
     );
 }

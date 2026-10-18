@@ -2851,6 +2851,7 @@ fn provider_arguments(
     arguments.extend(crate::remarks::arguments_from_environment());
     arguments.extend(crate::going_on_asks::arguments_from_environment());
     arguments.extend(crate::cut_in_told::arguments_from_environment());
+    arguments.extend(crate::misheard_hum::arguments_from_environment());
     if let Some(camera) = camera {
         arguments.extend(camera.source.arguments());
     }
@@ -3747,6 +3748,8 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
     /// A loop test's `LAMP_UNCLEAR_HUM=on` (#1421), as `TEST_FULL_LOOK`.
     static TEST_UNCLEAR_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_MISHEARD_HUM=on` (#828), as `TEST_FULL_LOOK`.
+    static TEST_MISHEARD_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3897,7 +3900,17 @@ fn conversation_with_gate(
         crate::head_cue::unclear_from_environment() || TEST_UNCLEAR_HUM.with(std::cell::Cell::get);
     #[cfg(not(test))]
     let unclear_hum_on = crate::head_cue::unclear_from_environment();
-    let head_cue = if controls.as_ref().is_some_and(HandControls::head_touch) || unclear_hum_on {
+    // A misheard cut-in's "hm?" in place of the model's "Sorry?"
+    // (`LAMP_MISHEARD_HUM=on`, #828).
+    #[cfg(test)]
+    let misheard_hum_on = crate::misheard_hum::enabled_from_environment()
+        || TEST_MISHEARD_HUM.with(std::cell::Cell::get);
+    #[cfg(not(test))]
+    let misheard_hum_on = crate::misheard_hum::enabled_from_environment();
+    let head_cue = if controls.as_ref().is_some_and(HandControls::head_touch)
+        || unclear_hum_on
+        || misheard_hum_on
+    {
         let level = crate::head_cue::level_from_environment().map_err(io::Error::other)?;
         Some(crate::head_cue::hum(level))
     } else {
@@ -4930,17 +4943,24 @@ fn conversation_with_gate(
                     }
                 }
                 ProviderOutput::GenerationComplete { .. } => {}
-                ProviderOutput::Unclear { request, why } => {
+                ProviderOutput::Unclear {
+                    request,
+                    why,
+                    cut_in,
+                } => {
                     // Only for the turn in hand: one cancelled first (a hand's
-                    // Stop, a capture gap) is never asked about.
+                    // Stop, a capture gap) is never asked about. A misheard
+                    // cut-in gets the lamp's "hm?" instead, with the switch.
+                    let hum = misheard_hum_on && cut_in;
                     let current = asking.unclear(
                         request,
                         reply.as_ref().map(|current| current.owner.turn()),
                         monotonic_us(),
+                        hum,
                     );
                     record(
                         trace,
-                        json!({"kind":"provider_turn_unclear","turn":request,"why":why,"at_us":monotonic_us(),"asked_again":current}),
+                        json!({"kind":"provider_turn_unclear","turn":request,"why":why,"at_us":monotonic_us(),"asked_again":current && !hum,"hum":current && hum}),
                     )?;
                 }
                 // Put on its turn by `observe_provider_output`.
@@ -7119,6 +7139,17 @@ fn conversation_with_gate(
                     )?;
                     asking.done();
                 }
+                // A misheard cut-in, with `LAMP_MISHEARD_HUM`: no model turn,
+                // whose answer would go back to the story still in its
+                // context, but the lamp's "hm?" once it is quiet (#828).
+                AskAgain::Due if asking.hum => {
+                    asking.done();
+                    unclear_hum.owe_misheard(wanted.0, wanted.1, clock);
+                    record(
+                        trace,
+                        json!({"kind":"unclear_hum_owed","turn":wanted.0,"at_us":clock,"after":"misheard_cut_in"}),
+                    )?;
+                }
                 AskAgain::Due => {
                     // What holds a due asking back, said once each time it
                     // changes (#926: on lamp-4ace one was never asked).
@@ -7620,15 +7651,29 @@ fn conversation_with_gate(
                     record(
                         trace,
                         json!({"kind":"unclear_hum","owed_at_us":owed_us,"at_us":at_us,"plays":false,
-                            "why":why,"held_by":unclear_hum.held()}),
+                            "why":why,"held_by":unclear_hum.held(),"misheard_turn":unclear_hum.misheard().map(|(turn, _)| turn)}),
                     )?;
+                    if let Some((turn, _)) = unclear_hum.misheard() {
+                        eprintln!(
+                            "lamp-voice: request {turn}: a misheard cut-in: its \"hm?\" was not played ({why})"
+                        );
+                    }
                     unclear_hum.done();
                 }
                 Ok(()) => {
+                    let misheard = unclear_hum.misheard();
                     record(
                         trace,
-                        json!({"kind":"unclear_hum","owed_at_us":owed_us,"at_us":at_us,"plays":true}),
+                        json!({"kind":"unclear_hum","owed_at_us":owed_us,"at_us":at_us,"plays":true,
+                            "misheard_turn":misheard.map(|(turn, _)| turn)}),
                     )?;
+                    if let Some((turn, held_us)) = misheard {
+                        // The time from the hold to the sound, for rule 7.
+                        eprintln!(
+                            "lamp-voice: request {turn}: a misheard cut-in: the lamp's \"hm?\" {} ms after it was held, and no model turn",
+                            at_us.saturating_sub(held_us) / 1_000
+                        );
+                    }
                     unclear_hum.done();
                     if let Some(choreography) = choreography.as_mut() {
                         choreography.set_unshown(false);
@@ -7639,7 +7684,11 @@ fn conversation_with_gate(
                         reply,
                         NoticeDelivery::sound(SpeechOrigin::UnclearHum, sound.clone()),
                         "unclear_hum",
-                        "the lamp's own \"Sorry?\" said nothing: nothing heard, nothing sent to the provider",
+                        if misheard.is_some() {
+                            "a cut-in was misheard: the lamp's \"hm?\", nothing sent to the provider"
+                        } else {
+                            "the lamp's own \"Sorry?\" said nothing: nothing heard, nothing sent to the provider"
+                        },
                         0,
                         rig.playout_start,
                         trace,
@@ -8765,17 +8814,21 @@ struct AskAgainState {
     held: Option<Vec<&'static str>>,
     /// Whether what keeps the unclear turn open was said.
     open_said: bool,
+    /// Whether the lamp hums its "hm?" for it rather than ask the model: a
+    /// misheard cut-in, with `LAMP_MISHEARD_HUM` ([`crate::misheard_hum`]).
+    hum: bool,
 }
 
 impl AskAgainState {
     /// `request` was judged unclear. Taken only if it is the turn in hand
     /// (`current`): one cancelled first is never asked about.
-    fn unclear(&mut self, request: u64, current: Option<u64>, at_us: u64) -> bool {
+    fn unclear(&mut self, request: u64, current: Option<u64>, at_us: u64, hum: bool) -> bool {
         if current != Some(request) {
             return false;
         }
         *self = Self {
             wanted: Some((request, at_us)),
+            hum,
             ..Self::default()
         };
         true
@@ -8811,6 +8864,9 @@ struct UnclearHum {
     owed: Option<u64>,
     /// What last held the owed hum back (`may_hum`'s word).
     held: Option<&'static str>,
+    /// The misheard cut-in it is owed for, and when that was held, if it
+    /// is owed for one (`LAMP_MISHEARD_HUM`, #828).
+    misheard: Option<(u64, u64)>,
 }
 
 /// What becomes of an owed hum, as the loop sees it.
@@ -8850,6 +8906,20 @@ impl UnclearHum {
         self.owed
     }
 
+    /// A misheard cut-in, `turn`, held at `held_us`: the lamp owes its "hm?"
+    /// from `at_us`, in place of a model turn (#828).
+    fn owe_misheard(&mut self, turn: u64, held_us: u64, at_us: u64) {
+        *self = Self {
+            owed: Some(at_us),
+            misheard: Some((turn, held_us)),
+            ..Self::default()
+        };
+    }
+
+    fn misheard(&self) -> Option<(u64, u64)> {
+        self.misheard
+    }
+
     /// The owed hum at `at_us`, with `current` the turn in hand: any turn
     /// begun since is someone speaking first.
     fn due(&self, current: Option<u64>, at_us: u64) -> HumDue {
@@ -8883,6 +8953,7 @@ impl UnclearHum {
     fn done(&mut self) {
         self.owed = None;
         self.held = None;
+        self.misheard = None;
     }
 }
 

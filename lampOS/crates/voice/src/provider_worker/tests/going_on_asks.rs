@@ -532,3 +532,25 @@ fn cut_in_told_is_read_after_going_on_asks() {
         .into();
     assert!(parse_flags(dir, &wrong).is_err());
 }
+
+/// #828: `--misheard-hum` comes right after `--cut-in-told`, on both routes'
+/// parsers, as the coordinator passes them.
+#[test]
+fn misheard_hum_is_read_after_cut_in_told() {
+    let dir = std::path::Path::new("/run/test");
+    let flags: Vec<String> = [crate::cut_in_told::FLAG, crate::misheard_hum::FLAG]
+        .map(String::from)
+        .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.cut_in_told && files.misheard_hum);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert!(files.misheard_hum);
+    let (_, _, files, _) = parse_flags(dir, &flags[1..]).unwrap();
+    assert!(files.misheard_hum && !files.cut_in_told);
+    let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
+    assert!(!files.misheard_hum);
+    let wrong: Vec<String> = [crate::misheard_hum::FLAG, crate::cut_in_told::FLAG]
+        .map(String::from)
+        .into();
+    assert!(parse_flags(dir, &wrong).is_err());
+}
