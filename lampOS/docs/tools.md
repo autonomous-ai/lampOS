@@ -83,11 +83,13 @@ the light is, is down, and come back a second or two after it starts. A
 session that opened in that gap would have no light functions for its whole
 life (lamp-4ace, 18 Oct 11:22, #1472). So the voice keeps what each session
 was given, looks at `tools.json` and `skills/tools.json` every 2 s (reading
-them again only when one's time changed), and when what it would declare now
+them again only when one's time changed; a change found is checked again
+every 20 ms until the next look, `RECHECK_EVERY`, so a gap between turns
+shorter than a look is still taken, Jarvis on #1588), and when what it would declare now
 differs from what the session was given, either way, it renews the session
 between turns, on the person switch's path: no turn open, no output owed, no
-conversation going on (`going_on`), no look owed, once a session and at most
-once in 30 s (`src/session_tools.rs`). The session after it is opened fresh,
+conversation going on (`going_on`, except as below), no look owed, once a
+session and at most once in 30 s (`src/session_tools.rs`). The session after it is opened fresh,
 not resumed: Google's resumption with other functions is not tested on a
 person's lamp (the first builder on #1472); the thread's recall carries the
 conversation. Each session's setup says what it was given, with `; no light
@@ -130,6 +132,42 @@ because its recall held the earlier turns where it had (the first builder's
 lamp run on #1495, lamp-4ace, 18 Oct 13:57). On by default: it corrects a
 wrong answer, and a session given the light's functions is told nothing of
 it.
+
+When the light, the volume or the reminders come back for a session told it
+can't use them, the renewal does not wait for the conversation to end. The
+lamp's own "I can't right now" keeps `going_on` true, so while the person
+kept asking, the light would work and the lamp would keep refusing (Jarvis
+on #1513). Such a change (`Change::came_back`: the kinds of added functions
+the session was given none of) renews at the first real gap between turns
+(the first builder on #1588): no turn owned (nobody's speech taken and the
+lamp not speaking, by the turn owner's own state), none open, no output or
+look owed, once a session and at most once in 30 s, and during a
+conversation for the same kind at most once a minute (`BACK_AT_MOST_EVERY`),
+so a light that comes and goes (#1514) does not renew it over and over. In a
+quiet room a return renews on the 30 s bound, as any change does under
+#1484. It need not wait out the 30 s after
+a renewal that brought nothing back: lamp-actions restarting in a quiet room
+renews for the light gone, and the light back seconds later renews at the
+next gap rather than the lamp refusing for half a minute (Jarvis on #1588).
+Two returns in a row still wait for it, so a catalog that comes and goes
+renews at most twice in 30 s. The cost is one reconnect landing just after
+the lamp's "I can't right now", when the person is likely to answer: a turn
+begun during it is held for the new session (lamp-4ace took 1.9 s from
+`server_go_away` to ready again, #960), once per return; not yet timed on a
+lamp for this case. With `--early-end-ms` (off, and set nowhere
+in `deploy/`), a turn's early piece and the rest that follows it could land
+on two sessions; the renewal does not wait for such a continuation yet, so
+that flag needs it before it is turned on (Jarvis on #1588). The session then ends only when
+nothing is owed on its connection, so never with a function call open, one
+the Policy holds included. The session after it is opened fresh with the
+thread recalled, as any renewal is, so "and a bit warmer" right after "make
+your light orange" is still understood. The journal says so in one line:
+
+    lamp-voice provider: the executive's functions changed (+7 (light_brighter, light_colour, light_cooler, …) -0): the light is back, which the session was told it could not use; a new session is opened between turns, though a conversation is going on
+
+Any other change, more of a kind the session had or one taken away, still
+waits for the conversation to end, as before (#1484's rule (b)). Every
+catalog renewal, not only these, now also waits for no turn owned.
 
 A call is one line to the socket and one line back, on a connection of its
 own:
@@ -429,7 +467,12 @@ the time unless you were asked for it" (not yet played).
 - **Nothing is retried,** and the voice does not know whether the
   executive did what it was asked when no answer came. The executive owns
   that: a command that was tried is finished, and what it reports is what
-  it established.
+  it established. One case says less than happened: a light call cut off
+  by `lamp-actions` stopping is told it could not be done, though the light
+  may already have changed. `lamp-actions` puts the change on
+  `light/command` and then waits up to 600 ms for the ring to confirm it
+  (`light.rs`), so a stop inside that wait leaves the change made and the
+  model told otherwise (El on #1588).
 - **Names are logged, arguments never.**
 
 ## Trying it without a sound

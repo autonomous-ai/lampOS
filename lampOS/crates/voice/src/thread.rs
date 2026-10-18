@@ -1329,6 +1329,76 @@ mod tests {
         assert!(plain.presents_handle());
     }
 
+    /// The first builder on #1588: the session renewed when the light comes
+    /// back in a conversation is opened fresh, with the light's functions,
+    /// not told it can't change it, and with the conversation recalled, so
+    /// "and a bit warmer" right after "make your light orange" is still
+    /// understood.
+    #[test]
+    fn a_session_renewed_for_the_light_back_recalls_the_conversation() {
+        let folder = std::env::temp_dir().join(format!("lv-thread-back-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let catalog = |names: &[&str]| {
+            let tools: Vec<_> = names
+                .iter()
+                .map(|name| serde_json::json!({"name": name, "description": "Do it."}))
+                .collect();
+            std::fs::write(
+                folder.join(crate::tools::CATALOG_FILE),
+                serde_json::json!({"tools": tools}).to_string(),
+            )
+            .unwrap();
+        };
+        let given = std::sync::Arc::new(crate::session_tools::Given::default());
+        let mut recalling = Recalling::new(
+            SessionConfig::new(
+                lamp_gemini::GOOGLE_ENDPOINT,
+                lamp_gemini::Credential::api_key("test-only").unwrap(),
+            )
+            .unwrap()
+            .instruction("You are a lamp.")
+            .unwrap(),
+        )
+        .tools(crate::tools::Settings {
+            exec: Some(folder.clone()),
+            ..Default::default()
+        })
+        .given(given.clone());
+        let now = Instant::now();
+        let open = |recalling: &Recalling, thread: &Thread| {
+            recalling
+                .opened(|keep| Some(recalling.recalled_keeping(thread, now, None, keep)))
+                .instruction_text()
+                .to_owned()
+        };
+        let has_light = || given.now().unwrap().contains("light_colour");
+        // Opened in the gap: no light, and told so.
+        catalog(&["volume_up"]);
+        let mut thread = Thread::new();
+        assert!(open(&recalling, &thread).ends_with(crate::session_tools::NO_LIGHT));
+        assert!(!has_light());
+        // Asked, and the lamp said it can't.
+        thread.person("Make your light orange.", true, now);
+        thread.lamp(1, "I can't change my light right now.", now);
+        // The light back: the session is renewed, fresh.
+        catalog(&["volume_up", "light_colour"]);
+        given.open_fresh();
+        assert!(!recalling.presents_handle());
+        let renewed = open(&recalling, &thread);
+        assert!(has_light());
+        assert!(
+            !renewed.contains("You cannot change your light"),
+            "{renewed}"
+        );
+        assert!(renewed.contains("Make your light orange."), "{renewed}");
+        assert!(
+            renewed.contains("I can't change my light right now."),
+            "{renewed}"
+        );
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
     const ROOM: usize = 8_192;
 
     /// A read-back longer than the 400 bytes kept loses its "?" in what is
