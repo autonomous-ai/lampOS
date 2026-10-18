@@ -329,8 +329,13 @@ time, from its opening note, and nothing said whose it was.
   from where `/etc/localtime` links, which is the time the lamp keeps, and
   from `/etc/timezone` only when that is no link: `timedatectl
   set-timezone` changes the link and not the file (the reviewer on #1552).
-  It is left out when neither reads. Asked for its own zone, or another
-  name for the same zone file (`Asia/Saigon`), the answer ends "That is
+  It is left out when neither reads. A call with no usable place (none,
+  empty, `null`, a wrong key) is given the lamp's own time naming its
+  place: "Here in Ho Chi Minh it is 7:32 in the evening, …" (the reviewer
+  on #1589). A lamp whose zone names no place (`UTC`, `Etc/GMT-7`) says
+  only "Here it is …", in both answers: "Here in UTC+7" would sound like
+  a machine's clock, not a place (Ten on #1602). Asked for its own zone,
+  or another name for the same zone file (`Asia/Saigon`), the answer ends "That is
   the time here too." A place it has no zone for answers
   `{"error":"I don't know the time in that place: it is not a time zone I
   know. Call again with the place's IANA time zone, such as Asia/Shanghai
@@ -341,7 +346,8 @@ time, from its opening note, and nothing said whose it was.
   leaves `/etc/timezone` to name the lamp's zone (Jarvis on #1575).
 - **The opening note says whose time it gives:** "… This is the time where
   you are, in Ho Chi Minh. For the time anywhere else, call the_time with
-  that place, never this time."
+  that place, never this time." For a zone that names no place, "This is
+  the time where you are."
 - **Off unless set;** without it the function, its answer and the note are
   as above, byte for byte. Both voice routes take it.
 - **What it costs:** one zone file of a few kilobytes read in the voice,
