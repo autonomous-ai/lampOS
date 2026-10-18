@@ -681,10 +681,13 @@ mod tests {
     ) {
         let (mut worker, mut peer, input) = Worker::cooperative_fixture(directory, role);
         // The cleanup's Stop is taken on its own thread, right after it is
-        // sent: the receipts go and the child's input closes there, so a
-        // busy host cannot hold them past the cleanup's 300 ms (#1249). This
-        // thread only hands the peer back once that has run.
+        // sent: the receipts go, the child's input closes, and its exit is
+        // waited for there, as `service_privacy`'s mock does, so a busy host
+        // cannot hold them past the cleanup's 300 ms (#1249; the reviewer's
+        // #1551 gate saw the exit itself late). This thread only hands the
+        // peer back once that has run.
         let (ended, end) = std::sync::mpsc::channel();
+        let pid = worker.fixture_pid();
         worker.on_stop(move || {
             let deadline = Instant::now() + Duration::from_secs(2);
             loop {
@@ -709,6 +712,7 @@ mod tests {
                 })?;
             }
             drop(input);
+            crate::scenario_clock::wait_child_exited(pid, Instant::now() + Duration::from_secs(5))?;
             let _ = ended.send(peer);
             Ok(())
         });
