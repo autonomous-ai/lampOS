@@ -423,3 +423,36 @@ fn a_set_aside_store_without_a_readable_identity_starts_fresh() {
     assert_eq!(engine.store_id(), FRESH);
     assert_eq!(engine.revision(), 0);
 }
+
+/// The reviewer's P3 on #1616: a crash after a newer store was renamed aside
+/// and before its successor was committed leaves an empty store with the kept
+/// one beside it. The next start carries the kept store's identity as the
+/// set-aside would have, so the delivery ledger still follows.
+#[test]
+fn an_empty_store_beside_one_set_aside_keeps_its_identity_after_a_crash() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("store");
+    let mut store = Store::open(&dir).unwrap();
+    store
+        .commit(
+            format!(r#"{{"schema":2,"store_id":"{STORE}","revision":7,"next_id":9,"items":[]}}"#)
+                .as_bytes(),
+        )
+        .unwrap();
+    // The rename happened; the carried state was never committed.
+    store.set_aside("newer-2-1791964800").unwrap();
+    assert_eq!(store.load().unwrap(), None);
+    drop(store);
+    let mut engine = Engine::open(Store::open(&dir).unwrap(), "Etc/UTC", &now(0), FRESH).unwrap();
+    assert_eq!(engine.store_id(), STORE);
+    assert_eq!(engine.revision(), 8);
+    let set = engine
+        .answer(set(&engine, When::After { seconds: 60 }), &now(0))
+        .unwrap();
+    assert_eq!(set["id"], 9);
+    drop(engine);
+    // Committed now: a later start reads it, and doesn't carry again.
+    let engine = Engine::open(Store::open(&dir).unwrap(), "Etc/UTC", &now(1), FRESH).unwrap();
+    assert_eq!(engine.store_id(), STORE);
+    assert_eq!(engine.revision(), 9);
+}

@@ -1,5 +1,5 @@
 use lamp_bus::Bus;
-use lamp_msgs::{Diagnostic, ScheduleDue};
+use lamp_msgs::{Diagnostic, Level, ScheduleDue};
 use lamp_schedule::{
     runtime::{Clock, Config, SystemClock, serve},
     time::ClockSample,
@@ -350,6 +350,44 @@ fn diagnostics_name_the_owner_and_do_not_include_personal_text() {
         }
         assert!(start.elapsed() < Duration::from_secs(3));
     }
+}
+/// #1562's follow-up: while a store set aside from a newer build is still
+/// in Schedule's folder, its health warns and names it, as lamp-tasks' does
+/// (#1554); removed, the warning goes.
+#[test]
+fn a_store_set_aside_is_said_in_health_until_it_is_gone() {
+    let s = Running::new();
+    let bus = Bus::new(&s.config.bus_root).unwrap();
+    let mut sub = bus
+        .subscribe_typed(Diagnostic::TOPIC, "diag_set_aside", Diagnostic::TYPE)
+        .unwrap();
+    let kept = s.config.dir.join("schedule.sqlite3.newer-2-1791964800");
+    fs::write(&kept, b"kept").unwrap();
+    let said = |sub: &mut lamp_bus::Subscriber, warned: bool| {
+        let start = Instant::now();
+        loop {
+            if let Some(message) = sub.recv(Duration::from_millis(100)).unwrap() {
+                let report: Diagnostic = message.parse().unwrap();
+                let named = report.values.iter().any(|v| {
+                    v.key == "set_aside" && v.value == "schedule.sqlite3.newer-2-1791964800"
+                });
+                if named == warned {
+                    return report;
+                }
+            }
+            assert!(start.elapsed() < Duration::from_secs(5), "never {warned}");
+        }
+    };
+    let report = said(&mut sub, true);
+    assert_eq!(report.level, Level::Warn);
+    assert!(
+        report.message.contains("will not sound"),
+        "{}",
+        report.message
+    );
+    fs::remove_file(&kept).unwrap();
+    let report = said(&mut sub, false);
+    assert!(!report.message.contains("set aside"), "{}", report.message);
 }
 #[test]
 fn a_second_owner_cannot_replace_the_live_socket_or_database() {

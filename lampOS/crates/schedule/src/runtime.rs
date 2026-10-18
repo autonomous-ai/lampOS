@@ -551,10 +551,18 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
                 }
                 let at_us = state.stamp.at_us;
                 publish(&mut due, at_us, &state, &mut publish_errors);
+                // A folder that can't be listed says nothing rather than
+                // stopping the part.
+                let set_aside = crate::store::kept_aside(&config.dir).ok().flatten();
                 let (level, message) = if !ready {
                     (Level::Error, "Schedule storage worker is not progressing")
                 } else if publish_errors > 0 {
                     (Level::Warn, "Schedule has bus publication failures")
+                } else if set_aside.is_some() {
+                    (
+                        Level::Warn,
+                        "Schedule set aside a store from a newer build; its reminders will not sound",
+                    )
                 } else if state.waiting_for_clock > 0 {
                     (
                         Level::Warn,
@@ -572,6 +580,10 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
                     .with("store_ready", ready)
                     .with("publish_errors", publish_errors)
                     .with("clients_refused", rejected.load(Ordering::Relaxed));
+                let report_out = match set_aside.as_deref() {
+                    Some(name) => report_out.with("set_aside", name),
+                    None => report_out,
+                };
                 publish(&mut diagnostic, at_us, &report_out, &mut publish_errors);
                 last_revision = Some(state.revision);
                 was_ready = Some(ready);
