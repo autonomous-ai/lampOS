@@ -821,7 +821,12 @@ fn the_lamps_name_heard_while_someone_spoke_is_joined_to_what_they_said() {
     assert_eq!(shown.len(), 3);
     assert!(shown.iter().all(|state| state.get("name_heard").is_none()));
     rig.voice(Voice::Resting);
-    thread::sleep(ms(100));
+    // Half a second clear of the hearing's `NAME_BEFORE` window. With
+    // 100 ms the next listening began about 0.9 s after the last, and the
+    // hearing, dated 100 ms before that, was outside the window by a few
+    // ms only: a turn of the policy that read it a moment late dated it
+    // inside, under load (#1488).
+    thread::sleep(ms(600));
 
     // The next thing said, with no name: the hearing before is not its.
     name.alive().unwrap();
