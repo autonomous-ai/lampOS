@@ -75,6 +75,11 @@ every result on a lamp below names it. Newest first.
   one hearing miss (a quiet line 1–5 % explained, scored 0). Cutting in went
   0.50 → 0.55. `cutins.sh` now waits for the reply's first speaker write
   before the cut (a sourced gate, on #828).
+- #1555 merged: `lamp-name --stop-least` runs `stop.onnx` on the name's
+  embeddings and publishes `stop/heard`; with `LAMP_STOP_HEARD=on` the voice
+  yields on it as heard plainly, and quiet after it ends the reply. Both
+  off. Replays (first builder): 6 of 28 played stops at 0.9, about 4 false
+  an hour. Lamp check: tonight's queue 13.
 
 ## 2026-10-17 — evening: #828 confounded, go-aways are the lamp's own
 
