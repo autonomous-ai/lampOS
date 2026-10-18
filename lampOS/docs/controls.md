@@ -699,7 +699,31 @@ coordinator polling consumes at most 16 entries without bus/filesystem I/O.
 Overflow, queued discontinuity and a full poll batch fence pending clear; Stop
 and one-way mute remain recoverable from later retained state. The pump targets
 a 2 ms tick, retries subscription errors after 250 ms, and records bounded
-health counts. Final owner destruction asks it to stop and waits at most 20 ms
+health counts. With `LAMP_CONTROLS_WAIT=on` (off unless set; #705, the lamp's
+heat) it waits on its subscribers' sockets with `poll` instead (`Subscriber`'s
+`AsFd`, and `holds` for a datagram already read ahead), at most 200 ms, the
+default bus rescan. Passes a datagram wakes do not line up with the bus's
+own 200 ms look, so a topic's `latest` file may be looked at up to almost
+400 ms apart, and with every topic silent a `Late` or `SourceGone` fence is
+noticed up to 200 ms later; neither delays a mute, since a fence only stops
+a clear and `controls/state` repeats a latched mute every 100 ms. The owner
+wakes it at once through a pipe for a stop and for a latch that changed
+(not one shared unchanged at each poll). **What it saves depends on the
+publisher:** the pump still wakes for every `controls/state`, and with
+`LAMP_HEAD_TOUCH` every `controls/touch_state`: 20 a second as declared,
+about 97 a second from lamp-4ace's `lamp-controls` on 18 Oct (its touch
+runtime's 20 ms tick; on lamp-4ace the pump went from 475 to 280 wakeups a
+second, 2.64 % to 2.14 % of a core, before the latch's wake was limited to
+a change). On a bus with nothing published it wakes about five times a
+second instead of 500
+(`with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once`):
+on this laptop `measure_the_idle_pumps_cpu` (ignored) reads 1.8 % with the
+switch off and 0.0 % with it on; on lamp-75c9 the 2 ms pump was 5.35 % of a
+core with nobody there (`pidstat -t`, 18 Oct). An owner polling every 2 ms
+with its latch unchanged wakes it no more
+(`with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump`), and a
+mute it takes through its poll is said on `voice/mute` at once
+(`with_the_wait_a_mute_taken_through_the_owners_poll_is_said_at_once`). Final owner destruction asks it to stop and waits at most 20 ms
 before detaching a thread stuck in an OS read. It is not respawned per audio
 cycle. These are scheduling/resource choices, not measured physical deadlines.
 
@@ -833,6 +857,7 @@ Voice's switches are independent and absent by default:
 | `--controls-stop` | Consume fresh, deduplicated Stop in the coordinator. |
 | `--controls-mute ABS_PRIVATE_RECORD` | Restore software mute and enable released-hold mute/fresh-second-hold clear. The parent directory must already exist, be trusted and private (0700). |
 | `--controls-bus-root ABS_PATH` | Override `LAMP_BUS_ROOT` or `/run/lampos-bus`; this option alone enables nothing. |
+| `LAMP_CONTROLS_WAIT=on` (environment) | The voice's one controls pump waits on its sockets instead of looking every 2 ms (#705): a gesture or touch is read as it arrives, and it wakes for each message on its topics (and about five times a second besides), not every 2 ms. Off unless set. |
 | `LAMP_HEAD_TOUCH=on` (environment) | Consume the head pads' requests from `--touch` Controls (#711). A qualified head touch stops the lamp while it says its answer (its reply has audio or playback), through the same cancellation as Stop (the speaker's discard of the rest of the answer is then expected, as for the button's Stop, the mute, sleep and a capture gap; before 16 Oct it ended the voice, which came back muted); while it is quiet or still thinking, it is only noted (`head_touch_noticed`). With `--controls-mute` too, a hand held 3 s on the head puts the lamp to sleep: the software mute with the reason `sleep`, traced as `head_sleep` (`hand_control_cancel` and `service_cycle_muted`); a later tap on the head wakes it through the saved clear, as the usual unmute does. A tap on a quiet lamp plays a soft "hm?" of its own, at most once in 30 s ([attention.md](attention.md#a-tap-on-its-head-is-a-call-711)). The voice then says `voice/mute` (muted, and `reason: sleep` while asleep) when it changes and every second, in a conversation and in the wait, from its one controls pump. Without `--controls-mute` a hold is not a sleep and `voice/mute` is not said. A head tap counts as a call for 2 s in the attention rule, the window Expression shows (and the ring, when the hum plays), with `LAMP_BUS=on` ([attention.md](attention.md#a-tap-on-its-head-is-a-call-711)). A hand kept on the head dims the ring's face from 1 to 3 s, a countdown to sleep ([ring-choreography.md](ring-choreography.md#a-hand-kept-on-the-head-the-countdown-711)). A tap while the lamp waits out a mute or a closed privacy slide shows the asleep face for about a second, where that face is the muted look (not with `LAMP_PRIVACY_CONTROLS=on` or `LAMP_RING_ASLEEP=on`), traced as `head_tap_muted_face` ([ring-choreography.md](ring-choreography.md#the-asleep-face-712)). |
 
 For example, append the selected options to `lamp-voice serve
@@ -976,7 +1001,13 @@ build, `head_touch_bus_to_poll_latency`, ignored by default), from the touch
 state and event being published on a real bus to the listener accepting it,
 three runs of 100: medians 2.0, 2.1 and 1.8 ms, p95 2.7 ms in each, and a
 worst of 2.9 ms in the first (the other two worsts were not kept).
-It is bounded by the pump's 2 ms tick. An earlier run once failed to deliver
+It is bounded by the pump's 2 ms tick. With `LAMP_CONTROLS_WAIT=on` the pump
+reads the touch as its datagram arrives: on this Linux laptop (x86-64, debug
+build, 18 Oct, 100 rounds each way) the median was 1.36 ms with the tick and
+0.25 ms with the wait, p95 1.71 and 0.34 ms, worst 1.83 and 0.38 ms
+(`with_the_wait_a_head_touch_is_read_as_it_arrives` holds the median under
+100 ms, loose for a loaded or emulated runner, so only a wait the touch does
+not end fails it). An earlier run once failed to deliver
 a touch within 2 s; it did not happen again in three runs, and the probe now
 prints the listener's counts if it does. The 150 ms target from the touch to
 silence still needs the lamp: the pad itself, the speaker worker and the

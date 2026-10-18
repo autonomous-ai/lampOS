@@ -633,6 +633,7 @@ impl SessionOptions {
         let mut notice_language = None;
         let mut controls = crate::hand_controls::ControlsOptions {
             head_touch: crate::hand_controls::head_touch_from_environment(),
+            wait: crate::hand_controls::wait_from_environment(),
             ..Default::default()
         };
         // The head tap's "hm?" level, tuned by ear (#711): refused at start
