@@ -324,6 +324,96 @@ pub type GestureNews = (&'static str, GestureState, Option<&'static str>);
 /// ended was, and who holds the body instead.
 pub type ToldNews = (GestureNews, Told);
 
+/// A line when a fold ends, for the journal (the first builder on #705,
+/// 2026-10-18 14:05): at rest the step lines come every thirty seconds, so
+/// on lamp-52e6 they caught 1 fold in 49. From the first step the arm
+/// comes down from standing to the step it is folded: how long, where the
+/// shoulder and the elbow were told to go against where they are, the
+/// head and base the same, and whether it sat down for a strain since it
+/// was last folded: on the way up, standing or on the way down. The body
+/// counts a sit-down after the step that shows it, and that fold's first
+/// step down already has it, so the count is taken from the last folded
+/// step, not from the fold's first (the reviewer on #1518).
+#[derive(Default)]
+pub struct FoldSaid {
+    /// Where the last step had it, 0 folded to 1 standing.
+    stand: f32,
+    /// The step a fold began on.
+    began: Option<u64>,
+    /// The retreats counted when it was last folded (none at the start).
+    folded_retreats: u16,
+}
+
+impl FoldSaid {
+    pub fn step(&mut self, glimpse: &Glimpse) -> Option<String> {
+        let (was, now) = (self.stand, glimpse.stand);
+        self.stand = now;
+        if !glimpse.stands {
+            return None;
+        }
+        if now > was {
+            // Rising again before it was down: that was no fold.
+            self.began = None;
+            return None;
+        }
+        if now < was && self.began.is_none() {
+            self.began = Some(glimpse.step.saturating_sub(1));
+        }
+        if now > 0.0 {
+            return None;
+        }
+        let retreats = glimpse.retreats.saturating_sub(self.folded_retreats);
+        self.folded_retreats = glimpse.retreats;
+        let began = self.began.take()?;
+        Some(format!(
+            "lamp-body: step {} folded in {:.1} s; arm goals {:?} ended at {:?}; head and base goals {:?} at {:?}; {}",
+            glimpse.step,
+            (glimpse.step - began) as f32 * crate::body::TICK.as_secs_f32(),
+            glimpse.arm_goals,
+            glimpse.arm_positions,
+            glimpse.goals,
+            glimpse.positions,
+            match retreats {
+                0 => "nothing retreated since it was last folded".to_owned(),
+                1 => "it sat down for a strain once since it was last folded".to_owned(),
+                sat => format!("it sat down for a strain {sat} times since it was last folded"),
+            }
+        ))
+    }
+}
+
+/// The reads not used so far, for the journal every five minutes (the
+/// first builder on #705, 2026-10-18 14:05), not only in the exit report.
+#[derive(Default)]
+pub struct ReadsSaid {
+    said_at: Option<u64>,
+}
+
+impl ReadsSaid {
+    /// Five minutes of 20 ms steps.
+    pub const EVERY_STEPS: u64 = 15_000;
+
+    pub fn step(&mut self, glimpse: &Glimpse) -> Option<String> {
+        if self
+            .said_at
+            .is_some_and(|at| glimpse.step.saturating_sub(at) < Self::EVERY_STEPS)
+        {
+            return None;
+        }
+        self.said_at = Some(glimpse.step);
+        let reads = crate::Joint::ALL
+            .iter()
+            .zip(glimpse.bad_reads)
+            .map(|(joint, bad)| format!("{} {bad}", joint.name()))
+            .collect::<Vec<_>>()
+            .join(", ");
+        Some(format!(
+            "lamp-body: step {} bad reads so far: {reads}; retreats so far {}",
+            glimpse.step, glimpse.retreats
+        ))
+    }
+}
+
 /// What became of the gestures, step by step, as lamp-body's journal says
 /// it and `body/gesture` publishes it, so that the two never differ: each
 /// gesture dropped (`glimpse.gesture_fates` saying `dropped: ...`), and the
@@ -678,11 +768,97 @@ mod tests {
             tipping: Default::default(),
             gesture_fates: Default::default(),
             looks_dropped: None,
+            bad_reads: [0; 5],
+            retreats: 0,
         }
     }
 
     fn near(a: f64, b: f64) -> bool {
         (a - b).abs() < 1e-9
+    }
+
+    /// Steps of a stand going from `from` to `to` evenly, from step `at`.
+    fn stands(at: u64, from: f32, to: f32, steps: u64) -> Vec<Glimpse> {
+        (0..=steps)
+            .map(|k| Glimpse {
+                stand: from + (to - from) * k as f32 / steps as f32,
+                ..glimpse(at + k)
+            })
+            .collect()
+    }
+
+    /// #705, 14:05: one line when a fold ends, how long it took, where the
+    /// joints were told to go against where they are, and any retreat.
+    #[test]
+    fn a_fold_is_said_once_when_it_ends_with_its_time_and_the_joints() {
+        let mut said = FoldSaid::default();
+        let mut lines = Vec::new();
+        // Standing a while, then 6 s down (300 steps of 20 ms), then folded.
+        for g in stands(0, 1.0, 1.0, 50)
+            .into_iter()
+            .chain(stands(51, 1.0, 0.0, 300))
+            .chain(stands(352, 0.0, 0.0, 50))
+        {
+            lines.extend(said.step(&g));
+        }
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(
+            lines[0].starts_with("lamp-body: step 351 folded in 6.0 s; arm goals [2657, 2602] ended at [2650, 2602]; head and base goals [1968, 2069, 2015] at [1950, 2043, 2015]; nothing retreated since it was last folded"),
+            "{}",
+            lines[0]
+        );
+    }
+
+    #[test]
+    fn a_fold_that_rises_again_is_not_said_and_a_retreat_on_the_way_is() {
+        let mut said = FoldSaid::default();
+        let mut lines = Vec::new();
+        // Down halfway, up again: no fold.
+        for g in stands(0, 1.0, 0.5, 100)
+            .into_iter()
+            .chain(stands(101, 0.5, 1.0, 100))
+        {
+            lines.extend(said.step(&g));
+        }
+        assert!(lines.is_empty(), "{lines:?}");
+        // Down all the way with a sit-down for a strain counted halfway.
+        for g in stands(300, 1.0, 0.0, 200) {
+            let g = Glimpse {
+                retreats: u16::from(g.step >= 400),
+                ..g
+            };
+            lines.extend(said.step(&g));
+        }
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(lines[0].contains("folded in 4.0 s"), "{}", lines[0]);
+        assert!(
+            lines[0].ends_with("it sat down for a strain once since it was last folded"),
+            "{}",
+            lines[0]
+        );
+        // A body that never stands says no fold.
+        let mut said = FoldSaid::default();
+        for g in stands(0, 1.0, 0.0, 10) {
+            assert_eq!(said.step(&Glimpse { stands: false, ..g }), None);
+        }
+    }
+
+    #[test]
+    fn the_bad_reads_are_said_at_the_first_step_and_every_five_minutes() {
+        let mut said = ReadsSaid::default();
+        let at = |step: u64| Glimpse {
+            bad_reads: [0, 0, 0, 3, 1],
+            retreats: 2,
+            ..glimpse(step)
+        };
+        assert_eq!(
+            said.step(&at(10)).as_deref(),
+            Some(
+                "lamp-body: step 10 bad reads so far: base_yaw 0, base_pitch 0, elbow_pitch 0, wrist_roll 3, wrist_pitch 1; retreats so far 2"
+            )
+        );
+        assert_eq!(said.step(&at(10 + ReadsSaid::EVERY_STEPS - 1)), None);
+        assert!(said.step(&at(10 + ReadsSaid::EVERY_STEPS)).is_some());
     }
 
     #[test]

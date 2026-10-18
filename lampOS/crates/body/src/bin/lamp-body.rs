@@ -1013,6 +1013,8 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let mut told_whether_it_stands = false;
     let mut face_said = 0u64;
     let mut gesture_said = lamp_body::bus_out::GestureSaid::default();
+    let mut fold_said = lamp_body::bus_out::FoldSaid::default();
+    let mut reads_said = lamp_body::bus_out::ReadsSaid::default();
     let mut tipping_said = lamp_body::body::Tipping::default();
     let mut looks_said: Option<&'static str> = None;
     let mut fate_said = Hush::default();
@@ -1144,6 +1146,14 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         lamp_body::bus_out::tell_told(&gestures, glimpse.step, bus.as_mut(), arbitration, |line| {
             eprintln!("{line}");
         });
+        // A fold's end, and the reads not used so far every five minutes,
+        // so a run can be read without stopping it (#705).
+        for line in [fold_said.step(glimpse), reads_said.step(glimpse)]
+            .into_iter()
+            .flatten()
+        {
+            eprintln!("{line}");
+        }
         // What the eyes report and where that has it look, at most every
         // five seconds: for setting the two numbers of --gaze on a lamp.
         // Twice a second filled the journal on a day of faces at desks.

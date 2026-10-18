@@ -798,6 +798,12 @@ pub struct Glimpse {
     /// eyes: paused, folded, or neither listening nor speaking. `None`
     /// while one would be.
     pub looks_dropped: Option<&'static str>,
+    /// Reads so far that each of the five joints gave and were not used
+    /// (the exit report's `bad_reads`), and times so far the arm sat down
+    /// for a strain (the exit report's `retreats`), for the journal while it
+    /// runs.
+    pub bad_reads: [u16; 5],
+    pub retreats: u16,
 }
 
 /// The gestures asked from outside that were taken or dropped on one step,
@@ -4966,6 +4972,8 @@ fn run_on<P: PortIo, R: Runtime>(
             tipping: report.tipping,
             gesture_fates: std::mem::take(&mut gesture_fates),
             looks_dropped,
+            bad_reads: bus.bad_reads,
+            retreats: retreats.into(),
         };
         watch(&glimpse);
         // A joint pushing at a goal it does not reach, and not moving, is
