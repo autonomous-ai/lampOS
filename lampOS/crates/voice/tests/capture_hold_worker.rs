@@ -127,8 +127,6 @@ struct Heard {
 static ONE_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 struct Rig {
-    /// Held for the rig's life ([`ONE_AT_A_TIME`]).
-    _alone: std::sync::MutexGuard<'static, ()>,
     _directory: SessionDirectory,
     controller: Controller,
     parent: WorkerChannels,
@@ -164,6 +162,9 @@ struct Rig {
     /// Linux a send that finds it gone drops its `CaptureStopped` unread
     /// (`a_refused_send_drops_what_the_gone_peer_had_sent`, #1359).
     ending: bool,
+    /// Held for the rig's life ([`ONE_AT_A_TIME`]). The last field, so a
+    /// rig dropped mid-test closes its channels before the next rig starts.
+    _alone: std::sync::MutexGuard<'static, ()>,
 }
 
 impl Rig {
@@ -295,7 +296,6 @@ impl Rig {
             .set_microphone_permission(now(), Permission::Allowed)
             .unwrap();
         let mut rig = Self {
-            _alone: alone,
             _directory: directory,
             controller,
             parent,
@@ -321,6 +321,7 @@ impl Rig {
             fault: None,
             refused: None,
             ending: false,
+            _alone: alone,
         };
         rig.service();
         rig.parent
