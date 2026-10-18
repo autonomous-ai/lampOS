@@ -1241,7 +1241,8 @@ pub fn harness_off(
     let _lock = Records::new(folder)
         .lock()
         .map_err(|error| format!("another lamp-update is running: {error}"))?;
-    // Again under the lock: a run that waited for another may find it done.
+    // Again under the lock, which never waits: a run that checked just
+    // before another finished finds it done.
     if !done.exists() {
         say("Harness was not set to start at boot by install: nothing to undo");
         return Ok(Vec::new());

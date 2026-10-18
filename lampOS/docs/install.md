@@ -498,11 +498,13 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    `/var/lib/lampos-tasks/.harness` (a reset's to wipe) and the `lampos`
    user stay. What Harness still has afterwards, its service or a `harnessd`
    running as `lampos` (`pgrep -u lampos -f harnessd`), is said with its pid
-   and never stopped. An install afterwards sets it up again. A second run
-   that waited for the first finds the record gone under the lock, and
-   changes nothing. The linger goes off whether or not install turned it
-   on: nothing else turns on `lampos`'s linger today; if something does,
-   install will note it in the record and `harness-off` leave it. Shown
+   and never stopped. An install afterwards sets it up again. The lock never
+   waits: a second run during the first is refused ("another lamp-update is
+   running"), and one that checked the record just before the first
+   finished finds it gone under the lock and changes nothing. The linger
+   goes off whether or not install turned it on: nothing else turns on
+   `lampos`'s linger today; if something did, install would have to note it
+   in the record for `harness-off` to leave it (not built). Shown
    only in tests (`crates/update/tests/install.rs`): the real steps,
    through stand-ins for `id`, `runuser … harness`, `loginctl` and `pgrep`
    that log each call and fail on demand, in their order; each failing
