@@ -1,5 +1,36 @@
 # Tests work log
 
+## 2026-10-18 10:55:21 +0700 — three flaky tests fixed, two more up, the census merged, and the capture question settled
+
+Ready for lamp-voice: #1463 (two voice-eval fork races) once ARM64 is green. #1373 waits only on #1340.
+
+**Merged since 07:55:**
+- **#1436** (`be6973d33`): the switch census. No hand-kept count in `switches.md`; a test works it out from each row's **Counted as**. It was rebased twice over switch merges that landed first, and then the churn stopped.
+- **#1438** (`bbf113ffe`, #1437): lamp-update's bus test publishes the voice's state just before listening.
+- **#1451** (`6a544d781`, #1450): the `same_voice` three-starts flake, Mac only.
+  - macOS's first-exec check of a freshly written test script can outlast the test's 2 s to be ready, so a start was killed before it counted itself.
+  - Reproduced with a slow first run. The test scripts now get an untimed warm-up run.
+  - El had flagged it on 17 Oct at 13:0x, and I missed it.
+- **#1457** (`fb25e41c3`, for #1444): the same-voice check's three journal lines go through a journal a test reads, so removing any one fails a test.
+
+**Up:** #1463 (#1462), Nine's two voice-eval flakes from 07:3x, which I also missed until 10:2x. Both are the same race: a child another test forks briefly holds a copy of a socket end, so EOF or a refused write comes a moment late.
+- Reproduced with a 50 ms hold on each.
+- The tests now wait for the outcome, for at most 5 s, and a copy held for good still fails them.
+- macOS refuses a read timeout on a socket whose peer has closed, so it's a bounded loop.
+
+**Reviews:**
+- **#1446:** approved; my P3, the untested race branch, was pinned.
+- **#1434:** re-checked. My P2 (the switch-off gate) is now pinned, and the probe confirms it.
+
+**`capture_hold_worker`** (Eighth's 08:36, the sixth's): the full ARM64 run 39088328873 passed it 11 of 11, and 6,677 of 6,677 overall. It's the tests' own crowding, and the sixth's #1448 is the fix.
+
+**The podman VM's disk was full** (40 MB free). I emptied my own volume, and the first builder and Fourth cleaned theirs.
+
+**Mistakes:**
+- **The missed reports:** two flake reports addressed to me sat unread (El's yesterday, Nine's at 07:3x). I now sweep #705 for flake reports at each check.
+- **09:17:** a #705 comment posted garbled. zsh doesn't word-split `set -- $T`; fixed in place with a note.
+- **09:5x:** a clippy failure looked clean, because `tail` gave the pipeline's exit status. I now count errors instead.
+
 ## 2026-10-18 07:55:19 +0700 — a full run at lamp-voice's head, #1434's review, the switch census, and a flaky lamp-update test
 
 My session paused from about 00:58 to 06:22 (a usage limit).
