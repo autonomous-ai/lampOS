@@ -339,6 +339,53 @@ impl Store {
         self.poisoned
     }
 
+    /// Keep the database as it is, renamed `tasks.sqlite3.<label>` in the
+    /// same owned directory, and go on with a new, empty one: a store
+    /// written by a newer build is never destroyed (#1505). `label` is
+    /// letters, digits and `-` only. The name it is kept under. Any
+    /// failure poisons this owner, as a failed commit does.
+    pub fn set_aside(&mut self, label: &str) -> io::Result<String> {
+        if label.is_empty()
+            || label.len() > 64
+            || !label
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "a set-aside label is letters, digits and '-'",
+            ));
+        }
+        let result = self.rename_and_start_empty(&format!("{DATABASE}.{label}"));
+        if result.is_err() {
+            self.poisoned = true;
+        }
+        result
+    }
+
+    fn rename_and_start_empty(&mut self, kept: &str) -> io::Result<String> {
+        self.check_files()?;
+        // The connection is closed before its file is renamed, so no write
+        // of its can reach the kept file; a connection to nothing stands in
+        // until the new database is open.
+        let open = std::mem::replace(&mut self.db, Connection::open_in_memory().map_err(sql)?);
+        open.close().map_err(|(_, error)| sql(error))?;
+        unix::renameat_with(
+            &self.held,
+            DATABASE,
+            &self.held,
+            kept,
+            RenameFlags::NOREPLACE,
+        )?;
+        self.held.sync_all()?;
+        initialize(&self.path, &self.held)?;
+        self.file = open_file(&self.held, DATABASE, false)?;
+        self.db = connect(&self.path.join(DATABASE))?;
+        validate(&self.db)?;
+        self.check_files()?;
+        Ok(kept.to_owned())
+    }
+
     fn write(&mut self, bytes: &[u8]) -> io::Result<()> {
         self.check_files()?;
         let tx = self
@@ -402,5 +449,44 @@ mod tests {
             .query_row("PRAGMA journal_mode", [], |row| row.get(0))
             .unwrap();
         assert_eq!(journal, "delete");
+    }
+
+    /// #1505: a newer build's store is kept as it was, under its new name,
+    /// and the owner goes on with a new, empty one in the same directory.
+    #[test]
+    fn a_store_set_aside_is_kept_whole_and_a_new_one_starts_empty() {
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("private");
+        let mut store = Store::open(&dir).unwrap();
+        store.commit(b"{\"schema\":2}").unwrap();
+        let kept = store.set_aside("newer-2-1760770000").unwrap();
+        assert_eq!(kept, "tasks.sqlite3.newer-2-1760770000");
+        assert_eq!(store.load().unwrap(), None, "the new store is empty");
+        store.commit(b"{\"schema\":1}").unwrap();
+        assert_eq!(
+            store.load().unwrap().as_deref(),
+            Some(&b"{\"schema\":1}"[..])
+        );
+        drop(store);
+        // The kept file is a whole database with the newer snapshot in it.
+        // Through the folder's own path: on macOS the tempdir is under a
+        // link (`/var`), which `SQLITE_OPEN_NOFOLLOW` refuses.
+        let db = connect(&dir.canonicalize().unwrap().join(&kept)).unwrap();
+        validate(&db).unwrap();
+        assert_eq!(
+            load_snapshot(&db).unwrap().as_deref(),
+            Some(&b"{\"schema\":2}"[..])
+        );
+        drop(db);
+        // And the owner opens again on the new one.
+        let store = Store::open(&dir).unwrap();
+        assert_eq!(
+            store.load().unwrap().as_deref(),
+            Some(&b"{\"schema\":1}"[..])
+        );
+        let mut store = store;
+        for bad in ["", "../x", "a b", "x/y"] {
+            assert!(store.set_aside(bad).is_err(), "{bad:?}");
+        }
     }
 }

@@ -39,9 +39,23 @@ pub const WATCH_CONFIRM_MS: u64 = 10_000;
 /// different answer it ends with later is kept as a new observation.
 pub const WATCH_FOLLOW_MS: u64 = 600_000;
 
+/// The state's `schema` this build reads and writes. A newer build bumps it
+/// for a change this one could not read safely: a new value in a stored
+/// enum; a new required field; a new field on a task's target, its launch
+/// or an observation's data (strict, and under digests); a larger
+/// `MAX_STATE_BYTES` (an older build refuses a state over its own, before it
+/// reads `schema`); or an optional field whose absence would let an older
+/// build launch, close or speak more than the newer one would. Any other new
+/// optional field needs no bump: this build reads past it (#1505, Jarvis on
+/// #1512).
+const SCHEMA: u32 = 1;
+
 pub trait Persistence {
     fn load(&self) -> io::Result<Option<Vec<u8>>>;
     fn commit(&mut self, bytes: &[u8]) -> io::Result<()>;
+    /// Keep what is stored under another name, `label`, as it is, and start
+    /// empty: the name it is kept under.
+    fn set_aside(&mut self, label: &str) -> io::Result<String>;
 }
 impl Persistence for Store {
     fn load(&self) -> io::Result<Option<Vec<u8>>> {
@@ -49,6 +63,9 @@ impl Persistence for Store {
     }
     fn commit(&mut self, bytes: &[u8]) -> io::Result<()> {
         self.commit(bytes)
+    }
+    fn set_aside(&mut self, label: &str) -> io::Result<String> {
+        self.set_aside(label)
     }
 }
 
@@ -91,8 +108,13 @@ impl Clock {
     }
 }
 
+// The stored state's types read past fields they do not know, so this build
+// starts on the state of the release after it (#1505: on lamp-4ace on 18
+// October every older build refused #1425's `told`). What they write is
+// only what they know, so a field this build does not know is dropped if it
+// saves the state. `Clock`, the requests, a task's target and launch and an
+// observation's data stay strict (see [`SCHEMA`]).
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct Audit {
     boot_id: String,
     session_id: String,
@@ -133,7 +155,6 @@ enum DispatchState {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct Dispatch {
     state: DispatchState,
     confirmed: Option<Audit>,
@@ -166,7 +187,6 @@ enum ReadState {
     Failed,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct Read {
     request_id: u64,
     state: ReadState,
@@ -194,7 +214,6 @@ enum SpeechState {
     Uncertain,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct Speech {
     claim_id: u64,
     text: String,
@@ -204,7 +223,6 @@ struct Speech {
     finished: Option<Audit>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct Observed {
     id: u64,
     digest: String,
@@ -236,7 +254,6 @@ enum CloseState {
 /// The lamp closing the harness it started, once its result was told
 /// (#1390).
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct Close {
     state: CloseState,
     tries: u8,
@@ -246,7 +263,6 @@ struct Close {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct Task {
     id: u64,
     target_alias: String,
@@ -278,14 +294,12 @@ struct Task {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct Receipt {
     request: Request,
     response: Value,
     at: Audit,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct State {
     schema: u32,
     store_id: String,
@@ -297,7 +311,67 @@ struct State {
     next_claim_id: u64,
     saved_at: Audit,
     tasks: Vec<Task>,
+    /// Read apart from the rest ([`read_state`]): one this build cannot read
+    /// is dropped, never refused.
+    #[serde(default)]
     last_receipt: Option<Receipt>,
+}
+
+/// What a stored state is to this build.
+enum Stored {
+    State(Box<State>),
+    /// Written by a newer build, with this `schema`.
+    Newer(u64),
+}
+
+/// A receipt's request name for the journal, only if it is a plain one (up
+/// to 32 lower-case letters and `_`): nothing of the request's words can
+/// reach the journal.
+fn receipt_op(receipt: &Value) -> &str {
+    receipt["request"]["op"]
+        .as_str()
+        .filter(|op| {
+            !op.is_empty()
+                && op.len() <= 32
+                && op.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
+        })
+        .unwrap_or("unknown")
+}
+
+/// A stored state, read one release forward: a `schema` newer than
+/// [`SCHEMA`] is [`Stored::Newer`]; fields this build does not know are
+/// passed over; and the last receipt, which keeps the last request itself,
+/// is dropped when it is one this build cannot read (a `told` before
+/// #1425), since it only answers a retry of that very request.
+fn read_state(bytes: &[u8]) -> Result<Stored, Error> {
+    let mut value: Value = serde_json::from_slice(bytes).map_err(|_| storage())?;
+    if let Some(schema) = value
+        .get("schema")
+        .and_then(Value::as_u64)
+        .filter(|schema| *schema > u64::from(SCHEMA))
+    {
+        return Ok(Stored::Newer(schema));
+    }
+    let receipt = value
+        .as_object_mut()
+        .and_then(|state| state.remove("last_receipt"))
+        .unwrap_or(Value::Null);
+    let mut state: State = serde_json::from_value(value).map_err(|_| storage())?;
+    state.last_receipt = if receipt.is_null() {
+        None
+    } else {
+        match serde_json::from_value::<Receipt>(receipt.clone()) {
+            Ok(receipt) => Some(receipt),
+            Err(_) => {
+                eprintln!(
+                    "tasks: the last receipt is not one this build reads (op {}); dropped",
+                    receipt_op(&receipt)
+                );
+                None
+            }
+        }
+    };
+    Ok(Stored::State(Box::new(state)))
 }
 
 fn token(value: &str, max: usize) -> bool {
@@ -459,7 +533,7 @@ fn task_label(store_id: &str, id: u64) -> String {
 impl State {
     fn check(&self) -> Result<(), Error> {
         let fail = storage;
-        if self.schema != 1
+        if self.schema != SCHEMA
             || !hex(&self.store_id, 32)
             || !hex(&self.session_id, 32)
             || self.tasks.len() > MAX_TASKS
@@ -818,6 +892,8 @@ pub struct ObservationJob {
 
 pub struct Engine<P: Persistence> {
     persistence: P,
+    /// The name a newer build's store was set aside under as this opened.
+    set_aside: Option<String>,
     targets: BTreeMap<String, Target>,
     state: State,
     last_clock: Clock,
@@ -858,12 +934,34 @@ impl<P: Persistence> Engine<P> {
             ));
         }
         let bytes = persistence.load().map_err(|_| storage())?;
-        let existing = bytes.is_some();
-        let mut state = if let Some(bytes) = bytes {
-            if bytes.is_empty() || bytes.len() > MAX_STATE_BYTES {
+        let mut set_aside = None;
+        let stored = match bytes {
+            Some(bytes) if bytes.is_empty() || bytes.len() > MAX_STATE_BYTES => {
                 return Err(storage());
             }
-            serde_json::from_slice::<State>(&bytes).map_err(|_| storage())?
+            Some(bytes) => match read_state(&bytes)? {
+                Stored::State(state) => Some(*state),
+                // A newer build's store is kept as it is, never destroyed,
+                // and this build starts with an empty one (#1505).
+                Stored::Newer(schema) => {
+                    let since = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_or(0, |since| since.as_secs());
+                    let kept = persistence
+                        .set_aside(&format!("newer-{schema}-{since}"))
+                        .map_err(|_| storage())?;
+                    eprintln!(
+                        "tasks: storage was written by a newer build (schema {schema}, this build reads {SCHEMA}); it is set aside as {kept}, and this build starts with an empty store"
+                    );
+                    set_aside = Some(kept);
+                    None
+                }
+            },
+            None => None,
+        };
+        let existing = stored.is_some();
+        let mut state = if let Some(state) = stored {
+            state
         } else {
             if !hex(new_store_id, 32) {
                 return Err(err(
@@ -872,7 +970,7 @@ impl<P: Persistence> Engine<P> {
                 ));
             }
             State {
-                schema: 1,
+                schema: SCHEMA,
                 store_id: new_store_id.into(),
                 session_id: session_id.into(),
                 revision: 0,
@@ -890,6 +988,22 @@ impl<P: Persistence> Engine<P> {
                 last_receipt: None,
             }
         };
+        // A receipt this build reads but whose reply it would write
+        // otherwise (a field a later release added to a reply) does not
+        // hold; it only answers an exact retry, which a restart refuses
+        // anyway, so it is dropped, never the store (the reviewer on #1512).
+        if existing && state.check().is_err() && state.last_receipt.is_some() {
+            let receipt = state.last_receipt.take();
+            state.check()?;
+            eprintln!(
+                "tasks: the last receipt is not one this build reads (op {}); dropped",
+                receipt
+                    .as_ref()
+                    .and_then(|receipt| serde_json::to_value(receipt).ok())
+                    .as_ref()
+                    .map_or("unknown", receipt_op)
+            );
+        }
         state.check()?;
         if existing {
             if state.session_id == session_id
@@ -966,7 +1080,14 @@ impl<P: Persistence> Engine<P> {
             failed: false,
             last_handover: None,
             close_told: false,
+            set_aside,
         })
+    }
+
+    /// The name a newer build's store was set aside under as this one
+    /// opened, if it was (#1505).
+    pub fn set_aside(&self) -> Option<&str> {
+        self.set_aside.as_deref()
     }
 
     pub fn store_id(&self) -> &str {
@@ -2191,6 +2312,8 @@ mod tests {
     #[derive(Default)]
     struct MemoryState {
         bytes: Option<Vec<u8>>,
+        /// What [`Persistence::set_aside`] kept, by its name.
+        kept: Vec<(String, Vec<u8>)>,
         writes: usize,
         fail_before: bool,
         fail_after: bool,
@@ -2200,6 +2323,13 @@ mod tests {
     impl Persistence for Memory {
         fn load(&self) -> io::Result<Option<Vec<u8>>> {
             Ok(self.0.borrow().bytes.clone())
+        }
+        fn set_aside(&mut self, label: &str) -> io::Result<String> {
+            let mut state = self.0.borrow_mut();
+            let bytes = state.bytes.take().unwrap_or_default();
+            let name = format!("tasks.sqlite3.{label}");
+            state.kept.push((name.clone(), bytes));
+            Ok(name)
         }
         fn commit(&mut self, bytes: &[u8]) -> io::Result<()> {
             let mut state = self.0.borrow_mut();
@@ -3559,6 +3689,225 @@ mod tests {
         assert!(engine.state.tasks.is_empty());
     }
 
+    /// The state the release after this one writes, as #1425's did on
+    /// lamp-4ace on 18 October (#1505): a field on every stored type this
+    /// build does not know, beside #1425's `Observed.told`, and a last
+    /// receipt for a request this build has no `op` for, as #1425's `told`
+    /// was to the builds before it.
+    /// It opens: the tasks are kept, the receipt is dropped, and the next
+    /// save writes none of what this build does not know.
+    #[test]
+    fn the_next_releases_state_opens_and_keeps_its_tasks() {
+        let (mut engine, memory) = opened();
+        let id = accepted(&mut engine, 0);
+        let observation = observe(&mut engine, id, "result", 0);
+        engine
+            .handle(&claim(&engine, id, observation), &clock(0), true)
+            .unwrap();
+        let mut next: Value =
+            serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
+        let audit = next["saved_at"].clone();
+        next["tasks"][0]["observations"][0]["told"] = audit.clone();
+        // A task closing its harness, so `Close` is read past a later field
+        // too (the reviewer on #1512).
+        next["tasks"][0]["close"] = json!({"state": "attempting", "tries": 1, "attempted": audit,
+                                           "finished": null, "code": null});
+        // What this build knows of the task, to compare once it is saved again.
+        let known = next["tasks"][0].clone();
+        for path in [
+            "",
+            "/saved_at",
+            "/tasks/0",
+            "/tasks/0/dispatch",
+            "/tasks/0/read",
+            "/tasks/0/observations/0",
+            "/tasks/0/observations/0/speech",
+            "/tasks/0/close",
+        ] {
+            next.pointer_mut(path).unwrap()["later_field"] = json!({"from": "the next release"});
+        }
+        next["last_receipt"] = json!({
+            "request": {"op": "a_later_op", "guard": {"store_id": STORE, "revision": 1,
+                        "request_id": "later-1"}, "id": id, "observation_id": observation,
+                        "session_id": SESSION},
+            "response": {"ok": true, "told": true},
+            "at": audit,
+        });
+        // A task's target, its launch and an observation's data stay strict:
+        // the target is the targets file's type too, and the launch and the
+        // data are under digests (the person's yes, and what was seen), so a
+        // field added to them needs a `schema` bump (Jarvis on #1512).
+        for path in [
+            "/tasks/0/launch/target",
+            "/tasks/0/launch",
+            "/tasks/0/observations/0/data",
+        ] {
+            let mut strict = next.clone();
+            strict.pointer_mut(path).unwrap()["later_field"] = json!(1);
+            let memory = Memory::default();
+            memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&strict).unwrap());
+            assert_eq!(
+                Engine::open(memory, targets(), STORE, RESTART, &clock(1))
+                    .err()
+                    .unwrap()
+                    .code,
+                "storage",
+                "{path}"
+            );
+        }
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&next).unwrap());
+        let mut engine = Engine::open(memory.clone(), targets(), STORE, RESTART, &clock(1))
+            .expect("the next release's state opens");
+        assert_eq!(engine.set_aside(), None);
+        assert_eq!(engine.state.tasks.len(), 1);
+        assert_eq!(engine.state.tasks[0].id, id);
+        assert!(
+            engine.state.last_receipt.is_none(),
+            "the later receipt is dropped"
+        );
+        // It goes on: a new hand-over is prepared and saved.
+        prepare(&mut engine, 2);
+        let saved = String::from_utf8(memory.0.borrow().bytes.clone().unwrap()).unwrap();
+        assert!(!saved.contains("later_field"), "{saved}");
+        // Nothing this build knows of the task is lost: the task as saved
+        // again is the task as it was before the later fields, but for what
+        // the restart itself moves on (its `updated`, and a close that was
+        // under way when it stopped).
+        let resaved: Value = serde_json::from_str(&saved).unwrap();
+        let task = &resaved["tasks"][0];
+        for field in [
+            "id",
+            "launch",
+            "dispatch",
+            "read",
+            "prepared_digest",
+            "created",
+        ] {
+            assert_eq!(task[field], known[field], "{field}");
+        }
+        // An observation's own record; its speech is moved on by the restart
+        // (a claim under way becomes uncertain).
+        for field in ["id", "digest", "data", "observed", "told", "seen_count"] {
+            assert_eq!(
+                task["observations"][0][field], known["observations"][0][field],
+                "observation {field}"
+            );
+        }
+        assert_eq!(task["close"]["tries"], known["close"]["tries"]);
+        assert!(task["close"].is_object(), "the close is kept");
+    }
+
+    /// A receipt this build reads but that does not hold for it, as a later
+    /// release's reply with a field added to it would be, is dropped and the
+    /// store opens (the reviewer on #1512); before, the whole store was
+    /// refused, as at 13:51.
+    #[test]
+    fn a_receipt_that_does_not_hold_is_dropped_and_the_store_opens() {
+        let (mut engine, memory) = opened();
+        let id = accepted(&mut engine, 0);
+        let observation = observe(&mut engine, id, "result", 0);
+        engine
+            .handle(&claim(&engine, id, observation), &clock(0), true)
+            .unwrap();
+        let original: Value =
+            serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
+        for altered in [
+            {
+                let mut later = original.clone();
+                later["last_receipt"]["response"]["later_field"] = json!(true);
+                later
+            },
+            {
+                let mut odd = original.clone();
+                odd["last_receipt"]["response"]["claim_id"] = json!(999);
+                odd
+            },
+        ] {
+            let memory = Memory::default();
+            memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&altered).unwrap());
+            let engine = Engine::open(memory, targets(), STORE, RESTART, &clock(1))
+                .expect("the store opens");
+            assert!(engine.state.last_receipt.is_none());
+            assert_eq!(engine.state.tasks.len(), 1);
+        }
+        // A fault elsewhere in the state is still refused.
+        let mut broken = original.clone();
+        broken["next_task_id"] = json!(1);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&broken).unwrap());
+        assert_eq!(
+            Engine::open(memory, targets(), STORE, RESTART, &clock(1))
+                .err()
+                .unwrap()
+                .code,
+            "storage"
+        );
+    }
+
+    /// The receipt's journal line names a plain `op` only: anything else is
+    /// `unknown`, so nothing of a request's words reaches the journal (the
+    /// first builder on #1512).
+    #[test]
+    fn a_dropped_receipt_names_only_a_plain_op() {
+        let named = |op: Value| receipt_op(&json!({"request": {"op": op}})).to_owned();
+        assert_eq!(named(json!("a_later_op")), "a_later_op");
+        for odd in [
+            json!("Told"),
+            json!("told me the plan"),
+            json!("x".repeat(33)),
+            json!(""),
+            json!(7),
+            Value::Null,
+        ] {
+            assert_eq!(named(odd.clone()), "unknown", "{odd}");
+        }
+        assert_eq!(receipt_op(&json!({})), "unknown");
+    }
+
+    /// A store from a newer `schema` is set aside whole and this build
+    /// starts with an empty one, never destroying it (#1505).
+    #[test]
+    fn a_newer_schema_is_set_aside_whole_and_a_new_store_begins() {
+        let (mut engine, memory) = opened();
+        accepted(&mut engine, 0);
+        let mut newer: Value =
+            serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
+        newer["schema"] = json!(2);
+        newer["tasks"][0]["dispatch"]["state"] = json!("a_state_from_later");
+        let bytes = serde_json::to_vec(&newer).unwrap();
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(bytes.clone());
+        let engine = Engine::open(
+            memory.clone(),
+            targets(),
+            "f".repeat(32).as_str(),
+            RESTART,
+            &clock(1),
+        )
+        .expect("a newer store is set aside, not refused");
+        let kept = engine.set_aside().unwrap().to_owned();
+        assert!(kept.starts_with("tasks.sqlite3.newer-2-"), "{kept}");
+        assert_eq!(
+            memory.0.borrow().kept,
+            [(kept, bytes)],
+            "kept byte for byte"
+        );
+        assert!(engine.state.tasks.is_empty());
+        assert_eq!(engine.store_id(), "f".repeat(32), "a new store, its own id");
+        assert_eq!(engine.state.schema, SCHEMA);
+    }
+
+    /// Requests stay strict: a request this build has no `op` for is
+    /// refused, as before (#1505 relaxes the stored state only).
+    #[test]
+    fn a_request_from_a_later_release_is_still_refused() {
+        assert!(serde_json::from_value::<Request>(json!({"op": "a_later_op"})).is_err());
+        assert!(
+            serde_json::from_value::<Request>(json!({"op": "status", "later_field": 1})).is_err()
+        );
+    }
+
     #[test]
     fn malformed_snapshots_fail_closed_before_writing() {
         let (mut engine, memory) = opened();
@@ -3569,11 +3918,12 @@ mod tests {
             .unwrap();
         let original: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        for variant in 0..9 {
+        // A newer `schema`, a field this build does not know, and a receipt
+        // that does not hold (7) are read one release forward, not refused
+        // (#1505's tests below).
+        for variant in [2, 3, 4, 5, 6, 8] {
             let mut altered = original.clone();
             match variant {
-                0 => altered["schema"] = json!(2),
-                1 => altered["unexpected"] = json!(true),
                 2 => altered["next_task_id"] = json!(1),
                 3 => altered["tasks"][0]["prepared_digest"] = json!("0".repeat(64)),
                 4 => altered["tasks"][0]["dispatch"]["state"] = json!("prepared"),
@@ -3582,7 +3932,6 @@ mod tests {
                     altered["tasks"][0]["observations"][0]["speech"]["text_digest"] =
                         json!("0".repeat(64))
                 }
-                7 => altered["last_receipt"]["response"]["claim_id"] = json!(999),
                 _ => altered["tasks"][0]["read"]["observation_id"] = json!(999),
             }
             let memory = Memory::default();
