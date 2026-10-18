@@ -680,40 +680,116 @@ fn staff_from(answer: &Value) -> Option<Vec<Member>> {
     Some(staff)
 }
 
-/// Read the staff from the tasks part: once now, briefly, and then every
-/// 30 s on a thread of its own, so that opening a session waits for
-/// nobody. Only with [`WHO_FLAG`], once per process. A read that fails
-/// keeps what was known.
-pub fn start(place: &Place) {
-    if !place.who || READING.set(()).is_err() {
-        return;
+/// Every target in the tasks part's answer to `targets`, alias and engine,
+/// in its order: unlike [`staff_from`], two of one engine are both kept, so
+/// they can be counted (#1390). Aliases that aren't plain are left out.
+fn targets_from(answer: &Value) -> Option<Vec<(String, String)>> {
+    if answer.get("ok") != Some(&json!(true)) {
+        return None;
     }
-    let socket = place.directory.join("request.sock");
-    read_staff(&socket, FIRST_READ);
-    let spawned = std::thread::Builder::new()
-        .name("lamp-voice-staff".into())
-        .spawn(move || {
-            loop {
-                std::thread::sleep(READ_AGAIN);
-                read_staff(&socket, crate::tools::ASK_DEADLINE);
-            }
-        });
-    if spawned.is_err() {
-        eprintln!("lamp-voice provider: no thread to read who work can go to; read once");
+    Some(
+        answer
+            .get("targets")?
+            .as_array()?
+            .iter()
+            .filter_map(|target| {
+                let (name, engine) = (target["alias"].as_str()?, target["engine"].as_str()?);
+                (alias(name) && alias(engine)).then(|| (name.to_owned(), engine.to_owned()))
+            })
+            .collect(),
+    )
+}
+
+/// "'office' (claude), 'laptop' (codex)", or "none", for the journal:
+/// aliases and engines only, never a machine or project.
+fn listed(targets: &[(String, String)]) -> String {
+    if targets.is_empty() {
+        return "none".to_owned();
+    }
+    targets
+        .iter()
+        .map(|(name, engine)| format!("'{name}' ({engine})"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// What becomes of a hand-over whose target the tasks part doesn't have.
+#[derive(Debug, PartialEq, Eq)]
+enum Missing {
+    /// The one target of the engine asked for: the work goes there.
+    Use(String),
+    /// None of that engine, or more than one to choose between.
+    NotSetUp,
+    /// Who is there couldn't be read: answered as any other refusal.
+    Unread,
+}
+
+/// The tasks part refused `asked` as no target of its own (#1390). On
+/// lamp-4ace on 18 Oct its targets file changed under the voice, which went
+/// on asking for `office-claude` while only `office` was there, and the
+/// person heard "I can't reach Claude Code". Who is there is read once, kept
+/// as the staff, and said in the journal. With exactly one target of the
+/// `engine` asked for, the work goes there: it is the only place it could
+/// go, and the read-back and the person's yes still come first. Otherwise
+/// the model is told it isn't set up, never that it can't be reached. A
+/// named member is never swapped for another engine.
+fn missing_target(
+    place: &Place,
+    request: u64,
+    asked: &str,
+    engine: &str,
+    deadline: Duration,
+) -> Missing {
+    let Some(there) = ask(
+        &place.directory.join("request.sock"),
+        &json!({"op":"targets"}),
+        deadline,
+    )
+    .as_ref()
+    .and_then(|answer| {
+        // Kept as the staff only where the staff are used ([`WHO_FLAG`]).
+        if place.who
+            && let Some(staff) = staff_from(answer)
+        {
+            keep_staff(staff);
+        }
+        targets_from(answer)
+    }) else {
+        return Missing::Unread;
+    };
+    eprintln!(
+        "lamp-voice provider: request {request}: no target '{asked}' in the tasks part; it has {}",
+        listed(&there)
+    );
+    let same: Vec<&String> = there
+        .iter()
+        .filter(|(_, kind)| kind == engine)
+        .map(|(name, _)| name)
+        .collect();
+    match same.as_slice() {
+        [one] if *one == asked => Missing::Unread,
+        [one] => {
+            eprintln!(
+                "lamp-voice provider: request {request}: using '{one}', the only {engine} target"
+            );
+            Missing::Use((*one).clone())
+        }
+        _ => Missing::NotSetUp,
     }
 }
 
-fn read_staff(socket: &Path, deadline: Duration) {
-    let Some(read) = crate::tools::exchange_up_to(
-        socket,
-        &json!({"op":"targets"}),
-        deadline,
-        crate::tools::MAX_TASKS_ANSWER_BYTES,
-    )
-    .as_ref()
-    .and_then(staff_from) else {
-        return;
-    };
+/// What the model is told when `who` isn't set up for the lamp: plainly
+/// that, and never that it can't be reached just now (#1390). No place is
+/// named: a home has no "office", and a target's name can be anything.
+fn not_set_up(who: &str) -> Value {
+    json!({"error": format!(
+        "{who} isn't set up for the lamp yet, so this can't be handed over. \
+         Say so plainly in a few words: it needs setting up on the computer first."
+    )})
+}
+
+/// The staff as read now, kept, with a journal line when it changed.
+fn keep_staff(read: Vec<Member>) {
     if let Ok(mut known) = STAFF.lock()
         && *known != read
     {
@@ -730,6 +806,77 @@ fn read_staff(socket: &Path, deadline: Duration) {
             }
         );
         *known = read;
+    }
+}
+
+/// The journal line for `target` missing from the tasks part's targets
+/// `there`, once per change of them: `seen` is what was read last (#1390).
+fn missing_line(
+    seen: &mut Option<Vec<(String, String)>>,
+    there: Vec<(String, String)>,
+    target: &str,
+) -> Option<String> {
+    if seen.as_ref() == Some(&there) {
+        return None;
+    }
+    let line = (!there.iter().any(|(name, _)| name == target)).then(|| {
+        format!(
+            "lamp-voice provider: no target '{target}' in the tasks part; it has {}",
+            listed(&there)
+        )
+    });
+    *seen = Some(there);
+    line
+}
+
+/// The targets the reader last saw, so that a target the voice was set to
+/// and the tasks part lacks is said once per change (#1390).
+static TARGETS_SEEN: Mutex<Option<Vec<(String, String)>>> = Mutex::new(None);
+
+/// Read the staff from the tasks part: once now, briefly, and then every
+/// 30 s on a thread of its own, so that opening a session waits for
+/// nobody. Only with [`WHO_FLAG`], once per process. A read that fails
+/// keeps what was known.
+pub fn start(place: &Place) {
+    if !place.who || READING.set(()).is_err() {
+        return;
+    }
+    let socket = place.directory.join("request.sock");
+    let target = place.target.clone();
+    read_staff(&socket, &target, FIRST_READ);
+    let spawned = std::thread::Builder::new()
+        .name("lamp-voice-staff".into())
+        .spawn(move || {
+            loop {
+                std::thread::sleep(READ_AGAIN);
+                read_staff(&socket, &target, crate::tools::ASK_DEADLINE);
+            }
+        });
+    if spawned.is_err() {
+        eprintln!("lamp-voice provider: no thread to read who work can go to; read once");
+    }
+}
+
+fn read_staff(socket: &Path, target: &str, deadline: Duration) {
+    let Some(answer) = crate::tools::exchange_up_to(
+        socket,
+        &json!({"op":"targets"}),
+        deadline,
+        crate::tools::MAX_TASKS_ANSWER_BYTES,
+    ) else {
+        return;
+    };
+    let Some(read) = staff_from(&answer) else {
+        return;
+    };
+    keep_staff(read);
+    // The target the voice was set to, missing from the tasks part: said
+    // once per change of its targets, before anyone asks (#1390).
+    if let Some(there) = targets_from(&answer)
+        && let Ok(mut seen) = TARGETS_SEEN.lock()
+        && let Some(line) = missing_line(&mut seen, there, target)
+    {
+        eprintln!("{line}");
     }
 }
 
@@ -954,11 +1101,35 @@ fn run_for(
             let Some(guard) = guard(&status, format!("voice-{request}-prepare-{}", nonce())) else {
                 return (unreached(place), false);
             };
-            let prepared = ask_until_sure(
+            let mut prepared = ask_until_sure(
                 &place.directory.join("request.sock"),
                 &json!({"op":"prepare","guard":guard,"text":task,"target":target}),
                 left,
             );
+            // The tasks part has no such target (#1390): its targets changed
+            // under the voice, or the voice was set to a name it lacks.
+            if prepared
+                .as_ref()
+                .is_some_and(|answer| answer.get("error") == Some(&json!("target")))
+            {
+                let engine = member.map_or("claude", |member| member.kind.engine);
+                match missing_target(place, request, target, engine, left()) {
+                    Missing::Use(other) => {
+                        let Some(again) =
+                            self::guard(&status, format!("voice-{request}-prepare-{}", nonce()))
+                        else {
+                            return (unreached(place), false);
+                        };
+                        prepared = ask_until_sure(
+                            &place.directory.join("request.sock"),
+                            &json!({"op":"prepare","guard":again,"text":task,"target":other}),
+                            left,
+                        );
+                    }
+                    Missing::NotSetUp => return (not_set_up(who), true),
+                    Missing::Unread => {}
+                }
+            }
             match prepared {
                 Some(answer) if answer.get("ok") == Some(&json!(true)) => {
                     let (Some(id), Some(digest)) = (
@@ -1461,6 +1632,261 @@ mod tests {
 
     /// Held by each test that prepares and confirms: they share [`PENDING`].
     static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
+
+    /// Held by each test that writes or reads the shared [`STAFF`].
+    static STAFF_HELD: Mutex<()> = Mutex::new(());
+
+    /// The reviewer on #1446: a named member keeps its own engine through
+    /// `run`. Codex is named, its `office-codex` is gone, and only `office`
+    /// (claude) is there: Codex isn't set up, and nothing is prepared on
+    /// Claude Code. With `LAMP_TASKS_WHO`, who is there becomes the staff;
+    /// without it, the staff stay as they were.
+    #[test]
+    fn a_named_member_whose_target_is_gone_keeps_its_engine_through_run() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _staff = STAFF_HELD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-named-{}", std::process::id()));
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let office = json!({"ok":true,"targets":[{"alias":"office","engine":"claude"}]});
+        let call = ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({"task":"Write hello.txt","who":"Codex"}),
+        };
+        *STAFF.lock().unwrap() = two();
+        for who in [true, false] {
+            let _ = std::fs::remove_dir_all(&directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            let mut answers = vec![
+                ("request.sock", status.clone()),
+                ("request.sock", json!({"ok":false,"error":"target"})),
+                ("request.sock", office.clone()),
+            ];
+            if !who {
+                // Without the switch nobody is named: Claude Code's one
+                // target is prepared.
+                answers.push((
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+                ));
+            }
+            let seen = tasks_part(&directory, answers);
+            let place = Place {
+                target: "office-claude".into(),
+                ..place(&directory, who)
+            };
+            let (told, answered) = run_for(&place, &two(), &call, 3, true, PEER_WAIT);
+            assert!(answered, "{told}");
+            let ops: Vec<Value> = seen.try_iter().collect();
+            if who {
+                assert_eq!(ops[1]["target"], "office-codex");
+                assert_eq!(
+                    told["error"],
+                    "Codex isn't set up for the lamp yet, so this can't be handed over. \
+                     Say so plainly in a few words: it needs setting up on the computer first."
+                );
+                assert_eq!(ops.len(), 3, "nothing prepared after: {ops:?}");
+                assert_eq!(*STAFF.lock().unwrap(), vec![member("office", "claude")]);
+                *STAFF.lock().unwrap() = two();
+            } else {
+                assert_eq!(ops[1]["target"], "office-claude");
+                assert_eq!(ops[3]["target"], "office");
+                assert_eq!(*STAFF.lock().unwrap(), two(), "the staff stay as they were");
+            }
+            if let Ok(mut pending) = PENDING.lock() {
+                *pending = None;
+            }
+        }
+        STAFF.lock().unwrap().clear();
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// #1390, lamp-4ace on 18 Oct: the voice asked for `office-claude`, and
+    /// the tasks part had only `office`. A `target` refusal reads who is
+    /// there once. The one target of the engine asked for is prepared
+    /// instead. With none of that engine, or two to choose between, the
+    /// model is told plainly that it isn't set up, never "can't reach it".
+    /// Any other refusal is answered as before, with nothing read.
+    #[test]
+    fn a_target_the_tasks_part_lacks_is_answered_from_who_is_there() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-target-{}", std::process::id()));
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let refused = |code: &str| json!({"ok":false,"error":code});
+        let there = |targets: Value| json!({"ok":true,"targets":targets});
+        let prepared = json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1});
+        let call = ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({"task":"Write hello.txt"}),
+        };
+        let place = Place {
+            directory: directory.clone(),
+            target: "office-claude".into(),
+            who: false,
+            lead_in: false,
+            asked: false,
+            needs: None,
+            staff_note: false,
+        };
+        let not_set_up = "Claude Code isn't set up for the lamp yet, so this can't be handed over. \
+                          Say so plainly in a few words: it needs setting up on the computer first.";
+        let cases = [
+            (
+                vec![
+                    status.clone(),
+                    refused("target"),
+                    there(
+                        json!([{"alias":"office","engine":"claude"},{"alias":"laptop","engine":"codex"}]),
+                    ),
+                    prepared.clone(),
+                ],
+                Some("office"),
+            ),
+            (
+                vec![
+                    status.clone(),
+                    refused("target"),
+                    there(json!([{"alias":"laptop","engine":"codex"}])),
+                ],
+                None,
+            ),
+            (
+                vec![
+                    status.clone(),
+                    refused("target"),
+                    there(
+                        json!([{"alias":"desk","engine":"claude"},{"alias":"office","engine":"claude"}]),
+                    ),
+                ],
+                None,
+            ),
+        ];
+        for (answers, used) in cases {
+            let _ = std::fs::remove_dir_all(&directory);
+            std::fs::create_dir_all(&directory).unwrap();
+            let seen = tasks_part(
+                &directory,
+                answers
+                    .into_iter()
+                    .map(|answer| ("request.sock", answer))
+                    .collect(),
+            );
+            let (told, answered) = run(&place, &call, 3, true, PEER_WAIT);
+            let ops: Vec<Value> = seen.try_iter().collect();
+            assert!(answered, "{told} {ops:?}");
+            assert_eq!(ops[1]["target"], "office-claude");
+            assert_eq!(ops[2], json!({"op":"targets"}));
+            match used {
+                Some(alias) => {
+                    assert_eq!(told["prepared"], true, "{told}");
+                    assert_eq!(ops[3]["op"], "prepare");
+                    assert_eq!(ops[3]["target"], alias);
+                    assert_ne!(ops[3]["guard"]["request_id"], ops[1]["guard"]["request_id"]);
+                }
+                None => {
+                    assert_eq!(told, json!({"error": not_set_up}));
+                    assert_eq!(ops.len(), 3, "nothing prepared after: {ops:?}");
+                }
+            }
+        }
+        // The target is listed again by the time it's read (the tasks part
+        // came back with it): nothing is prepared twice, and the answer is
+        // today's (Tests on #1446).
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status.clone()),
+                ("request.sock", refused("target")),
+                (
+                    "request.sock",
+                    there(json!([{"alias":"office-claude","engine":"claude"}])),
+                ),
+            ],
+        );
+        let (told, _) = run(&place, &call, 3, true, PEER_WAIT);
+        assert_eq!(
+            told,
+            json!({"error": "The work could not be prepared just now."})
+        );
+        assert_eq!(seen.try_iter().count(), 3);
+        // Another refusal: today's answer, and who is there is not read.
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status),
+                ("request.sock", refused("bad_text")),
+            ],
+        );
+        let (told, _) = run(&place, &call, 3, true, PEER_WAIT);
+        assert_eq!(
+            told,
+            json!({"error": "The work could not be prepared just now."})
+        );
+        assert_eq!(seen.try_iter().count(), 2);
+        if let Ok(mut pending) = PENDING.lock() {
+            *pending = None;
+        }
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// #1390: the staff reader says a target the voice was set to and the
+    /// tasks part lacks once per change of its targets, not at every read.
+    #[test]
+    fn a_missing_set_target_is_said_once_per_change_of_the_targets() {
+        let office = || vec![("office".to_owned(), "claude".to_owned())];
+        let mut seen = None;
+        let line = missing_line(&mut seen, office(), "office-claude");
+        assert_eq!(
+            line.as_deref(),
+            Some(
+                "lamp-voice provider: no target 'office-claude' in the tasks part; it has 'office' (claude)"
+            )
+        );
+        assert_eq!(missing_line(&mut seen, office(), "office-claude"), None);
+        let mut both = office();
+        both.push(("office-claude".to_owned(), "claude".to_owned()));
+        assert_eq!(missing_line(&mut seen, both, "office-claude"), None);
+        assert!(missing_line(&mut seen, office(), "office-claude").is_some());
+    }
+
+    /// A named member whose target is gone is never swapped for another
+    /// engine: with only a Claude Code target there, Codex isn't set up.
+    #[test]
+    fn a_missing_target_is_never_taken_by_another_engine() {
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-engine-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let _seen = tasks_part(
+            &directory,
+            vec![(
+                "request.sock",
+                json!({"ok":true,"targets":[{"alias":"office","engine":"claude"}]}),
+            )],
+        );
+        let place = place(&directory, false);
+        assert_eq!(
+            missing_target(&place, 3, "laptop", "codex", PEER_WAIT),
+            Missing::NotSetUp
+        );
+        assert_eq!(listed(&[]), "none");
+        let _ = std::fs::remove_dir_all(&directory);
+    }
 
     #[test]
     fn a_task_is_prepared_on_the_request_socket_and_started_only_on_the_voice_socket_after_a_yes() {
@@ -2517,6 +2943,9 @@ mod tests {
 
     #[test]
     fn the_staff_read_from_the_tasks_part_are_what_the_next_session_is_told_of() {
+        let _staff = STAFF_HELD
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let directory = std::env::temp_dir().join(format!("agent-staff-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
@@ -2532,9 +2961,9 @@ mod tests {
             ],
         );
         let socket = directory.join("request.sock");
-        read_staff(&socket, PEER_WAIT);
+        read_staff(&socket, DEFAULT_TARGET, PEER_WAIT);
         assert_eq!(seen.recv().unwrap(), json!({"op":"targets"}));
-        read_staff(&socket, PEER_WAIT);
+        read_staff(&socket, DEFAULT_TARGET, PEER_WAIT);
         assert_eq!(seen.recv().unwrap(), json!({"op":"targets"}));
         let on = place(&directory, true);
         let told = tools(&on);

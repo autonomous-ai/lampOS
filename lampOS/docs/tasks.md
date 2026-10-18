@@ -624,6 +624,30 @@ office iMac's speaker about 60 cm away.
   tasks part may take 3.5 s in all (`agent_tasks::DEADLINE`), where the
   other parts get 1.5 s. A refusal of any other kind is told to the model
   as before, and a journal line gives its code, never the task's words.
+- **A target the tasks part doesn't have** (#1390). On lamp-4ace on 18 Oct
+  an install rewrote `targets.json` and restarted the tasks part (which reads
+  it only as it starts) under a running voice. The voice went on asking for
+  `office-claude` while only `office` was there: with `LAMP_TASKS_WHO` until
+  its next staff read, at most 30 s later; without it, until the voice
+  restarts. The person heard
+  "I can't reach Claude Code at the moment", and the journal had only
+  `(target, 18 ms in)`. Now a `target` refusal has the voice read
+  `{"op":"targets"}` once. With the switch below it also keeps that as the
+  staff, so the next hand-over and session name who is there now. Then:
+  - **The journal, always:** `lamp-voice provider: request N: no target
+    'office-claude' in the tasks part; it has 'office' (claude)`, with
+    aliases and engines only.
+  - **Exactly one target of the engine asked for** (the named member's, or
+    Claude Code's with nobody named): the work is prepared there, and the
+    journal says `using 'office', the only claude target`. It's the only
+    place it could go, and the read-back and the person's yes still come
+    first. A named member is never swapped for another engine.
+  - **None of that engine, or two or more:** nothing more is prepared, and
+    the model is told "Claude Code isn't set up for the lamp yet, so this
+    can't be handed over. Say so plainly in a few words: it needs setting up
+    on the computer first", with the engine's own name. It names no place:
+    a home has no "office". It's never told "can't reach it now".
+  - **If the targets can't be read,** it's answered as any other refusal.
 - **A call made before the request was whole.** "…learns to sing, in five
   chapters…" was ended at its comma after 400 ms. The call the model made
   for the first piece was answered as not done (`UnownedToolCall`, above).
@@ -1258,7 +1282,12 @@ before it binds a task, is not seen: a receipt that does not leaves the task
   with other targets, is seen by the next session, and opening a session
   waits for nobody. A failed read keeps what was known. The journal says
   `lamp-voice provider: work can go to Claude Code (office-claude), Codex
-  (office-codex)` when it changes.
+  (office-codex)` when it changes. When the target it was given
+  (`LAMP_TASKS_TARGET`) isn't among them, it says so once per change of the
+  targets: `lamp-voice provider: no target 'office-claude' in the tasks
+  part; it has 'office' (claude)`. So a setup or update that changes
+  `targets.json` shows before anyone asks (#1390). Without the switch the
+  staff aren't read, and only a refusal reads the targets.
 - The staff are the first target of each engine, in alias order (one per
   engine: a second machine with the same engine is not offered yet). With
   two or more, `start_agent_task` takes `who`, an enum of their names, and
