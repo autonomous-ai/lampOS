@@ -1536,7 +1536,6 @@ fn quiet_owner() -> Controller {
     owner
 }
 
-/// A tap whose last step is 20 ms old when the loop first polls it.
 /// The first builder's 21:37 on #705, for #1592: a frame the capture gives
 /// marks the run heard where the conversation reads it (`heard_a_frame`), so
 /// its fault keeps the guard. The same run with no frame releases it.
@@ -1573,6 +1572,7 @@ fn a_frame_the_conversation_reads_marks_the_run_heard() {
     let _ = fs::remove_dir_all(&directory);
 }
 
+/// A tap whose last step is 20 ms old when the loop first polls it.
 fn head_tap() -> HandControls {
     HandControls::with_test_tap("test-hand-clock", monotonic_us() - 420_000).unwrap()
 }
