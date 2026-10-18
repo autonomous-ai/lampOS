@@ -4536,6 +4536,20 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#1522, queue 16's day lines:** the first builder's mapping was one request off. With mine (21:44), confirmed at 21:45: "warmer" was a `look_up`, which #1618 plays; "what do you see" was `NOT_THE_LAMPS`, the cost; "green" was the strict busy rule.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-18, 22:53 ICT: #1618 and #1625 merged; #829's three answers; the voice check's fix gating
+
+- **Merged:**
+  - #1618 (22:08): #1522's three fixes, folded and rebased.
+  - #1625 (22:45): Jarvis's P3, a test through the worker's loop that a reminder rung into a busy room is no answer. Its first version passed under the mutation, because the worker set the room's switches after the test made the room; the room is made after `ready()` now.
+- **#1617** (the reviewer's two P3s on #1602): no findings, waiting on ARM64.
+- **#829, the same-voice A/B** (the journal and the session's events, paired per turn):
+  - **The cause:** every scene's call was admitted while the line before it, left unanswered, still had its turn open (`over_the_lamp: replacing`), and so was never printed. 64 lines were begun so, none printed, 63 silent; 55 began with nothing in hand, 52 printed. The conversation then took the next speaker's voice: Samantha's "tomorrow" and "Pepper".
+  - **The three answers:** the 11 "no voice known" are the first line after each unprinted call. Daniel against Samantha scored 0.14 and 0.18; Samantha against herself 0.48–0.60; 8 of 8 verdicts right. "More popular" was held as another voice against "Pepper".
+  - My two hypotheses (a merged request, a late other voice) are withdrawn.
+  - **The fix,** with the first builder's yes (22:44): the check takes `over_the_lamps_voice`, behind `LAMP_SAME_VOICE_MODEL`. Scenes 1 and 5 through the worker's loop, and the mutation is caught. On `fourth/voice-over-silent` at `af5c1f45f`, gate running; the first builder's A/B on it after queue 22d.
+- **#1522's day lines:** the first builder's request mapping was one off; the corrected reading is on #1522, and the summary draft's item 10 was corrected.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
