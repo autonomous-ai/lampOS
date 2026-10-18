@@ -33,3 +33,11 @@ for the elbow and cable check, starts the body through the operator's
 `body-integration.sh` and prints `lamp-body exit-report`. It never writes to a
 servo: the torque off and on for the shoulder and elbow are the operator's
 manual steps. Run it with `--dry-run` first to see every command.
+
+`eyes-cost.sh [SECONDS [INTERVAL]]` (default 1200 and 10) is read-only: every
+INTERVAL seconds it prints lamp-eyes' CPU (% of one core, from
+`/proc/<pid>/stat`), the core it last ran on, the hottest thermal zone and the
+mesh's runs (the journal's `lamp-eyes: mouth open` lines), then a summary. It
+is for #720's mesh switches (`--mouth-on-heard`, `--mouth-runtime`): run it
+once with them off and once with them on, in the same empty room. It can be
+run without copying it to the lamp: `ssh LAMP 'sh -s 1200 10' < eyes-cost.sh`.
