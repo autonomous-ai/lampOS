@@ -1007,10 +1007,13 @@ fn waiting_with_a_due_reminder(
 ) -> (Vec<String>, Vec<(lamp_msgs::Level, String, bool)>) {
     use crate::service_privacy::WaitOutcome;
     use lamp_msgs::Diagnostic;
+    // Named by a count, not the clock: two tests reached here in the same
+    // microsecond, shared one bus and heard each other's reports (#1569).
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let root = std::path::PathBuf::from(format!(
         "/tmp/lvo-{}-{}",
         std::process::id(),
-        monotonic_us()
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(&root).unwrap();
