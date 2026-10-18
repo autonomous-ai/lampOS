@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "usage: lamp-policy-replay --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,YYYY-MM-DD...] --models NAME[,NAME...] [--labels ABSOLUTE_FILE] [--only-labelled] [--endpoint URL] [--deadline-ms 10000] [--pace-ms 500] [--most N]\n       lamp-policy-replay --again ABSOLUTE_FILE --labels ABSOLUTE_FILE [--refit [--cost-ratio N]]\n       lamp-policy-replay --pictures --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,...] [--labels ABSOLUTE_FILE]\n       lamp-policy-replay --agreement --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,...] [--from YYYY-MM-DDTHH:MM:SSZ] [--until YYYY-MM-DDTHH:MM:SSZ]";
+const USAGE: &str = "usage: lamp-policy-replay --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,YYYY-MM-DD...] --models NAME[,NAME...] [--labels ABSOLUTE_FILE] [--only-labelled] [--endpoint URL] [--deadline-ms 10000] [--pace-ms 500] [--most N]\n       lamp-policy-replay --again ABSOLUTE_FILE --labels ABSOLUTE_FILE [--refit [--cost-ratio N]]\n       lamp-policy-replay --pictures --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,...] [--labels ABSOLUTE_FILE]\n       lamp-policy-replay --agreement --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,...] [--from YYYY-MM-DDTHH:MM:SSZ] [--until YYYY-MM-DDTHH:MM:SSZ]\n       lamp-policy-replay --probe-connections --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,...] --endpoint URL [--models NAME] [--deadline-ms 10000] [--rounds N]";
 const HELP: &str = "Asks each attention decision in the decisions logs of the days given again, of each\n\
 model given in turn (at most four), as it was asked on the day, and prints one line per\n\
 decision and a summary: each model's choice, probability and time, and the kinds of what\n\
@@ -32,6 +32,12 @@ context, counted by kind (room, conversation, the lamp speaking, the name's scor
 the kinds of at least 20 decisions with no disagreement; it asks nothing (#705). --from and\n\
 --until (UTC) keep only the decisions made from and before those moments: a night held out\n\
 from the days its kinds were picked on.\n\
+--probe-connections takes the newest logged question a model decided, asks it seven ways,\n\
+about 17 minutes and seven askings a round, and prints one line each as it is made with\n\
+what it was sent on (new, kept, ahead, replaced) and how long it took: a new connection\n\
+after 5 quiet minutes and at once, the same one at once, after 140 s and after 300 s, and\n\
+one made ahead at once and after 5 quiet minutes (#1522). --endpoint is required: the one\n\
+lamp-policy asks. --rounds (1 to 3, default 1) repeats it. Run it with the room quiet.\n\
 What was heard is sent to the decision model's service again, as on the day.";
 
 #[derive(Debug, PartialEq)]
@@ -51,6 +57,17 @@ enum Run {
         log: PathBuf,
         days: Vec<String>,
         labels: Option<PathBuf>,
+    },
+    /// One logged question asked seven ways, to time each kind of
+    /// connection (#1522).
+    Probe {
+        key: PathBuf,
+        log: PathBuf,
+        days: Vec<String>,
+        endpoint: String,
+        model: String,
+        deadline: Duration,
+        rounds: u32,
     },
     /// The rule beside the model on these days' decisions (#705).
     Agreement {
@@ -113,6 +130,8 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Option<Run>, String> {
     let mut again = None;
     let mut pictures = false;
     let mut agreement = false;
+    let mut probe = false;
+    let mut rounds = None;
     let (mut from, mut until) = (None, None);
     let mut only_labelled = false;
     let mut refit = false;
@@ -137,6 +156,10 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Option<Run>, String> {
         }
         if option == "--agreement" {
             agreement = true;
+            continue;
+        }
+        if option == "--probe-connections" {
+            probe = true;
             continue;
         }
         if option == "--refit" {
@@ -180,6 +203,7 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Option<Run>, String> {
             "--deadline-ms" => deadline = number(&value, 1, 60_000)?,
             "--pace-ms" => pace = number(&value, 0, 10_000)?,
             "--most" => most = Some(number(&value, 1, 100_000)? as usize),
+            "--rounds" => rounds = Some(number(&value, 1, 3)? as u32),
             "--cost-ratio" => {
                 cost = Some(
                     value
@@ -191,6 +215,44 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Option<Run>, String> {
             }
             _ => return Err(format!("{option} is not an option")),
         }
+    }
+    if rounds.is_some() && !probe {
+        return Err("--rounds goes with --probe-connections only".into());
+    }
+    if probe {
+        if agreement
+            || pictures
+            || again.is_some()
+            || labels.is_some()
+            || only_labelled
+            || refit
+            || cost.is_some()
+            || from.is_some()
+            || until.is_some()
+            || most.is_some()
+            || seen.contains("--pace-ms")
+        {
+            return Err("--probe-connections takes --key-file, --log-dir, --days, --endpoint, --models, --deadline-ms and --rounds only".into());
+        }
+        // Only where lamp-policy itself asks: the default is not the
+        // lamp's (the reviewer on #1630).
+        if !seen.contains("--endpoint") {
+            return Err("--probe-connections needs --endpoint, the one lamp-policy asks".into());
+        }
+        let model = match models {
+            None => lamp_policy::decide::DEFAULT_MODEL.to_owned(),
+            Some(models) if models.len() == 1 => models[0].clone(),
+            Some(_) => return Err("--probe-connections asks one model".into()),
+        };
+        return Ok(Some(Run::Probe {
+            key: key.ok_or("--key-file is required")?,
+            log: log.ok_or("--log-dir is required")?,
+            days: days.ok_or("--days is required")?,
+            endpoint,
+            model,
+            deadline: Duration::from_millis(deadline),
+            rounds: rounds.unwrap_or(1),
+        }));
     }
     // A window means something only to `--agreement` (the reviewer on #1539).
     if !agreement && (from.is_some() || until.is_some()) {
@@ -347,6 +409,49 @@ fn run(arguments: &Arguments) -> io::Result<()> {
     stdout.flush()
 }
 
+/// `--probe-connections` (#1522): the newest logged question a model
+/// decided, asked seven ways; a line each as it is made.
+fn probe(
+    key: &Path,
+    log: &Path,
+    days: &[String],
+    endpoint: &str,
+    model: &str,
+    deadline: Duration,
+    rounds: u32,
+) -> io::Result<()> {
+    let mut judge = Jev::new(endpoint, model, key)?;
+    let (logged, _) = replay::read(log, days)?;
+    let question = replay::newest_asked(&logged).ok_or_else(|| {
+        io::Error::other("no attention decision a model made in those days' logs")
+    })?;
+    eprintln!(
+        "lamp-policy-replay: {} asked seven ways, {rounds} round(s), about {} minutes",
+        question.id,
+        rounds * 18
+    );
+    let mut written = Ok(());
+    replay::probe_connections(
+        &mut judge,
+        question,
+        deadline,
+        rounds,
+        &mut |wait| {
+            if !wait.is_zero() {
+                eprintln!("lamp-policy-replay: nothing asked for {} s", wait.as_secs());
+                thread::sleep(wait);
+            }
+        },
+        &mut |line| {
+            if written.is_ok() {
+                let mut stdout = io::stdout().lock();
+                written = writeln!(stdout, "{line}").and_then(|()| stdout.flush());
+            }
+        },
+    );
+    written
+}
+
 fn main() -> ExitCode {
     match parse(std::env::args().skip(1)) {
         Ok(None) => {
@@ -355,6 +460,15 @@ fn main() -> ExitCode {
         }
         Ok(Some(chosen)) => match match &chosen {
             Run::Ask(arguments) => run(arguments),
+            Run::Probe {
+                key,
+                log,
+                days,
+                endpoint,
+                model,
+                deadline,
+                rounds,
+            } => probe(key, log, days, endpoint, model, *deadline, *rounds),
             Run::Again {
                 lines,
                 labels,
@@ -389,10 +503,48 @@ mod tests {
     fn of(line: &str) -> Result<Option<Arguments>, String> {
         match parse(line.split_whitespace().map(str::to_owned))? {
             Some(Run::Ask(arguments)) => Ok(Some(arguments)),
-            Some(Run::Again { .. } | Run::Pictures { .. } | Run::Agreement { .. }) => {
-                Err("another run".into())
-            }
+            Some(
+                Run::Again { .. }
+                | Run::Pictures { .. }
+                | Run::Agreement { .. }
+                | Run::Probe { .. },
+            ) => Err("another run".into()),
             None => Ok(None),
+        }
+    }
+
+    /// #1522: the probe takes the key, the logs and the days, one model at
+    /// most (lamp-policy's by default), and nothing that is another run's.
+    #[test]
+    fn the_connection_probe_takes_its_own_options_only() {
+        let probe = |line: &str| parse(line.split_whitespace().map(str::to_owned));
+        let read = probe("--probe-connections --key-file /k --log-dir /d --days 2026-10-18 --endpoint https://campaign-api.autonomous.ai/x --rounds 2").unwrap();
+        // Never without the endpoint lamp-policy asks.
+        assert!(probe("--probe-connections --key-file /k --log-dir /d --days 2026-10-18").is_err());
+        match read {
+            Some(Run::Probe {
+                model,
+                rounds,
+                endpoint,
+                deadline,
+                ..
+            }) => {
+                assert_eq!(model, lamp_policy::decide::DEFAULT_MODEL);
+                assert_eq!(rounds, 2);
+                assert_eq!(endpoint, "https://campaign-api.autonomous.ai/x");
+                assert_eq!(deadline, Duration::from_secs(10));
+            }
+            other => panic!("{other:?}"),
+        }
+        for refused in [
+            "--probe-connections --key-file /k --log-dir /d --days 2026-10-18 --endpoint https://e/x --models a,b",
+            "--probe-connections --key-file /k --log-dir /d --days 2026-10-18 --endpoint https://e/x --rounds 4",
+            "--probe-connections --key-file /k --log-dir /d --days 2026-10-18 --endpoint https://e/x --most 3",
+            "--probe-connections --key-file /k --log-dir /d --days 2026-10-18 --endpoint https://e/x --agreement",
+            "--probe-connections --log-dir /d --days 2026-10-18 --endpoint https://e/x",
+            "--key-file /k --log-dir /d --days 2026-10-18 --models m --rounds 2",
+        ] {
+            assert!(probe(refused).is_err(), "{refused}");
         }
     }
 

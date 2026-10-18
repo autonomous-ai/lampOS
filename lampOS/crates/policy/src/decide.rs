@@ -961,6 +961,19 @@ pub struct Jev {
 }
 
 impl Jev {
+    /// Lets go of the connection kept for the next asking, so that the next
+    /// makes its own (`lamp-policy-replay --probe-connections`, #1522).
+    pub fn forget(&mut self) {
+        self.kept = None;
+    }
+
+    /// Keeps a connection that has answered for `keep` in place of
+    /// [`KEEPING`]'s, to find out whether the other end keeps it that long
+    /// (`lamp-policy-replay --probe-connections`, #1522).
+    pub fn keep_answered_for(&mut self, keep: Duration) {
+        self.keeping.answered = keep;
+    }
+
     /// Jev at `endpoint`, asked for `model`, with the key that is the one
     /// line of `key_file`. A certificate is checked against the roots this
     /// program is built with.
