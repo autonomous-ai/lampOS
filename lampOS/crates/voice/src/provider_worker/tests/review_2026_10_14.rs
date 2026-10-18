@@ -115,6 +115,7 @@ fn in_a_busy_room() -> Options {
         sounds_checked: false,
         ask_unclear: false,
         name_in_passing_ignored: false,
+        remarks: false,
         policy_holds: None,
         follows_run: false,
         wait_for_room: false,
