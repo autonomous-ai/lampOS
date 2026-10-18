@@ -664,6 +664,30 @@ function names: no words heard or said are printed. Records written before
 `voice_tool_call` lines existed still give each turn's first output (a call
 when it came first) and its sound.
 
+Each request the microphone heard is a row: one with an end of speech
+(`local_endpoint`), and one admitted with heard audio
+(`prefix_first_host_read_us`) but cut before its end of speech was decided.
+A cut one is marked `cut`, has no times after an end of speech, and is
+counted apart (`cut`) from the summary's `turns` and medians. The lamp's
+own lines (its hello, a reminder, a look, back online, the head-tap hum)
+are admitted with no heard audio and are no row, so the person's first
+request after one is still the run's first. Each row also says whether it was its run's first
+request admitted (`first_of_run`) and how long nothing went on before it
+(`idle_ms`): from the end of the request before (its `turn_finished`, else
+its first sound, else its end of speech; 0 if the request before had not
+ended yet), or from the run's `listening_ready` for its first; none for a
+first request in a run with no `listening_ready` line. `stalled_ms` is the
+longest `capture_gap` it held. A gap is stamped when it ended and goes to
+one request only, the latest admitted whose window holds it; a window runs
+from admission to `turn_finished`, or, with none, to the next row's
+admission; a run's last request with no `turn_finished` holds every gap to
+the end of its run's records. The summary's `by_idle` keeps a run's
+first requests, requests after at least five idle minutes (`long_idle_ms`)
+and the rest apart, each with its requests, cut ones, answered ones, median
+first sound, stalled ones and longest stall (#1608: the first request after
+about six idle minutes stalled the microphone 135 and 172 ms). It records
+only; nothing the voice does changes.
+
 ## Not shown
 
 Task 31's new fixtures use synthetic provider events, real local Actions and
