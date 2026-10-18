@@ -117,6 +117,7 @@ fn in_a_busy_room() -> Options {
         name_in_passing_ignored: false,
         remarks: false,
         going_on_asks: None,
+        cut_in_told: false,
         policy_holds: None,
         follows_run: false,
         wait_for_room: false,
@@ -240,5 +241,91 @@ async fn review_sound_a_name_heard_as_a_request_began_lets_out_the_answer_the_ru
         rig.output().await,
         ProviderOutput::TurnComplete { .. }
     ));
+    rig.stop().await;
+}
+
+/// The name note on (`NAME_NOTE`, the worker's `--name-note`) for one
+/// test, and off again when dropped, a failed assertion included.
+struct NameNoteOn;
+impl NameNoteOn {
+    fn set() -> Self {
+        NAME_NOTE.store(true, std::sync::atomic::Ordering::Relaxed);
+        Self
+    }
+}
+impl Drop for NameNoteOn {
+    fn drop(&mut self) {
+        NAME_NOTE.store(false, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// #828 (the first builder, 03:52 on 19 October): with `LAMP_CUT_IN_TOLD`,
+/// a cut-in over the lamp's answer that also names the lamp is told both:
+/// a request sends only its newest note, so the name's note, given after
+/// the cut-in's, goes out with it (`add_note`), never in its place.
+#[tokio::test(start_paused = true)]
+async fn review_sound_a_cut_in_that_names_the_lamp_is_told_both_notes_together() {
+    let _clock = logical_clock();
+    let _turn = one_at_a_time().await;
+    let root = Root::new();
+    let _note = NameNoteOn::set();
+    let mut options = in_a_busy_room();
+    options.cut_in_told = true;
+    let mut rig = LiveRig::start_with(quick_policy(), options);
+    let mut dial = rig.ready().await;
+    let began = monotonic_us();
+    let request = rig
+        .speak_as(
+            &mut dial,
+            false,
+            false,
+            StartSays {
+                over_the_lamp: true,
+                over_the_lamps_voice: true,
+                ..StartSays::default()
+            },
+        )
+        .await;
+    dial.service
+        .send(heard("Lamp, what is two plus two?"))
+        .await;
+    assert!(matches!(
+        rig.output().await,
+        ProviderOutput::Transcript { request: None, .. }
+    ));
+    name_heard(&mut rig, &root.0, began + 200_000).await;
+    let owner = rig.snapshot.owner().unwrap();
+    rig.owner.input_ended(real_time(), owner).unwrap();
+    rig.publish();
+    rig.parent
+        .data
+        .send(ProviderInput::End {
+            request,
+            privacy_generation: rig.snapshot.microphone_generation(),
+            sound: false,
+            cut_in: false,
+        })
+        .unwrap();
+    let mut told = Vec::new();
+    loop {
+        let message = rig.service_message(&mut dial).await;
+        if let Some(text) = message["realtimeInput"]["text"].as_str() {
+            told.push(text.to_owned());
+        }
+        if message["realtimeInput"].get("activityEnd").is_some() {
+            break;
+        }
+    }
+    let last = told.last().expect("a note beside the request");
+    assert!(
+        last.contains(crate::cut_in_told::NOTE) && last.contains(crate::called::NOTE),
+        "{told:?}"
+    );
+    assert!(
+        told.iter()
+            .all(|text| !text.contains(crate::called::NOTE)
+                || text.contains(crate::cut_in_told::NOTE)),
+        "the name's note went out without the cut-in's: {told:?}"
+    );
     rig.stop().await;
 }

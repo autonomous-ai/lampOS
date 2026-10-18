@@ -452,6 +452,44 @@ asking is dropped; so is one not begun within 5 s. Otherwise languages written i
 the Latin script are not told apart; outside a conversation nothing changes; on
 the second route nothing is asked again yet.
 
+## A spoken cut-in, told (#828)
+
+On lamp-4ace on 19 October at 02:59 (queue 22f, take 6), "Okay, okay, that
+is enough." was heard right and committed over the lamp's story. The answer
+was the story again, from about where its playback was cut, in new words: a
+new generation, not old audio. A touch or the stop button tells the model
+what it was saying is over (`LAMP_STOP_TOLD`, above). A spoken cut-in told
+it nothing, and with the story cut mid-sentence in its context, "Okay, okay"
+read as "go on". Of the 49 take-6 files since 16 October, 24 were heard
+right (20 acknowledged, 3 silent, this one the story again), and 25 were
+misheard (19 silent, 6 the story went on or something else): the misheard
+ones are `ASK_AGAIN_NOTE`'s case (above).
+
+With `LAMP_CUT_IN_TOLD=on` (the provider worker's `--cut-in-told`, right
+after `--going-on-asks`), the request that commits a spoken cut-in over the
+lamp's own audible answer (its Start's `over_the_lamps_voice`) is told
+beside what is heard, in the form of the lamp's other notes:
+"(For you to know, not to answer: they spoke while you were speaking, and
+you stopped there. Answer what they said; go back to what you were saying
+only if they ask you to.)" (`crate::cut_in_told::NOTE`).
+
+- **Not after a stop:** the first request after a hand or head stop is told
+  the stop instead.
+- **Not over a silent reply:** a line begun while a reply was in hand but
+  made no sound is no cut-in.
+- **One note per request:** a request sends only its newest note, so this one
+  goes with the others due on it, the name heard among them (`add_note`).
+- **The Live route only.** It needs no other switch. Off unless set.
+- **Its cost:** a few words more beside such a request, and nothing waits on
+  it. That the model then answers the cut-in rather than go on is what the
+  ten cut-ins, A/B, three rounds each, will show.
+- **Tests:** `provider_worker::tests::with_the_switch_a_cut_in_over_the_lamps_answer_is_told_so`
+  (told with the switch, not without it, not over a silent reply, the stop's
+  note instead after a stop),
+  `provider_worker::tests::review_2026_10_14::review_sound_a_cut_in_that_names_the_lamp_is_told_both_notes_together`
+  (the name heard too: both notes go out as one), `cut_in_told::tests` and
+  `provider_worker::tests::going_on_asks::cut_in_told_is_read_after_going_on_asks`.
+
 ## An answer with no word in it
 
 Told to stay quiet, the model sometimes says so aloud: an answer whose
