@@ -4404,6 +4404,14 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#1422:** the fix is local on `fourth/thread-lock`. On `lamp-voice`, the target test failed 4 of 10 parallel worker-test runs; with the lock, 0 of 9 whole-lib runs. Other real-time tests fail in parallel runs on both sides; a fair comparison comes before the PR.
 - **Still with the user:** whether my draft PR into the app's repository stands.
 
+## 2026-10-18, 12:40 ICT: #1482 for #1422; #1487, the room after a restart; #1467's review; the backend record
+
+- **#1482** (#1422, tests only): every worker test rig holds one lock on the process's conversation and room. Worker tests run together in parallel: the race test failed 6 of 20 runs on `lamp-voice` and 0 of 10 with the lock. It costs about 20 s per whole-lib parallel run (a median of 141 s against 121). The reviewer has no findings and merges on green. The PR lists the other real-time tests' failures by side, which aren't settled either way.
+- **#1487** (#1465 item 3, the first builder's yes at 12:0x): `LAMP_ROOM_FILE`, off unless set. The room and its clocks go to `/run` within a second of changing and every 30 s, and are taken back at start if from this boot and under five minutes old. Mac gate 2,524 passed, 0 failed. The first builder checks it on lamp-4ace with Eighth's #1474.
+- **#1467** (the reviewer at 12:16: ready, four P3s): all in at `b31e5d18c`. `Voices::at_verdict` gathers the verdict's likeness, its reason and the late flag, never taken at a call, with a test and a mutation. The worker-level case (strict busy form, a name heard in the sound) isn't reachable in the rig. The comments and doc no longer say one speaker's lines fell to 0.14, nor that the 09:34 scene showed a late flag.
+- **The same-voice check** stays off (the first builder, 11:0x): 14.3% equal error with the lamp quiet, chance with it sounding, over every recorded set.
+- **#1396:** the app's Lamp 2 page needs the backend's `lamp-v2` record first, since the page keys everything on the backend's numeric device type. The first builder says I build it (12:1x). Both repos' writes wait on my user's yes, asked again with the owner's words.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
