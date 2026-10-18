@@ -1365,7 +1365,7 @@ fn check(
 
 /// Where a `check_agent_task` answer carries the key of the finished news it
 /// gives (#1390), for the provider worker alone.
-const NEWS_KEY: &str = "news_key";
+pub(crate) const NEWS_KEY: &str = "news_key";
 
 /// The news key in a `check_agent_task` answer `told`, taken out, so that the
 /// model is never told it (#1390).
@@ -1464,7 +1464,7 @@ fn nonce() -> u128 {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::{
         io::{BufRead, BufReader, Write},
@@ -2180,7 +2180,7 @@ mod tests {
 
     /// [`checked`]'s tasks part, ready for one `check`: its place, and what
     /// it was sent, held while it answers.
-    fn serving(
+    pub(crate) fn serving(
         directory: &Path,
         state: &str,
         answer: &str,
@@ -2239,7 +2239,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&directory);
     }
 
-    /// The reviewer on #1427: through the real routes. The Live worker's
+    /// Seventh's peer review on #1427: through the real routes. The Live worker's
     /// asking thread (`provider_worker::answered`) takes the key out of what
     /// its model is told and keeps it; the second voice (`tools::answer`)
     /// takes it out too, and keeps nothing.

@@ -9367,6 +9367,55 @@ mod tests {
         rig.stop().await;
     }
 
+    /// #1427 through the worker's own loop (the reviewer's P3, 18:42): the
+    /// tasks part's answer to "is it done?" carries finished news's key; the
+    /// model is answered without it, and once the answer has gone the
+    /// coordinator is handed the key on the call's own request, for the
+    /// turn that answered it.
+    #[tokio::test]
+    async fn an_answer_with_news_goes_to_the_model_without_its_key_and_its_key_to_the_coordinator()
+    {
+        let directory =
+            std::env::temp_dir().join(format!("worker-news-key-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let (place, _seen) = crate::agent_tasks::tests::serving(
+            &directory,
+            "idle",
+            "Lumi, Sunny and Archie.",
+            false,
+        );
+        let mut rig = LiveRig::start_with(
+            quick_policy(),
+            typed_with(crate::tools::Settings {
+                tasks: Some(place),
+                ..Default::default()
+            }),
+        );
+        let mut dial = rig.ready().await;
+        let request = rig.speak(&mut dial, false, true).await;
+        dial.service
+            .send(function_call("c9", crate::agent_tasks::CHECK))
+            .await;
+        dial.service.send(idle_complete()).await;
+        let told = rig.service_message(&mut dial).await;
+        let response = &told["toolResponse"]["functionResponses"][0]["response"];
+        assert!(
+            response.get(crate::agent_tasks::NEWS_KEY).is_none(),
+            "{told}"
+        );
+        assert_eq!(response["answer"], "Lumi, Sunny and Archie.", "{told}");
+        let handed = loop {
+            match rig.output().await {
+                ProviderOutput::NewsAnswered { request, key } => break (request, key),
+                _ => continue,
+            }
+        };
+        assert_eq!(handed, (request, "s1:2:4".to_owned()));
+        rig.stop().await;
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
     #[tokio::test]
     async fn a_call_for_the_executive_is_asked_over_its_socket_and_its_answer_goes_back() {
         use std::io::{BufRead, Write};

@@ -330,8 +330,11 @@ started once its answer is told:
     - **Not sent:** hand-over and progress news, of no observation; with
       `--close-told` off, `told` is answered `told:false` and writes nothing,
       so the revision a tool's guard read still holds.
-    - **Asked about** (`check_agent_task`): its answer carries the finished
-      news's key, which the provider worker takes out before the model is
+    - **Asked about** (`check_agent_task`): its answer carries the news's
+      key once the agent has settled (`idle`, `needs-input`, `stopped` or
+      `failed`; never `working`, nor `idle` with no answer). Only an `idle`
+      answer that was told is ever closed: lamp-tasks' `close_due` leaves
+      the others open. The provider worker takes the key out before the model is
       told and, once the model has the answer, hands to the coordinator
       (`NewsAnswered`) for that request. It rides on that turn like news
       told unasked, on the same proof. Told before or not: a telling unasked
