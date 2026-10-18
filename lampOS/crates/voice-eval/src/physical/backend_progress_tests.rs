@@ -141,7 +141,19 @@ fn overflow_keeps_a_terminal_error_slot_and_closes_the_real_transport() {
     closed_before_consumption(closed);
     // No queue item has been consumed, yet a waiting relay writer can observe
     // the closed read end instead of remaining blocked behind the full queue.
-    let error = writer.write_all(b"still writing\n").unwrap_err();
+    // A child another test forks at that moment holds a copy of the read end
+    // until its exec (CLOEXEC), so a write may still be taken for a moment
+    // (#1462): it writes until one is refused, for at most `GUARD`.
+    let until = std::time::Instant::now() + GUARD;
+    let error = loop {
+        match writer.write_all(b"still writing\n") {
+            Ok(()) if std::time::Instant::now() < until => {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            Ok(()) => panic!("still written {GUARD:?} after the read end closed"),
+            Err(error) => break error,
+        }
+    };
     assert!(matches!(
         error.kind(),
         io::ErrorKind::BrokenPipe | io::ErrorKind::ConnectionReset | io::ErrorKind::NotConnected
