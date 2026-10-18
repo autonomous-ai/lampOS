@@ -1596,6 +1596,12 @@ impl Attention {
     pub fn names_the_schedule(&self) -> bool {
         crate::going_on_asks::names_the_schedule(&self.heard)
     }
+
+    /// Whether the request in hand answers the lamp's own question, as its
+    /// first output was judged ([`Self::lamp_asked`]).
+    pub fn answers_the_lamps_question(&self) -> bool {
+        self.lamp_asked
+    }
 }
 
 #[cfg(test)]
@@ -2595,12 +2601,31 @@ mod tests {
     /// the lamp (`follows_lamp` 0.66), every other line of the two people's
     /// `stay_quiet` or `look_up` (the first builder on #1522, 15:14).
     fn scene_three_and_four_with(remarks: bool, asks: bool) -> Vec<bool> {
+        scene_three_and_four_after(remarks, asks, 6)
+            .into_iter()
+            .map(|(play, _)| play)
+            .collect()
+    }
+
+    /// The same, the room made busy first by three lines of talk the lamp
+    /// left alone, the last of them `pause_s` seconds before the call, and
+    /// each line judged in the room `RoomTold` gives then (Eighth on #1594:
+    /// the scene had been given a busy room whatever `RoomTold` said).
+    /// Whether each line was played, and in what room.
+    fn scene_three_and_four_after(remarks: bool, asks: bool, pause_s: u64) -> Vec<(bool, Room)> {
         const S: u64 = 1_000_000;
         let start = std::time::Instant::now();
         let at = |us: u64| start + std::time::Duration::from_micros(us);
         let mut thread = crate::thread::Thread::new();
         let mut room = crate::room_told::RoomTold::new();
         room.count_only_talk(true);
+        room.end_busy_once_answered(asks);
+        for (request, before_s) in [(1, 11), (2, 6), (3, 1)] {
+            let began = (100 - pause_s - before_s) * S;
+            room.heard(request, began);
+            room.ended(request, began + S / 2);
+            room.left_unanswered(request, began + S);
+        }
         let mut attention = Attention::default();
         attention.speak_when_spoken_to(true);
         attention.hold_remarks(remarks);
@@ -2637,8 +2662,9 @@ mod tests {
                 };
                 attention.policy_said(request, Some(says));
             }
+            let now = room.at(began + S);
             let verdict = attention
-                .first_output_busy(request, Room::Busy, going_on, true, Some(false))
+                .first_output_busy(request, now, going_on, true, Some(false))
                 .unwrap();
             room.judged(request, Some(verdict), false);
             let play = matches!(verdict, Verdict::Play(_));
@@ -2648,9 +2674,32 @@ mod tests {
             } else {
                 room.left_unanswered(request, began + 2 * S);
             }
-            played.push(play);
+            played.push((play, now));
         }
         played
+    }
+
+    /// Eighth's probe on #1594: two people talk, pause, and one of them calls
+    /// the lamp, as an office minute goes. After a pause of 20 s or of 70 s
+    /// the call and "And what about tomorrow?" are answered and the other
+    /// seven held, every line of scene 3 judged in a busy room. A minute from
+    /// the talk alone would have ended busy at the call made 70 s after it,
+    /// and answered the umbrella, "leave a bit early" and the car.
+    #[test]
+    fn with_both_switches_scene_three_after_a_pause_is_still_judged_in_a_busy_room() {
+        for pause_s in [20, 70] {
+            let judged = scene_three_and_four_after(true, true, pause_s);
+            let played: Vec<bool> = judged.iter().map(|(play, _)| *play).collect();
+            assert_eq!(
+                played,
+                [true, true, false, false, false, false, false, false, false],
+                "{pause_s} s"
+            );
+            assert!(
+                judged[..5].iter().all(|(_, room)| *room == Room::Busy),
+                "{pause_s} s: {judged:?}"
+            );
+        }
     }
 
     /// The first builder on #705 (16:10): on scene 3 and scene 4's opening,

@@ -104,7 +104,7 @@ const QUIET_ENDS_RUN: usize = 2;
 /// thing left unanswered that counts as talk.
 const BUSY_ENDS_AFTER_US: u64 = 180_000_000;
 /// With [`RoomTold::end_busy_once_answered`] as well, busy ends this long
-/// after the last talk once the lamp has answered something since it.
+/// after the lamp's first answer since the last talk.
 const BUSY_ENDS_ONCE_ANSWERED_US: u64 = 60_000_000;
 /// With [`RoomTold::count_only_talk`], this many things said and left
 /// unanswered since the lamp last spoke, and a conversation with it is no
@@ -209,8 +209,7 @@ impl RoomTold {
     }
 
     /// With only talk counted, end a busy room [`BUSY_ENDS_ONCE_ANSWERED_US`]
-    /// after the last talk once the lamp has answered something since it,
-    /// from now on (`LAMP_GOING_ON_ASKS`, the first builder on #1522, 19:08).
+    /// after the lamp's first answer since the last talk, from now on (`LAMP_GOING_ON_ASKS`, the first builder on #1522, 19:08).
     /// People talk, then one of them turns to the lamp: on lamp-4ace at
     /// 18:51 a day line said to the lamp 108 s after two people's talk was
     /// still in a busy room, which the 180 s keep. While people go on
@@ -360,7 +359,14 @@ impl RoomTold {
         self.talk_counted = self.talk_counted.max(request);
         self.quiet_since_us = Some(now_us);
         self.last_sound_us = now_us;
-        self.answered_us = Some(now_us);
+        // The lamp's first answer since the last talk, not its newest: the
+        // minute runs from it (Eighth on #1594).
+        if self
+            .answered_us
+            .is_none_or(|answered| self.last_talk_us.is_some_and(|talk| answered < talk))
+        {
+            self.answered_us = Some(now_us);
+        }
     }
 
     /// The lamp answered `request` by doing something, a light or a timer,
@@ -459,21 +465,23 @@ impl RoomTold {
         } else {
             BUSY_RUN
         };
-        let ends_after = if self.ends_once_answered
-            && self
-                .answered_us
-                .zip(self.last_talk_us)
-                .is_some_and(|(answered, talk)| answered > talk)
-        {
-            BUSY_ENDS_ONCE_ANSWERED_US
-        } else {
-            BUSY_ENDS_AFTER_US
+        // Once the lamp has answered since the last talk, busy ends a minute
+        // after the later of the two: that talk and the lamp's first answer
+        // since it (Eighth on #1594). A minute after the talk alone would end
+        // it at a call made a minute or more after people stopped talking,
+        // and the talk after the call would then be answered as in a room
+        // not known to be busy, which undoes #1522's fix.
+        let busy_until = |talk: u64| match self.answered_us {
+            Some(answered) if self.ends_once_answered && answered > talk => {
+                answered.saturating_add(BUSY_ENDS_ONCE_ANSWERED_US)
+            }
+            _ => talk.saturating_add(BUSY_ENDS_AFTER_US),
         };
         let talk_over = self.talk_only
             && self.room == Room::Busy
             && self
                 .last_talk_us
-                .is_some_and(|talk| now_us.saturating_sub(talk) >= ends_after);
+                .is_some_and(|talk| now_us >= busy_until(talk));
         // With only talk counted: five minutes with no talk between people
         // is a quiet room, whatever one person says to the lamp meanwhile.
         // Without it a room where someone keeps talking to the lamp from
@@ -1490,13 +1498,17 @@ mod tests {
         assert_eq!(take(&flags[1..]), (false, &flags[1..]));
     }
 
-    /// #1522 (the first builder, 19:08): with `LAMP_GOING_ON_ASKS`, once the
-    /// lamp has answered something since two people last talked, their busy
-    /// room ends a minute after that talk, not three; while they go on
+    /// #1522 (the first builder, 19:08; Eighth on #1594): with
+    /// `LAMP_GOING_ON_ASKS`, once the lamp has answered since two people last
+    /// talked, their busy room ends a minute after the lamp's first answer
+    /// since that talk, not three minutes after the talk; while they go on
     /// talking it stays busy. On lamp-4ace at 18:51 a day line 108 s after
-    /// the talk was still in a busy room. Without the switch, three minutes.
+    /// the talk was still in a busy room. A call made more than a minute
+    /// after the talk keeps the room busy for a minute from its answer, so
+    /// the talk after it is still judged in a busy room. Without the switch,
+    /// three minutes.
     #[test]
-    fn with_the_switch_a_busy_room_ends_a_minute_after_its_talk_once_the_lamp_has_answered() {
+    fn with_the_switch_a_busy_room_ends_a_minute_after_the_lamps_first_answer_since_its_talk() {
         const S: u64 = 1_000_000;
         let busy_then_answered = |on: bool| {
             let mut room = RoomTold::new();
@@ -1514,10 +1526,34 @@ mod tests {
             room.spoke(4, 38 * S);
             room
         };
-        // The last talk was left at 31 s.
+        // The last talk was left at 31 s, the lamp's first answer since it
+        // came at 38 s: busy until a minute after that.
         let mut room = busy_then_answered(true);
-        assert_eq!(room.at(90 * S), Room::Busy);
-        assert_eq!(room.at(92 * S), Room::Quiet);
+        assert_eq!(room.at(97 * S), Room::Busy);
+        assert_eq!(room.at(99 * S), Room::Quiet);
+        // A later answer doesn't move it: the first one counts.
+        let mut room = busy_then_answered(true);
+        room.heard(6, 60 * S);
+        room.ended(6, 61 * S);
+        room.spoke(6, 62 * S);
+        assert_eq!(room.at(99 * S), Room::Quiet);
+        // A call answered 70 s after the talk (Eighth's probe): still busy
+        // at it and for a minute after, not quiet from the answer on.
+        let mut room = RoomTold::new();
+        room.count_only_talk(true);
+        room.end_busy_once_answered(true);
+        for (request, at) in [(1, 10), (2, 20), (3, 30)] {
+            room.heard(request, at * S);
+            room.ended(request, at * S + S / 2);
+            room.left_unanswered(request, at * S + S);
+        }
+        assert_eq!(room.at(31 * S), Room::Busy);
+        room.heard(4, 99 * S);
+        room.ended(4, 100 * S);
+        room.spoke(4, 101 * S);
+        assert_eq!(room.at(102 * S), Room::Busy);
+        assert_eq!(room.at(160 * S), Room::Busy);
+        assert_eq!(room.at(162 * S), Room::Quiet);
         let mut room = busy_then_answered(false);
         assert_eq!(room.at(92 * S), Room::Busy);
         assert_eq!(room.at(212 * S), Room::Quiet);

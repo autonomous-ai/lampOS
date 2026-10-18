@@ -50,10 +50,12 @@
 //!   is down must not make the lamp deaf in a conversation.
 //! - **No timer from talk:** in a busy room, a reply that follows the lamp
 //!   sets nothing on the schedule unless its words name a timer, a reminder
-//!   or the lamp ([`names_the_schedule`]; the first builder on #1522, 19:04).
+//!   or the lamp ([`names_the_schedule`]; the first builder on #1522, 19:04),
+//!   or it answers the lamp's own question (the reviewer on #1594).
 //! - **A busy room ends sooner once the lamp is answering someone:** a
-//!   minute after the last talk between people, not three, once the lamp
-//!   has answered since (`RoomTold::end_busy_once_answered`, #1522, 19:08).
+//!   minute after the later of the last talk between people and the lamp's
+//!   first answer since it, not three minutes after the talk
+//!   (`RoomTold::end_busy_once_answered`; #1522, 19:08; Eighth on #1594).
 //! - **Its cost:** none of the 48 lines got `answer`, so what it lets
 //!   through, it lets through by `follows_lamp`. A follow-up said to the
 //!   lamp that the Policy does not read as said back to it is held (17 of
@@ -223,6 +225,17 @@ mod tests {
             "",
         ] {
             assert!(!names_the_schedule(talk), "{talk}");
+        }
+        // Known misses (the reviewer on #1594): asks for the schedule that
+        // name no timer, reminder or the lamp. Each is refused only on a
+        // following `stay_quiet` in a busy room, and not when it answers
+        // the lamp's own question.
+        for missed in [
+            "Wake me at seven.",
+            "Count down five minutes.",
+            "Set one for ten.",
+        ] {
+            assert!(!names_the_schedule(missed), "{missed}");
         }
     }
 

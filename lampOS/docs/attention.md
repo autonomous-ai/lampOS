@@ -1903,17 +1903,27 @@ With the switch (`Attention::waits_for_policy`, `Attention::first_output_busy`):
     schedule unless its words name a timer, a reminder or the lamp
     (`going_on_asks::names_the_schedule`). On lamp-4ace at 18:4x Daniel's
     "Yes, give me five minutes.", to Samantha, set a five-minute timer that
-    rang mid-day. Only with the gate for actions on
-    (`LAMP_POLICY_HOLDS_ACTIONS`), which holds the call.
+    rang mid-day. Not when the line answers the lamp's own question: "Ten
+    minutes." to "For how long should I set it?" sets the timer asked for
+    (the reviewer on #1594). Only with the gate for actions on
+    (`LAMP_POLICY_HOLDS_ACTIONS`), which holds the call. Known misses, each
+    refused only on a following `stay_quiet` in a busy room: asks that name
+    no timer, reminder or the lamp ("Wake me at seven.", "Count down five
+    minutes.", "Set one for ten.").
   - **Of two decisions on one turn** (its words judged in two pieces), the
     newer one has heard more, so it wins, even where the older was more
     certain.
 - **A busy room ends sooner once the lamp is answering someone** (the
-  first builder on #1522, 19:08). Once the lamp has answered a line since
-  the last talk between people, the busy room ends a minute after that
-  talk, not three (`RoomTold::end_busy_once_answered`). While people go on
-  talking it stays busy, so a call answered amid their talk ends nothing,
-  and scene 3 is held as before. On lamp-4ace at 18:51 a day line said to
+  first builder on #1522, 19:08; Eighth on #1594). Once the lamp has
+  answered a line since the last talk between people, the busy room ends a
+  minute after the later of that talk and the lamp's first answer since it,
+  not three minutes after the talk (`RoomTold::end_busy_once_answered`).
+  While people go on talking it stays busy, so a call answered amid their
+  talk ends nothing, and scene 3 is held as before. A scene that starts
+  more than a minute after the talk is still busy at its call, and for a
+  minute from its answer: a minute from the talk alone would have ended it
+  at a call made 70 s after the talk, and the talk after the call would
+  have been answered. On lamp-4ace at 18:51 a day line said to
   the lamp 108 s after two people's talk was still in a busy room, held by
   the Policy. It's not ended on every line the lamp plays: scene 3's named
   call is played first, and the umbrella line would then be answered in a
@@ -1981,7 +1991,10 @@ actions off: on `look_up` the call runs and the words after it play; on
 `…::with_the_switch_talk_in_a_busy_room_sets_no_timer_unless_it_names_one`
 ("Yes, give me five minutes." on a following `stay_quiet`: no timer; "And
 set a timer for five minutes.": set),
-`room_told::tests::with_the_switch_a_busy_room_ends_a_minute_after_its_talk_once_the_lamp_has_answered`,
+`room_told::tests::with_the_switch_a_busy_room_ends_a_minute_after_the_lamps_first_answer_since_its_talk`,
+`attention::tests::with_both_switches_scene_three_after_a_pause_is_still_judged_in_a_busy_room`
+(scene 3 after a pause of 20 s and of 70 s, each line in the room
+`RoomTold` gives: the call and the follow-up answered, the rest held),
 `going_on_asks::tests::only_a_line_naming_a_timer_a_reminder_or_the_lamp_names_the_schedule`,
 `…::with_the_switch_a_shadow_decision_ends_the_wait_and_holds_nothing`
 (a `stay_quiet` in shadow before the line's answer: played at once; 300 ms

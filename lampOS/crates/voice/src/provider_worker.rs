@@ -2495,7 +2495,8 @@ async fn serve_with_visual<C: Connect>(
                                     && options.attention.is_some_and(|now| {
                                         now().0 == crate::room_told::Room::Busy
                                     })
-                                    && !attention.names_the_schedule(),
+                                    && !attention.names_the_schedule()
+                                    && !attention.answers_the_lamps_question(),
                             });
                         desk.called(&provider, lineage, call, held, turn)
                     }
@@ -2680,8 +2681,11 @@ struct Turn {
     /// it follows no line of the lamp's (the reviewer on #1054).
     lamp_spoke_lately: bool,
     /// Said in a busy room with `LAMP_GOING_ON_ASKS`, its words naming no
-    /// timer, reminder or the lamp: a reply to the lamp sets nothing on
-    /// the schedule (`crate::going_on_asks::names_the_schedule`, #1522).
+    /// timer, reminder or the lamp, and not an answer to the lamp's own
+    /// question: a reply to the lamp sets nothing on the schedule
+    /// (`crate::going_on_asks::names_the_schedule`, #1522). "Ten minutes."
+    /// to "For how long should I set it?" is the person's answer (the
+    /// reviewer on #1594).
     busy_talk: bool,
 }
 /// One of the lamp's actions kept for the turn's decision.

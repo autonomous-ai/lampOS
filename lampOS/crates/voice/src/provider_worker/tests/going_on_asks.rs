@@ -358,9 +358,17 @@ async fn with_the_switch_a_look_up_plays_and_a_stay_quiet_holds_its_call_too() {
 #[tokio::test(start_paused = true)]
 async fn with_the_switch_talk_in_a_busy_room_sets_no_timer_unless_it_names_one() {
     let _clock = logical_clock();
-    for (line, sets) in [
-        ("Yes, give me five minutes.", false),
-        ("And set a timer for five minutes.", true),
+    for (lamp_said, line, sets) in [
+        (None, "Yes, give me five minutes.", false),
+        (None, "And set a timer for five minutes.", true),
+        // The reviewer on #1594: an answer to the lamp's own question is the
+        // person's, so it sets the timer they asked for.
+        (Some("For how long should I set it?"), "Ten minutes.", true),
+        (
+            Some("Once upon a time there was a clever fox."),
+            "Yes, give me five minutes.",
+            false,
+        ),
     ] {
         let _room = super::spoken_to::OwnRoom::fresh();
         let mut desk = super::policy_holds::Desk::new(if sets { "gtn" } else { "gtt" });
@@ -373,6 +381,11 @@ async fn with_the_switch_talk_in_a_busy_room_sets_no_timer_unless_it_names_one()
         let first = rig.speak(&mut dial, false, true).await;
         desk.decide_with(Some(first), "answer", json!({}));
         dial.service.send(provider_audio(9, 480)).await;
+        if let Some(said) = lamp_said {
+            dial.service
+                .send(json!({"serverContent":{"outputTranscription":{"text":said}}}))
+                .await;
+        }
         dial.service.send(idle_complete()).await;
         let until = crate::scenario_clock::instant() + Duration::from_secs(3);
         let mut ended = false;
