@@ -247,7 +247,11 @@ pub fn run_body(
     standing: Option<crate::body::Standing>,
     looking: Option<crate::gaze::Looking>,
     news: impl FnMut() -> Option<(crate::gesture::Mood, u8)>,
-    asked: impl FnMut() -> (crate::body::Asked, crate::body::Priority),
+    asked: impl FnMut() -> (
+        crate::body::Asked,
+        crate::body::Priority,
+        Option<crate::body::Source>,
+    ),
     watch: impl FnMut(&crate::body::Glimpse),
     mut cancelled: impl FnMut() -> io::Result<bool>,
 ) -> BodyResult {
@@ -265,7 +269,7 @@ pub fn run_body(
             let mut io = LinuxPort {
                 fd: owner.fd.as_ref().expect("prepared tty"),
             };
-            body = Some(crate::body::run_arbitrated(
+            body = Some(crate::body::run_told(
                 &mut io,
                 &mut runtime,
                 limits,

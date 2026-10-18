@@ -10,7 +10,7 @@
 //! step to a thread of this module's own, without waiting, and a step that
 //! thread has no room for is let go.
 use crate::{
-    body::{Glimpse, Stop},
+    body::{Glimpse, Stop, Told},
     gesture::Mood,
 };
 use lamp_bus::{Bus, Publisher};
@@ -320,6 +320,10 @@ const LET_GO: &str = "dropped: a joint could not keep up with it";
 /// for a drop, why.
 pub type GestureNews = (&'static str, GestureState, Option<&'static str>);
 
+/// The same with whom it is told of (#940): whose a gesture dropped or
+/// ended was, and who holds the body instead.
+pub type ToldNews = (GestureNews, Told);
+
 /// What became of the gestures, step by step, as lamp-body's journal says
 /// it and `body/gesture` publishes it, so that the two never differ: each
 /// gesture dropped (`glimpse.gesture_fates` saying `dropped: ...`), and the
@@ -334,6 +338,14 @@ pub struct GestureSaid {
 impl GestureSaid {
     /// This step's news. Drops first, as the journal says them.
     pub fn step(&mut self, glimpse: &Glimpse) -> Vec<GestureNews> {
+        self.step_told(glimpse)
+            .into_iter()
+            .map(|(news, _)| news)
+            .collect()
+    }
+
+    /// The same, each with whom it is told of.
+    pub fn step_told(&mut self, glimpse: &Glimpse) -> Vec<ToldNews> {
         // The gesture it was making, let go in this step as it played (a
         // joint that could not keep up): it began, so it is `over`, not
         // `dropped`, which says one never began.
@@ -347,23 +359,23 @@ impl GestureSaid {
                 .iter()
                 .any(|(ended, why)| ended == name && why.starts_with("ended"))
         };
-        let mut said: Vec<GestureNews> = glimpse
+        let mut said: Vec<ToldNews> = glimpse
             .gesture_fates
-            .iter()
-            .filter(|(name, why)| {
+            .iter_told()
+            .filter(|((name, why), _)| {
                 (why.starts_with("dropped") && !(Some(*name) == let_go && *why == LET_GO))
                     || why.starts_with("ended")
             })
-            .map(|(name, why)| (name, GestureState::Dropped, Some(why)))
+            .map(|((name, why), told)| ((name, GestureState::Dropped, Some(why)), told))
             .collect();
         if glimpse.gesture != self.making {
             if let Some(name) = self.making
                 && !ended(name)
             {
-                said.push((name, GestureState::Over, None));
+                said.push(((name, GestureState::Over, None), Told::default()));
             }
             if let Some(name) = glimpse.gesture {
-                said.push((name, GestureState::Began, None));
+                said.push(((name, GestureState::Began, None), Told::default()));
             }
             self.making = glimpse.gesture;
         }
@@ -389,17 +401,35 @@ impl GestureSaid {
 pub fn tell(
     news: &[GestureNews],
     step: u64,
+    bus: Option<&mut BusOut>,
+    journal: impl FnMut(String),
+) {
+    let news: Vec<ToldNews> = news.iter().map(|news| (*news, Told::default())).collect();
+    tell_told(&news, step, bus, false, journal);
+}
+
+/// The same, and with `telling` (`lamp-body --arbitration on`, #940), a
+/// drop or an end on `body/gesture` also says whose it was, why, and who
+/// holds the body; without it, the message is as it always was.
+pub fn tell_told(
+    news: &[ToldNews],
+    step: u64,
     mut bus: Option<&mut BusOut>,
+    telling: bool,
     mut journal: impl FnMut(String),
 ) {
-    for (name, state, _) in news {
+    for ((name, state, why), told) in news {
         match state {
             GestureState::Began => journal(format!("lamp-body: step {step} gesture {name}")),
             GestureState::Over => journal(format!("lamp-body: step {step} gesture over")),
             GestureState::Dropped => {}
         }
         if let Some(bus) = bus.as_deref_mut() {
-            bus.gesture(name, *state);
+            if telling {
+                bus.gesture_told(name, *state, *why, *told);
+            } else {
+                bus.gesture(name, *state);
+            }
         }
     }
 }
@@ -560,9 +590,18 @@ impl BusOut {
     /// step, and never waited for. One the thread has no room for (the bus
     /// stalled for a second) is let go and counted in `gestures_let_go`.
     pub fn gesture(&mut self, name: &str, state: GestureState) {
+        self.gesture_told(name, state, None, Told::default());
+    }
+
+    /// The same, saying whose it was, why and who holds the body, each
+    /// when known (#940).
+    pub fn gesture_told(&mut self, name: &str, state: GestureState, why: Option<&str>, told: Told) {
         let gesture = BodyGesture {
             name: name.to_owned(),
             state,
+            source: told.source.map(|source| source.as_str().to_owned()),
+            why: why.map(str::to_owned),
+            by: told.by.map(|by| by.as_str().to_owned()),
         };
         if self.steps.try_send(Out::Gesture(gesture)).is_err() {
             self.gestures_let_go += 1;
@@ -1065,6 +1104,54 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    /// #940, the fifth's sixth condition: with `telling` a drop says whose
+    /// it was, why and who holds the body; without it, the message is byte
+    /// for byte as before, whatever the news holds.
+    #[test]
+    fn a_drop_says_whose_it_was_why_and_who_holds_the_body_only_when_telling() {
+        let root = std::path::PathBuf::from(format!("/tmp/lb-told-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut gestures = bus
+            .subscribe_typed(BodyGesture::TOPIC, "test", BodyGesture::TYPE)
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        let told = Told {
+            source: crate::moves::Source::new("skill:dance"),
+            by: crate::moves::Source::new("skill:stretch-break"),
+        };
+        let news = [
+            (
+                ("nod", GestureState::Dropped, Some("dropped: busy, skill")),
+                told,
+            ),
+            (("shy", GestureState::Began, None), Told::default()),
+        ];
+        tell_told(&news, 7, Some(&mut out), true, |_| {});
+        tell_told(&news, 8, Some(&mut out), false, |_| {});
+        let got: Vec<String> = (0..4)
+            .map(|_| {
+                let message = gestures
+                    .recv(Duration::from_secs(5))
+                    .unwrap()
+                    .expect("a gesture");
+                String::from_utf8(message.payload).unwrap()
+            })
+            .collect();
+        assert_eq!(
+            got,
+            [
+                "{\"name\":\"nod\",\"state\":\"dropped\",\"source\":\"skill:dance\",\
+                 \"why\":\"dropped: busy, skill\",\"by\":\"skill:stretch-break\"}",
+                "{\"name\":\"shy\",\"state\":\"began\"}",
+                "{\"name\":\"nod\",\"state\":\"dropped\"}",
+                "{\"name\":\"shy\",\"state\":\"began\"}",
+            ]
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn what_became_of_each_gesture_is_said_on_body_gesture_whatever_the_step() {
         let root = std::path::PathBuf::from(format!("/tmp/lb-gest-{}", std::process::id()));
@@ -1102,6 +1189,9 @@ mod tests {
         let named = |name: &str, state| BodyGesture {
             name: name.into(),
             state,
+            source: None,
+            why: None,
+            by: None,
         };
         assert_eq!(
             got,

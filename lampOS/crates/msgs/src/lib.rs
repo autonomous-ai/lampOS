@@ -934,10 +934,26 @@ pub enum GestureState {
 /// `gesture NAME dropped: ...`. Read-only: nothing on the bus asks for a
 /// gesture here. `name` is the clip's (`nod`, `dance_groove`, the body's
 /// own `idle` and its shifts).
+///
+/// Under `lamp-body --arbitration on`, a gesture dropped or ended also says
+/// whose it was, why, and who holds the body, so the asker that lost is
+/// told (#940); each is left out when not known, and with the switch off
+/// the message is as before.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BodyGesture {
     pub name: String,
     pub state: GestureState,
+    /// Who asked for it, as its datagram's `source` said (`skill:dance`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    /// Why it was dropped or ended, as lamp-body's journal says it
+    /// (`dropped: busy, skill`, `ended: by conversation`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub why: Option<String>,
+    /// Who holds the body instead, when an asker that named itself does: a
+    /// skill or the conversation, never a hand.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<String>,
 }
 
 impl BodyGesture {
@@ -1850,10 +1866,26 @@ mod tests {
                 &BodyGesture {
                     name: "nod".into(),
                     state,
+                    source: None,
+                    why: None,
+                    by: None,
                 },
                 &format!("{{\"name\":\"nod\",\"state\":\"{word}\"}}"),
             );
         }
+        // #940: under arbitration a drop names its asker, why and who holds
+        // the body; each is left out when not known.
+        round_trip(
+            &BodyGesture {
+                name: "dance_groove".into(),
+                state: GestureState::Dropped,
+                source: Some("skill:dance".into()),
+                why: Some("dropped: busy, skill".into()),
+                by: Some("skill:stretch-break".into()),
+            },
+            "{\"name\":\"dance_groove\",\"state\":\"dropped\",\"source\":\"skill:dance\",\
+             \"why\":\"dropped: busy, skill\",\"by\":\"skill:stretch-break\"}",
+        );
         assert!(
             !first_topics()
                 .iter()
