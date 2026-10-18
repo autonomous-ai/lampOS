@@ -43,6 +43,12 @@ every result on a lamp below names it. Newest first.
   lamp quiet and chance with it sounding, so the check stays off. The
   conversation's voice is the last answered print, which one bad print can
   poison; Fourth takes the highest cosine over the conversation's prints.
+- #1483 merged (docs only, taken at 12:16 as the first builder's fallback):
+  `LAMP_CAPTURE_CORES` says "don't set": at `6-7` it crashed the voice in a
+  conversation on lamp-4ace (#1459, 11:20). Seventh's fix is #1475.
+- #1485 (open, docs): the same-voice numbers in
+  `verification/same-voice-20261018`. The labelled set gives 7.5 % at 0.455
+  with the lamp quiet; 0.25 lets 43 % of other voices through.
 
 ## 2026-10-17 — evening: #828 confounded, go-aways are the lamp's own
 
