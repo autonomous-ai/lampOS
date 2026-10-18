@@ -33,6 +33,11 @@ pub trait Persistence {
             "this persistence cannot set a newer schedule aside",
         ))
     }
+    /// The snapshot of the newest store kept aside, if any. Backends that
+    /// can't set one aside have none.
+    fn kept_snapshot(&self) -> io::Result<Option<Vec<u8>>> {
+        Ok(None)
+    }
 }
 
 impl Persistence for Store {
@@ -44,6 +49,9 @@ impl Persistence for Store {
     }
     fn set_aside(&mut self, label: &str) -> io::Result<String> {
         self.set_aside(label)
+    }
+    fn kept_snapshot(&self) -> io::Result<Option<Vec<u8>>> {
+        self.kept_snapshot()
     }
 }
 
@@ -315,7 +323,22 @@ impl<P: Persistence> Engine<P> {
                     None
                 }
             },
-            None => None,
+            // An empty store with one kept aside beside it: a set-aside whose
+            // successor was never committed (a crash between the rename and
+            // the commit). Its identity is carried as if the set-aside had
+            // just happened, so the ledger still follows (the reviewer's P3
+            // on #1616). A kept store that can't be read leaves it fresh.
+            None => {
+                if let Some(kept) = persistence.kept_snapshot().ok().flatten() {
+                    carried = carried_identity(&kept);
+                    if carried.is_some() {
+                        eprintln!(
+                            "schedule: the store is empty and one set aside from a newer build is beside it; this store keeps its identity"
+                        );
+                    }
+                }
+                None
+            }
         };
         let existing = stored.is_some();
         let state = match stored {

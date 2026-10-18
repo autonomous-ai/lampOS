@@ -292,6 +292,31 @@ pub struct Store {
     held: File,
 }
 
+/// The newest store kept aside in `dir` that is still there, by its name
+/// (`schedule.sqlite3.newer-<schema>-<unix seconds>`), if any: until someone
+/// looks, health says reminders were set aside and won't sound (#1562's
+/// follow-up, as lamp-tasks' #1554). Read only for its names.
+pub fn kept_aside(dir: &Path) -> io::Result<Option<String>> {
+    let prefix = format!("{DATABASE}.newer-");
+    let mut newest: Option<(u64, String)> = None;
+    for entry in fs::read_dir(dir)? {
+        let name = entry?.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let Some(rest) = name.strip_prefix(&prefix) else {
+            continue;
+        };
+        let since = rest
+            .rsplit('-')
+            .next()
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(0);
+        if newest.as_ref().is_none_or(|(at, _)| since >= *at) {
+            newest = Some((since, name.to_owned()));
+        }
+    }
+    Ok(newest.map(|(_, name)| name))
+}
+
 impl Store {
     pub fn open(dir: &Path) -> io::Result<Self> {
         let (path, held) = directory(dir)?;
@@ -345,6 +370,30 @@ impl Store {
 
     pub fn poisoned(&self) -> bool {
         self.poisoned
+    }
+
+    /// The snapshot of the newest store kept aside in this folder, read-only,
+    /// or `None` if none is kept. For a start that finds an empty store with
+    /// a kept one beside it: a set-aside whose successor was never committed
+    /// (the reviewer on #1616), whose identity the empty store then keeps.
+    pub fn kept_snapshot(&self) -> io::Result<Option<Vec<u8>>> {
+        let Some(name) = kept_aside(&self.path)? else {
+            return Ok(None);
+        };
+        let path = self.path.join(&name);
+        if check_file(&path, MAX_DATABASE_BYTES)?.is_none() {
+            return Ok(None);
+        }
+        let db = Connection::open_with_flags(
+            &path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )
+        .map_err(sql)?;
+        db.set_db_config(DbConfig::SQLITE_DBCONFIG_TRUSTED_SCHEMA, false)
+            .map_err(sql)?;
+        load_snapshot(&db)
     }
 
     /// Retain the complete database as `schedule.sqlite3.<label>` and start

@@ -174,17 +174,29 @@ is fenced to that identity, so it follows: a reminder set after the set-aside
 is said, and one in the retained store is gone to it as a cancelled one is
 (the reviewer's P2 on #1562). Where the identity can't be read, the empty state
 gets a fresh one, and the ledger then refuses new sound (`store_changed`), as
-for any changed store. The new store accepts normal work; none of the retained
-schedule is delivered, merged or silently deleted. A later restart uses the new
-store. Keep the retained database for an appropriate newer build or explicit
-recovery; this build does not restore it automatically.
+for any changed store. A crash after the rename and before the empty state is
+committed leaves an empty store with the retained one beside it: the next
+start finds the store empty, reads the newest retained one (read-only), and
+carries its identity in the same way, with one journal line (the reviewer on
+#1616). The new store accepts normal work; none of the retained schedule is
+delivered, merged or silently deleted. A later restart uses the new store.
+Keep the retained database for an appropriate newer build; this build does
+not restore it. **Never put it back by hand once the lamp has taken new
+work:** the ledger would meet a revision that went back (`stale_revision`)
+and ids it already holds. Put it back only before any new work, or not at
+all.
 
-**Who is told about the retained reminders: only the journal, today.** The
-one journal line at start is all that says reminders were set aside, and a
-crash between the rename and that line leaves none. A person who set them is
-not told. The follow-up is Schedule's own `schedule` diagnostic warning in
-health while a `schedule.sqlite3.newer-*` file is there, as lamp-tasks' health
-does for its own (#1554); it is not in this change.
+**Who is told about the retained reminders.** The journal says it once at
+start, and a crash between the rename and that line leaves none. So health
+says it too, from the file itself: while a `schedule.sqlite3.newer-*` file is
+in Schedule's folder, its `schedule` diagnostic is a warning, "Schedule set
+aside a store from a newer build; its reminders will not sound", with
+`set_aside` naming the newest one (by its trailing seconds), as lamp-tasks'
+health does for its own (#1554). The folder is listed once a second, at most,
+with the diagnostic, and a folder that can't be listed says nothing rather
+than stopping the part. Removing the file, once someone has looked, ends the
+warning. Test: `a_store_set_aside_is_said_in_health_until_it_is_gone`
+(`crates/schedule/tests/runtime.rs`).
 
 An existing archive name is never clobbered. Rename, sync or replacement failure
 refuses startup and poisons the owner; any already-renamed database remains
