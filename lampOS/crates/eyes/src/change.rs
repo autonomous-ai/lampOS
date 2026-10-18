@@ -30,15 +30,28 @@ pub const DOWN: usize = 24;
 pub const GREYS: f32 = 12.0;
 /// A cell's own noise, learned from the glances of an empty room, counts
 /// this many times over: a cell changed past [`GREYS`] and past this many
-/// times its noise has changed.
-pub const NOISE_TIMES: f32 = 4.0;
+/// times its noise has changed. The noise rises five times slower than it
+/// falls, so it settles low, at about 0.4 of a steady noise's spread. Four
+/// times that (as it was) is 1.8 spreads, which about 48 of 768 cells pass
+/// on noise alone in a simulation of steady noise, consistent with
+/// lamp-4ace's empty office (33 a glance, #1479, 18 Oct, 14:26) though not
+/// yet shown to be its cause; eight times, with the rates below, is about 3.7
+/// spreads: under one cell a glance.
+pub const NOISE_TIMES: f32 = 8.0;
 /// How much of a cell's noise each compared glance teaches, rising and
 /// falling: it falls about ten glances back (six seconds), and rises five
 /// times slower, so a few seconds of a person moving in one place unseen
 /// do not teach their cells to be noise (the reviewer on #1460: at one
 /// rate, 19 to 22 of such a person's 40 glances were skipped).
-const NOISE_RISES: f32 = 0.02;
-const NOISE_FALLS: f32 = 0.1;
+///
+/// The rates and [`NOISE_TIMES`] are chosen together (a simulation of the
+/// three: steady noise, a person moving 50 greys in one place, a flicker of
+/// 80 that stops): under one cell a glance of steady noise passes; the
+/// person stays a change for fourteen glances (8 s); a cell is deaf for
+/// about 26 glances (16 s) after a learned flicker stops, while the 3 s look
+/// still runs. At 0.02 and 0.1 with four times, 48 cells passed on noise.
+const NOISE_RISES: f32 = 0.01;
+const NOISE_FALLS: f32 = 0.05;
 /// This many changed cells are a changed frame: a face at 0.15 of the
 /// picture's height (`sight::LEAST_SIZE`, the smallest the body turns to)
 /// changes six or more cells from 15 greys of contrast. A smaller face,
@@ -240,6 +253,16 @@ pub struct Why {
     /// The sum of each compared glance's median shift over the frame, its
     /// size in greys: the camera's exposure.
     pub frame_shift: f32,
+    /// The sum over compared glances of the median and the 90th percentile
+    /// of their cells' changes, the row's shift taken out, in greys: what
+    /// an empty room's own picture does from glance to glance (#1479 on
+    /// lamp-4ace: 33 cells a glance past the bar after eleven minutes).
+    pub residual_median: f32,
+    pub residual_p90: f32,
+    /// The cells' learned noise when the line was taken, median and 90th
+    /// percentile over the cells: what the noise settled to.
+    pub noise_median: f32,
+    pub noise_p90: f32,
 }
 
 impl Why {
@@ -260,6 +283,12 @@ impl Why {
             self.plain_cells as f32 / self.compared.max(1) as f32,
             self.row_cells as f32 / self.compared.max(1) as f32,
             self.frame_shift / self.compared.max(1) as f32
+        ) + &format!(
+            "; a glance's cells changed by, median {:.1} and p90 {:.1} greys; the learned noise over cells, median {:.1} and p90 {:.1} (a cell counts past {GREYS} and {NOISE_TIMES}x it)",
+            self.residual_median / self.compared.max(1) as f32,
+            self.residual_p90 / self.compared.max(1) as f32,
+            self.noise_median,
+            self.noise_p90
         )
     }
 }
@@ -346,6 +375,10 @@ impl Change {
             why.row_cells += row_cells;
             why.plain_cells += plain_cells;
             why.frame_shift += shift;
+            let mut sizes: Vec<f32> = residuals.iter().map(|residual| residual.abs()).collect();
+            sizes.sort_unstable_by(f32::total_cmp);
+            why.residual_median += sizes[sizes.len() / 2];
+            why.residual_p90 += sizes[sizes.len() * 9 / 10];
             // The room's own noise, learned only while it is empty, not
             // from the lamp's own light, and after the glance is judged.
             for (noise, residual) in self.noise.iter_mut().zip(residuals).filter(|_| !self.lit) {
@@ -384,6 +417,12 @@ impl Change {
     }
 
     pub fn take_why(&mut self) -> Why {
+        if !self.noise.is_empty() {
+            let mut noise = self.noise.clone();
+            noise.sort_unstable_by(f32::total_cmp);
+            self.why.noise_median = noise[noise.len() / 2];
+            self.why.noise_p90 = noise[noise.len() * 9 / 10];
+        }
         std::mem::take(&mut self.why)
     }
 }
@@ -561,9 +600,42 @@ mod tests {
         assert_eq!(change.take_why().skipped, 0);
     }
 
+    /// #1479 on lamp-4ace: an empty room whose cells each move by a few
+    /// greys from glance to glance, past the bar of 12 now and then (a
+    /// spread of 8 greys a cell, as no sensor's grain gives but the room's
+    /// light and the encoder can), is still once its noise is learned: of
+    /// the glances after the first minute, nearly none count as changed.
+    #[test]
+    fn a_room_whose_cells_each_move_a_little_is_still_once_learned() {
+        let mut change = Change::default();
+        let mut rng = 7u32;
+        let mut changed_late = 0;
+        for glance in 0..200u64 {
+            let mut grid = Grid::of(&room(glance as u32, 0.0, None));
+            for cell in grid.0.iter_mut() {
+                // About normal, spread 8: the sum of four uniform draws.
+                let mut sum = 0.0;
+                for _ in 0..4 {
+                    rng = rng.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                    sum += (rng >> 8) as f32 / (1u32 << 24) as f32 - 0.5;
+                }
+                *cell += sum * 8.0 * 3.46;
+            }
+            change.detect(grid, None, glance * GLANCE_US);
+            if glance == 100 {
+                change.take_why();
+            }
+        }
+        changed_late += change.take_why().changed;
+        assert!(
+            changed_late <= 5,
+            "{changed_late} of the last 100 glances changed"
+        );
+    }
+
     /// The reviewer on #1479: a cell's noise falls five times faster than
     /// it rises, so a flicker that stops (a screen switched off) does not
-    /// leave its cells deaf for long: a face at its place twelve glances
+    /// leave its cells deaf for long: a face at its place thirty glances
     /// later is seen.
     #[test]
     fn a_flicker_that_stops_does_not_leave_its_cells_deaf_for_long() {
@@ -576,7 +648,7 @@ mod tests {
                 glance * GLANCE_US,
             );
         }
-        for glance in 30..42u64 {
+        for glance in 30..60u64 {
             change.detect(
                 Grid::of(&scene(glance as u32, 0.0, false, 0.0, None)),
                 None,
@@ -584,8 +656,8 @@ mod tests {
             );
         }
         let before = change.take_why();
-        let face = Grid::of(&scene(42, 0.0, false, 0.0, Some((0, 0, 28))));
-        change.detect(face, None, 42 * GLANCE_US);
+        let face = Grid::of(&scene(60, 0.0, false, 0.0, Some((0, 0, 28))));
+        change.detect(face, None, 60 * GLANCE_US);
         assert_eq!(change.take_why().changed, 1, "{before:?}");
     }
 
@@ -756,7 +828,32 @@ mod tests {
         assert_eq!(why.compared, 19);
         assert!(why.most_cells >= CELLS && why.cells >= 2 * CELLS, "{why:?}");
         assert!(why.line().contains("2 changed, 2 settling, 2 every 3 s"));
-        assert_eq!(change.take_why(), Why::default());
+        // What the room's picture does, and the noise learned: a glance's
+        // cells move by under a grey of sensor noise, a face's by far more.
+        assert!(
+            why.residual_median > 0.0 && why.residual_p90 >= why.residual_median,
+            "{why:?}"
+        );
+        assert!(
+            why.noise_p90 >= why.noise_median && why.noise_median > 0.0,
+            "{why:?}"
+        );
+        assert!(
+            why.line().contains("the learned noise over cells, median"),
+            "{}",
+            why.line()
+        );
+        // A second take starts the counts again; the noise is still the
+        // cells' own, as learned.
+        let again = change.take_why();
+        assert_eq!(
+            Why {
+                noise_median: again.noise_median,
+                noise_p90: again.noise_p90,
+                ..Why::default()
+            },
+            again
+        );
         assert_eq!(busy(false, false, Some(1)), Some(Busy::Face));
         assert_eq!(busy(true, true, Some(1)), Some(Busy::Asked));
         assert_eq!(busy(false, true, None), Some(Busy::Remembering));
