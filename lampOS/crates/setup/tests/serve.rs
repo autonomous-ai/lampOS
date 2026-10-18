@@ -20,7 +20,7 @@ use std::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tower::ServiceExt;
 
@@ -175,6 +175,9 @@ struct Lamp {
     calls: Arc<Mutex<Vec<String>>>,
     name: Arc<Mutex<String>>,
     now_ms: u64,
+    /// When the join first found the internet: on the host's clock, for
+    /// how long after it `run` returns.
+    joined_at: Option<Instant>,
 }
 impl Lamp {
     fn new(connects: bool) -> Self {
@@ -184,6 +187,7 @@ impl Lamp {
             calls: Arc::default(),
             name: Arc::new(Mutex::new("orangepizero2w".into())),
             now_ms: 0,
+            joined_at: None,
         }
     }
     fn calls(&self) -> Vec<String> {
@@ -208,7 +212,11 @@ impl Host for Lamp {
         Ok(())
     }
     fn internet(&mut self) -> bool {
-        self.connects && self.now_ms >= 3_000
+        let up = self.connects && self.now_ms >= 3_000;
+        if up && self.joined_at.is_none() {
+            self.joined_at = Some(Instant::now());
+        }
+        up
     }
     fn current_ssid(&mut self) -> Option<String> {
         self.internet().then(|| "Home".into())
@@ -284,14 +292,17 @@ fn accepted() -> Accepted {
 fn a_joined_lamp_saves_the_settings_then_the_marker_and_says_it_is_set_up() {
     let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
     let mut saved = Saved::default();
-    run(
-        &status,
-        &accepted(),
-        "VN",
-        &mut Lamp::new(true),
-        &mut saved,
-        || Some("192.168.1.23".into()),
-    );
+    let mut lamp = Lamp::new(true);
+    run(&status, &accepted(), "VN", &mut lamp, &mut saved, || {
+        Some("192.168.1.23".into())
+    });
+    // The address watcher ends with the join, so the settings and "set up"
+    // follow it at once and never wait out the watcher's second.
+    let after_join = lamp
+        .joined_at
+        .expect("the join found the internet")
+        .elapsed();
+    assert!(after_join < Duration::from_millis(50), "{after_join:?}");
     let status = status.lock().unwrap().clone();
     assert_eq!(status.phase, Phase::Connected);
     assert!(status.set_up_completed);
