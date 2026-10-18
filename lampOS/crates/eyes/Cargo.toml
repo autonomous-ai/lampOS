@@ -21,6 +21,10 @@ lamp-msgs = { path = "../msgs" }
 sha2.workspace = true
 # The same pure Rust ONNX runtime as the endpoint worker.
 tract-onnx = { version = "=0.23.8", default-features = false }
+# With --mouth-runtime: the voice's pinned ONNX Runtime and its check, for
+# Face Mesh V2 (#720).
+lamp-turn-end = { path = "../turn-end" }
+ort = { version = "=2.0.0-rc.14", default-features = false, features = ["std", "load-dynamic", "api-30"] }
 # Pure Rust JPEG decoding: the camera gives MJPG.
 zune-jpeg = "=0.4.21"
 # Pure Rust JPEG encoding, no dependencies: a full look is made to fit the

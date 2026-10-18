@@ -2,10 +2,11 @@
 //! multiplications in memory ([`crate::eight_bit`]) and run by ONNX Runtime on
 //! two threads.
 //!
-//! ONNX Runtime is a native (C++) library. It is loaded at run time, only in
-//! this worker process, from a file installed beside the worker whose size and
-//! SHA256 are pinned here and checked before it is loaded. Nothing else in
-//! lampOS links it, and the interaction core never loads it.
+//! ONNX Runtime is a native (C++) library. It is loaded at run time, here only
+//! in this worker process, from a file installed beside the worker whose size
+//! and SHA256 are pinned here and checked before it is loaded. The only other
+//! part that loads it is lamp-eyes, with `--mouth-runtime` (#720), checked
+//! against this same pin; the interaction core never loads it.
 use crate::{FRAMES, MELS, ModelAsset, Result, eight_bit, model::read_pinned};
 use ort::{
     environment::Environment,

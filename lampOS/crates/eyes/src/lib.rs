@@ -24,6 +24,7 @@ pub mod faces;
 pub mod facing;
 pub mod full_look;
 pub mod kept;
+pub mod mesh;
 pub mod permit;
 pub mod picture;
 pub mod sight;

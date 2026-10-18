@@ -811,10 +811,13 @@ looking.
 Off unless `LAMP_EYES_SPEAKING=on` is in the eyes' unit beside `LAMP_BUS=on`.
 Off, nothing is computed and `humans/faces/tracked` is byte for byte as
 before. On, each face also has `speaking`:
-`{"state":"yes"|"no"|"unknown","score":0.03}`
+`{"state":"yes"|"no"|"unknown","score":0.03,"from":"corners"|"mesh"}`
 ([`speaking.rs`](../crates/eyes/src/speaking.rs)). It is read from the five
 landmarks YuNet already gives: a few additions a face a look, no new model,
-and no picture is kept or leaves the lamp. Nothing reads it yet.
+and no picture is kept or leaves the lamp. `from` says what judged it, and
+the score is on that one's scale: the corners' in eye distances a look
+(`yes` from 0.02), the mesh's in inner-lip gap over face height (`yes` from
+0.012, below). Nothing reads it yet.
 
 - **The shape:** the mouth's width over the distance between the eyes.
   Moving, coming closer, turning and tilting scale both alike. A nod
@@ -882,7 +885,62 @@ small at any jitter. The signal holds only for a near face (60 px, about
 still has to show,** numbers only: YuNet's corner jitter on a still face at
 0.5 and 1 m, and the score for a person silent, talking, nodding and
 turning. If 1 m matters, the next step is a landmark model with inner-lip
-points run on the tracked face box, as #720's comments propose.
+points run on the tracked face box, as #720's comments propose. Its model
+is chosen and converted (Face Mesh V2, `models/mouth/SOURCE.md`).
+
+**Measuring the mouth with Face Mesh V2 (`--mouth-model PATH`, none unless
+given, #720).** With it, the largest face in each look is cut out of the
+same 320 by 240 look: its box, widened by a quarter on every side and
+turned so the eyes are level, made 256 pixels square (`src/mesh.rs`).
+The mesh reads it under tract, and the journal says
+`lamp-eyes: mouth open 0.0123 eyes 31 px mesh 84 ms`. That is the inner
+lips' gap (points 13 and 14) over the face's height (10 to 152), the eye
+distance in detector pixels, and the time. No picture is kept.
+
+With `LAMP_EYES_SPEAKING=on` as well, that face's `speaking` reads the
+mesh instead of the corners whenever every look in its 2 s window had the
+mesh read: the score is how much `mouth_open` changes from look to look
+(root mean square), and `yes` from 0.012 (`MESH_SPEAKING_AT`). Every other
+face, and a window with one look the mesh missed, is judged by the corners
+as above, with the same `unknown` gates. On a recorded talking face cut as
+the lamp sees it (NASA's public-domain interview SVS14704, 320 by 240, 4
+looks a second, run through the real `Detector`, `Mesh` and `Mouths`), the
+mesh said `yes` in 98% of the talking looks at 26 px between the eyes and
+94% at 51 px; the corners said `yes` in 16% at either, where the synthetic
+faces gave them 98% at 60 px. The clip has no silent face, so `no` is not
+shown there: how far the gap moves on a still, silent face on the lamp's
+camera, at 0.5 and 1 m, is the next run.
+
+**Only while the voice hears a line (`--mouth-on-heard on`, off unless
+given, with `--mouth-model`).** lamp-eyes subscribes to `voice/heard` and
+runs the mesh from a line's first words until 2 s after it is finished
+(the speaking judge's window), or 15 s after its last words if its end
+never comes (`mesh::Heard`). Otherwise the mesh is not run, and the corners
+judge as before. A quiet room, or one with faces and nobody speaking, costs
+the mesh nothing. The first look or two of a line are judged on the corners,
+since the words reach the bus after they start; a line is timed by when
+the voice heard it (its header's `at_us`), so lines that waited while the
+camera was closed count as old as they are. It subscribes on the bus's
+root (`LAMP_BUS_ROOT`, or `/run/lampos-bus`) and lamp-eyes does not start
+if it cannot. Monday's silent-face measurement runs without it, so a
+silent face is read.
+
+**A closing camera waits for the mesh.** With `--mouth-model`, a
+`{"camera":false}` that arrives mid-look closes the camera once that look's
+mesh is done: up to 85 ms on a big core and 290 ms on a small one under
+tract, 33 and 154 under ONNX Runtime.
+
+**Under ONNX Runtime (`--mouth-runtime PATH`, with `--mouth-model`).** The
+mesh runs on one thread under the same pinned `libonnxruntime.so.1.30.0`
+the voice's turn-end worker loads, its size and SHA-256 checked against
+that worker's pin (`lamp_turn_end::ONNX_RUNTIME`) before it is loaded: 33
+ms a face on lamp-52e6's big core against tract's 85 (#720, 10:3x). The
+same crop gives the same `mouth_open` under both, to 1.5e-7 on the Mac
+(`onnx_runtime_reads_the_mouth_as_tract_does`, ignored without the
+library). Without it the mesh runs under tract.
+The file is checked by size and SHA-256 before it is parsed. It adds the
+mesh's time, 85 ms on a big core under tract on lamp-52e6, to every look
+with a face in it.
 
 Once it can be trusted, the voice's "spoken to" judging is to read it
 (`LAMP_SPOKEN_TO=on`, `crates/voice/src/attention.rs`, #829). A line heard
@@ -895,7 +953,7 @@ that reads `yes` with the voice's speech is the one speaking.
 lamp-eyes --device /dev/video0 --lock-directory /home/WORKER/private-camera-locks --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/face_detection_yunet_2023mar.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock
 ```
 
-Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`.
+Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`, and `--mouth-model ABSOLUTE_PATH` (with `--mouth-on-heard on` and `--mouth-runtime ABSOLUTE_PATH`).
 `--usb` is `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits; the
 lock directory must be private to the user it runs as. A camera that does not open, or fails, is tried again every five
 seconds while permission lasts. A start is given a 2 s budget (`OPEN_BUDGET_US`)

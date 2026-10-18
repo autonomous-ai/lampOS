@@ -19,7 +19,7 @@
 //! change is about as much as the marks jitter, so a face whose eyes are
 //! less than [`LEAST_EYES_PX`] apart, turned more than [`MOST_TURN_DEG`],
 //! too new, or with jittering marks is `unknown`, never `no`.
-use lamp_msgs::{Speaking, SpeakingState};
+use lamp_msgs::{Speaking, SpeakingFrom, SpeakingState};
 use std::collections::{HashMap, VecDeque};
 
 /// Where the eyes read whether to judge speaking. `on` only; with
@@ -43,6 +43,14 @@ pub const MOST_TURN_DEG: f32 = 30.0;
 pub const MOST_JITTER: f32 = 0.1;
 /// The score, in eye distances a look, from which a mouth is speaking.
 pub const SPEAKING_AT: f32 = 0.02;
+/// With Face Mesh V2 read on every look of the window (`--mouth-model`,
+/// #720): the score is how much `mouth_open` (the inner lips' gap over the
+/// face's height) changes from one look to the next, and from this it is
+/// speaking. On a recorded talking face cut as the lamp sees it (#1470,
+/// 4 looks a second), 95% of 2 s windows of talk scored 0.015 or more, at
+/// 26 and at 51 px between the eyes alike. A still silent face on the
+/// lamp's camera is not measured yet: this bar is to be checked against it.
+pub const MESH_SPEAKING_AT: f32 = 0.012;
 /// The marks' own jitter moves the mouth's width, look to look, this share
 /// of how much it bends the eye line (squared, from the geometry of the
 /// four points: (4 + 4 x 0.8^2) / 12, with the mouth 0.8 eye distances wide).
@@ -69,8 +77,9 @@ pub fn shape(marks: &[(f32, f32); 5]) -> Option<(f32, f32, f32)> {
 
 #[derive(Debug)]
 struct Mouth {
-    /// When, the shape, the eye distance in pixels and the eye line's angle.
-    looks: VecDeque<(u64, f32, f32, f32)>,
+    /// When, the shape, the eye distance in pixels, the eye line's angle
+    /// and the mesh's `mouth_open`, if it was read.
+    looks: VecDeque<(u64, f32, f32, f32, Option<f32>)>,
     /// The eye line's squared bend, averaged over this face's looks (about
     /// the last ten): its jitter at rest, steadier than one window's.
     rest: Option<f32>,
@@ -85,16 +94,19 @@ pub struct Mouths {
 const UNKNOWN: Speaking = Speaking {
     state: SpeakingState::Unknown,
     score: 0.0,
+    from: None,
 };
 
 impl Mouths {
-    /// This look of the face `id`: its marks in the detector's pixels and
-    /// how far it is turned, in degrees, if that was measured.
+    /// This look of the face `id`: its marks in the detector's pixels, how
+    /// far it is turned, in degrees, if that was measured, and how open the
+    /// mesh read its mouth, if it was read ([`MESH_SPEAKING_AT`]).
     pub fn judge(
         &mut self,
         id: u32,
         marks: &[(f32, f32); 5],
         turn_deg: Option<f32>,
+        open: Option<f32>,
         now_us: u64,
     ) -> Speaking {
         self.faces.retain(|_, mouth| {
@@ -110,7 +122,7 @@ impl Mouths {
             looks: VecDeque::new(),
             rest: None,
         });
-        mouth.looks.push_back((now_us, shape, eyes, angle));
+        mouth.looks.push_back((now_us, shape, eyes, angle, open));
         while mouth
             .looks
             .front()
@@ -143,19 +155,46 @@ impl Mouths {
         if jitter > MOST_JITTER {
             return UNKNOWN;
         }
-        let change = pairs.map(|(a, b)| (b.1 - a.1).powi(2)).sum::<f32>() / steps;
-        // What the jitter explains of the width's change is taken off.
+        // The eye line's jitter at rest, fed on every judged look, so the
+        // corners taking back over after the mesh have it up to date.
         let rest = mouth
             .rest
             .map_or(jitter.powi(2), |rest| rest + 0.1 * (jitter.powi(2) - rest));
         mouth.rest = Some(rest);
+        // The mesh read every look of the window: its inner lips, not the
+        // corners, and its own steadiness is not the eye line's.
+        let opens: Option<Vec<f32>> = looks.iter().map(|look| look.4).collect();
+        if let Some(opens) = opens {
+            let score = (opens
+                .windows(2)
+                .map(|two| (two[1] - two[0]).powi(2))
+                .sum::<f32>()
+                / steps)
+                .sqrt();
+            let state = if score >= MESH_SPEAKING_AT {
+                SpeakingState::Yes
+            } else {
+                SpeakingState::No
+            };
+            return Speaking {
+                state,
+                score,
+                from: Some(SpeakingFrom::Mesh),
+            };
+        }
+        let change = pairs.map(|(a, b)| (b.1 - a.1).powi(2)).sum::<f32>() / steps;
+        // What the jitter explains of the width's change is taken off.
         let score = (change - JITTER_TO_SHAPE * rest).max(0.0).sqrt();
         let state = if score >= SPEAKING_AT {
             SpeakingState::Yes
         } else {
             SpeakingState::No
         };
-        Speaking { state, score }
+        Speaking {
+            state,
+            score,
+            from: Some(SpeakingFrom::Corners),
+        }
     }
 }
 
@@ -271,7 +310,7 @@ mod tests {
             .into_iter()
             .map(|at| {
                 let seen = marks(&scene, at as f32 / 1e6, &mut noise);
-                (at, mouths.judge(1, &seen, facing::yaw_deg(&seen), at))
+                (at, mouths.judge(1, &seen, facing::yaw_deg(&seen), None, at))
             })
             .filter(|(at, _)| *at >= WINDOW_US)
             .map(|(_, judged)| judged)
@@ -415,7 +454,7 @@ mod tests {
         };
         for look in 0..20u64 {
             let seen = marks(&talking, look as f32 * 0.3, &mut noise);
-            let said = mouths.judge(3, &seen, None, look * LOOK_US);
+            let said = mouths.judge(3, &seen, None, None, look * LOOK_US);
             assert_eq!(said.state, SpeakingState::Unknown, "look {look}");
         }
     }
@@ -425,9 +464,65 @@ mod tests {
         let (mut mouths, mut noise) = (Mouths::default(), Noise(1));
         for look in 0..(LEAST_LOOKS as u64 - 1) {
             let seen = marks(&STILL, look as f32 * 0.3, &mut noise);
-            let said = mouths.judge(7, &seen, Some(0.0), look * LOOK_US);
+            let said = mouths.judge(7, &seen, Some(0.0), None, look * LOOK_US);
             assert_eq!(said.state, SpeakingState::Unknown);
         }
+    }
+
+    /// With the mesh read on every look (#720): a mouth whose inner-lip gap
+    /// opens and shuts is speaking, one that holds still (the mesh's own
+    /// jitter, a few thousandths) is not, whatever the corners do; and a
+    /// window with one look the mesh missed is judged by the corners.
+    #[test]
+    fn with_the_mesh_the_inner_lips_decide() {
+        let (mut talking, mut still, mut noise) = (Mouths::default(), Mouths::default(), Noise(5));
+        for look in 0..20u64 {
+            // The corners of a talking face, for both: only the mesh differs.
+            let seen = marks(
+                &Scene {
+                    talk: true,
+                    ..STILL
+                },
+                look as f32 * 0.3,
+                &mut noise,
+            );
+            let gap = 0.04 + 0.03 * (look as f32 * 1.7).sin();
+            let held = 0.01 + 0.003 * (noise.uniform() - 0.5);
+            let said = talking.judge(1, &seen, Some(0.0), Some(gap), look * LOOK_US);
+            let quiet = still.judge(2, &seen, Some(0.0), Some(held), look * LOOK_US);
+            if look + 1 >= LEAST_LOOKS as u64 {
+                assert_eq!(
+                    said.state,
+                    SpeakingState::Yes,
+                    "talking, look {look}: {said:?}"
+                );
+                assert_eq!(
+                    quiet.state,
+                    SpeakingState::No,
+                    "still, look {look}: {quiet:?}"
+                );
+            }
+        }
+        // One look in the window without the mesh: the corners judge. The
+        // mesh would hold this mouth still (0.01 each look) and say no; the
+        // talking corners say yes.
+        let mut mixed = Mouths::default();
+        let mut last = None;
+        for look in 0..8u64 {
+            let seen = marks(
+                &Scene {
+                    talk: true,
+                    ..STILL
+                },
+                look as f32 * 0.3,
+                &mut noise,
+            );
+            let open = (look != 5).then_some(0.01);
+            last = Some(mixed.judge(3, &seen, Some(0.0), open, look * LOOK_US));
+        }
+        let last = last.unwrap();
+        assert_eq!(last.state, SpeakingState::Yes, "{last:?}");
+        assert_eq!(last.from, Some(SpeakingFrom::Corners));
     }
 
     /// The margins, by face size and jitter: `cargo test -p lamp-eyes
