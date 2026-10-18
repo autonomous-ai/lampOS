@@ -1591,13 +1591,10 @@ impl Attention {
         request == self.request && matches!(self.verdict, Some(Verdict::Hold(_)))
     }
 
-    /// Whether the calls of `request` are held too: as its answer is,
-    /// except when the Policy chose `look_up`, whose words are held and
-    /// whose call is left to the lamp's own gate for actions
-    /// ([`crate::going_on_asks::LOOKED_UP`], the first builder's ruling on
-    /// #1538).
-    pub fn holds_calls(&self, request: u64) -> bool {
-        self.holds(request) && self.verdict != Some(Verdict::Hold(crate::going_on_asks::LOOKED_UP))
+    /// Whether what was heard of the request in hand names a timer, a
+    /// reminder or the lamp ([`crate::going_on_asks::names_the_schedule`]).
+    pub fn names_the_schedule(&self) -> bool {
+        crate::going_on_asks::names_the_schedule(&self.heard)
     }
 }
 

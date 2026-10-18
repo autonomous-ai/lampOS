@@ -41,12 +41,19 @@
 //!   on every tick.
 //! - **What it plays on** ([`Says`]): `answer`, or a `stay_quiet` whose
 //!   `follows_lamp` is [`crate::policy_holds::FOLLOWS_FROM`] or more (said
-//!   back to the lamp). Held on any other `stay_quiet`, and on `look_up`,
-//!   which turns to whoever spoke without speaking, its call run all the
-//!   same (the first builder's ruling on #1538: the Policy's choice
-//!   decides; tonight's battery sets the bar). With no decision in time it is
+//!   back to the lamp), or `look_up` (the first builder on #1522, 19:04: a
+//!   question put to the lamp mid-conversation is the lamp's, held for one
+//!   on lamp-4ace at 18:44). Held on any other `stay_quiet`, its calls with
+//!   it (the first builder on #1538, 16:51: tonight's battery sets the
+//!   bar). With no decision in time it is
 //!   played, as without the switch, and the journal says so: a Policy that
 //!   is down must not make the lamp deaf in a conversation.
+//! - **No timer from talk:** in a busy room, a reply that follows the lamp
+//!   sets nothing on the schedule unless its words name a timer, a reminder
+//!   or the lamp ([`names_the_schedule`]; the first builder on #1522, 19:04).
+//! - **A busy room ends sooner once the lamp is answering someone:** a
+//!   minute after the last talk between people, not three, once the lamp
+//!   has answered since (`RoomTold::end_busy_once_answered`, #1522, 19:08).
 //! - **Its cost:** none of the 48 lines got `answer`, so what it lets
 //!   through, it lets through by `follows_lamp`. A follow-up said to the
 //!   lamp that the Policy does not read as said back to it is held (17 of
@@ -69,10 +76,13 @@ pub const ANSWER: &str =
 pub const FOLLOWING: &str =
     "a conversation with the lamp is going on, and the Policy found the line said back to the lamp";
 pub const NOT_THE_LAMPS: &str = "a busy room: a conversation with the lamp is going on, but the Policy judged the line not for the lamp";
-/// A `look_up`: its words are held, and a call it makes is left to the
-/// lamp's own gate for actions ([`crate::policy_holds`]), which takes a
-/// `look_up` up (the first builder's ruling on #1538).
-pub const LOOKED_UP: &str = "a busy room: a conversation with the lamp is going on, and the Policy chose to turn to whoever spoke without the lamp speaking";
+/// A `look_up`: in a conversation going on with the lamp, a line the
+/// Policy turns to is the lamp's to answer (the first builder on #1522,
+/// 19:04, after lamp-4ace's 18:44 battery held "What do you see right
+/// now?" for one). Turning without speaking is right for the lamp named in
+/// passing, not for a question put to it mid-conversation.
+pub const LOOKED_UP: &str =
+    "a conversation with the lamp is going on, and the Policy turned to whoever spoke";
 pub const NO_DECISION: &str =
     "a conversation with the lamp is going on, and no decision of the Policy's came in time";
 /// The Policy decided the line only in shadow (`lamp-policy` without `--act
@@ -91,13 +101,38 @@ pub enum Says {
     /// `stay_quiet`, but said back to the lamp
     /// ([`crate::policy_holds::Verdict::StayQuietFollowing`]).
     Following,
-    /// `look_up`: turn to whoever spoke, without speaking. Its words are
-    /// held, and its call runs as the action gate says.
+    /// `look_up`: turn to whoever spoke. In a conversation going on with
+    /// the lamp, played.
     LookUp,
     /// `stay_quiet`: not for the lamp to answer.
     Not,
     /// Decided only in shadow: nothing to act on ([`SHADOW_ONLY`]).
     Shadow,
+}
+
+/// Words that ask for something on the schedule, or call the lamp.
+const SCHEDULE_WORDS: [&str; 10] = [
+    "timer",
+    "timers",
+    "reminder",
+    "reminders",
+    "remind",
+    "alarm",
+    "alarms",
+    "countdown",
+    "lamp",
+    "lamp's",
+];
+
+/// Whether `heard` names a timer, a reminder or the lamp (the first
+/// builder on #1522, 19:04): in a busy room, with the switch, a reply that
+/// follows the lamp sets nothing on the schedule without such a word. On
+/// lamp-4ace at 18:4x Daniel's "Yes, give me five minutes.", to Samantha,
+/// set a five-minute timer that rang mid-day.
+pub fn names_the_schedule(heard: &str) -> bool {
+    heard
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .any(|word| SCHEDULE_WORDS.contains(&word.to_lowercase().as_str()))
 }
 
 /// The verdict for such a line from what the Policy said, or `None` if
@@ -107,7 +142,7 @@ pub fn verdict(says: Option<Says>) -> crate::attention::Verdict {
     match says {
         Some(Says::Answer) => Verdict::Play(ANSWER),
         Some(Says::Following) => Verdict::Play(FOLLOWING),
-        Some(Says::LookUp) => Verdict::Hold(LOOKED_UP),
+        Some(Says::LookUp) => Verdict::Play(LOOKED_UP),
         Some(Says::Not) => Verdict::Hold(NOT_THE_LAMPS),
         Some(Says::Shadow) => Verdict::Play(SHADOW_ONLY),
         None => Verdict::Play(NO_DECISION),
@@ -148,7 +183,7 @@ mod tests {
         assert_eq!(verdict(Some(Says::Answer)), Verdict::Play(ANSWER));
         assert_eq!(verdict(Some(Says::Following)), Verdict::Play(FOLLOWING));
         assert_eq!(verdict(Some(Says::Not)), Verdict::Hold(NOT_THE_LAMPS));
-        assert_eq!(verdict(Some(Says::LookUp)), Verdict::Hold(LOOKED_UP));
+        assert_eq!(verdict(Some(Says::LookUp)), Verdict::Play(LOOKED_UP));
         assert_eq!(verdict(Some(Says::Shadow)), Verdict::Play(SHADOW_ONLY));
         assert_eq!(verdict(None), Verdict::Play(NO_DECISION));
         // Each reason still says the conversation was going on, for the
@@ -165,6 +200,29 @@ mod tests {
                 why.contains("a conversation with the lamp is going on"),
                 "{why}"
             );
+        }
+    }
+
+    /// A reply sets a timer in a busy room only when its words name one,
+    /// a reminder or the lamp (the first builder on #1522, 19:04).
+    #[test]
+    fn only_a_line_naming_a_timer_a_reminder_or_the_lamp_names_the_schedule() {
+        for named in [
+            "Set a timer for five minutes, please.",
+            "Remind me at six.",
+            "And a reminder for the call.",
+            "Lamp, five minutes.",
+            "Make it a TIMER for ten.",
+        ] {
+            assert!(names_the_schedule(named), "{named}");
+        }
+        for talk in [
+            "Yes, give me five minutes.",
+            "I'll be there in ten minutes.",
+            "Lampshade looks dusty.",
+            "",
+        ] {
+            assert!(!names_the_schedule(talk), "{talk}");
         }
     }
 

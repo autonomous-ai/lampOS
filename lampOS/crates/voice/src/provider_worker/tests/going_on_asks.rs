@@ -137,8 +137,10 @@ async fn with_the_switch_a_line_going_on_in_a_busy_room_is_played_only_as_the_po
             .await
             .0
     );
+    // A `look_up` is the lamp's in a conversation going on with it (the
+    // first builder on #1522, 19:04).
     assert!(
-        !going_on_line(true, Decided::Before("look_up", 0.3), CAR)
+        going_on_line(true, Decided::Before("look_up", 0.3), CAR)
             .await
             .0
     );
@@ -302,14 +304,13 @@ async fn with_the_switch_a_remark_held_as_one_does_not_wait_for_the_policy() {
     );
 }
 
-/// The first builder's ruling on #1538 (16:51): a `look_up` holds the
-/// line's words and leaves its call to the lamp's own gate for actions,
-/// which takes a `look_up` up, so the call runs; a `stay_quiet` under 0.6
-/// holds both. The call is the line's first output, as for "And turn
-/// yourself up a little.", and the gate for actions is off, as in the
-/// product units.
+/// A `look_up` plays in a conversation going on with the lamp (the first
+/// builder on #1522, 19:04, replacing #1538's 16:51 on this): its words and
+/// its call. A `stay_quiet` under 0.6 holds both. The call is the line's
+/// first output, as for "And turn yourself up a little.", and the gate for
+/// actions is off, as in the product units.
 #[tokio::test(start_paused = true)]
-async fn with_the_switch_a_look_up_holds_the_words_and_its_call_runs() {
+async fn with_the_switch_a_look_up_plays_and_a_stay_quiet_holds_its_call_too() {
     let _clock = logical_clock();
     for (choice, runs) in [("look_up", true), ("stay_quiet", false)] {
         let _room = super::spoken_to::OwnRoom::fresh();
@@ -330,21 +331,86 @@ async fn with_the_switch_a_look_up_holds_the_words_and_its_call_runs() {
         let told = rig.service_message(&mut dial).await;
         let response = &told["toolResponse"]["functionResponses"][0]["response"];
         assert_eq!(desk.asked.try_recv().is_ok(), runs, "{choice}: {response}");
-        // What the model says after it is held either way, watched for
-        // half a second with the worker's lease kept fresh: in this rig a
-        // turn that made a call is not completed (`policy_holds`' tests).
+        // What the model says after it, watched for half a second with the
+        // worker's lease kept fresh: in this rig a turn that made a call is
+        // not completed (`policy_holds`' tests).
         dial.service.send(provider_audio(9, 240)).await;
+        let mut played = false;
         let until = crate::scenario_clock::instant() + Duration::from_millis(500);
         while crate::scenario_clock::instant() < until {
             rig.publish();
             while let Some(wire) = rig.take() {
-                assert!(
-                    !matches!(wire, Wire::Output(ProviderOutput::Audio { request: of, .. }) if of == request),
-                    "{choice}: its words were played"
-                );
+                played |= matches!(wire, Wire::Output(ProviderOutput::Audio { request: of, .. }) if of == request);
             }
             rig.tick(Duration::from_millis(2)).await;
         }
+        assert_eq!(played, runs, "{choice}: its words");
+        rig.stop().await;
+    }
+}
+
+/// The first builder on #1522 (19:04): on lamp-4ace at 18:4x, Daniel's
+/// "Yes, give me five minutes.", to Samantha, followed the lamp by Jev's
+/// `follows_lamp` and set a five-minute timer that rang mid-day. With the
+/// switch, in a busy room, a reply that follows the lamp sets nothing on
+/// the schedule unless its words name a timer, a reminder or the lamp; the
+/// gate for actions on, as on lamp-4ace.
+#[tokio::test(start_paused = true)]
+async fn with_the_switch_talk_in_a_busy_room_sets_no_timer_unless_it_names_one() {
+    let _clock = logical_clock();
+    for (line, sets) in [
+        ("Yes, give me five minutes.", false),
+        ("And set a timer for five minutes.", true),
+    ] {
+        let _room = super::spoken_to::OwnRoom::fresh();
+        let mut desk = super::policy_holds::Desk::new(if sets { "gtn" } else { "gtt" });
+        let mut options = desk.options(true);
+        options.attention = Some(busy_going_on);
+        options.going_on_asks = Some(desk.bus());
+        let mut rig = LiveRig::start_with(quick_policy(), options);
+        let mut dial = rig.ready().await;
+        // The lamp answered a line just before, so the turn follows it.
+        let first = rig.speak(&mut dial, false, true).await;
+        desk.decide_with(Some(first), "answer", json!({}));
+        dial.service.send(provider_audio(9, 480)).await;
+        dial.service.send(idle_complete()).await;
+        let until = crate::scenario_clock::instant() + Duration::from_secs(3);
+        let mut ended = false;
+        while !ended {
+            assert!(
+                crate::scenario_clock::instant() < until,
+                "{line}: the first never ended"
+            );
+            rig.publish();
+            while let Some(wire) = rig.take() {
+                ended |= matches!(wire, Wire::Output(ProviderOutput::TurnComplete { request, .. }) if request == first);
+            }
+            rig.tick(Duration::from_millis(2)).await;
+        }
+        rig.owner
+            .complete_turn(real_time(), rig.snapshot.owner().unwrap())
+            .unwrap();
+        rig.publish();
+        let request = rig.speak(&mut dial, false, true).await;
+        dial.service.send(heard(line)).await;
+        desk.decide_with(
+            Some(request),
+            "stay_quiet",
+            json!({"calls_lamp": 0.05, "follows_lamp": 0.72}),
+        );
+        dial.service
+            .send(json!({"toolCall":{"functionCalls":[
+                {"id":"t1","name":"set_timer","args":{"minutes":5}}
+            ]}}))
+            .await;
+        let told = rig.service_message(&mut dial).await;
+        let response = told["toolResponse"]["functionResponses"][0]["response"].clone();
+        assert_eq!(desk.asked.try_recv().is_ok(), sets, "{line}: {response}");
+        assert_eq!(
+            response == json!({"done": false, "next": crate::policy_holds::HELD}),
+            !sets,
+            "{line}: {response}"
+        );
         rig.stop().await;
     }
 }

@@ -103,6 +103,9 @@ const QUIET_ENDS_RUN: usize = 2;
 /// With [`RoomTold::count_only_talk`], busy ends this long after the last
 /// thing left unanswered that counts as talk.
 const BUSY_ENDS_AFTER_US: u64 = 180_000_000;
+/// With [`RoomTold::end_busy_once_answered`] as well, busy ends this long
+/// after the last talk once the lamp has answered something since it.
+const BUSY_ENDS_ONCE_ANSWERED_US: u64 = 60_000_000;
 /// With [`RoomTold::count_only_talk`], this many things said and left
 /// unanswered since the lamp last spoke, and a conversation with it is no
 /// longer going on: the people have gone on talking to each other
@@ -167,6 +170,11 @@ pub struct RoomTold {
     /// three requests is kept out whole (the reviewer on #1291).
     cut_ins_not_talk: bool,
     over_the_lamp: VecDeque<u64>,
+    /// Busy ends [`BUSY_ENDS_ONCE_ANSWERED_US`] after the last talk once the
+    /// lamp has answered since it ([`Self::end_busy_once_answered`]), and
+    /// when it last did.
+    ends_once_answered: bool,
+    answered_us: Option<u64>,
     room: Room,
     /// The session last told, and what it was told.
     told: Option<(u64, Room)>,
@@ -193,9 +201,23 @@ impl RoomTold {
             watching_since_us: None,
             cut_ins_not_talk: false,
             over_the_lamp: VecDeque::new(),
+            ends_once_answered: false,
+            answered_us: None,
             room: Room::Unknown,
             told: None,
         }
+    }
+
+    /// With only talk counted, end a busy room [`BUSY_ENDS_ONCE_ANSWERED_US`]
+    /// after the last talk once the lamp has answered something since it,
+    /// from now on (`LAMP_GOING_ON_ASKS`, the first builder on #1522, 19:08).
+    /// People talk, then one of them turns to the lamp: on lamp-4ace at
+    /// 18:51 a day line said to the lamp 108 s after two people's talk was
+    /// still in a busy room, which the 180 s keep. While people go on
+    /// talking it is busy as before, so a call answered amid their talk
+    /// ends nothing (scene 3).
+    pub fn end_busy_once_answered(&mut self, on: bool) {
+        self.ends_once_answered = on;
     }
 
     /// A request began: something was heard.
@@ -338,6 +360,7 @@ impl RoomTold {
         self.talk_counted = self.talk_counted.max(request);
         self.quiet_since_us = Some(now_us);
         self.last_sound_us = now_us;
+        self.answered_us = Some(now_us);
     }
 
     /// The lamp answered `request` by doing something, a light or a timer,
@@ -436,11 +459,21 @@ impl RoomTold {
         } else {
             BUSY_RUN
         };
+        let ends_after = if self.ends_once_answered
+            && self
+                .answered_us
+                .zip(self.last_talk_us)
+                .is_some_and(|(answered, talk)| answered > talk)
+        {
+            BUSY_ENDS_ONCE_ANSWERED_US
+        } else {
+            BUSY_ENDS_AFTER_US
+        };
         let talk_over = self.talk_only
             && self.room == Room::Busy
             && self
                 .last_talk_us
-                .is_some_and(|talk| now_us.saturating_sub(talk) >= BUSY_ENDS_AFTER_US);
+                .is_some_and(|talk| now_us.saturating_sub(talk) >= ends_after);
         // With only talk counted: five minutes with no talk between people
         // is a quiet room, whatever one person says to the lamp meanwhile.
         // Without it a room where someone keeps talking to the lamp from
@@ -1455,5 +1488,45 @@ mod tests {
         let flags = [FLAG.to_owned(), "x".to_owned()];
         assert_eq!(take(&flags), (true, &flags[1..]));
         assert_eq!(take(&flags[1..]), (false, &flags[1..]));
+    }
+
+    /// #1522 (the first builder, 19:08): with `LAMP_GOING_ON_ASKS`, once the
+    /// lamp has answered something since two people last talked, their busy
+    /// room ends a minute after that talk, not three; while they go on
+    /// talking it stays busy. On lamp-4ace at 18:51 a day line 108 s after
+    /// the talk was still in a busy room. Without the switch, three minutes.
+    #[test]
+    fn with_the_switch_a_busy_room_ends_a_minute_after_its_talk_once_the_lamp_has_answered() {
+        const S: u64 = 1_000_000;
+        let busy_then_answered = |on: bool| {
+            let mut room = RoomTold::new();
+            room.count_only_talk(true);
+            room.end_busy_once_answered(on);
+            for (request, at) in [(1, 10), (2, 20), (3, 30)] {
+                room.heard(request, at * S);
+                room.ended(request, at * S + S / 2);
+                room.left_unanswered(request, at * S + S);
+            }
+            assert_eq!(room.at(31 * S), Room::Busy);
+            // Someone turns to the lamp, and it answers.
+            room.heard(4, 36 * S);
+            room.ended(4, 37 * S);
+            room.spoke(4, 38 * S);
+            room
+        };
+        // The last talk was left at 31 s.
+        let mut room = busy_then_answered(true);
+        assert_eq!(room.at(90 * S), Room::Busy);
+        assert_eq!(room.at(92 * S), Room::Quiet);
+        let mut room = busy_then_answered(false);
+        assert_eq!(room.at(92 * S), Room::Busy);
+        assert_eq!(room.at(212 * S), Room::Quiet);
+        // Talk after the answer: busy as before, three minutes from it.
+        let mut room = busy_then_answered(true);
+        room.heard(5, 40 * S);
+        room.ended(5, 41 * S);
+        room.left_unanswered(5, 42 * S);
+        assert_eq!(room.at(103 * S), Room::Busy);
+        assert_eq!(room.at(223 * S), Room::Quiet);
     }
 }
