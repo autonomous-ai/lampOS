@@ -67,6 +67,26 @@
 //!   all 79 rows were in conversation and a turn follows no line of the
 //!   lamp's when it has said none lately (the reviewer on #1054).
 //!
+//! - **With `LAMP_FOLLOWS_RUN=on`, a reply to the lamp runs its light and
+//!   its volume** (#1465), off unless set, and only with the Policy holding
+//!   actions: the same reply (a `stay_quiet` with `follows_lamp`
+//!   [`FOLLOWS_FROM`] or more, in conversation, not after a line the lamp
+//!   left unanswered) runs the light's tools (`light_*`) and
+//!   [`REPLY_VOLUME`] as well as what the schedule [`sets`]
+//!   ([`runs_on_a_reply`]). Still held on a reply: every skill's function
+//!   (`check_my_work` sends a still of the desk to the model, `dance` and
+//!   `show_verdict` move the body), `volume_mute` (a lamp muted wrongly
+//!   cannot say what it did) and `cancel_reminder` (the first builder on
+//!   #1474, after the reviewer's finding). On lamp-4ace on 2026-10-18 at
+//!   10:57 "Thanks. Now turn yourself back up a little, please.", 13 s
+//!   after the lamp had turned itself down when asked by name, scored
+//!   `follows_lamp` 0.89 with p 0.31, `stay_quiet` (the Policy's room
+//!   `unknown` after a restart): its `volume_up` was held, and the model
+//!   asked again 72 times in 49 s. What it costs: a line the Policy scores
+//!   as said back to the lamp that was not (6 of the 46 such rows not said
+//!   to it on 2026-10-16) can now change the light or the volume, which the
+//!   person sees or hears and can ask back.
+//!
 //! Nothing of what was heard is read here: the decision's choice and its
 //! `follows_lamp` answer only.
 use serde_json::{Value, json};
@@ -76,6 +96,12 @@ use std::{collections::VecDeque, io, path::Path, time::Duration};
 pub const ENVIRONMENT: &str = "LAMP_POLICY_HOLDS_ACTIONS";
 /// The provider worker's flag for it, after `--sounds-checked`.
 pub const FLAG: &str = "--policy-holds-actions";
+/// Where the coordinator reads whether a reply to the lamp runs its light
+/// and its volume too ([`runs_on_a_reply`], #1465). `on` only, and only
+/// with [`ENVIRONMENT`].
+pub const FOLLOWS_ENVIRONMENT: &str = "LAMP_FOLLOWS_RUN";
+/// The provider worker's flag for it, right after [`FLAG`].
+pub const FOLLOWS_FLAG: &str = "--follows-run";
 /// The longest an action waits for the turn's decision.
 pub const WAIT: Duration = Duration::from_secs(2);
 /// A hearing of the name at this score or more lets the action run, as the
@@ -134,16 +160,38 @@ pub fn sets(route: &crate::tools::Route, name: &str) -> bool {
     matches!(route, crate::tools::Route::Schedule(_)) && SETS.contains(&name)
 }
 
-/// The worker's argument for the switch in the environment.
-pub fn arguments_from_environment() -> Vec<String> {
-    arguments(std::env::var(ENVIRONMENT).ok().as_deref())
+/// Of the volume's functions, those a reply to the lamp runs with
+/// [`FOLLOWS_FLAG`]: not `volume_mute`, since a lamp muted wrongly cannot
+/// say what it did (the first builder on #1474).
+pub const REPLY_VOLUME: [&str; 3] = ["volume_up", "volume_down", "volume_unmute"];
+
+/// Whether a held call, by its route and its name, runs on a reply to the
+/// lamp ([`Verdict::StayQuietFollowing`]): what the schedule [`sets`]; and
+/// with [`FOLLOWS_FLAG`] (`light_and_volume`), the light's tools and
+/// [`REPLY_VOLUME`] on the actions' own route too, never a skill's (#1465).
+pub fn runs_on_a_reply(route: &crate::tools::Route, name: &str, light_and_volume: bool) -> bool {
+    let actions = matches!(route, crate::tools::Route::Executive(directory)
+        if directory.file_name() != Some(std::ffi::OsStr::new(crate::tools::SKILLS_DIR)));
+    sets(route, name)
+        || light_and_volume
+            && actions
+            && (name.starts_with("light_") || REPLY_VOLUME.contains(&name))
 }
 
-fn arguments(value: Option<&str>) -> Vec<String> {
-    if value == Some("on") {
-        vec![FLAG.to_owned()]
-    } else {
-        Vec::new()
+/// The worker's arguments for the switch in the environment, and for
+/// [`FOLLOWS_ENVIRONMENT`] after it, which means nothing without it.
+pub fn arguments_from_environment() -> Vec<String> {
+    arguments(
+        std::env::var(ENVIRONMENT).ok().as_deref(),
+        std::env::var(FOLLOWS_ENVIRONMENT).ok().as_deref(),
+    )
+}
+
+fn arguments(value: Option<&str>, follows: Option<&str>) -> Vec<String> {
+    match (value == Some("on"), follows == Some("on")) {
+        (true, true) => vec![FLAG.to_owned(), FOLLOWS_FLAG.to_owned()],
+        (true, false) => vec![FLAG.to_owned()],
+        (false, _) => Vec::new(),
     }
 }
 
@@ -151,6 +199,14 @@ fn arguments(value: Option<&str>) -> Vec<String> {
 pub fn take(flags: &[String]) -> (bool, &[String]) {
     match flags {
         [flag, rest @ ..] if flag == FLAG => (true, rest),
+        _ => (false, flags),
+    }
+}
+
+/// Take a leading [`FOLLOWS_FLAG`] off a worker's flags.
+pub fn take_follows(flags: &[String]) -> (bool, &[String]) {
+    match flags {
+        [flag, rest @ ..] if flag == FOLLOWS_FLAG => (true, rest),
         _ => (false, flags),
     }
 }
@@ -183,7 +239,8 @@ pub enum Verdict {
     StayQuiet,
     /// `stay_quiet`, but said back to the lamp about what it last said, by
     /// the decision's `follows_lamp` ([`FOLLOWS_FROM`]): what it sets on the
-    /// schedule ([`SETS`]) is not held (#1040).
+    /// schedule ([`SETS`]) is not held (#1040), nor, with [`FOLLOWS_FLAG`],
+    /// its light and its volume ([`runs_on_a_reply`], #1465).
     StayQuietFollowing,
     /// `answer` or `look_up`: the lamp's.
     TakenUp,
@@ -191,12 +248,17 @@ pub enum Verdict {
 
 /// The gate for an action, from its turn's verdict if one has come,
 /// whether the name was heard in the turn, how long the action has waited,
-/// and whether it sets something on the schedule ([`sets`]).
-pub fn gate(verdict: Option<Verdict>, name_heard: bool, waited: Duration, sets: bool) -> Gate {
+/// and whether a reply to the lamp runs it ([`runs_on_a_reply`]).
+pub fn gate(
+    verdict: Option<Verdict>,
+    name_heard: bool,
+    waited: Duration,
+    on_a_reply: bool,
+) -> Gate {
     match verdict {
         _ if name_heard => Gate::Run,
         Some(Verdict::StayQuiet) => Gate::Hold,
-        Some(Verdict::StayQuietFollowing) if sets => Gate::Run,
+        Some(Verdict::StayQuietFollowing) if on_a_reply => Gate::Run,
         Some(Verdict::StayQuietFollowing) => Gate::Hold,
         Some(Verdict::TakenUp) => Gate::Run,
         None if waited < WAIT => Gate::Wait,
@@ -384,6 +446,56 @@ mod tests {
         assert!(!sets(&Route::Nobody, "set_reminder"));
     }
 
+    /// #1465: with `--follows-run` a reply to the lamp runs the light's
+    /// tools and the volume but its mute on the actions' route, never a
+    /// skill's function nor a cancel; without it, only what [`sets`] says.
+    #[test]
+    fn with_follows_run_a_reply_runs_the_light_and_the_volume_only() {
+        use crate::tools::Route;
+        let place = std::path::PathBuf::from("/run/lamp-actions");
+        let skills = Route::Executive(place.join(crate::tools::SKILLS_DIR));
+        for (name, runs) in [
+            ("volume_up", true),
+            ("volume_down", true),
+            ("volume_unmute", true),
+            ("volume_mute", false),
+            ("light_on", true),
+            ("light_off", true),
+            ("light_colour", true),
+            ("light_dimmer", true),
+            ("cancel_reminder", false),
+            ("dance", false),
+        ] {
+            assert_eq!(
+                runs_on_a_reply(&Route::Executive(place.clone()), name, true),
+                runs,
+                "{name}"
+            );
+            assert!(
+                !runs_on_a_reply(&Route::Executive(place.clone()), name, false),
+                "{name}"
+            );
+        }
+        for name in [
+            "check_my_work",
+            "dance",
+            "show_verdict",
+            "light_on",
+            "volume_up",
+        ] {
+            assert!(!runs_on_a_reply(&skills, name, true), "the skill's {name}");
+        }
+        for name in crate::tools::SCHEDULE_NAMES {
+            for light_and_volume in [true, false] {
+                assert_eq!(
+                    runs_on_a_reply(&Route::Schedule(place.clone()), name, light_and_volume),
+                    sets(&Route::Schedule(place.clone()), name),
+                    "{name}"
+                );
+            }
+        }
+    }
+
     /// The executive's functions and the schedule's three that set or take
     /// away are held; the schedule's others, and every other route, are not.
     #[test]
@@ -410,13 +522,19 @@ mod tests {
 
     #[test]
     fn the_switch_is_on_only_and_its_flag_is_taken_once() {
-        assert_eq!(arguments(Some("on")), [FLAG]);
+        assert_eq!(arguments(Some("on"), None), [FLAG]);
+        assert_eq!(arguments(Some("on"), Some("on")), [FLAG, FOLLOWS_FLAG]);
         for not_on in [None, Some("yes"), Some("ON"), Some("1")] {
-            assert!(arguments(not_on).is_empty());
+            assert!(arguments(not_on, None).is_empty());
+            // A reply runs nothing more where nothing is held.
+            assert!(arguments(not_on, Some("on")).is_empty());
+            assert_eq!(arguments(Some("on"), not_on), [FLAG]);
         }
-        let flags: Vec<String> = [FLAG, "--next"].map(String::from).into();
+        let flags: Vec<String> = [FLAG, FOLLOWS_FLAG, "--next"].map(String::from).into();
         assert_eq!(take(&flags), (true, &flags[1..]));
         assert_eq!(take(&flags[1..]), (false, &flags[1..]));
+        assert_eq!(take_follows(&flags[1..]), (true, &flags[2..]));
+        assert_eq!(take_follows(&flags[2..]), (false, &flags[2..]));
     }
 
     fn verdicts(tag: &str) -> (Verdicts, std::path::PathBuf) {

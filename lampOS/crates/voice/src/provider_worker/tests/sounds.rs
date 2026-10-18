@@ -18,6 +18,7 @@ fn checked(on: bool) -> Options {
         ask_unclear: false,
         name_in_passing_ignored: false,
         policy_holds: None,
+        follows_run: false,
         wait_for_room: false,
         staff_note: false,
         spoken_to: false,

@@ -1180,6 +1180,32 @@ not held (the first builder, 05:57), nor is any other call:
   (and a cancel in such a turn held),
   `provider_worker::tests::policy_holds::a_timer_in_a_turn_after_a_line_the_lamp_left_unanswered_is_held`,
   `attention::tests::a_request_after_a_line_the_lamp_left_unanswered_follows_that_line`.
+- **With `LAMP_FOLLOWS_RUN=on`, a reply to the lamp runs its light and its
+  volume** (#1465), off unless set, and only with
+  `LAMP_POLICY_HOLDS_ACTIONS`. The same reply as above (`follows_lamp` 0.6
+  or more, in conversation, not after a line the lamp left unanswered)
+  runs the light's tools (`light_*`) and `volume_up`, `volume_down` and
+  `volume_unmute` (`policy_holds::REPLY_VOLUME`), as well as the schedule's
+  `set_timer` and `set_reminder` (`policy_holds::runs_on_a_reply`). Still
+  held on a reply: every skill's function, since `check_my_work`'s look
+  sends a still of the desk to the model and `dance` and `show_verdict`
+  move the body; `volume_mute`, since a lamp muted wrongly cannot say what
+  it did; and `cancel_reminder` (the first builder on #1474, after the
+  reviewer's finding). Named, or with a face turned, all of them run as
+  before. On lamp-4ace on 2026-10-18 at 10:57 "Thanks. Now turn yourself
+  back up a little, please.", 13 s after the lamp had turned itself down
+  when asked by name, scored `follows_lamp` 0.89 at p 0.31, `stay_quiet`
+  (the Policy's room `unknown` after a restart): its `volume_up` was held,
+  and the model asked again 72 times in 49 s. What it costs: a line
+  scored that high that was not said to the lamp (6 of the 46 on
+  2026-10-16) can change the light or the volume, which the person sees
+  or hears and can ask back. The journal says why it ran: `the turn
+  follows the lamp's last line, and its light and its volume are not held
+  from it`. Tests: `policy_holds::tests::with_follows_run_a_reply_runs_the_light_and_the_volume_only`,
+  `provider_worker::tests::policy_holds::with_follows_run_a_reply_to_the_lamp_turns_the_volume_back_up`
+  (with it off held; a cancel, the mute, `check_my_work` and `dance` held;
+  the volume held when the lamp said nothing lately or `follows_lamp` is
+  0.5), `provider_worker::tests::policy_holds::follows_run_is_read_right_after_policy_holds`.
 - **The turn's decision** is an attention decision the Policy publishes
   for real (`policy/decisions`, `about` `attention`, `shadow` false:
   `lamp-policy --act attention`) about the turn **by its number**
