@@ -938,6 +938,38 @@ fn a_press_during_the_stops_teardown_keeps_the_guard() {
     let _ = fs::remove_dir_all(&directory);
 }
 
+/// The reviewer's follow-up on #1632: the clean stop's release (#960) dates
+/// the record at the conversation's last read of the press queue, not at
+/// its save after the teardown, so a head hold reached during the teardown
+/// is the next start's.
+#[test]
+fn the_clean_stops_release_dates_the_record_at_the_last_poll() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, SystemTime};
+    let directory = std::env::temp_dir().join(format!("lv-clean-time-{}", monotonic_us()));
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let record = directory.join("mute.json");
+    let mut controls =
+        HandControls::with_test_guard("test-hand-clock", monotonic_us(), &record).unwrap();
+    controls.arm_active().unwrap();
+    controls.poll().unwrap();
+    // The teardown.
+    std::thread::sleep(Duration::from_millis(300));
+    // Against the moment just before the release, not the file's age after
+    // it, so a slow save cannot pass without the time (the reviewer on #1658).
+    let released = SystemTime::now();
+    assert!(released_after_cleanup(&mut controls, false).unwrap());
+    let before = released
+        .duration_since(fs::metadata(&record).unwrap().modified().unwrap())
+        .unwrap_or_default();
+    let _ = fs::remove_dir_all(&directory);
+    assert!(
+        before >= Duration::from_millis(250),
+        "{before:?} before the release: the save's time, not the last poll's"
+    );
+}
+
 /// The reviewer's P3s on #1592: the two places a run is marked as having
 /// heard, through the helpers the cycle and the conversation use, keep the
 /// guard for its fault; without them the same fault releases it.

@@ -2586,13 +2586,64 @@ fn the_records_time_is_the_releases_look_not_its_save() {
     owner.while_held = Some(Box::new(|| {
         std::thread::sleep(std::time::Duration::from_millis(300))
     }));
+    // Against the moment just before the release, not the file's age after
+    // it, so a slow save can neither pass without the time nor fail with it
+    // (the reviewer on #1658).
+    let released = SystemTime::now();
     assert!(owner.release_if_still_quiet().unwrap());
-    let age = SystemTime::now()
-        .duration_since(fs::metadata(directory.file()).unwrap().modified().unwrap())
-        .unwrap();
+    let after = record_time(&directory.file())
+        .duration_since(released)
+        .unwrap_or_default();
     assert!(
-        age >= std::time::Duration::from_millis(250),
-        "{age:?}: the save's time, not the look's"
+        after < std::time::Duration::from_millis(250),
+        "{after:?} after the release began: the save's time, not the look's"
+    );
+}
+
+/// How long before `released` the record at `path` is dated; nothing if it
+/// is dated after.
+fn dated_before(released: SystemTime, path: &Path) -> std::time::Duration {
+    released
+        .duration_since(record_time(path))
+        .unwrap_or_default()
+}
+
+fn record_time(path: &Path) -> SystemTime {
+    fs::metadata(path).unwrap().modified().unwrap()
+}
+
+/// The reviewer's follow-up on #1632: a clean stop sets the record's time
+/// to the conversation's last read of the press queue, not to its save
+/// after the teardown, so a head hold reached during the teardown is the
+/// next start's. With no read at all, the time is the save's.
+#[test]
+fn a_clean_stops_record_time_is_the_last_poll_not_its_save() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    owner.arm_active().unwrap();
+    owner.poll_at(START).unwrap();
+    // The teardown.
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    // Against the moment just before the release, not the file's age after
+    // it, so a slow save can neither pass without the time nor fail with it
+    // (the reviewer on #1658).
+    let released = SystemTime::now();
+    owner.disarm_after_clean_stop().unwrap();
+    let after_poll = dated_before(released, &directory.file());
+    assert!(
+        after_poll >= std::time::Duration::from_millis(250),
+        "{after_poll:?} before the release: the save's time, not the last poll's"
+    );
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    owner.arm_active().unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    let released = SystemTime::now();
+    owner.disarm_after_clean_stop().unwrap();
+    let unread = dated_before(released, &directory.file());
+    assert!(
+        unread < std::time::Duration::from_millis(250),
+        "{unread:?} before the release: no poll, so the save's time"
     );
 }
 
