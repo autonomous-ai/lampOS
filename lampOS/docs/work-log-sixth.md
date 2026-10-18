@@ -29,8 +29,9 @@ every result on a lamp below names it. Newest first.
 - #1442 (draft): `LAMP_SECOND_WARM` opens the backup voice's connections while
   the person speaks, about 0.3 s of connect saved. Parked with #779, which
   the owner put in the backlog.
-- #1448 (open, #1447): `capture_hold_worker` failed 2–4 of 11 on a loaded
-  Linux laptop; its rigs now run one worker at a time.
+- #1448 merged at 09:31 (#1447): `capture_hold_worker` failed 2–4 of 11 on a
+  loaded Linux laptop; its rigs now run one worker at a time. The full ARM64
+  run at `be6973d33` passed all 11, each alone, so the hold held.
 
 ## 2026-10-17 — evening: #828 confounded, go-aways are the lamp's own
 
