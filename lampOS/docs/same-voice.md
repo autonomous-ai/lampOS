@@ -132,7 +132,7 @@ plainly not the conversation's is no part of it
   them. One too short to know that began a conversation of its own leaves
   no voice known.
 - **The rule.** A line's **highest** cosine against the conversation's
-  prints, under 0.25 (`DIFFERENT_BELOW`), is another voice: no
+  prints, under 0.45 (`DIFFERENT_BELOW`), is another voice: no
   conversation is going on for that line, and only the name, a face, or close and turned to the
   lamp, let its answer out. The same voice, or no verdict, is as without
   the model. Each verdict is a journal line with its cosine: "another voice
@@ -163,7 +163,20 @@ to the lamp's answer to A ("And what about tomorrow?", when 1.5 s or
 longer) now needs B facing the lamp, or the name. A person at the desk
 would usually answer it. That is why it is behind its own model path.
 
-**The bar** is the measurement above, synthetic voices only: with both
+**The bar is 0.45**, the equal-error bar of lamp-4ace's labelled set
+(18 October, scored on lamp-4ace by the first builder with the Sixth's
+script; [verification](verification/same-voice-20261018/README.md), #1485).
+That set is 89 clips of Daniel, Samantha and Karen played on mic2 with the
+lamp quiet, cut as the worker prints them: 950 same-voice pairs (median
+0.62, lowest 0.27) and 2,966 of two (median 0.23, highest 0.69). Its equal
+error is **7.5% at 0.455**, wrong about 1 in 13 times each way. The bar of
+0.25 before it let 1,269 of the 2,966 pairs of two (43%) pass as one
+voice. Even at 0.45 **the check stays off**: it is at chance with the
+lamp's voice in a print, and if it's used at all it's one weak sign
+beside facing, lips (#720) and the name (the first builder, #1445).
+
+How the bar of 0.25 had come about, and why it was wrong: it was set on
+synthetic voices off the lamp. With both
 clips 1.5 s or longer and the lamp quiet, 0.25 took none of 37 same-voice
 pairs for two voices and caught 19 of 29 pairs of two. Those were whole
 clips, up to 6.2 s, and the voice prints only a line's first 1.8 s.
@@ -180,10 +193,8 @@ equal error was 14.3% (at 0.295). At 0.25, 85 of 793 same-voice pairs
 were read as two voices (11%) and 896 of 3,212 pairs of two as one
 (28%). With the lamp sounding over one or both it was 47.9%, chance. No
 bar separates them, so **the check stays off and is not to hold an
-answer** (the first builder's decision). Tuning waits on the labelled
-set recorded for it (#1445). If its quiet lines agree, #829 leans on
-facing, lip motion (#720) and the name instead, with this at most one
-weak sign among them. (An earlier note here, that one voice's own lines
+answer** (the first builder's decision). The labelled set (above) is the
+cleaner measurement and sets the bar at 0.45. (An earlier note here, that one voice's own lines
 came out at 0.14 and 0.24 in the 09:31 run, was wrong: they were two
 speakers, both judged right.)
 
@@ -214,7 +225,8 @@ speakers, both judged right.)
   question is only let through while a conversation is going on. And it
   needn't be a second person (the Seventh on #1415): a TV's line of 1.5 s
   or more, or the asker's own line shouted or whispered, can fall under
-  0.25 too, which was set on synthetic voices at one level. Before, one
+  the bar too. At 0.45, about 1 in 13 of one voice's own pairs does, on
+  the labelled set with the lamp quiet. Before, one
   false "another voice" held one line; now it holds every unnamed line
   after it until the lamp speaks. **So before `LAMP_SAME_VOICE_MODEL`
   goes on anywhere,** #829's battery on lamp-4ace gets a TV line and a
@@ -302,7 +314,7 @@ speakers, both judged right.)
   scene 3 went on with B and A's remark was judged against B's voice. Now
   the late print of a line let out as the conversation going on is
   compared with the conversation's voice first. Another voice's (under
-  0.25) is not taken; the journal says "another voice than the
+  0.45) is not taken; the journal says "another voice than the
   conversation's, known after its answer (cosine 0.12): the conversation
   is over", and at the next line's verdict the conversation ends, as for a
   line held as another voice (`RoomTold::another_voice_held`), that line
