@@ -17,7 +17,7 @@ use std::{
     io::{self, Write},
     os::unix::fs::OpenOptionsExt,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
     thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -684,24 +684,30 @@ pub fn run(
         status.error.clear();
         status.lan_ip.clear();
     }
-    let watching = Arc::new(Mutex::new(true));
+    // The watcher looks once a second while joining, and ends at once when
+    // the join does: its second is a wait on this channel, which the join's
+    // end closes, not a sleep that the save and the marker would wait out.
+    let (joining, watching) = mpsc::channel::<()>();
     let watcher = {
         let status = Arc::clone(status);
-        let watching = Arc::clone(&watching);
         let station_ip = Arc::clone(&station_ip);
         thread::spawn(move || {
-            while *watching.lock().unwrap() {
+            loop {
                 if let Some(address) = station_ip() {
                     status.lock().unwrap().lan_ip = address;
                 }
-                thread::sleep(Duration::from_secs(1));
+                if let Err(mpsc::RecvTimeoutError::Disconnected) =
+                    watching.recv_timeout(Duration::from_secs(1))
+                {
+                    break;
+                }
             }
         })
     };
     // Kept to put back if the settings cannot be saved after a good join.
     let previous = host.read_conf().ok().flatten();
     let joined = wifi::join(host, country, &accepted.ssid, &accepted.password);
-    *watching.lock().unwrap() = false;
+    drop(joining);
     let _ = watcher.join();
     let failure = match joined {
         Joined::Failed { reason } => Some(reason.detail().to_owned()),

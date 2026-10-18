@@ -20,7 +20,7 @@ use std::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tower::ServiceExt;
 
@@ -284,6 +284,7 @@ fn accepted() -> Accepted {
 fn a_joined_lamp_saves_the_settings_then_the_marker_and_says_it_is_set_up() {
     let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
     let mut saved = Saved::default();
+    let started = Instant::now();
     run(
         &status,
         &accepted(),
@@ -292,6 +293,10 @@ fn a_joined_lamp_saves_the_settings_then_the_marker_and_says_it_is_set_up() {
         &mut saved,
         || Some("192.168.1.23".into()),
     );
+    // The join here ends at once, and so does the address watcher with it:
+    // the settings and "set up" never wait out the watcher's second.
+    let took = started.elapsed();
+    assert!(took < Duration::from_millis(500), "{took:?}");
     let status = status.lock().unwrap().clone();
     assert_eq!(status.phase, Phase::Connected);
     assert!(status.set_up_completed);
