@@ -221,7 +221,22 @@ impl Rig {
         recovery: ReferenceRecovery,
         raw_blocks: bool,
     ) -> Self {
-        let mut rig = Self::spawn(device_name, failed, recovery, raw_blocks, false);
+        let mut rig = Self::spawn(device_name, failed, recovery, raw_blocks, false, false);
+        rig.handshake();
+        rig
+    }
+
+    /// The same, with the loop waiting on the microphone between passes
+    /// (`LAMP_CAPTURE_WAIT=on`, #705) or ticking.
+    fn start_waiting(device_name: &'static str, wait: bool) -> Self {
+        let mut rig = Self::spawn(
+            device_name,
+            (0, lamp_audio::device::errno::BUSY),
+            ReferenceRecovery::Off,
+            false,
+            false,
+            wait,
+        );
         rig.handshake();
         rig
     }
@@ -234,6 +249,7 @@ impl Rig {
             ReferenceRecovery::Off,
             false,
             true,
+            false,
         );
         rig.handshake();
         rig
@@ -246,6 +262,7 @@ impl Rig {
         recovery: ReferenceRecovery,
         raw_blocks: bool,
         record: bool,
+        wait: bool,
     ) -> Self {
         // A test that failed while holding it leaves it poisoned; the next
         // one still runs alone.
@@ -275,22 +292,27 @@ impl Rig {
             device.fail_next(lamp_audio::device::OPEN_CALL, errno);
         }
         let path = directory.path.clone();
-        let worker = std::thread::spawn(move || {
-            capture_on::<ScriptedCapture>(
-                channels,
-                parent_boot,
-                worker_boot,
-                &path,
-                device_name,
-                diagnostics.as_deref(),
-                NoiseSuppression::Off,
-                ReferenceClock::Capture,
-                recovery,
-                lamp_audio::Reference::AsGiven,
-                raw_blocks,
-            )
-            .map_err(|error| error.to_string())
-        });
+        // Named, for `capture_wait_cost` to find its counts in /proc.
+        let worker = std::thread::Builder::new()
+            .name("capture".into())
+            .spawn(move || {
+                capture_on::<ScriptedCapture>(
+                    channels,
+                    parent_boot,
+                    worker_boot,
+                    &path,
+                    device_name,
+                    diagnostics.as_deref(),
+                    NoiseSuppression::Off,
+                    ReferenceClock::Capture,
+                    recovery,
+                    lamp_audio::Reference::AsGiven,
+                    raw_blocks,
+                    wait,
+                )
+                .map_err(|error| error.to_string())
+            })
+            .unwrap();
         let mut controller = Controller::new(parent_boot, now());
         controller
             .set_microphone_permission(now(), Permission::Allowed)
@@ -492,8 +514,34 @@ impl Rig {
                 sleep(Duration::from_micros(300));
             }
             self.accept(signal.render(tick));
+            // Stamped before the push: a worker waiting on the microphone
+            // (LAMP_CAPTURE_WAIT) may read the block before the push returns.
+            let at = monotonic_us();
             self.device.push(&signal.microphone(tick));
-            self.pushed_at.push(monotonic_us());
+            self.pushed_at.push(at);
+            self.service();
+        }
+    }
+
+    /// The microphone holds a block every 10 ms for `ticks`, and the speaker
+    /// accepts each block's render `late` after it: a lamp's speaker sends
+    /// on its own clock, not beside each block.
+    fn stream_render(&mut self, signal: &Signal, ticks: usize, late: Duration) {
+        let from = self.pushed_at.len();
+        for tick in from..from + ticks {
+            let due = self.origin + TICK * tick as u32;
+            while Instant::now() < due {
+                self.service();
+                sleep(Duration::from_micros(300));
+            }
+            let at = monotonic_us();
+            self.device.push(&signal.microphone(tick));
+            self.pushed_at.push(at);
+            while Instant::now() < due + late {
+                self.service();
+                sleep(Duration::from_micros(300));
+            }
+            self.accept(signal.render(tick));
             self.service();
         }
     }
@@ -534,8 +582,9 @@ impl Rig {
                 self.service();
                 sleep(Duration::from_micros(300));
             }
+            let at = monotonic_us();
             self.device.push(&signal.microphone(tick));
-            self.pushed_at.push(monotonic_us());
+            self.pushed_at.push(at);
             self.service();
         }
     }
@@ -924,6 +973,7 @@ fn a_mute_while_the_microphone_is_waited_for_opens_nothing() {
         ReferenceRecovery::Off,
         false,
         false,
+        false,
     );
     // Long enough for the first tries to fail: it is waiting.
     let until = Instant::now() + Duration::from_millis(600);
@@ -1111,4 +1161,164 @@ fn a_stop_is_read_though_the_worker_has_gone_when_authority_falls_due() {
     rig.authority_at = None;
     let frames = rig.finish();
     assert_eq!(frames.len(), 50);
+}
+
+/// With `LAMP_CAPTURE_WAIT=on` the running loop waits on the microphone
+/// instead of ticking, and hands on every block in order, at once; without
+/// it the microphone is never waited on: the old loop. One run, both states.
+#[test]
+fn the_loop_waits_on_the_microphone_only_with_the_switch() {
+    warm_up();
+    for wait in [false, true] {
+        let name = Microphone::Mic2.device();
+        let signal = Signal::new(200);
+        let mut rig = Rig::start_waiting(name, wait);
+        rig.stream(&signal, 100);
+        // Two blocks with no render beside them: only the microphone wakes
+        // the loop, so it is waited on (with render, the speaker's socket
+        // mostly wakes it first).
+        rig.speaker_quiet(&signal, 2);
+        rig.stream(&signal, 98);
+        rig.settle(0);
+        let waits = rig.device.waits();
+        rig.end_with(Control::Stop);
+        let pushed_at = rig.pushed_at.clone();
+        let frames = rig.finish();
+        let (read_after_push, waited) = check(&frames, &pushed_at, 0);
+        eprintln!(
+            "LAMP_CAPTURE_WAIT {wait}: {waits} waits on the microphone, {} frames, read \
+             {read_after_push} us after the block was there, handed on {waited} us after (medians)",
+            frames.len()
+        );
+        if wait {
+            assert!(waits > 0, "{waits}");
+        } else {
+            assert_eq!(waits, 0);
+        }
+        assert!(read_after_push < 10_000, "{read_after_push}");
+    }
+}
+
+/// With the switch, a block is read as it arrives, not when the render comes
+/// (#1498's review): here the render comes 5 ms after each block. The
+/// scripted microphone hands over whole blocks, as the lamp's
+/// `plug:device_micro2` does. Each of the 200 blocks after the first 20
+/// (render beside them, so the prime has started) is read within 1 ms of
+/// being there.
+#[test]
+fn with_the_render_5_ms_after_each_block_every_block_is_read_within_a_ms() {
+    let late = Duration::from_millis(5);
+    warm_up();
+    let ticks = 200;
+    let signal = Signal::new(20 + ticks);
+    let mut rig = Rig::start_waiting(Microphone::Mic2.device(), true);
+    rig.stream(&signal, 20);
+    rig.stream_render(&signal, ticks, late);
+    rig.settle(0);
+    rig.end_with(Control::Stop);
+    let pushed_at = rig.pushed_at.clone();
+    let frames = rig.finish();
+    check(&frames, &pushed_at, 0);
+    let mut reads: Vec<u64> = frames[20..]
+        .iter()
+        .zip(&pushed_at[20..])
+        .map(|(frame, pushed)| frame.read_at - pushed)
+        .collect();
+    reads.sort_unstable();
+    eprintln!(
+        "render {late:?} after each block: {} blocks read {} us (median), {} us (p90), {} us (most) after they were there",
+        reads.len(),
+        reads[reads.len() / 2],
+        reads[reads.len() * 9 / 10],
+        reads[reads.len() - 1],
+    );
+    assert_eq!(reads.len(), ticks);
+    assert!(reads[reads.len() - 1] <= 1_000, "{reads:?}");
+}
+
+/// The capture thread's time on a core (ns) and its voluntary and forced
+/// context switches, from /proc.
+fn capture_thread() -> (u64, u64, u64) {
+    for task in std::fs::read_dir("/proc/self/task").unwrap() {
+        let path = task.unwrap().path();
+        if std::fs::read_to_string(path.join("comm"))
+            .unwrap_or_default()
+            .trim()
+            != "capture"
+        {
+            continue;
+        }
+        let on_core = std::fs::read_to_string(path.join("schedstat")).unwrap();
+        let status = std::fs::read_to_string(path.join("status")).unwrap();
+        let count = |key: &str| {
+            status
+                .lines()
+                .find_map(|line| line.strip_prefix(key))
+                .unwrap()
+                .trim()
+                .parse()
+                .unwrap()
+        };
+        return (
+            on_core.split_whitespace().next().unwrap().parse().unwrap(),
+            count("voluntary_ctxt_switches:"),
+            count("nonvoluntary_ctxt_switches:"),
+        );
+    }
+    panic!("no capture thread");
+}
+
+/// The numbers for #705 (`--ignored --nocapture`, Linux), ticking and with
+/// `LAMP_CAPTURE_WAIT=on` in one run: the capture thread's wakeups and share
+/// of a core over 10 s quiet (silence from both) and 10 s talking (the test
+/// noise), and how long from a block being in the microphone to its frame
+/// being sent. The rig sends the render beside each block, so the numbers
+/// hold only when it comes with each block; how a block is read when it
+/// does not is
+/// `with_the_render_5_ms_after_each_block_every_block_is_read_within_a_ms`.
+#[test]
+#[ignore = "a measurement, 20 s"]
+fn capture_wait_cost() {
+    warm_up();
+    let ticks = 1_000;
+    let quiet = Signal {
+        base: vec![0.0; (2 * ticks + 8) * 480 + 24],
+    };
+    let talking = Signal::new(2 * ticks);
+    for wait in [false, true] {
+        let mut rig = Rig::start_waiting(Microphone::Mic2.device(), wait);
+        for (scene, signal) in [("quiet", &quiet), ("talking", &talking)] {
+            let from = rig.pushed_at.len();
+            let heard = rig.frames.len();
+            let (core_before, woke_before, forced_before) = capture_thread();
+            let started = Instant::now();
+            rig.stream(signal, ticks);
+            let seconds = started.elapsed().as_secs_f64();
+            let (core_after, woke_after, forced_after) = capture_thread();
+            rig.settle(0);
+            let sent = median(
+                rig.frames[heard..]
+                    .iter()
+                    .zip(&rig.pushed_at[from..])
+                    .map(|(frame, pushed)| frame.processed_at - pushed)
+                    .collect(),
+            );
+            let read = median(
+                rig.frames[heard..]
+                    .iter()
+                    .zip(&rig.pushed_at[from..])
+                    .map(|(frame, pushed)| frame.read_at - pushed)
+                    .collect(),
+            );
+            eprintln!(
+                "LAMP_CAPTURE_WAIT {wait} {scene}: {:.0} wakeups/s ({:.0} forced), {:.2} % of a core; \
+             block read {read} us and sent {sent} us after it was there (medians)",
+                (woke_after - woke_before) as f64 / seconds,
+                (forced_after - forced_before) as f64 / seconds,
+                (core_after - core_before) as f64 / seconds / 1e7,
+            );
+        }
+        rig.end_with(Control::Stop);
+        rig.finish();
+    }
 }

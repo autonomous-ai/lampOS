@@ -4,12 +4,16 @@ use crate::{
     CAPTURE_RATE, CAPTURE_SAMPLES,
     capture::{CaptureConfig, CaptureFormat, valid_format},
     device::{
-        CaptureDevice, CaptureStatus, ConfigureError, DeviceFault, DeviceState, timestamp_us,
+        CaptureDevice, CaptureStatus, ConfigureError, DeviceFault, DeviceState, Woken, timestamp_us,
     },
 };
 use alsa::{
     Direction, ValueOr,
     pcm::{Access, Format, HwParams, PCM, State, TstampType},
+};
+use std::{
+    os::fd::{AsRawFd, BorrowedFd},
+    time::Duration,
 };
 
 fn fault(error: alsa::Error) -> DeviceFault {
@@ -29,12 +33,13 @@ fn state(state: State) -> DeviceState {
     }
 }
 
-pub struct AlsaCapture(PCM);
+/// The PCM, and the `avail_min` installed on it.
+pub struct AlsaCapture(PCM, i64);
 
 impl CaptureDevice for AlsaCapture {
     fn open(name: &str) -> Result<Self, DeviceFault> {
         PCM::new(name, Direction::Capture, true)
-            .map(Self)
+            .map(|pcm| Self(pcm, 1))
             .map_err(fault)
     }
 
@@ -80,6 +85,7 @@ impl CaptureDevice for AlsaCapture {
             software.set_tstamp_mode(false).map_err(failed)?;
         }
         pcm.sw_params(&software).map_err(failed)?;
+        self.1 = 1;
         let installed = pcm.sw_params_current().map_err(failed)?;
         format.monotonic_status_timestamps = installed.get_tstamp_mode().map_err(failed)?
             && installed.get_tstamp_type().map_err(failed)? == TstampType::Monotonic;
@@ -110,5 +116,54 @@ impl CaptureDevice for AlsaCapture {
 
     fn discard(&mut self) -> Result<(), DeviceFault> {
         self.0.drop().map_err(fault)
+    }
+
+    /// `avail_min` set to `frames` (only when it changes, so once for a
+    /// microphone read a whole block at a time), then
+    /// `snd_pcm_poll_descriptors` and the others in one `poll`; the PCM's
+    /// own `revents` are read through `snd_pcm_poll_descriptors_revents`. A
+    /// PCM descriptor that woke without samples (a plugin's) ends the wait
+    /// with neither, and the caller ticks before it waits again, so a
+    /// descriptor left readable is never spun on.
+    fn wait(
+        &mut self,
+        others: &[BorrowedFd<'_>],
+        timeout: Duration,
+        frames: usize,
+    ) -> Option<Result<Woken, DeviceFault>> {
+        use alsa::poll::{Descriptors, Flags, pollfd};
+        let frames = i64::try_from(frames.max(1)).unwrap_or(i64::MAX);
+        if frames != self.1 {
+            let installed = self.0.sw_params_current().and_then(|software| {
+                software.set_avail_min(frames)?;
+                self.0.sw_params(&software)
+            });
+            if let Err(error) = installed {
+                return Some(Err(fault(error)));
+            }
+            self.1 = frames;
+        }
+        let mut fds = match self.0.get() {
+            Ok(pcm) if !pcm.is_empty() => pcm,
+            Ok(_) => return None,
+            Err(error) => return Some(Err(fault(error))),
+        };
+        let count = fds.len();
+        fds.extend(others.iter().map(|other| pollfd {
+            fd: other.as_raw_fd(),
+            events: Flags::IN.bits(),
+            revents: 0,
+        }));
+        // Rounded up: a wait never ends before its bound.
+        let timeout_ms = i32::try_from(timeout.as_micros().div_ceil(1_000)).unwrap_or(i32::MAX);
+        if let Err(error) = alsa::poll::poll(&mut fds, timeout_ms) {
+            return Some(Err(fault(error)));
+        }
+        let samples = match self.0.revents(&fds[..count]) {
+            Ok(flags) => flags.intersects(Flags::IN | Flags::ERR | Flags::HUP),
+            Err(error) => return Some(Err(fault(error))),
+        };
+        let others = fds[count..].iter().any(|fd| fd.revents != 0);
+        Some(Ok(Woken { samples, others }))
     }
 }

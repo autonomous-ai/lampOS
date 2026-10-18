@@ -38,6 +38,13 @@ use std::{
 };
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 const TICK: Duration = Duration::from_millis(2);
+/// With `LAMP_CAPTURE_WAIT=on` (`quiet_pace::CAPTURE_WAIT_ENVIRONMENT`, #705,
+/// the lamp's heat) the loop waits in `poll` on the microphone and its
+/// sockets between passes, instead of passing every [`TICK`]. Off unless
+/// set; off, the loop is the ticking one. With the switch, the longest one wait lasts from its pass's start: a wake
+/// that was missed costs at most this, and the authority, the partial
+/// block's deadline and the channels' ages are still looked at this often.
+const WAIT_AT_MOST: Duration = Duration::from_millis(20);
 const MAX_CONTROL: usize = 8;
 const MAX_REFERENCE: usize = 16;
 const BARRIER_US: u64 = 100_000;
@@ -410,6 +417,7 @@ pub fn capture_with_noise_suppression(
         ReferenceRecovery::Off,
         lamp_audio::Reference::AsGiven,
         false,
+        capture_wait_from_environment(),
     )
 }
 
@@ -435,6 +443,7 @@ pub fn capture_with_options(
         options.reference_recovery,
         options.echo_reference.reference(),
         options.raw_blocks,
+        capture_wait_from_environment(),
     )
 }
 
@@ -454,6 +463,8 @@ pub fn capture_on<D: CaptureDevice>(
     reference_recovery: ReferenceRecovery,
     echo_reference: lamp_audio::Reference,
     raw_blocks: bool,
+    // `LAMP_CAPTURE_WAIT=on` (#705): wait on the microphone between passes.
+    capture_wait: bool,
 ) -> Result<()> {
     let mut recording = Recording::start(
         diagnostic_directory,
@@ -475,6 +486,7 @@ pub fn capture_on<D: CaptureDevice>(
         echo_reference,
         hold::blocks_for(device, reference_clock),
         raw_blocks,
+        capture_wait,
     );
     // Invalidate input authority and close hardware before any filesystem acknowledgement wait.
     let close = microphone.control_lost();
@@ -511,6 +523,7 @@ fn capture_loop<D: CaptureDevice>(
     hold_blocks: usize,
     // Each frame also carries the block before the canceller (#1047).
     raw_blocks: bool,
+    wait: bool,
 ) -> Result<EndReason> {
     // A frame waits this many capture blocks before it is cancelled, so that
     // the canceller has its render first. Whatever still waits when this
@@ -569,6 +582,11 @@ fn capture_loop<D: CaptureDevice>(
     // With LAMP_STALLS=on, a pass or an overrun wait of 50 ms or more is
     // recorded with what held it (#1178).
     let mut stalls = crate::stalls::Stalls::from_environment("capture");
+    if wait {
+        eprintln!(
+            "lamp-voice: capture: waits on the microphone and its sockets between blocks (LAMP_CAPTURE_WAIT=on)"
+        );
+    }
     loop {
         let tick = Instant::now();
         let stall_pass = stalls.begin();
@@ -832,6 +850,7 @@ fn capture_loop<D: CaptureDevice>(
         } else {
             None
         };
+        let available = read.as_ref().map(|frame| frame.timing.available_frames);
         if let Some(frame) = read {
             let step = reference.capture_step(
                 frame.timing.delayed_frames,
@@ -870,7 +889,16 @@ fn capture_loop<D: CaptureDevice>(
                         });
                 }
                 stall_pass.done();
-                finish_tick(tick);
+                pace(
+                    wait,
+                    microphone,
+                    channels,
+                    link.as_ref(),
+                    gap,
+                    primed_at,
+                    available,
+                    tick,
+                );
                 continue;
             };
             // As the microphone recorded it, for the stop words, when asked.
@@ -1000,7 +1028,16 @@ fn capture_loop<D: CaptureDevice>(
             privacy,
         )?;
         stall_pass.done();
-        finish_tick(tick);
+        pace(
+            wait,
+            microphone,
+            channels,
+            link.as_ref(),
+            gap,
+            primed_at,
+            available,
+            tick,
+        );
     }
 }
 
@@ -1961,6 +1998,110 @@ fn old_interaction_error(error: &(dyn std::error::Error + Send + Sync + 'static)
                 )
         })
 }
+/// Whether `LAMP_CAPTURE_WAIT` says `on`.
+fn wait_switched_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// The switch as the board's capture worker reads it.
+fn capture_wait_from_environment() -> bool {
+    wait_switched_on(
+        std::env::var(crate::quiet_pace::CAPTURE_WAIT_ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    )
+}
+
+/// How a wait between passes ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Waited {
+    /// A block was already there: no wait.
+    AtOnce,
+    Samples,
+    Sockets,
+    Timeout,
+    /// The device cannot be waited on, the wait failed, or it woke with
+    /// neither before its bound: a tick instead.
+    Ticked,
+}
+
+/// One wait between passes with `LAMP_CAPTURE_WAIT=on`: the microphone
+/// (`device`, woken once the block being assembled can be read whole, its
+/// `avail_min`) and the sockets in one `poll`, for the whole wait, until
+/// [`WAIT_AT_MOST`] from the pass's start, `tick`. So a block is read as it
+/// arrives, whenever the render comes. `block_there`: the device already
+/// held a block after the last read, so there is no wait. Nothing is read
+/// here: the next pass reads it in its old order.
+fn wait_between_passes(
+    sockets: &[std::os::fd::BorrowedFd<'_>],
+    block_there: bool,
+    tick: Instant,
+    device: impl FnOnce(
+        &[std::os::fd::BorrowedFd<'_>],
+        Duration,
+    ) -> Option<
+        std::result::Result<lamp_audio::device::Woken, lamp_audio::device::DeviceFault>,
+    >,
+) -> Waited {
+    if block_there {
+        return Waited::AtOnce;
+    }
+    let deadline = tick + WAIT_AT_MOST;
+    match device(sockets, deadline.saturating_duration_since(Instant::now())) {
+        Some(Ok(woken)) if woken.samples => Waited::Samples,
+        Some(Ok(woken)) if woken.others => Waited::Sockets,
+        Some(Ok(_)) if Instant::now() >= deadline => Waited::Timeout,
+        // A descriptor that woke with neither (a plugin's) may still be
+        // readable: a tick before it is polled again, never a busy loop.
+        Some(Ok(_)) => {
+            std::thread::sleep(TICK);
+            Waited::Ticked
+        }
+        // A failed wait is never a busy loop: it waits as the tick does,
+        // and the read finds what failed.
+        None | Some(Err(_)) => {
+            finish_tick(tick);
+            Waited::Ticked
+        }
+    }
+}
+
+/// The end of a pass: the old tick, or with the switch a wait on the
+/// microphone and the sockets (the coordinator's control, which carries the
+/// stop, and the speaker's reference control and render). It waits only
+/// while the microphone runs with nothing pending on time alone (no gap, no
+/// prime awaiting its start); otherwise it ticks as before. `available`: the
+/// samples the device still held after the block this pass read.
+#[allow(clippy::too_many_arguments)]
+fn pace<D: CaptureDevice>(
+    wait: bool,
+    microphone: &mut MicrophoneOn<D>,
+    channels: &WorkerChannels,
+    link: Option<&ReferenceChannels>,
+    gap: Option<u64>,
+    primed_at: Option<u64>,
+    available: Option<i64>,
+    tick: Instant,
+) {
+    use std::os::fd::AsFd;
+    let Some(link) =
+        link.filter(|_| wait && microphone.is_running() && gap.is_none() && primed_at.is_none())
+    else {
+        finish_tick(tick);
+        return;
+    };
+    let block_there =
+        available.is_some_and(|available| available >= lamp_audio::CAPTURE_SAMPLES as i64);
+    let sockets = [
+        channels.control.as_fd(),
+        link.control.as_fd(),
+        link.data.as_fd(),
+    ];
+    wait_between_passes(&sockets, block_there, tick, |sockets, timeout| {
+        microphone.wait(sockets, timeout)
+    });
+}
+
 fn finish_tick(started: Instant) {
     if let Some(remaining) = TICK.checked_sub(started.elapsed()) {
         std::thread::sleep(remaining);
@@ -2089,6 +2230,145 @@ mod open_at_start_tests {
             },
         ] {
             assert!(!OpenAtStart::default().waits(&other, at(0)), "{other}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod capture_wait_tests {
+    use super::*;
+    use lamp_audio::device::{DeviceFault, Woken};
+    use rustix::event::{PollFd, PollFlags, poll};
+    use std::{
+        cell::Cell,
+        os::{
+            fd::{AsFd, BorrowedFd, OwnedFd},
+            unix::net::UnixDatagram,
+        },
+    };
+
+    type Answer = Option<std::result::Result<Woken, DeviceFault>>;
+
+    /// A microphone's descriptor: a pipe, readable once written.
+    fn pcm() -> (OwnedFd, OwnedFd) {
+        rustix::pipe::pipe().unwrap()
+    }
+
+    /// Wait as a device does: its descriptor and the others in one poll.
+    fn device<'a>(
+        pcm: &'a OwnedFd,
+        calls: &'a Cell<u32>,
+    ) -> impl FnOnce(&[BorrowedFd<'_>], Duration) -> Answer + 'a {
+        move |others, timeout| {
+            calls.set(calls.get() + 1);
+            let mut fds = vec![PollFd::new(pcm, PollFlags::IN)];
+            fds.extend(
+                others
+                    .iter()
+                    .map(|fd| PollFd::from_borrowed_fd(*fd, PollFlags::IN)),
+            );
+            let timeout = rustix::time::Timespec {
+                tv_sec: 0,
+                tv_nsec: timeout.as_nanos() as _,
+            };
+            poll(&mut fds, Some(&timeout)).unwrap();
+            Some(Ok(Woken {
+                samples: !fds[0].revents().is_empty(),
+                others: fds[1..].iter().any(|fd| !fd.revents().is_empty()),
+            }))
+        }
+    }
+
+    #[test]
+    fn a_block_arriving_wakes_the_wait() {
+        let (read, write) = pcm();
+        let (socket, _peer) = UnixDatagram::pair().unwrap();
+        rustix::io::write(&write, &[1]).unwrap();
+        let calls = Cell::new(0);
+        let started = Instant::now();
+        let waited = wait_between_passes(&[socket.as_fd()], false, started, device(&read, &calls));
+        assert_eq!(waited, Waited::Samples);
+        assert_eq!(calls.get(), 1);
+        assert!(
+            started.elapsed() < Duration::from_millis(5),
+            "{:?}",
+            started.elapsed()
+        );
+    }
+
+    /// The stop comes on the coordinator's control socket: it ends the wait
+    /// at once, the microphone polled beside it.
+    #[test]
+    fn a_stop_on_the_control_socket_ends_the_wait_at_once() {
+        let (read, _write) = pcm();
+        let (socket, peer) = UnixDatagram::pair().unwrap();
+        peer.send(b"stop").unwrap();
+        let calls = Cell::new(0);
+        let started = Instant::now();
+        let waited = wait_between_passes(&[socket.as_fd()], false, started, device(&read, &calls));
+        assert_eq!(waited, Waited::Sockets);
+        assert_eq!(calls.get(), 1);
+        assert!(
+            started.elapsed() < Duration::from_millis(5),
+            "{:?}",
+            started.elapsed()
+        );
+    }
+
+    /// A block the device already holds (read ahead of the wait, as its
+    /// status said) is handled without waiting or polling at all.
+    #[test]
+    fn a_block_already_there_is_handled_without_waiting() {
+        let (read, _write) = pcm();
+        let (socket, _peer) = UnixDatagram::pair().unwrap();
+        let calls = Cell::new(0);
+        let waited = wait_between_passes(
+            &[socket.as_fd()],
+            true,
+            Instant::now(),
+            device(&read, &calls),
+        );
+        assert_eq!(waited, Waited::AtOnce);
+        assert_eq!(calls.get(), 0);
+    }
+
+    /// Nothing comes: the wait ends at its bound from the pass's start.
+    #[test]
+    fn with_nothing_the_wait_ends_at_its_bound() {
+        let (read, _write) = pcm();
+        let (socket, _peer) = UnixDatagram::pair().unwrap();
+        let calls = Cell::new(0);
+        let started = Instant::now();
+        let waited = wait_between_passes(&[socket.as_fd()], false, started, device(&read, &calls));
+        assert_eq!(waited, Waited::Timeout);
+        let took = started.elapsed();
+        assert!(took >= WAIT_AT_MOST - Duration::from_millis(1), "{took:?}");
+        assert!(took < WAIT_AT_MOST * 3, "{took:?}");
+    }
+
+    /// A device that cannot be waited on, whose wait failed, or that woke
+    /// with neither before the bound is paced by the old tick, not spun on.
+    #[test]
+    fn a_device_that_cannot_wait_is_ticked() {
+        let (socket, _peer) = UnixDatagram::pair().unwrap();
+        for answer in [
+            None,
+            Some(Err(DeviceFault::new("poll", 4))),
+            Some(Ok(Woken::default())),
+        ] {
+            let started = Instant::now();
+            let waited = wait_between_passes(&[socket.as_fd()], false, started, |_, _| answer);
+            assert_eq!(waited, Waited::Ticked);
+            assert!(started.elapsed() >= TICK, "{:?}", started.elapsed());
+        }
+    }
+
+    /// Only `on` switches it on; anything else is the ticking loop.
+    #[test]
+    fn the_switch_is_on_only_when_it_says_on() {
+        assert!(wait_switched_on(Some("on")));
+        for other in [None, Some(""), Some("off"), Some("1"), Some("ON")] {
+            assert!(!wait_switched_on(other), "{other:?}");
         }
     }
 }

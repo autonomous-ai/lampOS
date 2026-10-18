@@ -393,6 +393,75 @@ yet) is read as before. `activity::tests::the_detector_hears_the_linear_output_o
 scores a generated "Stop." (Piper `en_US-libritts-high`) with the processed block silenced: speech with
 the switch, silence without it.
 
+## The capture worker waits instead of ticking: `LAMP_CAPTURE_WAIT=on`
+
+The capture worker's loop passes every 2 ms (`audio_workers.rs`, `TICK`),
+five passes to a 10 ms block, four of them with nothing to read; on a small
+core those passes cost 460 us a block (#1454). With `LAMP_CAPTURE_WAIT=on`
+(off unless set, passed on to the capture worker only, which says so once
+in the journal at start) the end of a pass is a `poll` instead of the tick's sleep, on:
+
+- the microphone's ALSA descriptors (`snd_pcm_poll_descriptors`, their
+  `revents` read through `snd_pcm_poll_descriptors_revents`;
+  `CaptureDevice::wait` in `crates/audio`);
+- the coordinator's control socket, which carries the stop and the
+  authority, and the speaker's reference control and render sockets
+  (`impl AsFd for Channel`, `transport.rs`). The capture worker has no
+  other stop: a stop is `Control::Stop` on that socket;
+- at most 20 ms from the pass's start (`WAIT_AT_MOST`), so a wake that was
+  missed costs one wait, and the authority, the partial block's deadline
+  and the channels' ages are still looked at that often.
+
+With the switch, each wait first sets the microphone's `avail_min` to the
+samples the block being assembled still needs (a whole block after a whole
+one was read; set again only when that changes), so its descriptor wakes
+the wait as the block arrives, and the microphone is polled for the whole
+wait, beside the sockets. A block is read as it arrives whenever the
+speaker's render comes: some microphones hand over whole blocks (the rig's,
+and the lamp's `plug:device_micro2`, whose rate plugin converts the Jieli's
+48 kHz a period at a time), and the speaker renders on its own clock, so
+a wait timed from the read would read each block when the next render came
+(#1498's review). A descriptor that wakes with no samples (a plugin's)
+costs a 2 ms tick before it is polled again, never a busy loop. Off,
+`avail_min` stays 1. A block already in the device
+(its status after the last read said so) is read at once, with no wait:
+nothing is read ahead of the loop, so there is nothing else a `poll` could
+miss. Nothing is read in the wait: each pass reads controls, reference and
+then at most one block, in the old order, so no block is lost or reordered
+and the overrun handling and the reference path are the same. The loop
+waits only while the microphone runs with nothing due on time alone: before
+its start, through a stall's gap and while a prime awaits its start it
+ticks as before. Off, the loop ends every pass in the old tick.
+
+On Linux x86_64, native, 20 cores (run by Nine on this head:
+`capture_wait_cost` in `tests/capture_hold_worker.rs`, the real loop over
+a scripted microphone that holds a whole block at once, 10 s each, release
+build). On a core this fast the share of a core is at the noise floor both
+ways; lamp-4ace's `pidstat` is what counts for it. The rig sends
+the speaker's render beside each block, so these numbers hold only when
+the render comes with each block. With the render 5 ms after each block,
+`with_the_render_5_ms_after_each_block_every_block_is_read_within_a_ms`
+(the same file) holds each read within 1 ms of the block: the wait follows
+the microphone, not the render:
+
+| | wakeups/s | capture thread | block read after it was there | frame sent after it was there |
+|---|---|---|---|---|
+| tick, quiet | 484 | 2.43 % of a core | 1,049 us | 1,167 us |
+| wait, quiet | 124 | 2.84 % | 87 us | 266 us |
+| tick, talking | 484 | 3.03 % | 1,070 us | 1,243 us |
+| wait, talking | 124 | 2.53 % | 69 us | 257 us |
+
+The 124 wakes a second are the speaker's render (one a block, sent beside
+it) and the coordinator's authority (every 40 ms in the rig). How the
+lamp's own microphone and speaker clocks fall, only a lamp shows.
+
+On lamp-4ace the first builder measures it as for #1459: the same build
+with and without `LAMP_CAPTURE_WAIT=on` in the drop-in, `LAMP_STALLS=on` in
+both; `pidstat -t -w -p $(pgrep -f 'lamp-voice worker capture') 1 60` for the
+capture thread's share of a core and its `cswch/s` with nobody talking, then
+four talking turns, each answered, with no stall line and no lapsed lease
+in `/run/lampos-voice/stalls-capture.log` or the journal.
+
 ## Stop and current limits
 
 After entering the coordinator loop, SIGTERM/SIGINT records a service-stop request,
