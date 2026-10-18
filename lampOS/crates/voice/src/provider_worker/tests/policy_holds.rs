@@ -83,6 +83,7 @@ impl Desk {
             ask_unclear: false,
             name_in_passing_ignored: false,
             policy_holds: holds.then(|| self.bus.clone()),
+            follows_run: false,
             wait_for_room: false,
             staff_note: false,
             spoken_to: false,
@@ -102,7 +103,18 @@ impl Desk {
         choice: &str,
         answers: serde_json::Value,
     ) {
-        let decision = json!({"about": "attention", "choice": choice, "probability": 0.235,
+        self.decide_scored(request, choice, 0.235, answers);
+    }
+
+    /// The same, at the probability the Policy gave.
+    pub(super) fn decide_scored(
+        &mut self,
+        request: Option<u64>,
+        choice: &str,
+        probability: f32,
+        answers: serde_json::Value,
+    ) {
+        let decision = json!({"about": "attention", "choice": choice, "probability": probability,
                               "answers": answers, "by": "typesafe/jev-1.13-20260917",
                               "took_ms": 540, "shadow": false, "request": request});
         self.decisions.publish_json(0, &decision).unwrap();
@@ -631,6 +643,107 @@ async fn a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_s
     );
     assert!(desk.asked.try_recv().is_err(), "cancel_reminder was run");
     rig.stop().await;
+}
+
+/// #1465, lamp-4ace on 2026-10-18 at 10:57: "Thanks. Now turn yourself
+/// back up a little, please.", 13 s after the lamp answered, scored by the
+/// Policy `stay_quiet` at p 0.31 with `follows_lamp` 0.89 (request 2's real
+/// decision). With `--follows-run` its `volume_up` runs, and so does a light
+/// tool; without it, it is held, as it was that morning. With the switch a
+/// reply still has held: a cancel, the mute, and a skill's functions
+/// (`check_my_work`'s look sends a still of the desk, `dance` moves the
+/// body; the first builder on #1474); and the volume when the lamp has
+/// said nothing lately, since then the turn follows no line of the lamp's,
+/// or when `follows_lamp` is under 0.6 (El on #1474).
+#[tokio::test]
+async fn with_follows_run_a_reply_to_the_lamp_turns_the_volume_back_up() {
+    let call =
+        |name: &str| json!({"toolCall":{"functionCalls":[{"id":"c1","name":name,"args":{}}]}});
+    for (row, (follows_run, spoke, follows, name, runs)) in [
+        (true, true, 0.89, "volume_up", true),
+        (false, true, 0.89, "volume_up", false),
+        (true, true, 0.89, "light_brighter", true),
+        (true, true, 0.89, "cancel_reminder", false),
+        (true, true, 0.89, "volume_mute", false),
+        (true, true, 0.89, "check_my_work", false),
+        (true, true, 0.89, "dance", false),
+        (true, false, 0.89, "volume_up", false),
+        (true, true, 0.5, "volume_up", false),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut desk = Desk::new(&format!("fr-{row}"));
+        // The built skills, as the executive lists them: their calls go to
+        // the skills' route.
+        let skills = desk.home.path.join(crate::tools::SKILLS_DIR);
+        std::fs::create_dir_all(&skills).unwrap();
+        std::fs::write(
+            skills.join(crate::tools::CATALOG_FILE),
+            json!({"tools":[{"name":"check_my_work","description":"Look at the desk"},
+                            {"name":"dance","description":"Dance"}]})
+            .to_string(),
+        )
+        .unwrap();
+        let mut options = desk.options(true);
+        options.follows_run = follows_run;
+        let route = crate::tools::route(&options.tools, name);
+        assert_eq!(
+            matches!(&route, crate::tools::Route::Executive(dir) if dir.ends_with(crate::tools::SKILLS_DIR)),
+            ["check_my_work", "dance"].contains(&name),
+            "row {row}: {name} routes to {route:?}"
+        );
+        let mut rig = LiveRig::start_with(quick_policy(), options);
+        let mut dial = rig.ready().await;
+        if spoke {
+            the_lamp_answers(&mut rig, &mut dial).await;
+        }
+        let request = rig.speak(&mut dial, false, true).await;
+        desk.decide_scored(
+            Some(request),
+            "stay_quiet",
+            0.31,
+            json!({"calls_lamp": 0.02, "follows_lamp": follows}),
+        );
+        dial.service.send(call(name)).await;
+        let told = rig.service_message(&mut dial).await;
+        assert_eq!(
+            response(&told) == json!({"done": false, "next": crate::policy_holds::HELD}),
+            !runs,
+            "row {row}, {name}: {told}"
+        );
+        assert_eq!(
+            desk.asked.try_recv().is_ok(),
+            runs,
+            "row {row}, {name}: run"
+        );
+        rig.stop().await;
+    }
+}
+
+/// `--follows-run` is read right after `--policy-holds-actions`, on both
+/// routes; out of its place it is refused, and without the Policy holding
+/// actions it lets nothing more through.
+#[test]
+fn follows_run_is_read_right_after_policy_holds() {
+    let dir = std::path::Path::new("/run/test");
+    let flags: Vec<String> = [
+        crate::policy_holds::FLAG,
+        crate::policy_holds::FOLLOWS_FLAG,
+        crate::resend::FLAG,
+    ]
+    .map(String::from)
+    .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.policy_holds && files.follows_run && files.resend_lost_line);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert!(files.follows_run);
+    let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
+    assert!(!files.follows_run);
+    let wrong: Vec<String> = [crate::resend::FLAG, crate::policy_holds::FOLLOWS_FLAG]
+        .map(String::from)
+        .into();
+    assert!(parse_flags(dir, &wrong).is_err());
 }
 
 /// `--provider-patience` is read where the coordinator puts it, after

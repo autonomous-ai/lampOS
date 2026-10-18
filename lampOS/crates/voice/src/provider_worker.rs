@@ -195,6 +195,11 @@ pub struct Files {
     /// (`--policy-holds-actions`, `crate::policy_holds`, #800). Only with the
     /// bus.
     pub policy_holds: bool,
+    /// Whether a reply to the lamp runs its light and its volume too
+    /// (`--follows-run`, `LAMP_FOLLOWS_RUN`,
+    /// [`crate::policy_holds::runs_on_a_reply`], #1465). Only with
+    /// `policy_holds`.
+    pub follows_run: bool,
     /// Whether a line lost with its connection is sent again once
     /// (`--resend-lost-line`, `LAMP_RESEND_LOST_LINE`, [`crate::resend`]).
     pub resend_lost_line: bool,
@@ -275,6 +280,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (ask_unclear, flags) = crate::not_speech::take_unclear(flags);
     let (transcription_language, flags) = crate::not_speech::take_transcription(flags);
     let (policy_holds, flags) = crate::policy_holds::take(flags);
+    let (follows_run, flags) = crate::policy_holds::take_follows(flags);
     let (resend_lost_line, flags) = crate::resend::take(flags);
     let (staff_note, flags) = crate::staff_note::take(flags);
     let (provider_patience, flags) = crate::config::take_patience(flags);
@@ -313,6 +319,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         ask_unclear,
         transcription_language,
         policy_holds,
+        follows_run,
         resend_lost_line,
         staff_note,
         provider_patience,
@@ -846,6 +853,9 @@ pub(crate) struct Options {
     /// wait for them ([`crate::policy_holds`], #800). `None`: they run at
     /// once.
     pub(crate) policy_holds: Option<std::path::PathBuf>,
+    /// A reply to the lamp runs its light and its volume too
+    /// ([`crate::policy_holds::runs_on_a_reply`], #1465).
+    pub(crate) follows_run: bool,
     /// Input waits for room in Gemini's input queue (`--wait-for-room`).
     pub(crate) wait_for_room: bool,
     /// An answer is played only when the lamp was spoken to, in every room
@@ -886,6 +896,7 @@ impl Options {
             ask_unclear: false,
             name_in_passing_ignored: false,
             policy_holds: None,
+            follows_run: false,
             wait_for_room: false,
             staff_note: false,
             spoken_to: false,
@@ -1133,6 +1144,7 @@ pub async fn run_with_continuation(
         sounds_checked: files.attention && files.sounds_checked,
         ask_unclear: files.attention && files.ask_unclear,
         name_in_passing_ignored: files.attention && files.name_in_passing_ignored,
+        follows_run: files.policy_holds && files.follows_run,
         policy_holds: match (files.policy_holds, &files.bus_root) {
             (true, Some(root)) => Some(root.clone()),
             (true, None) => {
@@ -1376,6 +1388,7 @@ async fn serve_with_visual<C: Connect>(
             })
             .ok()
     });
+    desk.follows_run = options.follows_run;
     desk.name_signal = options.name_signal;
     let mut attention = crate::attention::Attention::default();
     // When the lamp's sound was last handed on: a turn follows the lamp's
@@ -2396,6 +2409,8 @@ struct ToolDesk {
     /// The Policy's decisions, when the lamp's actions wait for them
     /// ([`crate::policy_holds`], #800).
     verdicts: Option<crate::policy_holds::Verdicts>,
+    /// A reply to the lamp runs its light and its volume too (#1465).
+    follows_run: bool,
     /// The lamp's actions waiting for the turn's decision.
     parked: Vec<Parked>,
     /// The newest request one of whose actions the Policy held: none of its
@@ -2474,6 +2489,7 @@ impl ToolDesk {
             sounded: None,
             lines: Vec::new(),
             verdicts: None,
+            follows_run: false,
             parked: Vec::new(),
             quieted: None,
             looks: Vec::new(),
@@ -2851,15 +2867,24 @@ impl ToolDesk {
                     verdict => verdict,
                 });
             let waited = Duration::from_micros(now.saturating_sub(parked.called_us));
-            let sets = crate::policy_holds::sets(
+            let on_a_reply = crate::policy_holds::runs_on_a_reply(
                 &crate::tools::route(&self.settings, &parked.call.name),
                 &parked.call.name,
+                self.follows_run,
             );
-            match crate::policy_holds::gate(verdict, parked.turn.name_heard, waited, sets) {
+            match crate::policy_holds::gate(verdict, parked.turn.name_heard, waited, on_a_reply) {
                 crate::policy_holds::Gate::Wait => self.parked.push(parked),
                 crate::policy_holds::Gate::Run => {
                     let why = match verdict {
                         _ if parked.turn.name_heard => "its name was heard",
+                        Some(crate::policy_holds::Verdict::StayQuietFollowing)
+                            if !crate::policy_holds::sets(
+                                &crate::tools::route(&self.settings, &parked.call.name),
+                                &parked.call.name,
+                            ) =>
+                        {
+                            "the turn follows the lamp's last line, and its light and its volume are not held from it"
+                        }
                         Some(crate::policy_holds::Verdict::StayQuietFollowing) => {
                             "the turn follows the lamp's last line, and what it sets on the schedule is not held from it"
                         }
@@ -7831,6 +7856,7 @@ mod tests {
             ask_unclear: false,
             name_in_passing_ignored: false,
             policy_holds: None,
+            follows_run: false,
             wait_for_room: false,
             staff_note: false,
             spoken_to: false,
@@ -7855,6 +7881,7 @@ mod tests {
                 ask_unclear: false,
                 name_in_passing_ignored: false,
                 policy_holds: None,
+                follows_run: false,
                 wait_for_room: false,
                 staff_note: false,
                 spoken_to: false,
@@ -7904,6 +7931,7 @@ mod tests {
                 ask_unclear: false,
                 name_in_passing_ignored: false,
                 policy_holds: None,
+                follows_run: false,
                 wait_for_room: false,
                 staff_note: false,
                 spoken_to: false,
@@ -8823,6 +8851,7 @@ mod tests {
                 ask_unclear: false,
                 name_in_passing_ignored: false,
                 policy_holds: None,
+                follows_run: false,
                 wait_for_room: false,
                 staff_note: false,
                 spoken_to: false,
@@ -12229,6 +12258,7 @@ mod tests {
                     ask_unclear: false,
                     name_in_passing_ignored: false,
                     policy_holds: None,
+                    follows_run: false,
                     wait_for_room: false,
                     staff_note: false,
                     spoken_to: false,
@@ -12298,6 +12328,7 @@ mod tests {
                     ask_unclear: false,
                     name_in_passing_ignored: ignored,
                     policy_holds: None,
+                    follows_run: false,
                     wait_for_room: false,
                     staff_note: false,
                     spoken_to: false,
