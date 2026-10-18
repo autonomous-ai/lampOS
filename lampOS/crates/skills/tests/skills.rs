@@ -4940,3 +4940,90 @@ fn the_zone_flags_are_refused_before_the_start_when_they_cannot_stand() {
         assert!(stderr.contains(said), "{args:?}: {stderr}");
     }
 }
+
+/// The tools' folder looked after under a running lamp-skills (lamp-4ace,
+/// 19 Oct 04:33: systemd removed it with the actions part's at each of
+/// actions' restarts). Its socket gone from a folder still there: at the
+/// next look the socket and the file are made again, and a call on the new
+/// socket is answered. The folder itself gone, here under a parent it
+/// cannot write, as `/run` is to it on a lamp: it ends, not zero, with a
+/// line, so that systemd makes the folder again as it starts it (the
+/// reviewer and the first builder on #1656).
+#[test]
+fn the_tools_socket_lost_is_made_again_and_the_folder_gone_ends_lamp_skills() {
+    use std::os::unix::fs::PermissionsExt;
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("st")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    fs::create_dir(root.join("skills")).unwrap();
+    skill_with(&root.join("skills"), "tutor", TUTOR);
+    let run = root.join("run");
+    fs::create_dir(&run).unwrap();
+    let tools = run.join("tools");
+    let clock = Clock::at(root);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+        .args([
+            "--dir".as_ref(),
+            root.join("skills").as_os_str(),
+            "--bus-root".as_ref(),
+            root.join("bus").as_os_str(),
+            "--tools-dir".as_ref(),
+            tools.as_os_str(),
+        ])
+        .args(clock.args())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let made = |name: &str| {
+        while !tools.join(name).exists() {
+            assert!(Instant::now() < deadline, "no {name}");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    };
+    made("call.sock");
+    clock.started();
+    made("tools.json");
+    let file = fs::read_to_string(tools.join("tools.json")).unwrap();
+    // The socket lost, the folder still there.
+    fs::remove_file(tools.join("call.sock")).unwrap();
+    fs::remove_file(tools.join("tools.json")).unwrap();
+    clock.skip(RELOAD);
+    made("call.sock");
+    made("tools.json");
+    assert_eq!(fs::read_to_string(tools.join("tools.json")).unwrap(), file);
+    let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
+    writeln!(
+        &stream,
+        r#"{{"op":"call","name":"nobody_has_this","args":{{}}}}"#
+    )
+    .unwrap();
+    let mut line = String::new();
+    BufReader::new(&stream).read_line(&mut line).unwrap();
+    let answer: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(answer["ok"], false, "{answer}");
+    // The folder gone, under a parent it cannot write.
+    fs::remove_dir_all(&tools).unwrap();
+    fs::set_permissions(&run, fs::Permissions::from_mode(0o555)).unwrap();
+    clock.skip(RELOAD);
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
+        if Instant::now() > deadline {
+            let _ = child.kill();
+            panic!("lamp-skills went on with its folder gone");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    fs::set_permissions(&run, fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(!status.success(), "{status}");
+    let mut said = String::new();
+    std::io::Read::read_to_string(&mut child.stderr.take().unwrap(), &mut said).unwrap();
+    assert!(said.contains("is gone; ending"), "{said}");
+    assert!(!tools.exists(), "not made again by lamp-skills");
+}

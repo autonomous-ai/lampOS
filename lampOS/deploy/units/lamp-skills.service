@@ -21,12 +21,16 @@ Environment=LAMP_SKILLS_ASK=skip
 # LAMP_UTC_OFFSET_MINUTES: the lamp's zone, written by the install and by setup (lampOS/docs/install.md);
 # a skill's quiet hours need it (#1021).
 EnvironmentFile=/etc/lampOS/zone.env
-ExecStart=/opt/lampOS/skills/@SKILLS_SHA256@/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket @ACTIONS_DIR@/call.sock --say-socket /run/lampos-say/say.sock --tools-dir @ACTIONS_DIR@/skills --utc-offset-minutes ${LAMP_UTC_OFFSET_MINUTES}
+ExecStart=/opt/lampOS/skills/@SKILLS_SHA256@/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket @ACTIONS_DIR@/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --utc-offset-minutes ${LAMP_UTC_OFFSET_MINUTES}
 Restart=on-failure
 RestartSec=5s
 StandardInput=null
 SyslogIdentifier=lamp-skills
 NoNewPrivileges=yes
+# Its tools for the voice, in a folder of its own, not the actions part's, which systemd
+# removes at each restart of actions (lamp-4ace, 19 Oct 04:33).
+RuntimeDirectory=lampos-skills
+RuntimeDirectoryMode=0755
 
 [Install]
 WantedBy=lampos.target

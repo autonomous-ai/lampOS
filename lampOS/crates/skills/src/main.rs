@@ -449,7 +449,7 @@ fn serve(
     };
     let (ask, asks) = mpsc::channel::<ToolAsk>();
     if let Some(tools) = tools {
-        listen(tools, ask)?;
+        listen(tools, ask.clone())?;
     }
     let (skip, skips) = mpsc::channel::<Skip>();
     if let Some(path) = &options.clock_control {
@@ -534,6 +534,9 @@ fn serve(
                         }
                     }
                 }
+            }
+            if let Some(tools) = tools {
+                keep_tools(tools, &ask, &engine)?;
             }
             let _ = out.alive();
         }
@@ -1102,6 +1105,39 @@ fn write_tools(dir: &Path, engine: &Engine) {
     if let Err(error) = written {
         eprintln!("lamp-skills: {} not written: {error}", path.display());
     }
+}
+
+/// The tools' folder looked after at a look. Inside the actions part's
+/// folder, systemd removed it at each of actions' restarts, and the voice
+/// had no skill functions until lamp-skills restarted (lamp-4ace, 19 Oct
+/// 04:33); it is lamp-skills' own folder now, so this is the guard.
+/// - Its socket gone from a folder still there: bound again, and its file
+///   written. The old socket's thread is left waiting on a path no caller
+///   can reach any more.
+/// - The folder itself gone: lamp-skills ends, with a line. It cannot make
+///   it again as its user, under a sandbox whose writable bind went with
+///   the folder (the reviewer on #1656); systemd makes the folder again as
+///   it starts it once more (`Restart=on-failure`).
+fn keep_tools(dir: &Path, asks: &mpsc::Sender<ToolAsk>, engine: &Engine) -> io::Result<()> {
+    if dir.join("call.sock").exists() {
+        return Ok(());
+    }
+    if !dir.is_dir() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!(
+                "{} is gone; ending, so that the folder is made again as lamp-skills starts",
+                dir.display()
+            ),
+        ));
+    }
+    listen(dir, asks.clone())?;
+    write_tools(dir, engine);
+    eprintln!(
+        "lamp-skills: {} had no call.sock: made again",
+        dir.display()
+    );
+    Ok(())
 }
 
 /// Listens on `dir/call.sock` as the actions part does: one line in

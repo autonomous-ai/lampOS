@@ -983,10 +983,32 @@ fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
     let skills = fs::read_to_string(lamp.on("/etc/systemd/system/lamp-skills.service")).unwrap();
     assert!(skills.contains("--say-socket /run/lampos-say/say.sock"));
     assert!(skills.contains("--dir /var/lib/lampOS/skills"));
-    // Dance's tool reaches the model beside the actions part's, which the
-    // voice reads at each session.
-    assert!(skills.contains("--tools-dir /run/lampos-actions/skills"));
+    // Dance's tool reaches the model from lamp-skills' own folder, which the
+    // voice reads at each session (#1656), not the actions part's.
+    assert!(skills.contains("--tools-dir /run/lampos-skills"));
     assert!(service.contains(&"Environment=LAMP_ACTIONS_DIR=/run/lampos-actions"));
+}
+
+/// The skills' tools were in the actions part's folder, which systemd
+/// removes at each restart of actions, and the voice had no skill functions
+/// until lamp-skills restarted (lamp-4ace, 19 Oct 04:33). The product's
+/// skills keep them in a folder of their own, and its voice reads that one.
+#[test]
+fn the_skills_tools_are_in_their_own_folder_which_the_voice_reads() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap()
+            .1
+    };
+    let skills = unit("lamp-skills.service");
+    assert!(skills.contains("\nRuntimeDirectory=lampos-skills\n"));
+    assert!(skills.contains(" --tools-dir /run/lampos-skills "));
+    assert!(!skills.contains("/run/lampos-actions/skills"));
+    assert!(
+        unit("lamp-voice.service").contains("\nEnvironment=LAMP_SKILLS_DIR=/run/lampos-skills\n")
+    );
 }
 
 /// #1390: the product's tasks part closes the harness each task started once

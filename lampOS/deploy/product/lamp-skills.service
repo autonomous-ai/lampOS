@@ -26,7 +26,7 @@ Environment=LAMP_SKILLS_ASK=skip
 Environment=LAMP_LIGHT_REQUESTS=on
 # --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), for a skill's
 # [quiet] hours, which without it never start themselves (docs/skills.md); across summer time (#1384).
-ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-actions/skills --zone system
+ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --zone system
 Restart=on-failure
 RestartSec=5s
 StandardInput=null
@@ -34,9 +34,14 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=lamp-skills
 NoNewPrivileges=yes
+# Its tools for the voice, in a folder of its own (writable under ProtectSystem=strict): inside
+# the actions part's, systemd removed them at each restart of actions, and the voice had no skill
+# functions until this restarted (lamp-4ace, 19 Oct 04:33).
+RuntimeDirectory=lampos-skills
+RuntimeDirectoryMode=0755
 ProtectSystem=strict
-# The bus, and its tools beside the actions part's, which the voice reads at each session.
-ReadWritePaths=/run/lampos-bus /run/lampos-actions
+# The bus.
+ReadWritePaths=/run/lampos-bus
 ProtectHome=yes
 PrivateTmp=yes
 

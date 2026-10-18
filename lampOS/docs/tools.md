@@ -184,14 +184,27 @@ treated as no answer.
 
 ### The skills'
 
-`lamp-skills --tools-dir <dir>/skills` ([skills.md](skills.md#tools-for-the-model))
-keeps the same two things one folder down, and the voice reads and calls
-them the same way, at the same session open and within the same deadline:
+`lamp-skills --tools-dir <skills>` ([skills.md](skills.md#tools-for-the-model))
+keeps the same two things in a folder of its own, which the voice is given
+as `LAMP_SKILLS_DIR` (the worker's `--skills-dir`, an absolute path; the
+product's is `/run/lampos-skills`), and the voice reads and calls them the
+same way, at the same session open and within the same deadline:
 
-    <dir>/skills/tools.json   each skill's tool, described with its SKILL.md description,
-                              with the parameters of its choice and flag, if it has them
-    <dir>/skills/call.sock    {"op":"call","name":"dance","args":{"style":"calm"}} -> {"ok":true,"result":{"next":"..."}}
-                              arguments that are not the tool's -> {"ok":false,"error":"..."}
+    <skills>/tools.json   each skill's tool, described with its SKILL.md description,
+                          with the parameters of its choice and flag, if it has them
+    <skills>/call.sock    {"op":"call","name":"dance","args":{"style":"calm"}} -> {"ok":true,"result":{"next":"..."}}
+                          arguments that are not the tool's -> {"ok":false,"error":"..."}
+
+Until 19 Oct they were in `<dir>/skills`, inside the executive's folder,
+which systemd removes at each restart of `lamp-actions`: the voice then had
+no skill functions until `lamp-skills` restarted (lamp-4ace, 04:33). That
+folder is still read and called after `<skills>` for one release, so a
+voice and skills from different builds still meet, but only while
+`<skills>` has no socket: after the update, until actions restarts, it
+keeps the older `lamp-skills`' catalog and a socket nobody answers (the
+reviewer on #1656). A name `<skills>` gives is its. Both are looked at for
+a changed catalog with the executive's, and a call to either is a skill's
+(a skill's look, a held reply), known by its folder, not by its name.
 
 They come after the executive's and within the same 32. A name the voice
 or the executive already has, or a Schedule name, is left out of the
