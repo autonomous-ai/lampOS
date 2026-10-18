@@ -1818,8 +1818,11 @@ With the switch (`Attention::waits_for_policy`, `Attention::first_output_busy`):
 - **Which lines:** in a busy room, a line whose only reason to be played is
   the conversation going on. Not one with its name heard (plainly or
   close), the text calling it, a face turned to the lamp, a line said to it
-  from close, a head tap or a bare call just before. Those play as before,
-  at once. In a room not known to be busy nothing changes. With
+  from close, a head tap or a bare call just before. Nor a reply to the
+  lamp's own question (`lamp_asked`, as the remark arm reads it): "Yes, go
+  ahead." to "Shall I start it?" is the person's answer, and held it would
+  leave a hand-over never run (Eighth on #1538). Those play as before, at
+  once. In a room not known to be busy nothing changes. With
   `LAMP_REMARKS` too, a remark to the room (above) is held without asking.
 - **The Policy's word:** its attention decision on the line, by the line's
   number, made for real (`policy_holds::Verdicts`, the same reader the
@@ -1847,7 +1850,7 @@ With the switch (`Attention::waits_for_policy`, `Attention::first_output_busy`):
   lets through, it lets through by `follows_lamp`. A follow-up said to the
   lamp that the Policy doesn't read as said back to it is held (17 of the
   33 lines said to the lamp on 16 October scored 0.6 or more; `policy_holds`).
-  A reply to the lamp's own question is judged the same way. A line that
+  A line that
   waits is that much later. **Expected, from lamp-4ace's numbers of 18
   October** (Ten's read on #1538): the Policy's decision lands about 1.25 s
   after the end of the person's speech (median; 1.66 s p90), and a busy
@@ -1872,6 +1875,9 @@ the car line played without the switch),
 (a decision 300 ms after the first output: played only once `answer`
 comes, held on `stay_quiet`; none: played after 2 s),
 `…::with_the_switch_a_line_that_calls_the_lamp_does_not_wait`,
+`…::with_the_switch_a_reply_to_the_lamps_question_does_not_wait_and_is_not_held`
+("Yes, go ahead." to "Shall I start it?" played at once on a `stay_quiet`
+at `follows_lamp` 0.4; after a line that asked nothing, held),
 `…::with_the_switch_a_line_whose_turn_ends_while_it_waits_is_let_go_at_once`
 (cancelled while it waits: let go on the next tick, none of its sound out,
 and the next call answered at once) and

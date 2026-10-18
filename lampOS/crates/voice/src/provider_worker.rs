@@ -2107,6 +2107,12 @@ async fn serve_with_visual<C: Connect>(
                     } else {
                         let (room, going_on) = now();
                         let turned = eyes.as_ref().and_then(crate::bus_out::someone_turned_to_lamp);
+                        // Whether it answers the lamp's own question, read as
+                        // the judging reads it below: such a line never waits.
+                        let lamp_asked = crate::thread::THREAD
+                            .lock()
+                            .is_ok_and(|thread| thread.lamp_asked_with(request, attention.holds_remarks()));
+                        attention.lamp_asked(lamp_asked);
                         if attention.waits_for_policy(request, room, going_on, turned)
                             && let Ok(first) = notice
                         {

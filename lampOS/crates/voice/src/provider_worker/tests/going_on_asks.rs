@@ -156,6 +156,80 @@ async fn with_the_switch_a_line_that_calls_the_lamp_does_not_wait() {
     }
 }
 
+/// After the lamp's answer to a call, `lamp_said`, the line `reply` with the
+/// Policy's `stay_quiet` at `follows_lamp` 0.4, decided before its answer:
+/// whether the reply's answer was played, and how long after its first
+/// output.
+async fn reply_after(lamp_said: &str, reply: &str) -> (bool, Duration) {
+    let _room = super::spoken_to::OwnRoom::fresh();
+    let mut desk = super::policy_holds::Desk::new("gor");
+    let mut options = desk.options(false);
+    options.attention = Some(busy_going_on);
+    options.going_on_asks = Some(desk.bus());
+    let mut rig = LiveRig::start_with(quick_policy(), options);
+    let mut dial = rig.ready().await;
+    let call = rig.speak(&mut dial, false, true).await;
+    dial.service
+        .send(heard(
+            "Hey Lamp, ask Claude Code to write a poem about the sea.",
+        ))
+        .await;
+    dial.service.send(provider_audio(7, 240)).await;
+    dial.service
+        .send(json!({"serverContent":{"outputTranscription":{"text":lamp_said}}}))
+        .await;
+    dial.service.send(idle_complete()).await;
+    loop {
+        if matches!(rig.output().await, ProviderOutput::TurnComplete { request, .. } if request == call)
+        {
+            break;
+        }
+    }
+    rig.owner
+        .complete_turn(real_time(), rig.snapshot.owner().unwrap())
+        .unwrap();
+    rig.publish();
+    let request = rig.speak(&mut dial, false, true).await;
+    dial.service.send(heard(reply)).await;
+    desk.decide_with(Some(request), "stay_quiet", json!({"follows_lamp": 0.4}));
+    let sent = crate::scenario_clock::instant();
+    dial.service.send(provider_audio(9, 240)).await;
+    dial.service.send(idle_complete()).await;
+    let mut first_sound = None;
+    loop {
+        match rig.output().await {
+            ProviderOutput::Audio { request: of, .. } if of == request => {
+                first_sound.get_or_insert(crate::scenario_clock::instant() - sent);
+            }
+            ProviderOutput::TurnComplete { request: of, .. } if of == request => break,
+            _ => {}
+        }
+    }
+    rig.stop().await;
+    (first_sound.is_some(), first_sound.unwrap_or_default())
+}
+
+/// Eighth on #1538: a reply to the lamp's own question is the person's
+/// answer, as the remark arm has it. "Yes, go ahead." to "Shall I start
+/// it?" is played at once though the Policy said `stay_quiet` and read it
+/// as not following (0.4): held, the hand-over would never run. After a
+/// line that asked nothing, the same reply is held.
+#[tokio::test(start_paused = true)]
+async fn with_the_switch_a_reply_to_the_lamps_question_does_not_wait_and_is_not_held() {
+    let _clock = logical_clock();
+    let (played, after) = reply_after(
+        "I can ask Claude Code to write it. Shall I start it?",
+        "Yes, go ahead.",
+    )
+    .await;
+    assert!(played && after < Duration::from_millis(100), "{after:?}");
+    assert!(
+        !reply_after("Here is a poem about the sea.", "Yes, go ahead.")
+            .await
+            .0
+    );
+}
+
 /// A line whose turn is cancelled while it waits for the Policy is let go
 /// on the next tick, not after the wait, and judged once: none of its sound
 /// comes out, and the worker takes the service's notices again, so the

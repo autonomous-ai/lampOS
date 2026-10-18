@@ -828,8 +828,9 @@ impl Attention {
 
     /// Whether the first output of `request`, still to be judged, should
     /// wait for the Policy's decision before it is: with the switch, in a
-    /// busy room, a conversation going on, and nothing else yet known to
-    /// show the line was said to the lamp ([`crate::going_on_asks`]). A
+    /// busy room, a conversation going on, not a reply to the lamp's own
+    /// question, and nothing else yet known to show the line was said to
+    /// the lamp ([`crate::going_on_asks`]). A
     /// line this keeps waiting that is let out or held for another reason
     /// once judged has only waited; the verdict itself is
     /// [`Self::first_output_busy`]'s.
@@ -853,6 +854,7 @@ impl Attention {
             && turned != Some(true)
             && !self.near
             && !self.addressed
+            && !self.lamp_asked
     }
 
     /// Read the text's call with [`called_by_name`] from now on
@@ -1459,7 +1461,10 @@ impl Attention {
             }
             // #1522, with `LAMP_GOING_ON_ASKS=on`: in a busy room, a line
             // let out only as the conversation going on is the lamp's only
-            // if the Policy says so.
+            // if the Policy says so. A reply to the lamp's own question is
+            // the person's answer, as the remark arm has it: "Yes, go
+            // ahead." to "Shall I start it?" is never held for want of a
+            // `follows_lamp` of 0.6 (Eighth on #1538).
             Verdict::Play(GOING_ON)
                 if self.going_on_asks
                     && room == Room::Busy
@@ -1468,7 +1473,8 @@ impl Attention {
                     && !self.named_sure
                     && turned != Some(true)
                     && !self.near
-                    && !self.addressed =>
+                    && !self.addressed
+                    && !self.lamp_asked =>
             {
                 crate::going_on_asks::verdict(
                     self.policy_says
@@ -2355,6 +2361,20 @@ mod tests {
         assert_eq!(
             line(true, busy, CAR, None, Some((6, Some(Says::Not)))).1,
             Verdict::Play(going_on_asks::NO_DECISION)
+        );
+        // A reply to the lamp's own question neither waits nor is held
+        // (Eighth on #1538).
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(true);
+        attention.ask_policy_when_going_on(true);
+        attention.began_at(7, 4, 1_000_000);
+        attention.heard("Yes, go ahead.");
+        attention.lamp_asked(true);
+        assert!(!attention.waits_for_policy(7, busy, true, None));
+        attention.policy_said(7, Some(Says::Not));
+        assert_eq!(
+            attention.first_output_busy(7, busy, true, true, None),
+            Some(GOING_ON)
         );
         // As before, and nothing waits: the switch off, a call in its
         // words, a face turned to the lamp, a room not known to be busy.

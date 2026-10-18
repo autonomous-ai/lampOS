@@ -22,9 +22,10 @@
 //! - **Which lines:** in a busy room, a line whose only reason to be played
 //!   is the conversation going on: not called in its words, by its name
 //!   heard (plainly or close), by a face turned to the lamp or by a line
-//!   said to it from close by (`crate::attention`). A line with any of those
-//!   is played as before, at once. In a room not known to be busy nothing
-//!   changes.
+//!   said to it from close by (`crate::attention`), and not a reply to the
+//!   lamp's own question ("Yes, go ahead." to "Shall I start it?", Eighth on
+//!   #1538). A line with any of those is played as before, at once. In a
+//!   room not known to be busy nothing changes.
 //! - **What it waits for:** the Policy's attention decision on the line, by
 //!   its number, made for real ([`crate::policy_holds::Verdicts`]). The
 //!   decision is made as the line's words end, and Gemini's first output
