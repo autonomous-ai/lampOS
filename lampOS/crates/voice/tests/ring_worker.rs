@@ -1011,12 +1011,26 @@ fn a_flood_of_head_requests_never_holds_back_revocation_or_expiry() {
     let root = std::path::PathBuf::from(format!("/tmp/lrw-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     let head = lamp_voice::ring_head::RingHead::on(&root).unwrap();
+    // The flood is at full strength before the ring starts: 1,000 sent.
+    // Counted after a fixed 100 ms instead, its two bus senders once sent
+    // fewer on a loaded Mac, and `sent > 1_000` below failed (Fourth on
+    // #705, 19 October 02:34; #1569 row 24). It is waited for here, not
+    // after the ring is ready, which ends itself with no authority 250 ms
+    // into its start (`INITIAL_AUTHORITY_US`).
+    let mut flood = Flood::start(&root);
+    let started = Instant::now();
+    while flood.sent.load(std::sync::atomic::Ordering::Relaxed) < 1_000 {
+        assert!(
+            started.elapsed() < Duration::from_secs(4),
+            "the flood sent fewer than 1,000 in 4 s"
+        );
+        thread::sleep(Duration::from_millis(1));
+    }
     let mut rig = Rig::start_with_senses(Senses {
         head: Some(head),
         ..Senses::default()
     });
     rig.ready();
-    let mut flood = Flood::start(&root);
     thread::sleep(Duration::from_millis(100));
     // A colored frame whose permit lasts 50 ms is blanked when it expires.
     let (mut controller, owner) = conversation(rig.boot);
