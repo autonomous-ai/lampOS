@@ -535,7 +535,17 @@ gap of the lamp's silence as `Over` (`silence_heard`), but the gate uses
 `hearing_replay REPLAY_DIR --signal aec_linear_gated` scores a replay this
 way, from its AEC-only and linear outputs and the AEC-only evidence, gated by
 the replay's own `Hearing` (so `--explained` moves the judge and the gate
-together; the gate itself is `plain_percent`). Tests:
+together; the gate itself is `plain_percent`, so only an `--explained` under
+20 % moves it). Two ways it differs from the device: a recording keeps no
+reference trust, so the replay gates on every block's evidence where the
+device takes only trusted evidence and reads the processed block over an
+untrusted span; and on the device the judge and the gate stay at
+`Hearing::EVALUATED` whatever `--explained` a replay uses. The table above
+was worked out per block from separate `aec_only` and `aec_linear` scores;
+`--signal aec_linear_gated` runs one detector over the switched stream, as
+the device does, and is the figure to quote (Thirteen and the reviewer on
+#1504: in a synthetic probe the two differed by a yield in one pattern of
+several). Tests:
 `activity::tests::linear_gated_reads_the_linear_output_only_where_speech_would_be_a_person`
 and `linear_gated_keeps_the_lamps_own_voice_out_and_a_stop_over_it_in` (the
 generated "Stop." kept in the linear output: at 95 % and at 50 % explained
