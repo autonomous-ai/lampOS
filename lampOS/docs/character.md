@@ -260,8 +260,8 @@ it cannot make the service answer sooner.
 
 ## What the runtime adds to it
 
-Two things are put after the file each time a session with the provider
-opens. Neither is in the file, and neither is written anywhere.
+These are put after the file each time a session with the provider opens.
+None is in the file, and none is written anywhere.
 
 **The time.** `crates/voice/src/local_time.rs` reads the system's own
 compiled zone file (`/etc/localtime`) and adds, for example:
@@ -286,3 +286,16 @@ with `date` for each. Not yet shown on the lamp: that the model uses it.
 
 **The conversation so far**, when the previous session ended in the middle
 of one: [conversation-thread.md](conversation-thread.md).
+
+**That the light can't be changed right now**, when the session is given
+none of the light's functions (#1513, [tools.md](tools.md)), last:
+
+```text
+Your light
+You cannot change your light right now: it is not ready. If someone asks you to change it, say in a few words that you can't right now. Never say you changed it.
+```
+
+The file's light line says "You have a function for each when it is ready"
+and what to say when told the light can't be changed: without it, a
+session opened while the ring was down said "your light is all set to
+orange now" five times and made no call (lamp-4ace, 18 Oct 13:57).
