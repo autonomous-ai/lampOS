@@ -221,7 +221,21 @@ that electrode's touch threshold.
 
 An I²C child does all reset, calibration and reads. The parent runs GPIO and
 the nonblocking socket, draining at most 32 acquisitions from each per 2 ms
-step. State is refreshed every 20 ms or on an event. No I²C, worker wait,
+step. `controls/touch_state` is said at once when what a reader acts on
+changes (a press, a release, a contact, a fault; its times aside: when it
+was said, and when each source was last read), with an event, and every
+100 ms otherwise, as declared. What only grows or moves while a hand stays
+(each source's `held_us`, the strip's position, distance and speed) is said
+at most every 20 ms (`MOVING_EVERY_US`), the pace it always had: the
+product's pins read every 5 ms, and saying each reading took a held lamp to
+200 states a second (the reviewer on #1469). `controls/state` is said the
+same way (its stamp and the privacy reading's aside; `buttons[].held_us`
+and `base_held_us` at most every 20 ms, a tier at once), with a gesture,
+and every 100 ms, or every 20 ms with the privacy switch attached, since
+that reading lasts 50 ms. A publish the bus refuses is tried again 20 ms
+later (El on #1469). Before 18 October both were said every 20 ms whatever
+changed: about 50 a second each on a still lamp, and every reader woke for
+each one (the first builder on #1456). No I²C, worker wait,
 record-file write or hand-log output is in that polling path. A child packet
 is bounded to 1 KiB; faults retain at most 256 UTF-8 bytes. Source time is
 sampled before the I²C transaction sequence. A full socket drops the packet

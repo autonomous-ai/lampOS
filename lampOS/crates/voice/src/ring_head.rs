@@ -31,7 +31,9 @@ use std::{
 /// The ring worker's flag for it.
 pub const FLAG: &str = "--head-touch";
 
-/// Controls says the head's state at least every 20 ms; this looks every 50.
+/// Controls says the head's state when it changes, a held hand's time at
+/// most every 20 ms, and every 100 ms otherwise (#1469), inside the 300 ms
+/// it lasts; this looks every 50.
 const LOOK_EVERY_US: u64 = 50_000;
 
 #[derive(Default)]

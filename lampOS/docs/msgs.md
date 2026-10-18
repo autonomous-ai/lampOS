@@ -227,8 +227,9 @@ removal or measured handle-close/visible-light latency.
 transport lifespan) and `controls/touch_state` (`TouchState`, latest,
 100 ms declared period/300 ms lifespan). `declaration_of` recognizes both;
 `first_topics()` and the existing `controls_topics()` inventories are unchanged.
-Only the explicit `lamp-controls --touch` path publishes them, normally every
-20 ms and on events. All fields are strict; old controls shapes are unchanged.
+Only the explicit `lamp-controls --touch` path publishes them: a change at
+once, what only grows while a hand stays at most every 20 ms, events, and
+every 100 ms otherwise ([controls.md](controls.md)). All fields are strict; old controls shapes are unchanged.
 
 Source/session/contact identity, original acquisition and contact times,
 raw working-source masks, filtered event geometry, normalized strip position/travel/

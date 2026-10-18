@@ -389,6 +389,72 @@ fn base_only_touch_publishes_controls_state_and_strip_failure_is_independent() {
     assert!(!state.ready);
 }
 
+/// El on #1469: with the privacy switch attached, `controls/state` keeps
+/// its 20 ms pace in a still second (the reading lasts 50 ms), while the
+/// touch state, with nothing changing, goes out every 100 ms.
+#[test]
+fn with_privacy_attached_a_still_second_says_controls_state_fifty_times() {
+    // Short: a subscriber's socket path must fit in 103 bytes, which the
+    // Mac's temporary folder leaves no room for.
+    let root = std::path::PathBuf::from(format!("/tmp/cpv-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    let bus = Bus::new(&root).unwrap();
+    let (lines, _, _, _) = line(false);
+    let wiring: TouchPinsConfig = serde_json::from_str(include_str!(
+        "../fixtures/strip-711-working-pins-example.json"
+    ))
+    .unwrap();
+    let config = Config {
+        base_selected_mask: Some(
+            wiring
+                .base
+                .as_ref()
+                .unwrap()
+                .pads
+                .iter()
+                .fold(0, |mask, &pad| mask | (1 << pad)),
+        ),
+        ..Config::default()
+    };
+    let mut service =
+        touch_runtime::Service::new(&bus, config, wiring, NoGpio, None::<Worker>, CLOCK).unwrap();
+    service
+        .attach_privacy(
+            &bus,
+            Source::new(
+                Box::new(LineReader::new(lines, CLOCK, "privacy-reader")),
+                CLOCK,
+            ),
+        )
+        .unwrap();
+    service.strip_unavailable(0, "no strip");
+    let mut legacy = bus.subscribe(ControlsState::TOPIC, "test_legacy").unwrap();
+    let mut touch = bus
+        .subscribe(lamp_msgs::TouchState::TOPIC, "test_touch")
+        .unwrap();
+    let mut counts = (0, 0);
+    for at in (0..2_000_000u64).step_by(2_000) {
+        service.step(|| at);
+        if at == 1_000_000 {
+            counts = (0, 0);
+        }
+        while legacy.recv(std::time::Duration::ZERO).unwrap().is_some() {
+            counts.0 += 1;
+        }
+        while touch.recv(std::time::Duration::ZERO).unwrap().is_some() {
+            counts.1 += 1;
+        }
+    }
+    drop((service, legacy, touch));
+    let _ = std::fs::remove_dir_all(&root);
+    assert!(
+        (45..=55).contains(&counts.0),
+        "{} controls states",
+        counts.0
+    );
+    assert!((9..=11).contains(&counts.1), "{} touch states", counts.1);
+}
+
 #[test]
 fn legacy_bytes_omit_privacy_and_new_fields_reject_ambiguous_evidence() {
     let old = r#"{"stamp":{"clock_id":"privacy-test","at_us":0,"sequence":1},"session_id":"controls-replay","enabled":false,"ready":false,"fault":"missing","buttons":[],"head_active":false,"base_ready":false,"base_tier":"none","event_sequence":0,"rejected_inputs":0}"#;
