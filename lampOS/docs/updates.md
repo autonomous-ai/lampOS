@@ -291,6 +291,19 @@ and the job fails without moving the head.
     between two turns (resting, nothing heard or said for 5 s; at once if
     its state cannot be seen). They are watched again, the outcome says how
     the previous build is, and the build is refused from then on.
+    **What a part not well said of itself goes into the outcome** (#1505):
+    the unit that failed on the new build (read before it is put back), and
+    each unit still not well on the old one, gets how often systemd started
+    it again since this round restarted it (`NRestarts`, which a restart
+    asked for flushes) and its own last journal line since that restart
+    (`journalctl -u <unit> --since @<the restart> -o json`, systemd's own
+    lines skipped, control characters gone, at most 200 characters): "build
+    812 put back: lamp-tasks.service ended and systemd is starting it again
+    (systemd started it again once; its last line: "tasks: storage: Tasks
+    storage is unavailable; …")". **Only in the outcome**, which goes to
+    `lamp-update`'s own journal: the refusal kept in `state.json` holds the
+    reason alone, since a part's line can carry what a person said. Asked
+    only of a unit found not well; a round that switches asks nothing.
 11. **After.** Switched or put back, the folders this program made that no
     unit or link names now, nor any unit or link as it was before the last
     switch, are removed: the lamp keeps its build and the one before. A folder it did
@@ -390,7 +403,11 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   worker beside an unchanged voice in a folder named by its list; a folder
   made two builds ago removed and the one installed by hand kept; a part
   whose folder is gone installed afresh; a voice that is well put back only
-  5 s after the last word.
+  5 s after the last word; a part put back saying its restarts and last
+  line in the outcome and never in the kept refusal; the old build not well
+  either, each unit's line in `after`; no line asked of a good switch, and
+  none said when there is none; the journal line picked from `journalctl
+  -o json` (the program's own last, systemd's skipped, cleaned and cut).
 - With product parts (task #811, `cargo test -p lamp-update --test round`,
   19 rounds): a lamp with both kinds switched in one round, the voice by its
   unit and the eyes by their link, the eyes' unit byte for byte the same; a
