@@ -1043,9 +1043,11 @@ async fn with_the_switch_and_a_voice_check_another_voice_ends_the_conversation()
 /// for while heard, was on lamp-4ace. One shorter, asked for at its end, is
 /// answered on the second look, after its answer's verdict, as the child on
 /// lamp-4ace answered requests 18 and 19 on 18 October (#829, the first
-/// builder at 06:54).
+/// builder at 06:54). With `every_line`, every line is late so, as on a
+/// lamp slower still.
 #[derive(Default)]
 struct LatePrints {
+    every_line: bool,
     ready: std::collections::VecDeque<(u64, std::result::Result<Vec<f32>, String>)>,
     late: std::collections::VecDeque<(u64, std::result::Result<Vec<f32>, String>, bool)>,
 }
@@ -1057,7 +1059,7 @@ impl crate::same_voice::Printer for LatePrints {
         } else {
             vec![0.0, 1.0]
         };
-        if samples.len() == crate::same_voice::ASKED_AT {
+        if samples.len() == crate::same_voice::ASKED_AT && !self.every_line {
             self.ready.push_back((request, Ok(print)));
         } else {
             self.late.push_back((request, Ok(print), false));
@@ -1096,10 +1098,40 @@ impl crate::same_voice::Printer for LatePrints {
 #[tokio::test(start_paused = true)]
 async fn with_a_voice_check_whose_prints_take_the_lamps_time_the_scene_is_judged_with_it() {
     let _clock = logical_clock();
+    assert_eq!(
+        scene_3_with(LatePrints::default()).await,
+        [true, false, false, false, false]
+    );
+}
+
+/// The Seventh on #1445: on a lamp slower still, with every print after
+/// its line's verdict, B's follow-up is let out as the conversation going
+/// on, and its print, come late, is another voice than A's: the
+/// conversation is over, as for one held, and the umbrella line, A's
+/// remark and the car line are held. A late print used to become the
+/// conversation's voice unchecked, and the scene then went on with B:
+/// every line was played.
+#[tokio::test(start_paused = true)]
+async fn with_a_voice_check_whose_every_print_comes_late_a_late_other_voice_ends_the_conversation()
+{
+    let _clock = logical_clock();
+    let every_line = LatePrints {
+        every_line: true,
+        ..LatePrints::default()
+    };
+    assert_eq!(
+        scene_3_with(every_line).await,
+        [true, true, false, false, false]
+    );
+}
+
+/// Scene 3 at the lamp's lengths through the worker's own loop, with the
+/// prints as `prints` gives them: which of its five lines were played.
+async fn scene_3_with(prints: LatePrints) -> Vec<bool> {
     let _mark = OwnMark::kept();
     let _room = OwnRoom::fresh();
     let mut options = options(true, attention_now, crate::tools::Settings::default());
-    options.voices = Some(Box::new(LatePrints::default()));
+    options.voices = Some(Box::new(prints));
     let mut rig = LiveRig::start_configured(
         quick_policy(),
         options,
@@ -1131,7 +1163,7 @@ async fn with_a_voice_check_whose_prints_take_the_lamps_time_the_scene_is_judged
         played.push(voice_line(&mut rig, &mut dial, false, voice, SENT + blocks, text, true).await);
     }
     rig.stop().await;
-    assert_eq!(played, [true, false, false, false, false]);
+    played
 }
 
 /// #829, through the worker's own loop, with a conversation going on: after

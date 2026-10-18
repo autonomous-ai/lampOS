@@ -2035,14 +2035,34 @@ async fn serve_with_visual<C: Connect>(
                                 let likeness = voices.likeness(request);
                                 (likeness, likeness.is_none().then(|| voices.unjudged(request)).flatten())
                             });
+                            // A line let out before this one as the
+                            // conversation going on, whose print came after
+                            // its verdict, was another voice's: the
+                            // conversation is over, as for one held, and
+                            // this line is no part of it (the Seventh on
+                            // #1445). Taken here, at the next verdict, since
+                            // the lamp's answer to that line began the count
+                            // afresh.
+                            let late_other = intake
+                                .handoff
+                                .voices
+                                .as_mut()
+                                .filter(|_| attention.awaits_verdict(request))
+                                .and_then(|voices| voices.take_late_other());
+                            if let Some(late) = late_other
+                                && let Ok(mut told) = crate::room_told::room().lock()
+                            {
+                                told.another_voice_held(late);
+                            }
                             // A line long enough to know, judged as without
                             // the check for want of a print: said, never
                             // silently again (#829, lamp-4ace on 18 October,
                             // requests 18 and 19; the reviewer on #1435).
-                            if let Some((_, Some(why))) = judged {
+                            if let Some((_, Some(why))) = judged.filter(|_| late_other.is_none()) {
                                 eprintln!("lamp-voice provider: request {request}: judged without the voice check: {why}");
                             }
                             let going_on = match judged.and_then(|(likeness, _)| likeness) {
+                                _ if late_other.is_some() => false,
                                 Some(likeness) if likeness < crate::same_voice::DIFFERENT_BELOW => {
                                     eprintln!("lamp-voice provider: request {request}: another voice than the conversation's (cosine {likeness:.2}): no conversation is going on for it");
                                     other_voice = true;
