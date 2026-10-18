@@ -336,12 +336,15 @@ fn sigterm_finishes_recording_and_releases_the_actual_serve_owner() {
     assert_eq!(before.fault, Some(ControlFault::Missing));
     assert!(Service::new(&bus, Config::default(), MissingPins, CLOCK).is_err());
 
+    // Sent from here, not by running `/bin/kill`: a machine without procps
+    // (the ARM64 cross image these tests run in under qemu) has none, and
+    // the test failed there before any signal (the first builder on #705).
     let pid = running.0.as_ref().unwrap().id();
-    let signal = Command::new("/bin/kill")
-        .args(["-TERM", &pid.to_string()])
-        .status()
-        .unwrap();
-    assert!(signal.success());
+    rustix::process::kill_process(
+        rustix::process::Pid::from_raw(pid as i32).expect("a child's pid"),
+        rustix::process::Signal::TERM,
+    )
+    .unwrap();
     let output = running.finish();
     assert!(
         output.status.success(),
