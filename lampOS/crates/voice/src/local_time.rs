@@ -412,12 +412,19 @@ pub fn zone_file(zones: &std::path::Path, place: &str) -> Option<(String, Vec<u8
 /// (`America/New_York` is "New York").
 pub fn place_name(zone: &str) -> String {
     // `Etc/GMT-7` is seven hours ahead: POSIX turns the sign, so it is said
-    // as people write it, "UTC+7" (Jarvis on #1575).
-    if let Some(hours) = zone.strip_prefix("Etc/GMT") {
-        return match hours.as_bytes().first() {
-            None | Some(b'0') => "UTC".to_owned(),
-            Some(b'-') => format!("UTC+{}", &hours[1..]),
-            Some(b'+') => format!("UTC-{}", &hours[1..]),
+    // as people write it, "UTC+7" (Jarvis on #1575). Found after any folder
+    // before it (`posix/Etc/GMT-7`), and a zero either way is "UTC" (the
+    // reviewer on #1589).
+    if let Some((_, hours)) = zone.split_once("Etc/GMT") {
+        let (sign, number) = match hours.as_bytes().first() {
+            Some(b'-') => ("+", &hours[1..]),
+            Some(b'+') => ("-", &hours[1..]),
+            _ => ("", hours),
+        };
+        return match number.parse::<u32>() {
+            _ if number.is_empty() => "UTC".to_owned(),
+            Ok(0) => "UTC".to_owned(),
+            Ok(_) if !sign.is_empty() => format!("UTC{sign}{number}"),
             _ => zone.to_owned(),
         };
     }
@@ -663,6 +670,33 @@ pub fn now_here() -> Result<Option<String>, &'static str> {
     Ok(said(&file, now))
 }
 
+/// [`now_here`] naming whose time it is, for `LAMP_TIME_PLACES`: with the
+/// switch, every answer of the function says its place, its own one too
+/// (the reviewer on #1589), so the model never gives it as another's.
+pub fn now_here_named() -> Result<Option<String>, &'static str> {
+    if unset_here() {
+        return Err(SAID_UNSET);
+    }
+    let Some((file, now)) = here() else {
+        return Ok(None);
+    };
+    Ok(said_here(&file, zone_here().as_deref(), now))
+}
+
+/// [`said`], naming the lamp's own place when its zone is known: "Here in
+/// Ho Chi Minh it is 7:32 in the evening, …".
+pub fn said_here(file: &[u8], zone: Option<&str>, now: i64) -> Option<String> {
+    let said = said(file, now)?;
+    Some(match zone {
+        Some(zone) => format!(
+            "Here in {} it is{}",
+            place_name(zone),
+            said.strip_prefix("It is").unwrap_or(&said)
+        ),
+        None => said,
+    })
+}
+
 /// Whether `now` is night in the zone of this compiled zone file: from
 /// 21:00 to 4:59, as [`words`] calls it "at night". Nothing when the zone
 /// cannot be worked out.
@@ -835,6 +869,14 @@ mod tests {
             .unwrap()
             .ends_with("That is the time here too.")
         );
+        // The lamp's own time names its place too (the reviewer on #1589).
+        assert_eq!(
+            said_here(&saigon, Some("Asia/Ho_Chi_Minh"), at).as_deref(),
+            Some(
+                "Here in Ho Chi Minh it is 4:40 in the afternoon, Sunday 18 October 2026. Said aloud: twenty to five in the afternoon."
+            )
+        );
+        assert_eq!(said_here(&saigon, None, at), said(&saigon, at));
         let new_york = ruled(-18_000, "EST5EDT,M3.2.0,M11.1.0");
         assert!(
             said_in("America/New_York", &new_york, None, at)
@@ -903,6 +945,11 @@ mod tests {
         // The `Etc/GMT` zones are said as people write them: POSIX's sign
         // is turned.
         assert_eq!(place_name("Etc/GMT-7"), "UTC+7");
+        assert_eq!(place_name("posix/Etc/GMT-7"), "UTC+7");
+        assert_eq!(place_name("right/Etc/GMT+5"), "UTC-5");
+        assert_eq!(place_name("Etc/GMT-0"), "UTC");
+        assert_eq!(place_name("Etc/GMT+0"), "UTC");
+        assert_eq!(place_name("Etc/GMT-14"), "UTC+14");
         assert_eq!(place_name("Etc/GMT+5"), "UTC-5");
         assert_eq!(place_name("Etc/GMT"), "UTC");
         assert_eq!(place_name("Etc/GMT0"), "UTC");
