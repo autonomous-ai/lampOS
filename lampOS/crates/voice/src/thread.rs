@@ -313,6 +313,15 @@ impl Thread {
         let Ok(text) = std::fs::read_to_string(path) else {
             return false;
         };
+        // A file set aside is no thread taken: `false`, so the caller says
+        // nothing more than the set-aside's own line (the reviewer on #1571).
+        let (read, took) = match Self::read(&text, now, wall) {
+            Ok(read) => (read, true),
+            Err(why) => {
+                set_aside(path, &why, text.len());
+                (Self::new(), false)
+            }
+        };
         // Who is at the lamp and whom the session was opened for are this
         // process's own; each exchange keeps its `whose` through the file.
         let (whose, named, opened_for, note) = (
@@ -321,13 +330,13 @@ impl Thread {
             self.opened_for.take(),
             self.note.take(),
         );
-        *self = Self::load(&text, now, wall);
+        *self = read;
         self.whose = whose;
         self.named = named;
         self.opened_for = opened_for;
         self.note = note;
         self.held = Some(at);
-        true
+        took
     }
 
     /// This process has just written the thread to `path`: what is in the
@@ -366,12 +375,27 @@ impl Thread {
     /// minutes, cut to the usual lengths. Text that is not such a file, or
     /// that claims to be from the future, gives an empty thread.
     pub fn load(text: &str, now: Instant, wall: SystemTime) -> Self {
+        Self::read(text, now, wall).unwrap_or_else(|_| Self::new())
+    }
+
+    /// [`Self::load`], saying why when the text is not a thread file this
+    /// build can read (#1505), so the file can be set aside rather than
+    /// silently forgotten. A wall clock before 1970 is no fault of the file:
+    /// an empty thread, read.
+    pub fn read(text: &str, now: Instant, wall: SystemTime) -> Result<Self, String> {
         let mut thread = Self::new();
-        let (Ok(kept), Ok(wall)) = (
-            serde_json::from_str::<Vec<Kept>>(text),
-            wall.duration_since(UNIX_EPOCH),
-        ) else {
-            return thread;
+        // The error's kind and place, never its message, which can quote a
+        // value from the file (the reviewer on #1571).
+        let kept = serde_json::from_str::<Vec<Kept>>(text).map_err(|error| {
+            format!(
+                "{:?} at line {} column {}",
+                error.classify(),
+                error.line(),
+                error.column()
+            )
+        })?;
+        let Ok(wall) = wall.duration_since(UNIX_EPOCH) else {
+            return Ok(thread);
         };
         let wall_ms = wall.as_millis() as u64;
         let from = kept.len().saturating_sub(EXCHANGES * PEOPLE);
@@ -414,7 +438,7 @@ impl Thread {
                 }),
             });
         }
-        thread
+        Ok(thread)
     }
 
     /// A piece of what the provider heard a person say.
@@ -781,6 +805,38 @@ pub fn take_file(flags: &[String]) -> std::io::Result<(Option<std::path::PathBuf
             "the thread's file needs a short absolute path",
         )),
         _ => Ok((None, flags)),
+    }
+}
+
+/// Each thread file a set-aside line was said for, so a test can count the
+/// lines for its own file while others run beside it.
+#[cfg(test)]
+static SET_ASIDE_SAID: std::sync::Mutex<Vec<std::path::PathBuf>> =
+    std::sync::Mutex::new(Vec::new());
+
+/// A thread file this build cannot read, renamed beside itself as
+/// `<name>.unreadable-<unix_ms>` and said once, with why and its size,
+/// never its words (#1505): set aside, not silently forgotten. In `/run`,
+/// so a reboot ends it. A rename that fails is said, and changes nothing.
+fn set_aside(path: &Path, why: &str, bytes: usize) {
+    let at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis());
+    let mut kept = path.as_os_str().to_owned();
+    kept.push(format!(".unreadable-{at}"));
+    let kept = std::path::PathBuf::from(kept);
+    #[cfg(test)]
+    SET_ASIDE_SAID.lock().unwrap().push(path.to_path_buf());
+    match std::fs::rename(path, &kept) {
+        Ok(()) => eprintln!(
+            "lamp-voice: the thread file {} could not be read ({why}; {bytes} bytes); set aside as {}, and the thread starts empty",
+            path.display(),
+            kept.display()
+        ),
+        Err(error) => eprintln!(
+            "lamp-voice: the thread file {} could not be read ({why}; {bytes} bytes), nor set aside ({error}); the thread starts empty",
+            path.display()
+        ),
     }
 }
 
@@ -1390,13 +1446,13 @@ mod tests {
     }
 
     /// #1505: the thread file as a later build writes it, with a field this
-    /// build doesn't know in an exchange. The same file without it is told
-    /// again; with it, today's build silently starts an empty thread.
-    /// `el/thread-forward` makes it read: this test then stops panicking, and
-    /// becomes a plain test in that pull request (Tests).
+    /// build doesn't know in an exchange (Tests' forward-read test, made
+    /// plain by `el/thread-forward`). The same file without it is told
+    /// again. With it, `Kept` stays strict, so it is set aside: the thread
+    /// starts empty, `thread.json.unreadable-<ms>` beside it holds the later
+    /// build's text byte for byte, and one line says so.
     #[test]
-    #[should_panic(expected = "a later build's thread read as empty")]
-    fn a_thread_from_a_later_build_is_read() {
+    fn a_thread_from_a_later_build_is_set_aside_and_kept() {
         let mut thread = Thread::new();
         let start = Instant::now() + Duration::from_secs(3_600);
         let wall = UNIX_EPOCH + Duration::from_secs(1_800_000_000);
@@ -1410,6 +1466,7 @@ mod tests {
             .unwrap();
         let other = Instant::now() + Duration::from_secs(9_000);
         let later = wall + Duration::from_secs(10);
+        // Today's own file reads back.
         assert!(
             Thread::load(&text, other, later)
                 .recall(other, ROOM)
@@ -1418,12 +1475,41 @@ mod tests {
         let mut kept: serde_json::Value = serde_json::from_str(&text).unwrap();
         kept[0]["a_field_from_a_later_build"] = serde_json::json!(true);
         let text = serde_json::to_string(&kept).unwrap();
+        let directory = std::env::temp_dir().join(format!(
+            "lamp-voice-thread-later-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("thread.json");
+        std::fs::write(&path, &text).unwrap();
+        let mut reader = Thread::new();
+        assert!(!reader.reload(&path, other, later), "set aside, not taken");
+        assert_eq!(reader.recall(other, ROOM), None, "the thread starts empty");
+        assert!(!path.exists());
+        let aside: Vec<_> = std::fs::read_dir(&directory)
+            .unwrap()
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path())
+            .collect();
+        assert_eq!(aside.len(), 1, "{aside:?}");
         assert!(
-            Thread::load(&text, other, later)
-                .recall(other, ROOM)
-                .is_some(),
-            "a later build's thread read as empty"
+            aside[0]
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("thread.json.unreadable-")
         );
+        assert_eq!(std::fs::read_to_string(&aside[0]).unwrap(), text);
+        let said = SET_ASIDE_SAID
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|said| **said == path)
+            .count();
+        assert_eq!(said, 1, "one line for it");
+        std::fs::remove_dir_all(&directory).unwrap();
     }
 
     #[test]
@@ -2070,6 +2156,61 @@ mod tests {
         assert_eq!(recent[1].person, "What was it again?");
         // A Live session's recall is as before: no note is read to it.
         assert!(!read.recall(now, ROOM).unwrap().contains("Tell them"));
+    }
+
+    /// #1505: a thread file this build cannot read (a later build's field,
+    /// or no thread file at all) is set aside beside itself, renamed and
+    /// kept, never read as empty and forgotten; the thread starts empty. A
+    /// file it can read is left where it is.
+    #[test]
+    fn an_unreadable_thread_file_is_set_aside_and_the_thread_starts_empty() {
+        let directory = std::env::temp_dir().join(format!(
+            "lamp-voice-thread-aside-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("thread.json");
+        let now = Instant::now();
+        let wall = SystemTime::now();
+        let wall_ms = wall.duration_since(UNIX_EPOCH).unwrap().as_millis();
+        let later =
+            format!(r#"[{{"at_unix_ms":{wall_ms},"person":"Hello.","lamp":"Hi.","later":true}}]"#);
+        for text in [later.as_str(), "not json"] {
+            std::fs::write(&path, text).unwrap();
+            let mut thread = Thread::new();
+            assert!(
+                !thread.reload(&path, now, wall),
+                "{text}: set aside, not taken"
+            );
+            assert_eq!(thread.recall(now, ROOM), None, "{text}");
+            assert!(
+                !path.exists(),
+                "{text}: set aside, not left to be read again"
+            );
+            let kept: Vec<_> = std::fs::read_dir(&directory)
+                .unwrap()
+                .filter_map(|entry| entry.ok())
+                .map(|entry| entry.path())
+                .collect();
+            assert_eq!(kept.len(), 1, "{text}: {kept:?}");
+            let name = kept[0].file_name().unwrap().to_string_lossy().into_owned();
+            assert!(name.starts_with("thread.json.unreadable-"), "{name}");
+            assert_eq!(std::fs::read_to_string(&kept[0]).unwrap(), text);
+            std::fs::remove_file(&kept[0]).unwrap();
+        }
+        // A file this build reads is read, and stays.
+        let mut live = Thread::new();
+        live.opening(now);
+        live.person("Hello.", true, now);
+        live.lamp(1, "Hi.", now);
+        write_file(&path, &live.save(now, wall).unwrap()).unwrap();
+        let mut other = Thread::new();
+        assert!(other.reload(&path, now, wall));
+        assert!(other.recall(now, ROOM).is_some());
+        assert!(path.exists());
+        std::fs::remove_dir_all(&directory).unwrap();
     }
 
     /// First builder on #778: a person's exchange made on the second route
