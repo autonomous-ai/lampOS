@@ -4,6 +4,52 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 13:53 #1499 reviewed at 8c1ff5ba4: two P2s (many real requests are held as remarks: 'What's the weather tomorrow', 'Brighter', 'I need more light'...; replies to the lamp's question held when lamp_asked misses 'Shall I start it?'), four P3s
+- 13:53 merged #1487 (LAMP_ROOM_FILE keeps the room across a short restart, keyed on the machine's boot; off unless set)
+- 13:53 merged #1502 (harness-off's words: the lock never waits; docs and a comment)
+- 13:52 #1503 reviewed at adab5baed (#1484's P3s; a refactor with a test, docs with the lamp's lines): no findings; merge on green ARM64
+- 13:49 #1491 ready (the watcher ends with the join, 50 ms test holds); asked to fold its fix-up commit; the merge is mine per 12:4x
+- 13:49 merged #1497 (controls' SIGTERM test signals its child itself; two qemu-only failures explained; tests)
+- 13:45 merged #1500 (turn-end-wire's startup test keeps 300 ms for the silent worker only; tests). #1484 merged by the first builder. #1494 moved to 73542b54f; re-check started
+- 13:41 #1484 re-checked at a18a8c69d: P2 fixed (a loop-level renewal test, three mutations fail it); two P3s; on by default, the first builder's merge (their 12:47 lamp run covers this head)
+- 13:40 merged #1490 (the Policy's report period an option, 1 s on the lamp; its test rigs wait 20 ms: 43.7 s to 28.4 s on ARM64)
+- 13:34 #1502 reviewed at 17e067816 (harness-off's words, docs/comment only): no findings; merge on green ARM64
+- 13:32 noted #1493 on #811 (stays open). #1479 re-checked at fc1bcd711: P2 fixed (speech no longer counts a change as the lamp's own; a walk-in while it speaks seen at once); ready once the first builder's lamp run is done
+- 13:31 merged #1493 (lamp-update harness-off undoes install's Harness at boot; an operator command, nothing runs it by default); one P3
+- 13:30 #1475 re-checked at 1c85b65d3: the P2 fixed (both halves tested); conflicts in switches.md after #1483 (rebase, one account in serve-runtime.md); held for the lamp run
+- 13:25 #1491 (setup's address watcher ends with the join; on by default) and #1497 (controls' SIGTERM test signals itself; tests) ready; reviews started
+- 13:21 #1499 ready (LAMP_REMARKS: a remark to the room held in a busy room); review started. #1487 moved to f543270be; re-check started
+- 13:20 #1474 re-checked at c4d28fc85: no findings; the first builder said no to the camera at 12:4x, so skills, volume_mute and cancel_reminder stay held on a reply; ready once the first builder's followups.sh run is in
+- 13:17 #1486 re-checked at d4bb32136: all four P3s fixed; ready once the first builder's lamp run is done
+- 13:17 merged #1496 (the 5 ms pins test truly reads every 5 ms; tests only)
+- 13:10 #1494 reviewed at 510fe9939 (top commit): for the first builder (ring behaviour, no lamp shown, switch on in the product); two P2s (the candle swings each pixel over the full range with neighbours out of step, unlike V1's 80-100%; the pulse is not the agreed arc and stays low), one P3; waits for #1466
+- 13:10 merged #1473 (body/gesture tells a dropped gesture's asker why and who holds the body; off unless --arbitration on; msgs fields optional)
+- 13:07 merged #1489 (the Policy's name test's gap; tests only); closed #1488. #1490 (Policy report period option) ready; review started. #1475 moved to 1c85b65d3; re-check started
+- 13:04 #1493 reviewed at c0003fae2: one P2 (no test runs the real System::harness_off: step order, the stop, a failing step all untested), four P3s; nothing runs it by default, the sign-in is untouched; ARM64 green
+- 13:03 #1479 re-checked at 188c92b49: P2 (rule 8: 'lit' covers all the lamp's speech, so a walk-in while it talks is seen up to 2.4 s late, one try per 3 s; drop speaking from lit and keep the light-change window), one P3; held for the lamp run
+- 13:00 #1496 reviewed at b9df96172 (the 5 ms pins test truly reads every 5 ms; tests only): no findings; merge on green ARM64. #1484 moved to a18a8c69d; re-check started
+- 12:57 #1495 reviewed at 98ff34533 (light answers say warm white): no findings; on by default, sent to the first builder
+- 12:53 merged #1481 (the reset wipes the kept light's folder; docs say LAMP_LIGHT_KEEP is meant with LAMP_LIGHT_REQUESTS)
+- 12:49 #1487 reviewed at a9d938429: P1 (the file is keyed on the session's random BootId, so every restart reads as another boot and the room is never taken back; use /proc's boot_id), two P3s
+- 12:49 #1486 reviewed at 0025e1c32: ready apart from the first builder's lamp run (they asked not to merge before it); a name said over a reply is dropped as the 12:1x rule says, but the duplex yield and stop word still let a person in (P3, asked for the lamp check); other P3s
+- 12:48 #1494 ready (skill light patterns, stacked on #1466; its switch is on in the product); review started
+- 12:48 #1466 rebased to 3e3609fce (no change of its own, clean); still the first builder's
+- 12:47 merged #1485 (the same-voice bar's numbers, docs only)
+- 12:46 #1474 reviewed at f42beaf41: for the first builder (privacy path: with LAMP_FOLLOWS_RUN=on a reply also runs Desk tutor's check_my_work, which sends a camera still to the model; the 11:3x yes doesn't name the camera); P2 docs say a wrong run changes only what the person sees; held for the followups.sh run
+- 12:46 #1479 moved to 188c92b49 with OwnLight (camera changes during the lamp's own light change or speech count as its own); re-check started. #1493 ready (lamp-update harness-off); review started
+- 12:43 #1471 merged by the first builder
+- 12:40 merged #1480 (voice fixtures wait out a sibling's fork; tests only); closed #1477 and #1478
+- 12:40 #1471 re-checked at 195426057: one commit that passes alone, P3s fixed; the first builder's lamp check passed at 12:3x (most asks of one request 1, was 72); ready for the first builder's merge
+- 12:36 merged #1483 (docs: don't set LAMP_CAPTURE_CORES)
+- 12:35 #1481 rebased over #1464 (bad70cc1f, clean); merge on green ARM64. #1487 ready (LAMP_ROOM_FILE keeps the room across a short restart); review started
+- 12:34 #1484 reviewed at d6ff7b6cc: one P2 (the new renewal block runs in no test: every test sets catalog None; the issue's own test missing), two P3s; on by default, so the first builder's after the fix and their lamp check
+- 12:33 #1456 re-checked at e0fbdb55f: no findings left (macOS test fixed, a latch change through poll() tested); ready once the first builder's lamp-4ace run is done
+- 12:32 #1479 reviewed at 5680796f5: code ready (a fidgeting unseen person no longer learned as noise; the 3 s floor stays), two P3s (docs still say 3 s settling); the first builder holds it for the lamp run
+- 12:31 #1475 reviewed at 0610532b1: one P2 (nothing tests the half that makes core 7 safe: the voice passing the switch to turn-end and turn-end taking core 6 with one thread), P3s; the first builder holds it for the lamp run
+- 12:31 #1486 ready (lamp-name ignores a hearing begun while the lamp spoke, off unless set); review started
+- 12:28 #1485 reviewed at 2c5e2b693 (the same-voice bar's numbers, docs only): no findings; merge on green ARM64
+- 12:28 merged #1482 (every worker rig holds the one thread lock; tests only); closed #1422
+- 12:25 #1481 green but conflicts in switches.md after #1464 (the LAMP_LIGHT_REQUESTS row); rebase asked
 - 12:23 merged #1464 (lamp-cloud answers the app's Light row, off unless LAMP_CLOUD=on)
 - 12:20 #1473 reviewed at c6541b123: not a first-builder case (msgs fields optional, body motion unchanged); one P2 (with both switches off, a dropped clip changes skills' done text and journal), two P3s; ARM64 green
 - 12:19 #1483 reviewed at 1b135c2c6 (docs: don't set LAMP_CAPTURE_CORES): no findings; merge on green ARM64. #1469 re-checked at cb19e850a: P2 fixed (50/s held, was 200), mute flips in the same step; the first builder merges after the lamp check
