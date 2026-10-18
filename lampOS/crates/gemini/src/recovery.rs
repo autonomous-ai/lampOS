@@ -571,6 +571,9 @@ pub struct Supervisor<C> {
     /// The request whose turn was lost before any output, while it may
     /// still be sent again ([`Self::try_resend_for_session`]).
     lost: Cell<Option<Lineage>>,
+    /// Request IDs increase, so one watermark remembers accepted resends
+    /// across connection losses without retaining a history of requests.
+    resent_through: Cell<u64>,
     /// Camera grants revoked so far; applied to every new connection.
     revoked_images: Cell<Option<u64>>,
     resume: Option<ResumptionPoint>,
@@ -608,6 +611,7 @@ impl<C: Connect> Supervisor<C> {
             retired_through: Cell::new(0),
             resend_lost: false,
             lost: Cell::new(None),
+            resent_through: Cell::new(0),
             revoked_images: Cell::new(None),
             resume: None,
             recoveries: VecDeque::new(),
@@ -707,7 +711,8 @@ impl<C: Connect> Supervisor<C> {
     /// connection, and its input is the caller's to send again, as after any
     /// start. A connection that is not live, or not `expected`, or the one it
     /// was lost on, refuses, and so does a request retired or superseded
-    /// since.
+    /// since. Acceptance consumes its one resend even if that connection
+    /// also fails before any output; toggling the opt-in does not reset it.
     pub fn try_resend_for_session(
         &self,
         expected: SessionId,
@@ -729,6 +734,7 @@ impl<C: Connect> Supervisor<C> {
             return Err(StartRefusal::Refused(Error::StaleRequest));
         }
         input.try_start(request).map_err(StartRefusal::Refused)?;
+        self.resent_through.set(request.get());
         self.lost.set(None);
         let lineage = Lineage {
             session: live,
@@ -1452,15 +1458,17 @@ impl<C: Connect> Supervisor<C> {
         // Its identifier ends with that connection: a later session must not
         // accept the same request again as if nothing had happened. With
         // `resend_lost_lines`, one lost before any output is the exception:
-        // it is kept as `lost`, and the live connection is not told to retire
-        // it, so `try_resend_for_session` may start it once more (#705).
+        // if it has not already been resent, it is kept as `lost`, and the
+        // live connection is not told to retire it, so
+        // `try_resend_for_session` may start it once more (#705).
         self.retired_through.set(
             self.retired_through
                 .get()
                 .max(tracked.lineage.request.get()),
         );
-        let resendable =
-            self.resend_lost && matches!(tracked.stage, Stage::InputOpen | Stage::AwaitingResponse);
+        let resendable = self.resend_lost
+            && tracked.lineage.request.get() > self.resent_through.get()
+            && matches!(tracked.stage, Stage::InputOpen | Stage::AwaitingResponse);
         self.lost.set(resendable.then_some(tracked.lineage));
         if !resendable && let Link::Connected(live) = &self.link {
             live.input.retire(tracked.lineage.request);

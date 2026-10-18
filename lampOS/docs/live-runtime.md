@@ -263,15 +263,23 @@ one a second try mends (a barrier, write or read timeout, a transport loss,
 a peer close, a go-away, a stalled response; never a quota, a refusal or a
 silent model) and the next session is ready within 5 s of its end. Its
 answer, or the held `TurnFailed` if that try fails too, is the request's one
-outcome; the trace says `line_resent` or `resend_refused` with why. A line
+outcome. The provider worker writes `line_resent` or `resend_refused` JSON
+to its journal, with the request and monotonic time. `line_resent` means
+the replacement session accepted the replay attempt, not that its answer
+was received or heard; `resend_refused` says why a held line was given up.
+These are worker journal records, not coordinator trace records. A line
 still open when its connection is lost fails as before: the coordinator
 gives its input up on the link's change (`abandon_if_changed`). The worker
 keeps each line's blocks with their own sequence numbers as they are
 offered, starts the line again with `Supervisor::try_resend_for_session`
 (lamp-gemini keeps a request lost before any output open for that, only
 with `resend_lost_lines`), offers the kept blocks again as the queue has
-room with the capture time of then, and its End; the second `Started`
-is not handed on. Off
+room with the capture time of then, and its End. End also waits for queue
+space: if the last audio block fills the queue, the next worker tick tries
+again without blocking capture or control. The supervisor independently
+allows only one accepted resend per request, even if that replacement
+connection is also lost before output. A newer request has its own retry.
+The second `Started` is not handed on. Off
 unless set, nothing is ever sent twice. Require remains the
 cancellation policy; there is no automatic assumption of an unconfirmed cut-off.
 The library's explicit Legacy entry point remains for existing callers; worker
