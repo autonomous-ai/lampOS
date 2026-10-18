@@ -77,6 +77,28 @@ link would refuse: Light Off (a name the link does not take)`; #799). At most
 not refused, and the first of it that fit are told (Sixth on #1020);
 `not_for_me` in the file is ignored.
 
+The executive's file says only what can be done now, so it changes while a
+session lives: the light's functions drop out while the voice, whose ring
+the light is, is down, and come back a second or two after it starts. A
+session that opened in that gap would have no light functions for its whole
+life (lamp-4ace, 18 Oct 11:22, #1472). So the voice keeps what each session
+was given, looks at `tools.json` and `skills/tools.json` every 2 s (reading
+them again only when one's time changed), and when what it would declare now
+differs from what the session was given, either way, it renews the session
+between turns, on the person switch's path: no turn open, no output owed, no
+conversation going on (`going_on`), no look owed, once a session and at most
+once in 30 s (`src/session_tools.rs`). The session after it is opened fresh,
+not resumed: Google's resumption with other functions is not tested on a
+person's lamp (the first builder on #1472); the thread's recall carries the
+conversation. The journal says it (`lamp-voice provider: the executive's
+functions changed (+8 (light_brighter, light_colour, light_cooler, …) -0); a
+new session is opened between turns`), and each session's setup says what it
+was given: `lamp-voice: session functions: 22 declared; the executive's 17
+(light 8, volume 4, other 5)`, with `; no light functions: the ring is not
+up` when the light's are missing, or `; the executive's catalog is not
+there`. On by default: nothing changes for a session whose catalog never
+changes. Not yet seen on a lamp.
+
 A call is one line to the socket and one line back, on a connection of its
 own:
 

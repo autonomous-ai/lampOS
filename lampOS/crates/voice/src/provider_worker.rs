@@ -857,6 +857,9 @@ pub(crate) struct Options {
     /// A request whose heard words name one of the staff is told so
     /// beside its sound ([`crate::staff_note`]). Only with the tasks part.
     pub(crate) staff_note: bool,
+    /// What the worker's sessions were given, against which a changed
+    /// executive catalog is told apart (#1472). `None`: never renewed for it.
+    pub(crate) catalog: Option<std::sync::Arc<crate::session_tools::Given>>,
 }
 /// How the room is and whether the lamp is in a conversation, now. With
 /// `--spoken-to`, none is once people have gone on talking to each other
@@ -890,6 +893,7 @@ impl Options {
             staff_note: false,
             spoken_to: false,
             voices: None,
+            catalog: None,
         }
     }
 }
@@ -1116,8 +1120,10 @@ pub async fn run_with_continuation(
         }
     }
     // Each session it opens is told how the conversation went until then.
+    let given = std::sync::Arc::new(crate::session_tools::Given::default());
     let mut provider = Supervisor::new(
         crate::thread::Recalling::new(config)
+            .given(given.clone())
             .tools(files.tools.clone())
             .name_signal(files.name_signal)
             .file(THREAD_FILE.get().cloned()),
@@ -1144,6 +1150,8 @@ pub async fn run_with_continuation(
             (false, _) => None,
         },
         wait_for_room: files.wait_for_room,
+        // What each session was given, against a changed catalog (#1472).
+        catalog: Some(given),
         staff_note: files.staff_note,
         spoken_to: files.attention && files.spoken_to,
         // The child starts now: its model loads while the link opens.
@@ -1267,6 +1275,14 @@ async fn serve_with_visual<C: Connect>(
     // #1100).
     let mut counted: Option<String> = None;
     let mut switch_asked: Option<SessionId> = None;
+    // The session's functions against the executive's catalog now (#1472):
+    // a session that connected while the light's were out, say, is renewed
+    // between turns once they are back.
+    let mut catalog_watch = options.catalog.as_ref().and_then(|given| {
+        crate::session_tools::Watch::new(&options.tools, given.look_every)
+            .map(|watch| (watch, given))
+    });
+    let mut catalog_asked: Option<SessionId> = None;
     // With a memory, the session is also told that what they say is theirs.
     let theirs = if options.tools.memory.is_some() {
         crate::remember::THEIRS
@@ -1789,6 +1805,31 @@ async fn serve_with_visual<C: Connect>(
                         renewed_at = Instant::now();
                         eprintln!(
                             "lamp-voice provider: the person at the lamp has changed; a new session is opened between turns"
+                        );
+                    }
+                }
+                // The executive's catalog has moved on from what the session
+                // was given (#1472): a new session is opened between turns, on
+                // the person switch's path, and fresh.
+                if let Some((watch, given)) = catalog_watch.as_mut()
+                    && let Some(change) = watch.changed(&options.tools, given, Instant::now())
+                {
+                    let live = provider.live_session();
+                    let moment = crate::session_tools::Moment {
+                        turn_open: intake.handoff.visual_turn().is_some(),
+                        output_owed: !output.is_empty(),
+                        going_on: (given.going_on)(),
+                        look_owed: look_owed(look_owed_until),
+                        live_already_asked: live.is_none() || live == catalog_asked,
+                        may_renew: watch.may_renew(Instant::now()),
+                    };
+                    if moment.due() && provider.renew_when_idle() {
+                        catalog_asked = live;
+                        watch.renewed(Instant::now());
+                        renewed_at = Instant::now();
+                        given.open_fresh();
+                        eprintln!(
+                            "lamp-voice provider: the executive's functions changed ({change}); a new session is opened between turns"
                         );
                     }
                 }
@@ -7931,6 +7972,7 @@ mod tests {
             staff_note: false,
             spoken_to: false,
             voices: None,
+            catalog: None,
         }
     }
 
@@ -7955,6 +7997,7 @@ mod tests {
                 staff_note: false,
                 spoken_to: false,
                 voices: None,
+                catalog: None,
             },
         );
         let mut dial = rig.ready().await;
@@ -8004,6 +8047,7 @@ mod tests {
                 staff_note: false,
                 spoken_to: false,
                 voices: None,
+                catalog: None,
             },
         );
         let mut dial = rig.ready().await;
@@ -8923,6 +8967,7 @@ mod tests {
                 staff_note: false,
                 spoken_to: false,
                 voices: None,
+                catalog: None,
             },
         );
         let mut dial = rig.ready().await;
@@ -12329,6 +12374,7 @@ mod tests {
                     staff_note: false,
                     spoken_to: false,
                     voices: None,
+                    catalog: None,
                 },
                 BARRIER,
                 false,
@@ -12398,6 +12444,7 @@ mod tests {
                     staff_note: false,
                     spoken_to: false,
                     voices: None,
+                    catalog: None,
                 },
                 BARRIER,
                 false,
@@ -12769,6 +12816,9 @@ mod tests {
     /// Short sounds let through and checked (#800): tests only.
     mod sounds;
 
+    /// A session renewed when the executive's catalog changed (#1472):
+    /// tests only.
+    mod catalog;
     /// A name told is a name kept (`LAMP_NAMES=checked`): tests only.
     mod names;
     /// The Policy holds the lamp's actions (#800): tests only.

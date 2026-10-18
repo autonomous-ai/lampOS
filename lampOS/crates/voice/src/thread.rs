@@ -791,6 +791,8 @@ pub struct Recalling {
     // covers a fresh session. Per-handle ownership if that changes.
     fresh_only: bool,
     file: Option<PathBuf>,
+    /// What each session is given, shared with the provider loop (#1472).
+    given: Option<std::sync::Arc<crate::session_tools::Given>>,
 }
 
 impl Recalling {
@@ -801,7 +803,15 @@ impl Recalling {
             name_signal: false,
             fresh_only: false,
             file: None,
+            given: None,
         }
+    }
+
+    /// Each session's functions are kept here, and a renewal for a changed
+    /// catalog opens the next one fresh ([`crate::session_tools`]).
+    pub fn given(mut self, given: std::sync::Arc<crate::session_tools::Given>) -> Self {
+        self.given = Some(given);
+        self
     }
 
     /// Each session first takes the thread from this file if another voice
@@ -831,6 +841,12 @@ impl Recalling {
     /// leaves a session without functions, or says nothing.
     fn equipped(&self, config: SessionConfig) -> SessionConfig {
         let mut tools = crate::tools::declared(&self.tools);
+        // What this session is given, against which a changed catalog is
+        // told apart, and the journal's line for it (#1472).
+        if let Some(given) = &self.given {
+            given.record(&tools);
+        }
+        eprintln!("{}", crate::session_tools::setup_line(&tools, &self.tools));
         if self.name_signal && tools.len() < lamp_gemini::MAX_TOOLS {
             tools.push(crate::attention::name_tool());
         }
@@ -881,7 +897,10 @@ impl Connect for Recalling {
             }
             Err(_) => None,
         };
-        if self.fresh_only {
+        // A session renewed for a changed catalog is opened fresh: Google's
+        // resumption with other functions is not tested (#1472).
+        let renewed = self.given.as_ref().is_some_and(|given| given.take_fresh());
+        if renewed || self.fresh_only {
             resume = None;
         }
         let mut time = crate::local_time::told_here(self.tools.clock);
@@ -937,6 +956,57 @@ mod tests {
         assert_eq!(declared.as_array().unwrap().len(), 1);
         assert_eq!(declared[0]["name"], crate::tools::NOT_FOR_ME);
         assert!(declared[0].get("parameters").is_none());
+    }
+
+    /// #1472: a session is equipped from the executive's catalog as it
+    /// stands when it opens, so the one opened after the light's functions
+    /// came back declares them. This was already so before #1472; the
+    /// renewal (`provider_worker/tests/catalog.rs`) relies on it.
+    #[test]
+    fn a_session_opened_after_the_catalog_changed_declares_what_it_holds_now() {
+        let folder = std::env::temp_dir().join(format!("lv-thread-cat-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let catalog = |names: &[&str]| {
+            let tools: Vec<_> = names
+                .iter()
+                .map(|name| serde_json::json!({"name": name, "description": "Do it."}))
+                .collect();
+            std::fs::write(
+                folder.join(crate::tools::CATALOG_FILE),
+                serde_json::json!({"tools": tools}).to_string(),
+            )
+            .unwrap();
+        };
+        let recalling = Recalling::new(
+            SessionConfig::new(
+                lamp_gemini::GOOGLE_ENDPOINT,
+                lamp_gemini::Credential::api_key("test-only").unwrap(),
+            )
+            .unwrap(),
+        )
+        .tools(crate::tools::Settings {
+            exec: Some(folder.clone()),
+            ..Default::default()
+        });
+        let declared = |recalling: &Recalling| -> Vec<String> {
+            let config = recalling.equipped(recalling.config.clone());
+            let text = lamp_gemini::wire::encode_setup(&config).unwrap();
+            let setup: serde_json::Value = serde_json::from_str(&text).unwrap();
+            setup["setup"]["tools"][0]["functionDeclarations"]
+                .as_array()
+                .map(|all| {
+                    all.iter()
+                        .map(|tool| tool["name"].as_str().unwrap().to_owned())
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        catalog(&["volume_up"]);
+        assert_eq!(declared(&recalling), ["volume_up"]);
+        catalog(&["volume_up", "light_colour"]);
+        assert_eq!(declared(&recalling), ["volume_up", "light_colour"]);
+        let _ = std::fs::remove_dir_all(&folder);
     }
 
     const ROOM: usize = 8_192;

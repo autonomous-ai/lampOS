@@ -22,6 +22,7 @@ fn checked(on: bool) -> Options {
         staff_note: false,
         spoken_to: false,
         voices: None,
+        catalog: None,
     }
 }
 
