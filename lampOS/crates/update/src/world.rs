@@ -19,6 +19,11 @@ pub trait Systemd {
     fn reload(&mut self) -> Result<(), String>;
     /// `systemctl restart`: returns once systemd has done it.
     fn restart(&mut self, unit: &str) -> Result<(), String>;
+    /// The last line the unit's own program wrote to the journal since this
+    /// program last restarted it, cleaned ([`clean_line`]); none before a
+    /// restart, or when it said nothing since (#1505). Only ever asked of a
+    /// unit a round has found not well.
+    fn last_line(&mut self, unit: &str) -> Option<String>;
 }
 
 pub trait Ears {
@@ -43,12 +48,16 @@ pub struct Systemctl {
     /// The longest a restart may take: the body folds down before it stops,
     /// up to 25 s.
     pub restart_within: Duration,
+    /// When each unit was last restarted here, on the wall clock the
+    /// journal keeps: its lines since are its own build's.
+    restarted: Vec<(String, SystemTime)>,
 }
 
 impl Default for Systemctl {
     fn default() -> Self {
         Self {
             restart_within: Duration::from_secs(120),
+            restarted: Vec::new(),
         }
     }
 }
@@ -76,8 +85,56 @@ impl Systemd for Systemctl {
     }
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {
+        let at = SystemTime::now();
+        self.restarted.retain(|(name, _)| name != unit);
+        self.restarted.push((unit.to_owned(), at));
         run(&["restart", unit], self.restart_within)
     }
+
+    fn last_line(&mut self, unit: &str) -> Option<String> {
+        let (_, at) = self.restarted.iter().find(|(name, _)| name == unit)?;
+        let since = at.duration_since(UNIX_EPOCH).ok()?.as_secs();
+        let output = Command::new("journalctl")
+            .args(["-u", unit, "--since"])
+            .arg(format!("@{since}"))
+            .args(["-o", "json", "-n", "50", "--no-pager", "-q"])
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output()
+            .ok()?;
+        last_own_line(&String::from_utf8_lossy(&output.stdout))
+    }
+}
+
+/// The longest line a round's outcome carries of a part's journal.
+pub const LINE_MOST: usize = 200;
+
+/// The last line in `journalctl -o json` output that the unit's own program
+/// wrote: systemd's own lines about it ("Failed with result …", "Scheduled
+/// restart job …") are skipped, as is a message that is not text.
+pub fn last_own_line(json_lines: &str) -> Option<String> {
+    json_lines
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .filter(|entry| entry["_PID"] != "1" && entry["SYSLOG_IDENTIFIER"] != "systemd")
+        .filter_map(|entry| entry["MESSAGE"].as_str().map(clean_line))
+        .rfind(|line| !line.is_empty())
+}
+
+/// A journal line as an outcome may carry it: control characters gone,
+/// trimmed, and at most [`LINE_MOST`] characters, cut with "…".
+pub fn clean_line(line: &str) -> String {
+    let line: String = line
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    let line = line.trim();
+    if line.chars().count() <= LINE_MOST {
+        return line.to_owned();
+    }
+    let mut cut: String = line.chars().take(LINE_MOST - 1).collect();
+    cut.push('…');
+    cut
 }
 
 /// `systemctl` with these words, waiting at most `within` for it.

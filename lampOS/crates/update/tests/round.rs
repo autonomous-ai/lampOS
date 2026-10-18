@@ -14,7 +14,7 @@ use lamp_update::{
     manifest::{self, File, Manifest, Unit, sha256_hex},
     quiet::Heard,
     round, unit,
-    world::{Clock, Disk, Ears, Systemd},
+    world::{self, Clock, Disk, Ears, Systemd},
 };
 use ring::{
     rand::SystemRandom,
@@ -161,6 +161,12 @@ struct FakeSystemd {
     now: Rc<Cell<u64>>,
     /// When each restart was asked for.
     restarted_at: Vec<(String, u64)>,
+    /// What each unit's program last wrote to the journal.
+    lines: BTreeMap<String, String>,
+    /// Each unit whose last line was asked, in order (#1505).
+    lines_asked: Vec<String>,
+    /// Units that crash whatever their build: the old build too.
+    crashing: Vec<String>,
 }
 
 impl FakeSystemd {
@@ -176,7 +182,7 @@ impl FakeSystemd {
         )
         .unwrap_or_default();
         self.next_pid += 1;
-        let running = if binary.contains("crash") {
+        let running = if binary.contains("crash") || self.crashing.iter().any(|name| name == unit) {
             Running {
                 active: "activating".into(),
                 sub: "auto-restart".into(),
@@ -226,6 +232,11 @@ impl Systemd for FakeSystemd {
         self.restarted_at.push((unit.to_owned(), self.now.get()));
         self.start(unit);
         Ok(())
+    }
+
+    fn last_line(&mut self, unit: &str) -> Option<String> {
+        self.lines_asked.push(unit.to_owned());
+        self.lines.get(unit).cloned()
     }
 }
 
@@ -338,6 +349,9 @@ impl Lamp {
             next_pid: 100,
             now: Rc::clone(&now),
             restarted_at: Vec::new(),
+            lines: BTreeMap::new(),
+            lines_asked: Vec::new(),
+            crashing: Vec::new(),
         };
         for unit in [
             "lamp-voice.service",
@@ -737,6 +751,146 @@ fn a_part_that_dies_is_put_back_and_its_build_refused() {
         "{outcome:?}"
     );
     assert_eq!(lamp.calls().len(), 6);
+}
+
+/// #1505 (lamp-4ace, 18 Oct 13:51): a part not well says why in the
+/// round's outcome, with how often systemd started it again and its own
+/// last journal line, read before it is put back. Never in the kept
+/// refusal: a part's line can carry what a person said.
+#[test]
+fn a_part_put_back_says_its_restarts_and_last_line_in_the_outcome_only() {
+    let mut lamp = Lamp::new();
+    let said = "voice: storage: unavailable; restart and inspect before retrying.";
+    lamp.systemd
+        .lines
+        .insert("lamp-voice.service".into(), said.into());
+    lamp.publish(
+        2,
+        &[
+            ("lamp-voice", "voice 2, which crashes"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 2"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[],
+    );
+    let outcome = lamp.round();
+    let Outcome::RolledBack { why, after, .. } = &outcome else {
+        panic!("{outcome:?}");
+    };
+    assert!(
+        why.ends_with(&format!(
+            "(systemd started it again once; its last line: \"{said}\")"
+        )),
+        "{why}"
+    );
+    assert_eq!(after, &Ok(()));
+    assert!(outcome.to_string().contains(said), "{outcome}");
+    // Asked once, of the failing unit, before it was put back.
+    assert_eq!(lamp.systemd.lines_asked, ["lamp-voice.service"]);
+    let kept = lamp.state()["refused"][0]["why"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(!kept.contains(said), "{kept}");
+    assert!(!kept.contains("last line"), "{kept}");
+    assert!(why.starts_with(&kept), "{why} / {kept}");
+}
+
+/// Today's case: the old build is not well either. Each unit still not well
+/// after the put-back says its own restarts and line in `after`.
+#[test]
+fn the_old_build_not_well_either_says_each_units_line() {
+    let mut lamp = Lamp::new();
+    lamp.systemd.crashing = vec!["lamp-body.service".into()];
+    lamp.systemd.lines.insert(
+        "lamp-body.service".into(),
+        "body: the store is newer than this build".into(),
+    );
+    lamp.publish(
+        2,
+        &[
+            ("lamp-voice", "voice 1"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 2"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[],
+    );
+    let outcome = lamp.round();
+    let Outcome::RolledBack { why, after, .. } = &outcome else {
+        panic!("{outcome:?}");
+    };
+    assert!(why.contains("body: the store is newer"), "{why}");
+    let Err(after) = after else {
+        panic!("{outcome:?}");
+    };
+    assert!(
+        after.contains("(systemd started it again once; its last line: \"body: the store is newer than this build\")"),
+        "{after}"
+    );
+    assert!(
+        outcome
+            .to_string()
+            .contains("the previous build is not well either"),
+        "{outcome}"
+    );
+}
+
+/// A switch that goes well asks no line; a part not well that said nothing
+/// and was not started again gives the outcome as before.
+#[test]
+fn no_line_is_asked_of_a_good_switch_and_none_is_said_when_there_is_none() {
+    let mut lamp = Lamp::new();
+    build_two(&mut lamp);
+    assert!(matches!(lamp.round(), Outcome::Switched(2)));
+    assert!(lamp.systemd.lines_asked.is_empty());
+
+    let mut lamp = Lamp::new();
+    lamp.publish(
+        2,
+        &[
+            ("lamp-voice", "voice 1"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 2, unwell"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[],
+    );
+    let outcome = lamp.round();
+    let Outcome::RolledBack { why, .. } = &outcome else {
+        panic!("{outcome:?}");
+    };
+    assert_eq!(lamp.state()["refused"][0]["why"], why.as_str());
+    assert!(
+        !why.contains("last line") && !why.contains("again"),
+        "{why}"
+    );
+}
+
+/// The real systemd's line, from `journalctl -o json`: the unit's own
+/// program's last, systemd's own lines and non-text messages skipped,
+/// control characters gone, cut at 200 characters.
+#[test]
+fn the_journal_line_is_the_programs_own_last_cleaned_and_cut() {
+    let json = [
+        r#"{"_PID":"812","SYSLOG_IDENTIFIER":"lamp-tasks","MESSAGE":"tasks: starting"}"#,
+        r#"{"_PID":"812","SYSLOG_IDENTIFIER":"lamp-tasks","MESSAGE":"tasks: storage:\tunavailable\u001b[0m"}"#,
+        r#"{"_PID":"813","SYSLOG_IDENTIFIER":"lamp-tasks","MESSAGE":[104,105]}"#,
+        r#"{"_PID":"1","SYSLOG_IDENTIFIER":"systemd","MESSAGE":"lamp-tasks.service: Failed with result 'exit-code'."}"#,
+        "not json",
+    ]
+    .join("\n");
+    assert_eq!(
+        world::last_own_line(&json).as_deref(),
+        Some("tasks: storage: unavailable [0m")
+    );
+    assert_eq!(world::last_own_line(""), None);
+    let long = "x".repeat(300);
+    let cut = world::clean_line(&long);
+    assert_eq!(cut.chars().count(), world::LINE_MOST);
+    assert!(cut.ends_with('…'));
+    assert_eq!(world::clean_line("  short \n"), "short");
 }
 
 #[test]

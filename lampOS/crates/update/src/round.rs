@@ -820,7 +820,13 @@ impl Run<'_, '_> {
         failed: Option<&str>,
         why: String,
     ) -> Outcome {
-        self.say(&format!("putting build {} back: {why}", build.sequence));
+        // What the failing unit made of the new build, read before it is put
+        // back: the outcome says it, the kept refusal does not (#1505).
+        let told = failed.map(|unit| self.told(unit)).unwrap_or_default();
+        self.say(&format!(
+            "putting build {} back: {why}{told}",
+            build.sequence
+        ));
         let after = self.restore(backs, failed);
         state.refuse(build, &why);
         if let Err(error) = self
@@ -835,8 +841,38 @@ impl Run<'_, '_> {
         self.prune(state);
         Outcome::RolledBack {
             sequence: build.sequence,
-            why,
+            why: format!("{why}{told}"),
             after,
+        }
+    }
+
+    /// What a unit not well said of itself, for an outcome and never for the
+    /// records (a part's line can carry what a person said): how often
+    /// systemd started it again since this round restarted it (`NRestarts`,
+    /// which a restart asked for flushes), and its last own journal line.
+    /// Empty when there is neither.
+    fn told(&mut self, unit: &str) -> String {
+        let restarts = self
+            .world
+            .systemd
+            .states(&[unit.to_owned()])
+            .ok()
+            .and_then(|states| states.into_iter().find(|state| state.unit == unit))
+            .map_or(0, |state| state.restarts);
+        let line = self.world.systemd.last_line(unit);
+        let mut parts = Vec::new();
+        match restarts {
+            0 => {}
+            1 => parts.push("systemd started it again once".to_owned()),
+            n => parts.push(format!("systemd started it again {n} times")),
+        }
+        if let Some(line) = line {
+            parts.push(format!("its last line: \"{line}\""));
+        }
+        if parts.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", parts.join("; "))
         }
     }
 
@@ -863,8 +899,9 @@ impl Run<'_, '_> {
                 Err(why) => troubles.push(why),
             }
         }
-        if let Err((_, why)) = self.watch(&mut watches) {
-            troubles.push(why);
+        if let Err((unit, why)) = self.watch(&mut watches) {
+            let told = self.told(&unit);
+            troubles.push(format!("{why}{told}"));
         }
         if troubles.is_empty() {
             Ok(())
