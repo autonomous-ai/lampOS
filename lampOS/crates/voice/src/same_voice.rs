@@ -702,10 +702,33 @@ mod tests {
         let (path, starts) = (dir.join(EXECUTABLE), dir.join("starts"));
         std::fs::write(
             &path,
-            format!("#!/bin/sh\necho x >> '{}'\n{script}\n", starts.display()),
+            format!(
+                "#!/bin/sh\n[ \"$1\" = warm-up ] && exit 0\necho x >> '{}'\n{script}\n",
+                starts.display()
+            ),
         )
         .unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        // macOS checks a fresh executable on its first exec, which can take
+        // seconds on a loaded Mac: longer than `QUICK`'s 2 s to be ready, so
+        // a first start was killed before it counted itself (El on #705, 17
+        // Oct). Paid here, untimed, as the voice's other fixtures do; the
+        // warm-up run ends before it counts a start. A sibling's fork may
+        // still hold the new file open for writing (ETXTBSY on Linux), so
+        // that is waited out too.
+        let until = Instant::now() + Duration::from_secs(15);
+        let warm = loop {
+            match std::process::Command::new(&path).arg("warm-up").status() {
+                Err(error)
+                    if error.kind() == io::ErrorKind::ExecutableFileBusy
+                        && Instant::now() < until =>
+                {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                status => break status.unwrap(),
+            }
+        };
+        assert!(warm.success(), "same-voice test program warm-up: {warm}");
         (path, starts)
     }
 
