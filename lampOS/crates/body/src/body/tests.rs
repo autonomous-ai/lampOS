@@ -1630,6 +1630,42 @@ fn an_arm_that_strains_goes_back_down_and_stays_down_for_a_while() {
     assert_eq!((lamp.servos[1].goal, lamp.servos[2].goal), (2_050, 2_047));
 }
 
+/// #1518, the reviewer's P2: the fold that is itself the sit-down for a
+/// strain, on the way up or while standing, says so, not "nothing retreated".
+#[test]
+fn the_fold_line_counts_a_sit_down_for_a_strain_on_the_way_up_or_standing() {
+    for (from_ms, to_ms) in [(2_500, 3_500), (6_000, 7_000)] {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        lamp.strains = vec![(
+            Duration::from_millis(from_ms),
+            Duration::from_millis(to_ms),
+            1,
+            990,
+        )];
+        let news = move || Some((Mood::Listening, 100));
+        let mut said = crate::bus_out::FoldSaid::default();
+        let mut lines = Vec::new();
+        let report = run_standing(
+            &mut lamp,
+            &mut clock,
+            Limits::FOLDED,
+            Some(HOME),
+            Some(standing(100, 60)),
+            news,
+            |glimpse| lines.extend(said.step(glimpse)),
+        );
+        assert_eq!(report.retreats.len(), 1, "{:?}", report.retreats);
+        assert_eq!(lines.len(), 1, "strain {from_ms} ms: {lines:?}");
+        assert!(
+            lines[0].ends_with("it sat down for a strain once since it was last folded"),
+            "strain {from_ms} ms: {}",
+            lines[0]
+        );
+    }
+}
+
 #[test]
 fn an_arm_still_strained_two_seconds_on_ends_the_run_where_it_is() {
     let (mut lamp, mut clock) = folded(Duration::from_secs(12));

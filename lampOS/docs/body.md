@@ -1715,6 +1715,27 @@ It takes the same exclusive ownership of the servo port as
 `lamp-body-inspect`, so neither can run while the other does. Stop every
 other owner of the port first.
 
+### Reading a run without stopping it
+
+Two lines let a run be read from the journal while it goes on (#705), since
+at rest the step lines come only every thirty seconds:
+
+- **A fold's end**, once a fold reaches folded: how long from the first step
+  the arm came down, where the shoulder and the elbow were told to go against
+  where they are, the head and base the same, and whether it sat down for a
+  strain since it was last folded, on the way up, standing or on the way
+  down (`FoldSaid`, `src/bus_out.rs`). A fold that rises again
+  before it is down is not said.
+
+  `lamp-body: step 351 folded in 6.0 s; arm goals [2657, 2602] ended at [2650, 2602]; head and base goals [1968, 2069, 2015] at [1950, 2043, 2015]; nothing retreated since it was last folded`
+- **The reads not used so far**, at the first step and every five minutes:
+  the exit report's `bad_reads` per joint and its count of retreats
+  (`ReadsSaid`).
+
+  `lamp-body: step 15010 bad reads so far: base_yaw 0, base_pitch 0, elbow_pitch 0, wrist_roll 3, wrist_pitch 1; retreats so far 0`
+
+Both are on, with no switch.
+
 ### Reading its exit report
 
 `lamp-body exit-report` reads a line or a whole journal on stdin, finds the
