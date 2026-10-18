@@ -107,12 +107,12 @@ const WANT_STARTS: [&str; 8] = [
 ];
 /// The same, as whole words only: "it's too dark", "I'd rather have some
 /// jazz", "I could use more light".
-const WANTS: [&str; 3] = ["too", "rather", "use"];
+const WANTS: [&str; 5] = ["too", "rather", "use", "wanna", "missed"];
 
 /// A line that says the person could not take something in asks the lamp
 /// to say it again or to help: "I didn't catch that", "I can't hear it",
-/// "I can't read in this light". A word of [`CANNOT`] followed, within two
-/// words, by one of [`TAKE_IN`].
+/// "I can't read in this light", "I'm not sure I follow". A word of
+/// [`CANNOT`] followed, within three words, by one of [`TAKE_IN`].
 const CANNOT: [&str; 10] = [
     "can't", "cant", "cannot", "couldn't", "couldnt", "didn't", "didnt", "don't", "dont", "not",
 ];
@@ -138,7 +138,7 @@ fn could_not_take_in(heard: &str) -> bool {
         CANNOT.contains(&word.as_str())
             && all[at + 1..]
                 .iter()
-                .take(2)
+                .take(3)
                 .any(|next| TAKE_IN.contains(&next.as_str()))
     })
 }
@@ -157,8 +157,9 @@ const PEOPLE: [&str; 11] = [
     "i", "you", "we", "it", "that", "this", "he", "she", "they", "me", "there",
 ];
 /// Words a question of the lamp's begins with when a helping verb follows
-/// within two words ("Which one would you like", "What time should I set
-/// it for"): not "What a lovely poem." or "How nice."
+/// within four words ("Which one would you like", "What kind of music do
+/// you like"), "is" or "are" within two: not "What a lovely poem.", "How
+/// nice." or "How nice it is to see you."
 const LAMP_ASKS_WH: [&str; 8] = [
     "what", "which", "when", "where", "how", "who", "whom", "whose",
 ];
@@ -220,7 +221,7 @@ pub fn remark(heard: &str) -> bool {
 /// question: a `?` anywhere in that end ("Shall I start it? It takes about
 /// a minute."), or its last sentence asks without one: a helping verb and a
 /// person ("Shall I start it", "Is there anything else"), a question word
-/// with a helping verb within two words after it ("Which one would you
+/// with a helping verb within four words after it ("Which one would you
 /// like"), "how about", "or would", "Want me to…", or "let me know".
 pub fn lamp_asked(said_last: &str) -> bool {
     if said_last.contains('?') {
@@ -230,14 +231,18 @@ pub fn lamp_asked(said_last: &str) -> bool {
     let Some(last) = said.rsplit(['.', '!']).next() else {
         return false;
     };
-    let opening: Vec<String> = past_leading(last).take(3).collect();
+    let opening: Vec<String> = past_leading(last).take(5).collect();
     let asks_with = match opening.iter().map(String::as_str).collect::<Vec<_>>()[..] {
         ["want", "me" | "to", ..] | ["how", "about", ..] => true,
         [helper, person, ..] if LAMP_ASKS_WITH.contains(&helper) && PEOPLE.contains(&person) => {
             true
         }
+        // "is" and "are" only right after it ("What time is it"), not "How
+        // nice it is to see you".
         [wh, ref after @ ..] if LAMP_ASKS_WH.contains(&wh) => {
-            after.iter().any(|word| LAMP_ASKS_WITH.contains(word))
+            after.iter().enumerate().any(|(at, word)| {
+                LAMP_ASKS_WITH.contains(word) && (at < 2 || !matches!(*word, "is" | "are"))
+            })
         }
         _ => false,
     };
@@ -341,6 +346,10 @@ mod tests {
             "I can't hear it",
             "I don't understand that",
             "I can't read in this light",
+            // The reviewer's leftovers on #1499 (15:07).
+            "I wanna hear a joke",
+            "I missed what she said",
+            "I'm not sure I follow",
         ] {
             assert!(!remark(asked), "{asked}");
         }
@@ -405,6 +414,7 @@ mod tests {
             "How about a song",
             "Is there anything else",
             "Tea, or would you like coffee",
+            "What kind of music do you like",
         ] {
             assert!(lamp_asked(asked), "{asked}");
         }
@@ -415,6 +425,13 @@ mod tests {
             "What a lovely poem.",
             "How nice.",
             "Should be sunny tomorrow.",
+            "How nice it is to see you.",
+            // Known misses (Thirteen on #1533): "is" or "are" said third or
+            // later as the only helping verb, the price of keeping "How nice
+            // it is to see you" out. They matter only without the `?`.
+            "Which of these is better",
+            "What kind of tea is it",
+            "Where in the house is it",
             "",
         ] {
             assert!(!lamp_asked(told), "{told}");
