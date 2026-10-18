@@ -9,6 +9,8 @@ publish.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 lamp-bus = { path = "../bus" }
+# The host's monotonic clock, which a light asked for that lapses is on.
+lamp-ipc = { path = "../ipc" }
 lamp-msgs = { path = "../msgs" }
 # The company broker's MQTT v5 client (#1396, the first builder: a well-used
 # client, not our own). Pinned; TLS through rustls with no provider of its
@@ -24,6 +26,10 @@ webpki-roots = "1"
 # Setup's own settings and writer, so the account is read where and as setup
 # writes it (tests/setup.rs).
 lamp-setup = { path = "../setup" }
+# The voice's own ring, so a preview is tried against its arbitration
+# (tests/ring.rs, the reviewer on #1464).
+lamp-voice = { path = "../voice" }
+lamp-ipc = { path = "../ipc" }
 # The tests' broker reads and writes with rumqttc's own codec.
 bytes = "1"
 tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "net", "sync", "io-util"] }

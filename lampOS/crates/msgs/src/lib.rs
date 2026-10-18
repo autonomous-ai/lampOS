@@ -542,6 +542,24 @@ impl Light {
         "yellow", "red", "green", "blue", "cyan", "purple", "orange", "pink", "white", "warm",
     ];
     pub const BRIGHTEST: u8 = 5;
+    /// Each colour as the ring draws it, each channel a share of the
+    /// brightest, in the order of [`Light::COLOURS`]. The ring's face and
+    /// `lamp-cloud`'s answers to the app (`docs/cloud.md`) both read it.
+    /// `warm` is the amber the lamp has always rested in: no blue at all,
+    /// because at two or three steps a little blue lands on some pixels and
+    /// not on others, and the ring looks pink in places.
+    pub const TINTS: [(&str, [f32; 3]); 10] = [
+        ("yellow", [1.0, 0.80, 0.0]),
+        ("red", [1.0, 0.0, 0.0]),
+        ("green", [0.0, 1.0, 0.12]),
+        ("blue", [0.0, 0.22, 1.0]),
+        ("cyan", [0.0, 0.90, 1.0]),
+        ("purple", [0.62, 0.0, 1.0]),
+        ("orange", [1.0, 0.34, 0.0]),
+        ("pink", [1.0, 0.22, 0.42]),
+        ("white", [1.0, 0.88, 0.72]),
+        ("warm", [1.0, 0.55, 0.0]),
+    ];
 
     /// The light now replaces the one before. When it changes, and once a
     /// second.
@@ -1517,6 +1535,7 @@ mod tests {
         round_trip(&light, text);
         needs::<Light>(text, "colour");
         assert_eq!(Light::COLOURS.len(), 10);
+        assert_eq!(Light::TINTS.map(|(name, _)| name), Light::COLOURS);
         for colour in Light::COLOURS {
             for level in 1..=5 {
                 assert!(Light::new(false, colour, level).is_ok(), "{colour} {level}");

@@ -77,22 +77,8 @@ const WHOLE_STEP: f32 = 0.015;
 const AMBER: [f32; 3] = [1.0, 0.55, 0.0];
 
 impl Lit {
-    /// The ten colours by name, as [`lamp_msgs::Light::COLOURS`] has them.
-    /// `warm` is the amber the lamp has always rested in: no blue at all,
-    /// because at two or three steps a little blue lands on some pixels
-    /// and not on others, and the ring looks pink in places.
-    const TINTS: [(&'static str, [f32; 3]); 10] = [
-        ("yellow", [1.0, 0.80, 0.0]),
-        ("red", [1.0, 0.0, 0.0]),
-        ("green", [0.0, 1.0, 0.12]),
-        ("blue", [0.0, 0.22, 1.0]),
-        ("cyan", [0.0, 0.90, 1.0]),
-        ("purple", [0.62, 0.0, 1.0]),
-        ("orange", [1.0, 0.34, 0.0]),
-        ("pink", [1.0, 0.22, 0.42]),
-        ("white", [1.0, 0.88, 0.72]),
-        ("warm", AMBER),
-    ];
+    /// The ten colours by name, as [`lamp_msgs::Light::TINTS`] has them.
+    const TINTS: [(&'static str, [f32; 3]); 10] = lamp_msgs::Light::TINTS;
 
     /// A light of this colour and level, or `None` for a colour there is
     /// not or a level outside 1 to [`LEVELS`].

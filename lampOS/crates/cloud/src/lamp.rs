@@ -1,10 +1,12 @@
 //! The lamp the answers read from, through the parts that own each thing:
 //! the volume through `lamp-actions`' socket (its only writer), the
-//! microphones and health from the bus, the build from `lamp-update`'s
+//! microphones and health from the bus, the person's light asked of the
+//! ring on the bus as anyone asks it, the build from `lamp-update`'s
 //! state, the network and the host from `/proc` and `/sys`. Nothing here
 //! needs root.
-use crate::answer::{Lamp, Mic, Volume};
-use lamp_bus::Bus;
+use crate::answer::{Lamp, Mic, PREVIEW_HOLDS, Volume};
+use lamp_bus::{Bus, Publisher};
+use lamp_msgs::{Claim, Light, LightRequest, Priority};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, UdpSocket};
@@ -15,6 +17,19 @@ use std::time::{Duration, Instant};
 
 /// How long `lamp-actions` has to answer: its own callers get a second.
 const ACTIONS_WAIT: Duration = Duration::from_secs(2);
+/// The name `lamp-cloud` asks for the light under (`light/command`'s
+/// publishers, a preview's `claim.source`).
+pub const SOURCE: &str = "cloud";
+/// A preview's priority: over a skill's glow, under the person's own light,
+/// so "make your light blue" said at the lamp ends a preview at once and it
+/// stays given way while the drag goes on (the reviewer on #1464; the ring
+/// gives way every request below `person` to the person's light).
+pub const PREVIEW_PRIORITY: Priority = Priority::Conversation;
+/// How long the ring has to show the light asked for: it looks every
+/// 50 ms (`ring_light`), and the runtime that waits also drives the
+/// broker's keepalive.
+pub const SHOWN_WITHIN: Duration = Duration::from_secs(1);
+const NO_RING: &str = "the lamp's light is not running";
 
 /// Where each part is read.
 #[derive(Clone, Debug)]
@@ -47,6 +62,17 @@ pub struct Real {
     pub build: String,
     /// The Wi-Fi's name, asked of `iw` within a bound and kept a while.
     pub wifi: Wifi,
+    /// The light asked of the ring.
+    pub ring: Ring,
+}
+
+/// What `lamp-cloud` has asked of the ring: its publishers, made at first
+/// use, and the preview it shows until given back.
+#[derive(Default)]
+pub struct Ring {
+    command: Option<Publisher>,
+    request: Option<Publisher>,
+    previewing: Option<Light>,
 }
 
 /// How long `iw` has to say the Wi-Fi's name: the runtime that asks also
@@ -273,6 +299,39 @@ impl Real {
     fn latest(&self, topic: &str) -> Option<lamp_bus::Message> {
         self.bus.as_ref()?.latest(topic).ok().flatten()
     }
+
+    /// The host's boot, the clock a preview's claim is on (the ring's own).
+    fn boot(&self) -> Result<String, String> {
+        Some(read(&self.places.proc.join("sys/kernel/random/boot_id")))
+            .filter(|boot| !boot.is_empty())
+            .ok_or("the host's boot cannot be read".to_owned())
+    }
+
+    /// Asks the ring for `light` over the person's until `until_us` on the
+    /// host's monotonic clock; a time already passed gives it back.
+    fn request(&mut self, light: &Light, until_us: u64) -> Result<(), String> {
+        let clock_id = self.boot()?;
+        let bus = self.bus.as_ref().ok_or(NO_RING)?;
+        let out = match &mut self.ring.request {
+            Some(out) => out,
+            empty => empty.insert(
+                bus.publisher_declared(LightRequest::TOPIC, &LightRequest::declaration(), SOURCE)
+                    .map_err(|_| "the light cannot be asked for here".to_owned())?,
+            ),
+        };
+        let request = LightRequest {
+            claim: Claim {
+                source: SOURCE.into(),
+                priority: PREVIEW_PRIORITY,
+                clock_id,
+                until_us,
+            },
+            light: light.clone(),
+        };
+        out.publish_json(lamp_ipc::monotonic_us(), &request)
+            .map(|_| ())
+            .map_err(|_| "the light could not be asked for".to_owned())
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -354,6 +413,59 @@ impl Lamp for Real {
             // The voice renews its lease every 10 ms while it runs.
             available: privacy.is_some(),
         })
+    }
+
+    fn light(&mut self) -> Result<Light, String> {
+        self.latest(Light::TOPICS[1])
+            .filter(|message| !message.expired)
+            .ok_or(NO_RING)?
+            .parse::<Light>()
+            .map_err(|_| "the lamp's light said something unreadable".to_owned())
+    }
+
+    /// A preview still shown is given back first, so the light saved is the
+    /// one seen (V1's save cancels its preview).
+    fn set_light(&mut self, light: &Light) -> Result<Light, String> {
+        if let Some(shown) = self.ring.previewing.take() {
+            let _ = self.request(&shown, lamp_ipc::monotonic_us().saturating_sub(1));
+        }
+        let bus = self.bus.as_ref().ok_or(NO_RING)?;
+        let out = match &mut self.ring.command {
+            Some(out) => out,
+            empty => empty.insert(
+                bus.publisher_declared(Light::TOPICS[0], &Light::declaration(), SOURCE)
+                    .map_err(|_| "the light cannot be asked for here".to_owned())?,
+            ),
+        };
+        out.publish_json(lamp_ipc::monotonic_us(), light)
+            .map_err(|_| "the light could not be asked for".to_owned())?;
+        let asked = Instant::now();
+        loop {
+            if self.light().as_ref() == Ok(light) {
+                return Ok(light.clone());
+            }
+            if asked.elapsed() >= SHOWN_WITHIN {
+                return Err("the light was asked for, but the ring did not show it".into());
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+
+    /// Only where the ring takes lights that lapse (`LAMP_LIGHT_REQUESTS=on`,
+    /// the product's): elsewhere a preview would show nothing, and is
+    /// refused.
+    fn preview_light(&mut self, light: &Light) -> Result<(), String> {
+        let bus = self.bus.as_ref().ok_or(NO_RING)?;
+        let taken = bus
+            .subscribers(LightRequest::TOPIC)
+            .is_ok_and(|listeners| listeners.iter().any(|listener| listener.listening));
+        if !taken {
+            return Err("this lamp's light takes no previews".into());
+        }
+        let until_us = lamp_ipc::monotonic_us() + PREVIEW_HOLDS.as_micros() as u64;
+        self.request(light, until_us)?;
+        self.ring.previewing = Some(light.clone());
+        Ok(())
     }
 
     fn health(&mut self) -> Result<Value, String> {
@@ -447,6 +559,7 @@ mod tests {
             device_id: "d-42".into(),
             build: "812+460a1a1aa2b3".into(),
             wifi: Wifi::default(),
+            ring: Ring::default(),
         };
         let level = Volume {
             volume: 35,
@@ -488,6 +601,112 @@ mod tests {
             })
         );
         assert!(lamp.health().is_err());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// A stand-in ring on a bus of its own: it shows each light asked for on
+    /// `light/command` (saying it on `light/state`, as the ring does, every
+    /// 100 ms) and keeps each `light/request`, until `stop` is set.
+    fn ring(
+        bus: &Bus,
+        stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> std::thread::JoinHandle<Vec<LightRequest>> {
+        let mut asked = bus
+            .subscribe_typed(Light::TOPICS[0], "ring", Light::TYPE)
+            .unwrap();
+        let mut requests = bus
+            .subscribe_typed(LightRequest::TOPIC, "ring", LightRequest::TYPE)
+            .unwrap();
+        let mut state = bus
+            .publisher_declared(Light::TOPICS[1], &Light::declaration(), "ring")
+            .unwrap();
+        std::thread::spawn(move || {
+            let mut shown = crate::light::first();
+            let mut kept = Vec::new();
+            let mut said = Instant::now() - Duration::from_secs(1);
+            while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                while let Ok(Some(message)) = requests.recv(Duration::ZERO) {
+                    kept.push(message.parse::<LightRequest>().unwrap());
+                }
+                if let Ok(Some(message)) = asked.recv(Duration::from_millis(5)) {
+                    shown = message.parse::<Light>().unwrap();
+                    said = Instant::now() - Duration::from_secs(1);
+                }
+                if said.elapsed() >= Duration::from_millis(100) {
+                    state
+                        .publish_json(lamp_ipc::monotonic_us(), &shown)
+                        .unwrap();
+                    said = Instant::now();
+                }
+            }
+            // One asked just before the light it went with, read together.
+            while let Ok(Some(message)) = requests.recv(Duration::ZERO) {
+                kept.push(message.parse::<LightRequest>().unwrap());
+            }
+            kept
+        })
+    }
+
+    /// The first builder's 10:2x on #705: the app's Light row on the
+    /// person's light. Saved, it is asked on `light/command` and read back
+    /// from `light/state`; previewed, it is asked on `light/request` under
+    /// the person's priority for ten seconds on the host's boot clock, and
+    /// given back before a save. A lamp whose ring takes no previews says
+    /// so, and a ring that does not show a light in time is said.
+    #[test]
+    fn the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back() {
+        let (places, root) = places("light");
+        std::fs::create_dir_all(places.proc.join("sys/kernel/random")).unwrap();
+        std::fs::write(places.proc.join("sys/kernel/random/boot_id"), "boot-test\n").unwrap();
+        let bus_root = root.join("bus");
+        std::fs::create_dir_all(&bus_root).unwrap();
+        let mut lamp = Real {
+            places,
+            bus: Some(Bus::new(&bus_root).unwrap()),
+            device_id: "d-42".into(),
+            build: String::new(),
+            wifi: Wifi::default(),
+            ring: Ring::default(),
+        };
+        let blue = Light::new(true, "blue", 3).unwrap();
+        // No ring yet.
+        assert_eq!(lamp.light(), Err(NO_RING.to_owned()));
+        assert_eq!(
+            lamp.preview_light(&blue),
+            Err("this lamp's light takes no previews".to_owned())
+        );
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let ringing = ring(&Bus::new(&bus_root).unwrap(), stop.clone());
+        let began = Instant::now();
+        while lamp.light().is_err() && began.elapsed() < Duration::from_secs(5) {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(lamp.light(), Ok(crate::light::first()));
+        let pink = Light::new(true, "pink", 1).unwrap();
+        let before = lamp_ipc::monotonic_us();
+        assert_eq!(lamp.preview_light(&pink), Ok(()));
+        let after = lamp_ipc::monotonic_us();
+        assert_eq!(lamp.set_light(&blue), Ok(blue.clone()));
+        assert_eq!(lamp.light(), Ok(blue.clone()));
+        let saved = Instant::now();
+        let dropped = Light::new(true, "red", 2).unwrap();
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        let requests = ringing.join().unwrap();
+        // A ring that has stopped shows nothing asked of it: said in time.
+        assert!(lamp.set_light(&dropped).is_err());
+        assert!(saved.elapsed() < SHOWN_WITHIN + Duration::from_millis(500));
+        assert_eq!(requests.len(), 2, "{requests:?}");
+        let (shown, given_back) = (&requests[0], &requests[1]);
+        assert_eq!(shown.light, pink);
+        assert_eq!(given_back.light, pink);
+        for request in &requests {
+            assert_eq!(request.claim.source, "cloud");
+            assert_eq!(request.claim.priority, PREVIEW_PRIORITY);
+            assert_eq!(request.claim.clock_id, "boot-test");
+        }
+        let holds = PREVIEW_HOLDS.as_micros() as u64;
+        assert!((before + holds..=after + holds).contains(&shown.claim.until_us));
+        assert!(given_back.claim.until_us < lamp_ipc::monotonic_us());
         let _ = std::fs::remove_dir_all(root);
     }
 

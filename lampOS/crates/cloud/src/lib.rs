@@ -7,6 +7,7 @@ pub mod account;
 pub mod answer;
 pub mod beat;
 pub mod lamp;
+pub mod light;
 pub mod online;
 pub mod ping;
 pub mod wire;

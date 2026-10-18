@@ -53,10 +53,31 @@ routes are not served. Each kind is carried out by the part that owns it.
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
 | `mic.get` | `{"muted", "hw_switch_muted", "available"}`: the voice's own mute (`voice/mute`), the privacy switch (`voice/privacy`, `null` while unknown) and whether the voice is running |
 | `lamp.health` | `lamp/health`'s `level` and `message`, and `stale` |
+| `led.resting.get` | the person's own light (`light/state`, `docs/ring-choreography.md`), in V1's snapshot: `mode` (`off`; `default` while it is the light the lamp starts with, warm at the lowest level; else `custom`), `color` (`[r, g, b]` for `custom`, else `null`), `default` and `effective` (`{"effect", "color"}`), and `light`, the light by its own names (`on`, `colour`, `level`) |
+| `led.resting.set` (`{"mode": "default" \| "off" \| "custom", "color": [r, g, b]}`) | asked on `light/command`, as the actions program asks it, and read back from `light/state` within 1 s; the snapshot of what is shown. `off` keeps the colour and the level, and black is `off`, as V1 |
+| `led.resting.preview` (`{"color": [r, g, b]}`) | asked on `light/request` at `conversation` priority (over a skill's glow, under the person's own light), on the host's boot clock, holding 10 s unless asked again, so an abandoned screen leaves nothing behind (V1's 10 s); a save gives it back first. A light asked for at the lamp ("make your light blue") ends it, and a drag that goes on stays given way until it pauses past its 10 s (the reviewer on #1464). Answered only when it fails, as V1, so a drag does not flood `fd_channel`. Refused where the ring takes no lights that lapse (`LAMP_LIGHT_REQUESTS`, on in the product) |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `device.rename` | refused for now; step 2, through setup's record |
-| anything else (`add_channel`, `skills.*`, `face.*`, `tts.*`, `led.*`, `system.reboot`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
+| anything else (`add_channel`, `skills.*`, `face.*`, `tts.*`, the other `led.*`, `system.reboot`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
+
+### The light: V1's colours on this lamp's
+
+V1's resting light is any `[r, g, b]`. This lamp's light is the person's
+own, as a voice asks for it: on or off, one of ten colours by name, a
+level from 1 to 5 (`lamp_msgs::Light`). So a colour the app sends is the
+nearest of the ten (its channels against each colour's tint, both scaled
+to their brightest, `Light::TINTS`, the table the ring draws from), at the
+level its brightest channel reaches, rounded up so a faint colour is the
+lowest level and not off. A light is told to the app as its tint at its
+level's share of 255, so each of the fifty lights read and saved unchanged
+is the same light. Two differences from V1 the page should know:
+
+- a colour between two of the ten comes back as the nearer one: the page
+  shows what the lamp took, from the reply;
+- the light lasts until the board restarts, as a voice's does
+  (`docs/ring-choreography.md`), where V1 keeps the choice on disk; after a
+  restart the page reads `default`.
 
 ## Where things are kept
 
@@ -94,7 +115,11 @@ routes are not served. Each kind is carried out by the part that owns it.
 ## Tests
 
 `cargo test -p lamp-cloud`: the account and its rotation, V1's shapes, each
-kind's answer and refusal, the ping's URL, body and reply, and, against a
+kind's answer and refusal, each of the fifty lights back from its own
+colour, the light asked of a stand-in ring on a bus (a save read back, a
+preview at the person's priority for 10 s and given back before a save, a
+ring that takes no previews or shows nothing in time said), a preview
+answered only when it fails, the ping's URL, body and reply, and, against a
 broker in the test built from `rumqttc`'s own codec: coming online as V1
 (client id, keepalive, clean start, expiry, login), `info` on connect and
 answers on `fd_channel`; a refused login backing off and said once; a dropped

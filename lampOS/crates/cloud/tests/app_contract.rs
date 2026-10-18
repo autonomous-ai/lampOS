@@ -2,11 +2,14 @@
 //! reads, by name and type (Fourth on #1396, 09:44 and 10:10). The app reads each one
 //! leniently, so a renamed or retyped field would go blank on its page with
 //! nothing failing there: it fails here instead. Each reply is `lamp-cloud`'s
-//! own answer from the real lamp (`Real`, on a lamp of files and a stand-in
-//! `lamp-actions`), in V1's envelope, through JSON as the broker carries it.
+//! own answer from the real lamp (`Real`, on a lamp of files, a stand-in
+//! `lamp-actions` and a bus with the ring's light on it), in V1's envelope,
+//! through JSON as the broker carries it.
+use lamp_bus::Bus;
 use lamp_cloud::answer::answer;
-use lamp_cloud::lamp::{Places, Real, Wifi};
+use lamp_cloud::lamp::{Places, Real, Ring, Wifi};
 use lamp_cloud::wire::Identity;
+use lamp_msgs::{Light, LightRequest};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
@@ -20,6 +23,11 @@ enum Type {
     Percent,
     Whole,
     Flag,
+    /// `[r, g, b]`, each 0-255.
+    Rgb,
+    /// An `[r, g, b]`, or null where there is none (V1's `color` unless the
+    /// choice is `custom`).
+    RgbOrNull,
 }
 
 /// What the app's page reads of each reply, as Fourth listed it.
@@ -37,6 +45,16 @@ const READ: &[(&str, &str, Type)] = &[
     // Whether the voice is up: `false` makes the page say so instead of
     // offering the toggle (Fourth on #1396, 10:10).
     ("mic.get", "available", Type::Flag),
+    // The Light row (`resting_light.dart`, Fourth on #1396, 22:27): V1's
+    // snapshot, `docs/mqtt.md`'s `led.resting.*`.
+    ("led.resting.get", "mode", Type::Text),
+    ("led.resting.get", "color", Type::RgbOrNull),
+    ("led.resting.get", "default.color", Type::Rgb),
+    ("led.resting.get", "effective.color", Type::Rgb),
+    ("led.resting.set", "mode", Type::Text),
+    ("led.resting.set", "color", Type::RgbOrNull),
+    ("led.resting.set", "default.color", Type::Rgb),
+    ("led.resting.set", "effective.color", Type::Rgb),
 ];
 
 fn field<'a>(data: &'a Value, path: &str) -> Option<&'a Value> {
@@ -50,6 +68,13 @@ fn is(value: &Value, kind: Type) -> bool {
         Type::Percent => value.as_u64().is_some_and(|n| n <= 100),
         Type::Whole => value.is_u64(),
         Type::Flag => value.is_boolean(),
+        Type::Rgb => value.as_array().is_some_and(|channels| {
+            channels.len() == 3
+                && channels
+                    .iter()
+                    .all(|channel| channel.as_u64().is_some_and(|n| n <= 255))
+        }),
+        Type::RgbOrNull => value.is_null() || is(value, Type::Rgb),
     }
 }
 
@@ -109,13 +134,31 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
     let serving = actions(&places, 2);
     let mut wifi = Wifi::default();
     wifi.program = "/nonexistent/iw".into();
+    // The ring's side of the bus: the light it shows (the lamp's first,
+    // which a save of `default` asks for again), and a ring that takes
+    // previews.
+    let bus_root = root.join("bus");
+    std::fs::create_dir_all(&bus_root).unwrap();
+    std::fs::create_dir_all(places.proc.join("sys/kernel/random")).unwrap();
+    std::fs::write(places.proc.join("sys/kernel/random/boot_id"), "boot\n").unwrap();
+    let ring = Bus::new(&bus_root).unwrap();
+    let _previews = ring
+        .subscribe_typed(LightRequest::TOPIC, "ring", LightRequest::TYPE)
+        .unwrap();
+    let mut shows = ring
+        .publisher_declared(Light::TOPICS[1], &Light::declaration(), "ring")
+        .unwrap();
+    shows
+        .publish_json(1, &Light::new(true, "warm", 1).unwrap())
+        .unwrap();
     let mut real = Real {
         places,
-        bus: None,
+        bus: Some(Bus::new(&bus_root).unwrap()),
         device_id: "d-42".into(),
         build: "812+460a1a1aa2b3".into(),
         // No `iw` here: the Wi-Fi's name is not one the page reads.
         wifi,
+        ring: Ring::default(),
     };
     let me = Identity {
         device: "lamp".into(),
@@ -130,6 +173,9 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         ("volume.get", Value::Null),
         ("volume.set", json!({"volume": 44})),
         ("mic.get", Value::Null),
+        ("led.resting.get", Value::Null),
+        ("led.resting.preview", json!({"color": [20, 0, 10]})),
+        ("led.resting.set", json!({"mode": "default"})),
     ] {
         let result = answer(&mut real, kind, &data);
         let sent = me.data("2026-10-18T10:00:00Z", kind, &result).to_string();
