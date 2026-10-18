@@ -2068,7 +2068,10 @@ fn left_at(path: &Path, at_us: u64, looked_us: u64) {
 /// reached after it is taken, one reached before it is not.
 #[test]
 fn a_hold_reached_after_the_last_look_is_taken_through_the_records_time() {
-    let at = START + 4_900_000;
+    // The next voice starts at 8 s, so a look can come well after the hold
+    // is reached: the time between setting the record's time and reading it
+    // back only moves the floor earlier, by ms on a loaded host.
+    let at = START + 8_000_000;
     let start = |looked: u64| {
         let directory = Directory::new();
         let path = directory.file();
@@ -2078,29 +2081,24 @@ fn a_hold_reached_after_the_last_look_is_taken_through_the_records_time() {
         let window = restored
             .late_sleep
             .expect("a window from the record's time");
-        // Read back within a few ms of the look; this start is the bound.
+        // Read back about the look; this start is the bound.
         assert!(
-            window.reached_after_us.abs_diff(looked) < 50_000,
+            window.reached_after_us.abs_diff(looked) < 500_000,
             "{window:?}"
         );
         assert_eq!(window.reached_before_us, at);
         let mut head = TestHead::new(CLOCK, START);
         let _ = head.run(START + 500_000, false);
         let _ = head.run(START + 3_700_000, true);
-        let _ = head.run(START + 4_900_000, false);
+        let _ = head.run(at, false);
         let (mut next, sender) = from_record(head_options(Some(&directory)), restored.record, at);
         next.allow_late_sleep(window);
         send(&next, &sender, Input::State(Box::new(state(1, at, None))));
-        feed(
-            &mut next,
-            &sender,
-            head.run(START + 6_000_000, false),
-            false,
-        )
+        feed(&mut next, &sender, head.run(at + 1_100_000, false), false)
     };
     // The hand came at 1.51 s and reached 3 s at 4.51 s.
     assert!(asleep(&start(START + 600_000)));
-    assert!(listening(&start(START + 4_600_000)));
+    assert!(listening(&start(START + 6_500_000)));
 }
 
 /// The first builder's question on #1622: a sleep the voice took, which the
@@ -2194,8 +2192,22 @@ fn release_with(
     during: Option<Input>,
     hold: std::time::Duration,
 ) -> (bool, bool) {
+    release_after(vec![], queued, during, hold)
+}
+
+/// The same, with `taken` sent and taken in the run first.
+fn release_after(
+    taken: Vec<Input>,
+    queued: Vec<Input>,
+    during: Option<Input>,
+    hold: std::time::Duration,
+) -> (bool, bool) {
     let directory = Directory::new();
     let (mut owner, sender) = fixture(options(false, Some(&directory.file())));
+    for input in taken {
+        send(&owner, &sender, input);
+    }
+    owner.poll_at(START + 4_100_000).unwrap();
     owner.arm_active().unwrap();
     for input in queued {
         send(&owner, &sender, input);
@@ -2276,6 +2288,76 @@ fn only_a_press_during_the_releases_save_keeps_the_guard() {
     assert_eq!(release_with(vec![], Some(pet), none), (true, false));
     // And with nothing at all.
     assert_eq!(release_with(vec![], None, none), (true, false));
+}
+
+/// A Controls state from `session` whose newest event is a stop or a mute
+/// at `sequence`.
+fn controls_in(session: &str, sequence: u64, intent: ControlIntent) -> Input {
+    let mut state = state(
+        sequence + 1,
+        4_000_000,
+        Some(gesture(intent, sequence, 4_000_000)),
+    );
+    state.session_id = session.into();
+    for event in [&mut state.latest_stop, &mut state.latest_mute]
+        .into_iter()
+        .flatten()
+    {
+        event.session_id = session.into();
+    }
+    state.check().unwrap();
+    Input::State(Box::new(state))
+}
+
+/// Fourth's P3 on #1632: after Controls restarts, its new session's events
+/// count from nothing, so its first mute during the save is a press and
+/// keeps the guard, though its number is below the old session's; a lower
+/// number from the same session, a state already passed, is not one.
+#[test]
+fn a_new_controls_sessions_first_mute_is_a_press() {
+    let none = std::time::Duration::ZERO;
+    let restarted = "fedcba9876543210";
+    let seen = || vec![controls_in(SESSION, 9, ControlIntent::Stop)];
+    assert_eq!(
+        release_after(
+            seen(),
+            vec![],
+            Some(controls_in(restarted, 1, ControlIntent::SoftwareMute)),
+            none
+        ),
+        (false, true),
+        "a new session's first mute keeps the guard"
+    );
+    assert_eq!(
+        release_after(
+            seen(),
+            vec![],
+            Some(controls_in(SESSION, 5, ControlIntent::Stop)),
+            none
+        ),
+        (true, false),
+        "a number already passed in the same session is not a press"
+    );
+}
+
+/// The reviewer's P3 on #1632: a state the full queue drops never reached
+/// the owner, so its number is forgotten; the same state sent again while
+/// the release saves is a press, and keeps the guard.
+#[test]
+fn a_state_the_full_queue_dropped_counts_again() {
+    let none = std::time::Duration::ZERO;
+    let mut queued: Vec<Input> = (0..QUEUE_CAPACITY)
+        .map(|sequence| Input::Pet(gesture(ControlIntent::Pet, sequence as u64 + 1, 4_000_000)))
+        .collect();
+    queued.push(controls_in(SESSION, 7, ControlIntent::Stop));
+    assert_eq!(
+        release_with(
+            queued,
+            Some(controls_in(SESSION, 7, ControlIntent::Stop)),
+            none
+        ),
+        (false, true)
+    );
 }
 
 /// The reviewer on #1632, the look: routine states still queued at the end

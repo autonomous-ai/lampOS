@@ -1036,7 +1036,12 @@ head's sleep by the late window.
 **What counts as a press** (Fourth and the reviewer on #1632), at the look and
 during the save alike (`carries_press`): a head touch event, or a Controls or
 touch state whose `event_sequence` moved past the last one queued (a new
-mute, stop or head event in it). Controls and the head pads each republish
+mute, stop or head event in it). The last one is kept with its session: a
+state from a new Controls session (Controls restarted) counts its events
+from nothing, so its first mute is a press though its number is below the
+old session's (Fourth on #1632). A state the full queue drops never reached
+the owner, so its number is forgotten and the next state from its topic
+counts as a press (the reviewer on #1632). Controls and the head pads each republish
 their state every 100 ms with nothing new, so counting every queued input
 would have kept the guard on any teardown longer than a republish, and
 muted the next start with nobody having pressed. A routine state and a pet,
@@ -1070,6 +1075,8 @@ lamp muted after an update with nobody told. Tests:
 `the_late_window_returns_only_a_sleep_hold`,
 `a_press_waits_while_a_release_looks_and_saves`,
 `only_a_press_during_the_releases_save_keeps_the_guard`,
+`a_new_controls_sessions_first_mute_is_a_press`,
+`a_state_the_full_queue_dropped_counts_again`,
 `routine_states_queued_at_the_look_do_not_keep_the_guard`,
 `the_records_time_is_the_releases_look_not_its_save`,
 `the_start_gives_the_records_window_to_its_controls`,
