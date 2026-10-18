@@ -21,7 +21,8 @@ const HELP: &str = "The lamp's executive: carries out what the voice's model ask
   --mixer-control   the control's name, as `amixer scontrols` prints it\n\
   --volume-ceiling  the loudest the speaker is allowed, in points of 100 (default 100)\n\
   --bus-root        the bus's directory; with it the light functions are offered while the ring's owner says what it shows\n\
-  LAMP_SCHEDULE_TOOLS=on enables six reminder tools; LAMP_SCHEDULE_SOCKET is an absolute socket path (default /run/lampos-schedule/call.sock). Other switch values leave the old tool list unchanged.";
+  LAMP_SCHEDULE_TOOLS=on enables six reminder tools; LAMP_SCHEDULE_SOCKET is an absolute socket path (default /run/lampos-schedule/call.sock). Other switch values leave the old tool list unchanged.\n\
+  LAMP_SHORT_DONE=on tells the model to say only a word or two after a light or volume change it asked for.";
 
 #[derive(Debug, Default, Eq, PartialEq)]
 struct Arguments {
@@ -127,7 +128,18 @@ fn main() -> ExitCode {
         }
         None => None,
     };
-    let mut executive = Executive { sound, light };
+    let short =
+        std::env::var_os(lamp_actions::SHORT_ENVIRONMENT).is_some_and(|value| value == "on");
+    if short {
+        eprintln!(
+            "lamp-actions: the light's and the volume's calls are answered short (LAMP_SHORT_DONE)"
+        );
+    }
+    let mut executive = Executive {
+        sound,
+        light,
+        short,
+    };
     match lamp_actions::server::serve_reporting_with_schedule(
         &arguments.dir,
         &mut executive,

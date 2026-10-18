@@ -101,6 +101,7 @@ fn the_list_is_there_a_call_changes_the_control_and_anything_else_is_refused_in_
             let mut executive = Executive {
                 sound: Some(Volume::new(Shared(level), 100)),
                 light: None::<NoLight>,
+                short: false,
             };
             serve(&home, &mut executive, &stop)
         })
@@ -193,6 +194,75 @@ fn the_list_is_there_a_call_changes_the_control_and_anything_else_is_refused_in_
     std::fs::remove_dir_all(home).unwrap();
 }
 
+/// `LAMP_SHORT_DONE` (the first builder on #705, 13:4x): with it, a volume
+/// change the model asked for is answered with what was established and
+/// told to say only a word or two after it. A call not done, and the app's
+/// numbers, are answered as without it.
+#[test]
+fn with_the_switch_a_volume_change_is_answered_short_and_nothing_else_changes() {
+    let home = directory("short");
+    let level = Arc::new(AtomicU8::new(50));
+    let stop = Arc::new(AtomicBool::new(false));
+    let serving = {
+        let (home, level, stop) = (home.clone(), level.clone(), stop.clone());
+        std::thread::spawn(move || {
+            let mut executive = Executive {
+                sound: Some(Volume::new(Shared(level), 100)),
+                light: None::<NoLight>,
+                short: true,
+            };
+            serve(&home, &mut executive, &stop)
+        })
+    };
+    until("ready", || home.join(READY_FILE).exists());
+    assert_eq!(
+        ask(
+            &home,
+            b"{\"op\":\"call\",\"name\":\"volume_up\",\"args\":{}}\n"
+        ),
+        json!({"ok":true,"result":{
+            "result":"My volume is now 70 out of 100; it was 50.",
+            "next":lamp_actions::SHORT_NEXT
+        }})
+    );
+    assert_eq!(level.load(Ordering::Acquire), 70);
+    // At the ceiling, nothing changes: said as without the switch, so
+    // "louder" is never answered as if it had been made louder (the
+    // reviewer and Third on #1520).
+    for _ in 0..2 {
+        ask(
+            &home,
+            b"{\"op\":\"call\",\"name\":\"volume_up\",\"args\":{}}\n",
+        );
+    }
+    assert_eq!(level.load(Ordering::Acquire), 100);
+    assert_eq!(
+        ask(
+            &home,
+            b"{\"op\":\"call\",\"name\":\"volume_up\",\"args\":{}}\n"
+        ),
+        json!({"ok":true,"result":{"result":"My speaker is already as loud as it is allowed to go."}})
+    );
+    // Not done: the sentence alone, for the model to say.
+    assert_eq!(
+        ask(
+            &home,
+            b"{\"op\":\"call\",\"name\":\"light_on\",\"args\":{}}\n"
+        ),
+        json!({"ok":false,"error":"I can't do that."})
+    );
+    assert_eq!(
+        ask(
+            &home,
+            b"{\"op\":\"call\",\"name\":\"volume_level\",\"args\":{}}\n"
+        ),
+        json!({"ok":true,"level":{"volume":100,"raw":100,"max_volume":100}})
+    );
+    stop.store(true, Ordering::Release);
+    serving.join().unwrap().unwrap();
+    std::fs::remove_dir_all(home).unwrap();
+}
+
 /// Whether what the ring's owner last said still holds by the bus's clock.
 /// Expired here, it is past what the executive allows it as well.
 fn owner_says(bus: &lamp_bus::Bus) -> bool {
@@ -223,6 +293,7 @@ fn the_light_is_offered_when_its_owner_appears_and_withdrawn_when_it_goes() {
             let mut executive = Executive {
                 sound: None::<Volume<Shared>>,
                 light: Some(BusLight::new(lamp_bus::Bus::new(&root).unwrap()).unwrap()),
+                short: false,
             };
             let now = move || base + Duration::from_millis(ahead_ms.load(Ordering::Acquire));
             serve_with_clock(&home, &mut executive, &stop, None, None, &now)
@@ -350,6 +421,7 @@ fn one_executive_to_a_directory() {
             let mut executive = Executive {
                 sound: None::<Volume<Shared>>,
                 light: None::<NoLight>,
+                short: false,
             };
             serve(&home, &mut executive, &stop)
         })
@@ -358,6 +430,7 @@ fn one_executive_to_a_directory() {
     let mut second = Executive {
         sound: None::<Volume<Shared>>,
         light: None::<NoLight>,
+        short: false,
     };
     let refused = serve(&home, &mut second, &AtomicBool::new(true)).unwrap_err();
     assert_eq!(refused.kind(), std::io::ErrorKind::AddrInUse);

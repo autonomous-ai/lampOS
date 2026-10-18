@@ -168,6 +168,28 @@ could not confirm my speaker's volume changed.", "I asked for it but could
 not confirm my light changed.", and for anything not offered "I can't do
 that."
 
+**Short after a change (`LAMP_SHORT_DONE=on`, off unless set).** A light or
+volume call that changed the lamp is answered with what was established and
+`"next": "It is done. About this change, say only a word or two, in your own
+words and not the same each time. Answer anything else they asked as you
+would."` (`lamp_actions::SHORT_NEXT`). The change itself is the answer: on
+lamp-4ace on 17–18 October a light turn's model reached its call at a median
+0.88 s and our part took 0.06 s, so the change lands at about 0.94 s, while
+the model's sentence about it after our answer took another 0.80 s median to
+begin, then its length to say (the first builder, #705, 13:4x, with Twelve's
+reply-time table). A creature changes its light, then says so in a word,
+and not the same word every time (the character file; Third on #1520). A
+call that changed nothing (`Outcome::Already`: "My light is already
+orange.", "My speaker is already as loud as it is allowed to go.", or
+"My speaker is muted." for quieter while muted) is said
+as before, since there is no change to be the answer (the reviewer and
+Third on #1520), and so is a call not done; the app's two calls are numbers
+as before. The journal says so once at start: `lamp-actions: the light's
+and the volume's calls are answered short (LAMP_SHORT_DONE)`. Its measure on
+lamp-4ace is the model's first audio after our answer plus the reply's
+length, before and after, in the same hour, with a two-part line and
+several light changes in a row listened to for repeats.
+
 While the ring draws something over the person's light (a skill's glow on
 `light/request`, #940, or a self-test's colour), what it last drew
 (`light/drawn`) differs from the person's light (`light/state`). Then

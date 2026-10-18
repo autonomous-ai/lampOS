@@ -71,7 +71,9 @@ impl<M: Mixer> Volume<M> {
         };
         let ceiling = self.ceiling;
         if current >= ceiling {
-            return Outcome::Done("My speaker is already as loud as it is allowed to go.".into());
+            return Outcome::Already(
+                "My speaker is already as loud as it is allowed to go.".into(),
+            );
         }
         let next = ceiling.min(current.saturating_add(STEP));
         self.before_mute = None;
@@ -85,11 +87,11 @@ impl<M: Mixer> Volume<M> {
             return Outcome::Failed(UNREAD.into());
         };
         if current == 0 {
-            return Outcome::Done("My speaker is muted.".into());
+            return Outcome::Already("My speaker is muted.".into());
         }
         let floor = FLOOR.min(self.ceiling);
         if current <= floor {
-            return Outcome::Done(
+            return Outcome::Already(
                 "My speaker is already as quiet as it goes without being muted.".into(),
             );
         }
@@ -104,7 +106,7 @@ impl<M: Mixer> Volume<M> {
             return Outcome::Failed(UNREAD.into());
         };
         if current == 0 {
-            return Outcome::Done("My speaker is already muted.".into());
+            return Outcome::Already("My speaker is already muted.".into());
         }
         let outcome = self.change(current, 0, |_| "My speaker is muted.".into());
         if matches!(outcome, Outcome::Done(_)) {
@@ -119,7 +121,7 @@ impl<M: Mixer> Volume<M> {
         };
         let ceiling = self.ceiling;
         if current > 0 {
-            return Outcome::Done(format!(
+            return Outcome::Already(format!(
                 "My speaker is not muted; its volume is {current} out of {ceiling}."
             ));
         }
@@ -287,8 +289,15 @@ pub(crate) mod tests {
     }
     fn said(outcome: Outcome) -> String {
         match outcome {
-            Outcome::Done(said) => said,
+            Outcome::Done(said) | Outcome::Already(said) => said,
             Outcome::Failed(said) => panic!("expected it done, was told: {said}"),
+        }
+    }
+    /// Said, and nothing changed: an `Already`, never answered short (#1520).
+    fn already(outcome: Outcome) -> String {
+        match outcome {
+            Outcome::Already(said) => said,
+            other => panic!("expected it already so, was told: {other:?}"),
         }
     }
 
@@ -355,7 +364,7 @@ pub(crate) mod tests {
         );
         // At the ceiling nothing is written.
         assert_eq!(
-            said(volume.up()),
+            already(volume.up()),
             "My speaker is already as loud as it is allowed to go."
         );
         assert_eq!(volume.mixer.writes, [80]);
@@ -381,7 +390,7 @@ pub(crate) mod tests {
             );
         }
         assert_eq!(
-            said(volume.down()),
+            already(volume.down()),
             "My speaker is already as quiet as it goes without being muted."
         );
         assert_eq!(volume.mixer.writes, [40, 20, 10]);
@@ -396,13 +405,16 @@ pub(crate) mod tests {
         let mut volume = at(70, 100);
         assert_eq!(said(volume.mute()), "My speaker is muted.");
         assert_eq!(volume.mixer.level, 0);
-        assert_eq!(said(volume.mute()), "My speaker is already muted.");
+        assert_eq!(already(volume.mute()), "My speaker is already muted.");
+        // Quieter while muted changes nothing either (the reviewer on #1520).
+        assert_eq!(already(volume.down()), "My speaker is muted.");
+        assert_eq!(volume.mixer.level, 0);
         assert_eq!(
             said(volume.unmute()),
             "My speaker is back, at 70 out of 100."
         );
         assert_eq!(
-            said(volume.unmute()),
+            already(volume.unmute()),
             "My speaker is not muted; its volume is 70 out of 100."
         );
         // A process that started after the mute has nothing remembered: the
@@ -421,7 +433,9 @@ pub(crate) mod tests {
     fn a_failure_is_said_as_a_failure() {
         let failed = |outcome: Outcome| match outcome {
             Outcome::Failed(said) => said,
-            Outcome::Done(said) => panic!("expected a failure, was told: {said}"),
+            Outcome::Done(said) | Outcome::Already(said) => {
+                panic!("expected a failure, was told: {said}")
+            }
         };
         let mut unreadable = at(50, 100);
         unreadable.mixer.unreadable = true;

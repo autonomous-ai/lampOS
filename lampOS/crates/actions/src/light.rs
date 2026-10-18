@@ -66,7 +66,9 @@ fn set<L: Light>(light: &mut L, wanted: Wanted, said: String) -> Outcome {
 pub fn on<L: Light>(light: &mut L) -> Outcome {
     match light.shown() {
         None => Outcome::Failed(UNREAD.into()),
-        Some(now) if now.on && !light.covered() => Outcome::Done("My light is already on.".into()),
+        Some(now) if now.on && !light.covered() => {
+            Outcome::Already("My light is already on.".into())
+        }
         Some(now) => {
             let said = format!("My light is on, {}.", spoken(&now.colour));
             set(light, Wanted { on: true, ..now }, said)
@@ -78,7 +80,7 @@ pub fn off<L: Light>(light: &mut L) -> Outcome {
     match light.shown() {
         None => Outcome::Failed(UNREAD.into()),
         Some(now) if !now.on && !light.covered() => {
-            Outcome::Done("My light is already off.".into())
+            Outcome::Already("My light is already off.".into())
         }
         Some(now) => set(light, Wanted { on: false, ..now }, OFF.into()),
     }
@@ -92,7 +94,7 @@ pub fn colour<L: Light>(light: &mut L, name: &str) -> Outcome {
     match light.shown() {
         None => Outcome::Failed(UNREAD.into()),
         Some(now) if now.on && now.colour == name && !light.covered() => {
-            Outcome::Done(format!("My light is already {}.", spoken(name)))
+            Outcome::Already(format!("My light is already {}.", spoken(name)))
         }
         Some(now) => set(
             light,
@@ -124,7 +126,7 @@ pub fn brighter<L: Light>(light: &mut L) -> Outcome {
         if light.covered() {
             return set(light, now, "My light is at its brightest.".into());
         }
-        return Outcome::Done("My light is already at its brightest.".into());
+        return Outcome::Already("My light is already at its brightest.".into());
     }
     let level = now.level + 1;
     set(
@@ -147,13 +149,13 @@ pub fn dimmer<L: Light>(light: &mut L) -> Outcome {
         if light.covered() {
             return set(light, now, OFF.into());
         }
-        return Outcome::Done("My light is already off.".into());
+        return Outcome::Already("My light is already off.".into());
     }
     if now.level <= 1 {
         if light.covered() {
             return set(light, now, "My light is at its dimmest.".into());
         }
-        return Outcome::Done(
+        return Outcome::Already(
             "My light is already at its dimmest. I can switch it off if you like.".into(),
         );
     }
@@ -215,7 +217,7 @@ fn warmth<L: Light>(light: &mut L, warmer: bool) -> Outcome {
     let Some(colour) = next else {
         let end = if warmer { "warm" } else { "cool" };
         if now.on && !light.covered() {
-            return Outcome::Done(format!(
+            return Outcome::Already(format!(
                 "My light is already as {end} as it goes, {}.",
                 now.colour
             ));
@@ -407,8 +409,15 @@ pub(crate) mod tests {
     }
     fn said(outcome: Outcome) -> String {
         match outcome {
-            Outcome::Done(said) => said,
+            Outcome::Done(said) | Outcome::Already(said) => said,
             Outcome::Failed(said) => panic!("expected it done, was told: {said}"),
+        }
+    }
+    /// Said, and nothing changed: an `Already`, never answered short (#1520).
+    fn already(outcome: Outcome) -> String {
+        match outcome {
+            Outcome::Already(said) => said,
+            other => panic!("expected it already so, was told: {other:?}"),
         }
     }
 
@@ -428,7 +437,7 @@ pub(crate) mod tests {
             "My light is a step warmer, from warm white to orange."
         );
         assert_eq!(
-            said(warmer(&mut lamp)),
+            already(warmer(&mut lamp)),
             "My light is already as warm as it goes, orange."
         );
         // Cooler from orange is said with its way first and warm as a warm
@@ -442,7 +451,7 @@ pub(crate) mod tests {
             "My light is a step cooler, from warm white to white."
         );
         assert_eq!(
-            said(cooler(&mut lamp)),
+            already(cooler(&mut lamp)),
             "My light is already as cool as it goes, white."
         );
         assert_eq!(
@@ -477,13 +486,15 @@ pub(crate) mod tests {
         let mut lamp = Fake::showing(light(false, "blue", 3));
         assert_eq!(said(on(&mut lamp)), "My light is on, blue.");
         assert_eq!(lamp.shown, Some(light(true, "blue", 3)));
-        assert_eq!(said(on(&mut lamp)), "My light is already on.");
+        assert_eq!(already(on(&mut lamp)), "My light is already on.");
+        // Nothing changed: an `Already`, never answered short (#1520).
+        assert!(matches!(on(&mut lamp), Outcome::Already(_)));
         assert_eq!(
             said(off(&mut lamp)),
             "My light is off. The faint glow that is left shows I am still listening."
         );
         assert_eq!(lamp.shown, Some(light(false, "blue", 3)));
-        assert_eq!(said(off(&mut lamp)), "My light is already off.");
+        assert_eq!(already(off(&mut lamp)), "My light is already off.");
         assert_eq!(
             lamp.asked,
             [light(true, "blue", 3), light(false, "blue", 3)]
@@ -495,7 +506,10 @@ pub(crate) mod tests {
         let mut lamp = Fake::showing(light(true, "warm", 2));
         assert_eq!(said(colour(&mut lamp, "blue")), "My light is blue now.");
         assert_eq!(lamp.shown, Some(light(true, "blue", 2)));
-        assert_eq!(said(colour(&mut lamp, "blue")), "My light is already blue.");
+        assert_eq!(
+            already(colour(&mut lamp, "blue")),
+            "My light is already blue."
+        );
         assert_eq!(lamp.asked.len(), 1);
         // Off and already that colour: asked for a colour, it comes on.
         let mut dark = Fake::showing(light(false, "blue", 4));
@@ -540,7 +554,7 @@ pub(crate) mod tests {
         );
         assert_eq!(lamp.shown, Some(light(true, "pink", 5)));
         assert_eq!(
-            said(brighter(&mut lamp)),
+            already(brighter(&mut lamp)),
             "My light is already at its brightest."
         );
         for level in [4, 3, 2, 1] {
@@ -551,14 +565,14 @@ pub(crate) mod tests {
         }
         // The lowest level is not off, and dimmer does not switch it off.
         assert_eq!(
-            said(dimmer(&mut lamp)),
+            already(dimmer(&mut lamp)),
             "My light is already at its dimmest. I can switch it off if you like."
         );
         assert_eq!(lamp.shown, Some(light(true, "pink", 1)));
         assert_eq!(lamp.asked.len(), 6);
         // Off: brighter brings it on as it was, and dimmer has nothing to do.
         let mut dark = Fake::showing(light(false, "green", 2));
-        assert_eq!(said(dimmer(&mut dark)), "My light is already off.");
+        assert_eq!(already(dimmer(&mut dark)), "My light is already off.");
         assert_eq!(
             said(brighter(&mut dark)),
             "My light is on, at level 2 of 5."
@@ -573,7 +587,9 @@ pub(crate) mod tests {
     fn a_light_that_cannot_be_read_or_does_not_change_is_said_so() {
         let failed = |outcome: Outcome| match outcome {
             Outcome::Failed(said) => said,
-            Outcome::Done(said) => panic!("expected a failure, was told: {said}"),
+            Outcome::Done(said) | Outcome::Already(said) => {
+                panic!("expected a failure, was told: {said}")
+            }
         };
         let mut gone = Fake {
             shown: None,

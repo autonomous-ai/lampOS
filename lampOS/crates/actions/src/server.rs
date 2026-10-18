@@ -107,7 +107,8 @@ fn answer<S: Mixer, L: Light>(
             }
             (Some((name, args)), _) => {
                 let outcome = executive.call(name, args);
-                (name.to_owned(), outcome.line(), Some(outcome))
+                let line = outcome.line_for(name, executive.short);
+                (name.to_owned(), line, Some(outcome))
             }
             (None, _) => {
                 let outcome = Outcome::Failed("I can't do that.".into());
@@ -121,7 +122,7 @@ fn answer<S: Mixer, L: Light>(
     })();
     let took = started.elapsed().as_millis();
     match served {
-        Ok((name, _, Some(Outcome::Done(_)))) => {
+        Ok((name, _, Some(Outcome::Done(_) | Outcome::Already(_)))) => {
             eprintln!("lamp-actions: {name}: done in {took} ms")
         }
         Ok((name, _, Some(Outcome::Failed(said)))) => {
