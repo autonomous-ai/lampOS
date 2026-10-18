@@ -143,6 +143,9 @@ struct Duplex {
     blind: bool,
     /// Yields since the reply began that ended in a resume.
     fruitless: u8,
+    /// A forced yield (`stop/heard`) committed: the reply is to end
+    /// ([`PlaybackMask::take_stop_committed`]).
+    stop_committed: bool,
     /// See [`MATCHED_BLOCKS`].
     matched: u16,
     /// When the latest block was heard.
@@ -222,6 +225,7 @@ impl PlaybackMask {
                 last_yield: None,
                 blind: true,
                 fruitless: 0,
+                stop_committed: false,
                 matched: 0,
                 listened_at_us: 0,
             }),
@@ -287,6 +291,23 @@ impl PlaybackMask {
         if let Some(duplex) = self.duplex.as_mut() {
             duplex.interruption.await_words();
         }
+    }
+    /// A stop word heard by its own listener (`stop/heard`, #828): the next
+    /// block with something to yield begins a yield. See
+    /// `Interruption::force_yield`.
+    /// A forced yield committed since the last look: the stop was a stop,
+    /// and the reply ends, whether or not anything said in it is admitted
+    /// (a commit alone only lets a waiting request through).
+    pub fn take_stop_committed(&mut self) -> bool {
+        self.duplex
+            .as_mut()
+            .is_some_and(|duplex| std::mem::take(&mut duplex.stop_committed))
+    }
+    /// Whether it was taken: a duplex mask with no yield in force.
+    pub fn force_yield(&mut self) -> bool {
+        self.duplex
+            .as_mut()
+            .is_some_and(|duplex| duplex.interruption.force_yield())
     }
     /// Its words came: whether they told the lamp to stop.
     pub fn words(&mut self, stop: bool) {
@@ -366,7 +387,9 @@ impl PlaybackMask {
         };
         duplex.margin.observe(heard, evidence);
         // A reply that keeps yielding to nothing stops yielding.
-        let may_yield = speaking && duplex.fruitless < FRUITLESS_YIELDS;
+        // A stop heard by its own listener yields however many did not.
+        let may_yield = speaking
+            && (duplex.fruitless < FRUITLESS_YIELDS || duplex.interruption.force_pending());
         let plain = duplex.hearing.plain(heard, evidence);
         let step = duplex.interruption.observe(heard, plain, may_yield);
         if duplex.heard.len() >= duplex.max_heard {
@@ -420,12 +443,17 @@ impl PlaybackMask {
                     *state = Yielded::Committed;
                 }
                 duplex.fruitless = 0;
+                duplex.stop_committed |= duplex.interruption.yield_was_forced();
             }
             Step::Resume => {
                 if let Some((_, state)) = duplex.last_yield.as_mut() {
                     *state = Yielded::Resumed;
                 }
-                duplex.fruitless = duplex.fruitless.saturating_add(1);
+                // A forced yield that resumes is a false hearing of the
+                // stop listener, not the lamp yielding to its own voice.
+                if !duplex.interruption.yield_was_forced() {
+                    duplex.fruitless = duplex.fruitless.saturating_add(1);
+                }
                 // What plays next starts like a reply does.
                 duplex.matched = 0;
             }

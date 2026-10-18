@@ -256,6 +256,12 @@ pub struct Interruption {
     words_pending: bool,
     /// They were a stop word: the yield commits at its next block.
     stop_heard: bool,
+    /// A stop word heard by a listener of its own (`stop/heard`, #828):
+    /// the next block with something to yield begins a yield, whatever is
+    /// heard in it ([`Self::force_yield`]).
+    forced: bool,
+    /// The yield in force, or the last one, began so.
+    forced_yield: bool,
 }
 
 impl Interruption {
@@ -269,7 +275,32 @@ impl Interruption {
             resumes: 0,
             words_pending: false,
             stop_heard: false,
+            forced: false,
+            forced_yield: false,
         }
+    }
+
+    /// A stop word heard by a listener of its own (`stop/heard`, #828):
+    /// the next block with something to yield begins a yield whatever is
+    /// heard in it, and from there the yield commits on a person and
+    /// resumes on stillness or its deadline, as any yield. A false hearing
+    /// heard plainly, so quiet after it commits the yield: the lamp stops.
+    /// Nothing while a yield is in force, and nothing kept past a block with
+    /// nothing to yield. Whether it was taken.
+    pub fn force_yield(&mut self) -> bool {
+        let taken = matches!(self.state, State::Listening { .. });
+        self.forced |= taken;
+        taken
+    }
+
+    /// A forced yield waits for the next block.
+    pub fn force_pending(&self) -> bool {
+        self.forced
+    }
+
+    /// The yield in force, or the last one, was forced.
+    pub fn yield_was_forced(&self) -> bool {
+        self.forced_yield
     }
 
     /// The yield in force waits for the words said in it: stillness does
@@ -323,6 +354,7 @@ impl Interruption {
             0
         };
         let needed = self.onset_needed();
+        let forced = std::mem::take(&mut self.forced) && speaking;
         match &mut self.state {
             State::Listening { over, plain: seen } => {
                 if speaking && heard == Heard::Over {
@@ -332,16 +364,24 @@ impl Interruption {
                     *over = 0;
                     *seen = 0;
                 }
-                if *over < needed {
+                if *over < needed && !forced {
                     return Step::Carry;
                 }
                 self.state = State::Yielded {
                     blocks: 0,
                     speech: 0,
                     still: 0,
-                    plain: *seen,
+                    // A stop heard by its own listener counts as heard plainly:
+                    // quiet after it commits the yield, as after a short word
+                    // the lamp's own voice cannot explain.
+                    plain: if forced {
+                        self.rule.plain_blocks
+                    } else {
+                        *seen
+                    },
                 };
                 self.yields += 1;
+                self.forced_yield = forced;
                 Step::Yield
             }
             State::Yielded {
@@ -953,5 +993,33 @@ mod tests {
             margin.observe(heard, &evidence(0, None));
         }
         assert_eq!(margin.db(), Some(-20.0));
+    }
+
+    /// #828, `stop/heard`: a forced yield begins at the next block with
+    /// something to yield, whatever is heard, and counts as heard plainly:
+    /// quiet after it commits it (the lamp stops). It is dropped with
+    /// nothing to yield, and not taken while a yield is in force.
+    #[test]
+    fn a_forced_yield_begins_at_the_next_block_and_quiet_commits_it() {
+        let mut interruption = Interruption::new(Confirmation::EVALUATED);
+        assert_eq!(interruption.observe(Heard::Own, false, true), Step::Carry);
+        assert!(interruption.force_yield());
+        assert_eq!(interruption.observe(Heard::Own, false, true), Step::Yield);
+        assert!(interruption.yielded() && interruption.yield_was_forced());
+        assert!(!interruption.force_yield(), "a yield is in force");
+        let mut steps = Vec::new();
+        for _ in 0..200 {
+            steps.push(interruption.observe(Heard::Still, false, true));
+            if !interruption.yielded() {
+                break;
+            }
+        }
+        assert_eq!(steps.last(), Some(&Step::Commit), "{steps:?}");
+        // Asked with nothing to yield: dropped, not kept for later.
+        let mut later = Interruption::new(Confirmation::EVALUATED);
+        assert!(later.force_yield());
+        assert_eq!(later.observe(Heard::Own, false, false), Step::Carry);
+        assert!(!later.force_pending());
+        assert_eq!(later.observe(Heard::Own, false, true), Step::Carry);
     }
 }

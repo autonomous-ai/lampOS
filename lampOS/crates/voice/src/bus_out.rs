@@ -206,6 +206,17 @@ impl MicOut {
     }
 }
 
+/// With `LAMP_STOP_HEARD=on` (and the bus), a stop word heard by
+/// `lamp-name`'s `stop.onnx` (`stop/heard`, #828) yields the lamp's reply
+/// while it sounds, as a cut-in does, and the duplex rules then commit or
+/// resume it. Off unless set.
+pub const STOP_HEARD_ENVIRONMENT: &str = "LAMP_STOP_HEARD";
+
+/// Whether the voice takes `stop/heard`.
+pub fn stop_heard_on() -> bool {
+    std::env::var(STOP_HEARD_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// The lamp's name, heard in the room's sound by the part that listens
 /// for it (`name/heard`, `docs/name.md`): for the rule that decides
 /// whether an answer is played (`crate::attention`).
@@ -227,8 +238,13 @@ impl NameIn {
     /// The same for `topic`: `name/heard`, each hearing when it is over, or
     /// `name/rising`, its first sign as the name is said (#782).
     pub fn on_topic(root: &Path, topic: &str) -> io::Result<Self> {
+        let kind = if topic == lamp_msgs::StopHeard::TOPIC {
+            lamp_msgs::StopHeard::TYPE
+        } else {
+            lamp_msgs::NameHeard::TYPE
+        };
         Ok(Self {
-            heard: Bus::new(root)?.subscribe_typed(topic, SOURCE, lamp_msgs::NameHeard::TYPE)?,
+            heard: Bus::new(root)?.subscribe_typed(topic, SOURCE, kind)?,
             looked_at_us: None,
         })
     }
@@ -277,10 +293,20 @@ impl NameIn {
             let Ok(Some(message)) = self.heard.recv(std::time::Duration::ZERO) else {
                 break;
             };
-            if let Ok(heard) = message.parse::<lamp_msgs::NameHeard>() {
-                let began = now_us.saturating_sub(u64::from(heard.ago_ms) * 1_000);
+            // A stop word's hearing (`stop/heard`) is the same score and
+            // age as the name's.
+            let heard = message
+                .parse::<lamp_msgs::NameHeard>()
+                .map(|heard| (heard.score, heard.ago_ms))
+                .or_else(|_| {
+                    message
+                        .parse::<lamp_msgs::StopHeard>()
+                        .map(|heard| (heard.score, heard.ago_ms))
+                });
+            if let Ok((score, ago_ms)) = heard {
+                let began = now_us.saturating_sub(u64::from(ago_ms) * 1_000);
                 if newest.is_none_or(|(before, _)| began >= before) {
-                    newest = Some((began, heard.score));
+                    newest = Some((began, score));
                 }
             }
         }

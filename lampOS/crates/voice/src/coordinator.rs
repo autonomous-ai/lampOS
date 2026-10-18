@@ -3706,6 +3706,11 @@ fn conversation_with_gate(
     let mut name_in = crate::second_look::on()
         .then(crate::bus_out::NameIn::from_environment)
         .flatten();
+    // A stop word heard by `lamp-name`'s own listener (`stop/heard`, #828):
+    // with `LAMP_STOP_HEARD=on`, it yields the reply while it sounds.
+    let mut stop_in = crate::bus_out::stop_heard_on()
+        .then(|| crate::bus_out::NameIn::from_environment_on(lamp_msgs::StopHeard::TOPIC))
+        .flatten();
     // The first sign of the lamp's name as it is said, for a call's wait
     // (`--call-wait-ms`, #782): only with that option.
     let mut rising_in = rig
@@ -4203,7 +4208,12 @@ fn conversation_with_gate(
         // reviewer's P3 on #1352).
         let waited = std::mem::take(&mut waited_stop);
         let heard_over = stop_words.as_mut().is_some_and(|words| words.spoken_stop()) && speaking;
-        let spoken_stop = waited || heard_over;
+        // A stop heard by `lamp-name` whose forced yield committed
+        // (`LAMP_STOP_HEARD`, #828): it stops the reply as the hand does,
+        // though nothing said in the yield was admitted (the reviewer on
+        // #1555).
+        let stop_heard = playback_mask.take_stop_committed() && speaking;
+        let spoken_stop = waited || heard_over || stop_heard;
         {
             if stop || muted || gap_cut || head_stop || spoken_stop {
                 let observed_at_us = monotonic_us();
@@ -6820,6 +6830,19 @@ fn conversation_with_gate(
                     }
                 }
             }
+        }
+        // A stop word while the reply sounds: the next block begins a
+        // yield, which the duplex rules then commit or resume (#828).
+        if let Some(stops) = stop_in.as_mut()
+            && let Some((began, score)) = stops.newest_scored(clock)
+        {
+            let sounding = reply_sounding(&playback_mask, reply, clock);
+            let yields = sounding && playback_mask.force_yield();
+            record(
+                trace,
+                json!({"kind":"stop_heard","at_us":clock,"began_us":began,
+                    "score":score,"sounding":sounding,"yields":yields}),
+            )?;
         }
         if let Some(names) = name_in.as_mut()
             && let Some((began, score)) = names.newest_scored(clock)

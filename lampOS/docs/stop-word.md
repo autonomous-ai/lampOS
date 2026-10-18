@@ -569,6 +569,41 @@ what the first builder would add. It is as small as it can be.
    is quiet stops nothing, and the false alarms of ordinary talk measured
    here only matter while the lamp speaks.
 
+## Wired, off unless set (#828, 18 October)
+
+The proposal above, as built on `sixth/stop-model`:
+
+- **`lamp-name --stop-least SCORE`** loads `stop.onnx` from `--models`
+  beside the other three, refusing a file without the pinned SHA-256
+  (`hear::STOP_SHA256`), runs it on the same sixteen embeddings every
+  80 ms, and publishes `stop/heard` (`lamp_msgs::StopHeard`: `score`,
+  `ago_ms`) at the step the score first reaches the bar, then nothing new
+  for 1 s (`said::Stops`). It logs each hearing and `stops=` on the minute
+  line. Without the option nothing is loaded and nothing changes.
+- **`lamp-name check MODELS --stop-least 0.9 FILE…`** prints
+  `FILE stop SECONDS SCORE` for each hearing it would publish: the tool for
+  measuring it on replays before any lamp run.
+- **`LAMP_STOP_HEARD=on`** (with the bus) in the voice: a hearing while the
+  reply sounds (`reply_sounding`) makes the next block with something to
+  yield begin a yield (`Interruption::force_yield`), whatever the duplex
+  hearing says of it, **as heard plainly**: by the time `stop/heard` comes
+  the word is over, and quiet after it commits the yield, so the lamp stops
+  (the reviewer on #1555; proposal 6's pause-and-resume would have resumed
+  after 0.4 s of quiet). A person going on still commits it; the deadline
+  still resumes it. A forced yield that resumes is not counted as one of
+  the reply's fruitless yields, and the reply's fallback after two of those
+  does not drop a forced one, so "stop" said three times stops it the
+  third time too. A false hearing then costs the reply, which is why the
+  false stops an hour are measured before the switch goes on. A hearing at
+  any other time yields nothing. Each is a `stop_heard` trace line with its
+  score, whether the reply sounded, and whether the yield was taken.
+- `stop.onnx` is in no models release yet, so `deploy/product/models.json`
+  does not fetch it; it is placed by hand beside the name's models until
+  it is.
+- Tests: `said::tests::a_stop_word_is_said_at_the_step_it_reaches_the_bar_and_once_a_second`,
+  `duplex::tests::a_forced_yield_begins_at_the_next_block_and_the_rules_finish_it`,
+  the parse of `--stop-least`, and `lamp_msgs`' `StopHeard`.
+
 ## Where it is most likely to be wrong on the lamp, and how to see it quickly
 
 In the order I would look:
