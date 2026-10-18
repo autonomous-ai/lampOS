@@ -59,6 +59,16 @@ every result on a lamp below names it. Newest first.
 - #828's echo row: the canceller takes ~52 dB of the lamp's own voice on
   lamp-4ace mic2 (four 14 Oct sessions, unfloored); the row went 0.60 → 0.65.
   Both microphones waits on mic1's replay having its render.
+- #1521 merged (docs): the gated replay reads evidence without reference
+  trust; `--signal aec_linear_gated` is the figure to quote.
+- The replayed figure (one detector, the first builder's 15:26 tables):
+  `linear-gated` yields to 10 of 19 with 2 false yields, today 10 and 1,
+  `linear` 14 and 12. The per-block 11 of 19 was the mix; #1532 corrects the
+  docs. Monday's "Stop." scoring is one script (`stop_score_sixth.py`, on
+  #828).
+- #1524 peer review (cut-in side): a rule decision never touches a stop or a
+  yield (the Policy holds actions only), but any named kind with the lamp
+  speaking always answers; P2 to refuse those kinds.
 
 ## 2026-10-17 — evening: #828 confounded, go-aways are the lamp's own
 
