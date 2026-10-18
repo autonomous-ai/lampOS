@@ -118,7 +118,17 @@ struct Heard {
     raw_power: Option<f64>,
 }
 
+/// One rig at a time. Each runs the capture worker's loop in real time,
+/// canceller included, against a 40 ms bound on unread microphone and old
+/// render; with the file's tests in parallel on a loaded machine those
+/// workers starved each other, and 2 to 4 of 11 ended on that bound at their
+/// first frames (Eighth on #705, 18 October: `ReferenceBacklog after 0
+/// frames`, `Discontinuity(DeviceError) after 1 frames`). The lamp runs one.
+static ONE_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 struct Rig {
+    /// Held for the rig's life ([`ONE_AT_A_TIME`]).
+    _alone: std::sync::MutexGuard<'static, ()>,
     _directory: SessionDirectory,
     controller: Controller,
     parent: WorkerChannels,
@@ -236,6 +246,11 @@ impl Rig {
         raw_blocks: bool,
         record: bool,
     ) -> Self {
+        // A test that failed while holding it leaves it poisoned; the next
+        // one still runs alone.
+        let alone = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let directory = SessionDirectory::create().unwrap();
         let recording = record.then(|| directory.path.join("capture-audio"));
         let diagnostics = recording.clone();
@@ -280,6 +295,7 @@ impl Rig {
             .set_microphone_permission(now(), Permission::Allowed)
             .unwrap();
         let mut rig = Self {
+            _alone: alone,
             _directory: directory,
             controller,
             parent,
@@ -1055,6 +1071,8 @@ fn a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded() {
         "{refused}"
     );
 
+    // One rig at a time: the first goes before the second starts.
+    drop(rig);
     let mut rig = Rig::start_with(
         "scripted held-up speaker, bounded",
         0,
