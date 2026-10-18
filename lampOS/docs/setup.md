@@ -498,14 +498,16 @@ readlink /etc/localtime
 | `/etc/lampOS/voice/credential` (the voice's key) | 600 root | wiped |
 | `/etc/lampOS/policy/jev.key` (the Policy's key) | 600 root | wiped |
 | `/etc/lampOS/person/name` (the name typed) | 600 root, when a name was typed | wiped |
-| `/etc/localtime` | a link to the phone's zone under `/usr/share/zoneinfo` | kept (decided on #806, 17 Oct 23:39) |
-| `/etc/timezone` | the phone's zone | kept |
-| `/etc/lampOS/zone.env` | `LAMP_ZONE` and today's offset, 644 | kept |
+| `/etc/localtime` | a link to the phone's zone under `/usr/share/zoneinfo`, **when the request carried a zone the lamp's zone data has**; else as install left it | kept (decided on #806, 17 Oct 23:39) |
+| `/etc/timezone` | the phone's zone, on the same condition | kept |
+| `/etc/lampOS/zone.env` | `LAMP_ZONE` and today's offset, 644, on the same condition and only for a zone the parts' own zone data has too; else as install wrote it | kept |
 | `/etc/lampOS/setup/backend.json` (the app's link) | 600 root, **only when the app's request carried a whole link** | wiped |
 | `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf` | 600 root | wiped |
 
 Setup saves them in this order: the name, the zone, the backend's link, the
-key, then the marker. So a marker means all the others were written. The
+key, then the marker. So a marker means all the others were written, but
+the backend's link: that one is best effort, and a marker with no
+`backend.json` is what a failed write leaves (its journal line is below). The
 reset plan (`reset-plan-product.json`) also wipes the person's stores
 (memory, faces, tasks and Harness's sign-in, schedule, the Policy's and
 `lamp-cloud`'s folders, the voice's sessions); the zone is the one thing it
@@ -521,7 +523,7 @@ marker is there; `lamp-update` and `lamp-records` don't wait for it.
 
 ```sh
 systemctl is-active lampos.target lamp-voice lamp-setup-reset lamp-policy
-systemctl is-active lamp-setup        # inactive: the marker is there
+systemctl is-active lamp-setup        # active for up to 10 minutes after setup, so the page can follow the lamp; inactive after that
 systemctl status lamp-cloud --no-pager -n 3
 ```
 
@@ -534,7 +536,8 @@ started again). So on a lamp set up from the app but not turned on, expect
 Turned on, the drop-in carries both lines (the unit's own header; on
 lamp-4ace, `deploy/lamp-4ace/cloud-on.sh`), and the journal then says
 `online on the broker …`. Don't paste the address. A failing 15 s ping says
-`no backend ping: …`.
+`the backend's ping fails: …`, once for each new reason, and `the backend's
+ping answers again` when it comes back.
 
 **The setup journal, one line for each step** (`journalctl -u lamp-setup -b`;
 the board keeps its journal in RAM, so read it before a reboot, or follow it
@@ -547,12 +550,13 @@ live):
 | The app's request named a link that can't be kept | `lamp-setup: the request named a backend link, but <fields> … missing or not valid; setup goes on without it` (field names only) |
 | The link couldn't be written | `lamp-setup: the backend's link could not be saved (…); setup goes on without it` |
 | The run ended | `lamp-setup: run N ended Connected`, or `… ended Failed: …` with the reason |
-| Already set up, at a later boot | `lamp-setup: this lamp is already set up; nothing to serve` |
+| Already set up, at a later boot | no line from `lamp-setup`: systemd skips its start for `ConditionPathExists=!/var/lib/lampos-setup/done`, and `journalctl -u lamp-setup -b` shows only systemd's own line saying so. (`this lamp is already set up; nothing to serve` is printed only when it is run by hand.) |
 
 Then the voice, once the target is up: `journalctl -u lamp-voice -b | grep
 "person's name"` gives `the person's name from /etc/lampOS/person/name is used
-(N characters)`, or `the person's name is not used: …`. It never prints the
-name.
+(N characters)`, or `the person's name is not used: …` when the file can't be
+read. With no name typed there is no file, and the voice says nothing of it.
+It never prints the name.
 
 ## Units
 
