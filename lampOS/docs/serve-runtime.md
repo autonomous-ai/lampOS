@@ -181,7 +181,20 @@ policy6 is cores 6-7, the two big cores (max 2002 MHz). On 18 October
 room) `worker capture` took 17.0-17.4 % on small cores 0, 1, 2, 3 and 5,
 then moved to big core 6 and took 6.5-7.2 % there, with the small cores
 mostly at 1794 MHz and no zone over 69.5 degrees C: the core type, not the
-clock. `LAMP_CAPTURE_CORES=6-7` (off unless set, Linux only) keeps capture
+clock.
+
+**Don't set `LAMP_CAPTURE_CORES`: it crashes the voice in a conversation
+on lamp-4ace (#1459, 18 Oct 11:20); it is only for the quiet-room
+measurement.** At `6-7` (the first builder, 11:06–11:21, `b9b4a5d66`) the
+quiet share fell from 17.65 % to 6.17 %, but in four played talking turns
+the lamp answered none, capture stalled three times (99, 58 and 67 ms,
+`LAMP_STALLS=on`), the second route's and the speaker's leases lapsed, and
+the voice exited with status 1 and came back muted by the restart guard.
+The fix (`lamp-turn-end` off capture's cores) is #1475, and the switch
+stays unset until the same check passes: four turns answered, no lapses,
+capture stalls no worse than with it unset.
+
+`LAMP_CAPTURE_CORES=6-7` (off unless set, Linux only) keeps capture
 on the big cores: at its start the worker calls `sched_setaffinity` on its
 own thread, before the threads it starts, and logs one line with the cores
 and what `sched_getaffinity` reads back ("it took" or "it did not take").
