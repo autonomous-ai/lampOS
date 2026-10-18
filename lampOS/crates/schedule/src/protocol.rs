@@ -11,6 +11,8 @@ pub const MAX_PAGE_SIZE: u16 = 8;
 /// A compare-and-set guard prevents a timed-out or reordered mutation from
 /// being performed twice. Reusing the exact most recent mutation returns its
 /// original durable receipt; otherwise the caller must read the current state.
+// Saved exactly in the delivery ledger's Ack: a new field needs a `delivery::SCHEMA`
+// bump, or an older build refuses the whole ledger instead of setting it aside.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Guard {
@@ -49,6 +51,8 @@ pub enum Request {
         delivery: u64,
         seconds: u64,
     },
+    // Saved exactly in the delivery ledger: a new field needs a `delivery::SCHEMA`
+    // bump, or an older build refuses the whole ledger instead of setting it aside.
     Ack {
         guard: Guard,
         id: u64,

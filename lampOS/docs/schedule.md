@@ -655,9 +655,49 @@ and an explicit absolute
 `LAMP_SCHEDULE_DELIVERY_DIR` on persistent storage. Provision its parent for the
 Voice service user; the final directory/database are private 0700/0600. This is
 a separate tagged ledger, never Schedule's item database or an audio session
-directory. It retains no reminder text. Reusing a directory with a different
-schema, a changed store identity, or ambiguous storage failure refuses new
-sound. Never delete this ledger to clear an operational fault.
+directory. It retains no reminder text. A changed store identity, wrong ledger
+kind, or ambiguous storage failure refuses new sound. Never delete this ledger
+to clear an operational fault.
+
+The saved delivery ledger reads harmless added fields at schema 1, including
+nested entries and proof metadata. Known fields and their proof bindings still
+validate; missing required fields, duplicate known fields and unknown `kind`
+or `op` values are refused with the stored bytes unchanged. Public Voice IPC
+types remain strict. An exact saved Ack request and its guard also remain
+strict: their fields must not be silently removed before retransmission. So a
+field added to `Request::Ack` or `Guard` without a bump would make an older
+build refuse the whole ledger, not set it aside; a test pins their saved keys.
+
+- **The rule for a change to the saved ledger:** these bump `SCHEMA` in
+  `delivery.rs`, in the same PR:
+  - a new enum value, a new required field, or a change to the exact Ack
+    request or its guard;
+  - a field that changes admission, completion or acknowledgement meaning;
+  - a field a newer build needs back after a rollback and a roll forward,
+    not just one it can do without: an older build ignores it, and it is
+    gone after that build's next save;
+  - a larger `MAX_STATE_BYTES`: an older build refuses a state over its own
+    bound before it reads `schema` (`DeliveryLedger::open` checks the size
+    first), so it can only set aside what it can read. A ledger over the
+    older build's bound is refused there, and its due reminders wait.
+
+  Any other added field needs nothing more; it disappears on the next save.
+
+On a newer `schema`, the consumer closes and durably renames the whole database
+to `schedule.sqlite3.newer-<schema>-<unix-seconds>` under its existing directory
+lock, without replacing an earlier archive. It then commits an empty schema-1
+ledger, and after that commit writes one journal line naming that file. A crash
+after the rename and before that commit leaves the kept `newer-*` file with no
+journal line, and the next start begins empty, so the kept file is the record.
+A preservation failure refuses startup. No entry or completion proof from the
+newer ledger is interpreted.
+Current pending reminders can be offered again after the normal fresh Schedule
+observation, single-consumer claim and Voice admission checks. A reminder heard
+before rollback but not acknowledged in Schedule may therefore be heard twice;
+this follows the existing preference for a possible repeat over a lost reminder.
+Already acknowledged reminders are absent from Schedule and are not replayed
+from the preserved file. This work occurs at consumer startup; it adds no wait
+or I/O to Voice's audio path.
 
 One child, started by Voice's internal `schedule-consumer` entry, owns all Bus,
 Schedule socket and ledger work. It survives mute/unmute audio cycles. A fixed
