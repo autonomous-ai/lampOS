@@ -4567,6 +4567,27 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **Next:** queue 22e's same-voice A/B on #1627, about 03:30.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-19, 02:42 ICT: #1632 merged with my approval; #1637 approved; queue 22e read; #1636 up
+
+- **#1632** (Third's carry-forward of #1622, the privacy path): re-read at `3f04b4787`.
+  - My routine-state P2 is fixed: a routine Controls state during the save is now released.
+  - My restore P3 is fixed: the hand-off is pinned by a mutation.
+  - I found a new P3: a new Controls session's mute isn't counted as a press. It isn't lost; the next start takes it back by its watermark.
+  - Approved; the first builder merged it at 02:18.
+- **#1637** (that P3, and the reviewer's dropped-state P3): my readers' test now keeps the guard. No findings, approved.
+- **Queue 22e** (the same-voice A/B on #1627):
+  - 0 "no voice of the conversation is known", against 11 last evening. The job passes for real: the umbrella 0/3 with the check, 3/3 without.
+  - Lost: scene 5's kitten line and "more popular", 3/3 each, and scene 4's train 2 of 3.
+  - **Why, from the journal:** another voice's held line ("Pepper", the TV) ends the caller's conversation, and the bare "Lamp," is never heard as the name.
+- **#1636** (the narrower rule, the first builder's yes at 02:10): after only another voice's held line, a question in the conversation's own voice goes on.
+  - A statement, or any line after talk, still finds the conversation over, and #1030's 06:07 scene is unchanged.
+  - Four tests and three mutations.
+  - Gate 2648/1, the one a ring flake reported to Tests.
+  - Its A/B is Monday at 07:30.
+- **Monday's scene:** line 5b is now the Policy's choice; the scorer is updated.
+- **The log's worktree** is in my scratchpad now: the old `/private/tmp` one had lost its `.git` file.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
