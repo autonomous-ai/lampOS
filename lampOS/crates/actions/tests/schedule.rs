@@ -761,6 +761,18 @@ fn host_first_and_repeated_actions_to_durable_schedule_receipts_are_measured() {
             failures += 1;
         }
     }
+    // Third's P3 on #1603: a list of what is due now also reads Status, so
+    // it is timed too (within the same one deadline as every call).
+    let mut due_lists = Vec::new();
+    for _ in 0..10 {
+        let started = Instant::now();
+        let reply = actions.call("list_reminders", json!({"pending_only":true}));
+        due_lists.push(started.elapsed().as_micros() as u64);
+        if reply["result"]["not_yet_due"] != 21 {
+            failures += 1;
+        }
+    }
+    due_lists.sort_unstable();
     let first = durations.remove(0);
     durations.sort_unstable();
     let percentile = |p: usize| durations[(p * durations.len()).div_ceil(100) - 1];
@@ -773,7 +785,8 @@ fn host_first_and_repeated_actions_to_durable_schedule_receipts_are_measured() {
             "first_us":first,"repeated_count":durations.len(),"total_count":21,"failures":failures,
             "repeated_p50_us":percentile(50),"repeated_p95_us":percentile(95),"repeated_max_us":durations.last().unwrap(),
             "target_us":250_000,"target_is_not_a_functional_assertion":true,
-            "cold_scope":"first mutation after both newly started host services published readiness; process/store startup excluded"
+            "cold_scope":"first mutation after both newly started host services published readiness; process/store startup excluded",
+            "pending_only_list_p50_us":due_lists[4],"pending_only_list_max_us":due_lists[9]
         })
     );
     assert_eq!(failures, 0);
@@ -823,4 +836,55 @@ fn a_just_set_timer_is_listed_counted_beside_a_due_only_list_and_cancelled_for_g
         .find(|f| f.name == "cancel_reminder")
         .unwrap();
     assert!(cancel.description.contains("without pending_only"));
+}
+
+/// The reviewer's P3 on #1603: a `pending_only` page kept full of long due
+/// labels still has room for `not_yet_due` and its `next`, so a list of what
+/// is due, with one more item set and not yet due, fits the provider's
+/// allowance and says the count, instead of failing as uncertain.
+#[test]
+fn a_full_due_only_page_still_fits_its_count_of_what_is_not_yet_due() {
+    // Labels of quotes (two bytes each once escaped) of every length from
+    // 300 down to 150, so that some page lands just under the allowance
+    // without the room kept for the count.
+    for length in (150..=300).rev() {
+        let text = "\"".repeat(length);
+        let items: Vec<_> = (1..=8)
+            .map(|id| {
+                let mut item = listed(id, text.clone());
+                item["state"] = json!("pending");
+                item
+            })
+            .collect();
+        let mut script = Script::with(2, move |request, index| match index {
+            0 => {
+                assert_eq!(request["op"], "list");
+                assert_eq!(request["pending_only"], true);
+                json!({"ok":true,"store_id":STORE,"revision":1,"items":items,"next_after_id":null})
+            }
+            _ => {
+                assert_eq!(request["op"], "status");
+                json!({"ok":true,"store_id":STORE,"revision":1,"items":9,"pending":8})
+            }
+        });
+        let got = script
+            .adapter()
+            .call("list_reminders", &json!({"pending_only":true}));
+        let result = &got["result"];
+        assert!(
+            result.to_string().len() <= MAX_RESULT_BYTES,
+            "{length}: {}",
+            result.to_string().len()
+        );
+        assert_eq!(result["not_yet_due"], 1, "{length}: {got}");
+        assert_eq!(result["next"], lamp_actions::schedule::NOT_YET_DUE);
+        // What did not fit is said by the cursor, never dropped.
+        let shown = result["items"].as_array().unwrap().len() as u64;
+        assert!(shown >= 1);
+        if shown < 8 {
+            assert_eq!(result["next_after_id"], shown, "{length}");
+            assert_eq!(result["complete"], false);
+        }
+        script.finish();
+    }
 }
