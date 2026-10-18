@@ -4517,6 +4517,25 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#1602** (the reviewer's two P3s on #1589): Ten approved at 20:2x with 2 P3s, both being fixed. A lamp on a zone that names no place says "Here it is …", not "Here in UTC+7", and the sentence is built from its parts.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-18, 21:50 ICT: #1594 folded and rebased as #1618; #1609 as #1617; #829's A/B read; #1522's day lines mapped
+
+- **#1594 → #1613 → #1618** (#1522's three fixes). The reviewer's 20:53 P2: talk the Policy holds let a busy room end a minute after a call. Jarvis's three P3s. The first builder ruled at 20:58, and the fold has:
+  - a Policy hold joins the busy run and its clock but never ends the conversation;
+  - a reminder is no answer;
+  - the end is never past 180 s;
+  - a restart falls back to 180 s.
+
+  Five mutations are caught. #1613 was approved by Ten, Eighth and Jarvis, with the reviewer's ready. Then it was rebased as #1618 after #1592's `switches.md` row, keeping both rows; that gate is running.
+- **#1602 → #1609 → #1617** (Ten's two P3s, and the reviewer's two). The lamp's own place is named only under an area of places, and `the_time` asks for the place only for another one. I had missed the reviewer's 20:24 on #1602; I said so on #1609, and the memory rule now says to read a PR again before building its follow-up. Gate 2618/0.
+- **#1580's two P3s from Ten:** answered after the merge, and the description is corrected.
+- **The motor flake** I reported is Tests' #1611.
+- **#829, the same-voice A/B again (the first builder, 21:21):** a first read from the scene files.
+  - One call's print came from a request that began with the other person's line.
+  - A late "another voice" may hold the next line that doesn't call the lamp.
+  - The journal lines are asked for, to answer the three questions.
+- **#1522, queue 16's day lines:** the first builder's mapping was one request off. With mine (21:44), confirmed at 21:45: "warmer" was a `look_up`, which #1618 plays; "what do you see" was `NOT_THE_LAMPS`, the cost; "green" was the strict busy rule.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
