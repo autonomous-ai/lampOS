@@ -41,10 +41,12 @@ struct Bench {
     runs: usize,
     speed: Speed,
     cores: Cores,
+    priority: Option<u8>,
 }
 
 const BENCH_USAGE: &str = "usage: lamp-turn-end bench PATH [RUNS] [--fast] [--threads N] \
-                           [--cores fast|all|LIST] [--runtime LIBRARY] [--no-spin]";
+                           [--cores fast|all|LIST] [--runtime LIBRARY] [--no-spin] \
+                           [--realtime-priority N]";
 
 fn parse_bench(arguments: &[OsString]) -> Result<Bench, String> {
     let mut words = arguments
@@ -52,13 +54,16 @@ fn parse_bench(arguments: &[OsString]) -> Result<Bench, String> {
         .map(|word| word.to_str().ok_or(BENCH_USAGE));
     let model = PathBuf::from(words.next().ok_or(BENCH_USAGE)??);
     let (mut runs, mut fast, mut threads, mut cores, mut runtime) = (None, false, None, None, None);
-    let mut spin = true;
+    let (mut spin, mut priority) = (true, None);
     while let Some(word) = words.next() {
         let word = word?;
         let mut value = || words.next().ok_or(BENCH_USAGE).and_then(|value| value);
         match word {
             "--fast" if !fast => fast = true,
             "--no-spin" if spin => spin = false,
+            "--realtime-priority" if priority.is_none() => {
+                priority = Some(crate::realtime_priority(Some(value()?))?);
+            }
             "--threads" if threads.is_none() => {
                 let count = value()?.parse::<usize>().map_err(|_| "invalid --threads")?;
                 threads = Some(count).filter(|&count| count > 0);
@@ -101,6 +106,7 @@ fn parse_bench(arguments: &[OsString]) -> Result<Bench, String> {
         runs,
         speed,
         cores,
+        priority,
     })
 }
 
@@ -121,6 +127,10 @@ pub fn bench(arguments: &[OsString]) -> ExitCode {
         Ok(bench) => bench,
         Err(reason) => return fail(reason),
     };
+    // Before any thread starts, as the worker does (#1608).
+    if let Err(reason) = crate::take_priority(bench.priority) {
+        return fail(reason);
+    }
     if let Err(reason) = bound_resources(&bench.speed) {
         return fail(reason);
     }
@@ -198,6 +208,7 @@ pub fn bench(arguments: &[OsString]) -> ExitCode {
         "runtime": runtime,
         "threads": threads,
         "spin": spin,
+        "scheduling": serde_json::from_str::<Value>(&crate::scheduling()).unwrap_or(Value::Null),
         "cores": serde_json::from_str::<Value>(&json_cores(cores::allowed())).unwrap_or(Value::Null),
         "cpus": cpu_description(),
         "runs": bench.runs,
@@ -368,7 +379,8 @@ mod tests {
                 model: "m.onnx".into(),
                 runs: BENCH_RUNS,
                 speed: Speed::Exact,
-                cores: Cores::All
+                cores: Cores::All,
+                priority: None,
             }
         );
         let bench = parse_bench(&words("m.onnx 50 --cores fast")).unwrap();
@@ -395,6 +407,10 @@ mod tests {
         let quiet = parse_bench(&words("m.onnx --fast --runtime /x/lib.so --no-spin")).unwrap();
         assert!(matches!(quiet.speed, Speed::Fast { spin: false, .. }));
         assert!(parse_bench(&words("m.onnx --no-spin")).is_err());
+        // #1608: and below the voice's real-time priority, 1 to 99.
+        let below = parse_bench(&words("m.onnx --realtime-priority 10")).unwrap();
+        assert_eq!(below.priority, Some(10));
+        assert!(parse_bench(&words("m.onnx --realtime-priority 0")).is_err());
         let bench = parse_bench(&words("m.onnx --fast --runtime /x/lib.so --cores all")).unwrap();
         assert_eq!(bench.cores, Cores::All);
         assert!(matches!(bench.speed, Speed::Fast { threads: 2, .. }));

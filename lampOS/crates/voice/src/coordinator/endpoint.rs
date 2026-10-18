@@ -26,23 +26,43 @@ use std::{io, path::Path, time::Duration};
 /// core from everything ordinary there, `lamp-name` among them.
 pub const NO_SPIN_SWITCH: &str = "LAMP_TURN_END_NO_SPIN";
 
+/// The switch that lowers the worker to a real-time priority below the
+/// voice's own round-robin 20 (#1608): a number from 1 to 99; unset, it keeps
+/// the voice's. The voice's capture, playback and coordinator threads then
+/// take its core back at once, while a verdict still runs ahead of every
+/// ordinary process. The worker only ever lowers a priority.
+pub const PRIORITY_SWITCH: &str = "LAMP_TURN_END_PRIORITY";
+
+/// The switch's priority, if it is one from 1 to 99.
+fn priority(value: Option<&str>) -> Option<u8> {
+    value
+        .and_then(|value| value.trim().parse::<u8>().ok())
+        .filter(|priority| (1..=99).contains(priority))
+}
+
 /// The worker's command for `endpoint`, its threads not spinning with
 /// `no_spin` (the fast worker only: the exact model has one thread and no
-/// pool), or none for the silence window alone.
+/// pool) and lowered to real-time `priority`, or none for the silence
+/// window alone.
 fn worker_command(
     endpoint: Endpoint,
     program: std::path::PathBuf,
     model: std::path::PathBuf,
     no_spin: bool,
+    priority: Option<u8>,
 ) -> Option<WorkerCommand> {
-    match endpoint {
-        Endpoint::Silence => None,
-        Endpoint::SmartTurn => Some(WorkerCommand::smart_turn(program, model)),
+    let command = match endpoint {
+        Endpoint::Silence => return None,
+        Endpoint::SmartTurn => WorkerCommand::smart_turn(program, model),
         Endpoint::SmartTurnFast if no_spin => {
-            Some(WorkerCommand::smart_turn_fast(program, model).without_spinning())
+            WorkerCommand::smart_turn_fast(program, model).without_spinning()
         }
-        Endpoint::SmartTurnFast => Some(WorkerCommand::smart_turn_fast(program, model)),
-    }
+        Endpoint::SmartTurnFast => WorkerCommand::smart_turn_fast(program, model),
+    };
+    Some(match priority {
+        Some(priority) => command.with_realtime_priority(priority),
+        None => command,
+    })
 }
 
 pub(super) struct EndpointRig {
@@ -65,7 +85,14 @@ impl EndpointRig {
             directory.join(SMART_TURN_MODEL_FILE),
         );
         let no_spin = crate::ring_asleep::enabled(std::env::var(NO_SPIN_SWITCH).ok().as_deref());
-        let command = worker_command(options.endpoint, program, model, no_spin)?;
+        let asked = std::env::var(PRIORITY_SWITCH).ok();
+        let lowered = priority(asked.as_deref());
+        if asked.is_some() && lowered.is_none() {
+            eprintln!(
+                "lamp-voice: {PRIORITY_SWITCH} is not a priority from 1 to 99; the end-of-turn worker keeps the voice's"
+            );
+        }
+        let command = worker_command(options.endpoint, program, model, no_spin, lowered)?;
         let mut rig = Self::process(command, Limits::default());
         rig.commit_blocks = options.endpoint_commit_blocks;
         Some(rig)
@@ -244,15 +271,49 @@ mod tests {
     #[test]
     fn the_fast_worker_stops_spinning_only_with_its_switch() {
         let spins = |endpoint, no_spin| {
-            worker_command(endpoint, "w".into(), "m".into(), no_spin)
+            worker_command(endpoint, "w".into(), "m".into(), no_spin, None)
                 .map(|command| command.args.iter().any(|arg| arg == "--no-spin"))
         };
         assert_eq!(spins(Endpoint::SmartTurnFast, true), Some(true));
         assert_eq!(spins(Endpoint::SmartTurnFast, false), Some(false));
         assert_eq!(spins(Endpoint::SmartTurn, true), Some(false));
         assert_eq!(spins(Endpoint::Silence, true), None);
-        let fast = worker_command(Endpoint::SmartTurnFast, "w".into(), "m".into(), true).unwrap();
+        let fast =
+            worker_command(Endpoint::SmartTurnFast, "w".into(), "m".into(), true, None).unwrap();
         assert!(fast.args.iter().any(|arg| arg == "--fast"));
+    }
+
+    /// #1608: the worker is lowered only with a priority from 1 to 99, for
+    /// either model; anything else leaves it at the voice's.
+    #[test]
+    fn the_worker_is_lowered_only_with_a_priority_from_1_to_99() {
+        for (value, taken) in [
+            (Some("10"), Some(10)),
+            (Some(" 1 "), Some(1)),
+            (Some("99"), Some(99)),
+            (Some("0"), None),
+            (Some("100"), None),
+            (Some("on"), None),
+            (None, None),
+        ] {
+            assert_eq!(priority(value), taken, "{value:?}");
+        }
+        for endpoint in [Endpoint::SmartTurn, Endpoint::SmartTurnFast] {
+            let lowered =
+                worker_command(endpoint, "w".into(), "m".into(), false, Some(10)).unwrap();
+            let args: Vec<_> = lowered
+                .args
+                .iter()
+                .map(|arg| arg.to_string_lossy().into_owned())
+                .collect();
+            let at = args
+                .iter()
+                .position(|arg| arg == "--realtime-priority")
+                .unwrap();
+            assert_eq!(args[at + 1], "10", "{endpoint:?}");
+            let kept = worker_command(endpoint, "w".into(), "m".into(), false, None).unwrap();
+            assert!(!kept.args.iter().any(|arg| arg == "--realtime-priority"));
+        }
     }
 
     struct Silent;

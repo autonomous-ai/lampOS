@@ -125,6 +125,27 @@ checked on the held-out clips (shards 4 and 5), where it took them from 21 to
   `"spin":false`. Not measured on a lamp yet: the check is `bench` with and
   without it, at `chrt -r 20` as the voice runs it, cold and warm verdict
   times compared.
+- **Below the voice (`--realtime-priority N`, #1608).** A verdict holds
+  both big cores at the voice's round-robin 20 for about 148 ms. The
+  voice's capture thread runs there too at times (`serve-runtime.md`, "The
+  capture worker's cores"), and at the same priority it waits out the
+  verdict; inside a turn, 100 ms without a microphone frame lapses every
+  lease (#1608, #1459). With `--realtime-priority N` the worker lowers its
+  first thread to round-robin N before ONNX Runtime starts its pool, so its
+  threads start at N too (`thread-priority`, no `unsafe`). The voice's
+  threads at 20 then take a core back from it at once, and a verdict still
+  runs ahead of every ordinary process. It only lowers a real-time
+  priority: from an ordinary policy (the simulator) or one already at N or
+  below it changes nothing, and it never raises one. The journal says
+  `lamp-turn-end: real-time priority 20 lowered to 10`, or `… 20 kept, not
+  raised to 30` for an N at or above the voice's. The voice passes it
+  with `LAMP_TURN_END_PRIORITY=N` (unset, the worker keeps the voice's; a
+  value that isn't 1 to 99 is said once and ignored), for either model.
+  `bench … --realtime-priority N` measures it and reports `scheduling`. Not
+  measured on a lamp yet: the check is the verdict times first and repeated
+  with it on and off (`bench` at `chrt -r 20`), and, from a played battery,
+  how many turns end `silence_fallback` (`timeout`), a verdict that came
+  after the window had ended the turn, with it on and off.
 - A missing or different library ends the worker at startup with the
   reason. The core then keeps the silence window on every pause, as for any
   other failed worker, and never restarts it.

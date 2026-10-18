@@ -2193,6 +2193,7 @@ dependencies = [
  "rustix",
  "serde_json",
  "sha2",
+ "thread-priority",
  "tract-onnx",
 ]
 
