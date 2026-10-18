@@ -496,31 +496,51 @@ scores a generated "Stop." (Piper `en_US-libritts-high`) with the processed bloc
 the switch, silence without it.
 
 With `LAMP_VAD_INPUT=linear-gated` (the second exact value, passed on the
-same way) the detector reads the linear output only on a block the duplex
-rules would take speech in for a person: the room clear of the lamp
-(`Heard::Clear`) or someone plainly over it (`Heard::Over`, at most 75 %
-explained by the render with a fresh alignment), judged by
-`Hearing::EVALUATED` on the block's own evidence at a score of 1
-(`activity::linear_admitted`). Everywhere else (the lamp's own voice that the
-render explains, a block not yet judged, untrusted evidence) it reads the
-processed block, as without the switch. So the lamp alone is scored as the
-processed block scores it, for every reader of the score, while on each
-block a yield can come from the score is the linear output's, as with
-`linear`: the duplex rules need both a speech score and under 75 %
-explained, so a block the gate leaves on the processed block could not have
-been heard as a person over the lamp either way. Only the detector's state
-differs, since one detector runs over whichever block it is given. The
-gate's thresholds are the duplex rules' own; it adds none. `Hearing`'s
-listening-gap form (`silence_heard`, with ears) is not used for the gate, so
-a gap of zeros stays on the processed block. `hearing_replay REPLAY_DIR
---signal aec_linear_gated` scores a replay this way, from its AEC-only and
-linear outputs and the AEC-only evidence, beside `aec_only` and `aec_linear`
-on the same replay. Tests:
+same way) the detector reads the linear output only on a block where speech
+would plainly be a person: the room clear of the lamp (`Heard::Clear`), or
+someone over it that the render explains no more than `plain_percent` (20 %)
+of, with a fresh alignment (`Hearing::plain`), judged by `Hearing::EVALUATED`
+on the block's own trusted evidence at a score of 1
+(`activity::linear_admitted`). Everywhere else (the lamp's own voice, a block
+over the lamp but 20 to 75 % explained, one not yet judged, untrusted
+evidence) it reads the processed block, as without the switch.
+
+Why 20 % and not the duplex rules' 75 %: a yield is a run of `Over` blocks,
+and a block 20 to 75 % explained can be `Over` on either score, so a gate at
+75 % gives every block a yield can come from the linear score and with it
+`linear`'s false yields (the reviewer on #1504); the lamp's own voice
+misjudged as a person was 30 to 75 % explained on lamp-4ace
+(`duplex.rs`, `plain`). On the first builder's `hearing_replay` tables of
+18 October (#828; 14 October's cut-a, cut-b, cut-d and both-a, and this
+morning's mic2 stop rehearsal: 2.6 minutes of the lamp alone, 19 lines said
+over it; the gate worked out from each block's `aec_only` and `aec_linear`
+rows, the detector's state across a switch not modelled):
+
+| detector input | false yields over the lamp alone | lines over the lamp yielded |
+|---|---|---|
+| processed (`clean`) | 1 (0.4 a minute) | 10 of 19 |
+| `linear` | 13 (5.1 a minute) | 14 of 19 |
+| gated at 75 % | 13 | 14 of 19 |
+| gated at 50 % | 4 | 12 of 19 |
+| **gated at 20 % (`linear-gated`)** | **1** | **11 of 19** |
+
+So the switch keeps the processed block's false yields and catches one line
+more on these sets, not `linear`'s four. That is the false side made ready; Monday's real "Stop." measures the catch. For the
+score's other readers (the busy room, the re-centre's quiet test, the frame's
+`vad`, a turn start) the lamp alone is the processed block's score too, but
+for blocks the gate opens. The gate's thresholds are the duplex rules' own;
+it adds none. With `LAMP_LISTEN_GAPS=on` the coordinator's `Hearing` takes a
+gap of the lamp's silence as `Over` (`silence_heard`), but the gate uses
+`Hearing::EVALUATED`, so such a gap stays on the processed block.
+`hearing_replay REPLAY_DIR --signal aec_linear_gated` scores a replay this
+way, from its AEC-only and linear outputs and the AEC-only evidence, gated by
+the replay's own `Hearing` (so `--explained` moves the judge and the gate
+together; the gate itself is `plain_percent`). Tests:
 `activity::tests::linear_gated_reads_the_linear_output_only_where_speech_would_be_a_person`
 and `linear_gated_keeps_the_lamps_own_voice_out_and_a_stop_over_it_in` (the
-generated "Stop." kept in the linear output: with 95 % explained it scores as
-speech with `linear` and as silence with `linear-gated`; at 10 % explained, or
-with the room clear, block for block what `linear` gives).
+generated "Stop." kept in the linear output: at 95 % and at 50 % explained
+it scores as speech with `linear` and as silence with `linear-gated`; at 10 %,
+or with the room clear, block for block what `linear` gives).
 
 ## Stop and current limits
 

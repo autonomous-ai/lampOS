@@ -12,7 +12,8 @@
 //! one replayed signal (`segment-001-<signal>.wav`, the AEC-only output by
 //! default; `aec_linear` is what `LAMP_VAD_INPUT=linear` scores, and
 //! `aec_linear_gated` is `LAMP_VAD_INPUT=linear-gated`: the linear output on a
-//! block the AEC-only evidence admits, the AEC-only output elsewhere) is scored by
+//! block the AEC-only evidence admits, judged by this replay's `Hearing`, the
+//! AEC-only output elsewhere) is scored by
 //! the voice's own detector, one stream as the coordinator runs it, and the
 //! block is judged by `Hearing::EVALUATED` against the AEC-only canceller's
 //! echo evidence, as the duplex rules judge it. `--explained` changes only
@@ -39,7 +40,7 @@ use lamp_audio::{
     duplex::{Confirmation, Heard, Hearing, Interruption},
     evidence::EchoEvidence,
 };
-use lamp_voice::activity::{DetectorInput, SpeechProbability, detector_input};
+use lamp_voice::activity::{DetectorInput, SpeechProbability, detector_input, linear_admitted};
 use serde_json::Value;
 use std::{
     fs,
@@ -155,9 +156,11 @@ fn main() -> Result<()> {
                     .map_err(|_| io::Error::other("a short linear block"))
             })
             .transpose()?;
+        // Gated by this replay's own judge, so `--explained` and the gate
+        // move together.
         let probability = detector.analyze(detector_input(
             DetectorInput::LinearGated,
-            evidence.as_ref(),
+            linear_admitted(&hearing, evidence.as_ref()),
             &block,
             linear.as_ref(),
         ));

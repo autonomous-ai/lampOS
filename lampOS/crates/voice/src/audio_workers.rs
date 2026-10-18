@@ -911,14 +911,19 @@ fn capture_loop<D: CaptureDevice>(
             // of the block handed on; the letters, `explained` and `heard`
             // still come from `clean`.
             let linear = step.and(echo.linear());
-            // With `linear-gated`, the block's own evidence admits the
-            // linear output, as the frame would carry it.
-            let gate_evidence = reference
-                .evidence_trusted()
-                .then(|| echo.evidence())
-                .flatten();
-            let input =
-                crate::activity::detector_input(vad_input, gate_evidence.as_ref(), &clean, linear);
+            // With `linear-gated`, the block's own trusted evidence, as the
+            // frame would carry it, admits the linear output. Nothing is
+            // judged with any other value.
+            let admitted = vad_input == crate::activity::DetectorInput::LinearGated
+                && crate::activity::linear_admitted(
+                    &lamp_audio::duplex::Hearing::EVALUATED,
+                    reference
+                        .evidence_trusted()
+                        .then(|| echo.evidence())
+                        .flatten()
+                        .as_ref(),
+                );
+            let input = crate::activity::detector_input(vad_input, admitted, &clean, linear);
             vad_said.1 += 1;
             vad_said.2 += u64::from(linear.is_some_and(|linear| std::ptr::eq(input, linear)));
             let from = cost.now();
