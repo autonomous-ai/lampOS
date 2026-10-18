@@ -4,6 +4,32 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 22:01 merged #1616 (twelve carrying #1562: schedule stores one release forward, the set-aside keeps its identity), ARM64 green, two P3s
+- 21:57 #1615 reviewed at 221b5417b (ten, turn-times first_of_run/idle_ms/stalled_ms): P2 (a request cut before its end of speech gets no row, so its stall goes uncounted and the next is marked first), two P3s
+- 21:54 #1617 gated at e962875ec (clippy ok, 40/0); for the first builder
+- 21:52 #1616 reviewed at 2cd931d61 (twelve carrying #1562: schedule stores one release forward): P1, P2 and P3s fixed; two new P3s (a crash between rename and commit; putting the archive back by hand); waits for ARM64
+- 21:49 #1613 closed; refiled rebased as #1618 (no content change, both switches rows kept); waits for ARM64
+- 21:49 #1614 at b45764707: docs P3s fixed (endpoint-pilot.md); waits for ARM64
+- 21:48 reviewed and merged #1612 (tests, exchange's read as a helper with its own test; #1604's P3)
+- 21:48 #1067 folded to ebf1327ac (plus the body.md P3); still the first builder's. #1609 closed, refiled as #1617
+- 21:44 #1613 green but conflicts in switches.md after #1592; asked to rebase
+- 21:43 re-checked #1067 at c375b4c48 (fifth, Expression's base sway): the same two commits rebased, no P1/P2, rule 8 passes (2 in 5 sentences, side by hash); for the first builder (real-hardware motion), P3: fold
+- 21:41 #1614 reviewed at 60b926f1b (third, LAMP_TURN_END_NO_SPIN, off unless set): two P3s (the slowdown not measured; endpoint-pilot.md wording); waits for ARM64
+- 21:39 #1613 reviewed at ef9f679a4 (fourth, the folded #1594 with its fixes): the 20:53 P2 fixed, no P1/P2; waits for ARM64
+- 21:38 reviewed and merged #1611 (tests, three motor tests on the stepped clock; #1569 row 16)
+- 21:34 #1588 at edc4b6d0e: a test and a tools.md line only; still the first builder's
+- 21:27 #1594 closed; refiled folded as #1613 (fourth, going-on rulings with the 20:53 P2 fix), review started
+- 21:24 #1115 rebased to 48400e075 (all eight commits unchanged); still the first builder's
+- 21:18 merged #1610 (nine, #1605's P3s: pinned models built from the hashed bytes), ARM64 green
+- 21:17 #1592 folded to 6acd9c048 (same tree); the first builder's
+- 21:16 merged #1604 (tests' fix, exchange reads an answer whose sender closed, macOS only; the first builder's yes at 20:29), ARM64 green
+- 21:11 re-checked #1592 at c54e64e41: the fixes are right (the re-ask only keeps the guard; no write through a link); needs a fold; the first builder's merge after peer reads
+- 21:03 merged #1606 (tests, #1599 refiled with the fmt fix: the ring head's hand-time test inside 300 ms; #1569 row 14)
+- 21:03 #1606 is #1599 with the fmt fix (only that statement differs); waits for ARM64
+- 21:01 #1610 reviewed at 0af470905 (nine, #1605's P3s: pinned models built from the hashed bytes; the rest sentence), no findings; waits for ARM64
+- 20:58 #1486 rebased to a4443c49e after #1605: only the fields merged; still held for the lamp run
+- 20:58 #1609 reviewed at ab4e76653 (fourth, a lamp whose zone names no place says only 'here'): no P1/P2, P3s; for the first builder (LAMP_TIME_PLACES on in the product)
+- 20:54 re-checked #1574 at 930119838: the P2 fixed (the scan cap counts /proc entries, 100 ms is the bound), no findings; for the first builder (privacy path)
 - 20:53 re-checked #1594 at 147535e1a: both P2s fixed; a new P2 (Policy holds don't count as talk, so a busy room ends 60 s after the answer while people talk on: #1522 back); needs a fold
 - 20:53 merged #1605 (nine, lamp-name --rescue-model, off unless set), ARM64 green; #1486 must rebase
 - 20:49 re-checked #1588 at 27baeb766: no findings, P3s fixed; still the first builder's after lamp check 21b
