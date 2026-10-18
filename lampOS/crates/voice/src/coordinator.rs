@@ -1241,6 +1241,28 @@ impl Rig {
                 );
             }
         }
+        // A test fixture ends its child once every Stop is sent, as
+        // `Worker::shutdown` runs it (#1249, #1569): each on a thread of its
+        // own, so their children end together, as real workers do.
+        #[cfg(test)]
+        {
+            let ends: Vec<_> = [
+                &mut self.speaker,
+                &mut self.capture,
+                &mut self.provider,
+                &mut self.privacy,
+            ]
+            .into_iter()
+            .chain(self.ring.iter_mut())
+            .chain(self.camera.iter_mut().map(|camera| &mut camera.worker))
+            .chain(self.second.as_mut().map(second::Route::worker_mut))
+            .filter_map(Worker::take_on_stop)
+            .map(std::thread::spawn)
+            .collect();
+            for end in ends {
+                let _ = end.join();
+            }
+        }
         let mut failure = self.ring.cleanup_error();
         let ring_stop_requested_at_us = self.ring.stop_requested_at(stop_requested_at_us);
         let mut exited = vec![
