@@ -11,6 +11,7 @@ use crate::{
         PRIME_FRAMES, PrimeBarrier, RecoveryPolicy, ReferenceAssembly, accepted_write_survived,
         hold::{self, CaptureHold},
     },
+    stage_cost::Stage,
     transport::{ReferenceChannels, WorkerChannels},
     wire::{
         CaptureTiming, ClockPrimed, Control, MicrophoneFrame, ReferenceControl, ReferenceFault,
@@ -573,9 +574,13 @@ fn capture_loop<D: CaptureDevice>(
     // With LAMP_STALLS=on, a pass or an overrun wait of 50 ms or more is
     // recorded with what held it (#1178).
     let mut stalls = crate::stalls::Stalls::from_environment("capture");
+    // With LAMP_CAPTURE_STAGES=on, each stage's thread CPU time, a line a
+    // minute.
+    let mut cost = crate::stage_cost::StageCost::new(crate::stage_cost::on());
     loop {
         let tick = Instant::now();
         let stall_pass = stalls.begin();
+        cost.begin();
         // A worker held up (#784) finds the snapshots sent meanwhile queued:
         // they are read in this tick, up to what the longest gap can leave.
         let bound = if tick.duration_since(last_tick) > HELD_UP {
@@ -816,7 +821,9 @@ fn capture_loop<D: CaptureDevice>(
                         .fault(ReferenceFaultKind::PrivacyMismatch, monotonic_us())
                         .into());
                 }
+                let from = cost.now();
                 reference.accept(packet, monotonic_us(), privacy, &mut echo)?;
+                cost.stage(Stage::Reference, from);
             }
         }
         if primed_at.is_some_and(|at| monotonic_us().saturating_sub(at) >= BARRIER_US) {
@@ -825,7 +832,10 @@ fn capture_loop<D: CaptureDevice>(
                 .into());
         }
         let read = if microphone.is_running() {
-            match microphone.try_read() {
+            let from = cost.now();
+            let read = microphone.try_read();
+            cost.stage(Stage::Read, from);
+            match read {
                 Ok(frame) => frame,
                 Err(error) if started && stall(&error).is_some() => {
                     into_gap(&mut gap, channels, microphone.epoch(), &error, &mut hold)?;
@@ -837,12 +847,14 @@ fn capture_loop<D: CaptureDevice>(
             None
         };
         if let Some(frame) = read {
+            let from = cost.now();
             let step = reference.capture_step(
                 frame.timing.delayed_frames,
                 frame.timing.read_completed_at_us,
                 monotonic_us(),
                 &mut echo,
             )?;
+            cost.stage(Stage::Reference, from);
             // A reseed is a new DSP epoch from this block on.
             report_reference(
                 &mut reference,
@@ -873,6 +885,7 @@ fn capture_loop<D: CaptureDevice>(
                             reference: reference_meta(&reference.timing()),
                         });
                 }
+                said(cost.done());
                 stall_pass.done();
                 finish_tick(tick);
                 continue;
@@ -881,10 +894,12 @@ fn capture_loop<D: CaptureDevice>(
             let raw = raw_blocks.then(|| frame.samples.to_vec());
             // The canceller has this block's reference, or the block goes on
             // as the microphone recorded it. Nothing is put in its place.
+            let from = cost.now();
             let (clean, delay) = match step {
                 Some(delay) => (echo.capture(&frame.samples, delay)?, delay),
                 None => (frame.samples, 0),
             };
+            cost.stage(Stage::Canceller, from);
             // The linear output is this block's only when the canceller ran.
             // With the switch the score is 4 ms (one canceller block) ahead
             // of the block handed on; the letters, `explained` and `heard`
@@ -892,8 +907,10 @@ fn capture_loop<D: CaptureDevice>(
             let linear = step.and(echo.linear());
             vad_said.1 += 1;
             vad_said.2 += u64::from(vad_linear && linear.is_some());
+            let from = cost.now();
             let probability =
                 speech.analyze(crate::activity::detector_input(vad_linear, &clean, linear));
+            cost.stage(Stage::Detector, from);
             reference.note_score(probability);
             if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
                 return Err(io::Error::other("invalid local speech probability").into());
@@ -905,6 +922,7 @@ fn capture_loop<D: CaptureDevice>(
                 Ok(()) => {}
                 Err(error) if started && stall(&error).is_some() => {
                     into_gap(&mut gap, channels, microphone.epoch(), &error, &mut hold)?;
+                    said(cost.done());
                     stall_pass.done();
                     finish_tick(tick);
                     continue;
@@ -938,6 +956,7 @@ fn capture_loop<D: CaptureDevice>(
                     &clean,
                 );
             }
+            let from = cost.now();
             channels.data.send(MicrophoneFrame {
                 epoch: frame.epoch,
                 dsp_epoch,
@@ -969,6 +988,8 @@ fn capture_loop<D: CaptureDevice>(
                 samples: clean.to_vec(),
                 raw,
             })?;
+            cost.stage(Stage::Encode, from);
+            cost.block();
             if monotonic_us().saturating_sub(last_diagnostic) >= 1_000_000 {
                 channels
                     .control
@@ -1003,8 +1024,16 @@ fn capture_loop<D: CaptureDevice>(
             microphone.epoch(),
             privacy,
         )?;
+        said(cost.done());
         stall_pass.done();
         finish_tick(tick);
+    }
+}
+
+/// A minute's line from [`crate::stage_cost`], to the journal.
+fn said(line: Option<String>) {
+    if let Some(line) = line {
+        eprintln!("{line}");
     }
 }
 

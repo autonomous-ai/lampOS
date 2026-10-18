@@ -779,6 +779,10 @@ fn worker_command(
             role,
             var(crate::capture_cores::ENVIRONMENT),
         ))
+        .envs(capture_stages_worker_environment(
+            role,
+            var(crate::stage_cost::ENVIRONMENT).as_deref(),
+        ))
         .envs(person_name_worker_environment(
             role,
             var(crate::person::ENVIRONMENT).as_deref(),
@@ -829,6 +833,15 @@ fn quiet_evidence_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "capture" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::quiet_pace::EVIDENCE_ENVIRONMENT, "on"))
+}
+
+// The per-stage minute line, to the one worker it times: capture.
+fn capture_stages_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "capture" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::stage_cost::ENVIRONMENT, "on"))
 }
 
 // The detector's input (#828), to the one worker that runs it: capture,
@@ -910,6 +923,12 @@ mod tests {
                     (
                         quiet_evidence_worker_environment,
                         "LAMP_QUIET_EVIDENCE",
+                        ["capture"].as_slice(),
+                    ),
+                    // The per-stage line, the capture worker's.
+                    (
+                        capture_stages_worker_environment,
+                        "LAMP_CAPTURE_STAGES",
                         ["capture"].as_slice(),
                     ),
                 ] {
