@@ -2033,13 +2033,14 @@ async fn serve_with_visual<C: Connect>(
                             let mut other_voice = false;
                             let judged = intake.handoff.voices.as_mut().filter(|_| going_on && attention.awaits_verdict(request)).map(|voices| {
                                 let likeness = voices.likeness(request);
-                                (likeness, likeness.is_none() && voices.print_coming(request))
+                                (likeness, likeness.is_none().then(|| voices.unjudged(request)).flatten())
                             });
-                            // Its print still on its way: judged as without
-                            // the check, and said, never silently again (#829,
-                            // lamp-4ace on 18 October, requests 18 and 19).
-                            if judged.is_some_and(|(_, late)| late) {
-                                eprintln!("lamp-voice provider: request {request}: its voice print was not back at its answer: judged without the check");
+                            // A line long enough to know, judged as without
+                            // the check for want of a print: said, never
+                            // silently again (#829, lamp-4ace on 18 October,
+                            // requests 18 and 19; the reviewer on #1435).
+                            if let Some((_, Some(why))) = judged {
+                                eprintln!("lamp-voice provider: request {request}: judged without the voice check: {why}");
                             }
                             let going_on = match judged.and_then(|(likeness, _)| likeness) {
                                 Some(likeness) if likeness < crate::same_voice::DIFFERENT_BELOW => {

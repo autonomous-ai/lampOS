@@ -497,6 +497,12 @@ impl<P: Printer> Voices<P> {
             }
             self.asked.push_back(clip.request);
         } else {
+            // The line is then judged without the check: said, not
+            // silently (the reviewer on #1435).
+            eprintln!(
+                "lamp-voice provider: request {}: no voice print: the same-voice child was busy (loading its model or printing another line)",
+                clip.request
+            );
             self.unprinted(clip.request);
         }
     }
@@ -571,6 +577,24 @@ impl<P: Printer> Voices<P> {
         Some(likeness)
     }
 
+    /// Why the line `request`, long enough to know, has no verdict from
+    /// [`Self::likeness`]: its own print still on its way, the
+    /// conversation's, or no voice of the conversation known, in which
+    /// case waiting for its print would change nothing (the reviewer on
+    /// #1435). None for a line judged, too short to know, said over the
+    /// lamp, or whose print could not be asked for.
+    pub fn unjudged(&self, request: u64) -> Option<&'static str> {
+        let coming = self.print_coming(request);
+        if self.judged == Some(request) || !coming && self.print(request).is_none() {
+            return None;
+        }
+        match (&self.conversation, self.answered) {
+            (Some(_), _) => coming.then_some("its voice print was not back at its answer"),
+            (None, Some(_)) => Some("the conversation's voice print was not back at its answer"),
+            (None, None) => Some("no voice of the conversation is known"),
+        }
+    }
+
     /// The answer to the line `request` was judged: let out (`played`) or
     /// not, as part of a conversation going on (`going_on`) or not.
     pub fn decided(&mut self, request: u64, played: bool, going_on: bool) {
@@ -582,12 +606,7 @@ impl<P: Printer> Voices<P> {
             self.conversation = Some(print.clone());
             return;
         }
-        let coming = self.asked.contains(&request)
-            || self
-                .clip
-                .as_ref()
-                .is_some_and(|clip| clip.request == request);
-        if coming {
+        if self.print_coming(request) {
             self.answered = Some((request, !going_on));
         } else if !going_on {
             self.conversation = None;
@@ -669,6 +688,57 @@ mod tests {
         voices.began(10, false);
         voices.heard(10, &[1; 320]);
         assert!(!voices.print_coming(10));
+    }
+
+    /// The reviewer on #1435: a line long enough to know but judged without
+    /// the check says what was missing: its own print, the conversation's,
+    /// or any voice of the conversation. A line judged, too short to know,
+    /// said over the lamp, or that the child was too busy to take, says
+    /// nothing here.
+    #[test]
+    fn a_line_judged_without_the_check_says_which_print_was_missing() {
+        let mut voices = Voices::new(StandIn {
+            slow: true,
+            ..StandIn::default()
+        });
+        said(&mut voices, 1, 1, 48_000);
+        assert_eq!(voices.likeness(1), None);
+        assert_eq!(
+            voices.unjudged(1),
+            Some("no voice of the conversation is known")
+        );
+        // Line 1 let out, its print still to come: line 2 waits on it.
+        voices.decided(1, true, false);
+        said(&mut voices, 2, -1, 48_000);
+        assert_eq!(voices.likeness(2), None);
+        assert_eq!(
+            voices.unjudged(2),
+            Some("the conversation's voice print was not back at its answer")
+        );
+        // Both come: line 3's own is still to come.
+        voices.printer.slow = false;
+        voices.poll();
+        voices.printer.slow = true;
+        said(&mut voices, 3, -1, 48_000);
+        assert_eq!(voices.likeness(3), None);
+        assert_eq!(
+            voices.unjudged(3),
+            Some("its voice print was not back at its answer")
+        );
+        voices.printer.slow = false;
+        assert_eq!(voices.likeness(3), Some(0.0));
+        assert_eq!(voices.unjudged(3), None);
+        said(&mut voices, 4, 1, LEAST_SAMPLES - 320);
+        assert_eq!(voices.likeness(4), None);
+        assert_eq!(voices.unjudged(4), None);
+        voices.began(5, false);
+        voices.heard(5, &[1; 320]);
+        voices.ended(5);
+        assert_eq!(voices.unjudged(5), None);
+        voices.printer.busy = true;
+        said(&mut voices, 6, 1, 48_000);
+        assert_eq!(voices.likeness(6), None);
+        assert_eq!(voices.unjudged(6), None);
     }
 
     #[test]
