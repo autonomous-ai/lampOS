@@ -489,7 +489,18 @@ pub enum Route {
     Nobody,
 }
 
+/// The executive's calls for the Autonomous app alone,
+/// `lamp_actions::APP_CALLS` (a test holds the two lists equal; the voice
+/// does not link `lamp-actions`).
+pub const APP_CALLS: [&str; 2] = ["volume_level", "volume_to"];
+
 pub fn route(settings: &Settings, name: &str) -> Route {
+    // The Autonomous app's two volume calls on the executive's socket
+    // (`lamp-cloud`, #1396) are never the model's: one it names anyway is
+    // run by nobody, so it never sets the volume (the reviewer on #1418).
+    if APP_CALLS.contains(&name) {
+        return Route::Nobody;
+    }
     if is_schedule_tool(name) {
         return match (&settings.exec, settings.schedule_tools) {
             (Some(directory), true) => Route::Schedule(directory.clone()),
@@ -1111,6 +1122,21 @@ mod tests {
             assert_eq!(route(&settings, name), Route::Schedule(dir.clone()));
         }
         assert_eq!(route(&settings, "light_on"), Route::Executive(dir.clone()));
+        // The app's two volume calls are never the model's: run by nobody,
+        // with the executive there (the reviewer on #1418). They are the
+        // executive's own list, both ways (the reviewer on #1458).
+        assert_eq!(lamp_actions::APP_CALLS.as_slice(), APP_CALLS.as_slice());
+        for name in APP_CALLS {
+            assert!(lamp_actions::is_app_call(name), "{name}");
+        }
+        for offered in lamp_actions::catalog(true, true) {
+            assert!(!lamp_actions::is_app_call(offered.name), "{}", offered.name);
+        }
+        for name in APP_CALLS {
+            assert_eq!(route(&settings, name), Route::Nobody, "{name}");
+            assert!(declared(&settings).iter().all(|tool| tool.name != name));
+        }
+        assert_eq!(route(&settings, "volume_up"), Route::Executive(dir.clone()));
         let eyes = PathBuf::from("/run/lampos-eyes/who.sock");
         for name in [crate::known_faces::REMEMBER, crate::known_faces::FORGET] {
             assert_eq!(route(&settings, name), Route::Faces(eyes.clone(), false));

@@ -120,9 +120,14 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
     functions
 }
 
-/// The app's calls (#1396), never offered to the model.
+/// The app's calls (#1396), never offered to the model. The voice keeps
+/// the same list (`lamp_voice::tools::APP_CALLS`) and a test of its holds
+/// the two equal.
+pub const APP_CALLS: [&str; 2] = ["volume_level", "volume_to"];
+
+/// Whether `name` is one of the app's calls.
 pub fn is_app_call(name: &str) -> bool {
-    matches!(name, "volume_level" | "volume_to")
+    APP_CALLS.contains(&name)
 }
 
 /// The list as the voice reads it.
