@@ -347,10 +347,24 @@ impl RoundtripFixture {
     }
 
     pub(crate) fn offer(&mut self) -> Offer {
-        self.tick();
-        self.parent()
-            .offer(monotonic_us())
-            .expect("fresh durable offer")
+        // An offer is fresh for its lease (750 ms) from the tick that made
+        // it. One that came and expired before it was read means the host
+        // stalled that long: another tick offers it afresh, up to five times.
+        // An offer missing or refused while fresh still fails at once (#1569).
+        for _ in 0..5 {
+            self.tick();
+            let now = monotonic_us();
+            if let Some(offer) = self.parent().offer(now) {
+                return offer;
+            }
+            let expired = self
+                .parent()
+                .offer
+                .as_ref()
+                .is_some_and(|offer| now >= offer.expires_at_us);
+            assert!(expired, "fresh durable offer");
+        }
+        panic!("the host stalled past the offer's lease in 5 of 5 ticks");
     }
 
     /// A real manager packet is applied to the durable consumer before the
