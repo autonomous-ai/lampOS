@@ -979,13 +979,13 @@ fn after_a_new_cycle_the_last_cycle_s_written_turn_number_spoken_asks_for_the_st
 #[test]
 fn a_stop_ends_the_asking_and_an_unclear_after_it_is_never_taken() {
     let mut asking = AskAgainState::default();
-    assert!(asking.unclear(7, Some(7), 100));
+    assert!(asking.unclear(7, Some(7), 100, false));
     assert_eq!(asking.wanted(), Some((7, 100)));
     assert_eq!(asking.cancelled(), Some(7));
     assert_eq!(asking.wanted(), None);
     // After the Stop: no turn in hand, or another one.
-    assert!(!asking.unclear(7, None, 200));
-    assert!(!asking.unclear(7, Some(8), 200));
+    assert!(!asking.unclear(7, None, 200, false));
+    assert!(!asking.unclear(7, Some(8), 200, false));
     assert_eq!(asking.wanted(), None);
     assert_eq!(asking.cancelled(), None);
 }
