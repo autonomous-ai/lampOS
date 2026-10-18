@@ -4445,6 +4445,24 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **Ten's shadow night:** agreed that tonight's log through `--agreement` is the shadow night, on three conditions: the kinds picked from the week before, every decision asked of Jev, and no kind on a defaulted field. Ten has agreed to all three. My review of #1524 (`--rule-decides`) is next.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-18, 16:36 ICT: #1538 up and reviewed; #1524 and #1539 approved; the A/B's scorer; #1533 read
+
+- **#1538** (`LAMP_GOING_ON_ASKS`, #1522), opened at 16:0x:
+  - **Ten's timing read:** 0 P1/P2. Its P3 (the expected wait in numbers) is in `attention.md`.
+  - **Eighth's read:**
+    - P2 fixed: a reply to the lamp's own question neither waits nor is held, as the remark arm has it. A worker test covers it ("Yes, go ahead." to "Shall I start it?"), and its mutation fails.
+    - P3 declined for now as the Policy's owner: a Policy-held line is not booked as talk. Tonight's battery decides.
+  - **lamp-voice merged in** (#1533, merged at 16:15) with a plain merge commit, and a test that the two halves hold the same lines on scene 3, alone and together.
+  - **Gate:** 2579 passed, 0 failed at `3ba8c41d4`, pushed; ARM64 running.
+- **Reviews as the Policy's owner:**
+  - #1524 (`--rule-decides`): approve, 246 tests. Its P3 (never name a `busy true` kind while #1538 is relied on) is in `policy.md`.
+  - #1539 (`--from`/`--until`): yes, 244 tests. Its P3 (the read and in-window counts) is in at `904f88f16`.
+  - Ten's shadow night as `--agreement` over tonight's log: agreed.
+- **The A/B's scorer** `score_ab_fourth.py` (`0abc01728f73`) is on #829, checked on made-up outputs only. The A/B runs about 16:40–17:50, at 75 % volume.
+- **#1538 with #1524** answered on #705: they compose, but the rule can take the wait only off the lines #1538 holds.
+- **Corrections to my 15:49 entry:** 4 of #1538's first 9 tests ran through the worker's loop, not 5 (the fifth checks the flag order). And "each caught by a mutation" was true of the worker and attention tests only.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
