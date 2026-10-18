@@ -809,6 +809,9 @@ struct Rig {
     early_end_blocks: Option<u16>,
     faint_level: Option<u8>,
     playout_start: PlayoutStart,
+    /// `directed-fixture --fixture-at-ms`: the fixture's own turn, this long
+    /// after `listening_ready`, with no admitted turn needed. Diagnostic only.
+    fixture_at_ms: Option<u64>,
     /// Which microphone the capture worker reads.
     microphone: crate::options::Microphone,
     /// Opt-in end-of-turn worker client; its process is not a `Rig` child.
@@ -1451,7 +1454,12 @@ impl Rig {
 #[derive(Clone, Copy)]
 enum ProviderSource<'a> {
     Gemini(&'a Path),
-    Fixture { wav: &'a Path, sha256: &'a str },
+    /// `at_ms`: `--fixture-at-ms`, the diagnostic timed start.
+    Fixture {
+        wav: &'a Path,
+        sha256: &'a str,
+        at_ms: Option<u64>,
+    },
 }
 impl ProviderSource<'_> {
     fn arguments(self) -> io::Result<Vec<String>> {
@@ -1462,8 +1470,12 @@ impl ProviderSource<'_> {
         };
         match self {
             Self::Gemini(config) => Ok(vec![text(config)?]),
-            Self::Fixture { wav, sha256 } => {
-                Ok(vec!["--fixture".into(), text(wav)?, sha256.into()])
+            Self::Fixture { wav, sha256, at_ms } => {
+                let mut arguments = vec!["--fixture".into(), text(wav)?, sha256.into()];
+                if at_ms.is_some() {
+                    arguments.push(crate::fixture_provider::TIMED_FLAG.into());
+                }
+                Ok(arguments)
             }
         }
     }
@@ -1489,7 +1501,11 @@ pub fn run_fixture(
         .map(CueSink::connect)
         .transpose()?;
     run_source(
-        ProviderSource::Fixture { wav, sha256 },
+        ProviderSource::Fixture {
+            wav,
+            sha256,
+            at_ms: options.at_ms,
+        },
         Lifetime::Finite(seconds),
         output,
         options.directed,
@@ -1641,6 +1657,7 @@ fn run_start_record(
     camera_requested: bool,
     motor_requested: bool,
     fixture: Option<&FixtureInfo>,
+    fixture_at_ms: Option<u64>,
     cue_requested: bool,
 ) -> Value {
     let mut run_start = json!({"kind":"run_start","at_us":monotonic_us(),"scope":if options.ring_channel_ceiling.is_some(){"directed_voice_with_ring"}else{"directed_voice_only"},"seconds":lifetime.seconds(),"mode":if lifetime.continuous(){"serve"}else{"finite"},"acoustic_score":null,"audio_diagnostics_requested":options.diagnostics,
@@ -1662,6 +1679,10 @@ fn run_start_record(
     // Without the option the record keeps exactly its existing fields.
     if let Some(blocks) = options.early_end_blocks {
         run_start["early_end_ms"] = json!(u64::from(blocks) * 10);
+    }
+    // `--fixture-at-ms`: a take whose time never came still says it was timed.
+    if let Some(ms) = fixture_at_ms {
+        run_start["fixture_at_ms"] = json!(ms);
     }
     run_start
 }
@@ -1718,6 +1739,10 @@ fn run_source(
             camera_config.is_some(),
             motor_options.is_some(),
             fixture.as_ref(),
+            match source {
+                ProviderSource::Fixture { at_ms, .. } => at_ms,
+                ProviderSource::Gemini(_) => None,
+            },
             cues.is_some(),
         ),
     )?;
@@ -2731,6 +2756,10 @@ fn spawn_rig(
     // Model loading overlaps the remaining startup; nothing waits for it.
     let endpoint = EndpointRig::start(&options, &executable);
     let provider_boot = new_boot()?;
+    let fixture_at_ms = match source {
+        ProviderSource::Fixture { at_ms, .. } => at_ms,
+        ProviderSource::Gemini(_) => None,
+    };
     // A service that runs all day may keep a second voice route standing by.
     let second_config = second::configured(
         std::env::var_os(crate::second_config::SECOND_CONFIG_ENV)
@@ -2992,6 +3021,7 @@ fn spawn_rig(
         early_end_blocks: options.early_end_blocks,
         faint_level: options.faint_level,
         playout_start: options.playout_start,
+        fixture_at_ms,
         microphone: options.microphone,
         endpoint,
         call_wait_blocks: options.call_wait_blocks,
@@ -3503,6 +3533,10 @@ fn conversation_with_gate(
     // When the detector last called a block speech.
     let mut last_speech_us = 0u64;
     let reminder_cycle_started_us = monotonic_us();
+    // `--fixture-at-ms` (diagnostic only): when the fixture's own turn is
+    // due, N ms after `listening_ready`; set once, when that is recorded.
+    let mut fixture_at_ms = rig.fixture_at_ms;
+    let mut fixture_due_us = None;
     // A service that runs all day may also tell a body what it is doing.
     let mut body_link = if lifetime.continuous() {
         crate::body_link::BodyLink::from_environment()
@@ -5009,6 +5043,9 @@ fn conversation_with_gate(
                 && !submission_draining
             {
                 session_clock.activate(session_instant())?;
+                if let Some(ms) = fixture_at_ms.take() {
+                    fixture_due_us = Some(at + ms * 1_000);
+                }
                 // The link state readiness was just validated against, as a
                 // current-state publication. Retained startup link records can
                 // be older than the cue bound; they stay history, never re-stamped.
@@ -6866,6 +6903,27 @@ fn conversation_with_gate(
         {
             name_began_us = name_began_us.max(Some(began));
         }
+        if fixture_due_us.is_some() {
+            let at_rest = reply.is_none()
+                && provider_queue.is_empty()
+                && !admission.owns_stream()
+                && !submission_draining
+                && snapshot.listening_ready(now());
+            if let Some(started) = start_timed_fixture(
+                &mut fixture_due_us,
+                clock,
+                at_rest.then(|| unasked_session(&cloud, paused)).flatten(),
+                owner,
+                reply,
+                &mut provider_queue,
+                rig.playout_start,
+                trace,
+                |state| rig.publish(state),
+            )? {
+                snapshot = started;
+                last_publish = monotonic_us();
+            }
+        }
         // A second look at something said to the lamp by name that got
         // nothing, as soon as the lamp is at rest. Someone who has spoken
         // since is being listened to, and it was dropped for them.
@@ -8549,6 +8607,52 @@ fn ask_again_now((turn, asked_us): (u64, u64), current: Option<u64>, clock: u64)
     }
 }
 
+/// The written note of the fixture's timed turn; the fixture reads no text.
+const FIXTURE_AT_NOTE: &str = "(diagnostic: the fixture's timed start)";
+
+/// `directed-fixture --fixture-at-ms` (diagnostic only): once `due_us` has
+/// come and the lamp is at rest (`session`, the provider session to ask),
+/// the fixture's own written turn is admitted, with no heard turn needed.
+/// A turn admitted before then is handled as today, with no fixture audio;
+/// one still open at the due time holds the start until it is over. Once.
+#[allow(clippy::too_many_arguments)]
+fn start_timed_fixture(
+    due_us: &mut Option<u64>,
+    clock: u64,
+    session: Option<u64>,
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    provider_queue: &mut VecDeque<ProviderInput>,
+    playout_start: PlayoutStart,
+    trace: &mut SessionState,
+    publish: impl FnMut(Snapshot) -> io::Result<()>,
+) -> Result<Option<Snapshot>> {
+    let Some(due) = *due_us else {
+        return Ok(None);
+    };
+    let Some(session) = session.filter(|_| clock >= due) else {
+        return Ok(None);
+    };
+    *due_us = None;
+    record(
+        trace,
+        json!({"kind":"fixture_timed_start","at_us":clock,"due_us":due,"provider_session":session}),
+    )?;
+    commit_written_turn(
+        owner,
+        reply,
+        provider_queue,
+        FIXTURE_AT_NOTE,
+        false,
+        "fixture_at_ms",
+        session,
+        playout_start,
+        trace,
+        publish,
+    )
+    .map(Some)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn commit_written_turn(
     owner: &mut Controller,
@@ -9856,6 +9960,7 @@ mod tests {
     mod early_end;
     mod endpoint_session;
     mod failure_notice;
+    mod fixture_at;
     mod hand_controls;
     mod pilot_faults;
     mod playout_continuity;
@@ -10112,6 +10217,7 @@ mod tests {
             noise_suppression: NoiseSuppression::On,
             turn_taking: TurnTaking::VadOnly,
             playout_start: PlayoutStart::default(),
+            fixture_at_ms: None,
             endpoint: None,
             call_wait_blocks: None,
             cut_keeps_name: false,
@@ -12388,8 +12494,9 @@ mod tests {
         let (mut parent, worker) = pair(&dir, "provider");
         let mut startup = StartupEvents::default();
         std::thread::scope(|scope| {
-            let handle = scope
-                .spawn(|| crate::fixture_provider::run(worker, new_boot().unwrap(), &wav, &hash));
+            let handle = scope.spawn(|| {
+                crate::fixture_provider::run(worker, new_boot().unwrap(), &wav, &hash, false)
+            });
             let until = Instant::now() + Duration::from_secs(1);
             loop {
                 if let Some(event) = parent.control.receive::<WorkerEvent>().unwrap() {

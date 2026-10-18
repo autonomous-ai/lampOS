@@ -51,7 +51,7 @@ never pool groups.
 |---|---|---|
 | `fake_timing` | Fake runtime, declared speech intervals | Turn-policy consequences: false/missed interruptions, splits, unwanted responses, provider-fault handling, voice/ring state. Not level- or acoustics-sensitive. |
 | `fake_signal` | Fake runtime, lamp-voice VAD on the exact cached digital mixes | The same, plus what the VAD/detector does with the real stimulus waveform. No room, loudspeaker, microphone or AEC; host VAD numerics can differ from native ARM64. |
-| `physical_fixture` | `lamp-voice directed-fixture` on the Lamp | Real capture/echo path with the cached Gemini reply. Only the first turn has a reply. |
+| `physical_fixture` | `lamp-voice directed-fixture` on the Lamp | Real capture/echo path with the cached Gemini reply. Only the first turn has a reply (with the diagnostic `--fixture-at-ms N`, only its own turn N ms after `listening_ready`; see microphone-experiments.md). |
 | `physical_gemini` | `lamp-voice directed` | Conversation with event-triggered follow-ups and interruptions through the optional cue socket. |
 | `imported_trace` | An existing lamp-voice `events.jsonl` | Retained trials scored with declared turn attribution. |
 
