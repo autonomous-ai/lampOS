@@ -144,7 +144,16 @@ sees" with what has and has not been shown of it.
   a skipped glance costs only the JPEG decode and the grid (not measured
   on a lamp; the line's two numbers show it), so the line's "ms a look"
   is then per glance, far under a detection's cost, and the heat
-  comparisons read "ms a detected look".
+  comparisons read "ms a detected look". It goes on to say why each
+  glance was detected (the picture changed, it was settling within 3 s of
+  a change, the 3 s look, the first glance, a face found under 4 s ago, a
+  full look asked, or someone being remembered), the most and the mean
+  cells changed against the bar of 3, where a look's time went (the sight
+  file, the decode, the grid, the detector and the rest), and how many
+  looks found faces but none to follow. On lamp-4ace's first hour with the
+  switch (18 Oct, 08:30 to 09:30) almost no glance was skipped and half a
+  look was not the detector; these say which reason held and where the
+  rest of the time goes.
 - It never moves anything and decides nothing about the conversation. It
   recognises a face only for someone who asked the lamp to remember them
   ("Who is there", below), and nobody else.
