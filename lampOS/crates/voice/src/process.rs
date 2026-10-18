@@ -197,6 +197,36 @@ impl Worker {
         self.child.id()
     }
 
+    /// Sends Stop until a send is refused because the peer is gone, for at
+    /// most 5 s. A child another test forks just as the peer drops holds a
+    /// copy of its socket until its exec (CLOEXEC), so a first send can still
+    /// be accepted, or find the queue full (#1569, as #1478).
+    #[cfg(test)]
+    pub(crate) fn send_stop_until_peer_gone(&mut self) {
+        let until = Instant::now() + Duration::from_secs(5);
+        loop {
+            match self.channels.control.send(Control::Stop) {
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::ConnectionReset
+                            | io::ErrorKind::ConnectionRefused
+                            | io::ErrorKind::NotConnected
+                            | io::ErrorKind::BrokenPipe
+                    ) =>
+                {
+                    return;
+                }
+                sent => assert!(
+                    Instant::now() < until,
+                    "{}'s peer was not gone after 5 s: {sent:?}",
+                    self.role
+                ),
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+
     /// What ends this fixture's child once Stop has been sent to it.
     #[cfg(test)]
     pub(crate) fn on_stop(&mut self, end: impl FnOnce() -> io::Result<()> + Send + 'static) {
@@ -627,12 +657,38 @@ mod fixture_tests {
         let (mut capture, capture_peer) = Worker::sleeping_fixture(&directory.path, "capture");
         let (mut provider, _provider_peer) = Worker::sleeping_fixture(&directory.path, "provider");
         let (mut ring, ring_peer) = Worker::sleeping_fixture(&directory.path, "ring");
+        #[cfg(target_os = "linux")]
+        let dropped: Vec<String> = [&capture_peer, &ring_peer]
+            .into_iter()
+            .flat_map(|peer| [&peer.control, &peer.data])
+            .map(|channel| {
+                let inode = rustix::fs::fstat(channel.socket()).unwrap().st_ino;
+                format!("socket:[{inode}]")
+            })
+            .collect();
         drop(capture_peer);
         drop(ring_peer);
-        // The first sends fail; no probe/retry, delayed assertion, or killed child
-        // is used to manufacture a disconnected transport.
-        assert!(capture.channels.control.send(Control::Stop).is_err());
-        assert!(ring.channels.control.send(Control::Stop).is_err());
+        // The barrier's own claim, read at once from each worker with no retry:
+        // none holds a dropped peer's socket. Only Linux shows it in /proc, and
+        // only QEMU's spawn needs the barrier (#1569).
+        #[cfg(target_os = "linux")]
+        for worker in [&capture, &provider, &ring] {
+            let fds = format!("/proc/{}/fd", worker.fixture_pid());
+            for fd in fs::read_dir(&fds).unwrap() {
+                let held = fs::read_link(fd.unwrap().path()).unwrap_or_default();
+                assert!(
+                    !dropped
+                        .iter()
+                        .any(|socket| held.as_os_str() == socket.as_str()),
+                    "{} holds a dropped peer's {}",
+                    worker.role,
+                    held.display()
+                );
+            }
+        }
+        // The transport sees each peer gone. No worker is killed to make it so.
+        capture.send_stop_until_peer_gone();
+        ring.send_stop_until_peer_gone();
         capture.check_running().unwrap();
         provider.check_running().unwrap();
         ring.check_running().unwrap();

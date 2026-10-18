@@ -563,7 +563,7 @@ mod tests {
             assert!(Instant::now() < deadline, "the fixture did not end");
             std::thread::sleep(Duration::from_millis(2));
         }
-        assert!(worker.channels.control.send(Control::Stop).is_err());
+        worker.send_stop_until_peer_gone();
         cleanup(&mut worker, None).unwrap();
         drop(worker);
         let _ = fs::remove_dir(&directory.path);
