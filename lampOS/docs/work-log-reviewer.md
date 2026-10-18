@@ -4,6 +4,28 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 20:53 re-checked #1594 at 147535e1a: both P2s fixed; a new P2 (Policy holds don't count as talk, so a busy room ends 60 s after the answer while people talk on: #1522 back); needs a fold
+- 20:53 merged #1605 (nine, lamp-name --rescue-model, off unless set), ARM64 green; #1486 must rebase
+- 20:49 re-checked #1588 at 27baeb766: no findings, P3s fixed; still the first builder's after lamp check 21b
+- 20:47 #1605 reviewed at 8685c59ce (nine, lamp-name --rescue-model, SHA-256 pinned, off unless set): two P3s; waits for ARM64; conflicts with #1486
+- 20:46 #1592 re-checked at 73f7f53ed (thirteen, LAMP_GUARD_NEVER_LISTENED): P2s fixed, two P3s; for the first builder (privacy path)
+- 20:44 reviewed and merged #1601 (tests, the promised-look reminder test on the stepped clock; #1569 row 13)
+- 20:41 merged #1596 (twelve, docs: the slow short asks as measured), the P2 fixed, ARM64 green
+- 20:39 #1603 reviewed at 7613f5a9b (twelve, a due-only reminders list says how many are set and not yet due; #1595): two P3s; for the first builder (on by default, their 21c run)
+- 20:35 #1599 reviewed at 15f4fe4bd (tests, the ring head's hand-time test inside the 300 ms; #1569 row 14): fmt fails at ring_head.rs:195; asked to run cargo fmt
+- 20:35 re-checked #1588 at c95c8044f (rebased after #1549, per-kind renewal state): no P1/P2; for the first builder (#1484 rule b), waits for the lamp check
+- 20:31 reviewed and merged #1593 (tests, the round-trip fixture ticks again on an expired offer; #1569 row 11)
+- 20:31 reviewed and merged #1582 (tests, the cancelled-reminder test reads the wait's own report; buses named by a count; #1569 row 4)
+- 20:28 reviewed and merged #1597 (tests, the signal test's recording peer waits MAX_FINISH_WAIT; #1569 row 12)
+- 20:25 #1602 reviewed at 8dfea257f (fourth, the lamp's own time names its place; Etc/GMT after any folder): code fine; for the first builder, since #1598 made LAMP_TIME_PLACES a product default
+- 20:23 #1596 at 62704abf9: the P2 fixed (v2's hash, window and counts); waits for ARM64
+- 20:18 merged #1600 (nine, lamp.py train --rescue), ARM64 green
+- 20:16 #1514 rebased to c63b87e07 (the conflict with #1520 resolved, Ten's P3 folded): still the first builder's merge
+- 20:12 reviewed and merged #1590 (tests, voice rigs end a fixture on its Stop and wait for the exit; #1569 row 7)
+- 20:04 #1594 reviewed at 5f6a14848 (fourth, #1522's three rulings: a look_up plays, no timer from talk, a busy room ends): two P2s (the room ends at the first answer after a 60 s gap; a timer answering the lamp's own question is refused), P3s
+- 20:03 closed #1545 (all four items merged: #1551, #1565, #1581)
+- 20:02 merged #1581 (third, the owed-reminder pulse on the asleep face, off unless LAMP_REMINDER_PULSE=on), ARM64 green
+- 20:01 #1600 reviewed at cf5c62130 (nine, lamp.py train --rescue: the installed model gates, the trained folds rescue), no findings; waits for ARM64
 - 20:00 merged #1591 (sixth, a committed stop holds the speaker until the cancel; #1555's P3s), ARM64 green
 - 20:00 #1598 reviewed at f2066644e (fourth, LAMP_TIME_PLACES on in the product unit): no findings; for the first builder (product default)
 - 19:48 #1596 reviewed at 9c5c4a635 (twelve, docs: the slow short asks as measured): P2 (the figures are v2's but the bullet cites v1's hash and the wrong window), three P3s
