@@ -4,8 +4,9 @@
 //! on the bus (`light/command`, the newest value kept) and reads what the
 //! ring's owner says it is showing (`light/state`), both
 //! `lamp_msgs::Light`: on or off, one of ten colours by name, a level
-//! from 1 to 5. A lamp whose ring owner is not publishing has no light to
-//! ask for, and the light's functions are not offered.
+//! from 1 to 5. A lamp whose ring owner has never said what it shows, or
+//! stopped saying it more than [`LIGHT_GRACE`] ago, has no light to ask
+//! for, and the light's functions are not offered.
 //!
 //! The rules: on and off keep the colour and the level; a colour switches
 //! the light on; brighter and dimmer are one level, and stop at the ends;
@@ -250,7 +251,22 @@ pub struct BusLight {
     bus: lamp_bus::Bus,
     wanted: lamp_bus::Publisher,
     started: Instant,
+    /// When a state was last fresh, and how long after it the light is
+    /// still offered ([`LIGHT_GRACE`]).
+    seen: Option<Instant>,
+    grace: Duration,
 }
+
+/// How long the light is still offered after its state was last fresh. The
+/// ring is the voice's: a voice restart stops `light/state` for a second or
+/// two, and the light's functions dropped out of the catalog for that gap,
+/// so a session set up in it had none (the first builder's lamp run on
+/// #1495, 13:57:19–21; Ten's (a), the first builder's yes at 14:05). A call
+/// in the gap still answers truthfully: with the state stale, every light
+/// function stops at its first read with "I could not tell what my light is
+/// showing", and nothing is asked of the ring. A ring really gone drops out
+/// after it.
+pub const LIGHT_GRACE: Duration = Duration::from_secs(15);
 
 /// Where the executive asks, and where the ring's owner answers.
 pub const WANTED: &str = Wanted::TOPICS[0];
@@ -263,11 +279,19 @@ const STATE_LASTS_MS: u64 = 3_000;
 
 impl BusLight {
     pub fn new(bus: lamp_bus::Bus) -> std::io::Result<Self> {
+        Self::graced(bus, LIGHT_GRACE)
+    }
+
+    /// The same, the light still offered `grace` after its state was last
+    /// fresh.
+    pub fn graced(bus: lamp_bus::Bus, grace: Duration) -> std::io::Result<Self> {
         let wanted = bus.publisher_declared(WANTED, &Wanted::declaration(), "actions")?;
         Ok(Self {
             bus,
             wanted,
             started: Instant::now(),
+            seen: None,
+            grace,
         })
     }
 }
@@ -279,8 +303,9 @@ fn unix_ms() -> u64 {
 }
 
 impl Light for BusLight {
+    /// A light whose state is fresh, or was within [`LIGHT_GRACE`].
     fn there(&mut self) -> bool {
-        self.shown().is_some()
+        self.shown().is_some() || self.seen.is_some_and(|at| at.elapsed() < self.grace)
     }
     fn shown(&mut self) -> Option<Wanted> {
         let state = self.bus.latest(STATE).ok()??;
@@ -289,10 +314,14 @@ impl Light for BusLight {
             return None;
         }
         // A state that is not a light there is, is no light to change.
-        state
+        let shown = state
             .parse::<Wanted>()
             .ok()
-            .filter(|light| light.check().is_ok())
+            .filter(|light| light.check().is_ok());
+        if shown.is_some() {
+            self.seen = Some(Instant::now());
+        }
+        shown
     }
     fn ask(&mut self, light: &Wanted) -> bool {
         let at_us = self.started.elapsed().as_micros() as u64;
@@ -628,7 +657,8 @@ pub(crate) mod tests {
         ));
         std::fs::create_dir_all(&root).unwrap();
         let bus = lamp_bus::Bus::new(&root).unwrap();
-        let mut lamp = BusLight::new(lamp_bus::Bus::new(&root).unwrap()).unwrap();
+        let mut lamp =
+            BusLight::graced(lamp_bus::Bus::new(&root).unwrap(), Duration::ZERO).unwrap();
         // Nobody says what the ring shows: there is no light to ask for.
         assert!(!lamp.there());
         let mut ring = bus
@@ -669,6 +699,54 @@ pub(crate) mod tests {
         assert!(lamp.covered());
         drew.publish_json(2, &light(true, "blue", 1)).unwrap();
         assert!(!lamp.covered());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// The first builder's lamp run on #1495: a voice restart stopped
+    /// `light/state` for about 2 s, and the light's functions dropped out.
+    /// A light whose state was fresh is still there for its grace, and gone
+    /// after it; one never seen is not there at all.
+    #[test]
+    fn a_light_stays_there_through_its_grace_and_goes_after_it() {
+        let root = std::env::temp_dir().join(format!(
+            "lamp-actions-grace-{}-{:x}",
+            std::process::id(),
+            unix_ms()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        // Seconds apart from the 300 ms steps, so a stalled thread cannot
+        // carry a "within" look past it (Ten on #1514); the "past" look
+        // needs only to come after.
+        let grace = Duration::from_secs(2);
+        let mut lamp = BusLight::graced(lamp_bus::Bus::new(&root).unwrap(), grace).unwrap();
+        assert!(!lamp.there(), "never seen");
+        let mut ring = bus
+            .publisher_declared(STATE, &Wanted::declaration(), "ring")
+            .unwrap();
+        ring.expires_after(Some(Duration::from_millis(200)));
+        ring.publish_json(1, &light(true, "warm", 2)).unwrap();
+        assert!(lamp.there());
+        // The ring stopped: its state goes stale, and the light stays.
+        std::thread::sleep(Duration::from_millis(300));
+        assert_eq!(lamp.shown(), None);
+        assert!(lamp.there(), "within its grace");
+        // A call within the grace, the state stale, says it can't tell and
+        // asks nothing (the reviewer on #1514).
+        assert_eq!(
+            on(&mut lamp),
+            Outcome::Failed("I could not tell what my light is showing.".into())
+        );
+        assert!(bus.latest(WANTED).unwrap().is_none(), "nothing asked");
+        // Back within the grace: fresh again, and the grace starts over.
+        ring.publish_json(2, &light(true, "warm", 2)).unwrap();
+        assert!(lamp.there());
+        std::thread::sleep(Duration::from_millis(300));
+        assert!(lamp.there());
+        // Gone for longer than the grace: not there.
+        std::thread::sleep(grace);
+        assert!(!lamp.there(), "past its grace");
+        assert_eq!(LIGHT_GRACE, Duration::from_secs(15));
         std::fs::remove_dir_all(root).unwrap();
     }
 }

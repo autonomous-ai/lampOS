@@ -37,9 +37,10 @@ is refused while the first answers. It cannot catch a signal; killed, it
 leaves the call it was in unanswered, and the voice tells its model so.
 
 Only what can be done now is offered. With no mixer given there are no
-volume actions; the light's are offered only while the ring's owner is
-saying what it shows, and are withdrawn within about two seconds of it
-stopping. The list is looked at again every two seconds
+volume actions; the light's are offered while the ring's owner is saying
+what it shows and for 15 s after (`light::LIGHT_GRACE`, below), and are
+withdrawn 15–20 s after it stops (its last state lasts up to 3 s, and the
+list is looked at every 2 s). The list is looked at again every two seconds
 (`server::LOOK_AGAIN`). `server::serve_with_clock` reads that period, and
 the once-a-second health report's, on a clock its caller gives. The lamp
 runs on the host's clock; the light's test moves its own on
@@ -208,7 +209,15 @@ name, a level from 1 to 5) and what the ring's owner reports
 (`light/state`) is read back for up to 0.6 s. The ring's owner is the
 voice's ring worker ([ring-choreography.md](ring-choreography.md), "The
 lamp's own light"), which is also where each colour's and each level's
-look is decided.
+look is decided. The light's functions are offered while its state is fresh
+(each lasts 3 s) and for 15 s after it last was (`LIGHT_GRACE`): the ring is
+the voice's, so a voice restart stops `light/state` for a second or two, and
+before the grace the functions dropped out of `tools.json` for that gap, so
+a session set up in it had no light (the first builder's lamp run on #1495,
+18 Oct 13:57:19–21; Ten's (a)). A call in the gap still answers truthfully:
+what can't be read is said so, and what can't be confirmed within 0.6 s is
+said so. A ring really gone drops out after the grace. A light never seen
+is never offered.
 
 ## The app's two calls (#1396)
 

@@ -271,9 +271,10 @@ fn owner_says(bus: &lamp_bus::Bus) -> bool {
         .is_some_and(|state| !state.expired)
 }
 
-/// The light's functions are offered only while the ring's owner says what
-/// it shows. Here it starts after the executive, shows what it is asked,
-/// and then goes: the list follows it both ways.
+/// The light's functions are offered while the ring's owner says what it
+/// shows, and for a grace after it stops (`LIGHT_GRACE`, here 300 ms). Here
+/// it starts after the executive, shows what it is asked, and then goes:
+/// the list follows it both ways.
 #[test]
 fn the_light_is_offered_when_its_owner_appears_and_withdrawn_when_it_goes() {
     let home = directory("light");
@@ -290,9 +291,12 @@ fn the_light_is_offered_when_its_owner_appears_and_withdrawn_when_it_goes() {
         let (home, root, stop) = (home.clone(), root.clone(), stop.clone());
         let ahead_ms = ahead_ms.clone();
         std::thread::spawn(move || {
+            // A short grace on the wall clock, which the test does not move:
+            // what the owner said expires 600 ms after it stops, longer.
+            let bus = lamp_bus::Bus::new(&root).unwrap();
             let mut executive = Executive {
                 sound: None::<Volume<Shared>>,
-                light: Some(BusLight::new(lamp_bus::Bus::new(&root).unwrap()).unwrap()),
+                light: Some(BusLight::graced(bus, Duration::from_millis(300)).unwrap()),
                 short: false,
             };
             let now = move || base + Duration::from_millis(ahead_ms.load(Ordering::Acquire));
@@ -393,7 +397,8 @@ fn the_light_is_offered_when_its_owner_appears_and_withdrawn_when_it_goes() {
         .parse()
         .unwrap();
     assert_eq!(asked, lamp_msgs::Light::new(true, "blue", 2).unwrap());
-    // The owner goes. What it last said goes stale, and the list empties.
+    // The owner goes. What it last said goes stale, and after the grace
+    // (`LIGHT_GRACE`, here 300 ms) the list empties.
     owner_stop.store(true, Ordering::Release);
     owner.join().unwrap();
     until("what the owner said has expired", || !owner_says(&bus));

@@ -78,10 +78,11 @@ not refused, and the first of it that fit are told (Sixth on #1020);
 `not_for_me` in the file is ignored.
 
 The executive's file says only what can be done now, so it changes while a
-session lives: the light's functions drop out while the voice, whose ring
-the light is, is down, and come back a second or two after it starts. A
-session that opened in that gap would have no light functions for its whole
-life (lamp-4ace, 18 Oct 11:22, #1472). So the voice keeps what each session
+session lives: the light's functions drop out when the voice, whose ring
+the light is, is down for longer than `lamp-actions`' 15 s grace (#1514;
+before it, any restart over a second or so dropped them), and come back a
+second or two after it starts. A session that opened in that gap would have
+no light functions for its whole life (lamp-4ace, 18 Oct 11:22, #1472). So the voice keeps what each session
 was given, looks at `tools.json` and `skills/tools.json` every 2 s (reading
 them again only when one's time changed), and when what it would declare now
 differs from what the session was given, either way, it renews the session
