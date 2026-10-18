@@ -356,7 +356,6 @@ impl ReferenceChannels {
 mod tests {
     use super::*;
     use crate::process::{SessionDirectory, new_boot};
-    use std::{thread, time::Duration};
 
     fn pair(dir: &Path) -> (Channel, Channel) {
         let (a, b) = (new_boot().unwrap(), new_boot().unwrap());
@@ -368,22 +367,24 @@ mod tests {
     }
 
     /// A receiver held up for 400 ms takes the backlog that queued meanwhile;
-    /// held up past `HELD_UP_US`, it is refused as before.
+    /// held up past `HELD_UP_US`, it is refused as before. Both sides read
+    /// one clock the test moves on by what it once slept (#1128).
     #[test]
     fn a_receiver_held_up_takes_what_queued_meanwhile_within_a_bound() {
         let dir = SessionDirectory::create().unwrap();
         let (mut sender, mut receiver) = pair(&dir.path);
-        assert_eq!(receiver.receive::<u32>().unwrap(), None);
-        sender.send(1u32).unwrap();
-        sender.send(2u32).unwrap();
-        thread::sleep(Duration::from_millis(400));
-        assert_eq!(receiver.receive::<u32>().unwrap(), Some(1));
-        assert_eq!(receiver.receive::<u32>().unwrap(), Some(2));
-        assert_eq!(receiver.receive::<u32>().unwrap(), None);
+        let mut t = monotonic_us();
+        assert_eq!(receiver.receive_with::<u32>(|| t).unwrap(), None);
+        sender.send_with(1u32, || t).unwrap();
+        sender.send_with(2u32, || t).unwrap();
+        t += 400_000;
+        assert_eq!(receiver.receive_with::<u32>(|| t).unwrap(), Some(1));
+        assert_eq!(receiver.receive_with::<u32>(|| t).unwrap(), Some(2));
+        assert_eq!(receiver.receive_with::<u32>(|| t).unwrap(), None);
 
-        sender.send(3u32).unwrap();
-        thread::sleep(Duration::from_millis(1_700));
-        assert!(receiver.receive::<u32>().is_err());
+        sender.send_with(3u32, || t).unwrap();
+        t += 1_700_000;
+        assert!(receiver.receive_with::<u32>(|| t).is_err());
     }
 
     /// Only the next message in order may come late from a sender held up
