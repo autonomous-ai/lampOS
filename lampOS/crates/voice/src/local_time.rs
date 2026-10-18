@@ -336,9 +336,16 @@ pub fn told_with_clock(file: &[u8], now: i64) -> Option<String> {
 /// on lamp-4ace on 2026-10-14 the model, given "6:23 in the evening", said
 /// "twenty-three past in the evening" and lost the hour.
 pub fn said(file: &[u8], now: i64) -> Option<String> {
+    said_after("It is", file, now)
+}
+
+/// [`said`], led by `lead`, the words that say whose time it is: built
+/// from its parts, so a change to `said`'s wording cannot run the two
+/// together (Ten on #1602).
+fn said_after(lead: &str, file: &[u8], now: i64) -> Option<String> {
     let (weekday, day, month, year, hour, minute, part) = words(file, now)?;
     Some(format!(
-        "It is {hour}:{minute:02} {part}, {weekday} {day} {month} {year}. Said aloud: {} {part}.",
+        "{lead} {hour}:{minute:02} {part}, {weekday} {day} {month} {year}. Said aloud: {} {part}.",
         aloud(hour, minute)
     ))
 }
@@ -431,6 +438,29 @@ pub fn place_name(zone: &str) -> String {
     zone.rsplit('/').next().unwrap_or(zone).replace('_', " ")
 }
 
+/// [`place_name`] for a zone under one of the areas of places ([`AREAS`],
+/// `Antarctica`, `Arctic`), after any `posix/` or `right/` folder, and
+/// `None` for every other: UTC and its offsets (`Etc/GMT-7`), the old
+/// POSIX names (`CET`, `EST5EDT`), `Factory`, and the backward names whose
+/// last part is no place (`US/Pacific`, `Brazil/East`). Said of the lamp's
+/// own time, "Here in UTC+7" or "Here in Pacific" sounds like a machine's
+/// clock, not a place (Ten on #1602, the reviewer on #1609), so the lamp's
+/// own is then only "here".
+fn own_place(zone: &str) -> Option<String> {
+    let zone = zone
+        .strip_prefix("posix/")
+        .or_else(|| zone.strip_prefix("right/"))
+        .unwrap_or(zone);
+    let (area, _) = zone.split_once('/')?;
+    (AREAS.contains(&area) || matches!(area, "Antarctica" | "Arctic")).then(|| place_name(zone))
+}
+
+/// How the lamp's own time is led in, from its zone: "Here in Ho Chi
+/// Minh", or "Here" when the zone names no place ([`own_place`]).
+fn here_in(zone: &str) -> String {
+    own_place(zone).map_or_else(|| "Here".to_owned(), |place| format!("Here in {place}"))
+}
+
 /// The time at `now` in the place of `zone` (its file `there`), for the
 /// model that asked for it ([`crate::tools::THE_TIME`], `LAMP_TIME_PLACES`,
 /// #1547): whose time it is, said aloud, and the lamp's own beside it, so
@@ -451,8 +481,8 @@ pub fn said_in(zone: &str, there: &[u8], here: Option<(&str, &[u8])>, now: i64) 
         Some((home, file)) => {
             if let Some((_, _, _, _, hour, minute, part)) = words(file, now) {
                 said.push_str(&format!(
-                    " Here in {} it is {hour}:{minute:02} {part}.",
-                    place_name(home)
+                    " {} it is {hour}:{minute:02} {part}.",
+                    here_in(home)
                 ));
             }
         }
@@ -513,9 +543,9 @@ pub fn now_in(place: &str) -> Result<Option<String>, &'static str> {
 /// What the opening note adds with `LAMP_TIME_PLACES`: whose time it gives,
 /// and to ask the function for anywhere else.
 pub fn told_place(home: Option<&str>) -> String {
-    let here = home.map_or_else(
+    let here = home.and_then(own_place).map_or_else(
         || "the time where you are".to_owned(),
-        |home| format!("the time where you are, in {}", place_name(home)),
+        |place| format!("the time where you are, in {place}"),
     );
     format!(
         " This is {here}. For the time anywhere else, call the_time with that place, never this time."
@@ -684,17 +714,13 @@ pub fn now_here_named() -> Result<Option<String>, &'static str> {
 }
 
 /// [`said`], naming the lamp's own place when its zone is known: "Here in
-/// Ho Chi Minh it is 7:32 in the evening, …".
+/// Ho Chi Minh it is 7:32 in the evening, …", or "Here it is …" for a zone
+/// that names no place ([`own_place`]).
 pub fn said_here(file: &[u8], zone: Option<&str>, now: i64) -> Option<String> {
-    let said = said(file, now)?;
-    Some(match zone {
-        Some(zone) => format!(
-            "Here in {} it is{}",
-            place_name(zone),
-            said.strip_prefix("It is").unwrap_or(&said)
-        ),
-        None => said,
-    })
+    match zone {
+        Some(zone) => said_after(&format!("{} it is", here_in(zone)), file, now),
+        None => said(file, now),
+    }
 }
 
 /// Whether `now` is night in the zone of this compiled zone file: from
@@ -877,6 +903,58 @@ mod tests {
             )
         );
         assert_eq!(said_here(&saigon, None, at), said(&saigon, at));
+        // A lamp whose zone names no place says only "here" (Ten on #1602).
+        for zone in [
+            "Etc/GMT-7",
+            "posix/Etc/GMT-7",
+            "Etc/UTC",
+            "UTC",
+            "Zulu",
+            // Named no place either (the reviewer on #1609).
+            "Factory",
+            "CET",
+            "EST5EDT",
+            "US/Pacific",
+            "Mexico/General",
+            "Brazil/East",
+            "right/US/Eastern",
+        ] {
+            assert_eq!(
+                said_here(&saigon, Some(zone), at).as_deref(),
+                Some(
+                    "Here it is 4:40 in the afternoon, Sunday 18 October 2026. Said aloud: twenty to five in the afternoon."
+                ),
+                "{zone}"
+            );
+            assert!(
+                said_in("Europe/London", &london, Some((zone, &saigon)), at)
+                    .unwrap()
+                    .ends_with(
+                        "twenty to eleven in the morning. Here it is 4:40 in the afternoon."
+                    ),
+                "{zone}"
+            );
+            assert_eq!(
+                told_place(Some(zone)),
+                " This is the time where you are. For the time anywhere else, call the_time with that place, never this time.",
+                "{zone}"
+            );
+        }
+        // Asked for by the person, an offset is said as they wrote it.
+        assert!(
+            said_in("Etc/GMT-7", &saigon, None, at)
+                .unwrap()
+                .starts_with("In UTC+7 it is 4:40 in the afternoon")
+        );
+        for (zone, place) in [
+            ("Asia/Ho_Chi_Minh", "Ho Chi Minh"),
+            ("posix/Asia/Ho_Chi_Minh", "Ho Chi Minh"),
+            ("right/Europe/London", "London"),
+            ("America/Argentina/Buenos_Aires", "Buenos Aires"),
+            ("Antarctica/Troll", "Troll"),
+        ] {
+            assert_eq!(own_place(zone).as_deref(), Some(place), "{zone}");
+        }
         let new_york = ruled(-18_000, "EST5EDT,M3.2.0,M11.1.0");
         assert!(
             said_in("America/New_York", &new_york, None, at)
