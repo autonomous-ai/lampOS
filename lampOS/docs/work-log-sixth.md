@@ -32,6 +32,17 @@ every result on a lamp below names it. Newest first.
 - #1448 merged at 09:31 (#1447): `capture_hold_worker` failed 2–4 of 11 on a
   loaded Linux laptop; its rigs now run one worker at a time. The full ARM64
   run at `be6973d33` passed all 11, each alone, so the hold held.
+- #1454 merged at 12:01: `LAMP_CAPTURE_STAGES=on` (off, capture only) says
+  each minute what each stage of the capture worker cost its thread, and on
+  which CPU. On lamp-4ace the worker is 17 % on a small core and 6 % on a
+  big one; the canceller is the biggest stage (734 and 210 µs a block) and
+  the 2 ms tick's own passes next (460 and 225 µs). The reads cost nothing
+  measurable.
+- #1445, the same-voice bar: my script over every recorded set of 13–15 Oct
+  (run by the first builder on lamp-4ace) gave a 14.3 % equal error with the
+  lamp quiet and chance with it sounding, so the check stays off. The
+  conversation's voice is the last answered print, which one bad print can
+  poison; Fourth takes the highest cosine over the conversation's prints.
 
 ## 2026-10-17 — evening: #828 confounded, go-aways are the lamp's own
 
