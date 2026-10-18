@@ -1196,7 +1196,12 @@ fn a_reminder_cancelled_while_muted_is_never_said() {
         1,
         "{kinds:?}"
     );
-    let owed: Vec<bool> = said.iter().map(|(_, _, owed)| *owed).collect();
+    // The wait's last report is the opening one, never owed since #1565, so
+    // it says nothing of the cancel: the health stopped saying it owed on
+    // the wait's own last report, before that one (#1569).
+    let (opening, waited) = said.split_last().expect("the wait reported");
+    assert!(!opening.2, "{said:?}");
+    let owed: Vec<bool> = waited.iter().map(|(_, _, owed)| *owed).collect();
     assert_eq!(owed.first(), Some(&true), "{said:?}");
     assert_eq!(owed.last(), Some(&false), "{said:?}");
     assert!(!fixture.pending());
