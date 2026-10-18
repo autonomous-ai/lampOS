@@ -14,7 +14,7 @@ sha2.workspace = true
 lamp-turn-owner = { path = "../turn-owner" }
 
 [target.'cfg(unix)'.dependencies]
-rustix = { version = "=1.1.5", features = ["fs"] }
+rustix = { version = "=1.1.5", features = ["fs", "pipe", "event"] }
 lamp-ipc = { path = "../ipc" }
 
 [target.'cfg(target_os = "linux")'.dependencies]

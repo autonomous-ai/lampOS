@@ -13,7 +13,7 @@
 //! demand, off the board. A scripted device proves the logic above the trait.
 //! It says nothing about a real codec, clock or room.
 use crate::capture::{CaptureConfig, CaptureFormat};
-use std::fmt;
+use std::{fmt, os::fd::BorrowedFd, time::Duration};
 
 #[cfg(target_os = "linux")]
 pub use crate::alsa_device::AlsaCapture;
@@ -129,4 +129,26 @@ pub trait CaptureDevice: Sized {
     /// Stop at once and drop what is buffered. The handle itself closes when
     /// the device is dropped, whether or not this succeeded.
     fn discard(&mut self) -> Result<(), DeviceFault>;
+    /// Wait in one `poll` until `frames` samples may be read (the device's
+    /// `avail_min`, so a microphone that hands over whole blocks wakes once a
+    /// block, as it arrives) or one of `others` is readable, for at most
+    /// `timeout` (`LAMP_CAPTURE_WAIT`, #705). `None`: this device cannot be
+    /// waited on, and the caller paces itself.
+    fn wait(
+        &mut self,
+        _others: &[BorrowedFd<'_>],
+        _timeout: Duration,
+        _frames: usize,
+    ) -> Option<Result<Woken, DeviceFault>> {
+        None
+    }
+}
+
+/// What ended a [`CaptureDevice::wait`]: neither is a timeout.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Woken {
+    /// The device has samples, or a fault the next read will report.
+    pub samples: bool,
+    /// One of the other descriptors is readable or closed.
+    pub others: bool,
 }

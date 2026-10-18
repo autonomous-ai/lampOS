@@ -20,6 +20,11 @@ pub const ENVIRONMENT: &str = "LAMP_QUIET_PACE";
 /// (`lamp_audio::evidence::EchoObserver::skip_while_render_silent`).
 pub const EVIDENCE_ENVIRONMENT: &str = "LAMP_QUIET_EVIDENCE";
 
+/// `on` for the capture worker to wait in `poll` between blocks instead of
+/// passing every 2 ms (`audio_workers.rs`, #705). Passed on to the capture
+/// worker only.
+pub const CAPTURE_WAIT_ENVIRONMENT: &str = "LAMP_CAPTURE_WAIT";
+
 /// Whether this worker skips the evidence's search, read once.
 pub fn evidence_skipped() -> bool {
     std::env::var_os(EVIDENCE_ENVIRONMENT).as_deref() == Some(std::ffi::OsStr::new("on"))

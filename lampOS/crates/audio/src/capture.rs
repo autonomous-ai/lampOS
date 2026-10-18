@@ -556,6 +556,26 @@ impl<D: CaptureDevice> MicrophoneOn<D> {
         self.epoch
     }
 
+    /// Samples the block being assembled still needs.
+    pub fn missing(&self) -> usize {
+        CAPTURE_SAMPLES - self.partial.len
+    }
+
+    /// Wait for the samples the block still needs or for one of `others`
+    /// ([`CaptureDevice::wait`]); `None` unless the microphone is running on a device that can be
+    /// waited on.
+    pub fn wait(
+        &mut self,
+        others: &[std::os::fd::BorrowedFd<'_>],
+        timeout: std::time::Duration,
+    ) -> Option<std::result::Result<crate::device::Woken, crate::device::DeviceFault>> {
+        if !self.running {
+            return None;
+        }
+        let missing = self.missing();
+        self.pcm.as_mut()?.wait(others, timeout, missing)
+    }
+
     fn advance(&mut self) -> Result<MonoTime> {
         let now = now();
         if now < self.last_now {

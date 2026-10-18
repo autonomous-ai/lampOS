@@ -720,15 +720,27 @@ mod tests {
     /// lapse exits of #1214 among them (the midnight path, #1178), ends the
     /// pass's work with `done()` first, so a long lapse tick is one `work`
     /// line and its wait a `gap`. Those loops need a sound device, so no test
-    /// runs them; this holds their shape.
+    /// runs them; this holds their shape. The capture's end-of-pass helpers
+    /// (`wait_between_passes` and `pace`, `LAMP_CAPTURE_WAIT`) wait inside
+    /// themselves, so each call to `pace` is what must follow `done()`.
     #[test]
     fn every_audio_loop_wait_ends_its_pass_with_done_first() {
         let source = include_str!("audio_workers.rs");
         let lines: Vec<&str> = source.lines().collect();
+        let line_of = |start: &str| {
+            lines
+                .iter()
+                .position(|line| line.starts_with(start))
+                .unwrap_or_else(|| panic!("no line starting {start:?}"))
+        };
+        let helpers = line_of("fn wait_between_passes(")..line_of("fn finish_tick(");
         let waits: Vec<usize> = lines
             .iter()
             .enumerate()
-            .filter(|(_, line)| line.trim() == "finish_tick(tick);")
+            .filter(|(at, line)| {
+                (line.trim() == "finish_tick(tick);" && !helpers.contains(at))
+                    || line.trim() == "pace("
+            })
             .map(|(at, _)| at)
             .collect();
         assert!(waits.len() >= 10, "{} waits found", waits.len());
