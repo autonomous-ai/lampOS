@@ -935,6 +935,7 @@ fn a_stop_heard_by_the_listener_ends_the_reply_though_only_quiet_follows() {
     let finished = h.events("turn_finished");
     assert_eq!(finished.len(), 1);
     assert_eq!(finished[0]["turn"], json!(old.turn()));
+    let _ = std::fs::remove_dir_all(&root);
 }
 
 #[test]

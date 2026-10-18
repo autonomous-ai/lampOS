@@ -601,7 +601,7 @@ The proposal above, as built on `sixth/stop-model`:
   does not fetch it; it is placed by hand beside the name's models until
   it is.
 - Tests: `said::tests::a_stop_word_is_said_at_the_step_it_reaches_the_bar_and_once_a_second`,
-  `duplex::tests::a_forced_yield_begins_at_the_next_block_and_the_rules_finish_it`,
+  `duplex::tests::a_forced_yield_begins_at_the_next_block_and_quiet_commits_it`, `coordinator::tests::duplex::a_stop_heard_by_the_listener_ends_the_reply_though_only_quiet_follows` (the reply ends on the forced commit: the coordinator cancels it as the hand's Stop, and the speaker is held from the commit to the cancel), `hear::tests::only_the_pinned_stop_model_is_taken`, `the_stop_bar_is_read_in_the_program_and_in_check`,
   the parse of `--stop-least`, and `lamp_msgs`' `StopHeard`.
 
 ## Where it is most likely to be wrong on the lamp, and how to see it quickly
