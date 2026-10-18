@@ -214,6 +214,26 @@ impl Drop for Transport {
     }
 }
 
+/// What a test opens right after dropping the lock's holder: a claim, or a
+/// Store's directory. A child another test forks at that moment shares the
+/// lock until its exec (CLOEXEC), so `WouldBlock` is tried again for up to
+/// 5 s (#1569). A lock that is really kept still fails then.
+#[cfg(test)]
+pub(super) fn when_free<T>(mut open: impl FnMut() -> io::Result<T>) -> io::Result<T> {
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        match open() {
+            Err(error)
+                if error.kind() == io::ErrorKind::WouldBlock
+                    && std::time::Instant::now() < until =>
+            {
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
+            opened => return opened,
+        }
+    }
+}
+
 /// In-process test peer with the real claim descriptor handoff. The returned
 /// parent has no child to stop/reap and releases its descriptor on ordinary
 /// drop; callers still poll to accept the queued claim before protocol data.
@@ -588,7 +608,7 @@ mod tests {
             io::ErrorKind::WouldBlock
         );
         drop(parent);
-        assert!(acquire_claim(&scratch.claim()).is_ok());
+        assert!(when_free(|| acquire_claim(&scratch.claim())).is_ok());
     }
 
     #[test]
@@ -609,7 +629,7 @@ mod tests {
             io::ErrorKind::WouldBlock
         );
         drop(peers.parent.claim.take());
-        assert!(acquire_claim(&peers.scratch.claim()).is_ok());
+        assert!(when_free(|| acquire_claim(&peers.scratch.claim())).is_ok());
     }
 
     #[test]
@@ -738,7 +758,7 @@ mod tests {
         transport.exited = true;
         drop(claim);
         assert!(
-            acquire_claim(&scratch.claim()).is_ok(),
+            when_free(|| acquire_claim(&scratch.claim())).is_ok(),
             "rejected ancillary rights leaked their lock"
         );
     }
@@ -832,7 +852,7 @@ mod tests {
             io::ErrorKind::WouldBlock
         );
         drop(first);
-        let second = acquire_claim(&scratch.claim()).unwrap();
+        let second = when_free(|| acquire_claim(&scratch.claim())).unwrap();
         assert_eq!(second.metadata().unwrap().ino(), metadata.ino());
     }
 
@@ -877,7 +897,7 @@ mod tests {
             io::ErrorKind::WouldBlock
         );
         drop(transport);
-        assert!(acquire_claim(&scratch.claim()).is_ok());
+        assert!(when_free(|| acquire_claim(&scratch.claim())).is_ok());
     }
     #[test]
     fn stop_signals_once_and_actual_child_exit_can_be_polled_without_waiting() {
@@ -912,7 +932,7 @@ mod tests {
         );
         // The child asserts retention before actual process exit. The kernel,
         // rather than Transport Drop, releases the intentionally retained FD.
-        assert!(acquire_claim(&scratch.0.join("retained-inner")).is_ok());
+        assert!(when_free(|| acquire_claim(&scratch.0.join("retained-inner"))).is_ok());
     }
     #[test]
     fn child_fixture() {
@@ -1067,7 +1087,7 @@ mod tests {
         );
         // Both consumer and containing fixture are gone. Only actual fixture
         // exit releases the intentionally retained parent descriptor.
-        assert!(acquire_claim(&scratch.claim()).is_ok());
+        assert!(when_free(|| acquire_claim(&scratch.claim())).is_ok());
     }
     #[test]
     fn term_resistant_child_drop_retains_claim_until_fixture_exit() {

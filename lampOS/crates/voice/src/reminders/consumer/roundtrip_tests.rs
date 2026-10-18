@@ -230,10 +230,16 @@ impl RoundtripFixture {
     fn open_consumer(&mut self) {
         self.incarnation += 1;
         self.consumer = Some(Consumer::new(
-            DeliveryLedger::open(Store::open(&self.ledger_directory).unwrap(), LEDGER_ID).unwrap(),
+            DeliveryLedger::open(
+                transport::when_free(|| Store::open(&self.ledger_directory)).unwrap(),
+                LEDGER_ID,
+            )
+            .unwrap(),
             format!("roundtrip-{}", self.incarnation),
         ));
-        let (transport, worker) = transport::test_pair(&self.directory.0.join("claim")).unwrap();
+        // A restart reopens both locks the dropped incarnation held.
+        let (transport, worker) =
+            transport::when_free(|| transport::test_pair(&self.directory.0.join("claim"))).unwrap();
         self.parent = Some(Reminders {
             transport,
             offer: None,

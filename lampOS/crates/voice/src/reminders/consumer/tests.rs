@@ -627,9 +627,10 @@ fn completed_playout_survives_both_real_store_reopens_then_acks_without_respeech
     drop(socket);
     drop(engine);
 
+    // Both Stores are opened again just after their holders dropped.
     let engine = Arc::new(Mutex::new(
         Engine::open(
-            Store::open(&schedule_path).unwrap(),
+            crate::reminders::transport::when_free(|| Store::open(&schedule_path)).unwrap(),
             "Etc/UTC",
             &sample(1000),
             OTHER_STORE,
@@ -639,7 +640,11 @@ fn completed_playout_survives_both_real_store_reopens_then_acks_without_respeech
     let shared = engine.clone();
     let socket = Socket::new(move |request| Some(answer(&mut shared.lock().unwrap(), request)));
     let mut restored = Consumer::new(
-        DeliveryLedger::open(Store::open(&ledger_path).unwrap(), OTHER_STORE).unwrap(),
+        DeliveryLedger::open(
+            crate::reminders::transport::when_free(|| Store::open(&ledger_path)).unwrap(),
+            OTHER_STORE,
+        )
+        .unwrap(),
         "consumer-two".into(),
     );
     let now = monotonic_us();
