@@ -345,7 +345,8 @@ fn the_time(places: bool) -> Tool {
                           it is, what day it is, or how long until something. For the time somewhere \
                           else, such as \"what time is it in London\", give the place as its time \
                           zone; the time you know is only the time here. Then say it as it gives it \
-                          \"said aloud\", with its hour, and the place it names. Not for \"now\" or \
+                          \"said aloud\", with its hour, and for another place the place it names. \
+                          Not for \"now\" or \
                           \"today\" in a question about something else, and never say the time unless \
                           you were asked for it."
                 .into(),
