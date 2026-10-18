@@ -1035,7 +1035,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         .saturating_sub(stages.iter().sum::<Duration>())
                         .saturating_sub(detecting);
                     format!(
-                        ", {} of them unchanged and not detected, {:.0} ms a detected look{}; ms a look: sight file {:.1}, decode {:.1}, grid {:.1}, detector {:.1}, the rest {:.1}; {unfollowed} found faces but none to follow",
+                        ", {} of them unchanged and not detected, {:.0} ms a detected look{}; ms a look: sight file {:.1}, decode {:.1}, grid {:.1}, detector {:.1}, the rest {:.1}{}; {unfollowed} found faces but none to follow",
                         change.skipped(),
                         detecting.as_secs_f32() * 1e3 / detected.max(1) as f32,
                         change.take_why().line(),
@@ -1044,6 +1044,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         each(stages[2]),
                         each(detecting),
                         each(rest),
+                        kept.as_mut()
+                            .map_or(String::new(), |kept| std::mem::take(&mut kept.cost).line()),
                     )
                 }),
                 still.as_ref().map_or(String::new(), |still| format!(

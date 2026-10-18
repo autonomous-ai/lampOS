@@ -21,6 +21,38 @@ pub struct Kept {
     writing: PathBuf,
     present: bool,
     most: usize,
+    /// What the keeps cost since the last [`Kept::take_cost`]: the check,
+    /// the open and write, and the rename, and the bytes written (#1441:
+    /// a third of each look on lamp-4ace went to the sight file).
+    pub cost: KeepCost,
+}
+
+/// Where a keep's time goes, summed.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct KeepCost {
+    pub keeps: u32,
+    pub bytes: u64,
+    pub check: std::time::Duration,
+    pub write: std::time::Duration,
+    pub rename: std::time::Duration,
+}
+
+impl KeepCost {
+    /// `, sight file: N KB a frame, check C, write W, rename R ms`, each a
+    /// keep's mean; nothing without a keep.
+    pub fn line(&self) -> String {
+        if self.keeps == 0 {
+            return String::new();
+        }
+        let each = |spent: std::time::Duration| spent.as_secs_f32() * 1e3 / self.keeps as f32;
+        format!(
+            "; sight file: {:.1} KB a frame, check {:.2}, write {:.2}, rename {:.2} ms",
+            self.bytes as f32 / 1024.0 / self.keeps as f32,
+            each(self.check),
+            each(self.write),
+            each(self.rename)
+        )
+    }
 }
 
 /// A whole JPEG with its own Huffman tables: what a reader other than this
@@ -56,13 +88,18 @@ impl Kept {
             writing: writing.into(),
             present: false,
             most,
+            cost: KeepCost::default(),
         }
     }
 
     /// Put this frame in the file's place. A reader sees the frame before or
     /// this one, never part of either.
     pub fn keep(&mut self, frame: &[u8]) -> io::Result<()> {
-        if frame.len() > self.most || !whole_jpeg(frame) {
+        let began = std::time::Instant::now();
+        let whole = frame.len() <= self.most && whole_jpeg(frame);
+        let checked = std::time::Instant::now();
+        self.cost.check += checked - began;
+        if !whole {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "not a whole JPEG of the file's size at most",
@@ -76,7 +113,12 @@ impl Kept {
             .open(&self.writing)?;
         file.write_all(frame)?;
         drop(file);
+        let written = std::time::Instant::now();
+        self.cost.write += written - checked;
         fs::rename(&self.writing, &self.path)?;
+        self.cost.rename += written.elapsed();
+        self.cost.keeps += 1;
+        self.cost.bytes += frame.len() as u64;
         self.present = true;
         Ok(())
     }
@@ -179,6 +221,30 @@ mod tests {
         assert!(!working_path.exists() && !still_path.exists());
         // Without the files, nothing to do.
         forget_all(&mut None, &mut None);
+        fs::remove_dir_all(&directory).unwrap();
+    }
+
+    /// #1441: each keep's check, write and rename are counted, with its
+    /// bytes, for the eyes' 10 s line; a refused frame counts its check
+    /// only, and a take starts the counts again.
+    #[test]
+    fn a_keeps_cost_is_counted() {
+        let directory = std::env::temp_dir().join(format!(
+            "lamp-eyes-keep-cost-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        fs::create_dir_all(&directory).unwrap();
+        let mut kept = Kept::new(directory.join("sight.jpg"));
+        let whole = frame(true, 10);
+        kept.keep(&whole).unwrap();
+        kept.keep(&whole).unwrap();
+        assert!(kept.keep(&frame(false, 10)).is_err());
+        let cost = std::mem::take(&mut kept.cost);
+        assert_eq!((cost.keeps, cost.bytes), (2, 2 * whole.len() as u64));
+        assert!(cost.line().starts_with("; sight file: "), "{}", cost.line());
+        assert_eq!(kept.cost, KeepCost::default());
+        assert_eq!(KeepCost::default().line(), "");
         fs::remove_dir_all(&directory).unwrap();
     }
 

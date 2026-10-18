@@ -90,18 +90,27 @@ sees" with what has and has not been shown of it.
   still head. The frame is compared as a
   32 by 24 grid of cells, each the mean grey of its pixels (ten by ten in
   the working frame), against the last frame the detector ran on, not the
-  last one seen, so a slow change adds up: three cells or more 12 greys
-  brighter or darker are a change. A sensor's noise averages out over a
+  last one seen, so a slow change in one place adds up. Each cell's change
+  is taken less its row's median change, so what the whole frame does
+  (the camera's exposure, the room's light) and what a whole row does (a
+  light's flicker, drawn by the rolling shutter as bands across) are not
+  a change; and each cell learns its own noise from the empty room's
+  glances (about the last ten), so a screen or a plant that flickers in
+  one place stops counting once learned. Three cells or more past 12
+  greys and four times their own noise are a change. On lamp-4ace's empty
+  office the plain rule, against the previous frame, saw 49 cells change
+  a frame (#1441, 18 Oct, 10:00 to 10:20), and no glance was skipped;
+  this is the rule that followed (#705). A sensor's noise averages out over a
   cell (no false change on a dark wall with ±20 greys a pixel, in the
   reviewer's probe); a face at 0.15 of the height (`sight::LEAST_SIZE`,
   the smallest the body turns to) changes six cells or more from 15 greys
   of contrast. A smaller or fainter face, such as a co-worker's at 0.08
   to 0.14 across the office, may change fewer and wait for the 3 s look. Someone coming into
   view changes the picture, so the glance after it runs the detector, as
-  before; the head moving, the light changing or the sun moving are a
-  change too, and each change past the bar brings back detection at every
-  glance for 3 s (five glances): a head that idles every few seconds, or
-  a flickering light, keeps today's rate. Any face found, even
+  before; the head moving is a change too, and each change past the bar
+  brings back detection at every glance for 3 s (five glances): a head
+  that idles every few seconds keeps today's rate. The whole room's light
+  changing is not a change; the 3 s look still covers it. Any face found, even
   one too small to follow (but not one `--leave-still-faces` leaves out),
   keeps every glance detected for 4 s. A glance not detected tells the
   body, the bus and the known file what a look with no face tells them,
@@ -144,11 +153,16 @@ sees" with what has and has not been shown of it.
   a skipped glance costs only the JPEG decode and the grid (not measured
   on a lamp; the line's two numbers show it), so the line's "ms a look"
   is then per glance, far under a detection's cost, and the heat
-  comparisons read "ms a detected look". It goes on to say why each
+  comparisons read "ms a detected look". With a sight file it also says
+  the file's size a frame and what its check, write and rename each took.
+  It goes on to say why each
   glance was detected (the picture changed, it was settling within 3 s of
   a change, the 3 s look, the first glance, a face found under 4 s ago, a
   full look asked, or someone being remembered), the most and the mean
-  cells changed against the bar of 3, where a look's time went (the sight
+  cells changed against the bar of 3, over the empty-room glances it
+  compared (and how many: none while a face keeps the room busy), the
+  same glances counted the plain way and with only the rows taken out,
+  and the frame's mean shift in greys, where a look's time went (the sight
   file, the decode, the grid, the detector and the rest), and how many
   looks found faces but none to follow. On lamp-4ace's first hour with the
   switch (18 Oct, 08:30 to 09:30) almost no glance was skipped and half a

@@ -26,6 +26,13 @@ pub const ACROSS: usize = 32;
 pub const DOWN: usize = 24;
 /// A cell this much brighter or darker, of 255, has changed.
 pub const GREYS: f32 = 12.0;
+/// A cell's own noise, learned from the glances of an empty room, counts
+/// this many times over: a cell changed past [`GREYS`] and past this many
+/// times its noise has changed.
+pub const NOISE_TIMES: f32 = 4.0;
+/// How much of a cell's noise each compared glance teaches: about the last
+/// ten glances, six seconds.
+const NOISE_LEARNS: f32 = 0.1;
 /// This many changed cells are a changed frame: a face at 0.15 of the
 /// picture's height (`sight::LEAST_SIZE`, the smallest the body turns to)
 /// changes six or more cells from 15 greys of contrast. A smaller face,
@@ -77,9 +84,39 @@ impl Grid {
             .count()
     }
 
+    /// Each cell's change from `before`, less its row's median change: what
+    /// the whole frame did (the camera's exposure) and what a whole row did
+    /// (a light's flicker, which a rolling shutter draws as bands across)
+    /// are taken out, and what moved in one place stays (#1441: 49 cells a
+    /// frame changed past the bar in lamp-4ace's empty office).
+    fn residuals_from(&self, before: &Self) -> Vec<f32> {
+        let mut residuals = Vec::with_capacity(ACROSS * DOWN);
+        let mut row = [0f32; ACROSS];
+        for (now, then) in self
+            .0
+            .chunks_exact(ACROSS)
+            .zip(before.0.chunks_exact(ACROSS))
+        {
+            for ((delta, now), then) in row.iter_mut().zip(now).zip(then) {
+                *delta = now - then;
+            }
+            let mut sorted = row;
+            sorted.sort_unstable_by(f32::total_cmp);
+            let median = (sorted[ACROSS / 2 - 1] + sorted[ACROSS / 2]) / 2.0;
+            residuals.extend(row.iter().map(|delta| delta - median));
+        }
+        residuals
+    }
+
+    /// Changed past the bar with the row's shift taken out, and no noise
+    /// learned yet.
     #[cfg(test)]
     fn changed_from(&self, before: &Self) -> bool {
-        self.cells_changed_from(before) >= CELLS
+        self.residuals_from(before)
+            .iter()
+            .filter(|residual| residual.abs() >= GREYS)
+            .count()
+            >= CELLS
     }
 }
 
@@ -131,7 +168,7 @@ pub fn empty_room(asked: bool, remembering: bool, face_ago_us: Option<u64>) -> b
 /// Why each glance was detected or not, since the last
 /// [`Change::take_why`], for the 10 s line: what a night on a lamp says
 /// about where the detector still runs.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Why {
     pub asked: u32,
     pub remembering: u32,
@@ -147,16 +184,26 @@ pub struct Why {
     /// Not detected.
     pub skipped: u32,
     /// The most cells changed in a glance compared, and the sum, over
-    /// `compared` glances: against the bar of [`CELLS`].
+    /// `compared` glances: against the bar of [`CELLS`]. These are the
+    /// cells that decide: past [`GREYS`] and their own noise, after the
+    /// row's shift is taken out.
     pub most_cells: usize,
     pub cells: usize,
     pub compared: u32,
+    /// The same glances counted the plain way (each cell's change from the
+    /// frame, past [`GREYS`]) and with only the row's shift taken out, to
+    /// say which of the two the room's noise was.
+    pub plain_cells: usize,
+    pub row_cells: usize,
+    /// The sum of each compared glance's median shift over the frame, its
+    /// size in greys: the camera's exposure.
+    pub frame_shift: f32,
 }
 
 impl Why {
     pub fn line(&self) -> String {
         format!(
-            "; detected: {} changed, {} settling, {} every 3 s, {} first, {} near a face, {} asked, {} remembering; cells changed: most {}, mean {:.1} (bar {CELLS})",
+            "; detected: {} changed, {} settling, {} every 3 s, {} first, {} near a face, {} asked, {} remembering; cells changed over {} empty-room glances: most {}, mean {:.1} (bar {CELLS}); plain mean {:.1}, rows taken out {:.1}; the frame's shift {:.1} greys",
             self.changed,
             self.settling,
             self.every,
@@ -164,8 +211,12 @@ impl Why {
             self.face,
             self.asked,
             self.remembering,
+            self.compared,
             self.most_cells,
-            self.cells as f32 / self.compared.max(1) as f32
+            self.cells as f32 / self.compared.max(1) as f32,
+            self.plain_cells as f32 / self.compared.max(1) as f32,
+            self.row_cells as f32 / self.compared.max(1) as f32,
+            self.frame_shift / self.compared.max(1) as f32
         )
     }
 }
@@ -176,6 +227,9 @@ impl Why {
 pub struct Change {
     last: Option<(Grid, u64)>,
     changed_at: Option<u64>,
+    /// Each cell's noise, learned from empty-room glances; empty until the
+    /// first.
+    noise: Vec<f32>,
     why: Why,
 }
 
@@ -183,10 +237,37 @@ impl Change {
     /// Whether the detector runs on this frame. `busy`: why the room is not
     /// empty, if it is not; then it always runs.
     pub fn detect(&mut self, grid: Grid, busy: Option<Busy>, now_us: u64) -> bool {
-        let cells = self
-            .last
-            .as_ref()
-            .map(|(last, _)| grid.cells_changed_from(last));
+        let compared = self.last.as_ref().map(|(last, _)| {
+            let residuals = grid.residuals_from(last);
+            if self.noise.len() != residuals.len() {
+                self.noise = vec![0.0; residuals.len()];
+            }
+            let cells = residuals
+                .iter()
+                .zip(&self.noise)
+                .filter(|(residual, noise)| residual.abs() >= GREYS.max(NOISE_TIMES * **noise))
+                .count();
+            let row_cells = residuals
+                .iter()
+                .filter(|residual| residual.abs() >= GREYS)
+                .count();
+            let mut deltas: Vec<f32> = grid
+                .0
+                .iter()
+                .zip(&last.0)
+                .map(|(now, then)| now - then)
+                .collect();
+            deltas.sort_unstable_by(f32::total_cmp);
+            let shift = deltas[deltas.len() / 2].abs();
+            (
+                cells,
+                row_cells,
+                grid.cells_changed_from(last),
+                shift,
+                residuals,
+            )
+        });
+        let cells = compared.as_ref().map(|compared| compared.0);
         let changed = cells.is_some_and(|cells| cells >= CELLS);
         if changed {
             self.changed_at = Some(now_us);
@@ -200,11 +281,19 @@ impl Change {
             .is_none_or(|(_, at)| now_us.saturating_sub(*at) >= LOOK_AT_LEAST_US);
         let why = &mut self.why;
         if busy.is_none()
-            && let Some(cells) = cells
+            && let Some((cells, row_cells, plain_cells, shift, residuals)) = compared
         {
             why.most_cells = why.most_cells.max(cells);
             why.cells += cells;
             why.compared += 1;
+            why.row_cells += row_cells;
+            why.plain_cells += plain_cells;
+            why.frame_shift += shift;
+            // The room's own noise, learned only while it is empty and
+            // after the glance is judged.
+            for (noise, residual) in self.noise.iter_mut().zip(residuals) {
+                *noise += NOISE_LEARNS * (residual.abs() - *noise);
+            }
         }
         let counted = match busy {
             Some(Busy::Asked) => &mut why.asked,
@@ -242,13 +331,34 @@ mod tests {
     /// A room at 320 by 240: a grey wall with a darker desk, the sensor's
     /// noise of up to 4 greys on every pixel, and a box drawn in.
     fn room(seed: u32, drift: f32, face: Option<(usize, usize, usize)>) -> Picture {
+        scene(seed, drift, false, 0.0, face)
+    }
+
+    /// `room`, with a light's flicker drawn as bands across, of up to 30
+    /// greys a row and new each frame, and a screen in the top left corner
+    /// (40 by 30 pixels) `screen` greys brighter or darker than the wall.
+    fn scene(
+        seed: u32,
+        drift: f32,
+        bands: bool,
+        screen: f32,
+        face: Option<(usize, usize, usize)>,
+    ) -> Picture {
         let mut noise = seed;
         let mut rgb = Vec::with_capacity(320 * 240 * 3);
+        let mut band = 0.0;
         for y in 0..240usize {
+            if bands && y % 6 == 0 {
+                noise = noise.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                band = ((noise >> 24) % 61) as f32 - 30.0;
+            }
             for x in 0..320usize {
                 noise = noise.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
                 let wobble = ((noise >> 24) % 9) as f32 - 4.0;
-                let mut grey = if y > 170 { 70.0 } else { 150.0 } + drift + wobble;
+                let mut grey = if y > 170 { 70.0 } else { 150.0 } + drift + band + wobble;
+                if x < 40 && y < 30 {
+                    grey += screen;
+                }
                 if let Some((left, top, side)) = face
                     && (left..left + side * 3 / 4).contains(&x)
                     && (top..top + side).contains(&y)
@@ -265,11 +375,11 @@ mod tests {
     const GLANCE_US: u64 = 600_000;
 
     /// (a) The sensor's noise is no change; a face at 0.2 of the height
-    /// coming into a corner is, and so is one at 0.14 on a plain wall; so
-    /// is a slow change, added up over glances against the last frame the
-    /// detector ran on.
+    /// coming into a corner is, and so is one at 0.14 on a plain wall. The
+    /// whole frame's light changing, however far, is not: the camera's
+    /// exposure or the room's light, which the 3 s look still covers.
     #[test]
-    fn noise_is_no_change_and_a_face_or_a_slow_drift_is() {
+    fn noise_is_no_change_and_a_face_is_and_the_frames_light_is_not() {
         let empty = Grid::of(&room(1, 0.0, None));
         for seed in 2..20 {
             assert!(
@@ -281,22 +391,63 @@ mod tests {
             let face = Grid::of(&room(3, 0.0, Some((corner.0, corner.1, side))));
             assert!(face.changed_from(&empty), "{corner:?} {side}");
         }
-        // The light rising five greys a glance: never a change from the
-        // glance before, a change from where the detector last ran.
+        // The light rising five greys a glance, 25 in all against the last
+        // frame detected: no change.
         let mut change = Change::default();
         assert!(change.detect(empty.clone(), None, 0));
         let mut detected = Vec::new();
         for glance in 1..=5u64 {
             let grid = Grid::of(&room(glance as u32 + 5, 5.0 * glance as f32, None));
-            let before = Grid::of(&room(glance as u32 + 4, 5.0 * (glance - 1) as f32, None));
-            assert!(!grid.changed_from(&before), "{glance}");
             if change.detect(grid, None, glance * GLANCE_US / 10) {
                 detected.push(glance);
             }
         }
-        // Caught at the third glance, then detected while the picture
-        // has not been still for 3 s.
-        assert_eq!(detected, [3, 4, 5]);
+        assert!(detected.is_empty(), "{detected:?}");
+        let why = change.take_why();
+        assert!(why.plain_cells > 0 && why.frame_shift > 0.0, "{why:?}");
+    }
+
+    /// (a) #1441 on lamp-4ace: the empty office's picture changed 49 cells
+    /// a frame. A light's flicker, bands of up to 30 greys new each frame,
+    /// and the frame's exposure moving with it, are no change; nor, once
+    /// learned, is a screen that flickers in one corner. A face coming in
+    /// through all of that still is, at once.
+    #[test]
+    fn flicker_bands_exposure_and_a_screen_are_no_change_but_a_face_is() {
+        let mut change = Change::default();
+        let mut detected = Vec::new();
+        for glance in 0..40u64 {
+            let screen = if glance % 2 == 0 { 40.0 } else { -40.0 };
+            let face = (glance == 30).then_some((200, 80, 48));
+            let exposure = (glance % 3) as f32 * 6.0;
+            let grid = Grid::of(&scene(glance as u32, exposure, true, screen, face));
+            if change.detect(grid, None, glance * GLANCE_US) {
+                detected.push(glance);
+            }
+        }
+        // The first glance, the screen while its noise is learned (it
+        // changes every glance until then), then the 3 s look; the face at
+        // 30 at once, and the glances after it settling.
+        let why = change.take_why();
+        assert!(detected.contains(&30), "{detected:?}");
+        assert!(why.skipped >= 10, "{why:?} {detected:?}");
+        assert!(why.plain_cells > why.row_cells, "{why:?}");
+        // Without the screen, flicker and exposure alone never count.
+        let mut change = Change::default();
+        let mut detected = Vec::new();
+        for glance in 0..20u64 {
+            let grid = Grid::of(&scene(
+                glance as u32,
+                (glance % 3) as f32 * 6.0,
+                true,
+                0.0,
+                None,
+            ));
+            if change.detect(grid, None, glance * GLANCE_US) {
+                detected.push(glance);
+            }
+        }
+        assert_eq!(detected, [0, 5, 10, 15]);
     }
 
     /// (b) An empty, still room is detected once every 3 s; a changed frame
