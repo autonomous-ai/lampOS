@@ -14,8 +14,8 @@
 //! envelope/type/expiry separately: event and state publishers have different
 //! bus boot IDs; their shared payload session is the Controls owner identity.
 use lamp_msgs::{
-    ClockStamp, Invalid, TOUCH_INPUT_TTL_US, TOUCH_STATE_TTL_US, TouchEvent, TouchIntent,
-    TouchSource, TouchSourceState, TouchState,
+    ClockStamp, Invalid, TOUCH_INPUT_TTL_US, TOUCH_STATE_TTL_US, TouchEvent, TouchGesture,
+    TouchIntent, TouchSource, TouchSourceState, TouchState,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -37,6 +37,25 @@ pub struct TouchReceiver {
     state_valid: bool,
     last_now: Option<u64>,
     exhausted: bool,
+    /// [`Self::allow_late_sleep`]: once, on the first state taken, a Sleep
+    /// hold within this window is taken however old it is.
+    late_sleep: Option<LateSleep>,
+}
+
+/// Which head hold a new owner takes from the head's retained events, made
+/// while no owner ran (#1607). On the Controls clock.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LateSleep {
+    /// The owner's record watermark: the hold began after it, so it is not
+    /// one the record already holds.
+    pub began_after_us: u64,
+    /// When the owner before last looked for input: the hold was reached
+    /// (its 3 s) after it, so that owner never took it. A hold whose hand
+    /// came before and reached 3 s after is taken (the reviewer on #1622).
+    pub reached_after_us: u64,
+    /// This owner's start: the hold was reached before it, so a hold made
+    /// minutes later, while states were refused, is not taken late.
+    pub reached_before_us: u64,
 }
 
 fn invalid(message: &'static str) -> Invalid {
@@ -68,7 +87,41 @@ impl TouchReceiver {
             state_valid: false,
             last_now: None,
             exhausted: false,
+            late_sleep: None,
         })
+    }
+
+    /// For a new owner (#1607): a hand held on the head to put the lamp to
+    /// sleep while no owner ran (a restart's 4 s) is in the state's retained
+    /// `latest`, but older than any event this receiver otherwise takes, and
+    /// begun before it saw its source. On the next state it takes, such a
+    /// Sleep hold within `window` is accepted once all the same, unless a
+    /// newer head event asks to wake (a tap after it: the person's last act
+    /// was to wake it). Only Sleep: a late Wake, tap or reset never is, so
+    /// this can only close the microphones, never open them.
+    pub fn allow_late_sleep(&mut self, window: LateSleep) {
+        self.late_sleep = Some(window);
+    }
+
+    /// A retained head hold asking for Sleep, from this Controls session and
+    /// source reader, within `window`, and seen by `now`.
+    fn late_sleep(&self, now: u64, event: &TouchEvent, window: LateSleep) -> bool {
+        event.check().is_ok()
+            && event.source == TouchSource::Head
+            && event.gesture == TouchGesture::Hold
+            && event.when_speaking == TouchIntent::Sleep
+            && event.when_asleep != Some(TouchIntent::Wake)
+            && event.began_us > window.began_after_us
+            && event.observed_us > window.reached_after_us
+            && event.observed_us < window.reached_before_us
+            && event.observed_us <= now
+            && event.stamp.clock_id == self.clock_id
+            && self.session.as_deref() == Some(&event.session_id)
+            && self.sources.get(&event.source).is_some_and(|source| {
+                source.state.reader_session_id.as_deref() == Some(&event.reader_session_id)
+                    && source.state.name == event.name
+                    && event.stamp.sequence > source.through_sequence
+            })
     }
     fn clock(&mut self, now: u64) -> Result<(), Invalid> {
         if self.exhausted || self.last_now.is_some_and(|last| now < last) {
@@ -222,8 +275,29 @@ impl TouchReceiver {
         self.state_valid = true;
         let mut latest = state.latest.iter().collect::<Vec<_>>();
         latest.sort_by_key(|event| event.stamp.sequence);
+        let late = self.late_sleep.take();
+        // The newest retained head event that asks to wake: a late hold
+        // before it is not taken (the reviewer on #1622).
+        let woken_at = latest
+            .iter()
+            .filter(|event| {
+                event.source == TouchSource::Head && event.when_asleep == Some(TouchIntent::Wake)
+            })
+            .map(|event| event.stamp.sequence)
+            .max();
         let mut accepted = Vec::with_capacity(latest.len());
         for event in latest {
+            if let Some(window) = late
+                && event.stamp.sequence <= state.event_sequence
+                && woken_at.is_none_or(|woken| woken < event.stamp.sequence)
+                && self.late_sleep(now, event, window)
+            {
+                if let Some(source) = self.sources.get_mut(&event.source) {
+                    source.through_sequence = event.stamp.sequence;
+                }
+                accepted.push(event.clone());
+                continue;
+            }
             if let Some(event) = self.accept_event(now, event, false)? {
                 accepted.push(event);
             }
