@@ -412,7 +412,12 @@ impl HandControls {
         let stored = options.mute_record.as_deref().and_then(stored_identity);
         let record = match &options.mute_record {
             Some(path) => {
-                let record = MuteRecord::load(path, &clock_id, now_us)?;
+                // A record this build cannot read never stops the voice: it
+                // reads as muted, and that is said once (#1505).
+                let (record, note) = MuteRecord::load_noting(path, &clock_id, now_us)?;
+                if let Some(note) = note {
+                    eprintln!("lamp-voice: {note}");
+                }
                 // Checks the private parent and first-use/rebased persistence
                 // now. A path that cannot store a mute may not open audio.
                 record.save(path)?;

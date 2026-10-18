@@ -173,3 +173,77 @@ fn completed_replacements_leave_only_a_private_record() {
         );
     }
 }
+
+/// Writes `text` as the mute record, private as `save` makes it.
+fn written(root: &Root, text: &str) {
+    fs::write(root.file(), text).unwrap();
+    fs::set_permissions(root.file(), fs::Permissions::from_mode(0o600)).unwrap();
+}
+
+/// #1505, harm 1: a mute record from a newer build, with a field this
+/// build does not know, reads as muted, even one that said unmuted, and is
+/// said; it never stops the voice starting.
+#[test]
+fn a_record_with_a_later_field_reads_as_muted_and_is_said() {
+    let root = Root::new();
+    written(
+        &root,
+        r#"{"version":1,"clock_id":"boot","muted":false,"through_us":5,"later":true}"#,
+    );
+    let (record, note) = MuteRecord::load_noting(&root.file(), "boot", 1_000).unwrap();
+    assert!(record.muted);
+    assert_eq!(
+        record.reason, None,
+        "the privacy mute, which only a hold clears"
+    );
+    let note = note.unwrap();
+    assert!(
+        note.contains("newer build") && note.contains("later"),
+        "{note}"
+    );
+    assert!(MuteRecord::load(&root.file(), "boot", 1_000).unwrap().muted);
+}
+
+/// An unknown `reason` value, and a `version` this build does not have,
+/// read as muted too, the reason given up for the stronger mute.
+#[test]
+fn an_unknown_reason_or_version_reads_as_muted_and_is_said() {
+    for text in [
+        r#"{"version":1,"clock_id":"boot","muted":true,"through_us":5,"reason":"nap"}"#,
+        r#"{"version":2,"clock_id":"boot","muted":false,"through_us":5}"#,
+    ] {
+        let root = Root::new();
+        written(&root, text);
+        let (record, note) = MuteRecord::load_noting(&root.file(), "boot", 1_000).unwrap();
+        assert!(record.muted, "{text}");
+        assert_eq!(record.reason, None, "{text}");
+        assert!(note.is_some(), "{text}");
+    }
+}
+
+/// What is no mute record at all stays an error: never a default.
+#[test]
+fn what_is_not_a_mute_record_is_still_refused() {
+    for text in [
+        "not json",
+        r#"{"clock_id":"boot","muted":false}"#,
+        r#"{"version":0,"clock_id":"boot","muted":false,"through_us":5}"#,
+        r#"[1,2]"#,
+    ] {
+        let root = Root::new();
+        written(&root, text);
+        assert!(
+            MuteRecord::load_noting(&root.file(), "boot", 1_000).is_err(),
+            "{text}"
+        );
+    }
+    // Today's own record says nothing.
+    let root = Root::new();
+    written(
+        &root,
+        r#"{"version":1,"clock_id":"boot","muted":true,"through_us":5,"reason":"sleep"}"#,
+    );
+    let (record, note) = MuteRecord::load_noting(&root.file(), "boot", 1_000).unwrap();
+    assert!(record.asleep());
+    assert_eq!(note, None);
+}

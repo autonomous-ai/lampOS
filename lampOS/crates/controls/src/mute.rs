@@ -39,6 +39,15 @@ pub struct MuteRecord {
     pub reason: Option<MuteReason>,
 }
 
+/// Whether `bytes` are a mute record of some build: a JSON object with a
+/// whole-number `version` from 1 on. Anything else is corrupt, not newer.
+fn from_a_build(bytes: &[u8]) -> bool {
+    serde_json::from_slice::<serde_json::Value>(bytes)
+        .ok()
+        .and_then(|value| value.get("version").and_then(serde_json::Value::as_u64))
+        .is_some_and(|version| version >= 1)
+}
+
 fn invalid(why: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, why.into())
 }
@@ -119,7 +128,24 @@ impl MuteRecord {
 
     /// Load before starting capture/provider/output workers. Corruption and I/O
     /// failure are errors, never an unmuted default. Missing means first use.
+    /// A record from a newer build reads as muted ([`Self::load_noting`]).
     pub fn load(path: &Path, clock_id: &str, now_us: u64) -> io::Result<Self> {
+        Self::load_noting(path, clock_id, now_us).map(|(record, _)| record)
+    }
+
+    /// [`Self::load`], with a line to say when the record was written by a
+    /// newer build (#1505, harm 1): a mute record with a `version` that this
+    /// build cannot read, a field it does not know or a `reason` it does not
+    /// know. Such a record never stops the voice starting and never reads as
+    /// unmuted: it reads as muted for privacy, the mute only a fresh hold of
+    /// the button or the base clears (a hold on the head asks for sleep,
+    /// which a muted lamp ignores), whatever it said. What is not a mute record at all (not JSON,
+    /// no `version`) is still an error.
+    pub fn load_noting(
+        path: &Path,
+        clock_id: &str,
+        now_us: u64,
+    ) -> io::Result<(Self, Option<String>)> {
         if let (Some(parent), Some(name)) = (path.parent(), path.file_name()) {
             for suffix in ["pending", "replacement"] {
                 let marker = parent.join(format!(".{}.{suffix}", name.to_string_lossy()));
@@ -138,7 +164,9 @@ impl MuteRecord {
                     return Err(invalid("mute state must be a private regular file"));
                 }
             }
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Self::new(clock_id),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                return Ok((Self::new(clock_id)?, None));
+            }
             Err(error) => return Err(error),
         }
         let mut bytes = Vec::new();
@@ -148,8 +176,27 @@ impl MuteRecord {
         if bytes.len() as u64 > MAX_BYTES {
             return Err(invalid("mute state exceeds 4096 bytes"));
         }
-        let state: Self =
-            serde_json::from_slice(&bytes).map_err(|error| invalid(error.to_string()))?;
+        let state = match serde_json::from_slice::<Self>(&bytes) {
+            Ok(state) if state.version <= 1 => state,
+            read => {
+                let why = match read {
+                    Ok(state) => format!("version {}", state.version),
+                    Err(error) => error.to_string(),
+                };
+                if !from_a_build(&bytes) {
+                    return Err(invalid(why));
+                }
+                let mut muted = Self::new(clock_id)?;
+                muted.muted = true;
+                return Ok((
+                    muted,
+                    Some(format!(
+                        "the mute record at {} was written by a newer build, or is one this build cannot read ({why}): read as muted, until a fresh hold of the button or the base clears it",
+                        path.display()
+                    )),
+                ));
+            }
+        };
         state.check()?;
         if state.clock_id != clock_id {
             // Monotonic timestamps cannot cross machine boots, but the user's
@@ -158,12 +205,12 @@ impl MuteRecord {
             let mut rebased = Self::new(clock_id)?;
             rebased.muted = state.muted;
             rebased.reason = state.reason;
-            return Ok(rebased);
+            return Ok((rebased, None));
         }
         if state.through_us > now_us {
             return Err(invalid("mute state watermark is in the future"));
         }
-        Ok(state)
+        Ok((state, None))
     }
 
     /// Commit a private replacement while retaining a recovery marker until
@@ -267,11 +314,9 @@ mod tests {
     }
 
     /// #1505: a record as a later build writes it, with a field this build
-    /// doesn't know. Today it is refused, and the voice doesn't start on it.
-    /// `el/mute-forward` makes it read, as muted: this test then stops
-    /// panicking, and becomes a plain test in that pull request (Tests).
+    /// doesn't know, is read, as muted, and the voice starts on it (Tests'
+    /// forward-read test, made plain by `el/mute-forward`).
     #[test]
-    #[should_panic(expected = "unknown field")]
     fn a_record_from_a_later_build_is_read_and_stays_muted() {
         let root = Root::new();
         let path = root.0.join("mute.json");
