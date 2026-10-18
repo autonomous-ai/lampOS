@@ -4,10 +4,13 @@
 //! holds and when it fails.
 use crate::{
     capture::{CaptureConfig, CaptureFormat},
-    device::{CaptureDevice, CaptureStatus, ConfigureError, DeviceFault, DeviceState, errno},
+    device::{
+        CaptureDevice, CaptureStatus, ConfigureError, DeviceFault, DeviceState, Woken, errno,
+    },
 };
 use std::{
     collections::{BTreeMap, VecDeque},
+    os::fd::{BorrowedFd, OwnedFd},
     sync::{Arc, Mutex, MutexGuard, PoisonError},
     time::Duration,
 };
@@ -26,6 +29,26 @@ struct CaptureScript {
     starts: u32,
     discards: u32,
     reads: u64,
+    /// A pipe readable while `avail_min` samples are queued, as a PCM's
+    /// descriptor is: what [`CaptureDevice::wait`] polls.
+    readable: (OwnedFd, OwnedFd),
+    /// Set by each wait, as `snd_pcm_sw_params_set_avail_min`.
+    avail_min: usize,
+    signalled: bool,
+    waits: u64,
+}
+
+impl CaptureScript {
+    /// The pipe says whether `avail_min` samples are queued.
+    fn signal(&mut self) {
+        let queued = !self.queued.is_empty() && self.queued.len() >= self.avail_min;
+        if queued && !self.signalled {
+            let _ = rustix::io::write(&self.readable.1, &[1]);
+        } else if !queued && self.signalled {
+            let _ = rustix::io::read(&self.readable.0, &mut [0u8; 8]);
+        }
+        self.signalled = queued;
+    }
 }
 
 /// A test's hold on one scripted microphone. The device itself is opened by
@@ -58,6 +81,10 @@ impl CaptureControl {
             starts: 0,
             discards: 0,
             reads: 0,
+            readable: rustix::pipe::pipe().expect("a pipe for the scripted microphone"),
+            signalled: false,
+            avail_min: 1,
+            waits: 0,
         })));
         locked(&CAPTURES).insert(name.to_owned(), control.clone());
         control
@@ -71,7 +98,9 @@ impl CaptureControl {
     }
     /// Samples the microphone has "captured" and not yet handed over.
     pub fn push(&self, samples: &[i16]) {
-        self.script().queued.extend(samples);
+        let mut script = self.script();
+        script.queued.extend(samples);
+        script.signal();
     }
     /// The next call of this name fails once with `errno`, one of
     /// [`crate::device::errno`].
@@ -94,6 +123,10 @@ impl CaptureControl {
     pub fn counts(&self) -> (u32, u32, u32, u64) {
         let script = self.script();
         (script.opens, script.starts, script.discards, script.reads)
+    }
+    /// How often the device was waited on ([`CaptureDevice::wait`]).
+    pub fn waits(&self) -> u64 {
+        self.script().waits
     }
 }
 
@@ -131,6 +164,8 @@ impl CaptureDevice for ScriptedCapture {
         self.failing("configure").map_err(ConfigureError::Fault)?;
         let mut script = self.0.script();
         script.state = DeviceState::Prepared;
+        script.avail_min = 1;
+        script.signal();
         Ok(script.format)
     }
 
@@ -157,6 +192,7 @@ impl CaptureDevice for ScriptedCapture {
         for (target, sample) in into.iter_mut().zip(script.queued.drain(..frames)) {
             *target = sample;
         }
+        script.signal();
         Ok(frames)
     }
 
@@ -175,8 +211,43 @@ impl CaptureDevice for ScriptedCapture {
         let mut script = self.0.script();
         script.discards += 1;
         script.queued.clear();
+        script.signal();
         script.state = DeviceState::Setup;
         drop(script);
         self.failing("discard")
+    }
+
+    fn wait(
+        &mut self,
+        others: &[BorrowedFd<'_>],
+        timeout: std::time::Duration,
+        frames: usize,
+    ) -> Option<Result<Woken, DeviceFault>> {
+        use rustix::event::{PollFd, PollFlags, poll};
+        // The pipe is duplicated so the script is not locked while waiting.
+        let readable = {
+            let mut script = self.0.script();
+            script.waits += 1;
+            script.avail_min = frames.max(1);
+            script.signal();
+            rustix::io::dup(&script.readable.0).ok()?
+        };
+        let mut fds = vec![PollFd::new(&readable, PollFlags::IN)];
+        fds.extend(
+            others
+                .iter()
+                .map(|other| PollFd::from_borrowed_fd(*other, PollFlags::IN)),
+        );
+        let timeout = rustix::time::Timespec {
+            tv_sec: timeout.as_secs() as _,
+            tv_nsec: timeout.subsec_nanos() as _,
+        };
+        if let Err(error) = poll(&mut fds, Some(&timeout)) {
+            return Some(Err(DeviceFault::new("poll", error.raw_os_error())));
+        }
+        Some(Ok(Woken {
+            samples: !fds[0].revents().is_empty(),
+            others: fds[1..].iter().any(|fd| !fd.revents().is_empty()),
+        }))
     }
 }

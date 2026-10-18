@@ -868,6 +868,10 @@ fn worker_command(
             role,
             var(crate::quiet_pace::EVIDENCE_ENVIRONMENT).as_deref(),
         ))
+        .envs(capture_wait_worker_environment(
+            role,
+            var(crate::quiet_pace::CAPTURE_WAIT_ENVIRONMENT).as_deref(),
+        ))
         .envs(vad_input_worker_environment(
             role,
             var(crate::activity::INPUT_ENVIRONMENT).as_deref(),
@@ -930,6 +934,15 @@ fn quiet_evidence_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "capture" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::quiet_pace::EVIDENCE_ENVIRONMENT, "on"))
+}
+
+// The capture loop's wait (#705), to the capture worker only.
+fn capture_wait_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "capture" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::quiet_pace::CAPTURE_WAIT_ENVIRONMENT, "on"))
 }
 
 // The per-stage minute line, to the one worker it times: capture.
@@ -1021,6 +1034,12 @@ mod tests {
                     (
                         quiet_evidence_worker_environment,
                         "LAMP_QUIET_EVIDENCE",
+                        ["capture"].as_slice(),
+                    ),
+                    // The capture loop's wait, the capture worker's.
+                    (
+                        capture_wait_worker_environment,
+                        "LAMP_CAPTURE_WAIT",
                         ["capture"].as_slice(),
                     ),
                     // The per-stage line, the capture worker's.

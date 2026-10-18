@@ -218,6 +218,15 @@ impl Channel {
     }
 }
 
+/// The channel's socket, for a loop that waits on several with `poll`
+/// instead of asking each in turn (`LAMP_CAPTURE_WAIT`, #705). Nothing is
+/// read ahead of [`Channel::receive`], so a readable socket is all there is.
+impl std::os::fd::AsFd for Channel {
+    fn as_fd(&self) -> std::os::fd::BorrowedFd<'_> {
+        std::os::fd::AsFd::as_fd(&self.endpoint)
+    }
+}
+
 pub struct WorkerChannels {
     pub control: Channel,
     pub data: Channel,
