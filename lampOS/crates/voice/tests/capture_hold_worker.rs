@@ -917,10 +917,21 @@ fn a_microphone_gone_for_a_moment_at_start_is_opened_once_it_is_back() {
 /// device was never opened.
 #[test]
 fn a_mute_while_the_microphone_is_waited_for_opens_nothing() {
+    mute_during_the_wait("scripted gone then muted", lamp_audio::device::errno::NODEV);
+}
+
+/// The same for a microphone busy at start: its wait (8 s) is the longer
+/// window on the privacy path, and a mute in it opens nothing either.
+#[test]
+fn a_mute_while_a_busy_microphone_is_waited_for_opens_nothing() {
+    mute_during_the_wait("scripted busy then muted", lamp_audio::device::errno::BUSY);
+}
+
+fn mute_during_the_wait(device_name: &'static str, errno: i32) {
     warm_up();
     let mut rig = Rig::spawn(
-        "scripted gone then muted",
-        (40, lamp_audio::device::errno::NODEV),
+        device_name,
+        (40, errno),
         ReferenceRecovery::Off,
         false,
         false,
