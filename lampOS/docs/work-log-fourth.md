@@ -4447,7 +4447,7 @@ A usage limit paused me from about 00:40 to 06:2x.
 
 ## 2026-10-18, 16:36 ICT: #1538 up and reviewed; #1524 and #1539 approved; the A/B's scorer; #1533 read
 
-- **#1538** (`LAMP_GOING_ON_ASKS`, #1522), opened at 16:0x:
+- **#1538** (`LAMP_GOING_ON_ASKS`, #1522), opened at 15:56 (`createdAt` 08:56:17Z):
   - **Ten's timing read:** 0 P1/P2. Its P3 (the expected wait in numbers) is in `attention.md`.
   - **Eighth's read:**
     - P2 fixed: a reply to the lamp's own question neither waits nor is held, as the remark arm has it. A worker test covers it ("Yes, go ahead." to "Shall I start it?"), and its mutation fails.
