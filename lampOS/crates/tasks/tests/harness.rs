@@ -385,9 +385,15 @@ fn a_missing_working_directory_is_a_proven_preflight_spawn_failure() {
         "HOME".into(),
         rig.root.path().join("missing-home").into_os_string(),
     );
+    // Under qemu-user (the ARM64 cross image) this is "preflight_failed":
+    // qemu runs glibc's `posix_spawn` vfork as a plain fork, so the child's
+    // failed chdir never reaches the parent. The spawn looks made and the
+    // child exits 127. Native Linux and the lamp report the spawn's failure
+    // (the first builder on #705, 18 Oct).
     assert_eq!(
         rig.cli().launch(&launch()),
-        not_sent("preflight_spawn_failed")
+        not_sent("preflight_spawn_failed"),
+        "\"preflight_failed\" here is qemu-user losing the spawn's error: see above"
     );
     assert!(rig.calls().is_empty());
 }

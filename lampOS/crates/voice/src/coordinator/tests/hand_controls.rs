@@ -1615,10 +1615,17 @@ fn the_muted_waits_own_closures_count_the_slide_for_a_taps_face() {
             .filter(|row| row["kind"] == "head_tap_muted_face")
             .count()
     };
+    // A tap counts only while its head was read within `TOUCH_INPUT_TTL_US`
+    // (100 ms) of the poll that takes it, and `head_tap()` stamps its tap
+    // 420 ms back, before the controls are built. So this finds 0 where
+    // the first poll comes late: in a debug build under qemu (the ARM64
+    // cross image), and natively with a 40 ms hold after `head_tap()` (the
+    // first builder on #705, 18 Oct). Native release and debug runs pass.
     assert_eq!(
         faces_for(PrivacyState::Muted),
         1,
-        "the slide closed, the mute open"
+        "the slide closed, the mute open (0 if the first poll came over \
+         100 ms after the tap's last reading, as under qemu: see above)"
     );
     assert_eq!(faces_for(PrivacyState::Allowed), 0, "the slide open");
 }
