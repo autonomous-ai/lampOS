@@ -9,18 +9,23 @@ Three commands, run on a laptop or the office Mac, never on the lamp:
 
     python lamp.py lines VOICES.txt > plays.txt
         The play list for the scenario player, `Voice|text|seconds`, from `say -v '?'`'s output:
-        English voices only, calls and negatives spread over them, about 15 minutes in all.
+        English speaking voices only (macOS's novelty voices left out), up to twelve, taken in turn
+        from each English locale; calls and negatives spread over them, about 15 minutes in all.
 
     python lamp.py train --front DIR --plays PLAYED.tsv RECORD.jsonl... [--negatives RECORD.jsonl...]
                          [--compare NAME.onnx...] [--folds 3] [--out name.onnx]
         DIR holds the two fixed models (the installed melspectrogram.onnx and embedding_model.onnx).
         PLAYED.tsv: one line a played line, `UNIX_MS<TAB>VOICE<TAB>KIND<TAB>TEXT`, KIND one of
         bare, hey, oi (calls) or near, mid, other (not calls); UNIX_MS when it began to play.
-        RECORD.jsonl: `lamp-bus record DIR mic2/audio` while they played (its messages carry
-        their own times, so no anchor is needed). --negatives: recordings with no call at all
+        RECORD.jsonl: `lamp-bus record DIR mic2/audio --max-mb 160` while they played (its
+        messages carry their own times, so no anchor is needed; at the default 64 MiB a recording
+        stops after about 19 minutes). --negatives: recordings with no call at all
         (an empty office, the lamp telling stories), every step a negative.
-        It trains `--folds` models, each on the voices of the other folds, and scores each call
-        only by the model that never heard its voice. Then one model on every voice, `--out`.
+        It trains `--folds` models, each on the voices of the other folds and without one stretch
+        of the voiceless negatives (the gaps, --negatives), and scores each call and each stretch
+        only by the model that never heard it. False hearings are counted in all and by source:
+        the near, mid and other lines, the gaps (the lamp's own answers, the room) and the quiet
+        recording. Then one model on every voice, `--out`.
         --compare scores the same steps with other name models (the installed one, the bare-name
         one) for a table side by side.
 
@@ -68,6 +73,10 @@ NEGATIVES = {
     "near": ["The lamb was lovely.", "Meet me at the lab.", "We went to camp last summer.",
              "Pass me the clamp.", "Lan, are you coming?", "Sam, what time is it?"],
 }
+# macOS's novelty voices, which `say -v '?'` lists among the English ones (#705, 18 Oct: the first
+# sitting's first twelve were mostly these). Calls are made by speaking voices only.
+NOVELTY = {"Albert", "Bad News", "Bahh", "Bells", "Boing", "Bubbles", "Cellos", "Deranged", "Good News",
+           "Hysterical", "Jester", "Organ", "Pipe Organ", "Superstar", "Trinoids", "Whisper", "Wobble", "Zarvox"}
 VIETNAMESE = ["Lamp ơi, mấy giờ rồi?", "Lamp ơi, bật đèn lên.", "Lamp ơi, kể chuyện cười đi."]
 
 
@@ -82,12 +91,21 @@ def lines(voices_file: str) -> None:
         # `say -v '?'`: NAME  LOCALE  # sample; a name may hold spaces, the locale is xx_YY.
         locale = next((p for p in parts if len(p) == 5 and p[2] == "_"), "")
         name = row.split(locale)[0].strip() if locale else ""
-        if locale.startswith("en_") and name:
-            english.append(name)
+        if locale.startswith("en_") and name and name not in NOVELTY:
+            english.append((locale, name))
         elif locale.startswith("vi_") and name:
             vietnamese.append(name)
     rng = random.Random(0)
-    chosen = english[:12]
+    # Up to twelve speaking voices, taken in turn from each English locale, so that every accent the
+    # Mac has is heard before any one gives a second voice.
+    by_locale: dict[str, list[str]] = {}
+    for locale, name in english:
+        by_locale.setdefault(locale, []).append(name)
+    chosen = []
+    while len(chosen) < 12 and any(by_locale.values()):
+        for names in by_locale.values():
+            if names and len(chosen) < 12:
+                chosen.append(names.pop(0))
     out = []
     for n, voice in enumerate(chosen):
         follow = FOLLOW_ONS[n % len(FOLLOW_ONS):] + FOLLOW_ONS[: n % len(FOLLOW_ONS)]
@@ -225,9 +243,13 @@ def onnx_scores(path: str, x: np.ndarray) -> np.ndarray:
     return np.array([session.run(None, {name: x[i : i + 1].astype(np.float32)})[0].item() for i in range(len(x))])
 
 
-def report(title: str, scores: np.ndarray, y: np.ndarray, which: np.ndarray, plays, negative_hours: float, neg_scores) -> None:
+def report(title: str, scores: np.ndarray, y: np.ndarray, which: np.ndarray, plays, negative_hours: float, neg_scores,
+           neg_sources: np.ndarray) -> None:
     """Per voice: the share of calls whose highest own-step score reaches each bar; then hearings an
-    hour on the negatives (the played negatives and --negatives), by `said.rs`'s rule."""
+    hour on the negatives (the played negatives and --negatives), by `said.rs`'s rule, in all and by
+    where the negative came from: a "near" line (lamb, lab, camp), a "mid" line (the word in a
+    sentence), an "other" line (any other played line that is not a call), the gaps between lines
+    (the lamp's own answers, the room) and the quiet recording."""
     print(f"\n{title}")
     voices = sorted({voice for _, voice, kind in plays if kind in CALLS})
     print(f"  {'voice':18} {'calls':>5}  " + "  ".join(f"heard@{least}" for least in LEASTS) + "   best scores")
@@ -249,6 +271,11 @@ def report(title: str, scores: np.ndarray, y: np.ndarray, which: np.ndarray, pla
     print("  all" + " " * 21 + "  ".join(f"{t[0]:>2}/{t[1]:<5}" for t in total.values()))
     for least in LEASTS:
         print(f"  false hearings at {least}: {len(hearings(neg_scores, least)) / max(negative_hours, 1e-9):.1f} an hour of negatives ({negative_hours * 60:.1f} min)")
+    for source in sorted(set(neg_sources)):
+        own = neg_scores[neg_sources == source]
+        hours = len(own) * 0.08 / 3600
+        counts = "  ".join(f"at {least}: {len(hearings(own, least)):>3}" for least in LEASTS)
+        print(f"    from {source:28} ({hours * 60:5.1f} min): {counts}")
 
 
 def train(args) -> None:
@@ -274,24 +301,32 @@ def train(args) -> None:
           f"{len(extra)} more negative steps; {len(voices)} voices in {args.folds} folds: {folds}")
     held = np.zeros(len(x))
     held_extra = np.zeros(len(extra))
-    for fold in folds:
+    # Steps of no voice (the gaps between lines, and --negatives) are held out too: cut in time into
+    # one stretch a fold, each scored only by the model that did not train on it.
+    free = voice_of == ""
+    stretch = np.full(len(x), -1)
+    stretch[free] = np.arange(free.sum()) * args.folds // max(1, free.sum())
+    extra_stretch = np.arange(len(extra)) * args.folds // max(1, len(extra))
+    for k, fold in enumerate(folds):
         out = np.isin(voice_of, fold)
-        model = Flat(args.seed).fit(np.concatenate([x[~out & (y >= 0)], extra]),
-                                    np.concatenate([y[~out & (y >= 0)], np.zeros(len(extra), np.int8)]))
+        kept = ~out & (y >= 0) & (stretch != k)
+        model = Flat(args.seed).fit(np.concatenate([x[kept], extra[extra_stretch != k]]),
+                                    np.concatenate([y[kept], np.zeros(int((extra_stretch != k).sum()), np.int8)]))
         held[out] = model.scores(x[out])
-        # A negative of no voice (a gap, or --negatives) is scored by each fold's model in turn;
-        # its worst score counts.
-        free = voice_of == ""
-        held[free] = np.maximum(held[free], model.scores(x[free]))
-        if len(extra):
-            held_extra = np.maximum(held_extra, model.scores(extra))
+        if (stretch == k).any():
+            held[stretch == k] = model.scores(x[stretch == k])
+        if (extra_stretch == k).any():
+            held_extra[extra_stretch == k] = model.scores(extra[extra_stretch == k])
+    sources = np.array([plays[i][2] + " lines" if i >= 0 else "gaps (the lamp, the room)" for i in which])
+    neg_sources = np.concatenate([sources[y == 0], np.array(["the quiet recording"] * len(extra))])
     neg_scores = np.concatenate([held[y == 0], held_extra])
     hours = len(neg_scores) * 0.08 / 3600
-    report("Trained on the lamp's recordings, each voice scored by a model that never heard it:", held, y, which, plays, hours, neg_scores)
+    report("Trained on the lamp's recordings, each voice and each stretch of negatives scored by a model that never heard it:",
+           held, y, which, plays, hours, neg_scores, neg_sources)
     for path in args.compare:
         s = onnx_scores(path, x)
         se = onnx_scores(path, extra) if len(extra) else np.zeros(0)
-        report(f"{path}, on the same steps:", s, y, which, plays, hours, np.concatenate([s[y == 0], se]))
+        report(f"{path}, on the same steps:", s, y, which, plays, hours, np.concatenate([s[y == 0], se]), neg_sources)
     final = Flat(args.seed).fit(np.concatenate([x[y >= 0], extra]), np.concatenate([y[y >= 0], np.zeros(len(extra), np.int8)]))
     final.export(Path(args.out))
     check = onnx_scores(args.out, x[:200])

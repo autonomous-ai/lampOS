@@ -446,20 +446,25 @@ carry over to this microphone, and lowering the bar would buy one voice.
 judges a model only on voices it never heard:
 
 - `python lamp.py lines VOICES.txt`: from `say -v '?'`'s output, the play
-  list for the scenario player (`Voice|text|seconds`): per English voice
-  (up to twelve), five bare calls and three "Hey Lamp", 7 s each so the
+  list for the scenario player (`Voice|text|seconds`): per English speaking
+  voice (up to twelve, macOS's novelty voices left out, taken in turn from
+  each English locale), five bare calls and three "Hey Lamp", 7 s each so the
   lamp can answer, and three negatives (the word inside a sentence; "lamb",
   "lab", "camp", "Lan"), 5 s each; "Lamp ơi" by a Vietnamese voice if
   there is one. About 15 minutes.
 - `python lamp.py train --front DIR --plays PLAYED.tsv RECORD.jsonl
   [--negatives RECORD.jsonl…] [--compare NAME.onnx…]`: the recordings
-  (`lamp-bus record DIR mic2/audio`, whose messages carry their own times,
-  so no anchor is needed) and each played line's start (`UNIX_MS`, voice,
+  (`lamp-bus record DIR mic2/audio --max-mb 160`, whose messages carry their
+  own times, so no anchor is needed; the default 64 MiB stops after about
+  19 minutes) and each played line's start (`UNIX_MS`, voice,
   kind). A call's steps from 0.35 s to 1.6 s after it began are its own,
   the rest of it to 4 s (its words, the lamp's answer) neither, and every
   other step a negative, with `--negatives` (an empty office, the lamp's
   stories) all negative. It trains one model a fold of voices on the other
-  folds and scores each call only by the model that never heard its voice:
+  folds, and without one stretch of the voiceless negatives, and scores each
+  call and each stretch only by the model that never heard it. False
+  hearings are told apart by source (near, mid and other lines, the gaps
+  with the lamp's own answers, the quiet recording):
   per voice, the calls heard at 0.5, 0.9 and 0.98, and false hearings an
   hour of negatives by `said.rs`'s rule, beside the same for each
   `--compare` model. Then one model on every voice, written as `name.onnx`.
@@ -470,7 +475,20 @@ judges a model only on voices it never heard:
 - `python lamp.py dry-run --front DIR WAV…` runs it all on speech files and
   made-up plays; its numbers mean nothing.
 
-Not shown: any recording made for it. Played voices only, nothing of a
+**The first sitting** (lamp-4ace, 18 Oct, 15:38 to 16:02, trained on the
+office Mac; the recordings and the model stay there): 108 of 135 played
+lines were recorded (the recorder stopped at its 64 MiB default), and of
+the twelve voices `lines` took, eight were macOS's novelty voices. Over 99
+calls, with each voice held out, the model trained here heard 68 at 0.98,
+against 17 for the installed file and none for the bare-name one; but it
+heard 61.8 false calls an hour of negatives at 0.98, against none for the
+installed file, before the negatives were held out by stretch and counted
+by source. So a model of the lamp's own recordings hears voices it never
+heard far better, and its negatives are the next thing to bring down. The
+script now takes speaking voices only, holds the voiceless negatives out
+by fold, and says where false hearings come from.
+
+Not shown: a model fit to install. Played voices only, nothing of a
 person; recording people waits for the owner's yes.
 
 ## How to make it again
