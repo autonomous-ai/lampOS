@@ -81,6 +81,9 @@ static LOOK_FILE: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock:
 static LOOK_FULL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Where the conversation's thread is kept across a restart, if anywhere.
 static THREAD_FILE: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+/// Where the room is kept across a restart, if anywhere, and the boot it
+/// is kept for (#1465).
+static ROOM_FILE: std::sync::OnceLock<(std::path::PathBuf, String)> = std::sync::OnceLock::new();
 /// Whether a new session is told how things stand.
 static SESSION_FACT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether the session is told how busy the room is.
@@ -125,6 +128,8 @@ pub struct Files {
     /// Whether a line said over the lamp's reply and left unanswered is
     /// kept out of the busy room's count (`--cut-ins-not-talk`).
     pub cut_ins_not_talk: bool,
+    /// Where the room is kept across a restart (`--room-file`, #1465).
+    pub room_file: Option<std::path::PathBuf>,
     /// Whether a stuffy room is told beside what a person says
     /// (`--air-facts`, `crate::air_told`).
     pub air_facts: bool,
@@ -253,6 +258,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (session_fact, flags) = crate::session_fact::take(flags);
     let (room_facts, flags) = crate::room_told::take(flags);
     let (cut_ins_not_talk, flags) = crate::room_told::take_cut_ins(flags);
+    let (room_file, flags) = crate::room_told::take_file(flags)?;
     let (air_facts, flags) = crate::air_told::take(flags);
     let (keep_link, flags) = take_keep_link(flags);
     let (wait_for_room, flags) = take_wait_for_room(flags);
@@ -290,6 +296,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         session_fact,
         room_facts,
         cut_ins_not_talk,
+        room_file,
         air_facts,
         keep_link,
         wait_for_room,
@@ -1042,6 +1049,18 @@ pub async fn run_with_continuation(
         }
         let _ = THREAD_FILE.set(path);
     }
+    // The room a voice that ended a moment ago was in (#1465): known at
+    // once, not after five minutes.
+    if let Some(path) = files.room_file {
+        let boot = crate::room_told::boot_hex(boot.bytes());
+        if let Ok(mut room) = crate::room_told::room().lock()
+            && let Some(line) =
+                crate::room_told::take_back_from(&path, &mut room, &boot, monotonic_us())
+        {
+            eprintln!("lamp-voice provider: {line}");
+        }
+        let _ = ROOM_FILE.set((path, boot));
+    }
     if let Some(root) = files.bus_root.clone() {
         let _ = BUS_ROOT.set(root);
     }
@@ -1233,6 +1252,9 @@ async fn serve_with_visual<C: Connect>(
     // Until when a skill tool's look may still be owed (#941).
     let mut look_owed_until: Option<Instant> = None;
     let mut thread_saved_at = Instant::now();
+    let mut room_saved_at = Instant::now();
+    let mut room_kept: Option<crate::room_told::Kept> = None;
+    let mut room_unwritten_told = false;
     // The session last told how things stand, if new ones are.
     let session_fact = SESSION_FACT.load(std::sync::atomic::Ordering::Relaxed);
     let room_facts = ROOM_FACTS.load(std::sync::atomic::Ordering::Relaxed);
@@ -1819,6 +1841,21 @@ async fn serve_with_visual<C: Connect>(
                         && let Ok(mut thread) = crate::thread::THREAD.lock()
                     {
                         thread.wrote(path);
+                    }
+                }
+                // The room goes to its file within a second of changing,
+                // and every 30 s besides (#1465). One that cannot be
+                // written is said once.
+                if let Some((path, boot)) = ROOM_FILE.get()
+                    && room_saved_at.elapsed() >= Duration::from_secs(1)
+                {
+                    room_saved_at = Instant::now();
+                    if let Ok(room) = crate::room_told::room().lock()
+                        && let Err(error) = crate::room_told::keep_in(path, &room, boot, monotonic_us(), &mut room_kept)
+                        && !room_unwritten_told
+                    {
+                        room_unwritten_told = true;
+                        eprintln!("lamp-voice provider: the room's file could not be written ({error}): a restart will not know the room");
                     }
                 }
                 // And one that holds a picture, once the talk has paused.
