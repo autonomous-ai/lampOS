@@ -654,14 +654,25 @@ fn the_program_timed(
     }
     let mut requests =
         (lighting == Ring::Asked).then(|| bus.subscribe(LightRequest::TOPIC, "ring").unwrap());
+    // Its sound first, then the skill. On a clock the test moves, put in
+    // after the start and found by the reload. On the host's clock, there
+    // before the start and loaded at once: the reload would cost `RELOAD`,
+    // two real seconds (#1128).
+    let put_in = || {
+        if skill.contains("sound = \"ding\"") {
+            chime(&root.join("skills/hello/sounds/ding.wav"));
+        }
+        skill_with(&root.join("skills"), "hello", skill);
+    };
+    if on_the_host {
+        put_in();
+    }
     let _running = Running(command.spawn().unwrap());
     clock.started();
-    // Put in after the start: found by the reload, with its sound first.
-    if skill.contains("sound = \"ding\"") {
-        chime(&root.join("skills/hello/sounds/ding.wav"));
+    if !on_the_host {
+        put_in();
+        clock.skip(RELOAD);
     }
-    skill_with(&root.join("skills"), "hello", skill);
-    clock.skip(RELOAD);
     let deadline = Instant::now() + Duration::from_secs(10);
     while bus.subscribers(Faces::TOPIC).unwrap().is_empty() {
         assert!(Instant::now() < deadline, "the skill was never loaded");
@@ -2151,6 +2162,13 @@ fn asking_the_policy_in(
             (&stream).write_all(b"{\"outcome\":\"spoken\"}\n").unwrap();
         }
     });
+    // On the host's clock the hello is there before the start, so it loads
+    // at once: found by the reload it would cost `RELOAD`, two real seconds
+    // (#1128). On a clock the test moves it is put in after, as before.
+    let on_the_host = clock.socket.is_none();
+    if on_the_host {
+        skill_with(&root.join("skills"), "hello", &hello_after_a_second());
+    }
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
     command
         .args([
@@ -2169,8 +2187,10 @@ fn asking_the_policy_in(
         .env("LAMP_SKILLS_ASK", "policy");
     let running = Running(command.spawn().unwrap());
     clock.started();
-    skill_with(&root.join("skills"), "hello", &hello_after_a_second());
-    clock.skip(RELOAD);
+    if !on_the_host {
+        skill_with(&root.join("skills"), "hello", &hello_after_a_second());
+        clock.skip(RELOAD);
+    }
     let deadline = Instant::now() + Duration::from_secs(20);
     while bus.subscribers(Faces::TOPIC).unwrap().is_empty() {
         assert!(Instant::now() < deadline, "the skill was never loaded");
