@@ -301,6 +301,12 @@ impl Test {
 
 #[test]
 fn reminder_waits_for_promised_look_after_final_pcm_and_delayed_provider_terminal() {
+    // On the stepped scenario clock, as `reminder_roundtrip` (#935): the
+    // turn's input evidence lasts 500 ms, and on the real clock a busy
+    // host's SQLite commits in `fixture.offer()` outlasted it, so the turn was
+    // revoked (`StaleOwner`, #1569). Taken first, so it is dropped last.
+    let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
     let mut fixture = RoundtripFixture::new();
     let mut test = Test::new();
     // The preceding answer is ordinary, not a reminder quoting stored words.
@@ -341,7 +347,10 @@ fn reminder_waits_for_promised_look_after_final_pcm_and_delayed_provider_termina
     // A delayed provider terminal can arrive after the real mask's tail has
     // expired. Final speaker retirement alone therefore cannot protect the
     // promised look from a prepared reminder.
-    std::thread::sleep(Duration::from_micros(crate::turn_taking::TAIL_US + 1_000));
+    let tail_ends = monotonic_us() + crate::turn_taking::TAIL_US + 1_000;
+    while monotonic_us() < tail_ends {
+        crate::scenario_clock::step(crate::scenario_clock::Phase::Run).unwrap();
+    }
     assert!(test.mask.available(monotonic_us()));
     let offer = fixture.offer();
     test.renew_input_evidence();
