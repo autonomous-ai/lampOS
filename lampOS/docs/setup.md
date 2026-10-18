@@ -263,7 +263,8 @@ read before it would send the page to the wrong `.local` address:
 
 While joining it reads the station address every second and publishes it as
 `lan_ip`, V1's fix for the page that lost the lamp, and once more when the join
-is done; a new run clears the last run's address at once, so V1's page cannot
+is done. That watcher ends the moment the join does, so the save and "set up"
+never wait out its second. A new run clears the last run's address at once, so V1's page cannot
 follow an old one. Once joined, it saves the name, the time zone
 (`/etc/localtime` linked to the zone, `/etc/timezone` naming it, as V1's
 `timezone.go`, and `/etc/lampOS/zone.env` for schedule and skills, #820) and then the user's key (to the voice's credential and the
