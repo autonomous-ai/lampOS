@@ -26,6 +26,9 @@
 //! the asker renews it while it is shown, so a skill can wait for the light
 //! it asked for. A turn's face has colours of its own and never shows the
 //! lamp's light, so nothing is reached inside a turn (the reviewer on #1166).
+//! A request the ring holds but does not show, because another request or
+//! the person's light is over it, is said on `light/outranked`, naming
+//! what is over it, so its asker is told it lost (#940).
 //!
 //! With `LAMP_LIGHT_KEEP=on` (the first builder on #1464) the person's light
 //! is also kept on disk ([`KEEP_PATH`]), written when it changes, at most
@@ -40,7 +43,7 @@
 //! (a colour that does not exist, a level outside 1 to 5) is passed over.
 use crate::{ring_face::Lit, ring_requests::Requests};
 use lamp_bus::{Bus, Publisher, Subscriber};
-use lamp_msgs::{Light, LightReached, LightRequest};
+use lamp_msgs::{Light, LightOutranked, LightReached, LightRequest};
 use std::{io, path::Path, time::Duration};
 
 /// The name the ring's owner publishes under.
@@ -196,6 +199,9 @@ pub struct RingLight {
     reached: Option<Publisher>,
     /// Where the person's light is kept across a restart, when switched on.
     keep: Option<Keep>,
+    /// Where a request held but not shown is said outranked, when switched
+    /// on.
+    outranked: Option<Publisher>,
     /// The request the face shows, until its light is said reached.
     reaching: Option<Reaching>,
 }
@@ -257,6 +263,7 @@ impl RingLight {
                 requests: None,
                 requested: None,
                 reached: None,
+                outranked: None,
                 reaching: None,
                 keep: keep.map(|path| Keep {
                     path: path.to_owned(),
@@ -307,8 +314,14 @@ impl RingLight {
         let asked = bus.subscribe_typed(LightRequest::TOPIC, SOURCE, LightRequest::TYPE)?;
         let reached =
             bus.publisher_declared(LightReached::TOPIC, &LightReached::declaration(), SOURCE)?;
+        let outranked = bus.publisher_declared(
+            LightOutranked::TOPIC,
+            &LightOutranked::declaration(),
+            SOURCE,
+        )?;
         self.requests = Some((asked, Requests::new(clock_id)));
         self.reached = Some(reached);
+        self.outranked = Some(outranked);
         Ok(())
     }
 
@@ -413,7 +426,18 @@ impl RingLight {
             self.testing = None;
             changed = lit(&self.now);
         }
-        if let Some((_, requests)) = &self.requests {
+        if let Some((_, requests)) = &mut self.requests {
+            // Each asker that lost is told, whatever the face shows now: a
+            // turn or a test hides the winner too, but it still holds.
+            if let Some(outranked) = self.outranked.as_mut() {
+                requests.outranked(now_us, |source, by| {
+                    let told = LightOutranked {
+                        source: source.to_owned(),
+                        by: by.to_owned(),
+                    };
+                    let _ = outranked.publish_json(now_us, &told);
+                });
+            }
             let shown = requests.shown(now_us);
             let light = shown.map(|request| &request.light);
             if light != self.requested.as_ref() {
@@ -872,12 +896,15 @@ mod tests {
 
     /// The reviewer on #993: off unless switched on. A ring without
     /// `take_requests` takes no `light/request` at all: the same glow that a
-    /// switched-on ring shows leaves this one on the person's light.
+    /// switched-on ring shows leaves this one on the person's light, and
+    /// says nothing on `light/outranked` either, though the person's light
+    /// is what it shows (the reviewer on #1466).
     #[test]
     fn without_the_switch_a_light_request_changes_nothing() {
         let root = Root::new("light-request-off");
         let (mut ring, _) = RingLight::on(&root.0).unwrap();
         let bus = Bus::new(&root.0).unwrap();
+        let mut outranked = bus.subscribe(LightOutranked::TOPIC, "skills").unwrap();
         let mut asks = bus
             .publisher_declared(Light::TOPICS[0], &Light::declaration(), "actions")
             .unwrap();
@@ -901,6 +928,10 @@ mod tests {
             std::thread::sleep(Duration::from_millis(2));
         }
         assert_eq!(ring.face(), &light(true, "blue", 2));
+        assert!(
+            outranked.recv(Duration::ZERO).unwrap().is_none(),
+            "nothing said on light/outranked without the switch"
+        );
     }
 
     /// #940: a skill's glow is shown over the person's light while its
@@ -1127,6 +1158,63 @@ mod tests {
             std::thread::sleep(Duration::from_millis(2));
         }
         assert_eq!(ring.face(), &light(true, "white", 5));
+    }
+
+    /// #940: two skills ask for the light at once. The newer is shown and
+    /// the other is told on `light/outranked` what is over it, once, and
+    /// again after its renewal; it is shown by itself once the winner's
+    /// lease ends, and under the person's light it is told it is theirs.
+    #[test]
+    fn a_skill_whose_light_is_not_shown_is_told_what_is_over_it() {
+        let root = Root::new("light-outranked");
+        let (mut ring, _) = RingLight::on(&root.0).unwrap();
+        ring.take_requests(&root.0, "boot-test").unwrap();
+        let bus = Bus::new(&root.0).unwrap();
+        let mut outranked = bus.subscribe(LightOutranked::TOPIC, "skills").unwrap();
+        let mut asks = bus
+            .publisher_declared(Light::TOPICS[0], &Light::declaration(), "actions")
+            .unwrap();
+        let mut glows = bus
+            .publisher_declared(LightRequest::TOPIC, &LightRequest::declaration(), "skills")
+            .unwrap();
+        let told = |outranked: &mut lamp_bus::Subscriber| {
+            let mut said = Vec::new();
+            while let Some(message) = outranked.recv(Duration::ZERO).unwrap() {
+                let told: LightOutranked = message.parse().unwrap();
+                said.push(format!("{} by {}", told.source, told.by));
+            }
+            said
+        };
+        let mut at = 0u64;
+        ring.tick(at);
+        let skill = lamp_msgs::Priority::Skill;
+        let tutor = request("skill:tutor", skill, 10_000_000, "white");
+        glows.publish_json(1, &tutor).unwrap();
+        looked(&mut ring, &mut at);
+        assert!(told(&mut outranked).is_empty(), "alone, it is shown");
+        glows
+            .publish_json(2, &request("skill:stretch", skill, 1_500_000, "green"))
+            .unwrap();
+        looked(&mut ring, &mut at);
+        assert_eq!(ring.face(), &light(true, "green", 4));
+        assert_eq!(told(&mut outranked), ["skill:tutor by skill:stretch"]);
+        looked(&mut ring, &mut at);
+        assert!(told(&mut outranked).is_empty(), "said once");
+        // Its renewal is told again, and the newer still shown.
+        glows.publish_json(3, &tutor).unwrap();
+        looked(&mut ring, &mut at);
+        assert_eq!(ring.face(), &light(true, "green", 4));
+        assert_eq!(told(&mut outranked), ["skill:tutor by skill:stretch"]);
+        // The winner's lease ends: the loser is shown by itself, told
+        // nothing.
+        at = 1_500_000;
+        looked(&mut ring, &mut at);
+        assert_eq!(ring.face(), &light(true, "white", 4));
+        assert!(told(&mut outranked).is_empty());
+        asks.publish_json(4, &light(true, "blue", 2)).unwrap();
+        looked(&mut ring, &mut at);
+        assert_eq!(ring.face(), &light(true, "blue", 2));
+        assert_eq!(told(&mut outranked), ["skill:tutor by person"]);
     }
 
     /// The ring's own socket on `topic`, for a datagram made by hand.

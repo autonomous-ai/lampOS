@@ -372,7 +372,14 @@ As built on 2026-10-16 (#938, `crates/skills`, not yet run on a lamp):
   the switch. The
   actions part is not called for the light. `done` says
   `light warm: asked of the ring at level 5` and
-  `light given back: asked again with a time already passed`.
+  `light given back: asked again with a time already passed`. When the
+  ring shows another light over the run's (a higher priority, a newer
+  skill's, or the person's), it says so on `light/outranked`. The run
+  listens from before its first ask. It writes `lamp-skills: skill:<name>'s
+  light is outranked by <by>` in its journal at the next renewal, and
+  adds `; outranked by <by>, ...` to the give-back line, each `by` once,
+  in the order heard (#940). It keeps asking, so its light comes back by
+  itself once the other lapses.
 - **With `LAMP_BODY_REQUESTS=on`** (#940), each gesture and move a skill
   sends on `mood.sock` says who asks:
   `{"gesture":"nod","source":"skill:<name>","priority":"skill"}`, and the

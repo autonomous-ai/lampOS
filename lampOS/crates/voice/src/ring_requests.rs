@@ -20,7 +20,11 @@
 //! given way: there is no second list that could fill up. A request refused
 //! for want of a place is not held, so its asker's next request is a new
 //! claim, heard as begun when it comes (Twelve on #993).
-use lamp_msgs::{Light, LightRequest, Priority};
+//!
+//! The loser is told (#940): a request held but not shown is said
+//! outranked, naming what is over it, once for each thing over it and
+//! again after each renewal while it stays hidden ([`Requests::outranked`]).
+use lamp_msgs::{Light, LightOutranked, LightRequest, Priority};
 
 /// At most this many askers are kept at once, given way or not; another is
 /// passed over until one's claim lapses or is given back.
@@ -36,6 +40,9 @@ struct Held {
     /// Sent before the person's light that was read in the same look, so
     /// given way as if it had come first.
     before_person: bool,
+    /// What it was last said outranked by, since it was taken: none while
+    /// it is shown, or before it is first said hidden.
+    told: Option<String>,
 }
 
 pub struct Requests {
@@ -103,6 +110,7 @@ impl Requests {
             order,
             since_us,
             before_person: was_before,
+            told: None,
         });
         true
     }
@@ -118,15 +126,50 @@ impl Requests {
             && (held.before_person || self.person_at_us.is_some_and(|at| held.since_us < at))
     }
 
-    /// The request shown at `now_us`, if one holds and has not given way.
-    pub fn shown(&self, now_us: u64) -> Option<&LightRequest> {
+    /// Where the request shown at `now_us` is held, if one holds and has
+    /// not given way.
+    fn shown_at(&self, now_us: u64) -> Option<usize> {
         self.held
             .iter()
-            .filter(|held| {
+            .enumerate()
+            .filter(|(_, held)| {
                 held.request.claim.holds_at(&self.clock_id, now_us) && !self.given_way(held)
             })
-            .max_by_key(|held| (held.request.claim.priority, held.order))
-            .map(|held| &held.request)
+            .max_by_key(|(_, held)| (held.request.claim.priority, held.order))
+            .map(|(at, _)| at)
+    }
+
+    /// The request shown at `now_us`, if one holds and has not given way.
+    pub fn shown(&self, now_us: u64) -> Option<&LightRequest> {
+        self.shown_at(now_us).map(|at| &self.held[at].request)
+    }
+
+    /// Tells `tell(source, by)` of each request that holds at `now_us` but
+    /// is not shown: `by` is the source of the request shown over it, or
+    /// [`LightOutranked::PERSON`] for the person's own light. Each is told
+    /// once for what is over it, again when that changes, and again after
+    /// each renewal while it stays hidden; the one shown is told nothing.
+    pub fn outranked(&mut self, now_us: u64, mut tell: impl FnMut(&str, &str)) {
+        let shown = self.shown_at(now_us);
+        for at in 0..self.held.len() {
+            let held = &self.held[at];
+            let by = if Some(at) == shown || !held.request.claim.holds_at(&self.clock_id, now_us) {
+                None
+            } else if self.given_way(held) {
+                Some(LightOutranked::PERSON)
+            } else {
+                // One holds that has not given way, so one is shown.
+                shown.map(|shown| self.held[shown].request.claim.source.as_str())
+            };
+            if held.told.as_deref() == by {
+                continue;
+            }
+            let by = by.map(str::to_owned);
+            if let Some(by) = &by {
+                tell(&held.request.claim.source, by);
+            }
+            self.held[at].told = by;
+        }
     }
 
     /// The light shown at `now_us`, if a request holds.
@@ -313,6 +356,61 @@ mod tests {
         assert_eq!(colour(&requests, S), None);
         assert!(requests.take(request("hand", Priority::Person, 3 * S, "white"), 0, true));
         assert_eq!(colour(&requests, S), Some("white"));
+    }
+
+    /// #940: the loser is told what is over it, once, again when that
+    /// changes or it renews, and never while it is shown or once lapsed.
+    #[test]
+    fn a_request_held_but_not_shown_is_told_what_is_over_it() {
+        let told = |requests: &mut Requests, now_us| {
+            let mut said = Vec::new();
+            requests.outranked(now_us, |source, by| said.push(format!("{source} by {by}")));
+            said.sort();
+            said
+        };
+        let mut requests = Requests::new(BOOT);
+        let a = |until_us| request("skill:a", Priority::Skill, until_us, "blue");
+        let b = |until_us| request("skill:b", Priority::Skill, until_us, "red");
+        requests.take(a(15 * S), 0, false);
+        assert!(told(&mut requests, 0).is_empty(), "alone, it is shown");
+        // The newest claim of equal priority wins: a loses its place.
+        requests.take(b(15 * S), S, false);
+        assert_eq!(told(&mut requests, S), ["skill:a by skill:b"]);
+        assert!(told(&mut requests, 2 * S).is_empty(), "said once");
+        // Its renewal keeps b over it, and it is told again; b's is shown
+        // and told nothing.
+        requests.take(a(20 * S), 5 * S, false);
+        assert_eq!(told(&mut requests, 5 * S), ["skill:a by skill:b"]);
+        requests.take(b(20 * S), 6 * S, false);
+        // Taken below the light shown: told at once.
+        requests.take(
+            request("idle", Priority::Idle, 20 * S, "warm"),
+            6 * S,
+            false,
+        );
+        assert_eq!(told(&mut requests, 6 * S), ["idle by skill:b"]);
+        // The conversation over all three, and b over the others again once
+        // it lapses.
+        let voice = request("voice", Priority::Conversation, 10 * S, "white");
+        requests.take(voice, 7 * S, false);
+        assert_eq!(
+            told(&mut requests, 7 * S),
+            ["idle by voice", "skill:a by voice", "skill:b by voice"]
+        );
+        assert_eq!(
+            told(&mut requests, 10 * S),
+            ["idle by skill:b", "skill:a by skill:b"]
+        );
+        // The person's own light over every one.
+        requests.person_asked(11 * S);
+        assert_eq!(
+            told(&mut requests, 11 * S),
+            ["idle by person", "skill:a by person", "skill:b by person"]
+        );
+        // One given back, or lapsed, is told nothing more.
+        assert!(!requests.take(b(0), 12 * S, false));
+        assert!(told(&mut requests, 12 * S).is_empty());
+        assert!(told(&mut requests, 20 * S).is_empty());
     }
 
     /// The reviewer on #993 (11:35): sixteen skills, the person's light, a

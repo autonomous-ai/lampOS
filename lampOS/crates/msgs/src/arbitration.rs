@@ -112,11 +112,43 @@ impl LightReached {
     }
 }
 
+/// A light asked for on `light/request` that the ring holds but does not
+/// show, because another request or the person's own light is over it
+/// (`light/outranked`): said when the ring takes it so, when a request
+/// shown loses its place, when what is over it changes, and again after
+/// each renewal while it stays hidden, so its asker is told it lost (#940).
+/// It keeps its claim, and is shown by itself once what is over it lapses
+/// or is given back. Nothing is said for what hides every request alike
+/// (the privacy switch, a turn's face, a self-test): that is not a loss.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LightOutranked {
+    /// The hidden request's `claim.source`.
+    pub source: String,
+    /// The `claim.source` of the request shown over it, or
+    /// [`LightOutranked::PERSON`] for the person's own light.
+    pub by: String,
+}
+
+impl LightOutranked {
+    pub const TYPE: &str = "lamp_msgs/LightOutranked";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "light/outranked";
+    /// `by` for the person's own light (`light/command`), over every
+    /// request below a person's that began before they asked.
+    pub const PERSON: &str = "person";
+
+    /// Each is a message of its own: one asker's must not hide another's.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
 /// The requests to actuators beside the first topics (#940).
 pub fn arbitration_topics() -> Vec<(&'static str, Declaration)> {
     vec![
         (LightRequest::TOPIC, LightRequest::declaration()),
         (LightReached::TOPIC, LightReached::declaration()),
+        (LightOutranked::TOPIC, LightOutranked::declaration()),
     ]
 }
 
@@ -211,6 +243,28 @@ mod tests {
         assert_eq!(
             (declared.type_name.as_str(), declared.kind),
             (LightReached::TYPE, Kind::Event)
+        );
+    }
+
+    #[test]
+    fn a_light_outranked_names_its_asker_and_what_is_over_it() {
+        let outranked = LightOutranked {
+            source: "skill:stretch-break".into(),
+            by: "skill:desk-tutor".into(),
+        };
+        let text = serde_json::to_string(&outranked).unwrap();
+        assert_eq!(
+            text,
+            "{\"source\":\"skill:stretch-break\",\"by\":\"skill:desk-tutor\"}"
+        );
+        assert_eq!(
+            serde_json::from_str::<LightOutranked>(&text).unwrap(),
+            outranked
+        );
+        let declared = crate::declaration_of(LightOutranked::TOPIC).unwrap();
+        assert_eq!(
+            (declared.type_name.as_str(), declared.kind),
+            (LightOutranked::TYPE, Kind::Event)
         );
     }
 }

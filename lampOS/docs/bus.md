@@ -358,6 +358,7 @@ of each, and its kind and period as a declaration, are in
 | `light/test`, `light/drawn` | A self-test's colour, shown for 2 s at most; the light the ring actually drew | latched | The self-test; the ring's owner | Asked once a colour; drawn when it changes, and once a second |
 | `light/request` | A light asked for that lapses, with its asker, priority and time (#940) | event | Skills and other parts (`lamp-cloud`'s preview, [cloud.md](cloud.md)) | Asked, and asked again to keep it, at most 30 s ahead |
 | `light/reached` | A requested light the ring has shown at rest for 350 ms, with its asker (#1146) | event | The ring's owner, with `LAMP_LIGHT_REQUESTS=on` | When a request's light has been shown 350 ms, and again after each renewal while it is; never inside a turn |
+| `light/outranked` | A request the ring holds but doesn't show: its asker, and `by`, the asker shown over it or `person` (#940) | event | The ring's owner, with `LAMP_LIGHT_REQUESTS=on` | When it is taken hidden, loses its place, or what is over it changes, and again after each renewal while it stays hidden |
 | `diagnostics` | Each part's health: ok, warning, error or stale | stream | Every part | Once a second |
 | `policy/decisions` | What the policy decided, with the probability and each judgement behind it, and whether it is only watching ([policy.md](policy.md)) | stream | The policy | With each thing heard |
 
@@ -416,6 +417,7 @@ that owns it:
 | `light/drawn` | the voice's ring worker, from its own write receipts ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | the self-test |
 | `light/request` | `lamp-skills`, a skill's light, with `LAMP_LIGHT_REQUESTS=on` ([skills.md](skills.md)); `lamp-cloud`, the app's preview ([cloud.md](cloud.md)) | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` |
 | `light/reached` | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | nothing yet; `lamp-skills`, to wait for a skill's light before its look (#1146) |
+| `light/outranked` | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | `lamp-skills`, a run's own subscription: the run says what was over its light in its journal and at its give-back ([skills.md](skills.md)) |
 | `diagnostics` | every part that says how it is: the voice, the eyes, the body, the policy, and the board through the health program | the health program |
 | `lamp/health`, `board/state` | the health program ([health.md](health.md)) | `lamp-health`, the command |
 
