@@ -24,7 +24,7 @@
 //!   judged. Over the lamp's voice the model hears the lamp: on lamp-4ace's
 //!   recordings it was right no more often than chance.
 //! - **Only a line of [`LEAST_SAMPLES`] or more**, of which the first
-//!   [`MOST_SAMPLES`] are judged, asked for as soon as they are heard.
+//!   [`ASKED_AT`] are judged, asked for as soon as they are heard.
 //! - **The conversation's voice** is the last voice the lamp answered that
 //!   was long enough to know. An answered line too short to know keeps it,
 //!   unless it began a conversation of its own (answered for its name or a
@@ -55,8 +55,18 @@ pub const RATE: usize = 16_000;
 /// A line shorter than this is not judged: 1.5 s. Under it, the same voice
 /// was taken for another 7.7% of the time on lamp-4ace's recordings.
 pub const LEAST_SAMPLES: usize = RATE * 3 / 2;
-/// The first this much of a line is judged: 3 s, what the child takes.
+/// The most of a line the child takes: 3 s.
 pub const MOST_SAMPLES: usize = RATE * 3;
+/// A line is asked for as soon as this much of it is heard, and only this
+/// much is judged: the 0.3 s pre-roll each request begins with, then 1.5 s.
+/// Asked for at 3 s or at their ends, scene 3's two short lines were printed
+/// after their answers' first output on lamp-4ace on 18 October (#829). On
+/// lamp-4ace's October recordings the first 1.8 s told the voices apart no
+/// worse than the first 3 s, and the first 1.5 s took 6 of 37 same-voice
+/// pairs for two (`docs/verification/same-voice-early-20261018`).
+pub const ASKED_AT: usize =
+    LEAST_SAMPLES + crate::activity::PRE_ROLL_BLOCKS * lamp_audio::CAPTURE_SAMPLES;
+const _: () = assert!(ASKED_AT <= MOST_SAMPLES);
 /// Two prints with a cosine under this are plainly two voices. With both
 /// clips 1.5 s or longer and the lamp quiet, on lamp-4ace's recordings of
 /// three synthetic voices (`docs/verification/same-voice-20261015`), it
@@ -455,7 +465,7 @@ impl<P: Printer> Voices<P> {
     pub fn began(&mut self, request: u64, judged: bool) {
         self.clip = judged.then(|| Clip {
             request,
-            samples: Vec::with_capacity(MOST_SAMPLES),
+            samples: Vec::with_capacity(ASKED_AT),
         });
     }
 
@@ -464,10 +474,10 @@ impl<P: Printer> Voices<P> {
         let Some(clip) = self.clip.as_mut().filter(|clip| clip.request == request) else {
             return;
         };
-        let room = MOST_SAMPLES - clip.samples.len();
+        let room = ASKED_AT - clip.samples.len();
         clip.samples
             .extend_from_slice(&samples[..samples.len().min(room)]);
-        if clip.samples.len() == MOST_SAMPLES {
+        if clip.samples.len() == ASKED_AT {
             self.ask();
         }
     }
@@ -742,24 +752,30 @@ mod tests {
     }
 
     #[test]
-    fn a_line_is_judged_from_its_first_three_seconds_when_it_is_long_enough_and_said_with_the_lamp_quiet()
-     {
+    fn a_line_is_judged_from_its_first_1_8_s_when_it_is_long_enough_and_said_with_the_lamp_quiet() {
         let mut voices = Voices::new(StandIn::default());
-        // 3 s and more: asked for at 3 s, before the line ends.
+        // 1.8 s and more: asked for at 1.8 s, while it is still heard (#829:
+        // asked for at its end, a short line's print came too late on the
+        // lamp).
         voices.began(1, true);
-        for _ in 0..150 {
+        for _ in 1..ASKED_AT / 320 {
             voices.heard(1, &[1; 320]);
         }
-        assert_eq!(voices.printer.asked, [(1, MOST_SAMPLES)]);
+        assert!(voices.printer.asked.is_empty());
+        voices.heard(1, &[1; 320]);
+        assert_eq!(voices.printer.asked, [(1, ASKED_AT)]);
+        for _ in 0..60 {
+            voices.heard(1, &[1; 320]);
+        }
         voices.ended(1);
-        // 1.5 to 3 s: asked for at its end, all of it.
-        said(&mut voices, 2, 1, 32_000);
+        // 1.5 to 1.8 s: asked for at its end, all of it.
+        said(&mut voices, 2, 1, 25_600);
         // Under 1.5 s, or over the lamp: never.
         said(&mut voices, 3, 1, 22_400);
         voices.began(4, false);
         voices.heard(4, &[1; 32_000]);
         voices.ended(4);
-        assert_eq!(voices.printer.asked, [(1, MOST_SAMPLES), (2, 32_000)]);
+        assert_eq!(voices.printer.asked, [(1, ASKED_AT), (2, 25_600)]);
         // Sound of another line is not this one's.
         voices.began(5, true);
         voices.heard(6, &[1; 48_000]);

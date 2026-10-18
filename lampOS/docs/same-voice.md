@@ -83,9 +83,12 @@ plainly not the conversation's is no part of it
   `Start` that was admitted while a reply was in hand (`over_the_lamp`).
   Such a line, and a turn the lamp began itself, is never judged: with the
   lamp over it, the model hears the lamp (47.1% equal error, above).
-- **Only a line of 1.5 s or more** (`LEAST_SAMPLES`). Its first 3 s
-  (`MOST_SAMPLES`) are asked for as soon as they are heard, while the
-  person is still talking; a shorter line is asked for at its end.
+- **Only a line of 1.5 s or more** (`LEAST_SAMPLES`). Its first 1.8 s
+  (`ASKED_AT`: the request's 0.3 s pre-roll, then 1.5 s) are asked for as
+  soon as they are heard, while the person is still talking or in the
+  quiet that ends the line; a shorter line is asked for at its end. Asked
+  for at 3 s, scene 3's two short lines were printed too late on
+  lamp-4ace (below).
 - **The conversation's voice** is the last voice the lamp answered that was
   long enough to know. A print that comes after its answer was let out
   still becomes it. A line answered as the conversation going on that is
@@ -108,10 +111,13 @@ would usually answer it. That is why it is behind its own model path.
 **The bar** is the measurement above, synthetic voices only: with both
 clips 1.5 s or longer and the lamp quiet, 0.25 took none of 37 same-voice
 pairs for two voices and caught 19 of 29 pairs of two. Those were whole
-clips, up to 6.2 s, and the voice prints only a line's first 3 s: the
-reviewer on #1030 counted a clip longer than 3 s in 35 of the 37
-same-voice pairs and 21 of the 29 others. The pairs cut at 3 s are still
-to be run. A minute of two real people at the lamp is to set it.
+clips, up to 6.2 s, and the voice prints only a line's first 1.8 s.
+Cut as the worker prints them, with the pre-roll and, for a short line,
+the end silence (18 October,
+[verification](verification/same-voice-early-20261018/README.md)): at
+3 s, 0.25 took none of the 37 for two voices (the lowest 0.28) and caught
+22 of the 29; at 1.8 s, none (the lowest 0.32) and 22; at 1.5 s, 6 and
+26. A minute of two real people at the lamp is to set it.
 
 **What else the voice does with it** (the reviewer on #1030):
 - **Once a line.** A line's voice is judged, and said in the journal, once,
@@ -191,12 +197,25 @@ to be run. A minute of two real people at the lamp is to set it.
   busy (loading its model or printing another line)"), as it is for the
   15.5 s it loads after each start. And it says how long each print took
   from its ask ("its voice print came N ms after it was asked (S s of
-  sound)"), so a run with the check on times the child on the lamp. The
-  fix waits on that time: ask once a line has 1.5 s of its own speech, or
-  wait for the print at the verdict up to a bound. Tests:
-  `with_a_voice_check_whose_prints_come_late_the_scene_is_judged_without_it`
+  sound)"), so a run with the check on times the child on the lamp.
+  **The fix:** a line is asked for once 1.8 s of it is heard (`ASKED_AT`),
+  not at 3 s. Every line of scene 3 is 1.8 s or more as sent, so each is
+  asked for while it is still heard: B's follow-up 0.29 s before its End,
+  the umbrella line 0.68 s before, and their prints get that, plus
+  Gemini's own time to its first output, to come back. On lamp-4ace's
+  October recordings the first 1.8 s told the voices apart no worse than
+  the first 3 s (above). A line of 1.5 to 1.8 s as sent (0.6 to 0.9 s of
+  speech) is still asked for at its End, and on the lamp is likely judged
+  without the check. If the child on the A733 takes longer than a line's
+  head start and Gemini's time together, the journal says so and the
+  next step is to wait for the print at the verdict up to a bound. Tests:
+  `with_a_voice_check_whose_prints_take_the_lamps_time_the_scene_is_judged_with_it`
   (the scene at the lamp's lengths with a stand-in child that answers a
-  line asked at its end after its verdict, as on the lamp),
+  line asked for while it is heard at once and one asked at its end after
+  its verdict, as on the lamp: with the fix A's call is answered and the
+  four lines after it are held; asked for at 3 s, it gives the lamp's
+  `[true, true, true, false, false]`),
+  `a_line_is_judged_from_its_first_1_8_s_when_it_is_long_enough_and_said_with_the_lamp_quiet`,
   `a_print_is_coming_from_its_first_sample_until_it_comes` and
   `a_line_judged_without_the_check_says_which_print_was_missing`. The
   worker's journal line itself is not checked by a test.

@@ -1038,10 +1038,12 @@ async fn with_the_switch_and_a_voice_check_another_voice_ends_the_conversation()
 }
 
 /// Voice prints as [`TwoVoices`] makes them, but late for a line asked for
-/// at its end: only a line that reaches 3 s while it is heard is printed at
-/// once. One shorter, asked for at its end, is answered on the second look,
-/// after its answer's verdict, as the child on lamp-4ace answered requests
-/// 18 and 19 on 18 October (#829, the first builder at 06:54).
+/// at its end: a line asked for while it is heard, at its first
+/// [`crate::same_voice::ASKED_AT`], is printed at once, as A's call, asked
+/// for while heard, was on lamp-4ace. One shorter, asked for at its end, is
+/// answered on the second look, after its answer's verdict, as the child on
+/// lamp-4ace answered requests 18 and 19 on 18 October (#829, the first
+/// builder at 06:54).
 #[derive(Default)]
 struct LatePrints {
     ready: std::collections::VecDeque<(u64, std::result::Result<Vec<f32>, String>)>,
@@ -1055,7 +1057,7 @@ impl crate::same_voice::Printer for LatePrints {
         } else {
             vec![0.0, 1.0]
         };
-        if samples.len() >= crate::same_voice::MOST_SAMPLES {
+        if samples.len() == crate::same_voice::ASKED_AT {
             self.ready.push_back((request, Ok(print)));
         } else {
             self.late.push_back((request, Ok(print), false));
@@ -1081,17 +1083,18 @@ impl crate::same_voice::Printer for LatePrints {
 }
 
 /// #829, lamp-4ace on 18 October at `6ea956900` with the check on: scene 3
-/// at the lamp's lengths, with the prints as the lamp's child gave them. A's
-/// call, 3 s and more as sent, is printed while it is heard. B's follow-up
-/// and umbrella line, shorter, are asked for only at their ends, and their
-/// prints come after their verdicts: both are judged without the check and
-/// played, as on the lamp, and B's late print becomes the conversation's
-/// voice. A's own remark after them, printed in time, is then the other
-/// voice. With every print in time, scene 3 goes as
+/// at the lamp's lengths, with the prints as the lamp's child gave them: in
+/// time for a line asked for while it is heard, after the verdict for one
+/// asked for at its end. Every line of the scene is 1.8 s or more as sent,
+/// so each is asked for while it is heard and judged with the check: A's
+/// call is answered, and B's follow-up, in another voice, is held and ends
+/// the conversation, as
 /// `with_the_switch_and_a_voice_check_another_voice_ends_the_conversation`
-/// says.
+/// says with every print in time. Asked for at 3 s, as on the lamp, B's
+/// follow-up and umbrella line were asked for only at their ends, judged
+/// without the check and played (`[true, true, true, false, false]`).
 #[tokio::test(start_paused = true)]
-async fn with_a_voice_check_whose_prints_come_late_the_scene_is_judged_without_it() {
+async fn with_a_voice_check_whose_prints_take_the_lamps_time_the_scene_is_judged_with_it() {
     let _clock = logical_clock();
     let _mark = OwnMark::kept();
     let _room = OwnRoom::fresh();
@@ -1128,7 +1131,7 @@ async fn with_a_voice_check_whose_prints_come_late_the_scene_is_judged_without_i
         played.push(voice_line(&mut rig, &mut dial, false, voice, SENT + blocks, text, true).await);
     }
     rig.stop().await;
-    assert_eq!(played, [true, true, true, false, false]);
+    assert_eq!(played, [true, false, false, false, false]);
 }
 
 /// #829, through the worker's own loop, with a conversation going on: after
