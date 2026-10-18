@@ -16,6 +16,7 @@ use lamp_bus::Bus;
 use lamp_policy::{
     decide::{DEFAULT_DEADLINE, DEFAULT_ENDPOINT, DEFAULT_MODEL, Endpoint, Jev},
     gather::PAUSE,
+    hedge::Hedged,
     hello::{self, Hello},
     moment::{self, Moment},
     pictures::{self, Pictures},
@@ -31,7 +32,7 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "usage: lamp-policy --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR [--endpoint URL] [--model NAME] [--deadline-ms N] [--bus-root ABSOLUTE_DIR] [--progress] [--hello] [--utc-offset-minutes N | --zone system|NAME] [--act progress] [--act hello] [--rules] [--act attention] [--attention-next] [--rule-decides KIND[;KIND...]] [--gate] [--images MODEL [--sight-file ABSOLUTE_PATH]]";
+const USAGE: &str = "usage: lamp-policy --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR [--endpoint URL] [--model NAME] [--deadline-ms N] [--hedge-after-ms N] [--bus-root ABSOLUTE_DIR] [--progress] [--hello] [--utc-offset-minutes N | --zone system|NAME] [--act progress] [--act hello] [--rules] [--act attention] [--attention-next] [--rule-decides KIND[;KIND...]] [--gate] [--images MODEL [--sight-file ABSOLUTE_PATH]]";
 const HELP: &str = "The lamp's policy, in shadow mode: judges whether each thing the voice hears was said to\n\
 the lamp, publishes the decision on the bus (policy/decisions) and writes it down. Nothing\n\
 acts on it. See docs/policy.md.\n\
@@ -43,6 +44,9 @@ acts on it. See docs/policy.md.\n\
                  plain http only to this machine, for a test\n\
   --model        the model asked for (default typesafe/jev-1.13)\n\
   --deadline-ms  how long one asking may take, from 1 to 60000 (default 3000); after it a rule decides\n\
+  --hedge-after-ms  a question not answered in this many ms (1 to 60000) is asked again on a second\n\
+                 connection, and the first answer is taken; each second asking is in the journal. Off\n\
+                 unless set\n\
   --bus-root     the bus's directory (default LAMP_BUS_ROOT, or /run/lampos-bus)\n\
   --progress     also judge, in shadow, whether progress of the work handed over (tasks/status)\n\
                  is worth telling now, with a second connection to the same model. Off unless set\n\
@@ -122,6 +126,9 @@ struct Arguments {
     /// The kinds of attention decision the rule makes alone (`--rule-decides`,
     /// #705): none unless set.
     rule_decides: Vec<lamp_policy::replay::Kind>,
+    /// A question unanswered this long is asked again on a second
+    /// connection (`--hedge-after-ms`, #1522): off unless set.
+    hedge_after: Option<Duration>,
     /// The images model asked with the eyes' frame (`--images`, #871): off
     /// unless set.
     images: Option<String>,
@@ -139,6 +146,7 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
     let mut gate = false;
     let mut attention_next = false;
     let mut rule_decides: Option<Vec<lamp_policy::replay::Kind>> = None;
+    let mut hedge_after = None;
     let (mut images, mut sight_file) = (None, None);
     let mut arguments = arguments;
     while let Some(option) = arguments.next() {
@@ -250,6 +258,16 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
                     .replace(Duration::from_millis(milliseconds))
                     .is_some()
             }
+            "--hedge-after-ms" => {
+                let milliseconds = value
+                    .parse::<u64>()
+                    .ok()
+                    .filter(|milliseconds| (1..=60_000).contains(milliseconds))
+                    .ok_or("--hedge-after-ms is a whole number from 1 to 60000")?;
+                hedge_after
+                    .replace(Duration::from_millis(milliseconds))
+                    .is_some()
+            }
             other => return Err(format!("unknown option {other}")),
         };
         if twice {
@@ -294,6 +312,7 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
         gate,
         attention_next,
         rule_decides: rule_decides.unwrap_or_default(),
+        hedge_after,
         images,
         sight_file,
     }))
@@ -326,6 +345,9 @@ fn questions(arguments: &Arguments) -> String {
     }
     if !arguments.rule_decides.is_empty() {
         said.push_str(&format!(" rule_decides={}", arguments.rule_decides.len()));
+    }
+    if let Some(after) = arguments.hedge_after {
+        said.push_str(&format!(" hedge_after_ms={}", after.as_millis()));
     }
     let acting: Vec<&str> = [
         (arguments.act_progress, "progress"),
@@ -434,20 +456,24 @@ fn run(arguments: &Arguments) -> io::Result<()> {
     } else {
         None
     };
-    policy::run_beside(
-        &bus,
-        jev,
-        &options,
-        &stop,
-        &mut |note| log(&note.to_string()),
-        Beside {
-            progress,
-            hello,
-            pictures,
-            attention_next: arguments.attention_next,
-            rule_decides: arguments.rule_decides.clone(),
-        },
-    )
+    let beside = Beside {
+        progress,
+        hello,
+        pictures,
+        attention_next: arguments.attention_next,
+        rule_decides: arguments.rule_decides.clone(),
+    };
+    let say = &mut |note: policy::Note| log(&note.to_string());
+    match arguments.hedge_after {
+        // A second judge with its own connection, asked only when the
+        // first is slow (#1522).
+        Some(after) => {
+            let second = Jev::new(&arguments.endpoint, &arguments.model, &arguments.key_file)?;
+            let hedged = Hedged::new([jev, second], after, Arc::new(|line: &str| log(line)))?;
+            policy::run_beside(&bus, hedged, &options, &stop, say, beside)
+        }
+        None => policy::run_beside(&bus, jev, &options, &stop, say, beside),
+    }
     .map(|_| ())
 }
 
@@ -514,6 +540,7 @@ mod tests {
                 gate: false,
                 attention_next: false,
                 rule_decides: Vec::new(),
+                hedge_after: None,
                 images: None,
                 sight_file: None,
             }
@@ -539,6 +566,7 @@ mod tests {
                 gate: false,
                 attention_next: false,
                 rule_decides: Vec::new(),
+                hedge_after: None,
                 images: None,
                 sight_file: None,
             }
@@ -654,6 +682,29 @@ mod tests {
         );
         assert_eq!(of("--help").unwrap(), None);
         assert_eq!(of("-h").unwrap(), None);
+    }
+
+    #[test]
+    fn a_second_asking_is_set_from_1_to_60000_ms_and_said_at_the_start() {
+        let with = |more: &[&str]| {
+            let mut words: Vec<String> = ["--key-file", "/k", "--log-dir", "/d"]
+                .map(str::to_owned)
+                .into();
+            words.extend(more.iter().map(|word| (*word).to_owned()));
+            parse(words.into_iter())
+        };
+        let read = with(&["--hedge-after-ms", "550"]).unwrap().unwrap();
+        assert_eq!(read.hedge_after, Some(Duration::from_millis(550)));
+        assert_eq!(questions(&read), " hedge_after_ms=550");
+        assert_eq!(with(&[]).unwrap().unwrap().hedge_after, None);
+        for refused in [
+            &["--hedge-after-ms", "0"][..],
+            &["--hedge-after-ms", "60001"],
+            &["--hedge-after-ms", "soon"],
+            &["--hedge-after-ms", "550", "--hedge-after-ms", "550"],
+        ] {
+            assert!(with(refused).is_err(), "{refused:?}");
+        }
     }
 
     /// `--rule-decides` (#705): kinds as `--agreement` prints them, said on
