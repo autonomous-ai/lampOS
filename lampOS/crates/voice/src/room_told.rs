@@ -116,7 +116,8 @@ pub const TALK_ENDS_CONVERSATION: usize = 2;
 /// seconds after which a request the model leaves alone is closed.
 const SETTLED_US: u64 = 6_000_000;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Room {
     Unknown,
     Quiet,
@@ -467,14 +468,44 @@ impl Default for RoomTold {
     }
 }
 
-/// The provider worker's arguments for the two switches in the
-/// environment.
+/// Where the coordinator reads the path of the room's file (#1465): the
+/// room and its clocks, kept so that a voice started again a moment later
+/// knows the room it left, instead of not knowing it for five minutes. On
+/// lamp-4ace on 18 October at 10:57, a minute after the voice had been
+/// restarted for an install, the Policy read the room as unknown and held a
+/// plain follow-up. An absolute short path, as the thread's
+/// (`crate::thread`); unset, the room is in memory only. Off unless set.
+pub const FILE_ENVIRONMENT: &str = "LAMP_ROOM_FILE";
+/// The provider worker's flag for it, with the path, after
+/// [`CUT_INS_FLAG`].
+pub const FILE_FLAG: &str = "--room-file";
+/// A file written longer ago than this is not taken: the room may have
+/// changed since in ways no voice heard. Five minutes, as a quiet room
+/// takes to be known.
+const KEPT_FOR_US: u64 = QUIET_AFTER_US;
+/// The file is written within a second of the room changing, and this
+/// often besides, so that a quiet room that has not changed for an hour
+/// is still taken back.
+const KEPT_EVERY_US: u64 = 30_000_000;
+
+/// The provider worker's arguments for the switches and the room's file
+/// in the environment.
 pub fn arguments_from_environment() -> Vec<String> {
     let mut arguments = arguments(std::env::var(ENVIRONMENT).ok().as_deref());
     arguments.extend(cut_ins_arguments(
         std::env::var(CUT_INS_ENVIRONMENT).ok().as_deref(),
     ));
+    arguments.extend(file_arguments(
+        std::env::var(FILE_ENVIRONMENT).ok().as_deref(),
+    ));
     arguments
+}
+
+fn file_arguments(value: Option<&str>) -> Vec<String> {
+    value
+        .filter(|path| crate::thread::usable(std::path::Path::new(path)))
+        .map(|path| vec![FILE_FLAG.to_owned(), path.to_owned()])
+        .unwrap_or_default()
 }
 
 fn arguments(value: Option<&str>) -> Vec<String> {
@@ -510,6 +541,151 @@ pub fn take_cut_ins(flags: &[String]) -> (bool, &[String]) {
     }
 }
 
+/// Take a leading `--room-file PATH` off a worker's flags, after
+/// [`take_cut_ins`].
+pub fn take_file(flags: &[String]) -> std::io::Result<(Option<std::path::PathBuf>, &[String])> {
+    match flags {
+        [flag, path, rest @ ..]
+            if flag == FILE_FLAG && crate::thread::usable(std::path::Path::new(path)) =>
+        {
+            Ok((Some(path.into()), rest))
+        }
+        [flag, ..] if flag == FILE_FLAG => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "the room's file needs a short absolute path",
+        )),
+        _ => Ok((None, flags)),
+    }
+}
+
+/// The room as its file keeps it: the room and its clocks, nothing of the
+/// requests, which end with the worker that heard them.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Kept {
+    /// The boot it was written in, as hex: a file from another boot is
+    /// never taken, since the clocks below are that boot's.
+    pub boot: String,
+    /// When it was written, by the shared monotonic clock.
+    pub at_us: u64,
+    pub room: Room,
+    pub quiet_since_us: Option<u64>,
+    pub watching_since_us: Option<u64>,
+    pub last_talk_us: Option<u64>,
+    pub last_sound_us: u64,
+}
+
+impl Kept {
+    /// The same room and clocks, whenever written.
+    fn same(&self, other: &Self) -> bool {
+        Self {
+            at_us: 0,
+            ..self.clone()
+        } == Self {
+            at_us: 0,
+            ..other.clone()
+        }
+    }
+}
+
+/// `bytes` as the boot the room's file names.
+pub fn boot_hex(bytes: [u8; 16]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+impl RoomTold {
+    /// The room and its clocks now, for its file.
+    pub fn kept(&self, boot: &str, now_us: u64) -> Kept {
+        Kept {
+            boot: boot.to_owned(),
+            at_us: now_us,
+            room: self.room,
+            quiet_since_us: self.quiet_since_us,
+            watching_since_us: self.watching_since_us,
+            last_talk_us: self.last_talk_us,
+            last_sound_us: self.last_sound_us,
+        }
+    }
+
+    /// The room a voice before this one kept, taken if it is from this
+    /// boot and was written within [`KEPT_FOR_US`]: how old it was, or why
+    /// it is not taken. Taken, the room and its clocks are as they were:
+    /// a quiet room is quiet at once, a busy one ends as it would have,
+    /// and the time no voice was listening counts as nothing heard.
+    pub fn take_back(&mut self, kept: &Kept, boot: &str, now_us: u64) -> Result<u64, String> {
+        if kept.boot != boot {
+            return Err("it is from another boot".into());
+        }
+        let age = now_us
+            .checked_sub(kept.at_us)
+            .ok_or("it was written later than now")?;
+        if age > KEPT_FOR_US {
+            return Err(format!("it is {} s old", age / 1_000_000));
+        }
+        self.room = kept.room;
+        self.quiet_since_us = kept.quiet_since_us;
+        self.watching_since_us = kept.watching_since_us;
+        self.last_talk_us = kept.last_talk_us;
+        self.last_sound_us = kept.last_sound_us;
+        Ok(age)
+    }
+}
+
+/// At the worker's start: the room kept in `path`, taken back into `room`
+/// if it may be, and the journal's line for it. Nothing for a lamp's first
+/// start, when there is no file yet.
+pub fn take_back_from(
+    path: &std::path::Path,
+    room: &mut RoomTold,
+    boot: &str,
+    now_us: u64,
+) -> Option<String> {
+    let text = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(error) => return Some(format!("the room's file could not be read: {error}")),
+    };
+    let kept: Kept = match serde_json::from_str(&text) {
+        Ok(kept) => kept,
+        Err(error) => return Some(format!("the room's file is not one: {error}")),
+    };
+    Some(match room.take_back(&kept, boot, now_us) {
+        Ok(age) => format!(
+            "the room as it was {} s ago: {}",
+            age / 1_000_000,
+            match kept.room {
+                Room::Unknown => "not yet known",
+                Room::Quiet => "quiet",
+                Room::Busy => "busy",
+            }
+        ),
+        Err(why) => format!("the room's file is not taken: {why}"),
+    })
+}
+
+/// In the worker's loop, about once a second: the room written to `path`
+/// when it has changed since `last`, or [`KEPT_EVERY_US`] after it was last
+/// written. A file that cannot be written loses the room at the next start
+/// and nothing else.
+pub fn keep_in(
+    path: &std::path::Path,
+    room: &RoomTold,
+    boot: &str,
+    now_us: u64,
+    last: &mut Option<Kept>,
+) -> std::io::Result<bool> {
+    let kept = room.kept(boot, now_us);
+    if last
+        .as_ref()
+        .is_some_and(|last| last.same(&kept) && now_us.saturating_sub(last.at_us) < KEPT_EVERY_US)
+    {
+        return Ok(false);
+    }
+    let text = serde_json::to_string(&kept).map_err(std::io::Error::other)?;
+    crate::thread::write_file(path, &text)?;
+    *last = Some(kept);
+    Ok(true)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -521,6 +697,118 @@ mod tests {
         room.heard(request, at * S);
         room.hearing((at + 1) * S);
         room.ended(request, (at + 2) * S);
+    }
+
+    const BOOT: &str = "0123456789abcdef0123456789abcdef";
+
+    /// #1465, the first builder at 10:57 on lamp-4ace: a voice started
+    /// again a minute after it left a quiet room knows the room is quiet at
+    /// once, not five minutes later. A busy room taken back ends three
+    /// minutes after its last talk, as it would have. A room kept by
+    /// another boot, or longer ago than five minutes, is not taken.
+    #[test]
+    fn a_room_kept_by_the_voice_before_is_taken_back_if_from_this_boot_and_under_five_minutes_old()
+    {
+        let mut before = RoomTold::new();
+        before.count_only_talk(true);
+        assert_eq!(before.at(0), Room::Unknown);
+        assert_eq!(before.at(301 * S), Room::Quiet);
+        let kept = before.kept(BOOT, 302 * S);
+        // A minute later, a new voice.
+        let mut after = RoomTold::new();
+        after.count_only_talk(true);
+        assert_eq!(after.take_back(&kept, BOOT, 362 * S), Ok(60 * S));
+        assert_eq!(after.at(362 * S), Room::Quiet);
+        // Without it, a new voice doesn't know for five minutes.
+        let mut fresh = RoomTold::new();
+        fresh.count_only_talk(true);
+        assert_eq!(fresh.at(362 * S), Room::Unknown);
+        // Another boot, or over five minutes: not taken.
+        let mut other = RoomTold::new();
+        assert_eq!(
+            other.take_back(&kept, "ffffffffffffffffffffffffffffffff", 362 * S),
+            Err("it is from another boot".into())
+        );
+        assert_eq!(
+            other.take_back(&kept, BOOT, 603 * S),
+            Err("it is 301 s old".into())
+        );
+        assert_eq!(other.at(603 * S), Room::Unknown);
+        // A busy room ends 3 min after its last talk, restart or not.
+        let mut busy = RoomTold::new();
+        busy.count_only_talk(true);
+        for (request, at) in [(1, 0), (2, 15), (3, 30)] {
+            said(&mut busy, request, at);
+            busy.unanswered(request, (at + 6) * S);
+        }
+        assert_eq!(busy.at(40 * S), Room::Busy);
+        let kept = busy.kept(BOOT, 41 * S);
+        let mut after = RoomTold::new();
+        after.count_only_talk(true);
+        assert!(after.take_back(&kept, BOOT, 70 * S).is_ok());
+        assert_eq!(after.at(70 * S), Room::Busy);
+        assert_eq!(after.at(215 * S), Room::Busy);
+        assert_eq!(after.at(217 * S), Room::Quiet);
+    }
+
+    /// The room's file: written when the room changes and every 30 s
+    /// besides, whole, and read back at the next start with one line
+    /// saying what was taken. No file is no line; a broken one is said.
+    #[test]
+    fn the_room_goes_to_its_file_and_comes_back_from_it() {
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-room-file-{}-{:x}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .subsec_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("room.json");
+        let mut fresh = RoomTold::new();
+        assert_eq!(take_back_from(&path, &mut fresh, BOOT, S), None);
+        let mut room = RoomTold::new();
+        assert_eq!(room.at(0), Room::Unknown);
+        assert_eq!(room.at(301 * S), Room::Quiet);
+        let mut last = None;
+        assert!(keep_in(&path, &room, BOOT, 301 * S, &mut last).unwrap());
+        // Unchanged: not written again within 30 s, and written after.
+        assert!(!keep_in(&path, &room, BOOT, 320 * S, &mut last).unwrap());
+        assert!(keep_in(&path, &room, BOOT, 332 * S, &mut last).unwrap());
+        let mut after = RoomTold::new();
+        assert_eq!(
+            take_back_from(&path, &mut after, BOOT, 350 * S).as_deref(),
+            Some("the room as it was 18 s ago: quiet")
+        );
+        assert_eq!(after.at(350 * S), Room::Quiet);
+        std::fs::write(&path, "not json").unwrap();
+        assert!(
+            take_back_from(&path, &mut RoomTold::new(), BOOT, 350 * S)
+                .is_some_and(|line| line.starts_with("the room's file is not one"))
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn the_room_files_flag_takes_a_short_absolute_path_after_the_switches() {
+        assert_eq!(
+            file_arguments(Some("/run/lampos-voice/room.json")),
+            [FILE_FLAG, "/run/lampos-voice/room.json"]
+        );
+        assert!(file_arguments(Some("room.json")).is_empty());
+        assert!(file_arguments(None).is_empty());
+        let flags = [CUT_INS_FLAG, FILE_FLAG, "/run/room.json", "--rest"].map(str::to_owned);
+        let (cut_ins, rest) = take_cut_ins(&flags);
+        assert!(cut_ins);
+        let (file, rest) = take_file(rest).unwrap();
+        assert_eq!(
+            file.as_deref(),
+            Some(std::path::Path::new("/run/room.json"))
+        );
+        assert_eq!(rest, ["--rest"]);
+        assert!(take_file(&[FILE_FLAG.to_owned(), "room.json".into()]).is_err());
+        assert_eq!(boot_hex([0xab; 16]), "ab".repeat(16));
     }
 
     /// #828, the first builder at 10:14: three cut-ins over the lamp's

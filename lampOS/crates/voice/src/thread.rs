@@ -703,7 +703,7 @@ const GOING_ON: &str = "\n\nA moment ago\nThis is what you and the person at you
 pub const FILE_FLAG: &str = "--thread-file";
 pub const FILE_ENVIRONMENT: &str = "LAMP_THREAD_FILE";
 
-fn usable(path: &Path) -> bool {
+pub(crate) fn usable(path: &Path) -> bool {
     path.is_absolute()
         && path.as_os_str().len() <= 200
         && !path

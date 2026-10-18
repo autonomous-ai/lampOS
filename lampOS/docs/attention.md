@@ -1620,6 +1620,51 @@ and `provider_worker::tests::a_request_begun_over_the_lamps_voice_is_kept_out_of
 (the Start's mark reaching the room, a reply only in hand not marking, and
 the flag's place for both workers).
 
+## The room after a restart (#1465)
+
+Off unless `LAMP_ROOM_FILE` names a file (the worker's `--room-file PATH`,
+right after `--cut-ins-not-talk`), as the thread's `LAMP_THREAD_FILE` does.
+
+**Why:** the room is judged in the provider worker's process
+(`room_told.rs`) and starts unknown in each new one. Quiet is known only
+after five minutes with nothing heard, and busy only after a run of talk.
+On lamp-4ace on 18 October at 10:57, a minute after the voice had been
+restarted for an install, "Thanks. Now turn yourself back up a little,
+please.", with no name, came 13 s after a named ask the lamp had answered.
+The Policy read the room as `unknown` and held its `volume_up` (#1465).
+
+**What it does:**
+- The room and its clocks go to the file within a second of changing, and
+  every 30 s besides: the room, when quiet began to be watched, when
+  watching began, the last talk and the last sound, on the shared
+  monotonic clock, with the boot. Whole or not at all, owner-only, as the
+  thread's file. Nothing about requests goes: those end with the worker
+  that heard them.
+- At the worker's start, a file from this boot written within the last
+  five minutes is taken back. A quiet room is then quiet at once, and a
+  busy one ends three minutes after its last talk, as it would have. The
+  time no voice was listening counts as nothing heard. An older file, or
+  one from another boot, is not taken: the room may have changed in ways
+  no voice heard.
+- The journal says what was taken ("the room as it was 41 s ago: quiet"),
+  or why not ("the room's file is not taken: it is 412 s old"), or that
+  the file couldn't be written, once.
+- `room/state` publishes the room taken back on the worker's first tick,
+  and a new session is told it as before.
+
+**What it costs:** a room taken back may be wrong if it changed while the
+voice was down. People who began to talk in those seconds are counted as
+before from the next thing left unanswered. Only a restart under five
+minutes is taken back.
+
+**Not shown:** on a lamp. The first builder's check is a deliberate voice
+restart in a quiet room, then the 10:57 follow-up: its `context.room`
+should read `quiet` (with Eighth's #1474 for the `volume_up` itself).
+
+Tests: `room_told::tests::a_room_kept_by_the_voice_before_is_taken_back_if_from_this_boot_and_under_five_minutes_old`,
+`the_room_goes_to_its_file_and_comes_back_from_it` and
+`the_room_files_flag_takes_a_short_absolute_path_after_the_switches`.
+
 ## Switch
 
 `LAMP_ATTENTION=on` in the voice unit (the worker's `--attention`). Off by
@@ -1671,6 +1716,10 @@ day's own bars (the worker's `--spoken-to-by-day`, right after
 after `--room-facts`): a line said while the lamp's answer could be heard,
 and left unanswered, is not counted toward a busy room (above). Off by default; not
 on any lamp.
+
+`LAMP_ROOM_FILE=/run/lampos-voice/room.json` (the worker's `--room-file
+PATH`, right after `--cut-ins-not-talk`): the room is kept across a
+restart of under five minutes (above). Off by default; not on any lamp.
 
 `LAMP_HEAD_TOUCH=on` (the worker's `--head-touch`, right after the name
 note's flags; nothing without `LAMP_BUS=on` and Controls run with
