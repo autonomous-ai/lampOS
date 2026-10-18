@@ -90,14 +90,20 @@ conversation going on (`going_on`), no look owed, once a session and at most
 once in 30 s (`src/session_tools.rs`). The session after it is opened fresh,
 not resumed: Google's resumption with other functions is not tested on a
 person's lamp (the first builder on #1472); the thread's recall carries the
-conversation. The journal says it (`lamp-voice provider: the executive's
-functions changed (+8 (light_brighter, light_colour, light_cooler, …) -0); a
-new session is opened between turns`), and each session's setup says what it
-was given: `lamp-voice: session functions: 22 declared; the executive's 17
-(light 8, volume 4, other 5)`, with `; no light functions: the ring is not
-up` when the light's are missing, or `; the executive's catalog is not
-there`. On by default: nothing changes for a session whose catalog never
-changes. Not yet seen on a lamp.
+conversation. Each session's setup says what it was given, with `; no light
+functions: the ring is not up` when the light's are missing, or `; the
+executive's catalog is not there`. On by default: nothing changes for a
+session whose catalog never changes.
+
+Seen on lamp-4ace on 18 Oct at 12:47–12:50 (#1484), the voice stopped for
+20 s so lamp-actions dropped the light's functions, then started:
+
+    lamp-voice: session functions: 24 declared; the executive's 10 (light 0, volume 4, other 6); no light functions: the ring is not up
+    lamp-voice provider: the executive's functions changed (+7 (light_brighter, light_colour, light_cooler, …) -0); a new session is opened between turns
+    lamp-voice: session functions: 31 declared; the executive's 17 (light 7, volume 4, other 6)
+
+and then "make your light a little dimmer" and "… a little brighter" ran
+`light_dimmer` and `light_brighter` (30 and 46 ms).
 
 A call is one line to the socket and one line back, on a connection of its
 own:

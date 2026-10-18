@@ -114,7 +114,8 @@ impl Change {
 }
 
 impl std::fmt::Display for Change {
-    /// `+8 (light_on, light_off, …) -0`: counts, and the first few names.
+    /// `+7 (light_brighter, light_colour, light_cooler, …) -0`: counts, and
+    /// the first few names, as lamp-4ace said it on 18 Oct at 12:48.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let some = |names: &[String]| {
             let shown: Vec<&str> = names.iter().take(3).map(String::as_str).collect();

@@ -886,6 +886,18 @@ impl Recalling {
     }
 }
 
+impl Recalling {
+    /// Whether the session being opened may present a resumption handle:
+    /// not once the person at the lamp has changed, nor for a session
+    /// renewed for a changed catalog, which is opened fresh because
+    /// Google's resumption with other functions is not tested (#1472). The
+    /// renewal's flag is taken here, once.
+    fn presents_handle(&mut self) -> bool {
+        let renewed = self.given.as_ref().is_some_and(|given| given.take_fresh());
+        !renewed && !self.fresh_only
+    }
+}
+
 impl Connect for Recalling {
     fn connect(&mut self, session: SessionId, mut resume: Option<ResumptionHandle>) -> Attempt {
         // The session is for whoever is at the lamp now, and only theirs:
@@ -897,10 +909,7 @@ impl Connect for Recalling {
             }
             Err(_) => None,
         };
-        // A session renewed for a changed catalog is opened fresh: Google's
-        // resumption with other functions is not tested (#1472).
-        let renewed = self.given.as_ref().is_some_and(|given| given.take_fresh());
-        if renewed || self.fresh_only {
+        if !self.presents_handle() {
             resume = None;
         }
         let mut time = crate::local_time::told_here(self.tools.clock);
@@ -1007,6 +1016,32 @@ mod tests {
         catalog(&["volume_up", "light_colour"]);
         assert_eq!(declared(&recalling), ["volume_up", "light_colour"]);
         let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// The reviewer on #1484: a session renewed for a changed catalog
+    /// presents no handle, once; the next presents one again, unless the
+    /// person at the lamp has changed, after which none ever does.
+    #[test]
+    fn a_session_renewed_for_its_functions_is_opened_without_a_handle_once() {
+        let given = std::sync::Arc::new(crate::session_tools::Given::default());
+        let mut recalling = Recalling::new(
+            SessionConfig::new(
+                lamp_gemini::GOOGLE_ENDPOINT,
+                lamp_gemini::Credential::api_key("test-only").unwrap(),
+            )
+            .unwrap(),
+        )
+        .given(given.clone());
+        assert!(recalling.presents_handle());
+        given.open_fresh();
+        assert!(!recalling.presents_handle());
+        assert!(recalling.presents_handle());
+        recalling.fresh_only = true;
+        assert!(!recalling.presents_handle());
+        assert!(!recalling.presents_handle());
+        // Without a record, as before #1472.
+        let mut plain = Recalling::new(recalling.config.clone());
+        assert!(plain.presents_handle());
     }
 
     const ROOM: usize = 8_192;
