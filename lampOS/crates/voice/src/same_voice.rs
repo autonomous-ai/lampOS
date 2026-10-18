@@ -72,8 +72,10 @@ const _: () = assert!(ASKED_AT <= MOST_SAMPLES);
 /// three synthetic voices (`docs/verification/same-voice-20261015`), it
 /// took none of 37 same-voice pairs for two voices and caught 19 of 29
 /// pairs of two. Those were whole clips, up to 6.2 s, where a line's first
-/// 3 s are judged here (the reviewer on #1030). A minute of two real people
-/// is to set it.
+/// 1.8 s ([`ASKED_AT`]) are judged here (the reviewer on #1030, the Seventh
+/// on #1445). Cut as the worker prints them, it took none of the 37 and
+/// caught 22 of the 29 (`docs/verification/same-voice-early-20261018`). A
+/// minute of two real people is to set it.
 pub const DIFFERENT_BELOW: f32 = 0.25;
 /// A child that has ended is started again after this long.
 pub const RESTART_AFTER: Duration = Duration::from_secs(5);
@@ -445,6 +447,10 @@ pub struct Voices<P: Printer> {
     /// The line last judged, so that it is judged, and said, once (the
     /// reviewer on #1030).
     judged: Option<u64>,
+    /// A line let out as the conversation going on whose print, come after
+    /// its verdict, was another voice's: the worker ends the conversation
+    /// at the next verdict ([`Self::take_late_other`]).
+    late_other: Option<u64>,
 }
 
 impl<P: Printer> Voices<P> {
@@ -457,6 +463,7 @@ impl<P: Printer> Voices<P> {
             conversation: None,
             answered: None,
             judged: None,
+            late_other: None,
         }
     }
 
@@ -534,12 +541,11 @@ impl<P: Printer> Voices<P> {
             self.asked.retain(|asked| *asked != request);
             match print {
                 Ok(print) => {
-                    if self
-                        .answered
-                        .is_some_and(|(answered, _)| answered == request)
+                    if let Some((_, new)) =
+                        self.answered.filter(|(answered, _)| *answered == request)
                     {
-                        self.conversation = Some(print.clone());
                         self.answered = None;
+                        self.adopt(request, print.clone(), !new);
                     }
                     if self.prints.len() == KEPT {
                         self.prints.pop_front();
@@ -605,6 +611,39 @@ impl<P: Printer> Voices<P> {
         }
     }
 
+    /// `print`, of the line `request` let out as the conversation going on
+    /// (`going_on`) or for itself, becomes the conversation's voice, unless
+    /// the line was let out as the conversation going on without being
+    /// judged and its print is another voice's. Then the conversation's
+    /// voice is kept, and the conversation is over (the Seventh on #1445: a
+    /// print that came after its verdict made the other person the
+    /// conversation's voice, so on a slow lamp scene 3 went on with B).
+    fn adopt(&mut self, request: u64, print: Vec<f32>, going_on: bool) {
+        let likeness = self
+            .conversation
+            .as_ref()
+            .filter(|_| going_on && self.judged != Some(request))
+            .and_then(|voice| cosine(voice, &print));
+        match likeness {
+            Some(likeness) if likeness < DIFFERENT_BELOW => {
+                eprintln!(
+                    "lamp-voice provider: request {request}: another voice than the conversation's, known after its answer (cosine {likeness:.2}): the conversation is over"
+                );
+                self.late_other = Some(request);
+            }
+            _ => self.conversation = Some(print),
+        }
+    }
+
+    /// A line let out as the conversation going on, known since for another
+    /// voice's: the conversation is over, as for one held (#1415). Taken at
+    /// the next line's verdict, once the lamp's answer to that line, which
+    /// began the count afresh, has been spoken.
+    pub fn take_late_other(&mut self) -> Option<u64> {
+        self.poll();
+        self.late_other.take()
+    }
+
     /// The answer to the line `request` was judged: let out (`played`) or
     /// not, as part of a conversation going on (`going_on`) or not.
     pub fn decided(&mut self, request: u64, played: bool, going_on: bool) {
@@ -612,8 +651,8 @@ impl<P: Printer> Voices<P> {
             return;
         }
         self.poll();
-        if let Some(print) = self.print(request) {
-            self.conversation = Some(print.clone());
+        if let Some(print) = self.print(request).cloned() {
+            self.adopt(request, print, going_on);
             return;
         }
         if self.print_coming(request) {
@@ -768,6 +807,14 @@ mod tests {
             voices.heard(1, &[1; 320]);
         }
         voices.ended(1);
+        // 1.8 s is 28,800 samples, so a 2 s line is asked for before its
+        // end (the Seventh on #1445: the rest of this test would pass with
+        // the ask at 3 s).
+        assert_eq!(ASKED_AT, 28_800);
+        voices.began(7, true);
+        voices.heard(7, &[1; 32_000]);
+        assert_eq!(voices.printer.asked, [(1, ASKED_AT), (7, ASKED_AT)]);
+        voices.ended(7);
         // 1.5 to 1.8 s: asked for at its end, all of it.
         said(&mut voices, 2, 1, 25_600);
         // Under 1.5 s, or over the lamp: never.
@@ -775,12 +822,15 @@ mod tests {
         voices.began(4, false);
         voices.heard(4, &[1; 32_000]);
         voices.ended(4);
-        assert_eq!(voices.printer.asked, [(1, ASKED_AT), (2, 25_600)]);
+        assert_eq!(
+            voices.printer.asked,
+            [(1, ASKED_AT), (7, ASKED_AT), (2, 25_600)]
+        );
         // Sound of another line is not this one's.
         voices.began(5, true);
         voices.heard(6, &[1; 48_000]);
         voices.ended(5);
-        assert_eq!(voices.printer.asked.len(), 2);
+        assert_eq!(voices.printer.asked.len(), 3);
     }
 
     /// A stand-in for the child: a shell script that writes a line to
@@ -907,6 +957,44 @@ mod tests {
         voices.decided(8, true, false);
         said(&mut voices, 9, 1, 48_000);
         assert_eq!(voices.likeness(9), Some(0.0));
+    }
+
+    /// The Seventh on #1445: the print of a line let out as the
+    /// conversation going on, come after its verdict, is compared before it
+    /// becomes the conversation's voice. Another voice's is not taken, and
+    /// the conversation is over; the same voice's is. One that began a
+    /// conversation of its own becomes its voice unchecked.
+    #[test]
+    fn a_late_print_is_compared_before_it_becomes_the_conversations_voice() {
+        let mut voices = Voices::new(StandIn::default());
+        said(&mut voices, 1, 1, 48_000);
+        voices.decided(1, true, false);
+        voices.printer.slow = true;
+        said(&mut voices, 2, -1, 48_000);
+        assert_eq!(voices.likeness(2), None);
+        voices.decided(2, true, true);
+        voices.printer.slow = false;
+        assert_eq!(voices.take_late_other(), Some(2));
+        assert_eq!(voices.take_late_other(), None);
+        // A's voice is still the conversation's.
+        said(&mut voices, 3, 1, 48_000);
+        assert_eq!(voices.likeness(3), Some(1.0));
+        voices.decided(3, true, true);
+        // The same voice, late: taken.
+        voices.printer.slow = true;
+        said(&mut voices, 4, 1, 48_000);
+        assert_eq!(voices.likeness(4), None);
+        voices.decided(4, true, true);
+        voices.printer.slow = false;
+        assert_eq!(voices.take_late_other(), None);
+        // B let out for her name, late: hers is the conversation's now.
+        voices.printer.slow = true;
+        said(&mut voices, 5, -1, 48_000);
+        voices.decided(5, true, false);
+        voices.printer.slow = false;
+        assert_eq!(voices.take_late_other(), None);
+        said(&mut voices, 6, -1, 48_000);
+        assert_eq!(voices.likeness(6), Some(1.0));
     }
 
     #[test]

@@ -88,13 +88,20 @@ plainly not the conversation's is no part of it
   18 October at 08:34, with the model set, the provider worker missed its
   controller's heartbeat (`provider controller heartbeat expired`) before
   the child was ready, and the restart guard muted the lamp. The child's
-  load is 15.5 s of one core there. At the voice's priority it shares the
-  voice's own threads' time and starves everything at ordinary priority.
-  That is the likely cause, read from the code, and is not yet shown on
-  the lamp. The same steps at 06:36 started cleanly. Tests:
-  `the_child_takes_the_ordinary_policy_a_little_below_ordinary_priority`
-  (Linux only; a test cannot take a real-time policy without privilege,
-  so the step from it is not shown) and, through the worker's own loop,
+  load is 15.5 s of one of its four cores there. At the voice's priority
+  it shares the voice's own threads' time and starves everything at
+  ordinary priority. That is the likely cause, read from the code (the
+  first builder agreed at 08:44), and is not yet shown on the lamp. The
+  same steps at 06:36 started cleanly. Tests, Linux only:
+  `the_child_takes_the_ordinary_policy_a_little_below_ordinary_priority`,
+  and `tests/priority.rs`'s
+  `the_spawned_child_does_not_keep_the_voices_real_time_class`: the real
+  `lamp-same-voice serve`, started from a thread at round-robin priority
+  20 where the machine allows a test that, is read while it waits to open
+  a model that is a FIFO nobody writes. Where a test may not take a
+  real-time class, as on GitHub's runners, it shows only the child
+  lowering its own niceness before the model is read. And, through the
+  worker's own loop,
   `a_child_still_loading_its_model_takes_nothing_from_the_worker` (a real
   child that never gets ready: every line is taken and answered as without
   the check; with the ask made to wait for the child, the service sees
@@ -111,7 +118,10 @@ plainly not the conversation's is no part of it
   lamp-4ace (below).
 - **The conversation's voice** is the last voice the lamp answered that was
   long enough to know. A print that comes after its answer was let out
-  still becomes it. A line answered as the conversation going on that is
+  still becomes it, unless the line was let out as the conversation going
+  on without being judged and its print is another voice's: then the
+  conversation's voice is kept and the conversation is over, as for a line
+  held (below). A line answered as the conversation going on that is
   too short to know keeps it. One too short to know that began a
   conversation of its own (answered for its name, a face or anything but
   the conversation) leaves no voice known.
@@ -189,8 +199,13 @@ the end silence (18 October,
     is held as another voice, which is the scene's own expectation for B's
     follow-up without a face or the name, and with this rule the
     conversation ends there. A's own short follow-up, in A's voice, stays
-    answered unless the model takes it for another: 7.7% of same-voice
-    pairs under 1.5 s on lamp-4ace's October recordings. Judging the bar
+    answered unless the model takes it for another. On lamp-4ace's October
+    recordings, cut as the worker prints them, 8 of the 38 same-voice
+    pairs with a line under 1.5 s fall under 0.25 at 1.8 s, and 7 at 3 s
+    (`verification/same-voice-early-20261018`). Seven of the eight are one
+    clip, `cut-q-03` (1.45 s), against its own voice's long lines, and with
+    this rule each such hold ends the conversation (the reviewer on #1445).
+    The clean cut of 15 October gave 7.7%. Judging the bar
     on a line's own speech instead would keep a 1.19 s line unjudged, and
     would put a 1.58 s one such as the umbrella line just under it.
   - Test: `with_the_switch_and_a_voice_check_another_voice_ends_the_conversation`
@@ -224,7 +239,10 @@ the end silence (18 October,
   the umbrella line 0.68 s before, and their prints get that, plus
   Gemini's own time to its first output, to come back. On lamp-4ace's
   October recordings the first 1.8 s told the voices apart no worse than
-  the first 3 s (above). A line of 1.5 to 1.8 s as sent (0.6 to 0.9 s of
+  the first 3 s at the bar's own pairs and over all pairs together
+  (above), but not for short lines: with a line under 1.5 s, an equal
+  error of 21.7% against 18.2%, and 8 same-voice pairs under 0.25 against
+  7. A line of 1.5 to 1.8 s as sent (0.6 to 0.9 s of
   speech) is still asked for at its End, and on the lamp is likely judged
   without the check. If the child on the A733 takes longer than a line's
   head start and Gemini's time together, the journal says so and the
@@ -239,6 +257,26 @@ the end silence (18 October,
   `a_print_is_coming_from_its_first_sample_until_it_comes` and
   `a_line_judged_without_the_check_says_which_print_was_missing`. The
   worker's journal line itself is not checked by a test.
+- **A late print of another voice ends the conversation** (the Seventh on
+  #1445). On a lamp where a print still comes after its line's verdict,
+  the line is let out as the conversation going on, and its print used to
+  become the conversation's voice unchecked: B's, after B's follow-up, so
+  scene 3 went on with B and A's remark was judged against B's voice. Now
+  the late print of a line let out as the conversation going on is
+  compared with the conversation's voice first. Another voice's (under
+  0.25) is not taken; the journal says "another voice than the
+  conversation's, known after its answer (cosine 0.12): the conversation
+  is over", and at the next line's verdict the conversation ends, as for a
+  line held as another voice (`RoomTold::another_voice_held`), that line
+  included. It's taken then, and not at once, because the lamp's answer to
+  the late line begins the count afresh (`RoomTold::spoke`). A line that
+  began a conversation of its own, for its name or a face, still makes its
+  late print the conversation's voice unchecked. Tests:
+  `with_a_voice_check_whose_every_print_comes_late_a_late_other_voice_ends_the_conversation`
+  (scene 3 with every print after its verdict: A's call and B's follow-up
+  are answered and the other three held; with the late print taken
+  unchecked, every line is played) and
+  `a_late_print_is_compared_before_it_becomes_the_conversations_voice`.
 - **The child is supervised, with bounds.** One that gives no answer to a
   line within 2 s (`ANSWER_WITHIN`) is killed and started again, with a
   journal line. One that ends 3 times in a row before it is ready
