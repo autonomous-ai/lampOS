@@ -121,14 +121,15 @@ struct Arguments {
     model: PathBuf,
     parent: Option<u32>,
     speed: Speed,
+    /// The real-time priority to lower itself to (`--realtime-priority`).
+    priority: Option<u8>,
 }
 
-const USAGE: &str =
-    "usage: lamp-turn-end --model PATH [--parent PID] [--fast [--runtime LIBRARY] [--no-spin]]";
+const USAGE: &str = "usage: lamp-turn-end --model PATH [--parent PID] [--realtime-priority N] [--fast [--runtime LIBRARY] [--no-spin]]";
 
 fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Arguments, String> {
     let (mut model, mut parent, mut fast, mut runtime) = (None, None, false, None);
-    let mut spin = true;
+    let (mut spin, mut priority) = (true, None);
     while let Some(argument) = arguments.next() {
         match argument.to_str() {
             Some("--fast") if !fast => {
@@ -139,11 +140,14 @@ fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Arguments, Str
                 spin = false;
                 continue;
             }
-            Some("--model" | "--parent" | "--runtime") => {}
+            Some("--model" | "--parent" | "--runtime" | "--realtime-priority") => {}
             _ => return Err(USAGE.into()),
         }
         let value = arguments.next().ok_or("missing option value")?;
         match argument.to_str() {
+            Some("--realtime-priority") if priority.is_none() => {
+                priority = Some(realtime_priority(value.to_str())?);
+            }
             Some("--model") if model.is_none() => model = Some(PathBuf::from(value)),
             Some("--runtime") if runtime.is_none() => runtime = Some(PathBuf::from(value)),
             Some("--parent") if parent.is_none() => {
@@ -165,7 +169,112 @@ fn parse(mut arguments: impl Iterator<Item = OsString>) -> Result<Arguments, Str
         model: model.ok_or("missing --model")?,
         parent,
         speed,
+        priority,
     })
+}
+
+/// A real-time priority from the command line: 1 to 99.
+fn realtime_priority(value: Option<&str>) -> Result<u8, String> {
+    value
+        .and_then(|value| value.parse::<u8>().ok())
+        .filter(|priority| (1..=99).contains(priority))
+        .ok_or_else(|| "--realtime-priority is 1 to 99".into())
+}
+
+/// Lowers the worker to real-time round-robin `priority` on its first
+/// thread, before any other thread starts, so that ONNX Runtime's pool
+/// starts at it too (#1608). The voice's capture, playback and coordinator
+/// threads run at round-robin 20, which the worker inherits; below it, a
+/// verdict still runs ahead of everything at ordinary priority, but any of
+/// those threads takes its core back at once. Only from a higher real-time
+/// priority: it never raises one, and leaves an ordinary policy (the
+/// simulator, a unit without real-time priority) as it is.
+#[cfg(target_os = "linux")]
+fn lower_realtime(priority: u8) -> Result<Taken, String> {
+    use thread_priority::{
+        RealtimeThreadSchedulePolicy, ThreadPriority, ThreadPriorityValue, ThreadSchedulePolicy,
+        set_thread_priority_and_policy, thread_native_id, thread_schedule_policy_param,
+    };
+    let thread = thread_native_id();
+    let read =
+        || thread_schedule_policy_param(thread).map_err(|error| format!("scheduling: {error}"));
+    let (policy, parameters) = read()?;
+    let ThreadSchedulePolicy::Realtime(
+        RealtimeThreadSchedulePolicy::RoundRobin | RealtimeThreadSchedulePolicy::Fifo,
+    ) = policy
+    else {
+        return Ok(Taken::Ordinary);
+    };
+    let from = parameters.sched_priority;
+    if from <= i32::from(priority) {
+        return Ok(Taken::Kept(from));
+    }
+    let round_robin = ThreadSchedulePolicy::Realtime(RealtimeThreadSchedulePolicy::RoundRobin);
+    let value = ThreadPriorityValue::try_from(priority)
+        .map_err(|error| format!("real-time priority {priority}: {error}"))?;
+    set_thread_priority_and_policy(thread, ThreadPriority::Crossplatform(value), round_robin)
+        .map_err(|error| format!("real-time priority {priority}: {error}"))?;
+    let (taken, parameters) = read()?;
+    if taken != round_robin || parameters.sched_priority != i32::from(priority) {
+        return Err(format!("real-time priority {priority} was not taken"));
+    }
+    Ok(Taken::Lowered(from))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn lower_realtime(_priority: u8) -> Result<Taken, String> {
+    Ok(Taken::Ordinary)
+}
+
+/// What `--realtime-priority` did. Only Linux has a real-time policy to
+/// lower, so elsewhere only `Ordinary` is ever made.
+#[derive(Debug, PartialEq, Eq)]
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+enum Taken {
+    /// Not at a real-time policy: left as it is.
+    Ordinary,
+    /// Already at the asked priority or below it: kept, never raised.
+    Kept(i32),
+    /// Lowered from this priority.
+    Lowered(i32),
+}
+
+/// Lowers the priority when asked, and says so on the journal.
+fn take_priority(priority: Option<u8>) -> Result<(), String> {
+    let Some(priority) = priority else {
+        return Ok(());
+    };
+    match lower_realtime(priority)? {
+        Taken::Lowered(from) => {
+            eprintln!("lamp-turn-end: real-time priority {from} lowered to {priority}")
+        }
+        // A priority at or above the worker's own changes nothing: said, so
+        // that a run with it reads apart from one lowered (the reviewer on
+        // #1621).
+        Taken::Kept(from) => {
+            eprintln!("lamp-turn-end: real-time priority {from} kept, not raised to {priority}")
+        }
+        Taken::Ordinary => {}
+    }
+    Ok(())
+}
+
+/// The calling thread's policy and real-time priority, as JSON.
+#[cfg(target_os = "linux")]
+fn scheduling() -> String {
+    use thread_priority::{ThreadSchedulePolicy, thread_native_id, thread_schedule_policy_param};
+    match thread_schedule_policy_param(thread_native_id()) {
+        Ok((ThreadSchedulePolicy::Realtime(policy), parameters)) => {
+            format!("\"{policy:?} {}\"", parameters.sched_priority)
+        }
+        Ok((ThreadSchedulePolicy::Normal(policy), _)) => format!("\"{policy:?}\""),
+        Err(_) => "null".into(),
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn scheduling() -> String {
+    "null".into()
 }
 
 /// A hung worker must not outlive the core that can no longer kill it.
@@ -433,6 +542,7 @@ fn main() -> ExitCode {
     let started = Instant::now();
     let setup = parse(arguments.into_iter()).and_then(|arguments| {
         follow_parent(arguments.parent)?;
+        take_priority(arguments.priority)?;
         bound_resources(&arguments.speed)?;
         load(&arguments.model, &arguments.speed)
     });
@@ -467,7 +577,7 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{Speed, lowest_limit, parse};
+    use super::{Speed, lowest_limit, parse, realtime_priority};
     use std::{ffi::OsString, path::PathBuf};
 
     fn arguments(text: &str) -> impl Iterator<Item = OsString> {
@@ -497,9 +607,66 @@ mod tests {
     fn the_default_command_line_keeps_the_exact_model() {
         let parsed = parse(arguments("--model m.onnx --parent 42")).unwrap();
         assert_eq!(
-            (parsed.model, parsed.parent, parsed.speed),
-            (PathBuf::from("m.onnx"), Some(42), Speed::Exact)
+            (parsed.model, parsed.parent, parsed.speed, parsed.priority),
+            (PathBuf::from("m.onnx"), Some(42), Speed::Exact, None)
         );
+    }
+
+    /// #1608: a real-time priority to lower itself to, 1 to 99, once.
+    #[test]
+    fn a_realtime_priority_is_taken_only_from_1_to_99() {
+        let parsed = parse(arguments("--model m.onnx --realtime-priority 10")).unwrap();
+        assert_eq!(parsed.priority, Some(10));
+        for wrong in ["0", "100", "-1", "ten", ""] {
+            assert!(realtime_priority(Some(wrong)).is_err(), "{wrong:?}");
+        }
+        assert!(realtime_priority(None).is_err());
+        for wrong in [
+            "--model m.onnx --realtime-priority 10 --realtime-priority 10",
+            "--model m.onnx --realtime-priority",
+            "--model m.onnx --realtime-priority 0",
+        ] {
+            assert!(parse(arguments(wrong)).is_err(), "{wrong}");
+        }
+    }
+
+    /// The thread at an ordinary policy is left as it is, wherever the test
+    /// runs; with the privilege to take round-robin 20 first, as the voice's
+    /// workers do, it comes down to 10, and never goes up.
+    #[test]
+    fn the_worker_only_ever_lowers_a_realtime_priority() {
+        std::thread::spawn(|| {
+            assert_eq!(
+                super::lower_realtime(10),
+                Ok(super::Taken::Ordinary),
+                "an ordinary policy"
+            );
+            #[cfg(target_os = "linux")]
+            {
+                use thread_priority::{
+                    RealtimeThreadSchedulePolicy, ThreadPriority, ThreadPriorityValue,
+                    ThreadSchedulePolicy, set_thread_priority_and_policy, thread_native_id,
+                };
+                let round_robin =
+                    ThreadSchedulePolicy::Realtime(RealtimeThreadSchedulePolicy::RoundRobin);
+                let twenty =
+                    ThreadPriority::Crossplatform(ThreadPriorityValue::try_from(20).unwrap());
+                if set_thread_priority_and_policy(thread_native_id(), twenty, round_robin).is_ok() {
+                    assert_eq!(super::lower_realtime(30), Ok(super::Taken::Kept(20)));
+                    assert_eq!(super::lower_realtime(10), Ok(super::Taken::Lowered(20)));
+                    assert_eq!(super::scheduling(), "\"RoundRobin 10\"");
+                } else {
+                    // Say which half ran: without the privilege (ARM64's
+                    // runner), the real-time half's first run is the lamp's
+                    // `bench` (the reviewer on #1621).
+                    eprintln!(
+                        "round-robin 20 not taken here: only the ordinary half of this test ran"
+                    );
+                }
+            }
+        })
+        .join()
+        .unwrap();
     }
 
     #[test]

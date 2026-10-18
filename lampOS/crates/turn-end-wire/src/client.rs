@@ -74,6 +74,16 @@ impl WorkerCommand {
         self.args.push("--no-spin".into());
         self
     }
+
+    /// The worker lowered to real-time round-robin `priority` before its
+    /// threads start (`--realtime-priority`, #1608): below the voice's own
+    /// threads, which take its core back at once, and still ahead of
+    /// everything at ordinary priority. It only ever lowers a priority.
+    pub fn with_realtime_priority(mut self, priority: u8) -> Self {
+        self.args.push("--realtime-priority".into());
+        self.args.push(priority.to_string().into());
+        self
+    }
 }
 
 /// Whether the classifier's worker processes are confirmed gone.

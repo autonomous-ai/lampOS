@@ -27,6 +27,9 @@ rustix = { version = "=1.1.5", features = ["process", "thread", "time"] }
 ort = { version = "=2.0.0-rc.14", default-features = false, features = ["std", "load-dynamic", "api-30"] }
 # Already in tract-onnx's tree: encodes the 8-bit graph handed to ONNX Runtime.
 prost = "=0.14.4"
+# Lowers the real-time priority the worker inherits from the voice before its
+# threads start (`--realtime-priority`, #1608); the voice depends on it too.
+thread-priority = "=3.1.1"
 
 # `lamp-turn-end agree`: labelled clips and their manifest.
 hound.workspace = true
