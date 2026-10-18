@@ -196,12 +196,12 @@ it stays the speaker's only writer: `lamp-cloud` asks on the same socket for
 allowed range. They answer in numbers, `{"ok": true, "level": {"volume",
 "raw", "max_volume"}}`, as V1's `volume.*` has them, and a set is read back
 within a point or not done (`Volume::level`, `Volume::to_share`). They are
-never in `tools.json`, so the voice's model is never offered them. The
-executive answers them for any caller on its socket, though: the voice
-passes on any call name it doesn't route elsewhere (`crates/voice/src/tools.rs`),
-so a model call named `volume_to` would set the volume, within the same
-ceiling (the reviewer on #1418). The journal says their names and whether
-they were done, as for every call.
+never in `tools.json`, so the voice's model is never offered them, and
+one it names anyway the voice runs by nobody (`route` in
+`crates/voice/src/tools.rs`, on `lamp_actions::APP_CALLS`), so it never
+reaches the executive (the reviewer on #1418). The executive itself answers
+them for any caller on its socket, which only `lampos` may open. The journal
+says their names and whether they were done, as for every call.
 
 ## What was taken from V1, and what was not
 
