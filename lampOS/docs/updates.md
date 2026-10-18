@@ -302,11 +302,18 @@ and the job fails without moving the head.
 lamp-update check|once|serve --channel-url URL [--channel NAME] [--key-file PATH] [--lamp NAME]
                              [--apply on|off] [--every-s N] [--quiet-wait-s N] [--watch-s N]
                              [--keep-free-mb N] [--root DIR] [--bus-root DIR]
-lamp-update install --channel-url URL [--channel NAME] [--key-file PATH]
+lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setup on|off]
+lamp-update harness-off
+lamp-update check-units --cat FILE [--product DIR]
 lamp-update manifest --binaries DIR --deploy DIR --channel NAME --sequence N --commit SHA --files-url URL
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
 lamp-update public-key --key-file PRIVATE
 ```
+
+`harness-off` undoes install's Harness at boot, and only that, and
+`check-units` says whether a lamp runs exactly the product's units: both
+in `docs/install.md` (step 9, and "Checking a lamp runs the product's
+units").
 
 `install` puts lampOS on a blank lamp from the newest build: every product
 part through its `current` link, the product units, users and zone, enabled

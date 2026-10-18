@@ -46,11 +46,19 @@ struct FakeHost {
     failing_enables: u32,
     /// `harness service install` refuses, as for a user it cannot serve.
     harness_refuses: bool,
-    /// `harness service uninstall` refuses.
-    harness_off_refuses: bool,
-    /// What `harness-off` finds Harness still has afterwards.
-    harness_left: Vec<String>,
+    /// Each command `harness-off`'s steps ran, as its arguments.
+    steps: Vec<String>,
+    /// The step that fails: the first command containing this text.
+    failing_step: Option<String>,
+    /// What `harness service status --json` prints.
+    status_json: String,
+    /// What `pgrep` finds; none makes it end with 1, as `pgrep` does.
+    pids: String,
 }
+
+/// `harness service status --json` once the service is gone (Harness
+/// 0.4.17's fields, `cli/src/lib/serviceCommand.ts`).
+const STATUS_GONE: &str = r#"{"supported":true,"platform":"systemd","file":"/x","target":"/y","installed":false,"current":false,"registered":false,"running":false,"pid":null,"state":"inactive","lastExit":null,"failed":false,"linger":true,"unreachable":null}"#;
 
 impl Host for FakeHost {
     fn add_user(&mut self, name: &str, groups: &[String]) -> Result<(), String> {
@@ -99,9 +107,28 @@ impl Host for FakeHost {
 
     fn harness_off(&mut self, user: &str, home: &str) -> Result<Vec<String>, String> {
         self.calls.push(format!("harness-off {user} {home}"));
-        if self.harness_off_refuses {
-            return Err("harness service uninstall: no user manager".into());
-        }
+        // The real steps, each through stand-ins for `id`, `runuser … harness`,
+        // `loginctl` and `pgrep`.
+        let (steps, failing) = (&mut self.steps, self.failing_step.clone());
+        let (status, pids) = (self.status_json.clone(), self.pids.clone());
+        let left = install::harness_off_with(
+            &mut |argv: &[String]| {
+                let line = argv.join(" ");
+                steps.push(line.clone());
+                if failing.as_deref().is_some_and(|step| line.contains(step)) {
+                    return Err(format!("{line}: refused"));
+                }
+                match argv[0].as_str() {
+                    "id" => Ok("999\n".into()),
+                    "pgrep" if pids.is_empty() => Err("pgrep: exit 1".into()),
+                    "pgrep" => Ok(pids.clone()),
+                    _ if line.ends_with("service status --json") => Ok(status.clone()),
+                    _ => Ok(String::new()),
+                }
+            },
+            user,
+            home,
+        )?;
         // What `harness_at_boot` left, gone: the CLI's unit and the linger.
         let _ = fs::remove_file(self.root.join("var/lib/systemd/linger").join(user));
         let _ = fs::remove_file(
@@ -109,7 +136,7 @@ impl Host for FakeHost {
                 .join(home.trim_start_matches('/'))
                 .join(".config/systemd/user/harnessd.service"),
         );
-        Ok(self.harness_left.clone())
+        Ok(left)
     }
 
     fn utc_offset_minutes(&mut self, zone: &str) -> Result<i32, String> {
@@ -195,8 +222,10 @@ impl Lamp {
             calls: Vec::new(),
             failing_enables: 0,
             harness_refuses: false,
-            harness_off_refuses: false,
-            harness_left: Vec::new(),
+            steps: Vec::new(),
+            failing_step: None,
+            status_json: STATUS_GONE.into(),
+            pids: String::new(),
         };
         Self {
             _dir: dir,
@@ -1894,34 +1923,87 @@ fn harness_off_after_a_first_install_leaves_no_linger() {
     assert_eq!(lamp.harness_left_on(), [true, true, true]);
 }
 
-/// A refused uninstall keeps the record (and the linger, the CLI's to
-/// undo first), so a later run tries again and finishes.
+/// The steps, as the real host runs them: `id -u`, then as `lampos` with
+/// its `HOME` and runtime folder `harness service uninstall`, `harness
+/// stop`, `harness service status --json`, then `loginctl disable-linger`
+/// (after the status, which needs the user's manager), then `pgrep`.
 #[test]
-fn a_refused_harness_off_keeps_its_record_and_a_later_run_finishes() {
+fn harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep() {
     let mut lamp = Lamp::with_harness();
     lamp.install().unwrap();
-    lamp.host.harness_off_refuses = true;
-    let refused = lamp.harness_off().unwrap_err();
-    assert!(refused.contains("no user manager"), "{refused}");
-    assert_eq!(lamp.harness_left_on(), [true, true, true]);
-    lamp.host.harness_off_refuses = false;
     lamp.harness_off().unwrap();
-    assert_eq!(lamp.harness_left_on(), [false, false, false]);
-    assert_eq!(lamp.harness_offs(), 2);
+    let harness = "runuser -u lampos -- env HOME=/var/lib/lampos-tasks XDG_RUNTIME_DIR=/run/user/999 /usr/local/bin/harness";
+    assert_eq!(
+        lamp.host.steps,
+        [
+            "id -u lampos".to_owned(),
+            format!("{harness} service uninstall"),
+            format!("{harness} stop"),
+            format!("{harness} service status --json"),
+            "loginctl disable-linger lampos".to_owned(),
+            "pgrep -u lampos -f harnessd".to_owned(),
+        ]
+    );
 }
 
-/// What Harness still has afterwards is said and returned, never stopped,
-/// and the record goes all the same: install's part is undone. Without
-/// Harness on the lamp nothing can be undone, and the record is kept.
+/// Each step that fails stops there and keeps the record (and the linger
+/// with it, install's to undo first), so a later run tries again and
+/// finishes. A status that does not answer is said, not a failure.
+#[test]
+fn a_failing_step_keeps_the_record_and_a_later_run_finishes() {
+    for step in ["id -u", "service uninstall", "stop", "disable-linger"] {
+        let mut lamp = Lamp::with_harness();
+        lamp.install().unwrap();
+        lamp.host.failing_step = Some(step.into());
+        let refused = lamp.harness_off().unwrap_err();
+        assert!(refused.contains("refused"), "{step}: {refused}");
+        assert_eq!(lamp.harness_left_on(), [true, true, true], "{step}");
+        let ran = lamp.host.steps.len();
+        assert!(
+            lamp.host.steps.last().unwrap().contains(step),
+            "{step}: stopped at it, not after: {:?}",
+            lamp.host.steps
+        );
+        lamp.host.failing_step = None;
+        assert_eq!(lamp.harness_off().unwrap(), Vec::<String>::new(), "{step}");
+        assert_eq!(lamp.harness_left_on(), [false, false, false], "{step}");
+        assert_eq!(lamp.host.steps.len(), ran + 6, "{step}: all six again");
+    }
+    let mut lamp = Lamp::with_harness();
+    lamp.install().unwrap();
+    lamp.host.failing_step = Some("status --json".into());
+    assert_eq!(
+        lamp.harness_off().unwrap(),
+        ["`harness service status --json` did not answer"]
+    );
+    assert_eq!(lamp.harness_left_on(), [false, false, false]);
+}
+
+/// What Harness still has afterwards, its service in the status or a
+/// `harnessd` `pgrep` finds, is said and returned, never stopped, and the
+/// record goes all the same: install's part is undone. Without Harness on
+/// the lamp nothing can be undone, and the record is kept.
 #[test]
 fn what_harness_still_has_is_said_and_without_harness_the_record_is_kept() {
     let mut lamp = Lamp::with_harness();
     lamp.install().unwrap();
-    let left = "harnessd still runs as lampos: pid 4242".to_owned();
-    lamp.host.harness_left = vec![left.clone()];
-    assert_eq!(lamp.harness_off().unwrap(), std::slice::from_ref(&left));
-    assert!(lamp.said.contains(&left));
+    lamp.host.status_json = STATUS_GONE
+        .replace(r#""registered":false"#, r#""registered":true"#)
+        .replace(r#""running":false"#, r#""running":true"#)
+        .replace(r#""pid":null"#, r#""pid":4242"#);
+    lamp.host.pids = "4242\n4243\n".into();
+    let left = vec![
+        "Harness still has its service: installed false, registered true, running true, pid 4242"
+            .to_owned(),
+        "harnessd still runs as lampos: pid 4242, 4243".to_owned(),
+    ];
+    assert_eq!(lamp.harness_off().unwrap(), left);
+    assert!(left.iter().all(|line| lamp.said.contains(line)));
     assert!(!lamp.on("var/lib/lampos-update/harness-at-boot").exists());
+    assert!(
+        !lamp.host.steps.iter().any(|step| step.contains("kill")),
+        "never stopped here"
+    );
 
     let mut lamp = Lamp::with_harness();
     lamp.install().unwrap();
@@ -1937,9 +2019,8 @@ fn what_harness_still_has_is_said_and_without_harness_the_record_is_kept() {
 /// installed, registered nor running.
 #[test]
 fn what_harness_service_status_still_has_is_read_from_its_json() {
-    let gone = r#"{"supported":true,"platform":"systemd","file":"/x","target":"/y","installed":false,"current":false,"registered":false,"running":false,"pid":null,"state":"inactive","lastExit":null,"failed":false,"linger":true,"unreachable":null}"#;
-    assert!(install::service_left(gone).is_empty());
-    let running = gone
+    assert!(install::service_left(STATUS_GONE).is_empty());
+    let running = STATUS_GONE
         .replace(r#""registered":false"#, r#""registered":true"#)
         .replace(r#""running":false"#, r#""running":true"#)
         .replace(r#""pid":null"#, r#""pid":4242"#);
