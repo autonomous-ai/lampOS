@@ -99,6 +99,9 @@ pub struct Target {
     pub engine: EngineKind,
 }
 
+/// Strict when stored too: a task's `prepared_digest` is the person's yes
+/// to this exact launch, so a later field must never be passed over; a new
+/// one bumps the tasks state's `schema` (Jarvis on #1512).
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Launch {
@@ -159,6 +162,10 @@ const WAIT_SLACK: Duration = Duration::from_secs(30);
 /// No more agents than this are waited on in one `wait`.
 pub const MOST_WAITED: usize = 64;
 
+/// Strict when stored too: an observation's `digest` is over what this
+/// build would write of it, so a later field would not match it anyway; a
+/// new one bumps the tasks state's `schema` (Jarvis on #1512). Harness's own
+/// reply is read as `ShowReply`, not as this.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Observation {

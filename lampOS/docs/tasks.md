@@ -379,11 +379,12 @@ started once its answer is told:
   to be tried again the same way.
 - **The journal:** each close prints one line, `tasks: closing task N's
   harness: …`, and `get_task` shows the task's `close`.
-- **Reverting:** a `Task` is `deny_unknown_fields`, so a `lamp-tasks` from
-  before this can't load a store with `close` or `closable` in it, nor one
-  from before `told` a store with an observation `told` (written only with
-  `--close-told` on). Going back
-  on a lamp means resetting its tasks store, as with `watch_idle`.
+- **Reverting:** a `lamp-tasks` from before #1505 is `deny_unknown_fields`
+  on its stored state, so it can't load a store with `close` or `closable` in
+  it, nor a store with an observation `told` (written only with
+  `--close-told` on). Going back that far on a lamp means resetting its
+  tasks store, as with `watch_idle`. From #1505 on, a build reads one
+  release forward (below).
 - **Not done:** the sessions already on a computer from before this are the
   person's to close. This touches none of them.
 
@@ -468,6 +469,64 @@ only after SQLite commit and directory sync succeed. Any uncertain write
 poisons the owner until reopen; unreadable data is never replaced with empty
 history. Cooperating owners are excluded; another process with the same UID
 is outside this protection boundary.
+
+**Reading one release forward (#1505).** On lamp-4ace on 18 October at
+13:51 every `lamp-tasks` build before #1425 refused the store #1425's build
+had written: its observations had a `told`, and its last receipt was a
+`told` request, an `op` the older builds don't have. An install, and the
+hand rollback after it, stopped there, and hand-overs with them. A build
+now reads the state of the release after it:
+
+- **A field it doesn't know is passed over**, on the stored types: the
+  state, a task, its dispatch, read, observations, speech, close and audits. What a build writes is only what
+  it knows, so if it saves that state, the newer fields are dropped, as if
+  that release had never run. For #1425's `told`, a task told under it is
+  then not closed by the newer build after a roll forward; its harness stays
+  open, which is the safe side. **Strict still:** a task's target, being
+  the targets file's type too; its launch, under `prepared_digest`, the
+  person's yes to that exact task, so a later field that narrows a launch is
+  never passed over to run a wider one; an observation's data, under its
+  `digest`; and the requests (Jarvis on #1512).
+- **A last receipt it can't read is dropped**, never refused, with one
+  journal line naming the request's `op` only, if it's a plain name, and
+  `unknown` otherwise: `tasks: the last receipt is not one this build reads
+  (op a_later_op); dropped`. So is a receipt it reads but that doesn't hold
+  for it, as a later release's reply with a field added to it would be (the
+  reviewer on #1512). It only answers an exact retry of that very request,
+  which a restart refuses anyway (`stale_session` for the voice's trusted
+  requests, `conflict` for the rest).
+- **A newer `schema`** is a change no older build may read: a new value in
+  a stored enum, a new required field, or a new field on a target. A build
+  that finds a `schema` above its own (1) keeps the store as it is,
+  renamed `tasks.sqlite3.newer-<schema>-<unix seconds>` in the same folder
+  (Harness's `HOME` beside it is not touched), and starts with an empty
+  store and a new store id, with one line: `tasks: storage was written by a
+  newer build (schema N, this build reads 1); it is set aside as …, and
+  this build starts with an empty store`. The tasks it was following are
+  forgotten by the lamp; their harnesses go on in Harness. The kept file is
+  whole, so the newer build can be put back on it by hand.
+- **The rule for a change to the stored state:** these bump `SCHEMA` in
+  `engine.rs`, in the same PR:
+  - a new value in a stored enum, or a new required field;
+  - a new field on a target, a launch or an observation's data;
+  - a larger `MAX_STATE_BYTES`: an older build refuses a state over its own
+    bound before it reads `schema`, so it can only set aside what it can
+    read;
+  - an optional field whose absence would let an older build launch, close
+    or speak more than the newer one would, such as "never close this one".
+
+  Any other new optional field (`#[serde(default)]`) needs nothing more. Not yet shown: `lamp-health` saying a store was set aside (only the
+  journal says so).
+
+Tests: `engine::tests::the_next_releases_state_opens_and_keeps_its_tasks`
+(a field this build doesn't know on every stored type, a close under way,
+and a receipt for a later request; what this build knows of the task kept
+when it saves again; the target refused),
+`engine::tests::a_receipt_that_does_not_hold_is_dropped_and_the_store_opens`,
+`engine::tests::a_dropped_receipt_names_only_a_plain_op`,
+`engine::tests::a_newer_schema_is_set_aside_whole_and_a_new_store_begins`,
+`engine::tests::a_request_from_a_later_release_is_still_refused`,
+`store::tests::a_store_set_aside_is_kept_whole_and_a_new_one_starts_empty`.
 
 Linux confirmation/speech ages use BOOTTIME, including suspend. The host
 fallback uses MONOTONIC and an explicit test boot identity. Every stored audit
