@@ -806,3 +806,245 @@ fn the_bodys_hand_counts_only_fresh_and_from_the_body() {
         now_unix_ms()
     ));
 }
+
+/// What a still pad's and a hand's states are counted with: the two topics,
+/// read after every step (a Mac's socket queue holds only a few of them).
+struct Heard {
+    touch: lamp_bus::Subscriber,
+    legacy: lamp_bus::Subscriber,
+    counts: (usize, usize),
+    /// The last step's touch state, its times set aside.
+    last: Option<TouchState>,
+}
+
+impl Heard {
+    fn new(rig: &Rig) -> Self {
+        Self {
+            touch: rig.bus.subscribe(TouchState::TOPIC, "test_touch").unwrap(),
+            legacy: rig
+                .bus
+                .subscribe(ControlsState::TOPIC, "test_legacy")
+                .unwrap(),
+            counts: (0, 0),
+            last: None,
+        }
+    }
+
+    fn read(&mut self) {
+        while self.touch.recv(Duration::ZERO).unwrap().is_some() {
+            self.counts.0 += 1;
+        }
+        while self.legacy.recv(Duration::ZERO).unwrap().is_some() {
+            self.counts.1 += 1;
+        }
+    }
+
+    fn take(&mut self) -> (usize, usize) {
+        self.read();
+        std::mem::take(&mut self.counts)
+    }
+}
+
+/// A touch state with its times set aside, and what only grows while a
+/// hand stays (`held_us`, the strip's motion): what changes when a reader
+/// has something new to act on at once.
+fn changed_part(state: &TouchState) -> TouchState {
+    let mut part = state.clone();
+    part.stamp.at_us = 0;
+    part.stamp.sequence = 0;
+    for source in &mut part.sources {
+        source.observed_us = source.observed_us.map(|_| 0);
+        source.held_us = source.held_us.map(|_| 0);
+        source.position = source.position.map(|_| 0.0);
+        source.distance = 0.0;
+        source.speed = 0.0;
+    }
+    part
+}
+
+/// Steps the service every 2 ms from `from` to before `to`, the pins read
+/// every 20 ms with the primary button and the head as given. A step whose
+/// touch state changed must say it in that step. The last step's touch
+/// state.
+fn served(
+    rig: &mut Rig,
+    heard: &mut Heard,
+    from: u64,
+    to: u64,
+    primary: bool,
+    head: bool,
+) -> TouchState {
+    served_reading(rig, heard, (from, to), 20_000, (primary, head))
+}
+
+/// The same with the pins read every `pins_us` (the product's every 5 ms).
+fn served_reading(
+    rig: &mut Rig,
+    heard: &mut Heard,
+    (from, to): (u64, u64),
+    pins_us: u64,
+    (primary, head): (bool, bool),
+) -> TouchState {
+    let mut last = None;
+    for at in (from..to).step_by(2_000) {
+        if at % pins_us == 0 {
+            rig.gpio(at, primary, false, head);
+        }
+        let errors = rig.service.counts.publish_errors;
+        let state = rig.step(at).state;
+        let part = changed_part(&state);
+        last = Some(state);
+        // A Mac refuses a datagram over 2 KB, as a state holding two of the
+        // head's events is; Linux takes it, and must say every change.
+        let refused = rig.service.counts.publish_errors > errors;
+        assert!(!refused || cfg!(target_os = "macos"), "refused at {at}");
+        if !refused && heard.last.as_ref().is_some_and(|last| *last != part) {
+            assert_eq!(latest_touch(rig).stamp.at_us, at, "changed at {at}");
+        }
+        heard.last = Some(part);
+        heard.read();
+    }
+    last.unwrap()
+}
+
+fn latest_touch(rig: &Rig) -> TouchState {
+    rig.bus
+        .latest(TouchState::TOPIC)
+        .unwrap()
+        .unwrap()
+        .parse()
+        .unwrap()
+}
+
+fn head(state: &TouchState) -> &TouchSourceState {
+    state
+        .sources
+        .iter()
+        .find(|source| source.source == TouchSource::Head)
+        .unwrap()
+}
+
+/// Ten of each in a still second: the heartbeat, as declared.
+fn still(counts: (usize, usize)) {
+    assert!((9..=11).contains(&counts.0), "{} touch states", counts.0);
+    assert!((9..=11).contains(&counts.1), "{} controls states", counts.1);
+}
+
+/// The first builder on #1456 (lamp-4ace): a still pad was said 50 times a
+/// second on `controls/touch_state` and on `controls/state`, and each one
+/// woke every reader. Now each is said when what a reader acts on changes,
+/// and every 100 ms otherwise, as declared. A hand on the head, each reading
+/// of it held and its going still go out in the step that read them. (The
+/// button has a rig of its own: its events and the head's together make a
+/// state longer than a Mac's 2 KB datagram, which the bus refuses there and
+/// Linux takes.)
+#[test]
+fn a_still_pad_is_said_ten_times_a_second_and_a_hand_in_the_step_that_read_it() {
+    let mut rig = Rig::new(true);
+    let mut heard = Heard::new(&rig);
+    // Settled and armed first.
+    served(&mut rig, &mut heard, 0, 1_000_000, false, false);
+    heard.take();
+    served(&mut rig, &mut heard, 1_000_000, 2_000_000, false, false);
+    still(heard.take());
+    for at in (2_000_000..2_300_000).step_by(20_000) {
+        rig.gpio(at, false, false, true);
+        heard.last = Some(changed_part(&rig.step(at).state));
+        assert_eq!(latest_touch(&rig).stamp.at_us, at, "the head at {at}");
+        heard.read();
+        served(&mut rig, &mut heard, at + 2_000, at + 20_000, false, true);
+    }
+    assert!(head(&latest_touch(&rig)).held_us.is_some());
+    // Let go: every change on the way is said in its step, until the hand
+    // is gone (it lasts through a short gap). The button's test counts the
+    // still second after a release.
+    let gone = served(&mut rig, &mut heard, 2_300_000, 3_000_000, false, false);
+    assert!(
+        head(&gone).held_us.is_none() && head(&gone).active == Some(false),
+        "{:?}",
+        head(&gone)
+    );
+}
+
+/// The reviewer on #1469: the product's pins read every 5 ms, and saying a
+/// held contact at each reading took the lamp to 200 states a second while
+/// a hand stayed. What only grows while held is said at most every 20 ms,
+/// the pace it always had; the press and the release still at once.
+#[test]
+fn a_hand_held_with_the_pins_read_every_5_ms_is_said_at_most_50_times_a_second() {
+    let pins = 5_000;
+    let mut rig = Rig::new(true);
+    let mut heard = Heard::new(&rig);
+    served_reading(&mut rig, &mut heard, (0, 1_000_000), pins, (false, false));
+    heard.take();
+    served_reading(
+        &mut rig,
+        &mut heard,
+        (1_000_000, 2_000_000),
+        pins,
+        (false, true),
+    );
+    let (touch, _) = heard.take();
+    assert!(
+        (45..=55).contains(&touch),
+        "{touch} head states in a held second"
+    );
+    assert!(head(&latest_touch(&rig)).held_us.is_some());
+    // The button, on a lamp of its own (its events and the head's make a
+    // state too long for a Mac's datagram).
+    let mut rig = Rig::new(true);
+    let mut heard = Heard::new(&rig);
+    served_reading(&mut rig, &mut heard, (0, 1_000_000), pins, (false, false));
+    heard.take();
+    served_reading(
+        &mut rig,
+        &mut heard,
+        (1_000_000, 2_000_000),
+        pins,
+        (true, false),
+    );
+    let (touch, legacy) = heard.take();
+    assert!(
+        (45..=55).contains(&touch),
+        "{touch} touch states, the button held"
+    );
+    assert!(
+        (45..=55).contains(&legacy),
+        "{legacy} controls states, the button held"
+    );
+    assert!(rig.legacy().buttons[0].held_us.is_some());
+    // Let go: said in the step that read it.
+    rig.gpio(2_000_000, false, false, false);
+    rig.step(2_000_000);
+    assert_eq!(rig.legacy().stamp.at_us, 2_000_000);
+    assert!(!rig.legacy().buttons[0].pressed);
+}
+
+/// The same for the primary button on `controls/state`: its press, each
+/// reading while it is held (the hold's tiers count from it) and its
+/// release are said in the step that read them.
+#[test]
+fn a_button_held_is_said_at_each_reading_and_its_release_at_once() {
+    let mut rig = Rig::new(true);
+    let mut heard = Heard::new(&rig);
+    served(&mut rig, &mut heard, 0, 1_000_000, false, false);
+    heard.take();
+    for at in (1_000_000..1_300_000).step_by(20_000) {
+        rig.gpio(at, true, false, false);
+        rig.step(at);
+        assert_eq!(rig.legacy().stamp.at_us, at, "the button at {at}");
+        heard.last = None;
+        served(&mut rig, &mut heard, at + 2_000, at + 20_000, true, false);
+    }
+    assert!(rig.legacy().buttons[0].held_us.is_some());
+    rig.gpio(1_300_000, false, false, false);
+    rig.step(1_300_000);
+    let released = rig.legacy();
+    assert_eq!(released.stamp.at_us, 1_300_000);
+    assert!(!released.buttons[0].pressed);
+    heard.last = None;
+    served(&mut rig, &mut heard, 1_302_000, 2_000_000, false, false);
+    heard.take();
+    served(&mut rig, &mut heard, 2_000_000, 3_000_000, false, false);
+    still(heard.take());
+}

@@ -16,7 +16,20 @@ use lamp_msgs::{
 use std::{fs::File, io, path::Path};
 
 pub const DRAIN_LIMIT: usize = 32;
-pub const STATE_EVERY_US: u64 = 20_000;
+/// The head's and the buttons' states are said when what a reader acts on
+/// changes, with an event or a gesture, and at least this often, as their
+/// topics declare: each one wakes every reader, so a still pad is not said
+/// fifty times a second (the first builder on #1456, lamp-4ace). With the
+/// privacy switch attached, `controls/state` keeps
+/// [`crate::privacy::STATE_EVERY_US`], since its evidence lasts 50 ms.
+pub const STATE_EVERY_US: u64 = 100_000;
+/// What only grows or moves while a hand stays (a held contact's `held_us`,
+/// the strip's position, distance and speed) is said at most this often,
+/// the pace both states always had: the pins read every 5 ms, and saying
+/// each reading took a held lamp to 200 states a second (the reviewer on
+/// #1469). A press, a release or a tier is said at once. A publish the bus
+/// refused is tried again this long after.
+pub const MOVING_EVERY_US: u64 = 20_000;
 /// How often the body's `body/hand` is looked at. The body says it with
 /// every step it passes on, every 80 ms.
 pub const HAND_EVERY_US: u64 = 20_000;
@@ -55,7 +68,6 @@ pub struct Service<G: PinReader, S: StripReader> {
     state: Publisher,
     events: Publisher,
     diagnostic: Publisher,
-    last_state_us: Option<u64>,
     last_report_us: Option<u64>,
     pub counts: Counts,
     pub gpio_accepted: u64,
@@ -65,8 +77,123 @@ pub struct Service<G: PinReader, S: StripReader> {
     recorder: Option<crate::record::Recorder>,
     hand: HandIn,
     privacy: Option<crate::privacy::Source>,
-    last_privacy: Option<(Option<bool>, Option<ControlFault>, String)>,
+    /// When the head's state and `controls/state` were last said, and what.
+    touch_said: Said<TouchState>,
+    primary_said: Said<ControlsState>,
     _lock: File,
+}
+
+/// What a state last said, and when it is said again (#1456, #1469).
+struct Said<T> {
+    /// The last said, with its times set aside ([`Timeless`]), the same
+    /// with what grows or moves set aside too, and when.
+    last: Option<(T, T, u64)>,
+    /// When the bus last refused it: it is tried again
+    /// [`MOVING_EVERY_US`] after.
+    refused_us: Option<u64>,
+}
+
+impl<T> Default for Said<T> {
+    fn default() -> Self {
+        Self {
+            last: None,
+            refused_us: None,
+        }
+    }
+}
+
+/// A state with its times set aside (when it was said, when each source
+/// was read), and with what only grows or moves while a hand stays set
+/// aside too.
+trait Timeless: Clone + PartialEq {
+    fn timeless(&self) -> Self;
+    fn still(&self) -> Self;
+}
+
+impl Timeless for TouchState {
+    fn timeless(&self) -> Self {
+        let mut key = self.clone();
+        key.stamp.at_us = 0;
+        key.stamp.sequence = 0;
+        for source in &mut key.sources {
+            source.observed_us = source.observed_us.map(|_| 0);
+        }
+        key
+    }
+
+    fn still(&self) -> Self {
+        let mut key = self.timeless();
+        for source in &mut key.sources {
+            source.held_us = source.held_us.map(|_| 0);
+            source.position = source.position.map(|_| 0.0);
+            source.distance = 0.0;
+            source.speed = 0.0;
+        }
+        key
+    }
+}
+
+impl Timeless for ControlsState {
+    fn timeless(&self) -> Self {
+        let mut key = self.clone();
+        key.stamp.at_us = 0;
+        key.stamp.sequence = 0;
+        if let Some(privacy) = &mut key.privacy {
+            privacy.stamp.at_us = 0;
+            privacy.stamp.sequence = 0;
+        }
+        key
+    }
+
+    fn still(&self) -> Self {
+        let mut key = self.timeless();
+        for button in &mut key.buttons {
+            button.held_us = button.held_us.map(|_| 0);
+        }
+        key.base_held_us = key.base_held_us.map(|_| 0);
+        key
+    }
+}
+
+impl<T: Timeless> Said<T> {
+    /// Says `state` at `at_us` through `say` if it is due: with an event
+    /// or a gesture (`news`), when what a reader acts on changed, when
+    /// only what grows changed and [`MOVING_EVERY_US`] has passed, and
+    /// every `every_us` regardless. After a refusal, not again for
+    /// [`MOVING_EVERY_US`], but for news.
+    fn say(
+        &mut self,
+        state: &T,
+        at_us: u64,
+        every_us: u64,
+        news: bool,
+        say: impl FnOnce() -> io::Result<Published>,
+        counts: &mut Counts,
+    ) {
+        let (timeless, still) = (state.timeless(), state.still());
+        let since = |at: u64| at_us.saturating_sub(at);
+        let backing_off = self
+            .refused_us
+            .is_some_and(|at| since(at) < MOVING_EVERY_US);
+        let due = news
+            || (!backing_off
+                && self.last.as_ref().is_none_or(|(whole, held, at)| {
+                    *held != still
+                        || (*whole != timeless && since(*at) >= MOVING_EVERY_US)
+                        || since(*at) >= every_us
+                }));
+        if !due {
+            return;
+        }
+        let result = say();
+        if result.is_ok() {
+            self.last = Some((timeless, still, at_us));
+            self.refused_us = None;
+        } else {
+            self.refused_us = Some(at_us);
+        }
+        account(counts, result);
+    }
 }
 
 struct Primary {
@@ -160,7 +287,6 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
                 &Diagnostic::declaration(),
                 "controls",
             )?,
-            last_state_us: None,
             last_report_us: None,
             counts: Counts::default(),
             gpio_accepted: 0,
@@ -174,7 +300,8 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
                 pushed: false,
             },
             privacy: None,
-            last_privacy: None,
+            touch_said: Said::default(),
+            primary_said: Said::default(),
             _lock: lock,
         })
     }
@@ -407,17 +534,15 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
         }
         let at_us = now();
         let output = self.engine.tick(at_us);
-        let publish_state = !output.events.is_empty()
-            || self
-                .last_state_us
-                .is_none_or(|last| at_us.saturating_sub(last) >= STATE_EVERY_US);
-        if publish_state {
-            account(
-                &mut self.counts,
-                self.state.publish_json(at_us, &output.state),
-            );
-            self.last_state_us = Some(at_us);
-        }
+        let state = &mut self.state;
+        self.touch_said.say(
+            &output.state,
+            at_us,
+            STATE_EVERY_US,
+            !output.events.is_empty(),
+            || state.publish_json(at_us, &output.state),
+            &mut self.counts,
+        );
         for event in &output.events {
             account(&mut self.counts, self.events.publish_json(at_us, event));
         }
@@ -426,18 +551,20 @@ impl<G: PinReader, S: StripReader> Service<G, S> {
             if let Some(privacy) = &mut self.privacy {
                 output.state.privacy = Some(privacy.monitor.snapshot(at_us));
             }
-            let privacy_key = output
-                .state
-                .privacy
-                .as_ref()
-                .map(|value| (value.muted, value.fault, value.reader_session_id.clone()));
-            if publish_state || !output.gestures.is_empty() || self.last_privacy != privacy_key {
-                account(
-                    &mut self.counts,
-                    primary.state.publish_json(at_us, &output.state),
-                );
-                self.last_privacy = privacy_key;
-            }
+            let every_us = if self.privacy.is_some() {
+                crate::privacy::STATE_EVERY_US
+            } else {
+                STATE_EVERY_US
+            };
+            let state = &mut primary.state;
+            self.primary_said.say(
+                &output.state,
+                at_us,
+                every_us,
+                !output.gestures.is_empty(),
+                || state.publish_json(at_us, &output.state),
+                &mut self.counts,
+            );
             for gesture in &output.gestures {
                 account(
                     &mut self.counts,
