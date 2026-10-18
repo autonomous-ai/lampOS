@@ -321,7 +321,9 @@ fn kept_logs_land_in_a_file_at_their_level_with_their_bus_identity() {
             "--level",
             "warn",
             "--seconds",
-            "2",
+            // Counted from when it listens, and the logs go as soon as its
+            // socket is seen; it syncs once more as it ends (#1128).
+            "0.6",
         ],
     );
     root.socket();
