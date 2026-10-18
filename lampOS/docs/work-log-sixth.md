@@ -16,10 +16,18 @@ every result on a lamp below names it. Newest first.
 - The relay's day (17–18 Oct): chat first byte median 2.0 s, p90 16–18 s,
   past 3 s on 28–35 % of probes, 7 timeouts; the listen websocket 0.88 s
   with no failure.
-- #1430 (open): `replay-aec` refused the rehearsal because `mic1`'s capture
-  hold puts the reference four steps ahead of each recorded block. The
-  recorder now keeps those steps and the replay takes them, still bit for
-  bit.
+- #1430 merged at 07:41: `replay-aec` refused the rehearsal because `mic1`'s
+  capture hold puts the reference four steps ahead of each recorded block.
+  The recorder now keeps those steps and the replay takes them, bit for bit;
+  a recording without them has its hold guessed, which on last night's
+  rehearsal replayed 1.3 s and then stopped one frame off. A mic1 recording
+  with #1430 replayed whole on lamp-4ace (60 s, 6,001 blocks).
+- #1443 (open): `hearing_replay --signal aec_linear --explained N` scores the
+  linear output through the duplex rules. On the mic2 rehearsal (played
+  lines) the lamp alone made no yield at 75–90 %, and "Stop." yielded on the
+  linear output where today's input lost it. The owner's recording decides.
+- #1442 (open): `LAMP_SECOND_WARM` opens the backup voice's connections while
+  the person speaks, about 0.3 s of connect saved (#779).
 
 ## 2026-10-17 — evening: #828 confounded, go-aways are the lamp's own
 
