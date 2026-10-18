@@ -318,8 +318,16 @@ fn startup_failures_are_final() {
         ("old-protocol", "protocol"),
         ("twice-ready", "unexpected ready"),
     ] {
+        // Only the silent worker needs the short bound: it is what times
+        // out. The others end on an event (their exit, their `Ready`), and a
+        // debug test binary can take over half a second to start on a Mac,
+        // where a 300 ms bound failed every run as "not ready".
         let limits = Limits {
-            startup: Duration::from_millis(300),
+            startup: if mode == "silent" {
+                Duration::from_millis(300)
+            } else {
+                quick().startup
+            },
             ..quick()
         };
         let classifier = fake(mode, limits);
