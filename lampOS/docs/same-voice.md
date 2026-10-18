@@ -88,11 +88,14 @@ plainly not the conversation's is no part of it
   18 October at 08:34, with the model set, the provider worker missed its
   controller's heartbeat (`provider controller heartbeat expired`) before
   the child was ready, and the restart guard muted the lamp. The child's
-  load is 15.5 s of one of its four cores there. At the voice's priority
+  load is 15.5 s of one of its eight cores there. At the voice's priority
   it shares the voice's own threads' time and starves everything at
-  ordinary priority. That is the likely cause, read from the code (the
-  first builder agreed at 08:44), and is not yet shown on the lamp. The
-  same steps at 06:36 started cleanly. Tests, Linux only:
+  ordinary priority. **Shown on lamp-4ace at 09:31** with this fix
+  (`e7351fcb1`) and the model set: no heartbeat expiry, `ps` showing the
+  child `TS` at nice 10 beside the voice's `RR` 20 threads, and the model
+  loaded in 5.3 s rather than 15.5 s (the first builder on #1445, 09:36).
+  The same steps at 06:36, without the fix, had started cleanly by
+  chance. Tests, Linux only:
   `the_child_takes_the_ordinary_policy_a_little_below_ordinary_priority`,
   and `tests/priority.rs`'s
   `the_spawned_child_does_not_keep_the_voices_real_time_class`: the real
