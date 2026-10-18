@@ -468,6 +468,13 @@ judges a model only on voices it never heard:
   per voice, the calls heard at 0.5, 0.9 and 0.98, and false hearings an
   hour of negatives by `said.rs`'s rule, beside the same for each
   `--compare` model. Then one model on every voice, written as `name.onnx`.
+- `--rescue NAME.onnx [--gates 0.1,0.3,0.5]`: the two models together, one
+  table a gate G. A step's score is the given model's (the installed one),
+  or, where that model reached G at this step or in the 1 s before it in the
+  same recording, the higher of it and the trained folds' held-out score.
+  So the installed model gates, and the trained one only rescues a call the
+  installed one half heard. The table is what `lamp-name` would say running
+  both models on each step with `said.rs`'s rule on that score.
 - The model is `train.py`'s "flat" shape on `[1, 16, 96]`, fitted with
   scikit-learn's MLP, the scaling folded in: `lamp-name check` runs it as
   it runs the installed file (shown on a stand-in, 18 Oct), and its ONNX
@@ -487,6 +494,20 @@ by source. So a model of the lamp's own recordings hears voices it never
 heard far better, and its negatives are the next thing to bring down. The
 script now takes speaking voices only, holds the voiceless negatives out
 by fold, and says where false hearings come from.
+
+**The second sitting** (lamp-4ace, 18 Oct, 19:06 to 19:35, the first
+builder's): 135 lines by twelve speaking voices and a Vietnamese one, all
+recorded (`--max-mb 160`), and five quiet minutes. Over 99 calls the
+trained folds heard 82 at 0.98, the installed file 35 and the bare-name one
+6; but at 0.98 the trained folds heard 104.6 false calls an hour of
+held-out negatives (18.9 min), the installed file none and the bare-name
+one 6.3. Of the trained folds' false calls, 18 came from 1.7 min of near
+lines, 9 from the 11.6 min of gaps (the lamp's own answers, the room), 6
+from mid lines and none from the quiet minutes. Not for the lamp. Next,
+`--rescue` on the same recordings, with the installed file as the gate: a
+gate G that keeps false calls at 0.98 under about 2 an hour while calls
+heard rise well above 35 of 99 goes forward; if none does, more near lines
+and more of the lamp's own answers as negatives, in another sitting.
 
 Not shown: a model fit to install. Played voices only, nothing of a
 person; recording people waits for the owner's yes.
