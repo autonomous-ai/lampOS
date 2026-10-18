@@ -2198,6 +2198,7 @@ name = "lamp-turn-end-wire"
 version = "0.1.0"
 dependencies = [
  "lamp-ipc",
+ "rustix",
 ]
 
 [[package]]

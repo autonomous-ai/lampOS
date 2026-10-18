@@ -1275,9 +1275,15 @@ impl LoadingChild {
 
 impl Drop for LoadingChild {
     fn drop(&mut self) {
-        // The child's own id, as it wrote it before it slept.
-        if let Ok(pid) = std::fs::read_to_string(self.dir.join("pid")) {
-            let _ = std::process::Command::new("kill").arg(pid.trim()).status();
+        // The child's own id, as it wrote it before it slept. Signalled
+        // from here, not by a `kill` program, which a machine without
+        // procps lacks (#1497).
+        if let Some(pid) = std::fs::read_to_string(self.dir.join("pid"))
+            .ok()
+            .and_then(|pid| pid.trim().parse().ok())
+            .and_then(rustix::process::Pid::from_raw)
+        {
+            let _ = rustix::process::kill_process(pid, rustix::process::Signal::TERM);
         }
         let _ = std::fs::remove_dir_all(&self.dir);
     }

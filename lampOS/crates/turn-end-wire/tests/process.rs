@@ -13,7 +13,7 @@ use lamp_turn_end_wire::{
 use std::{
     io::{self, Write},
     panic,
-    process::{Command, ExitCode, Stdio},
+    process::ExitCode,
     thread,
     time::{Duration, Instant},
 };
@@ -212,13 +212,12 @@ fn token(utterance: u64) -> Token {
 }
 
 /// Zombies still answer `kill -0`, so this also detects an unreaped child.
+/// Asked of the kernel, not of a `kill` program: without procps that is
+/// missing, and under qemu-user a missing one exits 127 and reads as
+/// "gone" (#1497).
 fn exists(pid: u32) -> bool {
-    Command::new("kill")
-        .args(["-0", &pid.to_string()])
-        .stderr(Stdio::null())
-        .status()
-        .unwrap()
-        .success()
+    rustix::process::Pid::from_raw(pid as i32)
+        .is_some_and(|pid| rustix::process::test_kill_process(pid).is_ok())
 }
 
 fn submit(classifier: &mut ProcessClassifier, token: Token, pcm: &[i16]) -> Submit {
@@ -370,6 +369,8 @@ fn replaced(classifier: &mut ProcessClassifier, command: i16, expected: &str) {
     until(Duration::from_secs(5), "replacement", || {
         (classifier.report().worker == old.worker + 1).then_some(())
     });
+    // `exists` can say yes, or every "gone" here would pass unread.
+    assert!(exists(std::process::id()), "this process reads as gone");
     assert!(!exists(old.pid.unwrap()), "old worker still exists");
     ready(classifier);
     assert_eq!(
