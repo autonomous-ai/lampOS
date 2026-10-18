@@ -17,16 +17,19 @@
 pub const ENVIRONMENT: &str = "LAMP_MISHEARD_HUM";
 /// The provider worker's flag for it.
 pub const FLAG: &str = "--misheard-hum";
-/// Beside the first request after the hum, in the form of the lamp's other
-/// notes. #1651's cut-in note says its words stopped where the person cut
-/// in; this one says too that it didn't catch what was said then.
-pub const NOTE: &str = "(For you to know, not to answer: they spoke while you were speaking, and you stopped there, but you did not catch what they said and only went \"hm?\". This is what they say now. Answer it; go back to what you were saying only if they ask you to.)";
-/// A request begun later than this after the misheard cut-in is no answer
-/// to the "hm?", and is told nothing.
+/// Beside the first request begun after the misheard cut-in was held, in
+/// the form of the lamp's other notes. #1651's cut-in note says its words
+/// stopped where the person cut in; this one says too that it didn't catch
+/// what was said then. It says nothing of the "hm?": a person who goes on
+/// talking takes the turn first, and then no hum plays (the reviewer on
+/// #1659).
+pub const NOTE: &str = "(For you to know, not to answer: they spoke while you were speaking, and you stopped there, but you did not catch what they said. This is what they say now. Answer it; go back to what you were saying only if they ask you to.)";
+/// A request begun later than this after the misheard cut-in was held is
+/// no answer to it, and is told nothing.
 pub const NOTE_WITHIN_US: u64 = 10_000_000;
 
-/// Whether a request begun at `now_us` answers the "hm?" for a cut-in held
-/// as misheard at `held_us`, and is told so.
+/// Whether a request begun at `now_us` answers a cut-in held as misheard at
+/// `held_us`, and is told so.
 pub fn answers_the_hum(held_us: u64, now_us: u64) -> bool {
     now_us.saturating_sub(held_us) <= NOTE_WITHIN_US
 }

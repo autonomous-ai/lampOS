@@ -4583,11 +4583,17 @@ fn conversation_with_gate(
                     .map(|current| current.cloud.session);
                 // A Stop, a head touch, the mute or a gap ends the unclear
                 // turn's asking too: nothing is asked again after it (#926).
+                let hum = asking.hum;
                 if let Some(turn) = asking.cancelled() {
                     record(
                         trace,
                         json!({"kind":"ask_again_dropped","turn":turn,"at_us":monotonic_us(),"why":"cancelled with its turn"}),
                     )?;
+                    if hum {
+                        eprintln!(
+                            "lamp-voice: request {turn}: a misheard cut-in: no \"hm?\" (cancelled with its turn)"
+                        );
+                    }
                 }
                 // And a "hm?" owed for an empty "Sorry?" (#1417, the
                 // Seventh on #1421): a Stop is the person's whole answer.
@@ -7137,6 +7143,15 @@ fn conversation_with_gate(
                             "current_turn":reply.as_ref().map(|current| current.owner.turn()),
                             "why":why}),
                     )?;
+                    // A misheard cut-in whose turn someone took first: no
+                    // "hm?" is owed, and the journal says so (the reviewer
+                    // on #1659).
+                    if asking.hum {
+                        eprintln!(
+                            "lamp-voice: request {}: a misheard cut-in: no \"hm?\" ({why})",
+                            wanted.0
+                        );
+                    }
                     asking.done();
                 }
                 // A misheard cut-in, with `LAMP_MISHEARD_HUM`: no model turn,

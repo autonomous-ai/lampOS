@@ -645,11 +645,12 @@ pub enum ProviderOutput {
     Unclear {
         request: u64,
         why: String,
-        /// Whether `request` ended as a cut-in over the lamp's answer
-        /// (`ProviderInput::End { cut_in: true }`): with `LAMP_MISHEARD_HUM`
-        /// the lamp hums its "hm?" for it rather than ask the model
-        /// ([`crate::misheard_hum`]).
-        #[serde(default)]
+        /// Whether the lamp hums its "hm?" for `request` rather than ask the
+        /// model: it ended as a cut-in over the lamp's answer
+        /// (`ProviderInput::End { cut_in: true }`), with `LAMP_MISHEARD_HUM`
+        /// ([`crate::misheard_hum`]). Sent only when true, so the wire is
+        /// as before without the switch.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         cut_in: bool,
     },
     /// A skill's function the model called for `request` was answered with
@@ -4333,14 +4334,15 @@ impl InputHandoff {
             .map(|_| request)
     }
 
-    /// `request`, a cut-in over the lamp's answer, was held as misheard at
-    /// `at_us`: the lamp hums for it, and the next request is told so.
+    /// `request` was held as misheard at `at_us`. Whether the lamp hums for
+    /// it: a cut-in over the lamp's answer, with the switch. Then the next
+    /// request is told so.
     fn misheard_held(&mut self, request: u64, at_us: u64) -> bool {
-        let cut_in = self.ended_cut_in == Some(request);
-        if cut_in && self.misheard_hum {
+        let hum = self.misheard_hum && self.ended_cut_in == Some(request);
+        if hum {
             self.misheard_at_us = Some(at_us);
         }
-        cut_in
+        hum
     }
 
     /// The open request that is the first after a Stop, once: the model is
@@ -4895,7 +4897,7 @@ impl InputHandoff {
                 // after a stop, which is told that instead (#828).
                 self.cut_in =
                     (self.cut_in_told && over_the_lamps_voice && !after_stop).then_some(request);
-                // The first request after a misheard cut-in's "hm?", begun
+                // The first request begun after a misheard cut-in was held,
                 // soon enough to be the answer to it (#828).
                 self.misheard = self
                     .misheard_at_us

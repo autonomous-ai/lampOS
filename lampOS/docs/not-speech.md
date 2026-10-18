@@ -496,10 +496,12 @@ only if they ask you to.)" (`crate::cut_in_told::NOTE`).
 
 Asked to say "Sorry?" after a misheard cut-in (`ASK_AGAIN_NOTE`, above), the
 model mostly didn't. Of the 59 cut-in scene files since 16 October whose
-cut-in turn finished `unclear` (#828, 19 October 05:04):
+cut-in turn finished `unclear` (the Fourth's reader,
+`askagain_replies_fourth.py`, #828, 19 October 05:04; its split is rough at
+the edges, and it calls one story line an answer):
 - 13 got "Sorry?";
 - about 40 got the story going on, mostly mid-sentence;
-- 3 got an answer to what was really said (two jokes, "is green.");
+- 2 or 3 got an answer to what was really said (two jokes, "is green.");
 - 2 got silence.
 
 Tonight's queue 22f no-rt takes 2 and 3 are two of them: the cut-in held as
@@ -521,33 +523,38 @@ turn is made for a misheard cut-in.
   rule: never over someone, never more than 2 s late, and not if the lamp
   spoke since. It is what a person or a pet does when they didn't catch you.
 - **The model is told, not asked.** The first request begun within 10 s
-  after it (`misheard_hum::answers_the_hum`) is told beside what is heard,
-  with the lamp's other notes (`add_note`): "(For you to know, not to
-  answer: they spoke while you were speaking, and you stopped there, but you
-  did not catch what they said and only went "hm?". This is what they say
-  now. Answer it; go back to what you were saying only if they ask you to.)"
-  (`crate::misheard_hum::NOTE`).
+  of the hold (`misheard_hum::answers_the_hum`), once, is told beside what
+  is heard, with the lamp's other notes (`add_note`): "(For you to know, not
+  to answer: they spoke while you were speaking, and you stopped there, but
+  you did not catch what they said. This is what they say now. Answer it; go
+  back to what you were saying only if they ask you to.)"
+  (`crate::misheard_hum::NOTE`). It says nothing of the "hm?": a person who
+  goes on talking takes the turn first, and then no hum plays.
 - **Everything else as before:** a line held as unclear that was no cut-in
   is asked again with `ASK_AGAIN_NOTE`, and so is everything with the
   switch off. The Live route only.
 - **The journal:** `request N: a misheard cut-in: the lamp's "hm?" N ms
-  after it was held, and no model turn`, or `… its "hm?" was not played
-  (why)`; the worker's `request N: the model is told it didn't catch the
-  cut-in before it`. The trace has `unclear_hum_owed` with
+  after it was held, and no model turn`; `… its "hm?" was not played (why)`
+  when it was owed and dropped; `… no "hm?" (another turn began)`, or
+  another why, when someone took the turn before it was owed; and the
+  worker's `request N: the model is told it didn't catch the cut-in before
+  it`. `Unclear` carries `cut_in` only when the lamp hums, so without the
+  switch the wire is as before. The trace has `unclear_hum_owed` with
   `"after":"misheard_cut_in"`, and `unclear_hum` with `misheard_turn`.
 - **Rule 7:** no model round trip. In the loop test the hum's turn begins
   2 ms after the hold. The time in the journal runs from the hold to the
   hum's turn begun; its sound reaches the speaker after the playout start
   (`speaker_first_write` in the trace), not yet measured on a lamp.
-- **Its cost:** the 3 in 59 the model answered right from the audio,
+- **Its cost:** the 2 or 3 in 59 the model answered right from the audio,
   despite the transcript, now get "hm?", and the person says it again.
 - **Tests:**
   `coordinator::tests::second_route::with_the_switch_a_misheard_cut_in_hums_and_sends_no_model_turn`
   (the hum with the listening face and no written turn; a line held as
   unclear that was no cut-in, and the switch off, asked again as before),
   `provider_worker::tests::sounds::with_the_switch_a_misheard_cut_in_is_said_as_one_and_the_next_request_is_told`
-  (said as a cut-in, the next request told; a cut-in heard right, and the
-  switch off, told nothing), `misheard_hum::tests` and
+  (said as a cut-in, the next request told once and the one after it
+  nothing; a line held as unclear that was no cut-in, a cut-in heard right,
+  and the switch off, told nothing), `misheard_hum::tests` and
   `provider_worker::tests::going_on_asks::misheard_hum_is_read_after_cut_in_told`.
 
 ## An answer with no word in it

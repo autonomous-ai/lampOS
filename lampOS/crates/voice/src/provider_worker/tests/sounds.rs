@@ -290,10 +290,15 @@ async fn a_cut_in_heard_as_a_fragment_is_asked_again_and_stop_is_answered() {
 }
 
 /// #828, the first builder at 05:07 on 19 October: in a conversation, a
-/// cut-in heard as `text`, and then the next request. What the worker said
-/// of the cut-in (`Unclear`'s why and whether it was a cut-in), and what the
-/// service was given as text beside the next request, up to its end.
-async fn cut_in_then_next(misheard_hum: bool, text: &str) -> (Option<(String, bool)>, Vec<String>) {
+/// turn heard as `text`, ended as a cut-in over the lamp's answer or not,
+/// and then two more requests, each begun at once. What the worker said of
+/// the first (`Unclear`'s why and whether the lamp hums for it), and what
+/// the service was given as text beside each of the next two, up to its end.
+async fn misheard_then_two(
+    misheard_hum: bool,
+    text: &str,
+    cut_in: bool,
+) -> (Option<(String, bool)>, Vec<String>, Vec<String>) {
     let options = Options {
         attention: Some(talking),
         ask_unclear: true,
@@ -312,7 +317,7 @@ async fn cut_in_then_next(misheard_hum: bool, text: &str) -> (Option<(String, bo
             request,
             privacy_generation: rig.snapshot.microphone_generation(),
             sound: false,
-            cut_in: true,
+            cut_in,
         })
         .unwrap();
     let ended = rig.service_message(&mut dial).await;
@@ -340,8 +345,16 @@ async fn cut_in_then_next(misheard_hum: bool, text: &str) -> (Option<(String, bo
             other => panic!("{other:?}"),
         }
     }
-    // The person says it again, after the lamp's "hm?".
-    let next = rig.speak(&mut dial, false, false).await;
+    let second = told_beside_the_next(&mut rig, &mut dial).await;
+    let third = told_beside_the_next(&mut rig, &mut dial).await;
+    rig.stop().await;
+    (unclear, second, third)
+}
+
+/// The person speaks again: a request ended as speech, what the service is
+/// given as text beside it up to its end, and then its answer, to its end.
+async fn told_beside_the_next(rig: &mut LiveRig, dial: &mut Dial) -> Vec<String> {
+    let next = rig.speak(dial, false, false).await;
     let owner = rig.snapshot.owner().unwrap();
     rig.owner.input_ended(real_time(), owner).unwrap();
     rig.publish();
@@ -356,7 +369,7 @@ async fn cut_in_then_next(misheard_hum: bool, text: &str) -> (Option<(String, bo
         .unwrap();
     let mut told = Vec::new();
     loop {
-        let message = rig.service_message(&mut dial).await;
+        let message = rig.service_message(dial).await;
         if let Some(text) = message["realtimeInput"]["text"].as_str() {
             told.push(text.to_owned());
         }
@@ -364,47 +377,58 @@ async fn cut_in_then_next(misheard_hum: bool, text: &str) -> (Option<(String, bo
             break;
         }
     }
-    rig.stop().await;
-    (unclear, told)
+    dial.service.send(heard("And then what happened?")).await;
+    dial.service.send(provider_audio(9, 480)).await;
+    dial.service.send(idle_complete()).await;
+    loop {
+        if let ProviderOutput::TurnComplete { request: done, .. } = rig.output().await
+            && done == next
+        {
+            break;
+        }
+    }
+    told
+}
+
+fn has_note(told: &[String]) -> bool {
+    told.iter()
+        .any(|text| text.contains(crate::misheard_hum::NOTE))
 }
 
 /// #828, the first builder at 05:07 on 19 October: of 59 "Sorry?" turns the
 /// model was asked for after a misheard cut-in, it said "Sorry?" 13 times
-/// and went back to its story about 40. With `LAMP_MISHEARD_HUM`, a misheard
-/// cut-in is said unclear as a cut-in, for the coordinator's "hm?" in place
-/// of a model turn, and the next request is told it wasn't caught. A cut-in
-/// heard right is answered as before and the next request told nothing;
-/// without the switch the cut-in is said unclear as before, and the next
-/// request is told nothing.
+/// and went back to its story about 40 (the Fourth's reader). With
+/// `LAMP_MISHEARD_HUM`, a misheard cut-in is said unclear for the
+/// coordinator's "hm?" in place of a model turn, and the next request,
+/// once, is told it wasn't caught. A line held as unclear that was no cut-in
+/// is asked again as before, and the request after it told nothing; so is a
+/// cut-in heard right, and everything without the switch (the reviewer on
+/// #1659: once, and cut-ins only).
 #[tokio::test]
 async fn with_the_switch_a_misheard_cut_in_is_said_as_one_and_the_next_request_is_told() {
-    let (unclear, told) = cut_in_then_next(true, "vestido").await;
+    let (unclear, second, third) = misheard_then_two(true, "vestido", true).await;
     assert_eq!(
         unclear,
         Some((crate::not_speech::CUT_IN_FRAGMENT.to_owned(), true))
     );
-    assert!(
-        told.iter()
-            .any(|text| text.contains(crate::misheard_hum::NOTE)),
-        "{told:?}"
-    );
+    assert!(has_note(&second), "{second:?}");
+    assert!(!has_note(&third), "told twice: {third:?}");
 
-    let (unclear, told) = cut_in_then_next(true, "Okay, okay, that is enough.").await;
+    let (unclear, second, _) = misheard_then_two(true, "हिंदू के स्थान", false).await;
+    assert_eq!(
+        unclear,
+        Some((crate::not_speech::OTHER_SCRIPT.to_owned(), false))
+    );
+    assert!(!has_note(&second), "{second:?}");
+
+    let (unclear, second, _) = misheard_then_two(true, "Okay, okay, that is enough.", true).await;
     assert_eq!(unclear, None);
-    assert!(
-        told.iter()
-            .all(|text| !text.contains(crate::misheard_hum::NOTE)),
-        "{told:?}"
-    );
+    assert!(!has_note(&second), "{second:?}");
 
-    let (unclear, told) = cut_in_then_next(false, "vestido").await;
+    let (unclear, second, _) = misheard_then_two(false, "vestido", true).await;
     assert_eq!(
         unclear,
-        Some((crate::not_speech::CUT_IN_FRAGMENT.to_owned(), true))
+        Some((crate::not_speech::CUT_IN_FRAGMENT.to_owned(), false))
     );
-    assert!(
-        told.iter()
-            .all(|text| !text.contains(crate::misheard_hum::NOTE)),
-        "{told:?}"
-    );
+    assert!(!has_note(&second), "{second:?}");
 }
