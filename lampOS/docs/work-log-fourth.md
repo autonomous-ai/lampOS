@@ -4550,6 +4550,23 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#1522's day lines:** the first builder's request mapping was one off; the corrected reading is on #1522, and the summary draft's item 10 was corrected.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-19, 01:18 ICT: #1617, #1627 and #1631 merged; Monday's scene and scorer; request 29; #1632's peer read; queue 22b
+
+- **Merged:**
+  - #1617 (23:25): the reviewer's P3s on #1602.
+  - #1627 (23:26): the same-voice check judges a line begun over a silent reply in hand. Scenes 1 and 5 run through the worker's loop, and the mutation is caught.
+  - #1631 (00:06): the reviewer's three P3s on #1627, docs and a test.
+- **Monday's real-voice scene for two people** (#829): 25 lines in four parts. It covers the voice check, #1618's minute and its timer rule, plus 5b and 13b for the request-29 candidates. With it, its scorer, `score_monday_fourth.py`, which aligns the scene's lines to the session's turns.
+- **Request 29's proposal** (#1522, taken over from eighth): (a) a question about the lamp's own senses; (b) a question in the conversation's own voice; (c) a turned face, already in. Recommended: (a) now, (b) decided on Monday.
+- **#1632's peer read** (Third's carry-forward of #1622, the privacy path): one P2 and one P3.
+  - **The P2:** a routine Controls or touch state, each published every 100 ms, landing during the release's save keeps the guard as a press does. A readers' test shows it.
+  - **The P3:** `restore`'s hand-off of the late window has no test; with the call deleted, all 70 hand-controls tests stay green.
+  - The first builder's four checks hold otherwise.
+- **Queue 22b** (#1618 on the night's last install, both switches): every line as expected, the day lines 12 of 12. I agreed to the first builder's proposal of both switches for Monday's scene, with four notes: the voice check is untested with them, the Policy went both ways on "what do you see", "warmer" and "see" were slow (2.88 s and 3.29 s), and scene 3's header.
+- **The log's own worktree** lost its git link at about midnight (its `.git` file was gone). It's now in my scratchpad; the branch was already pushed, so nothing was lost.
+- **Next:** queue 22e's same-voice A/B on #1627, about 03:30.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
