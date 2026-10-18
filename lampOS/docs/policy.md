@@ -51,6 +51,7 @@ owner's rules for this part:
 | `--endpoint` | Where the decision model is asked: `https://`, or `http://` for a server on the same machine in a test (127.0.0.1, ::1 or localhost). Plain http to any other machine is refused, because the key and what was heard would cross the network in the clear | `https://openrouter.ai/api/alpha/decisions` |
 | `--model` | The model asked for | `typesafe/jev-1.13` |
 | `--deadline-ms` | How long one asking may take, from 1 to 60000 | 3000 |
+| `--hedge-after-ms` | A question not answered in this many ms (1 to 60000) is asked again on a second connection, and the first answer is taken ([below](#a-second-asking-when-the-first-is-slow-1522)) | off |
 | `--bus-root` | The bus's directory | `LAMP_BUS_ROOT`, or `/run/lampos-bus` |
 | `--progress` | Also ask, in shadow, whether progress of the work handed over is worth telling now ([below](#progress-news-say-this-progress-now-732)) | off |
 | `--utc-offset-minutes` | The lamp's local time east of UTC, for the hour of the day the progress and hello questions show, the same all year | the hour is null |
@@ -649,6 +650,35 @@ Measured on the development Mac, ten times each, with a stand-in model that
 answers at once: 314 to 324 ms after the last piece, 319 in the middle, and
 7 to 9 ms after a piece marked `finished`. With the real model the asking
 is added: see "On the lamp".
+
+### A second asking when the first is slow (#1522)
+
+The asking is the remote judge's own time, and in a busy room a person
+waits for it while the voice holds the reply (`LAMP_GOING_ON_ASKS`). On
+lamp-4ace on 18 October, of 1,472 model decisions, the 1,427 on a kept
+connection took 573 ms in the middle and 989 ms nine times in ten, and the
+44 on one made `ahead` 1,031 ms in the middle (the first builder, #1522). Request 28 that day
+waited 0.8 s for a decision that took 1,003 ms on a kept connection: the
+service's own tail.
+
+With `--hedge-after-ms N` (off unless set; the first builder's choice is
+550, about the middle), a question not answered within N ms is asked again
+on a second connection of its own (`hedge::Hedged`, two judges, each on a
+thread of its own with its own kept connection), and whichever answers
+first is taken. The other's answer is dropped when it comes, and its
+connection kept for the next question. A failure is not asked again: a
+first asking that fails before N ms is the answer, as without it; once both
+are out, one that fails waits for the other. If the second connection is
+still out on an earlier question, nothing is asked again. Each second
+asking is said in the journal once it ends, `decision asked again after
+550 ms; the second asking answered first, 612 ms after the question`, or
+`neither answered` when both failed or the deadline came first, so a day's
+extra requests are counted with `journalctl -u lamp-policy | grep -c 'asked
+again'`. At
+lamp-4ace's spread about half the questions would be asked twice. Not
+measured on a lamp yet: the check is a day's p90 of the voice's `the
+Policy's decision came after` with it and without, and the count of second
+askings.
 
 ## On the lamp
 

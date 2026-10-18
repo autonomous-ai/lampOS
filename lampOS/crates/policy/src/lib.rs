@@ -38,6 +38,7 @@
 pub mod attention;
 pub mod decide;
 pub mod gather;
+pub mod hedge;
 pub mod hello;
 pub mod moment;
 pub mod outcome;
