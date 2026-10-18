@@ -292,9 +292,6 @@ impl PlaybackMask {
             duplex.interruption.await_words();
         }
     }
-    /// A stop word heard by its own listener (`stop/heard`, #828): the next
-    /// block with something to yield begins a yield. See
-    /// `Interruption::force_yield`.
     /// A forced yield committed since the last look: the stop was a stop,
     /// and the reply ends, whether or not anything said in it is admitted
     /// (a commit alone only lets a waiting request through).
@@ -303,7 +300,10 @@ impl PlaybackMask {
             .as_mut()
             .is_some_and(|duplex| std::mem::take(&mut duplex.stop_committed))
     }
-    /// Whether it was taken: a duplex mask with no yield in force.
+    /// A stop word heard by its own listener (`stop/heard`, #828): the next
+    /// block with something to yield begins a yield. See
+    /// `Interruption::force_yield`. Whether it was taken: a duplex mask with
+    /// no yield in force.
     pub fn force_yield(&mut self) -> bool {
         self.duplex
             .as_mut()
@@ -482,7 +482,10 @@ impl PlaybackMask {
     /// Only while hearing is current: see [`HEARING_STALE_US`].
     pub fn yielded(&self, now: u64) -> bool {
         self.duplex.as_ref().is_some_and(|duplex| {
-            duplex.interruption.yielded()
+            // A committed stop holds the speaker until the coordinator has
+            // ended the reply on its next pass (the reviewer on #1555: one
+            // chunk was handed on between the commit and the cancel).
+            (duplex.interruption.yielded() || duplex.stop_committed)
                 && now.saturating_sub(duplex.listened_at_us) <= HEARING_STALE_US
         })
     }
@@ -492,6 +495,7 @@ impl PlaybackMask {
     pub fn reply_closed(&mut self) {
         if let Some(duplex) = self.duplex.as_mut() {
             duplex.fruitless = 0;
+            duplex.stop_committed = false;
         }
     }
     /// The person's level against the lamp's own at the microphone, once
