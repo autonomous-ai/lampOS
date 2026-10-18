@@ -1730,9 +1730,10 @@ answer, in a busy room, asking nothing of the lamp` when all of these hold
   "we", "she", "they", "I'll", "we're"…), it has four words or more, and
   it neither wants nor needs anything: a word that begins "need", "want",
   "lik", "wonder", "wish", "hop", "lov" or "prefer" ("she needs", "I was
-  wondering", "I'd love"), or "too", "rather" or "use"; nor says the person
-  could not take something in ("I didn't catch that", "I can't read in this
-  light": "can't", "didn't", "don't", "not"… before "hear", "see", "catch",
+  wondering", "I'd love"), or "too", "rather", "use", "wanna" or "missed";
+  nor says the person could not take something in ("I didn't catch that",
+  "I can't read in this light", "I'm not sure I follow": "can't", "didn't",
+  "don't", "not"… within three words before "hear", "see", "catch",
   "understand", "read", "follow" or "get");
 - and it asks nothing (`remarks::asks`): no `?`; no sentence that begins
   with a question word or a helping verb, contractions included ("what's",
@@ -1765,7 +1766,10 @@ conversation, and the car line and scene 4's lines ("Did you see the
 report from the client?", "I know.", "We need to cut something before
 Friday.") are held as a busy room's talk, until the name, a face or the
 lamp's own question shows the next line is for it. It needs
-`LAMP_SPOKEN_TO` (lamp-4ace's and the product's units have it). Test:
+`LAMP_SPOKEN_TO`: the product's unit sets it; lamp-4ace's repo unit
+does not, and lamp-4ace has it on the lamp itself (the first builder on
+#829, 18 October, 11:0x), so a battery with `LAMP_REMARKS` needs it checked
+there first. Test:
 `attention::tests::with_remarks_two_remarks_held_end_a_conversation_its_own_replies_kept_going`,
 with the switch off as on the lamp (all nine answered).
 
@@ -1774,13 +1778,14 @@ asked also when the end of its newest line before the request, as it was
 said, has a `?` anywhere, or its last sentence asks without one: a
 helping verb and a person ("Shall I start it", "Would you like…", "Is
 there anything else"), a question word with a helping verb within four
-words after it ("is" or "are" within two, so not "How nice it is to see
-you"). Known misses: "is" or "are" said third or later as the only helping
-verb ("Which of these is better", "What kind of tea is it"), the price of
-keeping "How nice it is to see you" out; they matter only when the
-transcript drops the `?` ("Which one would you like", "What time should I set it
-for"), "how about", "or would", "Want me to…", or "let me know" (`Thread::lamp_asked_with`,
-`remarks::lamp_asked`). Not "Will do." or "Should be sunny tomorrow." The
+words after it ("Which one would you like", "What time should I set it
+for"; "is" or "are" within two, so not "How nice it is to see you"),
+"how about", "or would", "Want me to…", or "let me know"
+(`Thread::lamp_asked_with`, `remarks::lamp_asked`). Not "Will do." or
+"Should be sunny tomorrow." Known misses: "is" or "are" said third or
+later as the only helping verb ("Which of these is better", "What kind of
+tea is it"), the price of keeping "How nice it is to see you" out; they
+matter only when the transcript drops the `?`. The
 thread keeps only the first 400 bytes of what the lamp said, so a
 read-back "I can ask Claude Code to … Shall I start it?" longer than that
 lost its `?`; and Gemini's transcript of the lamp's words often has none.
@@ -1796,7 +1801,13 @@ check (#926). Without the switch `lamp_asked` is as before.
 
 **What it costs.** A remark meant for the lamp that begins with a person
 ("I really liked that story.") goes unanswered in a busy room unless the
-name is said or the person turns to it. A remark in another language is
+name is said or the person turns to it. And one person who thinks aloud in
+two remark-shaped lines ends their own conversation with the lamp: in a
+busy room, after "I think I will go for a run later." and "I should bring
+some water with me.", both held, their next ask without the name ("What's
+the weather tomorrow?", "brighter") is held as a busy room's talk, where
+without the two-remarks rule it would play (the reviewer on #1533). One
+remark before it ends nothing. A remark in another language is
 still answered there. Of the night's 32 lines the first builder's first
 filter would have held (on lamp-4ace's first-output records, 17 October
 19:00 to 18 October 07:00), the umbrella and the car (11) are held and
