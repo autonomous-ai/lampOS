@@ -324,6 +324,29 @@ mod tests {
         (dir, control, reader)
     }
 
+    /// The reader at EOF: every copy of the writer gone. A child another
+    /// test forks at that moment holds a copy until its exec closes it
+    /// (CLOEXEC), so EOF can come a little after the drop, and a single
+    /// non-blocking read would see `WouldBlock` (Nine on #705, 2 of 10
+    /// runs). So it reads until EOF, for at most 5 s. (A read timeout
+    /// can't be set instead: macOS refuses it, `EINVAL`, on a socket whose
+    /// peer has closed.)
+    fn assert_eof(reader: &mut UnixStream) {
+        let until = Instant::now() + Duration::from_secs(5);
+        loop {
+            match reader.read(&mut [0; 1]) {
+                Ok(0) => return,
+                Ok(_) => panic!("data where EOF was expected"),
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::WouldBlock && Instant::now() < until =>
+                {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                Err(error) => panic!("no EOF within 5 s: {error}"),
+            }
+        }
+    }
+
     fn poll(sequence: u64) -> RelayPollProgress {
         RelayPollProgress {
             poll_seq: sequence,
@@ -361,7 +384,7 @@ mod tests {
         let (_dir, mut control, mut reader) = fixture(Runner::CloseAfter(Duration::from_secs(3)));
         let due = EPOCH_US + 3_000_000;
         control.fire_runner(due).unwrap();
-        assert_eq!(reader.read(&mut [0; 1]).unwrap(), 0);
+        assert_eof(&mut reader);
         assert_eq!(control.runner_frames, 0);
         let clock = Cell::new(due);
         control.completed(&clock, poll(1)).unwrap();
@@ -451,7 +474,7 @@ mod tests {
             panic!("exercise owned endpoint cleanup");
         }));
         assert!(result.is_err());
-        assert_eq!(reader.read(&mut [0; 1]).unwrap(), 0);
+        assert_eof(&mut reader);
         assert!(!dir.join("control.sock").exists());
     }
 }
