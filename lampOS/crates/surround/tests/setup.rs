@@ -421,3 +421,32 @@ fn local_only_and_ap_addresses_cannot_be_readiness() {
     assert!(usable_address("192.168.1.2".parse().unwrap()));
     assert!(usable_address("fd01::2".parse().unwrap()));
 }
+
+/// #1505: setup's progress as a later build writes it, with a field this build
+/// doesn't know. The same file without it reopens; with it, it is refused
+/// today and lamp-surround doesn't start. No fix yet, and no unit starts
+/// lamp-surround on a lamp: whoever makes it read one release forward flips
+/// this to a plain test (Tests).
+#[test]
+#[should_panic(expected = "invalid setup record")]
+fn progress_from_a_later_build_is_read() {
+    let dir = private_dir();
+    let path = dir.path().join("setup.json");
+    let mut s = store(&dir);
+    s.begin("a", 0, SetupMode::Wifi).unwrap();
+    apply(&mut s, 1, 1, ReceiptValue::Network(lan(LinkKind::Wifi)));
+    drop(s);
+    let restored = SetupStore::open(&path, "boot-b", 0).unwrap();
+    let phase = restored.progress().phase;
+    drop(restored);
+    let mut later: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    later["a_field_from_a_later_build"] = serde_json::json!(true);
+    atomic::write(
+        &path,
+        &serde_json::to_vec(&later).unwrap(),
+        MAX_PROGRESS_BYTES,
+    )
+    .unwrap();
+    let read = SetupStore::open(&path, "boot-c", 0).unwrap();
+    assert_eq!(read.progress().phase, phase);
+}

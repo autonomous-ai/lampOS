@@ -731,3 +731,33 @@ fn directory_lock_prevents_another_writer_and_time_overflow_creates_no_intent() 
     assert_eq!(reset.state(), &before);
     assert!(reset.state().operation.as_ref().unwrap().pending.is_none());
 }
+
+/// #1505: the reset record as a later build writes it, with a field this build
+/// doesn't know. The same record without it reopens; with it, it is refused
+/// today and lamp-surround doesn't start. No fix yet, and no unit starts
+/// lamp-surround on a lamp: whoever makes it read one release forward flips
+/// this to a plain test (Tests).
+#[test]
+#[should_panic(expected = "corrupt reset record")]
+fn a_record_from_a_later_build_is_read() {
+    let mut rig = Rig::new();
+    rig.finish();
+    let state = rig.reset.state().clone();
+    rig.reset = rig.root.open(true, "after-completion", rig.now);
+    assert_eq!(rig.reset.state(), &state);
+    let mut later: serde_json::Value = serde_json::from_slice(
+        &atomic::read(&rig.root.record(), MAX_STATE)
+            .unwrap()
+            .unwrap(),
+    )
+    .unwrap();
+    later["a_field_from_a_later_build"] = serde_json::json!(true);
+    atomic::write(
+        &rig.root.record(),
+        &serde_json::to_vec(&later).unwrap(),
+        MAX_STATE,
+    )
+    .unwrap();
+    rig.reset = rig.root.open(true, "later", rig.now);
+    assert_eq!(rig.reset.state(), &state);
+}
