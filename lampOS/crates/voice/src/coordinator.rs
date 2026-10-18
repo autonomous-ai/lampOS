@@ -2516,6 +2516,9 @@ struct StartupEvents {
     cloud: CloudAvailability,
     output_flow: OutputReceiver,
     events: Vec<Value>,
+    /// The capture sent a frame before activation (#1567): the microphone
+    /// was open and gave audio, so the run heard, whatever it then refused.
+    microphone_spoke: bool,
 }
 impl StartupEvents {
     fn push(&mut self, event: Value) -> io::Result<()> {
@@ -2590,6 +2593,7 @@ impl StartupEvents {
                 "speaker" | "ring" => break,
                 "capture" => {
                     if channels.data.receive::<MicrophoneFrame>()?.is_some() {
+                        self.microphone_spoke = true;
                         return Err(io::Error::other("microphone opened before activation"));
                     }
                     break;
@@ -3019,6 +3023,86 @@ fn run_inner(
     controls: &mut Option<HandControls>,
     reminders: &mut Option<crate::reminders::Reminders>,
 ) -> Result<()> {
+    let result = run_cycle(
+        source,
+        lifetime,
+        trace,
+        diagnostic_directory,
+        options,
+        camera_config,
+        motor_options,
+        motor_rearm,
+        notices,
+        cues,
+        termination,
+        controls,
+        reminders,
+    );
+    released_if_never_listened(result, trace, controls)
+}
+
+/// With `LAMP_GUARD_NEVER_LISTENED=on` (#1567, B): a run that ended in a
+/// fault, anywhere from its arming on, before its capture delivered any
+/// audio and with no control input in flight, releases the restart guard,
+/// the latch written as it was, and says so once. It heard nothing, so the
+/// next start comes up as the person left it, not muted with nobody told
+/// (lamp-4ace on 18 Oct: 15:32, a capture that gave no block, and 17:48, a
+/// microphone busy at its open). A privacy exit, a fault while listening and
+/// one with a mute in flight keep the guard; the error is returned as it was.
+fn released_if_never_listened(
+    result: Result<()>,
+    trace: &mut SessionState,
+    controls: &mut Option<HandControls>,
+) -> Result<()> {
+    let Err(error) = result else {
+        return result;
+    };
+    let privacy = error.is::<PhysicalMute>()
+        || error.is::<SoftwareMute>()
+        || service_privacy::is_unavailable(&*error);
+    if privacy {
+        return Err(error);
+    }
+    let Some(controls) = controls.as_mut() else {
+        return Err(error);
+    };
+    match controls.release_never_listened() {
+        Ok(true) => {
+            eprintln!(
+                "lamp-voice: the run failed before it heard anything ({error}); the mute is kept as it was, not restored muted"
+            );
+            // The run's error is returned as it was, even if this write fails.
+            let _ = record(
+                trace,
+                json!({"kind":"guard_released_never_listened","at_us":monotonic_us(),"could_not_start":controls.could_not_start()}),
+            );
+        }
+        Ok(false) => {}
+        Err(release) => {
+            eprintln!(
+                "lamp-voice: the run failed before it heard anything, and the guard could not be released: {release}"
+            );
+        }
+    }
+    Err(error)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_cycle(
+    source: ProviderSource<'_>,
+    lifetime: Lifetime,
+    trace: &mut SessionState,
+    diagnostic_directory: Option<&Path>,
+    options: DirectedOptions,
+    camera_config: Option<&Path>,
+    motor_options: Option<&crate::options::MotorOptions>,
+    motor_rearm: &mut bool,
+    notices: &FailureNotices,
+    cues: &mut Option<CueSink>,
+    termination: &Termination,
+    controls: &mut Option<HandControls>,
+    reminders: &mut Option<crate::reminders::Reminders>,
+) -> Result<()> {
     termination.check()?;
     if let Some(controls) = controls.as_mut() {
         controls.fence_clear()?;
@@ -3031,6 +3115,13 @@ fn run_inner(
             }));
         }
         controls.arm_active()?;
+        // Runs before this one could not start: say so as this one tries,
+        // before anything can fail again (#1567).
+        if controls.could_not_start() > 0
+            && let Some(mut health) = crate::bus_out::WaitHealth::from_environment()
+        {
+            health.report_could_not_start(monotonic_us(), controls.could_not_start());
+        }
     }
     let directory = SessionDirectory::create()?;
     let boot = new_boot()?;
@@ -3107,7 +3198,7 @@ fn run_inner(
         )?;
         motor.as_mut().expect("checked above").attach_head(driver)?;
     }
-    let mut rig = spawn_rig(
+    let spawned = spawn_rig(
         source,
         &directory.path,
         boot,
@@ -3119,7 +3210,9 @@ fn run_inner(
         lifetime,
         termination,
         controls,
-    )?;
+    );
+    heard_if_spoke(&startup, controls);
+    let mut rig = spawned?;
     rig.motor = motor;
     if let Some(frames) = head_camera {
         if let Some(camera) = &mut rig.camera {
@@ -3171,8 +3264,25 @@ fn run_inner(
             .downcast_ref::<io::Error>()
             .is_some_and(|error| error.kind() == io::ErrorKind::Interrupted)
     });
-    let requested_stop =
+    // #1567, A: read before any cleanup, as the conversation returns its
+    // error, so a signal that comes during the cleanup does not count.
+    let stop_came_first = released_by_stop_first(
+        controls.as_ref(),
+        result.is_err() && !privacy_mute,
+        termination.signal_name(),
+    );
+    if stop_came_first {
+        eprintln!(
+            "lamp-voice: the run's fault came after {}; it is the stop's, and the mute is kept as it was",
+            termination.signal_name().unwrap_or("the stop")
+        );
+    }
+    let stop_path =
         guard_released_on_stop(result.is_ok() || interrupted, termination.signal_name());
+    let requested_stop = stop_came_first || stop_path;
+    // A alone, not the clean stop's own rule: its "nothing in flight" is
+    // asked again at the release (the reviewer and Jarvis on #1592).
+    let only_by_stop_first = stop_came_first && !stop_path;
     // A person's mute, accepted and revoked: the restart guard's marker goes
     // now, before teardown, so a crash in teardown cannot leave it for a tap
     // to open (#997). A removal that fails ends the cycle as a fault would.
@@ -3198,15 +3308,50 @@ fn run_inner(
     };
     if (result.is_ok() || requested_stop)
         && let Some(controls) = controls.as_mut()
+        && released_after_cleanup(controls, only_by_stop_first)?
+        && result.is_err()
     {
-        if result.is_err() {
-            eprintln!(
-                "lamp-voice: a requested stop's cleanup reported a fault; the mute is kept as it was, not restored muted"
-            );
-        }
-        controls.disarm_after_cleanup()?;
+        eprintln!(
+            "lamp-voice: a requested stop's cleanup reported a fault; the mute is kept as it was, not restored muted"
+        );
     }
     result
+}
+
+/// The guard released after the run's cleanup, as the latch was (#960).
+/// When the stop-first rule (#1567, A) is the only reason, a control input
+/// that came during the teardown, queued unread or taken and unsaved, keeps
+/// the guard: the person pressed while the voice was going, and an
+/// unmuted latch must not be written over it (Jarvis on #1592). Whether it
+/// released.
+fn released_after_cleanup(
+    controls: &mut HandControls,
+    only_by_stop_first: bool,
+) -> io::Result<bool> {
+    if only_by_stop_first && !controls.still_quiet() {
+        eprintln!(
+            "lamp-voice: a control came during the stop's teardown; the guard is kept, so the next start is muted"
+        );
+        return Ok(false);
+    }
+    controls.disarm_after_cleanup()?;
+    Ok(true)
+}
+
+/// A microphone that spoke before activation was open and gave audio: the
+/// run heard, so its fault keeps the guard (#1567, the reviewer on #1592).
+fn heard_if_spoke(startup: &StartupEvents, controls: &mut Option<HandControls>) {
+    if startup.microphone_spoke {
+        heard_a_frame(controls);
+    }
+}
+
+/// The capture gave a frame: from here on this run heard, whatever it then
+/// drops or refuses (#1567).
+fn heard_a_frame(controls: &mut Option<HandControls>) {
+    if let Some(controls) = controls.as_mut() {
+        controls.heard_audio();
+    }
 }
 
 /// Whether the restart guard is released as for a clean stop (#960): the
@@ -3218,6 +3363,35 @@ fn run_inner(
 /// it was muted. A fault or a privacy exit keeps the conservative guard.
 fn guard_released_on_stop(ended_by_the_stop: bool, signal: Option<&str>) -> bool {
     ended_by_the_stop && signal.is_some()
+}
+
+/// With `LAMP_GUARD_NEVER_LISTENED=on` (#1567, A): a fault the
+/// conversation returned once the stop's signal had come is the stop's, not
+/// a crash: the workers go as the service stops, and what they say then is
+/// part of it. (Not 08:34 on 18 Oct on lamp-4ace: that run had no signal,
+/// the first builder read in its journal; its leases lapsed on their own.)
+/// The signal handler sets its
+/// flag as the signal comes and the conversation returns its error at once,
+/// so a flag set when it returned came before the fault, to within that
+/// return (the workspace allows no `unsafe`, so the handler keeps no time).
+/// A fault returned before the signal keeps the guard, and a privacy exit
+/// is never this.
+fn stop_before_fault(faulted: bool, signal: Option<&str>) -> bool {
+    faulted && signal.is_some()
+}
+
+/// A with its gates (#1567): the switch on, and no control input in flight,
+/// as for B, so a press queued and not yet read is never lost to an
+/// unmuted latch (the reviewer on #1592). `faulted` is a fault that is not
+/// a mute; an unreadable switch is one A may release, since the switch is
+/// read again at every start.
+fn released_by_stop_first(
+    controls: Option<&HandControls>,
+    faulted: bool,
+    signal: Option<&str>,
+) -> bool {
+    controls.is_some_and(|controls| controls.never_listened_on() && controls.nothing_in_flight())
+        && stop_before_fault(faulted, signal)
 }
 
 fn service_head(
@@ -4933,6 +5107,7 @@ fn conversation_with_gate(
             let Some(mut frame) = rig.capture.channels.data.receive::<MicrophoneFrame>()? else {
                 break;
             };
+            heard_a_frame(controls);
             // A turn cut by a gap is cancelled on the next pass: until then
             // nothing reaches admission or the provider across the cut.
             if closed_epoch == Some(frame.epoch) || gap_cut_utterance {
@@ -6498,6 +6673,7 @@ fn conversation_with_gate(
                 crate::ring_wire::RingPhase::from_snapshot(snapshot).filter(|_| !sound_now),
                 clock,
             );
+            bus.set_could_not_start(controls.as_ref().map_or(0, HandControls::could_not_start));
             bus.report(cloud.available(), clock, trace.mic_at_start);
         }
         if let Some(mic) = mic_out.as_mut() {
@@ -10458,6 +10634,53 @@ mod tests {
             })
             .unwrap();
         assert!(startup.poll(&mut parent, "provider").is_err());
+    }
+
+    /// #1567 (the reviewer on #1592): a frame the capture sends before its
+    /// activation is a microphone open and giving audio: startup refuses it,
+    /// and says the run heard, so its fault keeps the restart guard.
+    #[test]
+    fn a_microphone_that_speaks_before_activation_counts_as_heard() {
+        let dir = SessionDirectory::create().unwrap();
+        let (mut parent, mut capture) = pair(&dir, "capture");
+        let mut startup = StartupEvents::default();
+        startup.poll(&mut parent, "capture").unwrap();
+        assert!(!startup.microphone_spoke, "nothing sent: nothing heard");
+        let at = monotonic_us();
+        capture
+            .data
+            .send(MicrophoneFrame {
+                raw: None,
+                epoch: 1,
+                dsp_epoch: 1,
+                privacy_generation: 2,
+                frame_sequence: 1,
+                read_completed_at_us: at,
+                probability: 0.95,
+                echo: None,
+                reference: Default::default(),
+                samples: vec![123; 160],
+                timing: CaptureTiming {
+                    first_read_started_at_us: at,
+                    last_read_started_at_us: at,
+                    successful_reads: 1,
+                    alsa_status_monotonic_us: None,
+                    status_observed_at_us: at,
+                    available_frames: 0,
+                    delayed_frames: 0,
+                    processing_completed_at_us: at,
+                    aec_queue_delay_ms: 0,
+                    reference: crate::wire::ReferenceTiming::default(),
+                },
+            })
+            .unwrap();
+        let refused = startup.poll(&mut parent, "capture").unwrap_err();
+        assert!(
+            refused
+                .to_string()
+                .contains("microphone opened before activation")
+        );
+        assert!(startup.microphone_spoke);
     }
 
     #[test]

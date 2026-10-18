@@ -1702,3 +1702,175 @@ fn a_mute_record_from_a_newer_build_restores_muted() {
     assert_eq!(saved["muted"], true);
     assert!(saved.get("later").is_none(), "{saved}");
 }
+
+/// #1567, B: with `LAMP_GUARD_NEVER_LISTENED=on`, a run that ends before its
+/// capture gave any audio, with nothing in flight, releases the guard: the
+/// record is written as the latch was (listening), and the count beside it
+/// goes up by one. The first block a later run hears ends the count. A run
+/// that heard something keeps the guard.
+#[test]
+fn a_run_that_heard_nothing_releases_the_guard_and_is_counted() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    owner.never_listened = true;
+    let count = || fs::read_to_string(owner_count_path(&directory)).ok();
+    owner.arm_active().unwrap();
+    assert!(
+        MuteRecord::load(&directory.file(), CLOCK, START)
+            .unwrap()
+            .muted
+    );
+    assert!(owner.release_never_listened().unwrap());
+    assert!(
+        !MuteRecord::load(&directory.file(), CLOCK, START)
+            .unwrap()
+            .muted
+    );
+    assert_eq!(owner.could_not_start(), 1);
+    assert_eq!(count().as_deref(), Some("1\n"));
+    // The next run fails the same way: two in a row.
+    owner.arm_active().unwrap();
+    assert!(owner.release_never_listened().unwrap());
+    assert_eq!(owner.could_not_start(), 2);
+    assert_eq!(count().as_deref(), Some("2\n"));
+    // A run that hears: the count is over, and a fault now keeps the guard.
+    owner.arm_active().unwrap();
+    owner.heard_audio();
+    assert_eq!(owner.could_not_start(), 0);
+    assert_eq!(count(), None);
+    assert!(!owner.release_never_listened().unwrap());
+    assert!(
+        MuteRecord::load(&directory.file(), CLOCK, START)
+            .unwrap()
+            .muted,
+        "heard, so the guard stands"
+    );
+    // Each run starts unheard.
+    owner.disarm_after_cleanup().unwrap();
+    owner.arm_active().unwrap();
+    assert!(owner.release_never_listened().unwrap());
+}
+
+fn owner_count_path(directory: &Directory) -> PathBuf {
+    let mut name = directory.file().file_name().unwrap().to_os_string();
+    name.push(NEVER_LISTENED_SUFFIX);
+    directory.file().with_file_name(name)
+}
+
+/// #1567, B's limits: off unless set; and a control input unread or a mute
+/// change unsaved keeps the guard, so a person's mute in the startup is
+/// never lost; and a run never armed has nothing to release.
+#[test]
+fn the_guard_stands_when_off_or_with_a_control_in_flight() {
+    let directory = Directory::new();
+    let (mut owner, sender) = fixture(options(false, Some(&directory.file())));
+    assert!(!owner.release_never_listened().unwrap(), "never armed");
+    owner.arm_active().unwrap();
+    assert!(
+        !owner.release_never_listened().unwrap(),
+        "the switch is off"
+    );
+    owner.never_listened = true;
+    owner.shared.queued.fetch_add(1, Ordering::AcqRel);
+    assert!(!owner.release_never_listened().unwrap(), "an input unread");
+    owner.shared.queued.fetch_sub(1, Ordering::AcqRel);
+    let mute = gesture(ControlIntent::SoftwareMute, 1, 4_000_000);
+    observe(
+        &mut owner,
+        &sender,
+        state(1, 4_000_000, Some(mute)),
+        4_000_000,
+    );
+    assert!(owner.dirty);
+    assert!(!owner.release_never_listened().unwrap(), "a mute unsaved");
+    assert!(
+        MuteRecord::load(&directory.file(), CLOCK, START)
+            .unwrap()
+            .muted
+    );
+    assert_eq!(owner.could_not_start(), 0);
+}
+
+/// The count beside the record, as a restart reads it: a number, else none.
+#[test]
+fn the_count_of_runs_that_could_not_start_is_read_back_or_none() {
+    let directory = Directory::new();
+    let (owner, _sender) = fixture(options(false, Some(&directory.file())));
+    let path = owner_count_path(&directory);
+    assert_eq!(owner.read_could_not_start(), 0);
+    fs::write(&path, "3\n").unwrap();
+    assert_eq!(owner.read_could_not_start(), 3);
+    fs::write(&path, "three").unwrap();
+    assert_eq!(owner.read_could_not_start(), 0);
+    fs::write(&path, "1234567890123").unwrap();
+    assert_eq!(owner.read_could_not_start(), 0);
+}
+
+/// The reviewer on #1592: the count is read only with the switch on, and a
+/// FIFO or a large file where it is kept never holds the restore up.
+#[test]
+fn the_count_file_is_read_only_as_a_small_regular_file() {
+    let directory = Directory::new();
+    let (owner, _sender) = fixture(options(false, Some(&directory.file())));
+    let path = owner_count_path(&directory);
+    fs::write(&path, "x".repeat(17)).unwrap();
+    assert_eq!(owner.read_could_not_start(), 0, "too large");
+    fs::remove_file(&path).unwrap();
+    // rustix has no mkfifoat on Apple platforms, so the tool, as lamp-body's
+    // FIFO test does.
+    assert!(
+        std::process::Command::new("mkfifo")
+            .arg(&path)
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert_eq!(owner.read_could_not_start(), 0, "a FIFO is never opened");
+}
+
+/// The reviewer's P3 on #1592: the count is loaded at restore only with the
+/// switch on; with it off, a count left over says nothing.
+#[test]
+fn the_count_is_loaded_only_with_the_switch_on() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    fs::write(owner_count_path(&directory), "3\n").unwrap();
+    owner.load_could_not_start();
+    assert_eq!(owner.could_not_start(), 0, "off");
+    owner.never_listened = true;
+    owner.load_could_not_start();
+    assert_eq!(owner.could_not_start(), 3, "on");
+}
+
+/// Jarvis's P3 on #1592: a link where the count is kept is never followed:
+/// its target is left as it was, written or removed.
+#[test]
+fn a_link_where_the_count_is_kept_is_never_followed() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    owner.never_listened = true;
+    let target = directory.0.join("elsewhere");
+    fs::write(&target, "kept\n").unwrap();
+    std::os::unix::fs::symlink(&target, owner_count_path(&directory)).unwrap();
+    owner.arm_active().unwrap();
+    assert!(owner.release_never_listened().unwrap());
+    assert_eq!(
+        fs::read_to_string(&target).unwrap(),
+        "kept\n",
+        "not written through"
+    );
+    owner.arm_active().unwrap();
+    owner.heard_audio();
+    assert_eq!(
+        fs::read_to_string(&target).unwrap(),
+        "kept\n",
+        "not removed through"
+    );
+    assert!(
+        owner_count_path(&directory)
+            .symlink_metadata()
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+}

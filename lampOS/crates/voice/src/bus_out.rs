@@ -508,6 +508,33 @@ pub fn health(
     }
 }
 
+/// The voice's report with, while `runs` is above 0, that so many runs in a
+/// row failed before they heard anything (#1567): a warning, never that it
+/// is muted, since it is not, and the count as the fact `could_not_start`.
+/// What was wrong before is said after it.
+pub fn could_not_start(report: lamp_msgs::Diagnostic, runs: u32) -> lamp_msgs::Diagnostic {
+    use lamp_msgs::{Diagnostic, Level};
+    if runs == 0 {
+        return report;
+    }
+    let times = if runs == 1 { "time" } else { "times" };
+    let said = format!(
+        "the voice could not start ({runs} {times} since it last heard anything); trying again"
+    );
+    let message = if report.message.is_empty() {
+        said
+    } else {
+        format!("{said}; {}", report.message)
+    };
+    let level = match report.level {
+        Level::Ok => Level::Warn,
+        level => level,
+    };
+    let mut out = Diagnostic::new(level, SOURCE, &message);
+    out.values = report.values;
+    out.with("could_not_start", runs)
+}
+
 /// Why the voice waits with no audio open (#1371): between sessions it
 /// runs none, and nothing else says how it is, so `lamp-health` took a
 /// lamp muted by its privacy switch for 2 h 25 min as a voice gone quiet
@@ -644,6 +671,18 @@ impl WaitHealth {
         })
     }
 
+    /// At a run's start, before any worker opens, while runs before it
+    /// could not start (#1567): said at once, so a lamp whose voice keeps
+    /// failing before it hears shows the count each time it tries, not only
+    /// in a good run's first report (the reviewer on #1592).
+    pub fn report_could_not_start(&mut self, now_us: u64, runs: u32) {
+        let trying = lamp_msgs::Diagnostic::ok(SOURCE).with("link", "connecting");
+        let _ = self
+            .health
+            .publish_json(now_us, &could_not_start(trying, runs));
+        self.reported = None;
+    }
+
     /// Call on every look of the wait, with whether a due reminder is owed
     /// ([`waiting_health`]): at once when either changes.
     pub fn report(&mut self, now_us: u64, waiting: Waiting, owed: bool) {
@@ -692,6 +731,9 @@ pub struct BusOut {
     said_in: Option<u64>,
     unsaid: Option<u64>,
     calls: crate::not_speech::CallsLeftOut,
+    /// Runs in a row that failed before they heard anything (#1567), said
+    /// in the health until this run hears.
+    could_not_start: u32,
 }
 
 impl BusOut {
@@ -730,6 +772,7 @@ impl BusOut {
             said_in: None,
             unsaid: None,
             calls: crate::not_speech::CallsLeftOut::new(),
+            could_not_start: 0,
         })
     }
 
@@ -799,12 +842,20 @@ impl BusOut {
         let down_for = self
             .down_since_us
             .map_or(0, |since| now_us.saturating_sub(since));
-        let _ = self
-            .health
-            .publish_json(now_us, &health(link_up, down_for, mic_at_start));
+        let report = could_not_start(
+            health(link_up, down_for, mic_at_start),
+            self.could_not_start,
+        );
+        let _ = self.health.publish_json(now_us, &report);
         if let Some(link) = &mut self.link {
             let _ = link.publish_json(now_us, &link_state(link_up, down_for));
         }
+    }
+
+    /// How many runs in a row failed before they heard anything, as the
+    /// hand controls keep it (#1567): said with each report while above 0.
+    pub fn set_could_not_start(&mut self, runs: u32) {
+        self.could_not_start = runs;
     }
 
     /// A piece of the provider's text of what a person said, with the turn
@@ -979,6 +1030,80 @@ mod tests {
             assert!(closed.closed(), "{closed:?}");
         }
         assert!(!Waiting::Reading.closed() && !Waiting::Opening.closed());
+    }
+
+    /// #1567 (the reviewer on #1592): the count is said on the bus as each
+    /// run starts, as lamp-health reads it.
+    #[test]
+    fn a_run_starting_after_runs_that_could_not_start_says_the_count() {
+        let (bus, root) = bus("start");
+        let mut hears = bus
+            .subscribe_typed(
+                lamp_msgs::Diagnostic::TOPIC,
+                "test",
+                lamp_msgs::Diagnostic::TYPE,
+            )
+            .unwrap();
+        let mut health = WaitHealth::on(&bus).unwrap();
+        health.report_could_not_start(5, 2);
+        let said = hears
+            .recv(WAIT)
+            .unwrap()
+            .unwrap()
+            .parse::<lamp_msgs::Diagnostic>()
+            .unwrap();
+        assert_eq!(said.level, lamp_msgs::Level::Warn);
+        assert!(
+            said.message
+                .starts_with("the voice could not start (2 times")
+        );
+        assert!(
+            said.values
+                .iter()
+                .any(|fact| fact.key == "could_not_start" && fact.value == "2")
+        );
+        assert!(
+            said.values
+                .iter()
+                .any(|fact| fact.key == "link" && fact.value == "connecting")
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    /// #1567: runs that could not start are said as a warning beside what
+    /// else is wrong, never as a mute, and not at all once one has heard.
+    #[test]
+    fn runs_that_could_not_start_are_a_warning_never_a_mute() {
+        use lamp_msgs::Level;
+        let well = health(true, 0, None);
+        assert_eq!(could_not_start(well.clone(), 0), well);
+        let once = could_not_start(well.clone(), 1);
+        assert_eq!(once.level, Level::Warn);
+        assert_eq!(
+            once.message,
+            "the voice could not start (1 time since it last heard anything); trying again"
+        );
+        assert!(
+            once.values
+                .iter()
+                .any(|fact| fact.key == "link" && fact.value == "ready")
+        );
+        assert!(
+            once.values
+                .iter()
+                .any(|fact| fact.key == "could_not_start" && fact.value == "1")
+        );
+        assert!(!once.message.contains("muted"));
+        let down = could_not_start(health(false, LINK_GRACE_US, None), 3);
+        assert_eq!(down.level, Level::Warn);
+        assert!(
+            down.message
+                .starts_with("the voice could not start (3 times")
+        );
+        assert!(
+            down.message
+                .ends_with("it cannot reach the speech service, and keeps trying")
+        );
     }
 
     /// #1545: a reminder coming due, or said, in the wait is told at once,

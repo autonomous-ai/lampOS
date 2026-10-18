@@ -49,6 +49,13 @@ const SUBSCRIBER: &str = "voice_hand";
 /// told from a chosen one (#960).
 pub const RESTORED_MUTE_ENVIRONMENT: &str = "LAMP_RESTORED_MUTE";
 const GUARD_MARKER_SUFFIX: &str = ".restart-guard";
+/// Off unless `on`: a run that fails before it heard anything, with no
+/// control input in flight, does not leave the lamp muted (#1567, B), and a
+/// fault raised after the stop's signal is the stop's (A).
+pub const NEVER_LISTENED_ENVIRONMENT: &str = "LAMP_GUARD_NEVER_LISTENED";
+/// Beside the mute record: how many runs in a row have failed before they
+/// heard anything, for the health to say (#1567).
+const NEVER_LISTENED_SUFFIX: &str = ".never-listened";
 
 fn invalid(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
@@ -258,12 +265,20 @@ pub struct HandControls {
     seen_generation: u64,
     dirty: bool,
     armed: bool,
+    /// Whether this run's capture has delivered a block since it was armed
+    /// ([`Self::heard_audio`], #1567).
+    heard: bool,
     persistence_failed: bool,
     /// The head pads' requests, checked as Controls' own receiver does:
     /// fresh, from the current Controls and reader, each once.
     touch: Option<TouchReceiver>,
     /// `LAMP_RESTORED_MUTE=on`: arming leaves the guard's marker.
     mark_guard: bool,
+    /// `LAMP_GUARD_NEVER_LISTENED=on` (#1567).
+    never_listened: bool,
+    /// Runs in a row that failed before they heard anything, since the last
+    /// that did ([`Self::could_not_start`]).
+    could_not_start: u32,
     /// The record was muted by the restart guard, not by the person.
     restored_after_fault: bool,
     // One handle for the entire service, not one per supervised audio cycle.
@@ -397,6 +412,30 @@ impl HandControls {
         )
     }
 
+    /// A listening lamp with its mute record at `record` (in a private
+    /// directory) and `LAMP_GUARD_NEVER_LISTENED=on` (#1567).
+    #[cfg(test)]
+    pub(crate) fn with_test_guard(
+        clock_id: &str,
+        started_us: u64,
+        record: &Path,
+    ) -> io::Result<Self> {
+        let (_sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
+        let mut controls = Self::from_parts(
+            ControlsOptions {
+                mute_record: Some(record.to_path_buf()),
+                ..Default::default()
+            },
+            clock_id,
+            MuteRecord::new(clock_id)?,
+            input,
+            Arc::new(Shared::default()),
+            started_us,
+        )?;
+        controls.never_listened = true;
+        Ok(controls)
+    }
+
     /// Restore and validate durability before any Voice worker is opened.
     /// The pump alone may open bus paths; an unavailable bus is optional input
     /// loss, not permission to unmute and not a failure of healthy audio.
@@ -436,6 +475,9 @@ impl HandControls {
             Self::from_parts(options.clone(), &clock_id, record, input, shared, now_us)?;
         controls.mark_guard =
             std::env::var(RESTORED_MUTE_ENVIRONMENT).ok().as_deref() == Some("on");
+        controls.never_listened =
+            std::env::var(NEVER_LISTENED_ENVIRONMENT).ok().as_deref() == Some("on");
+        controls.load_could_not_start();
         controls.restore_guard_marker(stored);
         let root = options
             .bus_root
@@ -490,9 +532,12 @@ impl HandControls {
             seen_generation: 0,
             dirty: false,
             armed: false,
+            heard: false,
             persistence_failed: false,
             touch,
             mark_guard: false,
+            never_listened: false,
+            could_not_start: 0,
             restored_after_fault: false,
             _pump: None,
         };
@@ -934,6 +979,8 @@ impl HandControls {
         if self.muted() || self.persistence_failed {
             return Err(io::Error::other("hand mute inhibits an active runtime"));
         }
+        // A new run: nothing heard in it yet (#1567).
+        self.heard = false;
         if !self.armed {
             // Marker first: a fault between the two leaves an unmuted record
             // with a marker, which restore discards.
@@ -947,6 +994,126 @@ impl HandControls {
             self.armed = true;
         }
         Ok(())
+    }
+
+    /// This run's capture has delivered audio: from now on a fault keeps the
+    /// guard (#1567), and the count of runs that could not start is over.
+    pub fn heard_audio(&mut self) {
+        if self.heard {
+            return;
+        }
+        self.heard = true;
+        if self.could_not_start != 0 {
+            self.could_not_start = 0;
+            if let Some(path) = self
+                .never_listened_path()
+                .filter(|path| regular_or_absent(path))
+            {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
+
+    /// No control input sent and not yet read (#1567): a press still in the
+    /// queue could be a mute the latch has not taken.
+    pub fn nothing_in_flight(&self) -> bool {
+        self.shared.queued.load(Ordering::Acquire) == 0
+    }
+
+    /// Nothing in flight and nothing taken unsaved (#1567): no control the
+    /// release could write over.
+    pub fn still_quiet(&self) -> bool {
+        self.nothing_in_flight() && !self.dirty
+    }
+
+    /// `LAMP_GUARD_NEVER_LISTENED`, for a test.
+    #[cfg(test)]
+    pub(crate) fn set_never_listened_for_test(&mut self, on: bool) {
+        self.never_listened = on;
+    }
+
+    /// A control taken and not yet saved, for a test.
+    #[cfg(test)]
+    pub(crate) fn set_dirty_for_test(&mut self) {
+        self.dirty = true;
+    }
+
+    /// The count of control inputs sent and not yet read, for a test.
+    #[cfg(test)]
+    pub(crate) fn queued_for_test(&self) -> &AtomicUsize {
+        &self.shared.queued
+    }
+
+    /// Whether `LAMP_GUARD_NEVER_LISTENED=on` (#1567).
+    pub fn never_listened_on(&self) -> bool {
+        self.never_listened
+    }
+
+    /// Runs in a row that failed before they heard anything, since the last
+    /// that heard something; 0 once this run has (#1567).
+    pub fn could_not_start(&self) -> u32 {
+        self.could_not_start
+    }
+
+    fn never_listened_path(&self) -> Option<PathBuf> {
+        let record = self.options.mute_record.as_ref()?;
+        let mut name = record.file_name()?.to_os_string();
+        name.push(NEVER_LISTENED_SUFFIX);
+        Some(record.with_file_name(name))
+    }
+
+    /// The count beside the record, read only with the switch on, so a
+    /// count left from when it was on says nothing with it off (#1567).
+    fn load_could_not_start(&mut self) {
+        self.could_not_start = if self.never_listened {
+            self.read_could_not_start()
+        } else {
+            0
+        };
+    }
+
+    /// The count kept beside the record: at most a few digits; anything
+    /// else reads as none.
+    fn read_could_not_start(&self) -> u32 {
+        // Only a regular file of a few bytes is read, so a FIFO or a large
+        // file there never holds the restore up (as #1583 for the marker).
+        self.never_listened_path()
+            .filter(|path| {
+                path.symlink_metadata()
+                    .is_ok_and(|meta| meta.is_file() && meta.len() <= 16)
+            })
+            .and_then(|path| std::fs::read(path).ok())
+            .filter(|bytes| bytes.len() <= 10)
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+            .and_then(|text| text.trim().parse().ok())
+            .unwrap_or(0)
+    }
+
+    /// With `LAMP_GUARD_NEVER_LISTENED=on` (#1567, B): a run that ended in a
+    /// fault before its capture delivered any audio, with no control input
+    /// unread (`queued`) or unsaved (`dirty`), releases the guard as a clean
+    /// stop does, the latch written as it was. It heard nothing, so the guard
+    /// has nothing to protect, and muting it would leave a lamp muted after
+    /// an update with nobody told (lamp-4ace, 18 Oct, 15:32 and 17:48).
+    /// Whether it released.
+    pub fn release_never_listened(&mut self) -> io::Result<bool> {
+        if !self.never_listened
+            || !self.armed
+            || self.heard
+            || self.dirty
+            || self.persistence_failed
+            || !self.nothing_in_flight()
+        {
+            return Ok(false);
+        }
+        self.disarm_after_cleanup()?;
+        // Advice for the health only: a count that cannot be kept changes no
+        // permission.
+        self.could_not_start = self.could_not_start.saturating_add(1);
+        if let Some(path) = self.never_listened_path() {
+            let _ = write_count(&path, self.could_not_start);
+        }
+        Ok(true)
     }
 
     /// Only after VERIFIED clean destruction of all audio workers. Fault,
@@ -981,6 +1148,36 @@ impl HandControls {
 fn stored_identity(path: &Path) -> Option<(String, u64)> {
     let record: MuteRecord = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
     Some((record.clock_id, record.through_us))
+}
+
+/// Nothing there, or a regular file: never a link, a FIFO or a folder,
+/// whose target a write or a removal would touch (#1567, Jarvis on #1592).
+fn regular_or_absent(path: &Path) -> bool {
+    match path.symlink_metadata() {
+        Ok(meta) => meta.is_file(),
+        Err(error) => error.kind() == io::ErrorKind::NotFound,
+    }
+}
+
+/// The count, written whole beside a regular file or nothing: to a new
+/// private file first, then renamed over, so a link there is replaced, not
+/// followed.
+fn write_count(path: &Path, count: u32) -> io::Result<()> {
+    if !regular_or_absent(path) {
+        return Err(io::Error::other("the count's path is not a regular file"));
+    }
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(".new");
+    let new = path.with_file_name(name);
+    let _ = std::fs::remove_file(&new);
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&new)?;
+    std::io::Write::write_all(&mut file, format!("{count}\n").as_bytes())?;
+    drop(file);
+    std::fs::rename(&new, path)
 }
 
 /// Writes the marker naming the guard record `identity`, synced with its
