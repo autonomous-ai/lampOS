@@ -31,6 +31,7 @@ fn options(
         ask_unclear: false,
         spoken_to,
         voices: None,
+        catalog: None,
     }
 }
 

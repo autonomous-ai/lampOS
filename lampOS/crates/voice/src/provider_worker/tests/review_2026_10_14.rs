@@ -120,6 +120,7 @@ fn in_a_busy_room() -> Options {
         staff_note: false,
         spoken_to: false,
         voices: None,
+        catalog: None,
     }
 }
 
