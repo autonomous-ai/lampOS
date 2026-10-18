@@ -1406,8 +1406,8 @@ impl Policy<'_> {
         }
     }
 
-    /// Once a second: say how the policy is, and show the bus that it is
-    /// alive though it has decided nothing, which is also how it learns
+    /// Every `report_every`, once a second on the lamp: say how the policy
+    /// is, and show the bus that it is alive though it has decided nothing, which is also how it learns
     /// that the bus can be published to again.
     fn second(&mut self) {
         // Whether anything on the lamp is listening for its name: a part

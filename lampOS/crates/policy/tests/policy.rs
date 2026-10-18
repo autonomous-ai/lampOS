@@ -683,6 +683,13 @@ fn the_judge_is_told_to_get_ready_each_time_someone_begins_to_speak() {
     rig.stop();
 }
 
+/// The rigs here report every 20 ms, so nothing else pins the lamp's own
+/// period (#1490's reviewer): `lamp-policy` passes `REPORT_EVERY`.
+#[test]
+fn the_lamps_policy_reports_once_a_second() {
+    assert_eq!(policy::REPORT_EVERY, Duration::from_secs(1));
+}
+
 #[test]
 fn the_policy_says_how_it_is_once_a_second_and_that_it_decides_without_a_model() {
     let mut rig = Rig::new("report", |state| {
