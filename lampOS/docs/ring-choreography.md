@@ -445,15 +445,23 @@ light wanted and reads the state back ([actions.md](actions.md)). A bus
 that cannot be used is said once in the voice's log and the ring runs as
 it did, in its first light. The light is kept by the bus, which lives in
 memory: after the board restarts the lamp is back in its first light,
-unless `LAMP_LIGHT_KEEP=on` (#1464). Then the ring also keeps the person's
+unless `LAMP_LIGHT_KEEP=on` (#1468). Then the ring also keeps the person's
 light in `/var/lib/lampOS/light/person.json`, written when it changes
 (whole, beside it and renamed; at most once a second, the last change of
 a burst written a second after the one before), and begins with it after
 a restart when the bus has none: a light asked for since always comes
-first, and a file that is not a light there is is passed over for the
-first light. Only the person's light is kept, never a test's colour, a
-request or a turn's face. A write that fails is said once and tried
-again each second. The reset wipes the file.
+first, and a file that is not a light the ring has is passed over for
+the first light. Only the person's light is kept, never a test's colour,
+a request or a turn's face. That holds with `LAMP_LIGHT_REQUESTS=on` in
+both the voice's unit and `lamp-skills`', as the product has them:
+without it a skill's light goes through the actions part on
+`light/command` ([skills.md](skills.md)), and a light a skill dims and
+would give back is kept as the person's if the board restarts before it
+is given back. A write that fails is said once and tried again each
+second. The write runs in the ring's loop, at most once a second and
+only after a change; its time on the lamp's disk is not yet measured
+(the lamp check reads the ring's stall lines). The reset empties
+`/var/lib/lampOS/light`, a file left beside it by a power cut included.
 
 **On lamp-4ace, 2026-10-14, about 03:00, nobody in the office.** Called
 directly on the actions program's socket, each change was answered in 15
