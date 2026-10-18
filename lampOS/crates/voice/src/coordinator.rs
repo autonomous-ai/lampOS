@@ -2689,6 +2689,7 @@ fn provider_arguments(
     arguments.extend(crate::staff_note::arguments_from_environment());
     arguments.extend(crate::config::patience_arguments_from_environment());
     arguments.extend(crate::remarks::arguments_from_environment());
+    arguments.extend(crate::going_on_asks::arguments_from_environment());
     if let Some(camera) = camera {
         arguments.extend(camera.source.arguments());
     }

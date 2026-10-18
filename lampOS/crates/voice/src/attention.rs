@@ -756,6 +756,13 @@ pub struct Attention {
     /// A remark to the room is not a reply to the lamp in a busy room
     /// (`LAMP_REMARKS=on`, [`crate::remarks`], #829).
     remarks: bool,
+    /// In a busy room, a line let out only as the conversation going on
+    /// waits for the Policy's decision (`LAMP_GOING_ON_ASKS=on`,
+    /// [`crate::going_on_asks`], #1522).
+    going_on_asks: bool,
+    /// What the Policy said of a request, given before it is judged: by the
+    /// request's number, and `None` inside when nothing came in time.
+    policy_says: Option<(u64, Option<crate::going_on_asks::Says>)>,
     /// An answer is played only when the lamp was spoken to
     /// (`LAMP_SPOKEN_TO=on`, #829).
     spoken_to: bool,
@@ -799,6 +806,65 @@ impl Attention {
     /// Whether remarks are held ([`Self::hold_remarks`]).
     pub fn holds_remarks(&self) -> bool {
         self.remarks
+    }
+
+    /// In a busy room, let a line out only as the conversation going on
+    /// once the Policy has said it is the lamp's ([`crate::going_on_asks`]).
+    pub fn ask_policy_when_going_on(&mut self, on: bool) {
+        self.going_on_asks = on;
+    }
+
+    /// What the Policy said of `request` (`None`: nothing came in time),
+    /// for its verdict.
+    pub fn policy_said(&mut self, request: u64, says: Option<crate::going_on_asks::Says>) {
+        self.policy_says = Some((request, says));
+    }
+
+    /// Whether what the Policy said of `request` has been given, or that
+    /// nothing came in time ([`Self::policy_said`]).
+    pub fn policy_given(&self, request: u64) -> bool {
+        self.policy_says.is_some_and(|(of, _)| of == request)
+    }
+
+    /// Whether the first output of `request`, still to be judged, should
+    /// wait for the Policy's decision before it is: only a line whose
+    /// verdict would come to the Policy's arm of
+    /// [`Self::first_output_busy`] ([`crate::going_on_asks`]). So with the
+    /// switch, in a busy room, a conversation going on, and none of what
+    /// lets a line out or holds it first: nothing showing it was said to
+    /// the lamp (its name, a call, a face, said close or from close, a tap,
+    /// a bare call before it), not a reply to the lamp's own question, not
+    /// someone else's (a reply to a person called by name, a question put
+    /// to one, a reply to a question the lamp left alone), not a question
+    /// about the lamp's own work, and not a remark to the room with
+    /// `LAMP_REMARKS` (the reviewer and Jarvis on #1538: each waited, then
+    /// was judged without the Policy). The verdict itself is
+    /// [`Self::first_output_busy`]'s; the worker gives the room microphone's
+    /// rise and the lamp's question before it asks this.
+    pub fn waits_for_policy(
+        &self,
+        request: u64,
+        room: Room,
+        going_on: bool,
+        turned: Option<bool>,
+    ) -> bool {
+        self.going_on_asks
+            && self.awaits_verdict(request)
+            && !self.policy_given(request)
+            && room == Room::Busy
+            && going_on
+            && own_request().load(Ordering::Acquire) != request
+            && !self.sound_in_hand()
+            && !self.called_for_itself()
+            && !self.after_call
+            && !self.named_sure
+            && turned != Some(true)
+            && !self.near
+            && !self.addressed
+            && !self.lamp_asked
+            && self.another(room, false).is_none()
+            && !self.asks_about_its_work()
+            && !(self.remarks && crate::remarks::remark(&self.heard))
     }
 
     /// Read the text's call with [`called_by_name`] from now on
@@ -1192,25 +1258,7 @@ impl Attention {
         let own = own_request().load(Ordering::Acquire) == request;
         self.judged_own = own;
         let fresh = self.begun <= FRESH_REQUESTS;
-        // #829, with the switch: a reply to someone the room had just
-        // called by name is that person's conversation, not the lamp's.
-        // Only the lamp's name counts for it.
-        // #829, 15:40: a line that itself calls someone else by name is
-        // theirs too, and in a busy room so is a reply to a question the
-        // lamp left unanswered.
-        let another = if !self.spoken_to || own {
-            None
-        } else if self.after_another {
-            Some(ANSWERING_ANOTHER)
-        } else if addresses_someone_else(&self.heard) && self.heard.contains('?') {
-            // Only a question put to that person: a request that opens
-            // with a word and a comma is the lamp's (Second on #1090).
-            Some(TO_ANOTHER)
-        } else if self.after_question && room == Room::Busy {
-            Some(AFTER_QUESTION)
-        } else {
-            None
-        };
+        let another = self.another(room, own);
         let answering_another = another.is_some();
         let going_on = going_on && !answering_another;
         // The lamp's news has one reply: the first thing judged after it,
@@ -1403,6 +1451,29 @@ impl Attention {
             {
                 Verdict::Hold(crate::remarks::REMARK)
             }
+            // #1522, with `LAMP_GOING_ON_ASKS=on`: in a busy room, a line
+            // let out only as the conversation going on is the lamp's only
+            // if the Policy says so. A reply to the lamp's own question is
+            // the person's answer, as the remark arm has it: "Yes, go
+            // ahead." to "Shall I start it?" is never held for want of a
+            // `follows_lamp` of 0.6 (Eighth on #1538).
+            Verdict::Play(GOING_ON)
+                if self.going_on_asks
+                    && room == Room::Busy
+                    && !called_in_text
+                    && !self.named
+                    && !self.named_sure
+                    && turned != Some(true)
+                    && !self.near
+                    && !self.addressed
+                    && !self.lamp_asked =>
+            {
+                crate::going_on_asks::verdict(
+                    self.policy_says
+                        .filter(|(of, _)| *of == request)
+                        .and_then(|(_, says)| says),
+                )
+            }
             verdict => verdict,
         };
         self.verdict = Some(verdict);
@@ -1463,6 +1534,41 @@ impl Attention {
             }
     }
 
+    /// Whether the request in hand is someone else's, and why: with the
+    /// switch, a reply to someone the room had just called by name is that
+    /// person's conversation, not the lamp's, and only the lamp's name
+    /// counts for it (#829). A line that itself calls someone else by name
+    /// is theirs too, and in a busy room so is a reply to a question the
+    /// lamp left unanswered (#829, 15:40). Never the lamp's own turn.
+    fn another(&self, room: Room, own: bool) -> Option<&'static str> {
+        if !self.spoken_to || own {
+            None
+        } else if self.after_another {
+            Some(ANSWERING_ANOTHER)
+        } else if addresses_someone_else(&self.heard) && self.heard.contains('?') {
+            // Only a question put to that person: a request that opens
+            // with a word and a comma is the lamp's (Second on #1090).
+            Some(TO_ANOTHER)
+        } else if self.after_question && room == Room::Busy {
+            Some(AFTER_QUESTION)
+        } else {
+            None
+        }
+    }
+
+    /// Whether the request in hand asks about the lamp's own work, done
+    /// lately ([`ABOUT_ITS_WORK`]), as [`Self::first_output_busy`] lets it
+    /// out.
+    fn asks_about_its_work(&self) -> bool {
+        self.spoken_to
+            && self.began_us.is_some_and(|began| {
+                self.worked_us
+                    .filter(|at| *at <= began)
+                    .is_some_and(|at| began - at <= WORK_ASKED_US)
+            })
+            && about_its_work(&self.heard)
+    }
+
     /// Whether `request` is the request in hand and its answer is still
     /// to be judged: the first thing [`Self::first_output_busy`] checks.
     pub fn awaits_verdict(&self, request: u64) -> bool {
@@ -1483,6 +1589,15 @@ impl Attention {
     /// Whether `request`'s answer is being held back.
     pub fn holds(&self, request: u64) -> bool {
         request == self.request && matches!(self.verdict, Some(Verdict::Hold(_)))
+    }
+
+    /// Whether the calls of `request` are held too: as its answer is,
+    /// except when the Policy chose `look_up`, whose words are held and
+    /// whose call is left to the lamp's own gate for actions
+    /// ([`crate::going_on_asks::LOOKED_UP`], the first builder's ruling on
+    /// #1538).
+    pub fn holds_calls(&self, request: u64) -> bool {
+        self.holds(request) && self.verdict != Some(Verdict::Hold(crate::going_on_asks::LOOKED_UP))
     }
 }
 
@@ -2231,6 +2346,121 @@ mod tests {
         assert!(!about_its_work("I'll ask him about it."));
     }
 
+    /// #1522, with `LAMP_GOING_ON_ASKS=on` (the first builder's decision on
+    /// #1522 at 15:14): in a busy room, a line let out only as the
+    /// conversation going on waits for the Policy and is played on `answer`
+    /// or on a `stay_quiet` said back to the lamp, held otherwise, and played
+    /// with no decision in time. A call in its words, a face turned to the
+    /// lamp, a room not known to be busy, or the switch off: as before, and
+    /// nothing waits.
+    #[test]
+    fn with_the_switch_a_line_going_on_in_a_busy_room_is_the_lamps_only_as_the_policy_says() {
+        use crate::going_on_asks::{self, Says};
+        let line = |asks: bool,
+                    room: Room,
+                    heard: &str,
+                    turned: Option<bool>,
+                    says: Option<(u64, Option<Says>)>| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.ask_policy_when_going_on(asks);
+            attention.began_at(7, 4, 1_000_000);
+            attention.heard(heard);
+            let waits = attention.waits_for_policy(7, room, true, turned);
+            if let Some((request, says)) = says {
+                attention.policy_said(request, says);
+            }
+            let verdict = attention
+                .first_output_busy(7, room, true, true, turned)
+                .unwrap();
+            (waits, verdict)
+        };
+        const CAR: &str = "Okay, I will book the car for eight.";
+        let busy = Room::Busy;
+        assert_eq!(
+            line(true, busy, CAR, None, Some((7, Some(Says::Not)))),
+            (true, Verdict::Hold(going_on_asks::NOT_THE_LAMPS))
+        );
+        assert_eq!(
+            line(true, busy, CAR, None, Some((7, Some(Says::Following)))),
+            (true, Verdict::Play(going_on_asks::FOLLOWING))
+        );
+        assert_eq!(
+            line(true, busy, CAR, None, Some((7, Some(Says::Answer)))),
+            (true, Verdict::Play(going_on_asks::ANSWER))
+        );
+        assert_eq!(
+            line(true, busy, CAR, None, Some((7, None))),
+            (true, Verdict::Play(going_on_asks::NO_DECISION))
+        );
+        // What the Policy said of another request is nothing of this one's.
+        assert_eq!(
+            line(true, busy, CAR, None, Some((6, Some(Says::Not)))).1,
+            Verdict::Play(going_on_asks::NO_DECISION)
+        );
+        // A reply to the lamp's own question neither waits nor is held
+        // (Eighth on #1538).
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(true);
+        attention.ask_policy_when_going_on(true);
+        attention.began_at(7, 4, 1_000_000);
+        attention.heard("Yes, go ahead.");
+        attention.lamp_asked(true);
+        assert!(!attention.waits_for_policy(7, busy, true, None));
+        attention.policy_said(7, Some(Says::Not));
+        assert_eq!(
+            attention.first_output_busy(7, busy, true, true, None),
+            Some(GOING_ON)
+        );
+        // Nor does a line whose verdict comes before the Policy's arm (the
+        // reviewer and Jarvis on #1538): a remark to the room with
+        // `LAMP_REMARKS`, a question about the lamp's own work, a question
+        // put to someone else by name, a line said close to the lamp. Each
+        // is judged as without the switch.
+        let waits = |remarks: bool, heard: &str, prepare: &dyn Fn(&mut Attention)| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.ask_policy_when_going_on(true);
+            attention.hold_remarks(remarks);
+            attention.began_at(7, 4, 100_000_000);
+            attention.heard(heard);
+            // As the worker does, once the request has begun.
+            prepare(&mut attention);
+            attention.waits_for_policy(7, busy, true, None)
+        };
+        let nothing = |_: &mut Attention| {};
+        assert!(waits(false, "I should bring an umbrella then.", &nothing));
+        assert!(!waits(true, "I should bring an umbrella then.", &nothing));
+        assert!(waits(false, "How is that task going?", &nothing));
+        assert!(!waits(false, "How is that task going?", &|attention| {
+            attention.worked(90_000_000)
+        }));
+        assert!(!waits(
+            false,
+            "Daniel, are you coming to the meeting at two?",
+            &nothing
+        ));
+        assert!(!waits(false, "And what about tomorrow?", &|attention| {
+            attention.set_near(true)
+        }));
+        // As before, and nothing waits: the switch off, a call in its
+        // words, a face turned to the lamp, a room not known to be busy.
+        let not_says = Some((7, Some(Says::Not)));
+        assert_eq!(line(false, busy, CAR, None, not_says), (false, GOING_ON));
+        for (room, heard, turned) in [
+            (busy, "Lamp, book the car for eight.", None),
+            (busy, CAR, Some(true)),
+            (Room::Quiet, CAR, None),
+            (Room::Unknown, CAR, None),
+        ] {
+            assert_eq!(
+                line(true, room, heard, turned, not_says),
+                (false, line(false, room, heard, turned, None).1),
+                "{room:?} {heard} {turned:?}"
+            );
+        }
+    }
+
     /// One line said in a busy room while a conversation with the lamp is
     /// going on, nobody's face turned to it (`strict`, as lamp-4ace runs),
     /// after the lamp's line that `asked` or not, with `LAMP_REMARKS` on or
@@ -2359,6 +2589,15 @@ mod tests {
     /// replies, as on the lamp. With it, the follow-up is answered, the two
     /// remarks are held and end the conversation, and the rest is held.
     fn scene_three_and_four(remarks: bool) -> Vec<bool> {
+        scene_three_and_four_with(remarks, false)
+    }
+
+    /// The same, with `LAMP_GOING_ON_ASKS` (`asks`, #1538) as well, the
+    /// Policy's decision on each line given before it is judged as lamp-4ace's
+    /// were at 14:44: "And what about tomorrow?" a `stay_quiet` said back to
+    /// the lamp (`follows_lamp` 0.66), every other line of the two people's
+    /// `stay_quiet` or `look_up` (the first builder on #1522, 15:14).
+    fn scene_three_and_four_with(remarks: bool, asks: bool) -> Vec<bool> {
         const S: u64 = 1_000_000;
         let start = std::time::Instant::now();
         let at = |us: u64| start + std::time::Duration::from_micros(us);
@@ -2368,6 +2607,7 @@ mod tests {
         let mut attention = Attention::default();
         attention.speak_when_spoken_to(true);
         attention.hold_remarks(remarks);
+        attention.ask_policy_when_going_on(asks);
         let lines = [
             (0, "Hey Lamp, what's the weather in Hanoi today?"),
             (6, "And what about tomorrow?"),
@@ -2391,6 +2631,15 @@ mod tests {
             attention.ended(request, began + S);
             let going_on = !room.talked_past_the_lamp() && thread.going_on(at(began + S));
             attention.lamp_asked(thread.lamp_asked_with(request, remarks));
+            if asks {
+                use crate::going_on_asks::Says;
+                let says = match request {
+                    17 => Says::Answer,
+                    18 => Says::Following,
+                    _ => Says::Not,
+                };
+                attention.policy_said(request, Some(says));
+            }
             let verdict = attention
                 .first_output_busy(request, Room::Busy, going_on, true, Some(false))
                 .unwrap();
@@ -2405,6 +2654,23 @@ mod tests {
             played.push(play);
         }
         played
+    }
+
+    /// The first builder on #705 (16:10): on scene 3 and scene 4's opening,
+    /// does either of the two halves of #1522's fix pass a line the other
+    /// holds? No: `LAMP_REMARKS` alone, `LAMP_GOING_ON_ASKS` alone with the
+    /// Policy's own decisions of 14:44, and the two together all answer the
+    /// call and "And what about tomorrow?" and hold the other seven. Only
+    /// what the room books differs: two remarks held end the conversation,
+    /// while a line the Policy holds is not talk, so each line after it is
+    /// asked of the Policy again.
+    #[test]
+    fn on_scene_three_the_two_halves_of_the_fix_hold_the_same_lines() {
+        let expected = [true, true, false, false, false, false, false, false, false];
+        assert_eq!(scene_three_and_four_with(true, false), expected);
+        assert_eq!(scene_three_and_four_with(false, true), expected);
+        assert_eq!(scene_three_and_four_with(true, true), expected);
+        assert_eq!(scene_three_and_four_with(false, false), [true; 9]);
     }
 
     #[test]

@@ -83,6 +83,7 @@ impl Desk {
             ask_unclear: false,
             name_in_passing_ignored: false,
             remarks: false,
+            going_on_asks: None,
             policy_holds: holds.then(|| self.bus.clone()),
             follows_run: false,
             wait_for_room: false,
@@ -91,6 +92,11 @@ impl Desk {
             voices: None,
             catalog: None,
         }
+    }
+
+    /// The bus the Policy's decisions are published on.
+    pub(super) fn bus(&self) -> std::path::PathBuf {
+        self.bus.clone()
     }
 
     /// The Policy decides about what was said in turn `request`, for real.
