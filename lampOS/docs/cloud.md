@@ -105,9 +105,9 @@ against the company's broker or on a lamp.
 `tests/app_contract.rs` holds the fields the Autonomous app's device page
 reads, by name and type (Fourth on #1396): `versions.firmware`,
 `network.private_ip` and `host.hostname` of `system.info`; `volume`, `raw`
-and `max_volume` of `volume.get` and `volume.set`; `muted` and
-`hw_switch_muted` of `mic.get`. Each is checked in the real answer, as sent.
+and `max_volume` of `volume.get` and `volume.set`; `muted`,
+`hw_switch_muted` and `available` of `mic.get`. Each is checked in the real answer, as sent.
 The app reads them leniently, so a renamed or retyped field would otherwise
 go blank on its page unnoticed. `hw_switch_muted` is null while nothing reads
-the switch, and `versions.openclaw` and `versions.openclaw_detected` stay out
+the switch (the app takes that as not known, so not blocked by the switch), and `versions.openclaw` and `versions.openclaw_detected` stay out
 of the reply: only V1's "Starting" rule waits for them.

@@ -1,5 +1,5 @@
 //! The fields of `lamp-cloud`'s replies that the Autonomous app's device page
-//! reads, by name and type (Fourth on #1396, 09:44). The app reads each one
+//! reads, by name and type (Fourth on #1396, 09:44 and 10:10). The app reads each one
 //! leniently, so a renamed or retyped field would go blank on its page with
 //! nothing failing there: it fails here instead. Each reply is `lamp-cloud`'s
 //! own answer from the real lamp (`Real`, on a lamp of files and a stand-in
@@ -34,6 +34,9 @@ const READ: &[(&str, &str, Type)] = &[
     ("volume.set", "raw", Type::Whole),
     ("volume.set", "max_volume", Type::Whole),
     ("mic.get", "muted", Type::Flag),
+    // Whether the voice is up: `false` makes the page say so instead of
+    // offering the toggle (Fourth on #1396, 10:10).
+    ("mic.get", "available", Type::Flag),
 ];
 
 fn field<'a>(data: &'a Value, path: &str) -> Option<&'a Value> {
