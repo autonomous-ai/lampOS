@@ -1560,7 +1560,9 @@ async fn serve_with_visual<C: Connect>(
                         // Given whatever ended the wait, so that the line
                         // let go is judged, never kept again.
                         attention.policy_said(request, says);
-                        if says.is_some() {
+                        if says == Some(crate::going_on_asks::Says::Shadow) {
+                            eprintln!("lamp-voice provider: request {request}: the Policy decided it only in shadow, after {ms} ms: it is let out as without the switch");
+                        } else if says.is_some() {
                             eprintln!("lamp-voice provider: request {request}: the Policy's decision came after {ms} ms");
                         } else if gone {
                             eprintln!("lamp-voice provider: request {request}: its turn ended while it waited for the Policy's decision ({ms} ms)");

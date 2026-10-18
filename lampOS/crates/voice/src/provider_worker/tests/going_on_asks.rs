@@ -20,6 +20,9 @@ fn heard(text: &str) -> serde_json::Value {
 enum Decided {
     Before(&'static str, f32),
     After(&'static str, f32, Duration),
+    /// A `stay_quiet` in shadow only, so long after the first output (none
+    /// before it).
+    Shadow(Duration),
     Never,
 }
 
@@ -51,14 +54,19 @@ async fn going_on_line_with(
     let mut dial = rig.ready().await;
     let request = rig.speak(&mut dial, false, true).await;
     dial.service.send(heard(text)).await;
-    if let Decided::Before(choice, follows) = decided {
-        desk.decide_with(Some(request), choice, json!({"follows_lamp": follows}));
+    match decided {
+        Decided::Before(choice, follows) => {
+            desk.decide_with(Some(request), choice, json!({"follows_lamp": follows}))
+        }
+        Decided::Shadow(after) if after.is_zero() => desk.decide_in_shadow(request, "stay_quiet"),
+        _ => {}
     }
     let sent = crate::scenario_clock::instant();
     dial.service.send(provider_audio(7, 240)).await;
     dial.service.send(idle_complete()).await;
     let mut late = match decided {
-        Decided::After(choice, follows, after) => Some((choice, follows, after)),
+        Decided::After(choice, follows, after) => Some((Some(choice), follows, after)),
+        Decided::Shadow(after) if !after.is_zero() => Some((None, 0.0, after)),
         _ => None,
     };
     let mut first_sound = None;
@@ -72,7 +80,12 @@ async fn going_on_line_with(
         if let Some((choice, follows, after)) = late
             && since >= after
         {
-            desk.decide_with(Some(request), choice, json!({"follows_lamp": follows}));
+            match choice {
+                Some(choice) => {
+                    desk.decide_with(Some(request), choice, json!({"follows_lamp": follows}))
+                }
+                None => desk.decide_in_shadow(request, "stay_quiet"),
+            }
             late = None;
         }
         rig.publish();
@@ -249,6 +262,25 @@ async fn with_the_switch_a_reply_to_the_lamps_question_does_not_wait_and_is_not_
         !reply_after("Here is a poem about the sea.", "Yes, go ahead.", true)
             .await
             .0
+    );
+}
+
+/// The reviewer on #1538 (16:21): a Policy in shadow (no `--act
+/// attention`) decides every line, and nothing it decides is acted on. Its
+/// decision ends the wait at once, and the line is played as without the
+/// switch, though the shadow said `stay_quiet`: before the line's answer,
+/// at once; 300 ms after it, then, not after the 2 s.
+#[tokio::test(start_paused = true)]
+async fn with_the_switch_a_shadow_decision_ends_the_wait_and_holds_nothing() {
+    let _clock = logical_clock();
+    const TRAIN: &str = "And how long would that take by train?";
+    let (played, after) = going_on_line(true, Decided::Shadow(Duration::ZERO), TRAIN).await;
+    assert!(played && after < Duration::from_millis(100), "{after:?}");
+    let late = Duration::from_millis(300);
+    let (played, after) = going_on_line(true, Decided::Shadow(late), TRAIN).await;
+    assert!(
+        played && after >= late && after < late + Duration::from_millis(100),
+        "{after:?}"
     );
 }
 

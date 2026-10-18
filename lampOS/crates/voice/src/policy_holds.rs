@@ -274,6 +274,10 @@ pub struct Verdicts {
     /// only as a conversation going on ([`Self::says`]). Of two decisions
     /// about one turn (its words judged in two pieces), the newer.
     decided: VecDeque<(u64, Verdict, bool)>,
+    /// The turns the Policy decided only in shadow, by number: none of them
+    /// is acted on, but a line going on need not wait for a decision that
+    /// is not coming ([`Self::says`], the reviewer on #1538).
+    shadowed: VecDeque<u64>,
 }
 
 impl Verdicts {
@@ -285,6 +289,7 @@ impl Verdicts {
                 lamp_msgs::Decision::TYPE,
             )?,
             decided: VecDeque::new(),
+            shadowed: VecDeque::new(),
         })
     }
 
@@ -302,7 +307,18 @@ impl Verdicts {
     }
 
     fn took(&mut self, decision: &lamp_msgs::Decision) {
-        if decision.about != "attention" || decision.shadow {
+        if decision.about != "attention" {
+            return;
+        }
+        if decision.shadow {
+            if let Some(request) = decision.request
+                && !self.shadowed.contains(&request)
+            {
+                if self.shadowed.len() == KEPT {
+                    self.shadowed.pop_front();
+                }
+                self.shadowed.push_back(request);
+            }
             return;
         }
         // Which turn it judged is not known: nobody's.
@@ -359,6 +375,7 @@ impl Verdicts {
                 Verdict::StayQuietFollowing => Says::Following,
                 Verdict::StayQuiet => Says::Not,
             })
+            .or_else(|| self.shadowed.contains(&request).then_some(Says::Shadow))
     }
 }
 
@@ -435,6 +452,15 @@ mod tests {
             value["answers"] = json!({"follows_lamp": follows});
             verdicts.took(&serde_json::from_value(value).unwrap());
         }
+        // A decision in shadow only is acted on by nothing, the actions'
+        // gate included, and says only that it came (the reviewer on
+        // #1538): a real one about the same turn wins.
+        verdicts.took(&decision("attention", "stay_quiet", true, Some(6)));
+        assert_eq!(verdicts.says(6), Some(Says::Shadow));
+        assert_eq!(verdicts.verdict(6), None);
+        verdicts.took(&decision("attention", "stay_quiet", true, Some(7)));
+        verdicts.took(&decision("attention", "answer", false, Some(7)));
+        assert_eq!(verdicts.says(7), Some(Says::Answer));
         let said: Vec<Option<Says>> = (1..=6).map(|request| verdicts.says(request)).collect();
         assert_eq!(
             said,
@@ -444,7 +470,7 @@ mod tests {
                 Some(Says::LookUp),
                 Some(Says::Following),
                 Some(Says::Not),
-                None
+                Some(Says::Shadow)
             ]
         );
         // The actions' verdicts are as they were: `look_up` takes the turn

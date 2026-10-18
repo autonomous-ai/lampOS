@@ -114,6 +114,15 @@ impl Desk {
         self.decide_scored(request, choice, 0.235, answers);
     }
 
+    /// The Policy decides about turn `request` in shadow only: nothing acts
+    /// on it.
+    pub(super) fn decide_in_shadow(&mut self, request: u64, choice: &str) {
+        let decision = json!({"about": "attention", "choice": choice, "probability": 0.235,
+                              "answers": {}, "by": "typesafe/jev-1.13-20260917",
+                              "took_ms": 540, "shadow": true, "request": request});
+        self.decisions.publish_json(0, &decision).unwrap();
+    }
+
     /// The same, at the probability the Policy gave.
     pub(super) fn decide_scored(
         &mut self,
