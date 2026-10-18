@@ -786,3 +786,171 @@ fn a_window_keeps_its_start_and_drops_its_end() {
     within(&mut lines, None, None);
     assert_eq!(times(&lines), [9, 10, 15, 20, 21]);
 }
+
+/// A judge whose connection a probe steers, by Jev's own rules: an asking
+/// after `forget` makes its own connection; `ready` makes one ahead only
+/// while none is kept (a kept one has 600 s here, far over the 6 s `ready`
+/// leaves be); otherwise the kept one. What it does and what the probe
+/// waits go into one record, in order.
+struct Steered {
+    done: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
+    kept: bool,
+    next: Option<Connection>,
+}
+
+impl Decider for Steered {
+    fn ask(
+        &mut self,
+        _state: &str,
+        questions: &[(String, Question)],
+        _deadline: Duration,
+    ) -> Result<Asked, Failed> {
+        let on = self.next.take().unwrap_or(Connection::Kept);
+        self.done.borrow_mut().push(format!("ask on {on:?}"));
+        self.kept = true;
+        Ok(Asked {
+            answers: questions
+                .iter()
+                .map(|(name, _)| (name.clone(), Answer::Noul(0.5)))
+                .collect(),
+            model: "steered".into(),
+            took: Duration::from_millis(500),
+            usage: None,
+            connection: Some(on),
+        })
+    }
+    fn ready(&mut self, within: Duration) {
+        self.done
+            .borrow_mut()
+            .push(format!("ready within {}", within.as_secs()));
+        if !self.kept {
+            self.next = Some(Connection::Ahead);
+        }
+    }
+    fn name(&self) -> &str {
+        "steered"
+    }
+}
+
+impl Connections for Steered {
+    fn forget(&mut self) {
+        self.done.borrow_mut().push("forget".into());
+        self.kept = false;
+        self.next = Some(Connection::New);
+    }
+    fn keep_answered_for(&mut self, keep: Duration) {
+        self.done
+            .borrow_mut()
+            .push(format!("keep {}", keep.as_secs()));
+    }
+}
+
+/// #1522: the probe asks the one logged question seven ways, in order and
+/// waiting as each says, keeping a connection 600 s so the last kept asking
+/// tests the other end; one line each as it is made, with what it was sent
+/// on and how long it took. The whole record is checked, so a probe that
+/// skipped its `forget`, or waited before `ready` rather than after, would
+/// show (the reviewer on #1630).
+#[test]
+fn the_connection_probe_asks_seven_ways_with_its_waits() {
+    let done = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let mut judge = Steered {
+        done: done.clone(),
+        kept: false,
+        next: None,
+    };
+    let question = logged(
+        "2026-10-18#518",
+        1,
+        "Can you make your light a little warmer?",
+        Room::Busy,
+    );
+    let mut lines = Vec::new();
+    let waits = done.clone();
+    probe_connections(
+        &mut judge,
+        &question,
+        Duration::from_secs(10),
+        1,
+        &mut |wait| waits.borrow_mut().push(format!("wait {}", wait.as_secs())),
+        &mut |line| lines.push(line.clone()),
+    );
+    assert_eq!(
+        *done.borrow(),
+        [
+            "keep 600",
+            "wait 300",
+            "forget",
+            "ask on New",
+            "wait 0",
+            "ask on Kept",
+            "wait 0",
+            "forget",
+            "ask on New",
+            "wait 0",
+            "forget",
+            "ready within 2",
+            "wait 2",
+            "ask on Ahead",
+            "wait 140",
+            "ask on Kept",
+            "wait 300",
+            "ask on Kept",
+            "wait 300",
+            "forget",
+            "ready within 2",
+            "wait 2",
+            "ask on Ahead",
+        ]
+    );
+    let probes: Vec<(&str, &str)> = lines
+        .iter()
+        .map(|line| {
+            (
+                line["probe"].as_str().unwrap(),
+                line["on"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        probes,
+        [
+            ("fresh_after_quiet", "new"),
+            ("kept_at_once", "kept"),
+            ("fresh_at_once", "new"),
+            ("ahead_at_once", "ahead"),
+            ("kept_after_140s", "kept"),
+            ("kept_after_300s", "kept"),
+            ("ahead_after_quiet", "ahead"),
+        ]
+    );
+    assert!(
+        lines
+            .iter()
+            .all(|line| line["took_ms"] == 500 && line["round"] == 1)
+    );
+    // No words in any line.
+    assert!(
+        lines
+            .iter()
+            .all(|line| !line.to_string().contains("warmer"))
+    );
+}
+
+/// The reviewer on #1630: the probe's question is the newest one a model
+/// decided, never one the rule decided alone, whose words stayed on the
+/// lamp; none if the rule decided them all.
+#[test]
+fn the_probe_asks_only_what_went_to_a_judge_on_the_day() {
+    let mut asked = logged("2026-10-18#1", 1, "one", Room::Busy);
+    asked.by = "typesafe/jev-1.13-20260917".into();
+    let mut ruled = logged("2026-10-18#2", 2, "two", Room::Busy);
+    ruled.by = "rule".into();
+    let both = [asked.clone(), ruled.clone()];
+    assert_eq!(
+        newest_asked(&both).map(|line| line.id.as_str()),
+        Some("2026-10-18#1")
+    );
+    assert!(newest_asked(&[ruled]).is_none());
+    assert!(newest_asked(&[]).is_none());
+}

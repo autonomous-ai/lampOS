@@ -1290,6 +1290,57 @@ halves every time) and
 played on this machine: two models asked in turn, the state sent equal to
 the day's, and none of what was heard in its output).
 
+### Timing each kind of connection: `--probe-connections` (#1522)
+
+On lamp-4ace on 18 October the 44 askings on a connection made `ahead`
+took 1,031 ms in the middle, and the 1,427 on a kept connection 573 ms, of
+1,472 model decisions (the first builder on #1522). A connection made ahead is fully
+ready before the question: `open()` finishes the handshake. But lamp-policy
+makes one only when no kept connection has 6 s left of its 150 s, so in
+practice it is always the first question after 2.5 quiet minutes: a new
+connection and a quiet spell together. `--probe-connections` takes the two
+apart:
+
+    lamp-policy-replay --probe-connections --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR \
+        --days YYYY-MM-DD[,...] --endpoint URL [--models NAME] [--deadline-ms 10000] [--rounds N]
+
+It takes the newest logged attention question of those days that a model
+decided, and asks it seven ways, on one judge kept for 600 s after an answer
+(`replay::PROBES`), about 17 minutes and seven askings a round. Never one
+the rule decided alone (`--rule-decides`), whose words stayed on the lamp
+(`replay::newest_asked`), and only to the `--endpoint` given, which is
+required: the one lamp-policy asks, not the built-in default (the reviewer
+on #1630):
+
+| Probe | Before it | Sent on |
+|---|---|---|
+| `fresh_after_quiet` | 300 s with nothing asked | a new connection |
+| `kept_at_once` | nothing | the same one |
+| `fresh_at_once` | nothing | a new connection |
+| `ahead_at_once` | nothing | one made ahead, asked 2 s later |
+| `kept_after_140s` | 140 s | the kept one |
+| `kept_after_300s` | 300 s, past lamp-policy's 150 s | the kept one, or `replaced` if the other end closed it |
+| `ahead_after_quiet` | 300 s | one made ahead, asked 2 s later |
+
+One line each as it is made: the probe, what it was sent on (`new`, `kept`,
+`ahead`, `replaced`) and `took_ms`, no words. Read it with what each
+`took_ms` holds (the reviewer on #1630): a `fresh` probe's includes TCP and
+the TLS handshake (0.20 to 0.29 s on lamp-4ace on 14 October), and
+`fresh_after_quiet`'s a name lookup too, as addresses are kept 300 s; an
+`ahead` or `kept` probe's holds neither. So:
+- **A new connection's first request** is `ahead_at_once` against
+  `kept_at_once`: a new connection, with no handshake in its time. If it is
+  slower, holding the kept connection longer (or a second one warm) would
+  help.
+- **A path that goes cold in a quiet spell** is `ahead_after_quiet`,
+  `kept_after_140s` and `kept_after_300s` against the at-once ones.
+- **The handshake's own cost** is `fresh_at_once` against `ahead_at_once`.
+- `kept_after_300s` also says whether the other end keeps a connection that
+  long (`replaced` if not). `--rounds` (1 to 3)
+repeats it. Run it with the room quiet: lamp-policy's own askings would
+break the quiet spells. Tests: `the_connection_probe_asks_seven_ways_with_its_waits`
+and `the_probe_asks_only_what_went_to_a_judge_on_the_day`.
+
 ## The lamp's picture with the question (#871, `--images`)
 
 `lamp-policy --images MODEL [--sight-file ABSOLUTE_PATH]`, off unless set,

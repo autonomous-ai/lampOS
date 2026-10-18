@@ -15,7 +15,7 @@
 //! judged by weights that were not fitted to it.
 use crate::{
     attention::{self, Context, Room},
-    decide::{Decider, Failed},
+    decide::{Connection, Decider, Failed, Jev},
 };
 use serde_json::{Value, json};
 use std::{
@@ -240,6 +240,152 @@ pub fn ask(judge: &mut dyn Decider, logged: &Logged, deadline: Duration) -> Repl
             Err(_) => Replayed::Failed("missing"),
         },
         Err(failed) => Replayed::Failed(Failed::kind(&failed)),
+    }
+}
+
+/// A judge whose connection a probe can steer (#1522).
+pub trait Connections: Decider {
+    /// Let go of the kept connection: the next asking makes its own.
+    fn forget(&mut self);
+    /// Keep a connection that has answered for `keep`.
+    fn keep_answered_for(&mut self, keep: Duration);
+}
+
+impl Connections for Jev {
+    fn forget(&mut self) {
+        Jev::forget(self);
+    }
+    fn keep_answered_for(&mut self, keep: Duration) {
+        Jev::keep_answered_for(self, keep);
+    }
+}
+
+/// One asking of `--probe-connections`: how long nothing is asked first,
+/// whether it goes on a connection of its own, and whether that one is made
+/// ahead of the question, as lamp-policy does when someone speaks.
+pub struct Probe {
+    pub name: &'static str,
+    pub after: Duration,
+    pub fresh: bool,
+    pub ahead: bool,
+}
+
+/// Nothing asked for this long before an asking "after quiet".
+pub const QUIET: Duration = Duration::from_secs(300);
+/// A connection made ahead is asked on this long after, about the length
+/// of something said.
+pub const AHEAD_BY: Duration = Duration::from_secs(2);
+/// How long the probe keeps a connection that has answered, so that the
+/// last kept asking finds out whether the other end kept it 300 s.
+pub const PROBE_KEEPS: Duration = Duration::from_secs(600);
+
+/// The first builder's question on #1522 (18 Oct 23:08): on lamp-4ace an
+/// asking on a connection made `ahead` took 1,031 ms in the middle where one
+/// on a kept connection took 573 ms. Made ahead always means after 2.5 quiet
+/// minutes too, so these askings take the two apart: a new connection with
+/// and without a quiet spell before it, a kept one at once and after 140 s
+/// and 300 s (past lamp-policy's 150 s), and one made ahead with and
+/// without a quiet spell.
+pub const PROBES: [Probe; 7] = [
+    Probe {
+        name: "fresh_after_quiet",
+        after: QUIET,
+        fresh: true,
+        ahead: false,
+    },
+    Probe {
+        name: "kept_at_once",
+        after: Duration::ZERO,
+        fresh: false,
+        ahead: false,
+    },
+    Probe {
+        name: "fresh_at_once",
+        after: Duration::ZERO,
+        fresh: true,
+        ahead: false,
+    },
+    Probe {
+        name: "ahead_at_once",
+        after: Duration::ZERO,
+        fresh: true,
+        ahead: true,
+    },
+    Probe {
+        name: "kept_after_140s",
+        after: Duration::from_secs(140),
+        fresh: false,
+        ahead: false,
+    },
+    Probe {
+        name: "kept_after_300s",
+        after: Duration::from_secs(300),
+        fresh: false,
+        ahead: false,
+    },
+    Probe {
+        name: "ahead_after_quiet",
+        after: QUIET,
+        fresh: true,
+        ahead: true,
+    },
+];
+
+/// The newest decision a model made, whose words went to a judge on the
+/// day: never one the rule made alone (`--rule-decides`), whose words stayed
+/// on the lamp (the reviewer on #1630).
+pub fn newest_asked(logged: &[Logged]) -> Option<&Logged> {
+    logged.iter().rev().find(|line| line.by != "rule")
+}
+
+/// Asks `logged`'s question of `judge` as [`PROBES`] say, `rounds` times,
+/// waiting with `wait`, and gives `each` one line for each asking as it is
+/// made: its name, what it was sent on, how long it took, and whether it
+/// was answered. No words.
+pub fn probe_connections(
+    judge: &mut dyn Connections,
+    logged: &Logged,
+    deadline: Duration,
+    rounds: u32,
+    wait: &mut dyn FnMut(Duration),
+    each: &mut dyn FnMut(&Value),
+) {
+    judge.keep_answered_for(PROBE_KEEPS);
+    let (state, questions) = (
+        attention::state_text(&logged.context),
+        attention::questions(),
+    );
+    for round in 1..=rounds {
+        for probe in &PROBES {
+            wait(probe.after);
+            if probe.fresh {
+                judge.forget();
+            }
+            if probe.ahead {
+                judge.ready(AHEAD_BY);
+                wait(AHEAD_BY);
+            }
+            let line = match judge.ask(&state, &questions, deadline) {
+                Ok(asked) => json!({
+                    "round": round,
+                    "probe": probe.name,
+                    "on": match asked.connection {
+                        Some(Connection::New) => "new",
+                        Some(Connection::Ahead) => "ahead",
+                        Some(Connection::Kept) => "kept",
+                        Some(Connection::Replaced) => "replaced",
+                        None => "none",
+                    },
+                    "took_ms": u64::try_from(asked.took.as_millis()).unwrap_or(u64::MAX),
+                }),
+                Err(failed) => json!({
+                    "round": round,
+                    "probe": probe.name,
+                    "failed": Failed::kind(&failed),
+                }),
+            };
+            each(&line);
+        }
     }
 }
 
