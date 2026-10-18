@@ -1346,9 +1346,11 @@ async fn with_a_voice_check_a_call_begun_over_a_silent_reply_gives_the_conversat
     const CLEAR: (bool, bool) = (false, false);
     const SILENT: (bool, bool) = (true, false);
     const VOICE: (bool, bool) = (true, true);
-    let scene = |lines: &'static [((bool, bool), i16, &'static str)]| async move {
+    let scene_with = |check: bool, lines: &'static [((bool, bool), i16, &'static str)]| async move {
         let mut options = options(true, quiet_going_on, crate::tools::Settings::default());
-        options.voices = Some(Box::new(TwoVoices(Default::default())));
+        if check {
+            options.voices = Some(Box::new(TwoVoices(Default::default())));
+        }
         let mut rig = LiveRig::start_with(quick_policy(), options);
         let mut dial = rig.ready().await;
         let mut played = Vec::new();
@@ -1358,6 +1360,7 @@ async fn with_a_voice_check_a_call_begun_over_a_silent_reply_gives_the_conversat
         rig.stop().await;
         played
     };
+    let scene = |lines| scene_with(true, lines);
     // Scene 1: Daniel calls, Samantha follows up, then remarks.
     assert_eq!(
         scene(&[
@@ -1371,6 +1374,24 @@ async fn with_a_voice_check_a_call_begun_over_a_silent_reply_gives_the_conversat
         ])
         .await,
         [true, false, false]
+    );
+    // Without the check (the reviewer on #1627): scene 1 as before, every
+    // line answered.
+    assert_eq!(
+        scene_with(
+            false,
+            &[
+                (
+                    SILENT,
+                    1,
+                    "Hey Lamp, what is the weather like in Hanoi today?"
+                ),
+                (CLEAR, -1, "And what about tomorrow?"),
+                (CLEAR, -1, "I should bring an umbrella then."),
+            ]
+        )
+        .await,
+        [true, true, true]
     );
     // Scene 5: Samantha's "Pepper" is another voice; Daniel calls again,
     // over its silent reply in hand, and his own follow-up is his.
