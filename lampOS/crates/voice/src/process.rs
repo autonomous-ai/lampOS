@@ -482,6 +482,26 @@ impl Worker {
 #[cfg(test)]
 const FIXTURE_EXEC_WAIT: Duration = Duration::from_secs(30);
 
+/// A test's run of a script it has just written, to its end. On Linux an
+/// exec fails with `ETXTBSY` while any process still holds the file open
+/// for writing, and a child another test forks holds a new script that way
+/// until its own exec (CLOEXEC): that is waited out, for at most 15 s, as
+/// the motor fixture does (Ten on #705, 18 Oct).
+#[cfg(test)]
+pub(crate) fn status_of_fresh(command: &mut Command) -> ExitStatus {
+    let until = Instant::now() + Duration::from_secs(15);
+    loop {
+        match command.status() {
+            Err(error)
+                if error.kind() == io::ErrorKind::ExecutableFileBusy && Instant::now() < until =>
+            {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            status => return status.unwrap(),
+        }
+    }
+}
+
 /// Test-only exec completion, never an audio/runtime readiness signal. The
 /// one-byte pipe is nonblocking and has a finite bound, [`FIXTURE_EXEC_WAIT`]
 /// for the fixtures.
@@ -1082,18 +1102,28 @@ mod tests {
                 ],
             ),
         ] {
-            let status = worker_command(&script, &home.path, role, (boot, boot), &[], on)
-                .status()
-                .unwrap();
+            let status = status_of_fresh(&mut worker_command(
+                &script,
+                &home.path,
+                role,
+                (boot, boot),
+                &[],
+                on,
+            ));
             assert!(status.success(), "{role}");
             let written =
                 std::fs::read_to_string(home.path.join(format!("env-{role}.txt"))).unwrap();
             let got = given(&written);
             assert!(got == expected, "{role}: the child got {:?}", names(&got));
         }
-        let status = worker_command(&script, &home.path, "provider", (boot, boot), &[], |_| None)
-            .status()
-            .unwrap();
+        let status = status_of_fresh(&mut worker_command(
+            &script,
+            &home.path,
+            "provider",
+            (boot, boot),
+            &[],
+            |_| None,
+        ));
         assert!(status.success());
         let written = std::fs::read_to_string(home.path.join("env-provider.txt")).unwrap();
         let got = given(&written);

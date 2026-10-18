@@ -20,13 +20,15 @@ impl ChildFixture {
         // macOS checks a fresh executable on its first exec, which took over
         // the 3 s worker startup bound on a loaded Mac (2026-10-15). Pay that
         // here, before any startup deadline runs; this arm writes nothing.
-        let preflight = Command::new(&executable)
-            .arg("--fixture-preflight")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .unwrap();
+        // On Linux a sibling's fork may still hold the new file open for
+        // writing (`ETXTBSY`), which `status_of_fresh` waits out.
+        let preflight = super::status_of_fresh(
+            Command::new(&executable)
+                .arg("--fixture-preflight")
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null()),
+        );
         assert!(preflight.success(), "fake ring preflight: {preflight}");
         Self {
             directory,
