@@ -1889,6 +1889,7 @@ fn a_mute_record_from_a_newer_build_restores_muted() {
         mute_record: Some(directory.file()),
         bus_root: Some(directory.0.join("b")),
         head_touch: false,
+        wait: false,
     };
     let owner = HandControls::restore(&options).unwrap().unwrap();
     assert!(owner.muted());
