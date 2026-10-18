@@ -608,3 +608,201 @@ fn only_a_requested_stop_releases_the_mute_guard_despite_a_cleanup_fault() {
     assert!(!guard_released_on_stop(true, None));
     assert!(!guard_released_on_stop(false, None));
 }
+
+/// #1567, A: a fault the conversation returned once the stop's signal had
+/// come is the stop's; one returned before it, a privacy exit, and a clean
+/// end are not this rule's.
+#[test]
+fn a_fault_after_the_stops_signal_is_the_stops() {
+    assert!(stop_before_fault(true, Some("SIGTERM")));
+    assert!(stop_before_fault(true, Some("SIGINT")));
+    assert!(!stop_before_fault(true, None), "no signal yet: a fault");
+    assert!(!stop_before_fault(false, Some("SIGTERM")), "not a fault");
+}
+
+/// #1567, B, through the cycle's own wrapper: a run that failed before it
+/// heard anything releases the guard and says so in the trace, the error
+/// returned as it was; a privacy exit or a run that heard keeps the guard.
+#[test]
+fn a_cycle_that_failed_before_it_heard_releases_the_guard() {
+    use crate::service_privacy::{PhysicalMute, SoftwareMute};
+    use std::os::unix::fs::PermissionsExt;
+    let directory = std::env::temp_dir().join(format!("lv-guard-{}", monotonic_us()));
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let record = directory.join("mute.json");
+    let muted_on_disk = || {
+        lamp_controls::mute::MuteRecord::load(&record, "test-hand-clock", monotonic_us())
+            .unwrap()
+            .muted
+    };
+    let fresh = || {
+        let mut controls =
+            HandControls::with_test_guard("test-hand-clock", monotonic_us(), &record).unwrap();
+        controls.arm_active().unwrap();
+        Some(controls)
+    };
+    let failed = || -> Result<()> {
+        Err(io::Error::other("capture: snd_pcm_open failed with errno 16").into())
+    };
+
+    let mut trace = SessionState::default();
+    let mut controls = fresh();
+    assert!(muted_on_disk());
+    let error = released_if_never_listened(failed(), &mut trace, &mut controls).unwrap_err();
+    assert!(error.to_string().contains("errno 16"));
+    assert!(!muted_on_disk(), "released: the latch as it was");
+    assert!(
+        trace.iter().any(
+            |row| row["kind"] == "guard_released_never_listened" && row["could_not_start"] == 1
+        )
+    );
+
+    for exit in [
+        Box::new(PhysicalMute { observed_at_us: 1 }) as Box<dyn std::error::Error + Send + Sync>,
+        Box::new(SoftwareMute {
+            observed_at_us: 1,
+            asleep: false,
+        }),
+    ] {
+        let mut controls = fresh();
+        assert!(
+            released_if_never_listened(Err(exit), &mut SessionState::default(), &mut controls)
+                .is_err()
+        );
+        assert!(muted_on_disk(), "a privacy exit keeps the guard");
+    }
+
+    let mut controls = fresh();
+    controls.as_mut().unwrap().heard_audio();
+    assert!(
+        released_if_never_listened(failed(), &mut SessionState::default(), &mut controls).is_err()
+    );
+    assert!(muted_on_disk(), "it heard, so the guard stands");
+    assert!(
+        released_if_never_listened(Ok(()), &mut SessionState::default(), &mut controls).is_ok()
+    );
+    let _ = fs::remove_dir_all(&directory);
+}
+
+/// #1567, A with its gates (the reviewer on #1592): off unless set, never
+/// with a control input queued and unread, and only for a fault after the
+/// signal.
+#[test]
+fn the_stop_first_rule_is_off_unless_set_and_never_with_a_press_in_flight() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::sync::atomic::Ordering;
+    let directory = std::env::temp_dir().join(format!("lv-stopfirst-{}", monotonic_us()));
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let record = directory.join("mute.json");
+    let on = HandControls::with_test_guard("test-hand-clock", monotonic_us(), &record).unwrap();
+    assert!(released_by_stop_first(Some(&on), true, Some("SIGTERM")));
+    assert!(!released_by_stop_first(Some(&on), true, None), "no signal");
+    assert!(
+        !released_by_stop_first(Some(&on), false, Some("SIGTERM")),
+        "a mute, or no fault"
+    );
+    assert!(
+        !released_by_stop_first(None, true, Some("SIGTERM")),
+        "no controls"
+    );
+    on.queued_for_test().fetch_add(1, Ordering::AcqRel);
+    assert!(
+        !released_by_stop_first(Some(&on), true, Some("SIGTERM")),
+        "a press in flight keeps the guard"
+    );
+    let mut off =
+        HandControls::with_test_guard("test-hand-clock", monotonic_us(), &record).unwrap();
+    off.set_never_listened_for_test(false);
+    assert!(
+        !released_by_stop_first(Some(&off), true, Some("SIGTERM")),
+        "off unless set"
+    );
+    let _ = fs::remove_dir_all(&directory);
+}
+
+/// Jarvis's P2 on #1592: when the stop-first rule (A) is the release's only
+/// reason, a control that came during the teardown, queued or taken and
+/// unsaved, keeps the guard; with nothing in flight it releases. The clean
+/// stop's own rule (#960) is unchanged.
+#[test]
+fn a_press_during_the_stops_teardown_keeps_the_guard() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::sync::atomic::Ordering;
+    let directory = std::env::temp_dir().join(format!("lv-teardown-{}", monotonic_us()));
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let record = directory.join("mute.json");
+    let muted = || {
+        lamp_controls::mute::MuteRecord::load(&record, "test-hand-clock", monotonic_us())
+            .unwrap()
+            .muted
+    };
+    let armed = || {
+        let mut controls =
+            HandControls::with_test_guard("test-hand-clock", monotonic_us(), &record).unwrap();
+        controls.arm_active().unwrap();
+        controls
+    };
+    // Classified with nothing in flight; a press queued in the teardown.
+    let mut controls = armed();
+    controls.queued_for_test().fetch_add(1, Ordering::AcqRel);
+    assert!(!released_after_cleanup(&mut controls, true).unwrap());
+    assert!(muted(), "the press keeps the guard");
+    // A press taken and not yet saved, the same.
+    let mut controls = armed();
+    controls.set_dirty_for_test();
+    assert!(!released_after_cleanup(&mut controls, true).unwrap());
+    assert!(muted());
+    // Nothing came: released, the latch as it was.
+    let mut controls = armed();
+    assert!(released_after_cleanup(&mut controls, true).unwrap());
+    assert!(!muted());
+    // The clean stop's rule is not A's: it releases as before (#960).
+    let mut controls = armed();
+    controls.queued_for_test().fetch_add(1, Ordering::AcqRel);
+    assert!(released_after_cleanup(&mut controls, false).unwrap());
+    let _ = fs::remove_dir_all(&directory);
+}
+
+/// The reviewer's P3s on #1592: the two places a run is marked as having
+/// heard, through the helpers the cycle and the conversation use, keep the
+/// guard for its fault; without them the same fault releases it.
+#[test]
+fn a_frame_or_a_spoken_startup_marks_the_run_heard() {
+    use std::os::unix::fs::PermissionsExt;
+    let directory = std::env::temp_dir().join(format!("lv-heard-{}", monotonic_us()));
+    fs::create_dir(&directory).unwrap();
+    fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
+    let record = directory.join("mute.json");
+    let muted = || {
+        lamp_controls::mute::MuteRecord::load(&record, "test-hand-clock", monotonic_us())
+            .unwrap()
+            .muted
+    };
+    let armed = || {
+        let mut controls =
+            HandControls::with_test_guard("test-hand-clock", monotonic_us(), &record).unwrap();
+        controls.arm_active().unwrap();
+        Some(controls)
+    };
+    let failed = || -> Result<()> { Err(io::Error::other("a fault").into()) };
+    let spoke = StartupEvents {
+        microphone_spoke: true,
+        ..StartupEvents::default()
+    };
+    let mut controls = armed();
+    heard_if_spoke(&spoke, &mut controls);
+    let _ = released_if_never_listened(failed(), &mut SessionState::default(), &mut controls);
+    assert!(muted(), "spoke before activation: heard");
+    let mut controls = armed();
+    heard_a_frame(&mut controls);
+    let _ = released_if_never_listened(failed(), &mut SessionState::default(), &mut controls);
+    assert!(muted(), "a frame: heard");
+    let mut controls = armed();
+    heard_if_spoke(&StartupEvents::default(), &mut controls);
+    let _ = released_if_never_listened(failed(), &mut SessionState::default(), &mut controls);
+    assert!(!muted(), "nothing spoke, no frame: released");
+    let _ = fs::remove_dir_all(&directory);
+}

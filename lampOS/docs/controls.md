@@ -941,6 +941,83 @@ mute stays muted; a fault or a privacy exit keeps the guard. A failed initial ar
 whose subsequent save fails still has the active durable guard. Persistence
 failure stays visible and cannot clear the live latch.
 
+**A run that never heard, and a fault after the stop** (#1567,
+`LAMP_GUARD_NEVER_LISTENED=on` on the voice, off unless set; the first
+builder's decision of 18 Oct 19:00). On lamp-4ace on 18 Oct six first runs
+after a restart failed and each left the lamp muted by the guard; two of
+them (15:32, a capture that gave no block; 17:48, a microphone busy at its
+open) had heard nothing. With the switch, two more cases release the guard,
+the latch written as it was:
+- **B, never listened:** the run ended in a fault, anywhere from its arming
+  on (the cycle's wrapper `released_if_never_listened`), before its capture
+  delivered a block and with no control input unread or unsaved (`queued`,
+  `dirty`). A block delivered is any `MicrophoneFrame` the coordinator
+  receives, marked (`HandControls::heard_audio`) before it is dropped or
+  refused, and one sent before activation counts too (startup's
+  "microphone opened before activation", `StartupEvents::microphone_spoke`):
+  the microphone was open and gave audio, so that fault keeps the guard (the
+  reviewer on #1592). It says once `lamp-voice: the run failed before it heard
+  anything (<the error>); the mute is kept as it was, not restored muted`,
+  the trace gets `guard_released_never_listened`, and
+  `<record>.never-listened` counts such runs in a row. While it is above 0
+  the running voice's health is a warning, "the voice could not start (N
+  times since it last heard anything); trying again", with the fact
+  `could_not_start`, never "muted"; the run's first block ends the count.
+  Each run says it as it starts, before any worker opens, so a lamp that
+  keeps failing before it hears shows it on every try. The count is read
+  only with the switch on, and only as a regular file of at most 16 bytes,
+  so a FIFO or a large file there never holds the restore up. It is written
+  to a new private file and renamed over, and removed, only where nothing or
+  a regular file is: a link there is never followed.
+- **A, the stop first:** a fault the conversation returned once SIGTERM or
+  SIGINT had come is the stop's (`released_by_stop_first`), read as it
+  returns, before any cleanup, and only with no control input queued and
+  unread, as for B. When A is the release's only reason, the same is asked
+  again at the release itself, after the teardown (`released_after_cleanup`):
+  a press queued, or taken and unsaved, while the voice went keeps the
+  guard, so it is never lost to an unmuted latch (Jarvis on #1592). A mute
+  is never this; a switch that could not be read is, since the switch is
+  read again at every start. The handler only sets its flag (the workspace
+  allows no `unsafe`, so it keeps no time), so "before" is to within that
+  return; a fault raised just before the signal and seen in the next pass
+  is then the stop's too, which leaves the person's latch as it was, as a
+  clean stop does (the first builder's yes, 18 Oct 20:48). The journal says
+  `the run's fault came after SIGTERM; it is the stop's`. Not 08:34 on 18
+  Oct: that run had no signal (the first builder, from lamp-4ace's
+  journal); its leases lapsed 160 ms after it was ready.
+
+Everything else keeps the guard as before: a fault while listening without
+a signal first, any fault with a control input in flight, a persistence
+fault, a privacy exit, and a crash or abort.
+
+**Known limit, accepted for now (the first builder, 18 Oct 20:48):** a head
+hold (sleep) made in the 4 s between processes (`RestartSec=4s`) is dropped
+by the next process's touch receiver, which takes no touch that began before
+it saw the source. After a fault that the guard would have muted, A or B
+then brings the lamp back listening against the person's sleep. Every clean
+restart has the same gap today; a button mute in the window is kept
+(`Receiver::observe` applies `latest_mute` by `through_us`). The switch
+stays off on the product until #1607 (the touch receiver keeps a hold that
+began after the stored `through_us` and the previous exit), and Monday's
+check with the owner tries a 3 s head hold in the window after the EBUSY
+run. There is no backstop that mutes:
+a lamp that cannot start cannot hear, so muting it would only bring back a
+lamp muted after an update with nobody told. Tests:
+`hand_controls::tests::a_run_that_heard_nothing_releases_the_guard_and_is_counted`,
+`the_guard_stands_when_off_or_with_a_control_in_flight`,
+`the_count_of_runs_that_could_not_start_is_read_back_or_none`,
+`coordinator::tests::termination::a_cycle_that_failed_before_it_heard_releases_the_guard`,
+`a_fault_after_the_stops_signal_is_the_stops`,
+`the_stop_first_rule_is_off_unless_set_and_never_with_a_press_in_flight`,
+`coordinator::tests::a_microphone_that_speaks_before_activation_counts_as_heard`,
+`hand_controls::tests::the_count_file_is_read_only_as_a_small_regular_file`,
+`the_count_is_loaded_only_with_the_switch_on`,
+`a_link_where_the_count_is_kept_is_never_followed`,
+`coordinator::tests::termination::a_press_during_the_stops_teardown_keeps_the_guard`,
+`a_frame_or_a_spoken_startup_marks_the_run_heard`,
+`bus_out::tests::runs_that_could_not_start_are_a_warning_never_a_mute` and
+`a_run_starting_after_runs_that_could_not_start_says_the_count`.
+
 **A restored mute told from a chosen one** (#960 point 2, `LAMP_RESTORED_MUTE=on`
 on the voice, off unless set). Arming also leaves a private marker,
 `<record>.restart-guard`, beside the record, written before the guard and
