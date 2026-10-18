@@ -124,12 +124,47 @@ pub enum Outcome {
         sequence: u64,
         why: String,
         after: Result<(), String>,
+        /// What the units not well said of themselves (#1505): printed with
+        /// the outcome, never kept in `log.jsonl` or `state.json`.
+        told: Told,
     },
     /// Something on the lamp itself went wrong.
     Failed(String),
 }
 
+/// What the units a round found not well said of themselves, each a
+/// ` (…)` to follow its reason, or empty: how often systemd started it
+/// again and its own last journal line. A part's line can carry what a
+/// person said, so it is printed and never kept (#1505).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Told {
+    /// The unit that failed on the new build.
+    pub new: String,
+    /// The first unit not well on the old build after the put-back.
+    pub old: String,
+}
+
 impl Outcome {
+    /// The outcome as `log.jsonl` keeps it: as printed, without what the
+    /// parts said of themselves ([`Told`]).
+    pub fn kept(&self) -> String {
+        match self {
+            Self::RolledBack {
+                sequence,
+                why,
+                after,
+                ..
+            } => Self::RolledBack {
+                sequence: *sequence,
+                why: why.clone(),
+                after: after.clone(),
+                told: Told::default(),
+            }
+            .to_string(),
+            other => other.to_string(),
+        }
+    }
+
     /// A word for the log.
     pub fn kind(&self) -> &'static str {
         match self {
@@ -167,11 +202,16 @@ impl std::fmt::Display for Outcome {
                 sequence,
                 why,
                 after,
+                told,
             } => {
-                write!(f, "build {sequence} put back: {why}; ")?;
+                write!(f, "build {sequence} put back: {why}{}; ", told.new)?;
                 match after {
                     Ok(()) => f.write_str("the previous build is well"),
-                    Err(why) => write!(f, "the previous build is not well either: {why}"),
+                    Err(why) => write!(
+                        f,
+                        "the previous build is not well either: {why}{}",
+                        told.old
+                    ),
                 }
             }
             Self::Failed(why) => write!(f, "failed: {why}"),
@@ -263,7 +303,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         Err(error) => return Outcome::Failed(error.to_string()),
     };
     let outcome = run.acting();
-    run.records.log(outcome.kind(), &outcome.to_string());
+    run.records.log(outcome.kind(), &outcome.kept());
     outcome
 }
 
@@ -721,7 +761,7 @@ impl Run<'_, '_> {
                 }))
             });
         if let Err(why) = written {
-            return self.put_back(state, &build, &backs, None, why);
+            return self.put_back(state, &build, &backs, None, why, String::new());
         }
         // Writing and reloading took a moment: still quiet, or nothing is
         // started and the old units go back.
@@ -750,12 +790,18 @@ impl Run<'_, '_> {
             let back = &backs[at];
             if let Err(why) = self.world.systemd.restart(&back.unit) {
                 let unit = back.unit.clone();
-                return self.put_back(state, &build, &backs, Some(&unit), why);
+                let told = self.told(&unit);
+                return self.put_back(state, &build, &backs, Some(&unit), why, told);
             }
             watches.push(Watch::new(&back.unit, &back.part, back.before.clone()));
         }
-        if let Err((unit, why)) = self.watch(&mut watches) {
-            return self.put_back(state, &build, &backs, Some(&unit), why);
+        if let Err((unit, why, judged)) = self.watch(&mut watches) {
+            let told = if judged {
+                self.told(&unit)
+            } else {
+                String::new()
+            };
+            return self.put_back(state, &build, &backs, Some(&unit), why, told);
         }
         state.previous = state.installed.replace(build.clone());
         if let Err(error) = self
@@ -773,18 +819,22 @@ impl Run<'_, '_> {
 
     /// Watches the restarted parts for the configured time. The unit and
     /// why, for the first that is not well.
-    fn watch(&mut self, watches: &mut [Watch]) -> Result<(), (String, String)> {
+    /// The third is whether the part was found not well: false when systemd
+    /// itself could not be asked, and no part was looked at.
+    fn watch(&mut self, watches: &mut [Watch]) -> Result<(), (String, String, bool)> {
         if watches.is_empty() {
             return Ok(());
         }
         let units: Vec<String> = watches.iter().map(|watch| watch.unit.clone()).collect();
         let until = self.world.clock.now_ms() + self.config.watch.as_millis() as u64;
         loop {
-            let states = self
-                .world
-                .systemd
-                .states(&units)
-                .map_err(|why| (units[0].clone(), format!("systemd cannot be asked: {why}")))?;
+            let states = self.world.systemd.states(&units).map_err(|why| {
+                (
+                    units[0].clone(),
+                    format!("systemd cannot be asked: {why}"),
+                    false,
+                )
+            })?;
             let done = self.world.clock.now_ms() >= until;
             let health = if done { self.world.ears.health() } else { None };
             for watch in watches.iter_mut() {
@@ -801,7 +851,7 @@ impl Run<'_, '_> {
                 } else {
                     watch.look(&state)
                 };
-                judged.map_err(|why| (watch.unit.clone(), why))?;
+                judged.map_err(|why| (watch.unit.clone(), why, true))?;
             }
             if done {
                 return Ok(());
@@ -819,15 +869,15 @@ impl Run<'_, '_> {
         backs: &[Back],
         failed: Option<&str>,
         why: String,
+        // What the failing unit made of the new build ([`Run::told`]), read
+        // by the caller before anything is put back.
+        told: String,
     ) -> Outcome {
-        // What the failing unit made of the new build, read before it is put
-        // back: the outcome says it, the kept refusal does not (#1505).
-        let told = failed.map(|unit| self.told(unit)).unwrap_or_default();
         self.say(&format!(
             "putting build {} back: {why}{told}",
             build.sequence
         ));
-        let after = self.restore(backs, failed);
+        let (after, old) = self.restore(backs, failed);
         state.refuse(build, &why);
         if let Err(error) = self
             .records
@@ -841,8 +891,9 @@ impl Run<'_, '_> {
         self.prune(state);
         Outcome::RolledBack {
             sequence: build.sequence,
-            why: format!("{why}{told}"),
+            why,
             after,
+            told: Told { new: told, old },
         }
     }
 
@@ -880,8 +931,11 @@ impl Run<'_, '_> {
     /// restarted again, in the reverse order of a switch: the voice last,
     /// and between two turns unless the voice itself is what failed. Then
     /// watched. Every unit is tried, whatever happens to one.
-    fn restore(&mut self, backs: &[Back], failed: Option<&str>) -> Result<(), String> {
-        self.put_units_and_links_back(backs)?;
+    /// With what the first unit found not well said of itself ([`Told`]).
+    fn restore(&mut self, backs: &[Back], failed: Option<&str>) -> (Result<(), String>, String) {
+        if let Err(why) = self.put_units_and_links_back(backs) {
+            return (Err(why), String::new());
+        }
         let mut again: Vec<&Back> = backs.iter().filter(|back| back.restarted).collect();
         again.sort_by(|a, b| order(&b.unit).cmp(&order(&a.unit)));
         let mut watches = Vec::new();
@@ -899,14 +953,17 @@ impl Run<'_, '_> {
                 Err(why) => troubles.push(why),
             }
         }
-        if let Err((unit, why)) = self.watch(&mut watches) {
-            let told = self.told(&unit);
-            troubles.push(format!("{why}{told}"));
+        let mut told = String::new();
+        if let Err((unit, why, judged)) = self.watch(&mut watches) {
+            if judged {
+                told = self.told(&unit);
+            }
+            troubles.push(why);
         }
         if troubles.is_empty() {
-            Ok(())
+            (Ok(()), told)
         } else {
-            Err(troubles.join("; "))
+            (Err(troubles.join("; ")), told)
         }
     }
 
@@ -957,7 +1014,7 @@ impl Run<'_, '_> {
             Ok(state) => state,
             Err(error) => return Outcome::Failed(format!("the state cannot be read: {error}")),
         };
-        self.put_back(&mut state, &journal.build, &backs, None, why)
+        self.put_back(&mut state, &journal.build, &backs, None, why, String::new())
     }
 
     /// Removes the folders this program made that no unit names now, nor

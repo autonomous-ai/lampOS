@@ -49,8 +49,9 @@ pub struct Systemctl {
     /// up to 25 s.
     pub restart_within: Duration,
     /// When each unit was last restarted here, on the wall clock the
-    /// journal keeps: its lines since are its own build's.
-    restarted: Vec<(String, SystemTime)>,
+    /// journal keeps, and its main process just before: the lines since,
+    /// but that process's own last words as it stopped, are the new build's.
+    restarted: Vec<(String, SystemTime, u32)>,
 }
 
 impl Default for Systemctl {
@@ -85,38 +86,92 @@ impl Systemd for Systemctl {
     }
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {
+        // Asked within the journal's bound, so a slow systemd delays the
+        // restart by that at most; not known, nothing is skipped.
+        let before = output_within(
+            Command::new("systemctl").args(["show", "--property=MainPID", "--value", "--", unit]),
+            JOURNAL_WITHIN,
+        )
+        .and_then(|pid| pid.trim().parse().ok())
+        .unwrap_or(0);
         let at = SystemTime::now();
-        self.restarted.retain(|(name, _)| name != unit);
-        self.restarted.push((unit.to_owned(), at));
+        self.restarted.retain(|(name, _, _)| name != unit);
+        self.restarted.push((unit.to_owned(), at, before));
         run(&["restart", unit], self.restart_within)
     }
 
     fn last_line(&mut self, unit: &str) -> Option<String> {
-        let (_, at) = self.restarted.iter().find(|(name, _)| name == unit)?;
+        let (_, at, before) = self.restarted.iter().find(|(name, _, _)| name == unit)?;
         let since = at.duration_since(UNIX_EPOCH).ok()?.as_secs();
-        let output = Command::new("journalctl")
+        let mut command = Command::new("journalctl");
+        command
             .args(["-u", unit, "--since"])
             .arg(format!("@{since}"))
-            .args(["-o", "json", "-n", "50", "--no-pager", "-q"])
-            .stdin(Stdio::null())
-            .stderr(Stdio::null())
-            .output()
-            .ok()?;
-        last_own_line(&String::from_utf8_lossy(&output.stdout))
+            .args([
+                "-o",
+                "json",
+                "--output-fields=_SYSTEMD_UNIT,_PID,MESSAGE",
+                "-n",
+                "50",
+                "--no-pager",
+                "-q",
+            ]);
+        let json = output_within(&mut command, JOURNAL_WITHIN)?;
+        last_own_line(&json, unit, (*before != 0).then_some(*before))
     }
+}
+
+/// The longest `journalctl` has to say a unit's last line: a put-back waits
+/// for it, and must never wait without end.
+pub const JOURNAL_WITHIN: Duration = Duration::from_secs(5);
+
+/// What `command` printed, if it ended well within `within`; else none, and
+/// it is killed. Its output is read while it runs, so one that prints more
+/// than a pipe holds is not stopped by its own writing.
+pub fn output_within(command: &mut Command, within: Duration) -> Option<String> {
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+    let mut stdout = child.stdout.take()?;
+    let reading = thread::spawn(move || {
+        let mut text = String::new();
+        let _ = io::Read::read_to_string(&mut stdout, &mut text);
+        text
+    });
+    let until = Instant::now() + within;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) if Instant::now() < until => thread::sleep(Duration::from_millis(20)),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break None;
+            }
+        }
+    };
+    let text = reading.join().ok()?;
+    status.filter(|status| status.success()).map(|_| text)
 }
 
 /// The longest line a round's outcome carries of a part's journal.
 pub const LINE_MOST: usize = 200;
 
-/// The last line in `journalctl -o json` output that the unit's own program
-/// wrote: systemd's own lines about it ("Failed with result …", "Scheduled
-/// restart job …") are skipped, as is a message that is not text.
-pub fn last_own_line(json_lines: &str) -> Option<String> {
+/// The last line in `journalctl -o json` output that `unit`'s own processes
+/// wrote (`_SYSTEMD_UNIT`): what systemd, systemd-coredump or journald said
+/// about it is skipped, as is `skip`, the main process from before the
+/// restart (its last words as it stopped are the old build's), and a
+/// message that is not text.
+pub fn last_own_line(json_lines: &str, unit: &str, skip: Option<u32>) -> Option<String> {
+    let skip = skip.map(|pid| pid.to_string());
     json_lines
         .lines()
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-        .filter(|entry| entry["_PID"] != "1" && entry["SYSLOG_IDENTIFIER"] != "systemd")
+        .filter(|entry| entry["_SYSTEMD_UNIT"] == unit)
+        .filter(|entry| skip.as_deref().is_none_or(|pid| entry["_PID"] != pid))
         .filter_map(|entry| entry["MESSAGE"].as_str().map(clean_line))
         .rfind(|line| !line.is_empty())
 }
