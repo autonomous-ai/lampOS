@@ -55,7 +55,10 @@ the lamp has finished from another person's, and cannot tell who speaks
 over it.
 
 A clip took 75 ms for 1.5 s and 280 ms for 6 s on one thread of the Mac,
-and loading took 1.8 s. The lamp's A733 has not been timed.
+and loading took 1.8 s. On lamp-4ace on 18 October, in the voice's own
+child, a line's first 1.8 s came back a median of 235 ms after
+it was asked, 206–535 ms over 52 prints (the same-voice A/B's check-on arm,
+below).
 
 ## In the voice (#829, 16 October)
 
@@ -115,10 +118,14 @@ plainly not the conversation's is no part of it
   turn the lamp began itself, is never judged: with the lamp over it, the
   model hears the lamp (47.1% equal error, above).
   - **A line begun while a silent reply was in hand is judged** (#829,
-    18 October). Each of the A/B's scene calls came while the line before
-    it, left unanswered, still had its turn open, so it was taken for one
-    said over the lamp (`over_the_lamp`, a reply in hand), though the lamp
-    had said nothing.
+    18 October). This was measured in lamp-4ace's same-voice A/B: six
+    two-person scenes, three rounds with the check on
+    and three without, played `say` voices (Daniel, Samantha) on mic2. The
+    check-on arm ran 20:03–20:39, and its journal and session events were
+    paired per turn.
+    - Each scene's call came while the line before it, left unanswered,
+      still had its turn open. So it was taken for one said over the lamp
+      (`over_the_lamp`, a reply in hand), though the lamp had said nothing.
     - In the check-on arm, 64 lines were begun so, none was printed, and 63
       had no sound from the lamp; 55 began with nothing in hand, and 52 were
       printed.
@@ -131,7 +138,8 @@ plainly not the conversation's is no part of it
     - `over_the_lamp` itself still marks a reply in hand, for the staff
       note (`crate::staff_note`).
   - **What a call printed this way costs:** its print is asked for at
-    1.8 s and comes about 220 ms later in the child, as any line's does.
+    1.8 s and comes back a median of 235 ms later in the child, as any
+    line's does (206–535 ms over the check-on arm's 52 prints).
     The call's reply never waits for it: a print not back at the verdict is
     kept for the conversation when it comes (`Voices::decided`).
 - **Only a line of 1.5 s or more** (`LEAST_SAMPLES`). Its first 1.8 s
