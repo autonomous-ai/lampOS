@@ -248,7 +248,13 @@ lampOS is Rust only, so a measuring script in Python (reading servos
 during an unplug, say) is not committed under `lampOS/`. It lives in the
 builder's own scratch folder, outside the repository, and the
 verification README says what it did, what it read and how often, so that
-it can be written again. [wake-lamp-52e6-20261014](verification/wake-lamp-52e6-20261014/)
+it can be written again. **The one exception is training code under
+`lampOS/training/`** (the first builder, #1507, 18 Oct): the Python that
+makes a model the lamp runs (`training/name/`, `training/stop/`) may be
+committed there, if it runs on a laptop or the office Mac and never on a
+lamp, makes no network call and holds no credential, keeps no recording in
+the repository, and nothing in `crates/` or the image depends on it. The
+model it makes is what the Rust reads. [wake-lamp-52e6-20261014](verification/wake-lamp-52e6-20261014/)
 is an example.
 
 A result on a laptop is not a result on a lamp and is never written as

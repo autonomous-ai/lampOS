@@ -38,7 +38,10 @@ Every ready pull request into `lamp-voice` (not a draft), oldest first.
    - Its documents are changed in the same pull request and say what the
      code does.
    - Nothing in it is a credential, a key, Python, a picture of a person,
-     or a colleague's name.
+     or a colleague's name. Python is allowed only as training code under
+     `lampOS/training/`, on `joining.md`'s conditions (it never runs on a
+     lamp, makes no network call, holds no credential, keeps no recording,
+     and nothing in `crates/` or the image depends on it; #1507).
    - You found nothing that needs changing, or the builder has changed it.
    Then comment on the issue what was merged (`Reviewer: merged #<n> at
    <time>`), and close the issue by hand if the pull request says it closes
