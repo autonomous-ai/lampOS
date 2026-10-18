@@ -356,6 +356,46 @@ in conversation labelled as well (#873's `lamp-policy-replay --again …
 `with_attention_next_a_second_judgement_is_written_beside_and_nothing_published_changes`,
 and `attention::tests::the_next_judgement_raises_a_reply_to_the_lamp_in_conversation_only`.
 
+**The rule alone for kinds it is certain of: `--rule-decides` (#705).**
+A call the voice holds for the Policy's decision (`LAMP_POLICY_HOLDS_ACTIONS`)
+waits for Jev's answer: 0.55 s median and 0.97 s p90 on lamp-4ace on
+18 Oct, which left a held call waiting 0.18 s median and 0.47 s p90, and
+the rule (`attention::fallback`) would have said the same on 45 of the 51
+that waited. With `--rule-decides KIND[;KIND…]`, an attention question of
+a kind named there is decided by the rule (`by: rule`, `took_ms` 0) and the
+model is not asked; every other kind is asked as before. Questions keep
+their order: a named kind that comes while the model is still being asked
+about the one before it waits for that answer (up to Jev's ~0.55 s), and is
+then decided at once, so "no wait" holds for a held call with nothing
+asked ahead of it (the reviewer on #1524). The rule answers whenever the
+room is quiet, the lamp is in conversation (speaking, or words of its own
+within 20 s) or its name was heard at 0.9 or more, and stays quiet
+otherwise, so a kind with `conversation true` is always `answer` (Sixth on
+#1524). So never name a `busy true …` kind while the voice relies on
+`LAMP_GOING_ON_ASKS` (#1538): that switch asks the decision for a line a
+busy room's conversation lets out, and a `busy true` kind would answer
+every one of them by the rule, undoing #1522's fix. `--agreement` keeps
+such kinds out on its own (Jev disagreed with the rule on 39 of the day's
+48), but the list is a person's to write (Fourth on #1524). A kind with the lamp speaking is refused at start: the rule would
+answer talk said over the lamp's reply whatever it was, and a night's
+record can't show the office's talk over the lamp that wasn't for it. A
+kind is written as `lamp-policy-replay --agreement` prints it (room,
+conversation, the lamp speaking, the name's score: `busy false false
+>=0.99`), and is named only once a night's `--agreement` shows no
+disagreement on it (Fourth's conditions on #705). Its line says `certain`
+and no failure, leaves out `asked` and `state`, and the model's health line
+is not moved by it. The cost: those questions' model answers are no longer
+logged for fitting, and with `--images` they get no picture question
+either. A rule
+decision carries no `follows_lamp`, so the voice reads its `stay_quiet` as
+the plain one; `--agreement` counts a following `stay_quiet` as a
+disagreement, so no such kind is named. Only the single asker: with
+`judges` the switch does nothing. The start line says `rule_decides=N`.
+Off unless set. Tests: `tests/policy.rs`,
+`a_kind_the_rule_decides_is_not_asked_and_others_are` and
+`a_rule_decision_leaves_the_models_health_as_it_was`; `main.rs`,
+`the_rule_decides_kinds_are_read_and_a_speaking_kind_is_refused`.
+
 ## Shadow mode
 
 Every decision is published with `shadow: true` and nothing subscribes to
@@ -415,8 +455,8 @@ the day by UTC. Its shape, with numbers made up:
 | `at_unix_ms` | When the decision was made |
 | `context` | Everything that was known, as above, whether or not the model was shown it |
 | `in_conversation` | Whether the lamp was in conversation |
-| `state` | What the model was shown. Its fields are here in the order of the alphabet; what was sent had them in the order above |
-| `asked` | The model that was asked for |
+| `state` | What the model was shown. Its fields are here in the order of the alphabet; what was sent had them in the order above. Left out on a `certain` line (`--rule-decides`): nothing was shown |
+| `asked` | The model that was asked for. Left out on a `certain` line: none was |
 | `answers` | Its seven answers. Empty when the rule decided |
 | `judgement` | The probability, the choice, and whether the rule made it |
 | `by` | Who decided: the model as its service names it, or `rule` |
