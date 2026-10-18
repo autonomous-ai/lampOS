@@ -360,7 +360,18 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   first of a run (`taken late, in order: the receiver was behind`) and the
   run when the next is on time. A message from another boot, out of order or
   after one missing is still refused, and every other channel keeps its
-  bound.
+  bound (a test binds each worker's four channels and refuses the second
+  late message on all but this one). How late a message can be is bounded by
+  the worker itself, not by its control heartbeat, which it drains while a
+  command waits (Tests on #1660): the command waiting for room may be
+  `ROOM_WAIT` (250 ms, 1.05 s with patient writes) plus 100 ms old
+  (`check_retained`), the parent's sends fail once the socket's buffer is
+  full, and audio more than 2.5 s from its capture
+  (`lamp_gemini::MAX_INPUT_AGE`) ends the worker as stale. A run of late
+  messages is said as it ends, `on time again`, `ended by an error` or
+  `closed` with the channel, with its count and its oldest, and its first
+  line names the bound it failed, the receiver's held-up time included (the
+  reviewer on #1660).
 - **A late privacy observation while the voice waits to open.** lamp-4ace's
   power cut at 18:15 ended the voice at 13.56 s with "invalid or stale
   privacy observation while waiting", while every other part was starting.
