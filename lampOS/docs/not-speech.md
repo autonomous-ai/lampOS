@@ -460,7 +460,9 @@ was the story again, from about where its playback was cut, in new words: a
 new generation, not old audio. A touch or the stop button tells the model
 what it was saying is over (`LAMP_STOP_TOLD`, above). A spoken cut-in told
 it nothing, and with the story cut mid-sentence in its context, "Okay, okay"
-read as "go on". Of the 49 take-6 files since 16 October, 24 were heard
+read as "go on". In the first builder's count of the 49 take-6 files since
+16 October (03:15 on #828,
+`~/lamp-voice-data/scenarios/2026101[6-9]T*cutin*-6.txt`), 24 were heard
 right (20 acknowledged, 3 silent, this one the story again), and 25 were
 misheard (19 silent, 6 the story went on or something else): the misheard
 ones are `ASK_AGAIN_NOTE`'s case (above).
