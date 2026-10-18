@@ -20,7 +20,7 @@ use crate::{
     decide::{Asked, Connection, Decider, Failed, Usage},
     gather::{Gather, Lamp, Utterance},
     hello::{self, Hello},
-    outcome::{Begun, Watch},
+    outcome::{Begun, Watch, sent_at},
     pictures::{self, Pictures},
     progress::{self, Progress},
     record::Record,
@@ -453,10 +453,25 @@ impl Ear {
     /// nothing of it is said: what it holds may be what was heard.
     fn take<T: DeserializeOwned>(
         &mut self,
-        mut wait: Duration,
+        wait: Duration,
         unreadable: &mut u64,
         say: &mut dyn FnMut(Note),
     ) -> Vec<T> {
+        self.take_sent(wait, unreadable, say)
+            .into_iter()
+            .map(|(read, _)| read)
+            .collect()
+    }
+
+    /// [`Self::take`], each with the stamp its publisher sent it with
+    /// (`at_us`, the monotonic clock; 0 if it gave none), for the outcome
+    /// (#1652).
+    fn take_sent<T: DeserializeOwned>(
+        &mut self,
+        mut wait: Duration,
+        unreadable: &mut u64,
+        say: &mut dyn FnMut(Note),
+    ) -> Vec<(T, u64)> {
         let topic = self.topic;
         let mut taken = Vec::new();
         while taken.len() < MOST_AT_ONCE {
@@ -470,7 +485,7 @@ impl Ear {
                             if let Some(passed_over) = self.unreadable.right() {
                                 say(Note::Readable { topic, passed_over });
                             }
-                            taken.push(read);
+                            taken.push((read, message.header.at_us));
                         }
                         Err(_) => {
                             *unreadable += 1;
@@ -1032,7 +1047,7 @@ impl Policy<'_> {
                 at_unix_ms,
                 judgement.choice,
                 Instant::now(),
-                (utterance.began, utterance.ended),
+                utterance.sent,
                 &self.begun,
             ),
             self.totals.decided,
@@ -1730,8 +1745,10 @@ fn run_inner<D: Decider + Send + 'static>(
         // utterance may miss the lamp's last 20 ms, and never has any of
         // what came after its own beginning.
         let now = Instant::now();
+        let now_us = lamp_ipc::monotonic_us();
         let unreadable = &mut policy.totals.unreadable;
-        for state in voice.take::<VoiceState>(Duration::ZERO, unreadable, policy.say) {
+        for (state, at_us) in voice.take_sent::<VoiceState>(Duration::ZERO, unreadable, policy.say)
+        {
             if let Some(judges) = policy.judges.as_mut() {
                 judges.voice_seen(now);
             }
@@ -1743,10 +1760,15 @@ fn run_inner<D: Decider + Send + 'static>(
             }
             let speaking = state.state == Voice::Speaking;
             policy.lamp.state(speaking, now);
-            if policy.begun.state(speaking, now)
+            // The outcome times the lamp's sound by its message's stamp, so
+            // that a turn that takes it up with what was heard before it,
+            // this first, still has them in order (#1652). What the policy
+            // decides keeps the time it was taken up.
+            let sent = sent_at(at_us, now, now_us);
+            if policy.begun.state(speaking, sent)
                 && let Some((watch, _)) = policy.watch.as_mut()
             {
-                watch.spoke(now);
+                watch.spoke(sent);
             }
             let listening = state.state == Voice::Listening;
             policy.gather.person_stopped(!listening);
@@ -1783,7 +1805,7 @@ fn run_inner<D: Decider + Send + 'static>(
                 hello.voice_gone();
             }
         }
-        for piece in said.take::<Speech>(Duration::ZERO, unreadable, policy.say) {
+        for (piece, at_us) in said.take_sent::<Speech>(Duration::ZERO, unreadable, policy.say) {
             if let Some(progress) = policy.progress.as_mut() {
                 progress.talk(now);
             }
@@ -1791,10 +1813,11 @@ fn run_inner<D: Decider + Send + 'static>(
                 hello.talk(now);
             }
             policy.lamp.said(&piece.text, piece.request, now);
-            if policy.begun.said(piece.request, now)
+            let sent = sent_at(at_us, now, now_us);
+            if policy.begun.said(piece.request, sent)
                 && let Some((watch, _)) = policy.watch.as_mut()
             {
-                watch.said(piece.request, now);
+                watch.said(piece.request, sent);
             }
         }
         said.source(policy.say);
@@ -1913,9 +1936,10 @@ fn run_inner<D: Decider + Send + 'static>(
         } else {
             TICK
         };
-        let pieces = heard.take::<Speech>(wait, unreadable, policy.say);
+        let pieces = heard.take_sent::<Speech>(wait, unreadable, policy.say);
         heard.source(policy.say);
         let now = Instant::now();
+        let now_us = lamp_ipc::monotonic_us();
         if !pieces.is_empty() {
             if let Some(progress) = policy.progress.as_mut() {
                 progress.talk(now);
@@ -1924,13 +1948,14 @@ fn run_inner<D: Decider + Send + 'static>(
                 hello.talk(now);
             }
         }
-        for piece in pieces {
-            policy.gather.piece(
+        for (piece, at_us) in pieces {
+            policy.gather.piece_sent(
                 &piece.text,
                 piece.finished,
                 piece.request,
                 &policy.lamp,
                 now,
+                sent_at(at_us, now, now_us),
             );
         }
         policy.gather.tick(now);

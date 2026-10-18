@@ -28,6 +28,7 @@ fn utterance(at: Instant) -> Utterance {
         request: None,
         began: at,
         ended: at,
+        sent: (at, at),
         lamp: LampThen {
             speaking: false,
             said: String::new(),
