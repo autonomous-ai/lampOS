@@ -39,6 +39,15 @@ pub const WATCH_CONFIRM_MS: u64 = 10_000;
 /// different answer it ends with later is kept as a new observation.
 pub const WATCH_FOLLOW_MS: u64 = 600_000;
 
+/// The newest store kept aside, or none; a folder that can't be read says
+/// nothing rather than stopping the part.
+fn persistence_kept<P: Persistence>(persistence: &P) -> Option<String> {
+    persistence.kept_aside().unwrap_or_else(|error| {
+        eprintln!("tasks: the stores kept aside could not be listed: {error}");
+        None
+    })
+}
+
 /// The state's `schema` this build reads and writes. A newer build bumps it
 /// for a change this one could not read safely: a new value in a stored
 /// enum; a new required field; a new field on a task's target, its launch
@@ -56,6 +65,9 @@ pub trait Persistence {
     /// Keep what is stored under another name, `label`, as it is, and start
     /// empty: the name it is kept under.
     fn set_aside(&mut self, label: &str) -> io::Result<String>;
+    /// The newest store kept aside that is still there, by its name: until
+    /// someone looks, a lamp that forgot its tasks says so (#1505).
+    fn kept_aside(&self) -> io::Result<Option<String>>;
 }
 impl Persistence for Store {
     fn load(&self) -> io::Result<Option<Vec<u8>>> {
@@ -66,6 +78,9 @@ impl Persistence for Store {
     }
     fn set_aside(&mut self, label: &str) -> io::Result<String> {
         self.set_aside(label)
+    }
+    fn kept_aside(&self) -> io::Result<Option<String>> {
+        self.kept_aside()
     }
 }
 
@@ -894,6 +909,13 @@ pub struct Engine<P: Persistence> {
     persistence: P,
     /// The name a newer build's store was set aside under as this opened.
     set_aside: Option<String>,
+    /// The newest store kept aside that is still in the folder
+    /// ([`Persistence::kept_aside`]), as last looked at.
+    kept_aside: Option<String>,
+    /// The task targets were written for a newer build, with this
+    /// `version`: hand-overs are refused until they match this build
+    /// (#1505).
+    targets_newer: Option<u32>,
     targets: BTreeMap<String, Target>,
     state: State,
     last_clock: Clock,
@@ -1072,6 +1094,7 @@ impl<P: Persistence> Engine<P> {
             return Err(storage());
         }
         persistence.commit(&bytes).map_err(|_| storage())?;
+        let kept_aside = persistence_kept(&persistence);
         Ok(Self {
             persistence,
             targets,
@@ -1080,8 +1103,23 @@ impl<P: Persistence> Engine<P> {
             failed: false,
             last_handover: None,
             close_told: false,
+            kept_aside,
             set_aside,
+            targets_newer: None,
         })
+    }
+
+    /// Look again for a store kept aside ([`Persistence::kept_aside`]): the
+    /// runtime does it once a minute, so a file someone has dealt with stops
+    /// being said within a minute.
+    pub fn look_aside(&mut self) {
+        self.kept_aside = persistence_kept(&self.persistence);
+    }
+
+    /// The task targets were written for a newer build (their `version`):
+    /// every hand-over is refused, with why, until they match (#1505).
+    pub fn targets_newer(&mut self, version: u32) {
+        self.targets_newer = Some(version);
     }
 
     /// The name a newer build's store was set aside under as this one
@@ -1182,7 +1220,8 @@ impl<P: Persistence> Engine<P> {
             "attempting":count(DispatchState::Attempting),"accepted":count(DispatchState::Accepted),"pending":count(DispatchState::Pending),
             "uncertain":count(DispatchState::Uncertain),"observations":self.state.tasks.iter().map(|t|t.observations.len()).sum::<usize>(),
             "speech_claimed":speech(SpeechState::Claimed),"speech_spoken":speech(SpeechState::Spoken),"speech_uncertain":speech(SpeechState::Uncertain),"completion":"unverified",
-            "last_handover":self.last_handover.map(|handed| if handed { "handed" } else { "failed" })})
+            "last_handover":self.last_handover.map(|handed| if handed { "handed" } else { "failed" }),
+            "set_aside":self.kept_aside,"targets_newer":self.targets_newer})
     }
 
     pub fn handle(
@@ -1311,6 +1350,14 @@ impl<P: Persistence> Engine<P> {
         let at = next_audit(&mut next, now)?;
         match request {
             Request::Prepare { text, target, .. } => {
+                // Targets written for a newer build: nothing is handed over
+                // until they match this one (#1505).
+                if self.targets_newer.is_some() {
+                    return Err(err(
+                        "targets_newer",
+                        "The task targets were written for a newer build; hand-overs are off until they match this build.",
+                    ));
+                }
                 // Full: the oldest task that is over gives way. Only when
                 // every task kept is still going is a new one refused.
                 if next.tasks.len() >= MAX_TASKS {
@@ -2323,6 +2370,9 @@ mod tests {
     impl Persistence for Memory {
         fn load(&self) -> io::Result<Option<Vec<u8>>> {
             Ok(self.0.borrow().bytes.clone())
+        }
+        fn kept_aside(&self) -> io::Result<Option<String>> {
+            Ok(self.0.borrow().kept.last().map(|(name, _)| name.clone()))
         }
         fn set_aside(&mut self, label: &str) -> io::Result<String> {
             let mut state = self.0.borrow_mut();
@@ -3843,6 +3893,69 @@ mod tests {
                 .code,
             "storage"
         );
+    }
+
+    /// #1505: a store set aside is said in the summary while its kept file
+    /// is there, across a reopen, and not once it is gone (looked at again
+    /// as the runtime does once a minute).
+    #[test]
+    fn a_store_kept_aside_is_in_the_summary_until_it_is_gone() {
+        let (mut engine, memory) = opened();
+        accepted(&mut engine, 0);
+        assert!(engine.summary()["set_aside"].is_null());
+        let mut newer: Value =
+            serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
+        newer["schema"] = json!(2);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&newer).unwrap());
+        let engine = Engine::open(
+            memory.clone(),
+            targets(),
+            "f".repeat(32).as_str(),
+            RESTART,
+            &clock(1),
+        )
+        .unwrap();
+        let kept = engine.summary()["set_aside"].as_str().unwrap().to_owned();
+        assert!(kept.starts_with("tasks.sqlite3.newer-2-"), "{kept}");
+        drop(engine);
+        let mut engine = Engine::open(
+            memory.clone(),
+            targets(),
+            "f".repeat(32).as_str(),
+            "4".repeat(32).as_str(),
+            &clock(2),
+        )
+        .unwrap();
+        assert_eq!(
+            engine.summary()["set_aside"],
+            json!(kept),
+            "said after a reopen"
+        );
+        memory.0.borrow_mut().kept.clear();
+        engine.look_aside();
+        assert!(
+            engine.summary()["set_aside"].is_null(),
+            "gone: said no more"
+        );
+    }
+
+    /// #1505: with targets for a newer build, a task offered is refused with
+    /// why, nothing is kept, and the summary says the version.
+    #[test]
+    fn with_targets_for_a_newer_build_a_task_offered_is_refused() {
+        let (mut engine, _memory) = opened();
+        engine.targets_newer(2);
+        let refused = engine
+            .handle(
+                &preparation(&engine, "Review this project."),
+                &clock(0),
+                false,
+            )
+            .unwrap_err();
+        assert_eq!(refused.code, "targets_newer");
+        assert!(engine.state.tasks.is_empty());
+        assert_eq!(engine.summary()["targets_newer"], 2);
     }
 
     /// The receipt's journal line names a plain `op` only: anything else is

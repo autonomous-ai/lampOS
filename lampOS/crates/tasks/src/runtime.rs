@@ -133,11 +133,30 @@ pub struct Config {
     /// read just before finds it idle on that turn (`serve --close-told`,
     /// #1390). Off unless set.
     pub close_told: bool,
+    /// The task targets were written for a newer build, with this
+    /// `version` ([`read_targets_or_newer`]): the part runs with hand-overs
+    /// off and says so, rather than stopping and saying nothing (#1505).
+    pub targets_newer: Option<u32>,
 }
 
 /// An operator-owned file selects targets; a model supplies only an alias.
 /// Configuration is read once. Existing tasks retain their original target.
 pub fn read_targets(path: &Path) -> io::Result<BTreeMap<String, Target>> {
+    read_targets_or_newer(path)?.map_err(|version| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("targets were written for a newer build (version {version})"),
+        )
+    })
+}
+
+/// [`read_targets`], or the `version` of targets written for a newer build:
+/// a `version` above 1, or a field this build does not know. They stay
+/// strict, since a later field may narrow what a task may do and passing
+/// over it would hand work over more widely than the person set; but the
+/// part can run with hand-overs off and say why (#1505). A file that is
+/// not a targets file at all is refused as before.
+pub fn read_targets_or_newer(path: &Path) -> io::Result<Result<BTreeMap<String, Target>, u32>> {
     fn unique_targets<'de, D: serde::Deserializer<'de>>(
         deserializer: D,
     ) -> Result<BTreeMap<String, Target>, D::Error> {
@@ -195,8 +214,35 @@ pub fn read_targets(path: &Path) -> io::Result<BTreeMap<String, Target>> {
     if bytes.len() > 16_384 {
         return Err(invalid("targets file grew beyond its bound"));
     }
-    let document: Document =
-        serde_json::from_slice(&bytes).map_err(|_| invalid("invalid targets JSON"))?;
+    let newer = |version: u64| u32::try_from(version).unwrap_or(u32::MAX);
+    // Read strictly from the bytes first: a duplicate alias is refused
+    // there, which a `Value` would hide by keeping the last.
+    let document: Document = match serde_json::from_slice::<Document>(&bytes) {
+        Ok(document) if document.version > 1 => return Ok(Err(document.version)),
+        Ok(document) => document,
+        // Not this build's: a newer `version`, or a field this build does
+        // not know in version 1. Anything else is not a targets file.
+        Err(error) => {
+            let version = serde_json::from_slice::<serde_json::Value>(&bytes)
+                .ok()
+                .and_then(|value| value.get("version").and_then(serde_json::Value::as_u64));
+            return match version {
+                Some(version) if version > 1 => Ok(Err(newer(version))),
+                // serde's own words for a field or an engine this build
+                // does not know; if they change, every such file reads as
+                // not a targets file again, as before, and
+                // `targets_for_a_newer_build_are_told_apart_and_never_read`
+                // fails.
+                Some(1)
+                    if error.to_string().starts_with("unknown field")
+                        || error.to_string().starts_with("unknown variant") =>
+                {
+                    Ok(Err(1))
+                }
+                _ => Err(invalid("invalid targets JSON")),
+            };
+        }
+    };
     if document.version != 1 || document.targets.is_empty() || document.targets.len() > 8 {
         return Err(invalid("targets requires version 1 and 1..8 aliases"));
     }
@@ -213,7 +259,7 @@ pub fn read_targets(path: &Path) -> io::Result<BTreeMap<String, Target>> {
             .validate()
             .map_err(|_| invalid("invalid configured target"))?;
     }
-    Ok(document.targets)
+    Ok(Ok(document.targets))
 }
 
 /// Harness's own `wait`, held beside the adapter's one lane (`serve
@@ -440,6 +486,9 @@ fn bind(path: &Path) -> io::Result<(UnixListener, Binding)> {
     ))
 }
 
+/// How often the owner looks again for a store kept aside (#1505).
+const LOOK_ASIDE_EVERY: Duration = Duration::from_secs(60);
+
 fn owner<C: Clock>(
     mut engine: Engine<Store>,
     clock: C,
@@ -458,7 +507,13 @@ fn owner<C: Clock>(
     let mut tracker = progress.then(|| Tracker::started(unix_ms()));
     let mut status: Option<(u64, Arc<TaskStatus>)> = None;
     let mut status_began = Instant::now();
+    // A store kept aside is looked for again once a minute (#1505).
+    let mut looked_aside = Instant::now();
     while !stop.load(Ordering::Acquire) {
+        if looked_aside.elapsed() >= LOOK_ASIDE_EVERY {
+            engine.look_aside();
+            looked_aside = Instant::now();
+        }
         // Something that may have changed which tasks are watched.
         let mut moved = false;
         if waits.lane.is_some() {
@@ -1029,6 +1084,9 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     )
     .map_err(io::Error::other)?;
     engine.close_told(config.close_told);
+    if let Some(version) = config.targets_newer {
+        engine.targets_newer(version);
+    }
     let adapter = make_adapter(engine.store_id())?;
     let lane = if config.push_wait {
         let lane = adapter.wait_lane();
@@ -1183,17 +1241,35 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 // The newest hand-over did not reach Harness: with no
                 // internet, every one fails while the store is well (#830).
                 let handover_failed = report.summary["last_handover"] == "failed";
+                // Targets for a newer build, and a store kept aside: the
+                // part runs, and says so until someone looks (#1505).
+                let targets_newer = report.summary["targets_newer"].as_u64();
+                let set_aside = report.summary["set_aside"].as_str().map(str::to_owned);
                 let level = if !ready {
                     Level::Error
-                } else if errors > 0 || handover_failed {
+                } else if errors > 0
+                    || targets_newer.is_some()
+                    || set_aside.is_some()
+                    || handover_failed
+                {
                     Level::Warn
                 } else {
                     Level::Ok
                 };
+                let newer_message = targets_newer.map(|version| match version {
+                    // Version 1 with a field or an engine this build does
+                    // not know: a newer build's, or a hand-made typo.
+                    1 => "The task targets have a field or an engine this build doesn't know (from a newer build, or mistyped); hand-overs are off until they match this build".to_owned(),
+                    version => format!("The task targets were written for a newer build (version {version}); hand-overs are off until they match this build"),
+                });
                 let message = if !ready {
                     "Tasks owner or CLI worker is unavailable"
                 } else if errors > 0 {
                     "Tasks has bus publication failures"
+                } else if let Some(message) = newer_message.as_deref() {
+                    message
+                } else if set_aside.is_some() {
+                    "Tasks set aside a store from a newer build; its tasks are not followed"
                 } else if handover_failed {
                     "Tasks could not hand the last task over"
                 } else {
@@ -1220,6 +1296,12 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     if let Some(count) = report.summary[field].as_u64() {
                         value = value.with(field, count);
                     }
+                }
+                if let Some(version) = targets_newer {
+                    value = value.with("targets_newer", version);
+                }
+                if let Some(name) = set_aside.as_deref() {
+                    value = value.with("set_aside", name);
                 }
                 // Only with `--progress`: without it the report is as it was.
                 if let Some(reads) = report.reads {
@@ -1498,6 +1580,48 @@ mod tests {
         assert!(read_targets(&path).is_err());
     }
 
+    /// #1505: targets written for a newer build, a `version` above 1 or a
+    /// field this build does not know (at the top or in a target), are
+    /// told apart from a file that is not a targets file: the part can run
+    /// with hand-overs off and say why. They are never read as targets.
+    #[test]
+    fn targets_for_a_newer_build_are_told_apart_and_never_read() {
+        let dir = root();
+        let path = dir.path().join("targets.json");
+        let target = targets()["targets"]["coding"].clone();
+        let mut later = target.clone();
+        later["read_only"] = json!(true);
+        for (value, newer) in [
+            (json!({"version":2,"targets":{"coding":target}}), 2),
+            (json!({"version":7,"targets":{}}), 7),
+            (
+                json!({"version":1,"targets":{"coding":target},"trusted":true}),
+                1,
+            ),
+            (json!({"version":1,"targets":{"coding":later}}), 1),
+            // An engine this build does not know (as `opencode` came).
+            (
+                json!({"version":1,"targets":{"coding":{"machine_id":"11111111111111111111111111111111","project":"project","engine":"a_later_engine"}}}),
+                1,
+            ),
+        ] {
+            write_targets(&path, &value);
+            assert_eq!(read_targets_or_newer(&path).unwrap(), Err(newer), "{value}");
+            assert!(read_targets(&path).is_err(), "{value}");
+        }
+        for value in [
+            json!({"targets":{"coding":target}}),
+            json!({"version":"1","targets":{}}),
+            json!({"version":1,"targets":{}}),
+            json!({"version":1,"targets":{"bad alias":target}}),
+        ] {
+            write_targets(&path, &value);
+            assert!(read_targets_or_newer(&path).is_err(), "{value}");
+        }
+        write_targets(&path, &targets());
+        assert_eq!(read_targets_or_newer(&path).unwrap().unwrap().len(), 1);
+    }
+
     #[test]
     fn configuration_never_silently_selects_the_last_duplicate_alias() {
         let dir = root();
@@ -1581,6 +1705,7 @@ mod tests {
             progress: false,
             push_wait: false,
             close_told: false,
+            targets_newer: None,
         };
         serve_with_adapter::<_, Never>(config, Never, Arc::new(AtomicBool::new(false)), |_| {
             panic!("adapter configured while disabled")

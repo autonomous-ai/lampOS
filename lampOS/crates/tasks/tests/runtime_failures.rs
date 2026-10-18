@@ -57,6 +57,7 @@ fn config(root: &Path) -> Config {
         progress: false,
         push_wait: false,
         close_told: false,
+        targets_newer: None,
     }
 }
 

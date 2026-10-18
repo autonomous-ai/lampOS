@@ -1,10 +1,11 @@
 use lamp_bus::Bus;
-use lamp_msgs::{AgentState, Diagnostic, Sign, TaskStatus};
+use lamp_msgs::{AgentState, Diagnostic, Level, Sign, TaskStatus};
 use lamp_tasks::{
     engine::{Clock as Sample, WATCH_EARLY_MS},
     harness::{Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, Observation, Target},
     progress::SETTLED_FOR_MS,
     runtime::{Adapter, Clock, Config, WaitLane, request, serve_with_adapter},
+    store::Store,
 };
 use serde_json::{Value, json};
 use std::{
@@ -212,6 +213,7 @@ impl Running {
             progress,
             push_wait: false,
             close_told,
+            targets_newer: None,
         };
         let mut running = Self {
             root,
@@ -1108,4 +1110,100 @@ fn without_push_wait_no_wait_is_held() {
     });
     thread::sleep(Duration::from_millis(100));
     assert!(s.counts.waits.lock().unwrap().is_empty());
+}
+
+/// The newest `tasks` diagnostic.
+fn tasks_diagnostic(s: &Running) -> Diagnostic {
+    let bus = Bus::new(&s.config.bus_root).unwrap();
+    let mut diagnostic = bus
+        .subscribe_typed(Diagnostic::TOPIC, "tasks_test", Diagnostic::TYPE)
+        .unwrap();
+    let start = Instant::now();
+    loop {
+        if let Some(message) = diagnostic.recv(Duration::from_secs(3)).unwrap() {
+            let report: Diagnostic = message.parse().unwrap();
+            if report.name == "tasks" {
+                return report;
+            }
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "no tasks diagnostic"
+        );
+    }
+}
+
+/// #1505: task targets written for a newer build (a `version` above this
+/// build's, or a field it does not know) keep the part running with
+/// hand-overs off. A task offered is refused with why and never reaches
+/// Harness, and the part says so every second, where a stopped part would
+/// say nothing.
+#[test]
+fn targets_for_a_newer_build_keep_the_part_running_with_hand_overs_off() {
+    let mut s = Running::new(false);
+    s.stop();
+    s.config.targets = BTreeMap::new();
+    s.config.targets_newer = Some(2);
+    s.start();
+    let refused = s.ask(
+        json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":"coding"}),
+    );
+    assert_eq!(refused["ok"], false, "{refused}");
+    assert_eq!(refused["error"], "targets_newer", "{refused}");
+    assert_eq!(s.status()["summary"]["retained"], 0);
+    assert_eq!(s.counts.launches.load(Ordering::SeqCst), 0);
+    let report = tasks_diagnostic(&s);
+    assert_eq!(report.level, Level::Warn);
+    assert_eq!(
+        report.message,
+        "The task targets were written for a newer build (version 2); hand-overs are off until they match this build"
+    );
+    assert!(
+        report
+            .values
+            .iter()
+            .any(|pair| pair.key == "targets_newer" && pair.value == "2")
+    );
+}
+
+/// #1505: a store a newer build wrote is set aside, and until someone looks
+/// (the kept file removed, or put back by hand), the part says so: across a
+/// restart too, and not once it is gone.
+#[test]
+fn a_store_set_aside_is_said_until_its_file_is_gone() {
+    let mut s = Running::new(false);
+    s.stop();
+    let mut store = Store::open(&s.config.dir).unwrap();
+    let mut newer: Value = serde_json::from_slice(&store.load().unwrap().unwrap()).unwrap();
+    newer["schema"] = json!(2);
+    store.commit(&serde_json::to_vec(&newer).unwrap()).unwrap();
+    drop(store);
+    s.start();
+    let said = |s: &Running| {
+        let report = tasks_diagnostic(s);
+        let kept = report
+            .values
+            .iter()
+            .find(|pair| pair.key == "set_aside")
+            .map(|pair| pair.value.clone());
+        (report.level, report.message, kept)
+    };
+    let (level, message, kept) = said(&s);
+    assert_eq!(level, Level::Warn);
+    assert_eq!(
+        message,
+        "Tasks set aside a store from a newer build; its tasks are not followed"
+    );
+    let kept = kept.expect("the kept file is named");
+    assert!(kept.starts_with("tasks.sqlite3.newer-2-"), "{kept}");
+    // Restarted: the store opens well now, and the kept file is still said.
+    s.stop();
+    s.start();
+    assert_eq!(said(&s).2.as_deref(), Some(kept.as_str()));
+    // Someone looked: the file is gone, and it is said no more.
+    s.stop();
+    std::fs::remove_file(s.config.dir.join(&kept)).unwrap();
+    s.start();
+    let (level, message, kept) = said(&s);
+    assert_eq!((level, message.as_str(), kept), (Level::Ok, "", None));
 }

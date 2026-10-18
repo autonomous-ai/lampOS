@@ -1,4 +1,4 @@
-use lamp_tasks::runtime::{Config, SystemClock, read_targets, request, serve};
+use lamp_tasks::runtime::{Config, SystemClock, read_targets_or_newer, request, serve};
 use std::{
     io::{self, Read},
     path::PathBuf,
@@ -108,18 +108,32 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         );
         return Ok(());
     }
+    // Targets written for a newer build: the part runs with hand-overs off
+    // and says so, rather than stopping and saying nothing (#1505).
+    let (targets, targets_newer) = match read_targets_or_newer(
+        &targets.ok_or("--targets is required")?,
+    )? {
+        Ok(targets) => (targets, None),
+        Err(version) => {
+            eprintln!(
+                "tasks: the task targets were written for a newer build or mistyped (version {version}); hand-overs are off until they match this build"
+            );
+            (Default::default(), Some(version))
+        }
+    };
     let config = Config {
         enabled,
         dir: dir.ok_or("--dir is required")?,
         socket: socket.ok_or("--socket is required")?,
         voice_socket: voice_socket.ok_or("--voice-socket is required")?,
         bus_root,
-        targets: read_targets(&targets.ok_or("--targets is required")?)?,
+        targets,
         run_for,
         watch,
         progress,
         push_wait,
         close_told,
+        targets_newer,
     };
     let clock = SystemClock::new(boot_id.as_deref())?;
     let executable = executable.ok_or("--harness is required")?;

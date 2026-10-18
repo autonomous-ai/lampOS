@@ -112,6 +112,7 @@ impl Place {
             progress: false,
             push_wait: false,
             close_told: true,
+            targets_newer: None,
         };
         let mut place = Self {
             root,
