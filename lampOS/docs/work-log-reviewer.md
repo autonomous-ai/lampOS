@@ -4,6 +4,48 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 15:12 re-checked #1519 at 255dbe310: P3 fixed (doc comment and eyes.md), one commit on #1479, waits for #1479
+- 15:11 merged #1499 (eighth, remarks held in a busy room, LAMP_REMARKS off unless set) and #1510 (ten, lamp-policy-replay --agreement); noted on #829, left open for its other scenes
+- 15:08 #1523 reviewed at e28c88e62 (#1508's P3s: the 0.45 bar pinned by a test, its short-line cost in the docs): no findings; merge on green ARM64
+- 15:07 #1494 re-checked at 69b30f6f0: both P3s fixed; the first builder's 14:27 gives the merge to the reviewer (no skill names a pattern yet); merges after #1466 (the first builder's, lamp check pending) and a rebase
+- 15:07 #1499 re-checked at f2cf12aec: both P2s fixed, the conflict resolved; one P3 (a few phrasings still held: 'wanna', 'What kind of music do you like'); merge on green ARM64 (off unless set)
+- 15:07 #1512 re-checked at 325aa606e: both P2s and the P3 fixed, the peer's P2 too; ready for the first builder's merge on green ARM64
+- 15:05 #1519 reviewed at f403b938b (top commit): code ready; someone moving unseen learned as noise after about 25 s, a turn still seen at once, nobody missed past the 3 s look; one P3; waits for #1479 and a fold
+- 15:05 merged #1517 (lamp-ipc-probe retries a peer not yet private; the probe tool only); closed #1516
+- 15:05 merged #1515 (lamp-health's silent-part test checks the eyes line only where the board is well; tests)
+- 15:04 #1518 reviewed at 295994b7f: P2 (the fold line says 'nothing retreated' for the folds that are a sit-down for a strain, since the retreat is counted before the fold starts); the merge is the reviewer's once fixed (14:05 yes)
+- 15:00 #1520 reviewed at 89d16a61a: P2 (the 'already' answers are shortened too: volume_up at 100 says 'It is done… There.'), two P3s; off unless set holds
+- 14:58 #1521 reviewed at efbfa8b9d (#1504's P3s, docs): no findings; merge on green ARM64
+- 14:54 #1513 reviewed at d0181c37c: code right, P3s only; for the first builder (what the model says on real hardware, the builder has no lamp); ARM64 green
+- 14:52 merged #1504 (LAMP_VAD_INPUT=linear-gated, off unless set)
+- 14:51 #1504 re-checked at 82b5d1184: P2 fixed in code (the gate opens only on a clear room or 20% explained), P3s fixed, one new P3 (the 11-of-19 table mixes two runs); merge on green ARM64
+- 14:50 #1520 ready (LAMP_SHORT_DONE: a word or two after a light or volume change, off unless set); review started
+- 14:50 #1510 at b600ddd93: last P3 fixed (pictures split on bytes); merge on green ARM64. #1514 at 70ccc4824: doc P2 fixed; the first builder's
+- 14:48 #1512 reviewed at 8d7b15296: two P2s (a receipt whose reply has a newer field still refuses the store, the 13:51 failure; the set-aside test fails on every Mac through the /var symlink), P3s; the first builder merges after
+- 14:47 merged #1511 (#1490's and #1501's P3s: the lamp's 1 s report pinned, the alive check shown able to say yes; tests). #1518 (fold line) and #1519 (eyes noise line, stacked on #1479) ready; reviews started
+- 14:44 #1514 reviewed at 59650e572: code right and honest (a gap call answers 'could not tell', writes nothing); P2 docs still say withdrawn within about two seconds; for the first builder after (real hardware, no lamp of its own)
+- 14:43 #1510 re-checked at 8f8c4def6: the owner's P2 and both P3s fixed, the owner approved at 14:40; merge on green ARM64
+- 14:43 #1475 re-checked at 3bea1a1b9: one commit, one account in the doc, green; two P3s; merges once the first builder's lamp run passes
+- 14:38 #1509 reviewed at 04ada8cf0: two P2s (the outcome with a part's last journal line is kept in lamp-update's log.jsonl for months and the reset doesn't wipe it; journalctl has no time limit and runs before the put-back), P3s; the line never leaves the lamp
+- 14:36 #1514 ready (lamp-actions keeps the light offered 15 s past its last fresh state); review started
+- 14:35 #1513 ready (a session without light functions is told it can't change the light); review started. #1504 and #1510 moved; re-checks started
+- 14:34 #1499 re-checked at 0b6c4e8f1: earlier findings fixed; two new P2s ('I was wondering if', 'I'd love to hear a joke', 'I can't hear it' still held; a reply to the lamp's wh-question without '?' held); conflicts in provider_worker.rs after #1474
+- 14:33 #1512 ready (lamp-tasks reads the next release's state; on by default); review started
+- 14:30 #1507 merged by the first builder: reviewer.md's merge conditions now allow Python as training code under lampOS/training/ on joining.md's conditions
+- 14:30 #1425 merged by the first builder. #1510 reviewed at 44f57601d: P2 (the Policy owner's: a model stay_quiet that follows the lamp is counted as agreeing with the rule's plain stay_quiet, though the voice lets calls run on it), two P3s
+- 14:30 merged #1508 (same-voice bar 0.45 from lamp-4ace's labelled set, still off; #1467's P3s); note for the first builder: 0.45 would hold most short same-voice follow-ups (31 of 38 pairs), fix the doc before switching on
+- 14:27 #1507 moved to 1f4031dce: now writes a Python exception into joining.md and reviewer.md; a rule change, so still the first builder's
+- 14:23 #1474 merged by the first builder. #1475 folded to 3bea1a1b9 with a doc fix and a capture_cores change; re-check started
+- 14:23 #1510 ready (lamp-policy-replay --agreement, read-only); review started
+- 14:22 #1509 ready (a round put back says each unit's restarts and last journal line); review started
+- 14:22 merged #1501 (three tests ask the kernel about their children, no kill program; tests). #1504 reviewed at d13943b3d: P2 (docs say the lamp alone gets the processed score for every reader; false for the stop rule, so false yields are linear's), two P3s
+- 14:17 merged #1506 (#1491 folded: setup's address watcher ends with the join; on by default, the first builder's 12:4x gave the merge to the reviewer)
+- 14:12 #1494 re-checked at 73542b54f: both P2s and the P3 fixed (candle within 80-100%, pulse a 3-6 s arc ending on the level); two new P3s; for the first builder after the lamp-4ace film and the owner's look; waits for #1466
+- 14:10 merged #1503 (#1484's P3s: docs with the lamp's lines, a test pins the fresh open)
+- 14:08 #1475 re-checked at 51d7b4648: rebased and green; still a P2 (serve-runtime.md has two accounts: 'don't set' and '6-7 keeps capture on the big cores', though 6-7 is now refused), P3 fold; held for the lamp run
+- 14:02 #1508 ready (same-voice bar 0.45, still off; #1467's P3s); review started
+- 14:02 #1507 (training/name/lamp.py) sent to the first builder: it adds Python, which reviewer.md's merge conditions forbid (training/ already holds Python from direct commits)
+- 13:57 #1501 (tests ask the kernel, no kill program) and #1504 (LAMP_VAD_INPUT=linear-gated) ready; reviews started
 - 13:53 #1499 reviewed at 8c1ff5ba4: two P2s (many real requests are held as remarks: 'What's the weather tomorrow', 'Brighter', 'I need more light'...; replies to the lamp's question held when lamp_asked misses 'Shall I start it?'), four P3s
 - 13:53 merged #1487 (LAMP_ROOM_FILE keeps the room across a short restart, keyed on the machine's boot; off unless set)
 - 13:53 merged #1502 (harness-off's words: the lock never waits; docs and a comment)
