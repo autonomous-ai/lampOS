@@ -1603,10 +1603,10 @@ impl Attention {
         self.lamp_asked
     }
 
-    /// Whether what was heard of the request in hand asks something
-    /// ([`crate::remarks::asks`]).
-    pub fn asks_something(&self) -> bool {
-        crate::remarks::asks(&self.heard)
+    /// Whether what was heard of the request in hand is a question
+    /// ([`crate::remarks::questions`]).
+    pub fn asks_a_question(&self) -> bool {
+        crate::remarks::questions(&self.heard)
     }
 }
 

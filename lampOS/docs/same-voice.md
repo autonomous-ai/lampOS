@@ -287,25 +287,40 @@ speakers, both judged right.)
       how long would that take by train?" was held.
     - Now, when lines held as another voice are all that ended the
       conversation since the lamp last spoke (`RoomTold::ended_only_by_another_voice`),
-      a line that asks something (`remarks::asks`) in the conversation's
-      own voice (likeness at or over the bar) goes on with it. The journal
+      a **question** in the conversation's own voice (likeness at or over
+      the bar) goes on with it. A question here (`remarks::questions`, the
+      first builder's ruling on #1636) is a `?`, a sentence that begins
+      with a question word or a helping verb (after one "and", "so", "but"
+      or "then" at most), or the lamp's name. The journal
       says `the conversation's voice (cosine …), a question after another
-      voice's line: the conversation goes on`.
+      voice's line: the conversation goes on`. Not `remarks::asks`, which
+      takes any "you", "please", "thanks" or a doing word, all common in
+      talk to another person (the reviewer on #1636).
     - **Still held:**
       - a statement in that voice: the caller's talk to the other person,
-        scene 1's "Yes, and we should leave a bit early.";
-      - any line after talk left unanswered: #1030's 06:07 scene, where
-        Daniel's "But the client wants to meet in person." ends it by talk
-        before his "budget" question;
-      - another voice's next line, which is compared with the
-        conversation's prints and held.
+        scene 1's "Yes, and we should leave a bit early.", "Yes, and you
+        should bring yours too.", "Okay, let's leave a bit early then.",
+        "Thanks, I'll take the car.". It is talk past the lamp, so it ends
+        the conversation for every voice (`RoomTold::own_voice_talked`;
+        the journal says `… no question after another voice's line: talk
+        past the lamp`), whether the model would have answered it or not;
+      - any line after that or after talk left unanswered: #1030's 06:07
+        scene, where Daniel's "But the client wants to meet in person."
+        ends it before his "budget" question;
+      - another voice's lines, compared with the conversation's prints:
+        her own question right after "Pepper" ("Do you like that name?")
+        is held;
+      - a question whose print is not back at its verdict, which says
+        `judged without the voice check: …`.
     - **Its cost:** the caller asking the other person a question right
       after her line ("Do you really like Pepper?") is answered (the
       first builder's yes, 19 October, 02:10).
     - **Tests:**
       `spoken_to::with_a_voice_check_a_question_in_the_conversations_voice_goes_on_after_another_voices_line`
-      (scene 5 and her line after it; scene 4; the statement held), with
-      #1030's `…_a_line_held_as_another_voice_counts_as_talk` unchanged;
+      (scene 5 with her question and her line after it; scene 4; four
+      statements held; #1030's scene with the model answering Daniel's
+      statement), with #1030's `…_a_line_held_as_another_voice_counts_as_talk`
+      unchanged; `remarks::question_tests::a_question_is_a_question_mark_or_a_question_word_first`;
       `room_told::tests::a_conversation_is_over_only_by_another_voice_until_talk_or_the_lamp`.
   - **Off the lamp, on the battery's lines** (made with `say` in its two
     voices, 16 kHz, the real model, `lamp-same-voice pairs`): against

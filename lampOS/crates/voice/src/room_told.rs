@@ -457,6 +457,16 @@ impl RoomTold {
         self.talked_past_the_lamp() && self.other_voice_only
     }
 
+    /// A line in the conversation's own voice that is no question was said
+    /// after another voice's line: talk past the lamp, which ends the
+    /// conversation for every voice, as talk left unanswered does, though
+    /// the lamp's rule held it rather than leaving it to the model (the
+    /// reviewer on #1636: Daniel's "But the client wants to meet in
+    /// person.", held, had left his "budget" question to go on).
+    pub fn own_voice_talked(&mut self) {
+        self.other_voice_only = false;
+    }
+
     /// `request` ended with the lamp saying nothing. Whether it counts as
     /// something said that the lamp left alone: a sound does not.
     pub fn unanswered(&mut self, request: u64, now_us: u64) -> bool {

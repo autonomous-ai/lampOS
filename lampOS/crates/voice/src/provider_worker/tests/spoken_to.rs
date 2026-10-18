@@ -990,14 +990,16 @@ async fn with_the_switch_and_a_voice_check_a_line_held_as_another_voice_counts_a
 /// "Lamp," not heard as the name) and "And which of those names is more
 /// popular?". So was scene 4's "And how long would that take by train?"
 /// after a television's line. A question in the conversation's own voice
-/// now goes on with it after only another voice's line, and her next line
-/// is still held. A statement in his voice there is still his talk to her
-/// (the reviewer on #1030, and `RoomTold::another_voice_held`).
+/// now goes on with it after only another voice's line; her own question
+/// there, and her line after the lamp's answer, are still held. A statement
+/// in his voice there is his talk to her, which ends the conversation, so
+/// his question after it is held too, whether or not the model answered
+/// the statement (the reviewer on #1030 and on #1636).
 #[tokio::test(start_paused = true)]
 async fn with_a_voice_check_a_question_in_the_conversations_voice_goes_on_after_another_voices_line()
  {
     let _clock = logical_clock();
-    let scene = |lines: &'static [(i16, &'static str)]| async move {
+    let scene = |lines: Vec<(i16, &'static str)>| async move {
         let _mark = OwnMark::kept();
         let _room = OwnRoom::fresh();
         let mut options = options(true, attention_now, crate::tools::Settings::default());
@@ -1020,46 +1022,81 @@ async fn with_a_voice_check_a_question_in_the_conversations_voice_goes_on_after_
         );
         let mut dial = rig.ready().await;
         let mut played = Vec::new();
-        for &(voice, text) in lines {
+        for (voice, text) in lines {
             played.push(voice_line(&mut rig, &mut dial, false, voice, 150, text, true).await);
         }
         rig.stop().await;
         played
     };
-    // Scene 5, and her line after the lamp's answer.
+    const DANIEL: i16 = 1;
+    const SAMANTHA: i16 = -1;
+    // Scene 5, her own question after "Pepper", and her line after the
+    // lamp's answer.
     assert_eq!(
-        scene(&[
-            (1, "Hey Lamp, what is a good name for a small grey cat?"),
-            (-1, "I think we should call her Pepper, she looks like one."),
-            (1, "What about a name for a black kitten then?"),
-            (1, "And which of those names is more popular?"),
-            (-1, "I still like Pepper better."),
+        scene(vec![
+            (
+                DANIEL,
+                "Hey Lamp, what is a good name for a small grey cat?"
+            ),
+            (
+                SAMANTHA,
+                "I think we should call her Pepper, she looks like one."
+            ),
+            (SAMANTHA, "Do you like that name?"),
+            (DANIEL, "What about a name for a black kitten then?"),
+            (DANIEL, "And which of those names is more popular?"),
+            (SAMANTHA, "I still like Pepper better."),
         ])
         .await,
-        [true, false, true, true, false]
+        [true, false, false, true, true, false]
     );
     // Scene 4: a television's line, then his question.
     assert_eq!(
-        scene(&[
-            (1, "Hey Lamp, how far is it from Hanoi to Da Nang?"),
+        scene(vec![
+            (DANIEL, "Hey Lamp, how far is it from Hanoi to Da Nang?"),
             (
-                -1,
+                SAMANTHA,
                 "In other news, heavy rain is expected across the north this weekend."
             ),
-            (1, "And how long would that take by train?"),
+            (DANIEL, "And how long would that take by train?"),
         ])
         .await,
         [true, false, true]
     );
-    // A statement in his voice after her line is his talk to her.
+    // A statement in his voice after her line is his talk to her, whatever
+    // "you", "let's" or "thanks" is in it.
+    for statement in [
+        "Yes, and we should leave a bit early.",
+        "Yes, and you should bring yours too.",
+        "Okay, let's leave a bit early then.",
+        "Thanks, I'll take the car.",
+    ] {
+        assert_eq!(
+            scene(vec![
+                (DANIEL, "Hey Lamp, what is the weather like in Hanoi today?"),
+                (SAMANTHA, "I should bring an umbrella then."),
+                (DANIEL, statement),
+            ])
+            .await,
+            [true, false, false],
+            "{statement}"
+        );
+    }
+    // #1030's 06:07 scene with the model answering Daniel's statement: held
+    // by the rule, it still ends the conversation, and his "budget"
+    // question after it is held.
     assert_eq!(
-        scene(&[
-            (1, "Hey Lamp, what is the weather like in Hanoi today?"),
-            (-1, "I should bring an umbrella then."),
-            (1, "Yes, and we should leave a bit early."),
+        scene(vec![
+            (
+                DANIEL,
+                "Hey Lamp, how much is one hundred dollars in euros?"
+            ),
+            (SAMANTHA, "Anyway, if we drop the trip we save almost half."),
+            (DANIEL, "But the client wants to meet in person."),
+            (DANIEL, "Did you get my message about the budget?"),
         ])
         .await,
-        [true, false, false]
+        [true, false, false, false]
     );
 }
 

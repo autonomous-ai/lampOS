@@ -2311,13 +2311,16 @@ async fn serve_with_visual<C: Connect>(
                             // talk left unanswered, and not a statement: the
                             // caller's talk to the other person is still
                             // theirs (the reviewer on #1030).
-                            let own_voice_may_go_on = !going_on
+                            // Judged for its voice after another voice's line
+                            // too: a question in the conversation's voice goes
+                            // on, and a statement in it is talk past the lamp
+                            // (the reviewer on #1636).
+                            let under_the_mark = !going_on
                                 && intake.handoff.voices.is_some()
-                                && attention.asks_something()
                                 && crate::room_told::room().lock().is_ok_and(|room| room.ended_only_by_another_voice())
                                 && crate::thread::THREAD.lock().is_ok_and(|thread| thread.going_on(Instant::now()));
                             let judged = intake.handoff.voices.as_mut().filter(|_| attention.awaits_verdict(request)).map(|voices| {
-                                voices.at_verdict(request, going_on || own_voice_may_go_on, attention.called_for_itself())
+                                voices.at_verdict(request, going_on || under_the_mark, attention.called_for_itself())
                             });
                             let late_other = judged.and_then(|at| at.late_other);
                             if let Some(late) = late_other {
@@ -2332,7 +2335,7 @@ async fn serve_with_visual<C: Connect>(
                             // the check for want of a print: said, never
                             // silently again (#829, lamp-4ace on 18 October,
                             // requests 18 and 19; the reviewer on #1435).
-                            if let Some(why) = judged.and_then(|at| at.unjudged).filter(|_| late_other.is_none() && going_on)
+                            if let Some(why) = judged.and_then(|at| at.unjudged).filter(|_| late_other.is_none() && (going_on || under_the_mark))
                                 && let Some(voices) = intake.handoff.voices.as_ref()
                             {
                                 voices.judged_without(request, why);
@@ -2344,9 +2347,16 @@ async fn serve_with_visual<C: Connect>(
                                     other_voice = true;
                                     false
                                 }
-                                Some(likeness) if own_voice_may_go_on => {
+                                Some(likeness) if under_the_mark && attention.asks_a_question() => {
                                     eprintln!("lamp-voice provider: request {request}: the conversation's voice (cosine {likeness:.2}), a question after another voice's line: the conversation goes on");
                                     true
+                                }
+                                Some(likeness) if under_the_mark => {
+                                    eprintln!("lamp-voice provider: request {request}: the conversation's voice (cosine {likeness:.2}), no question after another voice's line: talk past the lamp, and the conversation is over");
+                                    if let Ok(mut told) = crate::room_told::room().lock() {
+                                        told.own_voice_talked();
+                                    }
+                                    false
                                 }
                                 Some(likeness) => {
                                     eprintln!("lamp-voice provider: request {request}: the conversation's voice (cosine {likeness:.2})");

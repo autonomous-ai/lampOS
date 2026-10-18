@@ -201,6 +201,59 @@ pub fn asks(heard: &str) -> bool {
     })
 }
 
+/// Whether a line is a question, or names the lamp: a `?`, a sentence that
+/// begins with a question word or a helping verb (after one "and", "so",
+/// "but" or "then" at most: "And how long would that take by train" with no
+/// `?`), or the lamp's name. Narrower than [`asks`]: "you", "please",
+/// "thanks" or a word that tells someone to do something make no question
+/// here (the reviewer and the first builder on #1636: "Thanks, I'll take the
+/// car.", said to another person, asks nothing of the lamp).
+pub fn questions(heard: &str) -> bool {
+    const ONE_BEFORE: [&str; 4] = ["and", "so", "but", "then"];
+    heard.contains('?')
+        || words(heard).any(|word| word == "lamp")
+        || heard.split(['.', '!', ';']).any(|sentence| {
+            let mut sentence = words(sentence);
+            match sentence.next() {
+                Some(first) if ONE_BEFORE.contains(&first.as_str()) => sentence
+                    .next()
+                    .is_some_and(|second| QUESTION_WORDS.contains(&second.as_str())),
+                Some(first) => QUESTION_WORDS.contains(&first.as_str()),
+                None => false,
+            }
+        })
+}
+
+#[cfg(test)]
+mod question_tests {
+    /// The reviewer on #1636: a question, not a line with "you" or a word
+    /// that tells someone to do something.
+    #[test]
+    fn a_question_is_a_question_mark_or_a_question_word_first() {
+        for question in [
+            "What about a name for a black kitten then?",
+            "And how long would that take by train?",
+            "and what about tomorrow",
+            "so which one is cheaper",
+            "Lamp, the black kitten",
+            "Do you like that name?",
+        ] {
+            assert!(super::questions(question), "{question}");
+        }
+        for statement in [
+            "Yes, and you should bring yours too.",
+            "Okay, let's leave a bit early then.",
+            "Thanks, I'll take the car.",
+            "Yes, and we should leave a bit early.",
+            "But the client wants to meet in person.",
+            "Remember that my favourite colour is green.",
+            "Okay, so what now",
+        ] {
+            assert!(!super::questions(statement), "{statement}");
+        }
+    }
+}
+
 /// Whether a line is a remark to the room: English as its letters show; past
 /// its leading words it begins with a person who does something, has
 /// [`REMARK_WORDS`] words or more and wants nothing ([`WANTS`]); and it
