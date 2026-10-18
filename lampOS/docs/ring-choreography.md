@@ -444,7 +444,16 @@ Whoever asks never writes the ring: the actions program publishes the
 light wanted and reads the state back ([actions.md](actions.md)). A bus
 that cannot be used is said once in the voice's log and the ring runs as
 it did, in its first light. The light is kept by the bus, which lives in
-memory: after the board restarts the lamp is back in its first light.
+memory: after the board restarts the lamp is back in its first light,
+unless `LAMP_LIGHT_KEEP=on` (#1464). Then the ring also keeps the person's
+light in `/var/lib/lampOS/light/person.json`, written when it changes
+(whole, beside it and renamed; at most once a second, the last change of
+a burst written a second after the one before), and begins with it after
+a restart when the bus has none: a light asked for since always comes
+first, and a file that is not a light there is is passed over for the
+first light. Only the person's light is kept, never a test's colour, a
+request or a turn's face. A write that fails is said once and tried
+again each second. The reset wipes the file.
 
 **On lamp-4ace, 2026-10-14, about 03:00, nobody in the office.** Called
 directly on the actions program's socket, each change was answered in 15
@@ -470,7 +479,8 @@ request the lamp has acted on ([tools.md](tools.md)).
 Not shown: a person asking. How the levels look to someone in the room,
 and whether level 5 is a useful light under a ceiling of 24, a camera
 cannot say: it saturates on the ring. The light is not restored after the
-board restarts.
+board restarts, unless `LAMP_LIGHT_KEEP=on` (above; not yet seen on a
+lamp).
 
 Seen through the office iMac's camera on lamp-4ace on 2026-10-12 with a
 ceiling of 40: across eight stills of the resting face the dark centre of
