@@ -35,6 +35,11 @@ impl Hearings {
         }
     }
 
+    /// Whether a hearing is going on.
+    pub fn is_open(&self) -> bool {
+        self.open.is_some()
+    }
+
     /// The first sign of a hearing that has just begun, once: the score it
     /// began with, and how long ago it reached the bar. Nothing when no
     /// hearing is open or its first sign has been said.
@@ -145,7 +150,9 @@ mod tests {
         assert_eq!(hearings.score(0.2, start), None);
         assert_eq!(hearings.rising(start), None);
         let opened = start + ms(80);
+        assert!(!hearings.is_open());
         assert_eq!(hearings.score(0.93, opened), None);
+        assert!(hearings.is_open());
         let first = hearings.rising(opened).unwrap();
         assert_eq!((first.score, first.ago_ms), (0.93, 0));
         assert_eq!(hearings.rising(opened + ms(80)), None);
@@ -156,6 +163,7 @@ mod tests {
         assert_eq!((said.score, said.ago_ms), (1.0, 480));
         // Held off for a second, then a new hearing has its own first sign.
         assert_eq!(hearings.score(0.95, opened + ms(800)), None);
+        assert!(!hearings.is_open(), "a score held off opens nothing");
         assert_eq!(hearings.rising(opened + ms(800)), None);
         let again = opened + ms(1_600);
         assert_eq!(hearings.score(0.95, again), None);
