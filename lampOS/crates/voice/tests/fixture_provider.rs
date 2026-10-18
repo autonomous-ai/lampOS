@@ -719,6 +719,17 @@ fn real_fixture_worker_exchanges_exact_pcm_and_stops_without_devices_or_cloud() 
     let private = Private::new();
     let (wav, hash, expected) = private.wave(24_000, 1, 2500);
     let dir = SessionDirectory::create().unwrap();
+    // On macOS the first run of `lamp-voice` from this test took 0.7 to
+    // 0.95 s under `cargo test` before the binary ran at all, and a fresh
+    // copy's first run took 0.7 to 1.9 s while the Mac built, once 4.7 s:
+    // past the worker's 3 s start (`WORKER_STARTUP_TIMEOUT`). A later run
+    // takes 10 to 20 ms. So it is run once before the worker's start is
+    // timed, as an unknown command, which it refuses (`process.rs`). Its
+    // exit is not this test's (#1569 row 23).
+    let _ = std::process::Command::new(env!("CARGO_BIN_EXE_lamp-voice"))
+        .args(["third", "/nonexistent"])
+        .env_clear()
+        .output();
     let mut worker = Worker::spawn(
         Path::new(env!("CARGO_BIN_EXE_lamp-voice")),
         &dir.path,
