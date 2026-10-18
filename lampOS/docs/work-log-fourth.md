@@ -4412,6 +4412,16 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **The same-voice check** stays off (the first builder, 11:0x): 14.3% equal error with the lamp quiet, chance with it sounding, over every recorded set.
 - **#1396:** the app's Lamp 2 page needs the backend's `lamp-v2` record first, since the page keys everything on the backend's numeric device type. The first builder says I build it (12:1x). Both repos' writes wait on my user's yes, asked again with the owner's words.
 
+## 2026-10-18, 14:06 ICT: #1482 merged; #1487's P1 fixed; #1467 merged early, so #1508; #1499 reviewed
+
+- **#1482 merged** (#1422 closed): every worker test rig holds the one lock on the process's conversation and room.
+- **#1487** (the room after a restart): the reviewer's P1 was right. I'd keyed the file on the session's `BootId`, new each session, so no room would ever have been taken back, and my tests passed because they used one fixed boot. Fixed at `f543270be` (pushed 13:19, before the first builder's 13:30 run): the machine's boot from `/proc/sys/kernel/random/boot_id`, nothing kept where it can't be read, and a test where two workers in one boot share the room. Also from the review: a room not yet known counts only 30 s of a restart's gap, and the census row moved.
+- **#1467 merged at 12:17**, a minute after the reviewer's "ready" with four P3s, as #1435 had. My answers and the first builder's 0.45 bar are **#1508**, from `lamp-voice`. At 13:40 I posted a comment saying they were pushed when the merge check had stopped the push; corrected at 13:41. The memory on pipelines now says: check the PR is open, join every step with `&&`, and check the push landed before writing about it.
+- **The bar** is 0.45, the labelled set's equal-error bar (7.5% at 0.455, 89 clips on lamp-4ace with the lamp quiet); 0.25 had let 43% of other voices pass. Still off.
+- **#1499** (Eighth's `LAMP_REMARKS`): my two conditions are met (no reliance on the `?`; plain-ASCII letters only). Peer review: approve, three P3s (a moved doc comment; after a restart the lamp's line keeps its start, not its end; the widened `lamp_asked` also reaches the short-sound arm, #926's rule and the record), and a rebase of `docs/attention.md`.
+- **Gate flakes today**, each passing 3 of 3 alone: `fixture_provider`'s worker startup (13:3x) and a reminders lease (`StaleOwner`, 13:5x), both on a loaded Mac.
+- **Waiting on my user:** writes to the app and backend repositories (the backend's `lamp-v2` record, then the app's Lamp 2 page).
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
