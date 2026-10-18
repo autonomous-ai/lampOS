@@ -4,6 +4,42 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 18:55 merged #1578 (ten, tests: lamp-policy's FOLLOWS_FROM pinned to the voice's), ARM64 green
+- 18:51 merged #1558 (el, people.json one release forward, set aside never dropped, the reset empties it; the first builder gave it to me at 17:02), ARM64 green, reset plans equal
+- 18:51 #1570 at f19651b03: plus a test helper waiting for the store lock after stop (a flaky runtime test); waits for ARM64
+- 18:50 merged #1470 (fifth, Face Mesh V2 inner lips for speaking, off unless given), folded, ARM64 green
+- 18:48 merged #1575 (fourth, #1568 folded: own zone from the /etc/localtime link, no top-level fixed zones), ARM64 green
+- 18:45 #1549 at f59cadd3a: one doc line (the new P3's byte count); still the first builder's merge after the lamp check
+- 18:45 #1570 at efe08c790: my P3 fixed (the receipt read as raw text, a duplicate inside it dropped, tested); waits for ARM64
+- 18:44 #1578 reviewed at 1b79e46b4 (ten, a test pins lamp-policy's FOLLOWS_FROM to the voice's), no findings; waits for ARM64
+- 18:34 #1573 reviewed at 933c22280 (thirteen, Waiting::closed names every case): code fine; asked to remove the attribution line from the PR body; waits for that and ARM64
+- 18:33 #1470 folded to 2f2cb6066 (tree equal to bc8278d8d); waits for ARM64
+- 18:31 merged #1564 (fifth, eyes-cost.sh, read-only), folded, ARM64 green
+- 18:31 #1570 reviewed at dc277fac7 (eighth, tasks state decoded from the bytes so a duplicate field is refused again): one P3; waits for ARM64
+- 18:29 #1575 is #1568 folded (tree equal to ea005887d); waits for ARM64
+- 18:28 re-checked #1549 at 055298f40: all four P3s fixed; ready for the first builder's merge after tonight's lamp check
+- 18:27 #1572 is #1408 refiled (same 95a71daa7, the body without a person's name); reviewed on #1408; waits for the first builder (Monday)
+- 18:26 re-checked #1470 at bc8278d8d: all four findings fixed (Speaking gains an optional from field; nothing else reads Speaking), ARM64 green; asked to fold the review fix-up
+- 18:24 #1568 at ea005887d: doc P3 fixed in two fix-up commits; asked to fold
+- 18:22 merged #1548 (el, a newer build's mute record reads as muted, said once; the first builder gave it to me at 17:02), folded, #1553's test flipped, ARM64 green
+- 18:21 closed #1249 after #1566
+- 18:21 reviewed and merged #1566 (tests, service_privacy_controls' stopping fixture waits for the child's exit; #1249's last case)
+- 18:21 re-checked #1558 at 20b05b358: bump rule in, P3s fixed; one P2 case open (forget misses a set-aside record whose name isn't plain text), two new P3s
+- 18:20 #1568 reviewed at 9e8278794 (fourth, #1552's P3s: own zone from the /etc/localtime link, no top-level fixed zones), one doc P3; still off unless set; waits for ARM64
+- 18:18 #1562 reviewed at 6c08532ac (second, schedule stores read one release forward): P1 (doesn't flip #1553's engine test, so lamp-voice's schedule tests go red on merge), P2 (a set-aside store's new store_id makes the ledger refuse every new reminder), two P3s; not ready
+- 18:18 reviewed and merged #1561 (tests, forward-read should_panic tests for five surround files; #1505)
+- 18:17 #1555 reviewed at 6296ff919 (sixth, stop.onnx and LAMP_STOP_HEARD, off): one P2 (a forced yield on a short Stop commits with no turn let in, so the reply plays on), P3s and a fold; not ready; conflicts with #1486 in lamp-name main.rs
+- 18:17 merged #1563 (fourth, LAMP_GOING_ON_ASKS, the folded #1538; the second half of #1522's fix), ARM64 green
+- 18:14 #1408 reviewed at 95a71daa7 (eighth, --close-told on in the product unit): change fine; for the first builder (product default); the body names a machine after a person, noted for the author
+- 18:11 merged #1565 (thirteen, owed only while the wait holds the mics closed; a mute past an hour tested; #1551's P3s), ARM64 green
+- 18:11 #1564 folded to cb3928d6b; waits for ARM64
+- 18:08 merged #1560 (ten, docs: faster-answers.md as measured), ARM64 green, five P3s left
+- 18:07 reviewed and merged #1556 (tests, forward-read should_panic tests for eyes, thread, settings, memory; #1505)
+- 18:04 #1548 rebased to ea9fae39a: one commit, #1553's mute test flipped to plain; waits for ARM64
+- 18:04 #1559 reviewed at e19dbd430 (second, the delivery ledger read one release forward): sound; P2: rebase and flip #1553's ledger test (conflicts in delivery_ledger.rs); four P3s
+- 18:03 #1557 reviewed at 289d1af95 (second, records' reports read one release forward): no report feeds a cleanup decision; P2s: rebase and flip #1553's test, and the commit subject needs the lampOS: prefix; two P3s
+- 18:02 merged #1554 (eighth, the set-aside tasks store in health; newer targets run with hand-overs off), the first builder gave it to me at 17:37, ARM64 green
+- 17:59 #1564 at ff9d1d6c2: the P3 fixed (journal cursor); asked to fold
 - 17:57 reviewed and merged #1553 (tests, forward-read should_panic tests for mute, schedule, ledger, records; #1505)
 - 17:54 re-checked #1498 at 3fae4f7a5: folded to one commit, the no-render test dropped, ARM64 green (blocks read 15 µs late); one doc P3 open (numbers from the first version); waits for #1456 and a rebase
 - 17:52 #1470 reviewed at e1a59cfab (fifth, Face Mesh V2 inner lips for speaking, off unless set): one P2 (Speaking.score's scale differs under the mesh and msgs doesn't say which judge; add a from field), three P3s; no picture kept; with the mesh on a camera close waits up to one mesh pass (85-290 ms), noted
