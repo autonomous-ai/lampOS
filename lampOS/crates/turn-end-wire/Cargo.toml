@@ -10,6 +10,10 @@ publish.workspace = true
 [dependencies]
 lamp-ipc = { path = "../ipc" }
 
+# The process test asks the kernel whether its workers still exist.
+[dev-dependencies]
+rustix = { version = "=1.1.5", features = ["process"] }
+
 [[test]]
 name = "process"
 # The test binary re-executes itself as a scripted worker that owns stdout.

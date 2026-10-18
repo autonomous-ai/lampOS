@@ -2046,13 +2046,12 @@ fn mute_then_reopen_never_overlaps_endpoint_workers() {
         assert_eq!(record["reaped"], true, "{record}");
         let pid = record["report"]["pid"].as_u64().unwrap();
         // The previous cycle's worker is gone before this one ever existed.
+        // Asked of the kernel, not of a `kill -0` program: without procps
+        // that is missing, and under qemu-user a missing one exits 127 and
+        // read as "gone" (#1497).
         if let Some(old) = previous {
-            let alive = Command::new("kill")
-                .args(["-0", &old.to_string()])
-                .stderr(std::process::Stdio::null())
-                .status()
-                .unwrap()
-                .success();
+            let alive = rustix::process::Pid::from_raw(old as i32)
+                .is_some_and(|old| rustix::process::test_kill_process(old).is_ok());
             assert!(!alive, "worker {old} outlived its cycle");
             assert_ne!(old, pid);
         }
