@@ -1013,8 +1013,52 @@ on 17 Oct). Measured, not a cause: the slow tail is the short asks, in
 every age bin. An earlier, smaller look (v1, `b7e105244ebd`, 18 Oct 07:42
 to 08:38 UTC, four slow turns, all in the session the 14:41 install
 opened, during its battery) had read it as early in a session; the
-day-long bins above supersede it. What the short slow asks are (the name
-alone, or a short question) is the next read.
+day-long bins above supersede it.
+
+**What the slow short asks are: the model's own time, most on short asks
+and on turns ended on silence, and nothing of ours was found to cut from
+the endpoint on** (Twelve's three reads, #705 18:22 to 19:17, read-only, run
+by the first builder on lamp-4ace; turns keyed by service cycle, since each
+cycle numbers its turns afresh). "Slow" is the model's first audio over 2 s
+after our endpoint.
+
+- **Not the bare name** (`short_asks_twelve.py` v2, `36a6dbe683ae`, 17 Oct
+  and 18 Oct to 18:45 +07): of the short asks under 2 s of speech, none was
+  the name alone ("Hey Lamp", "Lamp?") on either day, slow or not. By words,
+  1 to 2 words were slow 5 of 12 and 2 of 7, 3 or more 9 of 69 and 5 of 65.
+  By the endpoint's basis, a turn ended on silence (`silence_fallback`) was
+  slow 12 of 46 and 5 of 32, one the turn-end model called complete 2 of 33
+  and 2 of 31, and one it called uncertain 0 of 3 and 0 of 9.
+- **Not a second end-of-speech wait, nor our end held back** (the same v2
+  read, and the code at lamp-voice's head). The session is opened with
+  Gemini's own detection off (`automaticActivityDetection` disabled,
+  `crates/gemini/src/wire.rs`), so our `activityEnd` is the only end. The
+  worker passes the coordinator's end on at once (`ProviderInput::End`,
+  `provider_worker.rs`), unless `LAMP_RESEND_LOST_LINE` is set, when it
+  keeps the end while a lost line's blocks are sent again; that switch is
+  off on lamp-4ace. The session writes it at once (`Command::End` and
+  `commit()`, `crates/gemini/src/session.rs`), except while an earlier
+  response's barrier is up, when it is held and the journal says for how
+  long (`end_withheld_ms`). That hold covered 2 short asks a day, and 1 of
+  the 21 slow ones (0 of 14 and 1 of 7).
+- **No search seen, by a proxy, on the turns with a usage line**
+  (`search_asks_twelve.py`, `f9cc76d63572`, 17 Oct and 18 Oct to 19:15
+  +07). The lamp keeps no `groundingMetadata`, since the codec drops unknown
+  metadata. Gemini's `totalTokenCount` also counts the tool-use prompt, so
+  a plain turn whose total was more than its prompt, response and thoughts
+  was taken as a search. None read so (0 of 195 and 0 of 345 plain turns
+  with a usage line). Not every turn had one: on 17 Oct only 8 of the 14
+  slow short asks did, so 6 were not checked either way. The proxy is not
+  shown to catch a search: lamp-cb94, with search off, reads 0 too, which
+  shows only that it invents none.
+
+So nothing of ours was found to cut in the slow short asks, from the
+endpoint on. The wait before the endpoint is the endpoint's own (600 ms of
+quiet on a turn ended on silence, against about 400 ms on one the turn-end
+model calls complete), and belongs to the "Knows when you've finished" row.
+This row's remaining levers are the shorter second reply after a light or
+volume change (`LAMP_SHORT_DONE`, #1520) and the Policy's wait on a held
+call.
 
 ## What was not shown
 
