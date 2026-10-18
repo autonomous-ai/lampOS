@@ -38,10 +38,19 @@ use std::{
     io::{self, BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
-    sync::mpsc,
+    sync::{Arc, mpsc},
     thread,
     time::{Duration, Instant},
 };
+
+/// Where the same-voice check's journal lines go: stderr on a lamp. A test
+/// may take them instead, to see each one said (#1444).
+pub type Journal = Arc<dyn Fn(&str) + Send + Sync>;
+
+/// The lamp's journal: each line to stderr, as `eprintln!` writes it.
+pub fn to_stderr() -> Journal {
+    Arc::new(|line: &str| eprintln!("{line}"))
+}
 
 /// Where the coordinator reads the model's absolute path.
 pub const ENVIRONMENT: &str = "LAMP_SAME_VOICE_MODEL";
@@ -190,11 +199,16 @@ impl Prints {
     }
 
     fn timed(program: PathBuf, model: PathBuf, timing: Timing) -> Self {
+        Self::journaled(program, model, timing, to_stderr())
+    }
+
+    /// [`Self::timed`], its child's lines said to `journal`.
+    fn journaled(program: PathBuf, model: PathBuf, timing: Timing, journal: Journal) -> Self {
         let (asked, jobs) = mpsc::sync_channel(0);
         let (told, answers) = mpsc::channel();
         let started = thread::Builder::new()
             .name("same-voice".into())
-            .spawn(move || keep(&program, &model, &jobs, &told, timing));
+            .spawn(move || keep(&program, &model, &jobs, &told, timing, &journal));
         if let Err(error) = started {
             eprintln!("lamp-voice provider: the same voice is not judged: {error}");
         }
@@ -233,10 +247,11 @@ fn keep(
     jobs: &mpsc::Receiver<(u64, Vec<i16>)>,
     told: &mpsc::Sender<(u64, Result<Vec<f32>, String>)>,
     timing: Timing,
+    journal: &Journal,
 ) {
     let mut unready = 0;
     loop {
-        let why = match child(program, model, jobs, told, timing) {
+        let why = match child(program, model, jobs, told, timing, journal) {
             Ended::Closed => return,
             Ended::Failed(why, ready) => {
                 unready = if ready { 0 } else { unready + 1 };
@@ -301,6 +316,7 @@ fn child(
     jobs: &mpsc::Receiver<(u64, Vec<i16>)>,
     told: &mpsc::Sender<(u64, Result<Vec<f32>, String>)>,
     timing: Timing,
+    journal: &Journal,
 ) -> Ended {
     let started = Command::new(program)
         .arg("serve")
@@ -371,11 +387,11 @@ fn child(
         // the child on the lamp (#829: a short line's print lost to
         // Gemini's first output on the A733, which had never been timed).
         if answer.is_ok() {
-            eprintln!(
+            journal(&format!(
                 "lamp-voice provider: request {request}: its voice print came {} ms after it was asked ({:.2} s of sound)",
                 asked.elapsed().as_millis(),
                 samples.len() as f32 / RATE as f32
-            );
+            ));
         }
         let failed = answer.as_ref().err().cloned();
         if told
@@ -451,6 +467,8 @@ pub struct Voices<P: Printer> {
     /// its verdict, was another voice's: the worker ends the conversation
     /// at the next verdict ([`Self::take_late_other`]).
     late_other: Option<u64>,
+    /// Where its lines are said ([`to_stderr`] on a lamp).
+    journal: Journal,
 }
 
 impl<P: Printer> Voices<P> {
@@ -464,7 +482,26 @@ impl<P: Printer> Voices<P> {
             answered: None,
             judged: None,
             late_other: None,
+            journal: to_stderr(),
         }
+    }
+
+    /// [`Self::new`], its lines said to `journal` (#1444).
+    #[cfg(test)]
+    fn journaled(printer: P, journal: Journal) -> Self {
+        Self {
+            journal,
+            ..Self::new(printer)
+        }
+    }
+
+    /// Say that `request`, long enough to know, was judged without the
+    /// voice check, and `why` (#829, the reviewer on #1435): the worker
+    /// calls it at the verdict.
+    pub fn judged_without(&self, request: u64, why: &str) {
+        (self.journal)(&format!(
+            "lamp-voice provider: request {request}: judged without the voice check: {why}"
+        ));
     }
 
     /// The line `request` began; it is judged only if it was said with the
@@ -516,10 +553,10 @@ impl<P: Printer> Voices<P> {
         } else {
             // The line is then judged without the check: said, not
             // silently (the reviewer on #1435).
-            eprintln!(
+            (self.journal)(&format!(
                 "lamp-voice provider: request {}: no voice print: the same-voice child was busy (loading its model or printing another line)",
                 clip.request
-            );
+            ));
             self.unprinted(clip.request);
         }
     }
@@ -917,6 +954,66 @@ mod tests {
         assert_eq!(starts(&file), MOST_UNREADY as usize);
         std::thread::sleep(Duration::from_millis(100));
         assert_eq!(starts(&file), MOST_UNREADY as usize);
+    }
+
+    /// A journal that keeps what is said to it, for a test to read.
+    fn kept_journal() -> (Journal, Arc<std::sync::Mutex<Vec<String>>>) {
+        let kept = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let into = Arc::clone(&kept);
+        let journal: Journal =
+            Arc::new(move |line: &str| into.lock().unwrap().push(line.to_owned()));
+        (journal, kept)
+    }
+
+    /// #1444: each of the check's three journal lines is said, word for
+    /// word, through the journal it was given. Removing any of them fails
+    /// here: the busy child's, the verdict's "judged without", and the
+    /// timing of a print, from the child's own thread.
+    #[test]
+    fn each_line_the_check_says_is_said_to_its_journal() {
+        // A child too busy to take the line.
+        let (journal, kept) = kept_journal();
+        let mut voices = Voices::journaled(
+            StandIn {
+                busy: true,
+                ..StandIn::default()
+            },
+            journal,
+        );
+        said(&mut voices, 7, 1, ASKED_AT);
+        assert_eq!(
+            *kept.lock().unwrap(),
+            [
+                "lamp-voice provider: request 7: no voice print: the same-voice child was busy (loading its model or printing another line)"
+            ]
+        );
+        // The worker's line at a verdict without a print.
+        kept.lock().unwrap().clear();
+        voices.judged_without(8, "no voice of the conversation is known");
+        assert_eq!(
+            *kept.lock().unwrap(),
+            [
+                "lamp-voice provider: request 8: judged without the voice check: no voice of the conversation is known"
+            ]
+        );
+        // A real child that answers one print: its time, once.
+        let (path, _) = program(
+            "timed",
+            r#"printf '{"ready":true,"loaded_ms":1}\n'
+dd bs=332 count=1 of=/dev/null 2>/dev/null
+printf '{"request":1,"print":[1.0,0.0]}\n'
+exec sleep 30"#,
+        );
+        let (journal, kept) = kept_journal();
+        let mut prints = Prints::journaled(path, "model".into(), QUICK, journal);
+        ask_until(&mut prints, |answer| answer.is_ok());
+        let timed: Vec<String> = kept.lock().unwrap().clone();
+        assert_eq!(timed.len(), 1, "{timed:?}");
+        assert!(
+            timed[0].starts_with("lamp-voice provider: request 1: its voice print came ")
+                && timed[0].ends_with(" ms after it was asked (0.01 s of sound)"),
+            "{timed:?}"
+        );
     }
 
     /// The reviewer on #1030: a child that hangs after "ready" is killed
