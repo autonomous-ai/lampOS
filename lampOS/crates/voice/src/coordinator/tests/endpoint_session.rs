@@ -2034,6 +2034,8 @@ fn a_worker_failure_falls_back_through_recovery_and_then_resumes() {
 #[test]
 fn mute_then_reopen_never_overlaps_endpoint_workers() {
     use crate::service_privacy::PhysicalMute;
+    // The alive check below can say yes, or its "gone" would pass unread.
+    assert!(rustix::process::test_kill_process(rustix::process::getpid()).is_ok());
     let mut previous: Option<u64> = None;
     for cycle in 0..2 {
         let endpoint = scripted_process(&[ready()], "exec sleep 60", Limits::default());
