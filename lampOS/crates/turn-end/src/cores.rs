@@ -5,51 +5,11 @@
 //! first pair and 1,292 ms on the second (docs/endpoint-detection.md). Linux
 //! gives each core a relative `cpu_capacity` (1024 for the fastest); the
 //! cores with the largest value are the fast ones. When every core reports
-//! the same capacity, or none reports one, there is nothing to choose.
-use std::path::Path;
+//! the same capacity, or none reports one, there is nothing to choose. Which
+//! cores are fast lives in `lamp_turn_end_wire::cores`, so that the voice
+//! keeps its capture worker off the same ones.
 
-/// Each online core's number and its capacity, from a sysfs CPU directory
-/// (normally `/sys/devices/system/cpu`). Falls back to the highest frequency
-/// a core can run at when the kernel reports no capacity.
-pub fn capacities(cpu_dir: &Path) -> Vec<(usize, u64)> {
-    let Ok(entries) = std::fs::read_dir(cpu_dir) else {
-        return Vec::new();
-    };
-    let read = |path: std::path::PathBuf| {
-        std::fs::read_to_string(path)
-            .ok()
-            .and_then(|text| text.trim().parse::<u64>().ok())
-    };
-    let mut cores = entries
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let name = entry.file_name();
-            let cpu = name.to_str()?.strip_prefix("cpu")?.parse::<usize>().ok()?;
-            let path = entry.path();
-            // cpu0 often has no `online` file; a 0 in it means offline.
-            if read(path.join("online")) == Some(0) {
-                return None;
-            }
-            read(path.join("cpu_capacity"))
-                .or_else(|| read(path.join("cpufreq/cpuinfo_max_freq")))
-                .map(|capacity| (cpu, capacity))
-        })
-        .collect::<Vec<_>>();
-    cores.sort_unstable();
-    cores
-}
-
-/// The cores with the largest capacity, when the cores differ; otherwise
-/// `None`.
-pub fn fastest(cores: &[(usize, u64)]) -> Option<Vec<usize>> {
-    let top = cores.iter().map(|&(_, capacity)| capacity).max()?;
-    let fast = cores
-        .iter()
-        .filter(|&&(_, capacity)| capacity == top)
-        .map(|&(cpu, _)| cpu)
-        .collect::<Vec<_>>();
-    (fast.len() < cores.len()).then_some(fast)
-}
+pub use lamp_turn_end_wire::cores::{capacities, fastest};
 
 /// Keeps the calling thread, and every thread it starts afterwards, on
 /// `cpus`. Linux only; elsewhere it does nothing.
@@ -91,6 +51,7 @@ pub fn allowed() -> Option<Vec<usize>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     /// A core's number, capacity, highest frequency and `online` value.
     type Core = (usize, Option<u64>, Option<u64>, Option<u8>);

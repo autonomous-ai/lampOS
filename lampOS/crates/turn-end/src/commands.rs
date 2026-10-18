@@ -125,9 +125,9 @@ pub fn bench(arguments: &[OsString]) -> ExitCode {
     // The fast model keeps itself on the fast cores while loading; an
     // explicit choice here overrides that before any thread starts.
     let pinned = match &bench.cores {
-        Cores::All => Ok(None),
-        Cores::Fast => keep_on_fast_cores(),
-        Cores::List(list) => cores::keep_on(list).map(|()| Some(list.clone())),
+        Cores::All => Ok(()),
+        Cores::Fast => keep_on_fast_cores(0).map(drop),
+        Cores::List(list) => cores::keep_on(list),
     };
     if let Err(reason) = pinned {
         return fail(reason);
@@ -141,7 +141,7 @@ pub fn bench(arguments: &[OsString]) -> ExitCode {
                 Err(error) => Err(format!("fast model {}: {error}", bench.model.display())),
             }
         }
-        _ => load(&bench.model, &bench.speed),
+        _ => load(&bench.model, &bench.speed).map(|(model, _)| model),
     };
     let mut model = match speed {
         Ok(model) => model,

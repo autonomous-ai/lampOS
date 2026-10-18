@@ -4,23 +4,10 @@
 //! eight. Linux only, and never a reason to stop the voice.
 use std::collections::BTreeSet;
 
-pub const ENVIRONMENT: &str = "LAMP_CAPTURE_CORES";
+pub const ENVIRONMENT: &str = lamp_turn_end_wire::cores::CAPTURE_CORES;
 
-/// A kernel cpu-list ("6-7", "6,7", "6", "0-2,6") as its cores; `None` for
-/// anything else, the empty string included.
-pub fn parse(list: &str) -> Option<BTreeSet<usize>> {
-    let mut cores = BTreeSet::new();
-    for part in list.trim().split(',') {
-        let (first, last) = part.split_once('-').unwrap_or((part, part));
-        let (first, last): (usize, usize) = (first.parse().ok()?, last.parse().ok()?);
-        // 1024 is the kernel's `cpu_set_t`.
-        if first > last || last >= 1024 {
-            return None;
-        }
-        cores.extend(first..=last);
-    }
-    Some(cores)
-}
+use lamp_turn_end_wire::cores::beside_capture;
+pub use lamp_turn_end_wire::cores::parse;
 
 /// Pins the calling thread (and the threads it starts afterwards) to the
 /// cores this worker's environment names, logging one line. Unset, nothing.
@@ -34,13 +21,16 @@ pub fn apply_from_environment() {
 /// What pinning to `value` did, as the line to log; `None`, and nothing
 /// touched, when the variable is unset. Any fault keeps the default cores.
 pub fn apply(value: Option<&str>) -> Option<String> {
-    apply_with(value, get, set)
+    apply_with(value, lamp_turn_end_wire::cores::fast, get, set)
 }
 
 /// `apply` over the thread's affinity as `get` and `set` see it, `set`
-/// returning what reads back after it; the tests fake a narrowing cpuset.
+/// returning what reads back after it, beside the machine's `fast` cores
+/// (read only when the variable is set); the tests fake a narrowing cpuset
+/// and the fast cores.
 fn apply_with(
     value: Option<&str>,
+    fast: impl FnOnce() -> Option<Vec<usize>>,
     get: impl Fn() -> Result<BTreeSet<usize>, String>,
     set: impl Fn(&BTreeSet<usize>) -> Result<BTreeSet<usize>, String>,
 ) -> Option<String> {
@@ -60,6 +50,20 @@ fn apply_with(
             "{ENVIRONMENT}={value}: cores {} are not all online ({}); keeping the default cores",
             text(&cores),
             text(&online)
+        ));
+    }
+    // The fast end-of-turn worker runs at RR 20 on the fast cores and leaves
+    // capture's to it; a list taking all of them would leave it none, and
+    // capture held there stalled 99 ms and the voice died (#1459).
+    if let Some(fast) = fast()
+        && beside_capture(&fast, &cores).is_none()
+    {
+        let fast: BTreeSet<usize> = fast.into_iter().collect();
+        return Some(format!(
+            "{ENVIRONMENT}={value}: cores {} take every one of the end-of-turn worker's \
+             fast cores ({}), which run at RR 20 too; keeping the default cores",
+            text(&cores),
+            text(&fast)
         ));
     }
     let fault =
@@ -162,6 +166,9 @@ mod tests {
     #[test]
     fn unset_applies_nothing_and_a_bad_value_keeps_the_default() {
         assert_eq!(apply(None), None);
+        // Unset, not even the fast cores are read.
+        let read = || -> Option<Vec<usize>> { panic!("the fast cores were read") };
+        assert_eq!(apply_with(None, read, get, set), None);
         for bad in ["big", "", "1023"] {
             let line = apply(Some(bad)).unwrap();
             assert!(line.contains("keeping the default cores"), "{line}");
@@ -172,11 +179,13 @@ mod tests {
     fn a_cpuset_allowing_part_of_the_list_gets_the_mask_from_before_back() {
         use std::cell::RefCell;
         let set_of = |cores: &[usize]| cores.iter().copied().collect::<BTreeSet<_>>();
-        // A cpuset allowing cores 0-6: asked for 0 and 7, the thread is held to 0.
-        let allowed = set_of(&[0, 1, 2, 3, 4, 5, 6]);
+        // A cpuset allowing core 0 only: asked for 0 and 1, the thread is
+        // held to 0. Cores 0 and 1 are online on any machine the tests run on.
+        let allowed = set_of(&[0]);
         let mask = RefCell::new(allowed.clone());
         let line = apply_with(
-            Some("0,7"),
+            Some("0,1"),
+            || Some(vec![6, 7]),
             || Ok(mask.borrow().clone()),
             |cores| {
                 let narrowed: BTreeSet<_> = cores.intersection(&allowed).copied().collect();
@@ -185,15 +194,50 @@ mod tests {
             },
         )
         .unwrap();
-        if line.contains("not all online") {
-            return; // A machine with fewer than eight cores.
-        }
         assert_eq!(
             line,
-            "pinned to cores 0,7 (LAMP_CAPTURE_CORES); read back 0: it did not take; \
-             restored cores 0,1,2,3,4,5,6"
+            "pinned to cores 0,1 (LAMP_CAPTURE_CORES); read back 0: it did not take; \
+             restored cores 0"
         );
         assert_eq!(*mask.borrow(), allowed);
+    }
+
+    #[test]
+    fn a_list_taking_every_fast_core_is_refused_before_anything_is_touched() {
+        let touched = std::cell::Cell::new(false);
+        let get = || {
+            touched.set(true);
+            Ok(BTreeSet::new())
+        };
+        let set = |_: &BTreeSet<usize>| {
+            touched.set(true);
+            Ok(BTreeSet::new())
+        };
+        // Fast cores 0 and 1, online on any machine the tests run on.
+        for list in ["0-1", "0,1"] {
+            let line = apply_with(Some(list), || Some(vec![0, 1]), get, set).unwrap();
+            assert!(
+                line.contains("end-of-turn worker's fast cores (0,1)")
+                    && line.ends_with("keeping the default cores"),
+                "{line}"
+            );
+        }
+        assert!(!touched.get());
+    }
+
+    #[test]
+    fn one_fast_core_for_capture_leaves_the_other_and_is_pinned() {
+        let line = apply_with(
+            Some("1"),
+            || Some(vec![0, 1]),
+            || Ok([0, 1].into()),
+            |cores| Ok(cores.clone()),
+        )
+        .unwrap();
+        assert_eq!(
+            line,
+            "pinned to cores 1 (LAMP_CAPTURE_CORES); read back 1: it took"
+        );
     }
 
     #[cfg(target_os = "linux")]

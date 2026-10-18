@@ -7,6 +7,7 @@
 //! busy, slow, crashed or misbehaving worker is an explicit state the caller
 //! answers with its own silence fallback.
 pub mod client;
+pub mod cores;
 pub mod frame;
 pub mod serve;
 

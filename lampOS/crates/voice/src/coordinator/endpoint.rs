@@ -31,6 +31,29 @@ pub(super) struct EndpointRig {
     commit_blocks: Option<u16>,
 }
 
+/// The worker `endpoint` starts, if any. With `LAMP_CAPTURE_CORES` (`capture`)
+/// the fast worker gets it too and leaves those cores to capture
+/// (lamp_turn_end_wire::cores); the exact worker is not pinned.
+fn worker_command(
+    endpoint: Endpoint,
+    program: std::path::PathBuf,
+    model: std::path::PathBuf,
+    capture: Option<std::ffi::OsString>,
+) -> Option<WorkerCommand> {
+    match endpoint {
+        Endpoint::Silence => None,
+        Endpoint::SmartTurn => Some(WorkerCommand::smart_turn(program, model)),
+        Endpoint::SmartTurnFast => {
+            let mut command = WorkerCommand::smart_turn_fast(program, model);
+            let name = lamp_turn_end_wire::cores::CAPTURE_CORES;
+            command
+                .env
+                .extend(capture.map(|cores| (name.into(), cores)));
+            Some(command)
+        }
+    }
+}
+
 impl EndpointRig {
     /// Starts loading at once; the session never waits for it.
     pub(super) fn start(options: &DirectedOptions, executable: &Path) -> Option<Self> {
@@ -39,11 +62,8 @@ impl EndpointRig {
             directory.join(WORKER_EXECUTABLE),
             directory.join(SMART_TURN_MODEL_FILE),
         );
-        let command = match options.endpoint {
-            Endpoint::Silence => return None,
-            Endpoint::SmartTurn => WorkerCommand::smart_turn(program, model),
-            Endpoint::SmartTurnFast => WorkerCommand::smart_turn_fast(program, model),
-        };
+        let capture = std::env::var_os(lamp_turn_end_wire::cores::CAPTURE_CORES);
+        let command = worker_command(options.endpoint, program, model, capture)?;
         let mut rig = Self::process(command, Limits::default());
         rig.commit_blocks = options.endpoint_commit_blocks;
         Some(rig)
@@ -236,6 +256,22 @@ mod tests {
         let mut rig = EndpointRig::double(Box::new(Silent));
         let (detector, _) = EndpointRig::attach(Some(&mut rig), TurnTaking::V1Baseline, detector)?;
         Ok(detector.confirmation_policy().unwrap())
+    }
+
+    #[test]
+    fn only_the_fast_worker_gets_the_capture_cores_and_only_when_set() {
+        let name = lamp_turn_end_wire::cores::CAPTURE_CORES;
+        let env = |endpoint, capture: Option<&str>| {
+            worker_command(endpoint, "w".into(), "m".into(), capture.map(Into::into))
+                .map(|command| command.env)
+        };
+        assert_eq!(
+            env(Endpoint::SmartTurnFast, Some("7")),
+            Some(vec![(name.into(), "7".into())])
+        );
+        assert_eq!(env(Endpoint::SmartTurnFast, None), Some(Vec::new()));
+        assert_eq!(env(Endpoint::SmartTurn, Some("7")), Some(Vec::new()));
+        assert_eq!(env(Endpoint::Silence, Some("7")), None);
     }
 
     #[test]

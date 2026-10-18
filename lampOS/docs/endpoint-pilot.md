@@ -96,7 +96,14 @@ checked on the held-out clips (shards 4 and 5), where it took them from 21 to
 - `lamp-turn-end --model PATH [--parent PID] --fast`, otherwise as before:
   - keeps itself on the cores with the largest `cpu_capacity` (cpu6 and cpu7
     on the A733; where all cores are alike, as in the VM, it chooses none),
-    so ONNX Runtime's second thread starts there too;
+    so ONNX Runtime's second thread starts there too; with
+    `LAMP_CAPTURE_CORES` in its environment (the voice passes it, #705) it
+    leaves those cores to the capture worker, which runs at RR 20 too, and
+    runs one thread a core it keeps (`7`: core 6, one thread, 213 ms a
+    verdict); a list capture does not take (every fast core, an offline
+    core, one outside the cpuset, not a cpu list) leaves it both fast cores
+    and two threads, and `--check-model` reports the threads it runs
+    (serve-runtime.md, "The capture worker's cores");
   - checks the ONNX Runtime library beside the worker
     (`libonnxruntime.so.1.30.0`) by size and SHA-256 before loading it;
   - checks the model as before, makes its 8-bit form and opens it on two

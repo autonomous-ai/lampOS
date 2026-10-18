@@ -27,7 +27,7 @@ use lamp_turn_end::{
     FAST_THREADS, FastTurn, FeatureExtractor, Network, SMART_TURN_V3_2, SmartTurn, classify, cores,
     fast, reference,
 };
-use lamp_turn_end_wire::serve;
+use lamp_turn_end_wire::{cores as wire_cores, serve};
 use std::{
     ffi::OsString,
     io,
@@ -229,28 +229,38 @@ fn ms(us: u64) -> f64 {
     us as f64 / 1_000.0
 }
 
-/// Keeps the worker on the fastest cores when the cores differ. Returns the
-/// cores chosen, or `None` when there is nothing to choose.
-fn keep_on_fast_cores() -> Result<Option<Vec<usize>>, String> {
+/// Keeps the worker on the fastest cores when the cores differ, less the
+/// capture worker's when the voice passed `LAMP_CAPTURE_CORES` and capture
+/// takes them (both run at RR 20; `lamp_turn_end_wire::cores::kept`).
+/// Returns the threads to run: one a kept core beside capture, otherwise
+/// `threads`.
+fn keep_on_fast_cores(threads: usize) -> Result<usize, String> {
     let Some(fast) = cores::fastest(&cores::capacities(Path::new("/sys/devices/system/cpu")))
     else {
-        return Ok(None);
+        return Ok(threads);
     };
-    cores::keep_on(&fast)?;
-    Ok(Some(fast))
+    let capture = std::env::var(wire_cores::CAPTURE_CORES).ok();
+    let allowed = cores::allowed().map(|allowed| allowed.into_iter().collect());
+    let (kept, threads) = wire_cores::kept(&fast, capture.as_deref(), allowed.as_ref(), threads);
+    cores::keep_on(&kept)?;
+    Ok(threads)
 }
 
-/// Loads the model the way `speed` says. With `Fast`, the calling thread is
-/// first kept on the fastest cores so that ONNX Runtime's threads start there.
-fn load(model: &Path, speed: &Speed) -> Result<Box<dyn Network>, String> {
+/// Loads the model the way `speed` says, with the ONNX threads it runs
+/// (`None` for `Exact`). With `Fast`, the calling thread is first kept on the
+/// fastest cores so that ONNX Runtime's threads start there.
+fn load(model: &Path, speed: &Speed) -> Result<(Box<dyn Network>, Option<usize>), String> {
     match speed {
         Speed::Exact => SmartTurn::load(model, &SMART_TURN_V3_2)
-            .map(|model| Box::new(model) as Box<dyn Network>)
+            .map(|model| (Box::new(model) as Box<dyn Network>, None))
             .map_err(|error| format!("model {}: {error}", model.display())),
         Speed::Fast { runtime, threads } => {
-            keep_on_fast_cores()?;
-            FastTurn::load(model, &SMART_TURN_V3_2, runtime, *threads)
-                .map(|model| Box::new(model) as Box<dyn Network>)
+            // Beside capture on one fast core the model runs one thread on
+            // the other (213 against 148 ms a verdict on lamp-4ace,
+            // docs/endpoint-pilot.md).
+            let threads = keep_on_fast_cores(*threads)?;
+            FastTurn::load(model, &SMART_TURN_V3_2, runtime, threads)
+                .map(|model| (Box::new(model) as Box<dyn Network>, Some(threads)))
                 .map_err(|error| format!("fast model {}: {error}", model.display()))
         }
     }
@@ -262,7 +272,7 @@ fn load(model: &Path, speed: &Speed) -> Result<Box<dyn Network>, String> {
 fn self_check(path: &Path, speed: &Speed) -> Result<String, String> {
     bound_resources(speed)?;
     let (started, cpu_started) = (Instant::now(), cpu_us());
-    let mut model = load(path, speed)?;
+    let (mut model, used) = load(path, speed)?;
     let load_us = u64::try_from(started.elapsed().as_micros()).unwrap_or(u64::MAX);
     let load_cpu_us = cpu_us() - cpu_started;
     let (expected, tolerance, reference_name) = match speed {
@@ -321,7 +331,7 @@ fn self_check(path: &Path, speed: &Speed) -> Result<String, String> {
         address_space,
         nice,
     );
-    if let Speed::Fast { runtime, threads } = speed {
+    if let (Speed::Fast { runtime, .. }, Some(threads)) = (speed, used) {
         let asset = fast::runtime_asset().map_err(|error| error.to_string())?;
         line.push_str(&format!(
             ",\"speed\":\"fast\",\"threads\":{threads},\"cores\":{},\"runtime\":\"{}\",\"runtime_version\":\"{}\",\"runtime_sha256\":\"{}\"",
@@ -377,7 +387,7 @@ fn main() -> ExitCode {
     let setup = parse(arguments.into_iter()).and_then(|arguments| {
         follow_parent(arguments.parent)?;
         bound_resources(&arguments.speed)?;
-        load(&arguments.model, &arguments.speed)
+        load(&arguments.model, &arguments.speed).map(|(model, _)| model)
     });
     let mut model = match setup {
         Ok(model) => model,

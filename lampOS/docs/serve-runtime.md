@@ -183,19 +183,18 @@ then moved to big core 6 and took 6.5-7.2 % there, with the small cores
 mostly at 1794 MHz and no zone over 69.5 degrees C: the core type, not the
 clock.
 
-**Don't set `LAMP_CAPTURE_CORES`: it crashes the voice in a conversation
-on lamp-4ace (#1459, 18 Oct 11:20); it is only for the quiet-room
-measurement.** At `6-7` (the first builder, 11:06–11:21, `b9b4a5d66`) the
-quiet share fell from 17.65 % to 6.17 %, but in four played talking turns
-the lamp answered none, capture stalled three times (99, 58 and 67 ms,
-`LAMP_STALLS=on`), the second route's and the speaker's leases lapsed, and
-the voice exited with status 1 and came back muted by the restart guard.
-The fix (`lamp-turn-end` off capture's cores) is #1475, and the switch
-stays unset until the same check passes: four turns answered, no lapses,
-capture stalls no worse than with it unset.
+**Don't set `LAMP_CAPTURE_CORES` outside the first builder's check until
+it passes: `6-7` crashed the voice in a conversation on lamp-4ace (#1459,
+18 Oct 11:20) and is now refused; `7` is not yet run on a lamp.** At `6-7`
+(the first builder, 11:06–11:21, `b9b4a5d66`) the quiet share fell from
+17.65 % to 6.17 %, but in four played talking turns the lamp answered none,
+capture stalled three times (99, 58 and 67 ms, `LAMP_STALLS=on`), the second
+route's and the speaker's leases lapsed, and the voice exited with status 1
+and came back muted by the restart guard. Why, the layout that replaces it
+(`7`) and the check are below.
 
-`LAMP_CAPTURE_CORES=6-7` (off unless set, Linux only) keeps capture
-on the big cores: at its start the worker calls `sched_setaffinity` on its
+`LAMP_CAPTURE_CORES` (off unless set, Linux only) keeps capture on the
+cores it names: at its start the worker calls `sched_setaffinity` on its
 own thread, before the threads it starts, and logs one line with the cores
 and what `sched_getaffinity` reads back ("it took" or "it did not take").
 If the read-back differs (a cpuset allowing only part of the list), the
@@ -203,21 +202,40 @@ mask read before the change is set back and the line says so, so the
 default is really kept. Unset, nothing is called. A value that is not a
 cpu-list (`6-7`, `6,7`, `6`), or that names a core not online, is logged
 and the default kept; the voice never stops for it. The supervisor passes
-it to the capture worker only. The risk is the big cores' other tenants,
-not the eyes (`lamp-eyes` has no `CPUAffinity`). With `--endpoint
-smart-turn-fast`, `lamp-turn-end` keeps itself and its two ONNX Runtime
-threads on cores 6-7 (`keep_on_fast_cores`, `FAST_THREADS = 2`) at the
-unit's `RR 20`. During a verdict (about 148 ms on lamp-4ace) both big
-cores run RR 20 threads of the same priority, and a capture thread held to
-6-7 cannot preempt them or move to a small core: it can wait up to an RR
-slice (100 ms), longer than the 40 ms the microphone buffers
-(`buffer_blocks: 4`), so it overruns just as the person stops talking.
-Unpinned, the scheduler moves it to a small core. A single big core (`6`
-or `7`) does not help, since the verdict holds both. `lamp-name`
-(`CPUAffinity=6 7`) is what loses capture's ~7 % of a big core. So the
-switch is not turned on beside `smart-turn-fast` until talking turns with
-`LAMP_STALLS=on` show no held passes and no overruns; a quiet-room
-off/on/off never runs a verdict and cannot show it.
+it to the capture worker, and with `--endpoint smart-turn-fast` to
+`lamp-turn-end` too.
+
+The big cores' other real-time tenant is `lamp-turn-end`: it keeps itself
+and its ONNX Runtime threads on the fast cores (`keep_on_fast_cores`,
+`FAST_THREADS = 2`) at the unit's `RR 20`. Capture held to 6-7 beside it
+cannot preempt a verdict (about 148 ms) or move to a small core, and waits
+up to an RR slice (100 ms), longer than the 40 ms the microphone buffers
+(`buffer_blocks: 4`): the crash above. So the two share the fast cores by construction
+(`lamp_turn_end_wire::cores`, #705): `lamp-turn-end` keeps the fast cores
+less capture's, and one ONNX Runtime thread a core kept, when capture takes
+its list (a cpu list within the online cores and the unit's cpuset;
+`lamp_turn_end_wire::cores::kept`). Otherwise it keeps both fast cores and
+two threads, as unset. A list that would take every fast core (`6-7`, `5-7`) is refused with a line naming them, and
+both keep their defaults; that is the crash case, and it can no longer be
+configured. The shape is `LAMP_CAPTURE_CORES=7`: capture on core 7,
+`lamp-turn-end` on core 6 with one thread, each the only RR 20 tenant of its
+core. One thread costs the verdict 65 ms (213 against 148 ms on lamp-4ace,
+endpoint-pilot.md), asked 200 ms into a pause: about 413 ms after someone
+stops against the 400 ms the responsive policy waits anyway, so a confident
+"finished" ends about 13 ms later. `lamp-name` (`CPUAffinity=6 7`, `Nice=5`,
+not real-time) only loses processor time to both, never a deadline.
+
+The check (the first builder's, lamp-4ace, `LAMP_STALLS=on`, the product's
+`smart-turn-fast`): five minutes of `pidstat -t -u` on `worker capture` in a
+quiet room off, then with `LAMP_CAPTURE_CORES=7`, then off again, and the
+same four talking turns in each round. It passes with capture's quiet share
+on core 7 at about a third of the small cores' 17 %; all four turns
+answered; no `lease expired`, `authority lapsed` or worker exit in the
+voice's journal; `stalls-capture.log` no worse than the off round (0 of 50
+ms or more); and the voice's start lines reading `pinned to cores 7 ... it
+took`, and `LAMP_CAPTURE_CORES=7 lamp-turn-end --check-model MODEL --fast`
+reporting `"cores":[6]`, `"threads":1` and a warm median near 213 ms. Not
+yet run.
 
 A minute of what the harness itself does, concentrated (138 rounds of a
 log-in, a 16 MiB log read, a Python start and an 8 MiB synced write to the
