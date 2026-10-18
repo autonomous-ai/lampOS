@@ -68,13 +68,18 @@ impl Grid {
         )
     }
 
-    fn changed_from(&self, before: &Self) -> bool {
+    /// How many cells are [`GREYS`] or more brighter or darker.
+    fn cells_changed_from(&self, before: &Self) -> usize {
         self.0
             .iter()
             .zip(&before.0)
             .filter(|(now, then)| (*now - *then).abs() >= GREYS)
             .count()
-            >= CELLS
+    }
+
+    #[cfg(test)]
+    fn changed_from(&self, before: &Self) -> bool {
+        self.cells_changed_from(before) >= CELLS
     }
 }
 
@@ -83,20 +88,86 @@ impl Grid {
 pub fn detect(
     change: Option<&mut Change>,
     picture: &Picture,
-    empty_room: bool,
+    busy: Option<Busy>,
     now_us: u64,
 ) -> bool {
-    change.is_none_or(|change| change.detect(Grid::of(picture), empty_room, now_us))
+    change.is_none_or(|change| change.detect(Grid::of(picture), busy, now_us))
 }
 
 /// Nobody has been found for this long: the room counts as empty.
 pub const EMPTY_AFTER_US: u64 = 4_000_000;
 
-/// Whether the room counts as empty: no face found for
-/// [`EMPTY_AFTER_US`] (or ever), no full look asked for and nobody being
-/// remembered. Anything else runs the detector at every glance.
+/// Why the room does not count as empty, so every glance is detected.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Busy {
+    /// A full look is asked for.
+    Asked,
+    /// Someone is being remembered.
+    Remembering,
+    /// A face was found under [`EMPTY_AFTER_US`] ago.
+    Face,
+}
+
+/// Why the room is not empty, if it is not: a full look asked for, someone
+/// being remembered, or a face found under [`EMPTY_AFTER_US`] ago (or ever
+/// none of them, and it is empty).
+pub fn busy(asked: bool, remembering: bool, face_ago_us: Option<u64>) -> Option<Busy> {
+    if asked {
+        Some(Busy::Asked)
+    } else if remembering {
+        Some(Busy::Remembering)
+    } else if face_ago_us.is_some_and(|ago| ago < EMPTY_AFTER_US) {
+        Some(Busy::Face)
+    } else {
+        None
+    }
+}
+
+/// Whether the room counts as empty: [`busy`] says no reason.
 pub fn empty_room(asked: bool, remembering: bool, face_ago_us: Option<u64>) -> bool {
-    !asked && !remembering && face_ago_us.is_none_or(|ago| ago >= EMPTY_AFTER_US)
+    busy(asked, remembering, face_ago_us).is_none()
+}
+
+/// Why each glance was detected or not, since the last
+/// [`Change::take_why`], for the 10 s line: what a night on a lamp says
+/// about where the detector still runs.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Why {
+    pub asked: u32,
+    pub remembering: u32,
+    pub face: u32,
+    /// The first glance, with nothing to compare.
+    pub first: u32,
+    /// The picture changed past the bar from the last frame detected.
+    pub changed: u32,
+    /// Unchanged, but changed under [`STILL_FOR_US`] ago.
+    pub settling: u32,
+    /// Unchanged and still, but [`LOOK_AT_LEAST_US`] since the last.
+    pub every: u32,
+    /// Not detected.
+    pub skipped: u32,
+    /// The most cells changed in a glance compared, and the sum, over
+    /// `compared` glances: against the bar of [`CELLS`].
+    pub most_cells: usize,
+    pub cells: usize,
+    pub compared: u32,
+}
+
+impl Why {
+    pub fn line(&self) -> String {
+        format!(
+            "; detected: {} changed, {} settling, {} every 3 s, {} first, {} near a face, {} asked, {} remembering; cells changed: most {}, mean {:.1} (bar {CELLS})",
+            self.changed,
+            self.settling,
+            self.every,
+            self.first,
+            self.face,
+            self.asked,
+            self.remembering,
+            self.most_cells,
+            self.cells as f32 / self.compared.max(1) as f32
+        )
+    }
 }
 
 /// When the detector last ran, and on what, and when the picture last
@@ -105,42 +176,62 @@ pub fn empty_room(asked: bool, remembering: bool, face_ago_us: Option<u64>) -> b
 pub struct Change {
     last: Option<(Grid, u64)>,
     changed_at: Option<u64>,
-    /// Looks said to hold no face without the detector, since the last
-    /// [`Change::take_skipped`].
-    skipped: u32,
+    why: Why,
 }
 
 impl Change {
-    /// Whether the detector runs on this frame. `empty_room`: nobody was in
-    /// view for a while and nothing is asked of the eyes; otherwise it
-    /// always runs.
-    pub fn detect(&mut self, grid: Grid, empty_room: bool, now_us: u64) -> bool {
-        if self
+    /// Whether the detector runs on this frame. `busy`: why the room is not
+    /// empty, if it is not; then it always runs.
+    pub fn detect(&mut self, grid: Grid, busy: Option<Busy>, now_us: u64) -> bool {
+        let cells = self
             .last
             .as_ref()
-            .is_some_and(|(last, _)| grid.changed_from(last))
-        {
+            .map(|(last, _)| grid.cells_changed_from(last));
+        let changed = cells.is_some_and(|cells| cells >= CELLS);
+        if changed {
             self.changed_at = Some(now_us);
         }
         let moving = self
             .changed_at
             .is_some_and(|at| now_us.saturating_sub(at) < STILL_FOR_US);
-        let detect = !empty_room
-            || moving
-            || self
-                .last
-                .as_ref()
-                .is_none_or(|(_, at)| now_us.saturating_sub(*at) >= LOOK_AT_LEAST_US);
+        let due = self
+            .last
+            .as_ref()
+            .is_none_or(|(_, at)| now_us.saturating_sub(*at) >= LOOK_AT_LEAST_US);
+        let why = &mut self.why;
+        if busy.is_none()
+            && let Some(cells) = cells
+        {
+            why.most_cells = why.most_cells.max(cells);
+            why.cells += cells;
+            why.compared += 1;
+        }
+        let counted = match busy {
+            Some(Busy::Asked) => &mut why.asked,
+            Some(Busy::Remembering) => &mut why.remembering,
+            Some(Busy::Face) => &mut why.face,
+            None if cells.is_none() => &mut why.first,
+            None if changed => &mut why.changed,
+            None if moving => &mut why.settling,
+            None if due => &mut why.every,
+            None => &mut why.skipped,
+        };
+        *counted += 1;
+        let detect = busy.is_some() || moving || due;
         if detect {
             self.last = Some((grid, now_us));
-        } else {
-            self.skipped += 1;
         }
         detect
     }
 
-    pub fn take_skipped(&mut self) -> u32 {
-        std::mem::take(&mut self.skipped)
+    /// Looks said to hold no face without the detector, since the last
+    /// [`Change::take_why`].
+    pub fn skipped(&self) -> u32 {
+        self.why.skipped
+    }
+
+    pub fn take_why(&mut self) -> Why {
+        std::mem::take(&mut self.why)
     }
 }
 
@@ -193,13 +284,13 @@ mod tests {
         // The light rising five greys a glance: never a change from the
         // glance before, a change from where the detector last ran.
         let mut change = Change::default();
-        assert!(change.detect(empty.clone(), true, 0));
+        assert!(change.detect(empty.clone(), None, 0));
         let mut detected = Vec::new();
         for glance in 1..=5u64 {
             let grid = Grid::of(&room(glance as u32 + 5, 5.0 * glance as f32, None));
             let before = Grid::of(&room(glance as u32 + 4, 5.0 * (glance - 1) as f32, None));
             assert!(!grid.changed_from(&before), "{glance}");
-            if change.detect(grid, true, glance * GLANCE_US / 10) {
+            if change.detect(grid, None, glance * GLANCE_US / 10) {
                 detected.push(glance);
             }
         }
@@ -217,20 +308,20 @@ mod tests {
         for glance in 0..20u64 {
             let face = (glance == 12).then_some((100, 50, 48));
             let grid = Grid::of(&room(glance as u32, 0.0, face));
-            if change.detect(grid, true, glance * GLANCE_US) {
+            if change.detect(grid, None, glance * GLANCE_US) {
                 detected.push(glance);
             }
         }
         // 0 s, 3 s, 6 s; the face at 7.2 s; back to empty at 7.8 s, and
         // every glance until the picture has been still for 3 s.
         assert_eq!(detected, [0, 5, 10, 12, 13, 14, 15, 16, 17]);
-        assert_eq!(change.take_skipped(), 11);
-        assert_eq!(change.take_skipped(), 0);
+        assert_eq!(change.take_why().skipped, 11);
+        assert_eq!(change.take_why().skipped, 0);
         for glance in 20..30u64 {
             let grid = Grid::of(&room(glance as u32, 0.0, None));
-            assert!(change.detect(grid, false, glance * GLANCE_US));
+            assert!(change.detect(grid, Some(Busy::Face), glance * GLANCE_US));
         }
-        assert_eq!(change.take_skipped(), 0);
+        assert_eq!(change.take_why().skipped, 0);
     }
 
     /// (b) Someone walks in over four glances and sits still: every
@@ -247,7 +338,7 @@ mod tests {
                 _ => None,
             };
             let grid = Grid::of(&room(glance as u32, 0.0, face));
-            if change.detect(grid, true, glance * GLANCE_US) {
+            if change.detect(grid, None, glance * GLANCE_US) {
                 detected.push(glance);
             }
         }
@@ -264,12 +355,49 @@ mod tests {
         let mut change = Change::default();
         let mut on = Vec::new();
         for glance in 0..20u64 {
-            assert!(detect(None, &picture, true, glance * GLANCE_US));
-            if detect(Some(&mut change), &picture, true, glance * GLANCE_US) {
+            assert!(detect(None, &picture, None, glance * GLANCE_US));
+            if detect(Some(&mut change), &picture, None, glance * GLANCE_US) {
                 on.push(glance);
             }
         }
         assert_eq!(on, [0, 5, 10, 15]);
+    }
+
+    /// Each glance is counted by why it was detected or not, with the
+    /// cells changed, for the 10 s line.
+    #[test]
+    fn each_glance_is_counted_by_why() {
+        let mut change = Change::default();
+        for glance in 0..20u64 {
+            let face = (glance == 12).then_some((100, 50, 48));
+            change.detect(
+                Grid::of(&room(glance as u32, 0.0, face)),
+                None,
+                glance * GLANCE_US,
+            );
+        }
+        for glance in 20..23u64 {
+            let grid = Grid::of(&room(glance as u32, 0.0, None));
+            change.detect(grid, Some(Busy::Face), glance * GLANCE_US);
+        }
+        let grid = Grid::of(&room(23, 0.0, None));
+        change.detect(grid, Some(Busy::Asked), 23 * GLANCE_US);
+        let why = change.take_why();
+        // As `an_empty_still_room_is_…`: 0 first; 5 and 10 every 3 s; the
+        // face in and out at 12 and 13; settling to 17; eleven skipped.
+        assert_eq!(
+            (why.first, why.every, why.changed, why.settling, why.skipped),
+            (1, 2, 2, 4, 11)
+        );
+        assert_eq!((why.face, why.asked, why.remembering), (3, 1, 0));
+        assert_eq!(why.compared, 19);
+        assert!(why.most_cells >= CELLS && why.cells >= 2 * CELLS, "{why:?}");
+        assert!(why.line().contains("2 changed, 4 settling, 2 every 3 s"));
+        assert_eq!(change.take_why(), Why::default());
+        assert_eq!(busy(false, false, Some(1)), Some(Busy::Face));
+        assert_eq!(busy(true, true, Some(1)), Some(Busy::Asked));
+        assert_eq!(busy(false, true, None), Some(Busy::Remembering));
+        assert_eq!(busy(false, false, None), None);
     }
 
     /// (b) A face found under 4 s ago, a full look asked for or someone

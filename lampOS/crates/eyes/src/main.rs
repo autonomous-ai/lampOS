@@ -481,6 +481,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     // Looks the detector ran on, and its time: with `--look-on-change` the
     // 10 s line's "ms a look" counts the glances it skipped too.
     let (mut detected, mut detecting) = (0u32, Duration::ZERO);
+    // With `--look-on-change`, where a look's time goes (the sight file,
+    // the decode, the grid, the detector is `detecting`, and the rest), and
+    // the looks that found faces but none to follow (#1441 on lamp-4ace:
+    // half a look was not the detector, and almost no glance was skipped).
+    let mut stages = [Duration::ZERO; 3];
+    let mut unfollowed = 0u32;
     let mut reported_at = Instant::now();
     // How the camera is, for the lamp's health.
     let mut camera = lamp_eyes::bus_out::Camera::Closed;
@@ -882,6 +888,12 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         {
             latest = None;
             looked_at = Instant::now();
+            let mut stage_at = looked_at;
+            let stage = |at: &mut Instant, into: &mut Duration| {
+                let now = Instant::now();
+                *into += now.saturating_duration_since(*at);
+                *at = now;
+            };
             // What the lamp sees now, for the voice service; a frame that is
             // not whole leaves the one before it.
             // With a full look the frame is larger: it is kept shrunk to
@@ -893,18 +905,22 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     let _ = kept.keep(&working);
                 }
             }
-            let empty_room = lamp_eyes::change::empty_room(
+            stage(&mut stage_at, &mut stages[0]);
+            let busy = lamp_eyes::change::busy(
                 wanted.is_some(),
                 who.as_ref().is_some_and(|who| who.taking.is_some()),
                 any_face_at.map(|at| at.elapsed().as_micros() as u64),
             );
-            let found = Picture::from_jpeg(&frame[..used]).and_then(|picture| {
+            let decoded = Picture::from_jpeg(&frame[..used]);
+            stage(&mut stage_at, &mut stages[1]);
+            let found = decoded.and_then(|picture| {
                 let detect = lamp_eyes::change::detect(
                     change.as_mut(),
                     &picture,
-                    empty_room,
+                    busy,
                     lamp_ipc::monotonic_us(),
                 );
+                stage(&mut stage_at, &mut stages[2]);
                 // A frame like the last one the detector ran on, with
                 // nobody in it then: nobody in it now either.
                 let faces = if detect {
@@ -971,6 +987,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             }
                         }
                         let sight = choose(&faces, picture.filled);
+                        unfollowed += u32::from(!faces.is_empty() && sight.is_none());
                         let tall = picture.filled.1.max(1) as f32;
                         steady.look(
                             faces
@@ -1010,11 +1027,25 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 "lamp-eyes: {frames} frames, looked at {looks}, a face in {with_face}, {unreadable} unreadable, {:.0} ms a look{}{}{}",
                 spent.as_secs_f32() * 1e3 / (looks + unreadable).max(1) as f32,
                 if halved { ", steady" } else { "" },
-                change.as_mut().map_or(String::new(), |change| format!(
-                    ", {} of them unchanged and not detected, {:.0} ms a detected look",
-                    change.take_skipped(),
-                    detecting.as_secs_f32() * 1e3 / detected.max(1) as f32
-                )),
+                change.as_mut().map_or(String::new(), |change| {
+                    let each = |spent: Duration| {
+                        spent.as_secs_f32() * 1e3 / (looks + unreadable).max(1) as f32
+                    };
+                    let rest = spent
+                        .saturating_sub(stages.iter().sum::<Duration>())
+                        .saturating_sub(detecting);
+                    format!(
+                        ", {} of them unchanged and not detected, {:.0} ms a detected look{}; ms a look: sight file {:.1}, decode {:.1}, grid {:.1}, detector {:.1}, the rest {:.1}; {unfollowed} found faces but none to follow",
+                        change.skipped(),
+                        detecting.as_secs_f32() * 1e3 / detected.max(1) as f32,
+                        change.take_why().line(),
+                        each(stages[0]),
+                        each(stages[1]),
+                        each(stages[2]),
+                        each(detecting),
+                        each(rest),
+                    )
+                }),
                 still.as_ref().map_or(String::new(), |still| format!(
                     ", {} still faces left out so far",
                     still.left_out
@@ -1023,6 +1054,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             (frames, looks, with_face, unreadable) = (0, 0, 0, 0);
             spent = Duration::ZERO;
             (detected, detecting) = (0, Duration::ZERO);
+            (stages, unfollowed) = ([Duration::ZERO; 3], 0);
             reported_at = Instant::now();
         }
         std::thread::sleep(Duration::from_millis(5));
