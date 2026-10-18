@@ -514,6 +514,17 @@ pub enum Waiting {
 pub const WAIT_UNREADABLE_AFTER_US: u64 = 1_000_000;
 
 impl Waiting {
+    /// Whether the microphones are held closed: by the switch, a mute, a
+    /// hand, the restart guard or a switch that cannot be read. Not while
+    /// the switch is first read or has read open, which every start of the
+    /// voice passes through, muted or not (the reviewer on #1551).
+    pub fn closed(self) -> bool {
+        matches!(
+            self,
+            Self::Switch | Self::Muted | Self::Asleep | Self::RestartGuard | Self::Unreadable
+        )
+    }
+
     /// From the switch as the wait last read it, whether it has gone
     /// unread for [`WAIT_UNREADABLE_AFTER_US`], whether the software mute
     /// lets the lamp hear, and why it is set. The worst reason first: a
@@ -930,6 +941,18 @@ mod tests {
         };
         assert!(marked(&owed) && marked(&unread) && marked(&opening));
         assert!(!marked(&waiting_health(Waiting::Muted, false)));
+        // Owed is counted only while the microphones are held closed (the
+        // reviewer on #1551).
+        for closed in [
+            Waiting::Switch,
+            Waiting::Muted,
+            Waiting::Asleep,
+            Waiting::RestartGuard,
+            Waiting::Unreadable,
+        ] {
+            assert!(closed.closed(), "{closed:?}");
+        }
+        assert!(!Waiting::Reading.closed() && !Waiting::Opening.closed());
     }
 
     /// #1545: a reminder coming due, or said, in the wait is told at once,

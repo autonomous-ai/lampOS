@@ -32,9 +32,15 @@ const WALL: i64 = 1_791_964_800_000;
 const TEXT: &str = "The private tea timer is due.";
 
 fn clock() -> ClockSample {
+    clock_after(0)
+}
+
+/// Schedule's clock `ms` after the fixture's fixed start: its wall and boot
+/// clocks move together ([`RoundtripFixture::advance_wall`]).
+fn clock_after(ms: u64) -> ClockSample {
     ClockSample {
-        unix_ms: WALL + 1000,
-        boot_ms: 1000,
+        unix_ms: WALL + 1000 + i64::try_from(ms).unwrap(),
+        boot_ms: 1000 + ms,
         boot_id: CLOCK.into(),
         wall_trusted: true,
     }
@@ -71,6 +77,8 @@ struct Schedule {
     engine: Arc<Mutex<Engine<Store>>>,
     requests: Arc<Mutex<Vec<Request>>>,
     lose_acks: Arc<AtomicBool>,
+    /// How far Schedule's clock has been moved on, in ms.
+    advanced: Arc<AtomicU64>,
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
 }
@@ -107,11 +115,13 @@ impl Schedule {
         listener.set_nonblocking(true).unwrap();
         let requests = Arc::new(Mutex::new(Vec::new()));
         let lose_acks = Arc::new(AtomicBool::new(false));
+        let advanced = Arc::new(AtomicU64::new(0));
         let stop = Arc::new(AtomicBool::new(false));
-        let (shared, captured, lose, stopped) = (
+        let (shared, captured, lose, moved, stopped) = (
             engine.clone(),
             requests.clone(),
             lose_acks.clone(),
+            advanced.clone(),
             stop.clone(),
         );
         let thread = thread::spawn(move || {
@@ -145,7 +155,7 @@ impl Schedule {
                 let reply = shared
                     .lock()
                     .unwrap()
-                    .answer(request, &clock())
+                    .answer(request, &clock_after(moved.load(Ordering::Acquire)))
                     .unwrap_or_else(|error| refusal(error.code, error.message));
                 if mutation && lose.load(Ordering::Acquire) {
                     continue; // The real commit happened; its reply is lost.
@@ -158,6 +168,7 @@ impl Schedule {
             engine,
             requests,
             lose_acks,
+            advanced,
             stop,
             thread: Some(thread),
         }
@@ -248,8 +259,10 @@ impl RoundtripFixture {
     pub(crate) fn tick(&mut self) {
         self.sequence += 1;
         let now = monotonic_us();
-        let report = self.schedule.as_ref().unwrap().engine.lock().unwrap().due(
-            &clock(),
+        let schedule = self.schedule.as_ref().unwrap();
+        let at = clock_after(schedule.advanced.load(Ordering::Acquire));
+        let report = schedule.engine.lock().unwrap().due(
+            &at,
             ClockStamp {
                 clock_id: CLOCK.into(),
                 at_us: now,
@@ -299,6 +312,16 @@ impl RoundtripFixture {
     pub(crate) fn return_parent(&mut self, parent: Reminders) {
         assert!(self.parent.is_none(), "parent lent once");
         self.parent = Some(parent);
+    }
+
+    /// Moves Schedule's wall and boot clocks on by `ms`, as time passing
+    /// while the lamp is muted: a due item becomes that much later.
+    pub(crate) fn advance_wall(&self, ms: u64) {
+        self.schedule
+            .as_ref()
+            .unwrap()
+            .advanced
+            .fetch_add(ms, Ordering::AcqRel);
     }
 
     /// The person cancels the due item through Schedule, as the app does.
