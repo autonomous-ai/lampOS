@@ -175,6 +175,18 @@ impl Channel {
     /// [`Self::send_with`] instead of sleeping.
     pub fn receive_with<T: DeserializeOwned>(
         &mut self,
+        now: impl FnMut() -> u64,
+    ) -> io::Result<Option<T>> {
+        let received = self.take_next(now);
+        if received.is_err() {
+            // The runs worth reading end so (the reviewer on #1660).
+            self.say_run("ended by an error");
+        }
+        received
+    }
+
+    fn take_next<T: DeserializeOwned>(
+        &mut self,
         mut now: impl FnMut() -> u64,
     ) -> io::Result<Option<T>> {
         #[cfg(test)]
@@ -220,7 +232,7 @@ impl Channel {
         match on_time {
             Ok(()) => {
                 self.sender_held_up = false;
-                self.back_on_time();
+                self.say_run("on time again");
             }
             Err(_) if self.take_late && self.incoming.is_in_order(&packet) => {
                 self.incoming
@@ -228,7 +240,10 @@ impl Channel {
                     .map_err(|error| {
                         io::Error::new(error.kind(), format!("{}: {error}", self.name))
                     })?;
-                self.taken_late(now.saturating_sub(packet.sent_at_us), max_age_us);
+                self.taken_late(
+                    now.saturating_sub(packet.sent_at_us),
+                    max_age_us + self.held_up_us,
+                );
             }
             Err(_) if late_but_next() => {
                 self.incoming
@@ -252,26 +267,30 @@ impl Channel {
         Ok(Some(packet.payload))
     }
 
-    /// A late message taken ([`Self::taking_late`]): the first of a run is
-    /// said, and the run when it ends.
+    /// A late message taken ([`Self::taking_late`]), against the bound it
+    /// failed, the receiver's held-up time included: the first of a run is
+    /// said, and the run when it ends ([`Self::say_run`]).
     fn taken_late(&mut self, age_us: u64, bound_us: u64) {
         self.late_run += 1;
         self.late_oldest_us = self.late_oldest_us.max(age_us);
         if self.late_run == 1 {
-            eprintln!(
+            say(format!(
                 "lamp-voice: {}: a message {} us old (bound {bound_us} us) taken late, in order: the receiver was behind",
                 self.name, age_us
-            );
+            ));
         }
     }
 
-    /// An on-time message after a run of late ones: the run is said.
-    fn back_on_time(&mut self) {
+    /// A run of late messages, said as it ends: `on time again`, `ended by
+    /// an error` or `closed` with the channel, so a run that ends the
+    /// worker or goes quiet still says its count and its oldest (the
+    /// reviewer on #1660).
+    fn say_run(&mut self, how: &str) {
         if self.late_run > 0 {
-            eprintln!(
-                "lamp-voice: {}: on time again after {} late messages, the oldest {} us",
+            say(format!(
+                "lamp-voice: {}: {how} after {} late messages, the oldest {} us",
                 self.name, self.late_run, self.late_oldest_us
-            );
+            ));
             self.late_run = 0;
             self.late_oldest_us = 0;
         }
@@ -282,6 +301,30 @@ impl Channel {
     pub(crate) fn late_run(&self) -> u64 {
         self.late_run
     }
+}
+
+impl Drop for Channel {
+    fn drop(&mut self) {
+        self.say_run("closed");
+    }
+}
+
+/// A line for the journal; a test reads what its own thread said.
+fn say(line: String) {
+    #[cfg(test)]
+    SAID.with(|said| said.borrow_mut().push(line.clone()));
+    eprintln!("{line}");
+}
+
+#[cfg(test)]
+thread_local! {
+    static SAID: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The channels' lines this test thread said so far, taken.
+#[cfg(test)]
+pub(crate) fn said() -> Vec<String> {
+    SAID.with(|said| std::mem::take(&mut *said.borrow_mut()))
 }
 
 /// The channel's socket, for a loop that waits on several with `poll`
@@ -563,6 +606,156 @@ mod tests {
         assert!(
             refused.to_string().starts_with("provider.d.p: "),
             "{refused}"
+        );
+    }
+
+    /// Two messages in a row late through `sender` to `receiver`, each look
+    /// under the bound: the second's answer.
+    fn second_late(sender: &mut Channel, receiver: &mut Channel) -> io::Result<Option<u32>> {
+        let start = monotonic_us();
+        let at = |ms: u64| start + ms * 1_000;
+        assert_eq!(receiver.receive_with::<u32>(|| at(0)).unwrap(), None);
+        sender.send_with(1u32, || at(0)).unwrap();
+        assert_eq!(receiver.receive_with::<u32>(|| at(1)).unwrap(), Some(1));
+        for (message, ms) in [(2u32, 1), (3, 2), (4, 3)] {
+            sender.send_with(message, || at(ms)).unwrap();
+        }
+        assert_eq!(receiver.receive_with::<u32>(|| at(60)).unwrap(), Some(2));
+        assert_eq!(receiver.receive_with::<u32>(|| at(103)).unwrap(), Some(3));
+        receiver.receive_with::<u32>(|| at(104))
+    }
+
+    /// The reviewer on #1660: taking late is the provider's input alone.
+    /// Every other channel refuses the second late message in a row: the
+    /// provider's control both ways and its output, and every other
+    /// worker's data and control, both ways.
+    #[test]
+    fn only_the_providers_input_takes_late_and_every_other_channel_keeps_its_bound() {
+        let roles = [
+            "provider", "capture", "speaker", "privacy", "second", "ring", "probe", "camera",
+        ];
+        for role in roles {
+            let dir = SessionDirectory::create().unwrap();
+            let (parent, worker) = (new_boot().unwrap(), new_boot().unwrap());
+            let mut parent_side =
+                WorkerChannels::bind(&dir.path, role, parent, worker, false).unwrap();
+            let mut worker_side =
+                WorkerChannels::bind(&dir.path, role, parent, worker, true).unwrap();
+            parent_side.connect(&dir.path, role, false).unwrap();
+            worker_side.connect(&dir.path, role, true).unwrap();
+            let into_worker = second_late(&mut parent_side.data, &mut worker_side.data);
+            if role == "provider" {
+                assert_eq!(into_worker.unwrap(), Some(4), "{role}.d.w");
+            } else {
+                let refused = into_worker.unwrap_err().to_string();
+                assert!(refused.starts_with(&format!("{role}.d.w: ")), "{refused}");
+            }
+            for (name, refused) in [
+                (
+                    "d.p",
+                    second_late(&mut worker_side.data, &mut parent_side.data),
+                ),
+                (
+                    "c.w",
+                    second_late(&mut parent_side.control, &mut worker_side.control),
+                ),
+                (
+                    "c.p",
+                    second_late(&mut worker_side.control, &mut parent_side.control),
+                ),
+            ] {
+                let refused = refused.unwrap_err().to_string();
+                assert!(
+                    refused.starts_with(&format!("{role}.{name}: ")),
+                    "{refused}"
+                );
+            }
+        }
+    }
+
+    /// The reviewer on #1660: a run of late messages is said when it ends
+    /// in an error and when the channel closes, not only when the next is
+    /// on time; and the first line names the bound used, the receiver's
+    /// held-up time included.
+    #[test]
+    fn a_run_of_late_messages_is_said_however_it_ends() {
+        let start = monotonic_us();
+        let at = |ms: u64| start + ms * 1_000;
+        let late_run = |parent: &mut WorkerChannels, worker: &mut WorkerChannels| {
+            assert_eq!(worker.data.receive_with::<u32>(|| at(0)).unwrap(), None);
+            parent.data.send_with(1u32, || at(0)).unwrap();
+            assert_eq!(worker.data.receive_with::<u32>(|| at(1)).unwrap(), Some(1));
+            for (message, ms) in [(2u32, 1), (3, 2), (4, 3)] {
+                parent.data.send_with(message, || at(ms)).unwrap();
+            }
+            assert_eq!(worker.data.receive_with::<u32>(|| at(60)).unwrap(), Some(2));
+            assert_eq!(
+                worker.data.receive_with::<u32>(|| at(103)).unwrap(),
+                Some(3)
+            );
+            assert_eq!(
+                worker.data.receive_with::<u32>(|| at(104)).unwrap(),
+                Some(4)
+            );
+        };
+        let _ = said();
+        // Ended by an error: a message from another boot.
+        let dir = SessionDirectory::create().unwrap();
+        let (mut parent, mut worker) = provider(&dir.path);
+        late_run(&mut parent, &mut worker);
+        let lines = said();
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(
+            lines[0].contains("101000 us old (bound 100000 us) taken late"),
+            "{lines:?}"
+        );
+        let data = encode(&Envelope {
+            boot: new_boot().unwrap(),
+            sequence: 5,
+            sent_at_us: at(104),
+            payload: 5u32,
+        })
+        .unwrap();
+        parent.data.endpoint.try_send(&data).unwrap();
+        assert!(worker.data.receive_with::<u32>(|| at(105)).is_err());
+        assert_eq!(
+            said(),
+            [
+                "lamp-voice: provider.d.w: ended by an error after 2 late messages, the oldest 101000 us"
+            ]
+        );
+        // Closed with the channel, the worker gone quiet.
+        let dir = SessionDirectory::create().unwrap();
+        let (mut parent, mut worker) = provider(&dir.path);
+        late_run(&mut parent, &mut worker);
+        let _ = said();
+        drop(worker);
+        assert_eq!(
+            said(),
+            ["lamp-voice: provider.d.w: closed after 2 late messages, the oldest 101000 us"]
+        );
+        drop(parent);
+        // The bound said is the one used: the receiver held up 150 ms
+        // between its looks, so 250 ms.
+        let dir = SessionDirectory::create().unwrap();
+        let (mut parent, mut worker) = provider(&dir.path);
+        assert_eq!(worker.data.receive_with::<u32>(|| at(1)).unwrap(), None);
+        parent.data.send_with(1u32, || at(1)).unwrap();
+        parent.data.send_with(2u32, || at(2)).unwrap();
+        assert_eq!(
+            worker.data.receive_with::<u32>(|| at(150)).unwrap(),
+            Some(1)
+        );
+        assert_eq!(
+            worker.data.receive_with::<u32>(|| at(300)).unwrap(),
+            Some(2)
+        );
+        let lines = said();
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.contains("298000 us old (bound 250000 us) taken late")),
+            "{lines:?}"
         );
     }
 
