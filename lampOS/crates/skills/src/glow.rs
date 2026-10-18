@@ -10,12 +10,15 @@
 //! by itself once the other lapses (#940).
 use crate::Call;
 use lamp_bus::{Bus, Publisher, Subscriber};
-use lamp_msgs::{Claim, Light, LightOutranked, LightRequest, Priority};
+use lamp_msgs::{
+    Claim, Light, LightOutranked, LightPattern, LightReached, LightRequest, PatternKind, Priority,
+};
 use std::{
+    collections::HashMap,
     io,
     sync::{Arc, Mutex, MutexGuard, PoisonError, mpsc},
     thread::JoinHandle,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 /// The switch, off unless `on`, as the ring's.
@@ -41,6 +44,10 @@ pub struct Glows {
     pub out: Arc<Mutex<Publisher>>,
     pub clock_id: String,
     pub every: Duration,
+    /// When each skill's last pulse was drawn, as the ring said it on
+    /// `light/reached`, on the program's clock: the ring plays one a minute
+    /// from an asker, counted from what it drew, and the run says so.
+    pub pulses: Arc<Mutex<HashMap<String, Instant>>>,
 }
 
 /// A lock that a panic elsewhere left poisoned is still used: what it holds
@@ -60,10 +67,11 @@ pub struct Glow {
     renewing: Option<Renewing>,
 }
 
-/// The renewals of a skill's light: the light asked again, their stop, and
-/// their thread, which gives back what the light was outranked by.
+/// The renewals of a skill's light: the light asked again, with its
+/// pattern, their stop, and their thread, which gives back what the light
+/// was outranked by.
 struct Renewing {
-    held: Arc<Mutex<Light>>,
+    held: Arc<Mutex<(Light, Option<LightPattern>)>>,
     stop: mpsc::Sender<()>,
     thread: JoinHandle<Vec<String>>,
 }
@@ -80,6 +88,50 @@ fn outranked(bus: &Bus) -> Option<Subscriber> {
     )
     .map_err(|error| eprintln!("lamp-skills: light/outranked not subscribed to: {error}"))
     .ok()
+}
+
+/// `light/reached`, subscribed to under a name of its own for each run
+/// before its light is first asked: a pulse the ring drew is counted from
+/// there (the reviewer on #1494).
+fn reached(bus: &Bus) -> Option<Subscriber> {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let number = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    bus.subscribe_typed(
+        LightReached::TOPIC,
+        &format!("skills_seen_{number}"),
+        LightReached::TYPE,
+    )
+    .map_err(|error| eprintln!("lamp-skills: light/reached not subscribed to: {error}"))
+    .ok()
+}
+
+/// A pulse of `source`'s the ring said drawn since the last look, while
+/// the light it holds has one, counted in `pulses` from then; its renewals,
+/// said again, keep the first.
+fn seen(
+    reached: Option<&mut Subscriber>,
+    source: &str,
+    held: &Mutex<(Light, Option<LightPattern>)>,
+    pulses: &Mutex<HashMap<String, Instant>>,
+) {
+    let Some(reached) = reached else {
+        return;
+    };
+    while let Ok(Some(message)) = reached.recv(Duration::ZERO) {
+        let Ok(drawn) = message.parse::<LightReached>() else {
+            continue;
+        };
+        let pulsing = locked(held)
+            .1
+            .is_some_and(|pattern| pattern.kind == PatternKind::Pulse);
+        if drawn.source == source && pulsing {
+            let now = crate::clock::now();
+            let gap = Duration::from_micros(LightPattern::PULSE_GAP_US);
+            let mut pulses = locked(pulses);
+            pulses.retain(|_, at| now.saturating_duration_since(*at) < gap);
+            pulses.entry(source.to_owned()).or_insert(now);
+        }
+    }
 }
 
 /// What `source`'s light was said outranked by since the last look, each
@@ -124,8 +176,12 @@ impl Glow {
             return format!("{what}: left alone, since no light is on to dim");
         };
         // The skill's steps build on each other as written, whether or not
-        // the last one could be asked.
+        // the last one could be asked. A dim is steady.
         self.light = Some(light.clone());
+        let pattern = match call {
+            Call::Light { pattern, .. } => *pattern,
+            _ => None,
+        };
         // Looked at each time, so a ring that starts during the run is asked
         // from its next step on (the seventh on #1132).
         let taken = self
@@ -139,19 +195,20 @@ impl Glow {
             );
         }
         // Listened to before the first ask, and by the renewals after it.
-        let mut told = match self.renewing {
-            Some(_) => None,
-            None => outranked(&self.glows.bus),
+        let (mut told, mut drawn) = match self.renewing {
+            Some(_) => (None, None),
+            None => (outranked(&self.glows.bus), reached(&self.glows.bus)),
         };
         let until_us = lamp_ipc::monotonic_us() + GLOW_HOLDS_US;
-        if let Err(error) = ask_ring(&self.glows, &self.source, &light, until_us) {
+        if let Err(error) = ask_ring(&self.glows, &self.source, (&light, pattern), until_us) {
             return format!("{what}: light/request not written ({error})");
         }
         let level = light.level;
+        let moving = pattern.map_or(String::new(), |pattern| self.moving(pattern));
         match &self.renewing {
-            Some(renewing) => *locked(&renewing.held) = light,
+            Some(renewing) => *locked(&renewing.held) = (light, pattern),
             None => {
-                let held = Arc::new(Mutex::new(light));
+                let held = Arc::new(Mutex::new((light, pattern)));
                 let (stop, stopped) = mpsc::channel::<()>();
                 let (glows, source, again) =
                     (self.glows.clone(), self.source.clone(), Arc::clone(&held));
@@ -163,19 +220,49 @@ impl Glow {
                         crate::clock::recv_timeout(&stopped, glows.every)
                     {
                         heard(told.as_mut(), &source, &mut by);
-                        let light = locked(&again).clone();
+                        seen(drawn.as_mut(), &source, &again, &glows.pulses);
+                        let (light, pattern) = locked(&again).clone();
                         let until_us = lamp_ipc::monotonic_us() + GLOW_HOLDS_US;
-                        if let Err(error) = ask_ring(&glows, &source, &light, until_us) {
+                        let asked = (&light, pattern);
+                        if let Err(error) = ask_ring(&glows, &source, asked, until_us) {
                             eprintln!("lamp-skills: {source}'s light not asked again: {error}");
                         }
                     }
                     heard(told.as_mut(), &source, &mut by);
+                    seen(drawn.as_mut(), &source, &again, &glows.pulses);
                     by
                 });
                 self.renewing = Some(Renewing { held, stop, thread });
             }
         }
-        format!("{what}: asked of the ring at level {level}")
+        format!("{what}: asked of the ring at level {level}{moving}")
+    }
+
+    /// How the run's line says a pattern (#940 item 3), and for a pulse
+    /// whether the ring plays it: one a minute from the same skill, counted
+    /// from the last the ring drew.
+    fn moving(&self, pattern: LightPattern) -> String {
+        let ms = pattern.period_ms;
+        match pattern.kind {
+            PatternKind::Breathe => {
+                return format!(", breathing every {ms} ms down to {}", pattern.low);
+            }
+            PatternKind::Candle => return format!(", flickering as a candle every {ms} ms"),
+            PatternKind::Pulse => {}
+        }
+        let said = format!(", with one pulse of {ms} ms");
+        let now = crate::clock::now();
+        let gap = Duration::from_micros(LightPattern::PULSE_GAP_US);
+        match locked(&self.glows.pulses)
+            .get(&self.source)
+            .filter(|at| now.saturating_duration_since(**at) < gap)
+        {
+            Some(at) => format!(
+                "{said}; the pulse is not played: one a minute, and the last was shown {} s ago",
+                now.saturating_duration_since(*at).as_secs()
+            ),
+            None => said,
+        }
     }
 
     /// Stops asking and gives the light back, if it was asked for.
@@ -189,11 +276,11 @@ impl Glow {
         let Renewing { held, stop, thread } = renewing?;
         drop(stop);
         let by = thread.join().unwrap_or_default();
-        let light = locked(&held).clone();
+        let (light, pattern) = locked(&held).clone();
         // A time already passed: the ring lets it go at once, and shows the
         // person's light again.
         let until_us = lamp_ipc::monotonic_us().saturating_sub(1);
-        let back = match ask_ring(&glows, &source, &light, until_us) {
+        let back = match ask_ring(&glows, &source, (&light, pattern), until_us) {
             Ok(()) => "light given back: asked again with a time already passed".into(),
             Err(error) => format!(
                 "light not given back at once: light/request not written ({error}); the ring lets it go within {} s",
@@ -228,9 +315,14 @@ pub fn asked(call: &Call, from: Option<&Light>) -> Option<Light> {
     }
 }
 
-/// One `light/request` from `source` at skill priority, holding until
-/// `until_us` on the host's monotonic clock.
-fn ask_ring(glows: &Glows, source: &str, light: &Light, until_us: u64) -> io::Result<()> {
+/// One `light/request` from `source` at skill priority for a light and
+/// its pattern, holding until `until_us` on the host's monotonic clock.
+fn ask_ring(
+    glows: &Glows,
+    source: &str,
+    (light, pattern): (&Light, Option<LightPattern>),
+    until_us: u64,
+) -> io::Result<()> {
     let request = LightRequest {
         claim: Claim {
             source: source.to_owned(),
@@ -239,6 +331,7 @@ fn ask_ring(glows: &Glows, source: &str, light: &Light, until_us: u64) -> io::Re
             until_us,
         },
         light: light.clone(),
+        pattern,
     };
     locked(&glows.out)
         .publish_json(lamp_ipc::monotonic_us(), &request)
@@ -263,6 +356,7 @@ mod tests {
             colour: colour.into(),
             level,
             lasting: None,
+            pattern: None,
         }
     }
 
@@ -311,6 +405,7 @@ mod tests {
             out: Arc::new(Mutex::new(out)),
             clock_id: "boot-test".into(),
             every,
+            pulses: Arc::default(),
         };
         (dir, glows)
     }
@@ -412,6 +507,87 @@ mod tests {
                  outranked by skill:stretch-break, person"
             )
         );
+    }
+
+    /// #940 item 3: a light's pattern is asked of the ring with it and with
+    /// each renewal, a dim is steady, and a skill's second pulse within a
+    /// minute of one the ring drew is said not played; a pulse the ring
+    /// never drew is not counted (the reviewer on #1494).
+    #[test]
+    fn a_pattern_is_asked_with_the_light_and_a_second_pulse_is_said_not_played() {
+        let (_dir, glows, mut ring) = on_a_bus(Duration::from_millis(50));
+        let mut says = glows
+            .bus
+            .publisher_declared(LightReached::TOPIC, &LightReached::declaration(), "ring")
+            .unwrap();
+        let patterned = |kind, period_ms| Call::Light {
+            colour: "warm".into(),
+            level: Some(3),
+            lasting: None,
+            pattern: Some(LightPattern {
+                kind,
+                period_ms,
+                low: 1,
+            }),
+        };
+        let mut glow = Glow::new(&glows, "calm", None);
+        assert_eq!(
+            glow.ask(&patterned(PatternKind::Breathe, 6_000)),
+            "light warm: asked of the ring at level 3, breathing every 6000 ms down to 1"
+        );
+        std::thread::sleep(Duration::from_millis(120));
+        let asked = taken(&mut ring);
+        assert!(asked.len() >= 2, "{asked:?}");
+        assert!(
+            asked
+                .iter()
+                .all(|request| request.pattern.map(|p| p.kind) == Some(PatternKind::Breathe)),
+            "renewals carry it: {asked:?}"
+        );
+        assert_eq!(glow.ask(&dim(1)), "dim: asked of the ring at level 2");
+        std::thread::sleep(Duration::from_millis(80));
+        assert!(
+            taken(&mut ring)
+                .iter()
+                .all(|request| request.pattern.is_none())
+        );
+        glow.give_back();
+        let pulse = patterned(PatternKind::Pulse, 4_000);
+        // Drawn: the ring says so, and the next within the minute is not
+        // played.
+        let mut news = Glow::new(&glows, "news", None);
+        assert_eq!(
+            news.ask(&pulse),
+            "light warm: asked of the ring at level 3, with one pulse of 4000 ms"
+        );
+        let drawn = LightReached {
+            source: "skill:news".into(),
+            light: Light {
+                on: true,
+                colour: "warm".into(),
+                level: 3,
+            },
+        };
+        says.publish_json(1, &drawn).unwrap();
+        std::thread::sleep(Duration::from_millis(30));
+        news.give_back();
+        let mut again = Glow::new(&glows, "news", None);
+        assert!(
+            again
+                .ask(&pulse)
+                .ends_with("the pulse is not played: one a minute, and the last was shown 0 s ago")
+        );
+        again.give_back();
+        // Never drawn (a turn over it, or outranked): not counted.
+        let mut quiet = Glow::new(&glows, "quiet", None);
+        quiet.ask(&pulse);
+        quiet.give_back();
+        let mut next = Glow::new(&glows, "quiet", None);
+        assert_eq!(
+            next.ask(&pulse),
+            "light warm: asked of the ring at level 3, with one pulse of 4000 ms"
+        );
+        next.give_back();
     }
 
     #[test]

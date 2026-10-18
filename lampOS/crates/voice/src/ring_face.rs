@@ -9,8 +9,9 @@
 //! they counted clockwise as a person facing the lamp sees them (pixels 8,
 //! 16 and 24 at three, six and nine o'clock), and every angle here is
 //! counted that way.
+use lamp_msgs::{LightPattern, PatternKind};
 use lamp_ring::{PIXEL_COUNT, Rgb};
-use std::f32::consts::TAU;
+use std::f32::consts::{PI, TAU};
 
 /// What the lamp is doing, as far as its face is concerned.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -235,6 +236,9 @@ pub struct Face {
     /// The accent with the lamp's gesture ([`accent_code`]) and when it began.
     accent: u8,
     accent_at_us: u64,
+    /// How the lamp's own light moves at rest, and since when (#940 item 3,
+    /// a skill's pattern): none, and it rests in its own slow breath.
+    pattern: Option<(LightPattern, u64)>,
 }
 
 impl Default for Face {
@@ -265,6 +269,7 @@ impl Face {
             hum_turn: None,
             accent: 0,
             accent_at_us: 0,
+            pattern: None,
         }
     }
 
@@ -356,6 +361,14 @@ impl Face {
 
     pub fn lit(&self) -> Lit {
         self.lit
+    }
+
+    /// How the lamp's own light moves at rest, from when, or not at all
+    /// ([`crate::ring_light::RingLight::pattern`]): between the pattern's
+    /// low and the light's level, eased like any other change. A turn's
+    /// faces, a tap's and an ember are unchanged.
+    pub fn pattern(&mut self, pattern: Option<(LightPattern, u64)>) {
+        self.pattern = pattern;
     }
 
     /// The frame for `now_us`. `level` is the voice in play on the scale of
@@ -463,10 +476,27 @@ impl Face {
             && now_us >= self.accent_at_us
             && now_us - self.accent_at_us < ACCENT_US)
             .then(|| (now_us - self.accent_at_us) as f32 / ACCENT_US as f32);
+        // A skill's pattern: its kind, how many of its periods since it
+        // began, and its low.
+        let motion = self.pattern.map(|(pattern, since)| {
+            let period_us = f64::from(pattern.period_ms.max(1)) * 1_000.0;
+            let cycles = (now_us.saturating_sub(since) as f64 / period_us) as f32;
+            (pattern.kind, cycles, pattern.low)
+        });
         let mut frame = [Rgb::BLACK; PIXEL_COUNT];
         for (pixel, (shown, out)) in self.shown.iter_mut().zip(&mut frame).enumerate() {
             let angle = TAU * pixel as f32 / PIXEL_COUNT as f32;
-            let wanted = look(mood, self.level, seconds, angle, self.lit, ceiling, look_to);
+            // A pulse that has gone around is the light as it rests, with
+            // its own slow breath, not a still disc (the reviewer on #1494).
+            let moves = |(kind, cycles, _): &(PatternKind, f32, u8)| {
+                mood == Mood::Resting
+                    && self.lit.on
+                    && !(*kind == PatternKind::Pulse && *cycles >= 1.0)
+            };
+            let wanted = match motion.filter(moves) {
+                Some(motion) => moving(self.lit, motion, pixel),
+                None => look(mood, self.level, seconds, angle, self.lit, ceiling, look_to),
+            };
             let scale = accent_t.map_or([1.0; 3], |t| accent_scale(self.accent, t, angle));
             for ((channel, target), scale) in shown.iter_mut().zip(wanted).zip(scale) {
                 *channel += (target * brighten * open * scale - *channel) * ease;
@@ -573,6 +603,53 @@ pub fn toward(xmin: f32, ymin: f32, xmax: f32, ymax: f32) -> [f32; 2] {
         (0.5 - down).clamp(-0.5, 0.5),
     ]
 }
+
+/// A pixel of the lamp's own light moving in a skill's pattern (#940 item
+/// 3): `cycles` of its period since it was first drawn, its colour never
+/// shifting.
+/// - Breathe: the whole ring on a sine between the glow of `low` and the
+///   light's level, from its low.
+/// - Candle: each pixel wanders at most a fifth under the level (V1's
+///   candle, `CANDLE_FLICKER_MIN` 0.8), on two slow waves of two and three
+///   lobes, so neighbours stay close and the shimmer has no beat.
+/// - Pulse: at the level, one soft arc a sixth of the ring wide, up to a
+///   third brighter, goes once around over the period; then the light as
+///   it rests ([`look`]), drawn by [`Face::render`].
+fn moving(lit: Lit, (kind, cycles, low): (PatternKind, f32, u8), pixel: usize) -> [f32; 3] {
+    let glow = |level: u8| LEVEL_GLOW[usize::from(level.clamp(1, LEVELS)) - 1].0;
+    let top = glow(lit.level);
+    let angle = TAU * pixel as f32 / PIXEL_COUNT as f32;
+    let shown = match kind {
+        PatternKind::Breathe => {
+            let bottom = glow(low);
+            bottom + (top - bottom) * (0.5 - 0.5 * (TAU * cycles).cos())
+        }
+        PatternKind::Candle => {
+            let wander = 0.5
+                + 0.3 * (TAU * cycles + 2.0 * angle).sin()
+                + 0.2 * (TAU * cycles / 1.618 - 3.0 * angle + 1.1).sin();
+            top * (1.0 - CANDLE_DIP * wander.clamp(0.0, 1.0))
+        }
+        PatternKind::Pulse if cycles < 1.0 => {
+            let apart = (angle - TAU * cycles).rem_euclid(TAU);
+            let apart = apart.min(TAU - apart);
+            let width = TAU / 6.0;
+            let near = if apart < width {
+                0.5 + 0.5 * (PI * apart / width).cos()
+            } else {
+                0.0
+            };
+            top + ((top * PULSE_RISE).min(1.0) - top) * near
+        }
+        PatternKind::Pulse => top,
+    };
+    lit.tint.map(|channel| channel * shown)
+}
+
+/// How far under its level a candle dips at most: V1's 0.8 of its colour.
+const CANDLE_DIP: f32 = 0.2;
+/// How much brighter than the level a pulse's arc is at its middle.
+const PULSE_RISE: f32 = 1.35;
 
 /// The wanted colour of one pixel, each channel as a share of the ceiling.
 /// `look_to`: the eye's look, as the angle around the ring toward the
@@ -943,6 +1020,163 @@ mod tests {
             }
         }
         sums
+    }
+
+    /// A face resting in `colour` at `level`, moving in `kind` from 0 µs.
+    fn moving_face(colour: &str, level: u8, kind: PatternKind, period_ms: u32, low: u8) -> Face {
+        let mut face = Face::new();
+        face.light(Lit::of(true, colour, level).unwrap());
+        face.pattern(Some((
+            LightPattern {
+                kind,
+                period_ms,
+                low,
+            },
+            0,
+        )));
+        face
+    }
+
+    /// #940 item 3: a breath goes smoothly from the low level to the light's
+    /// level and back, once a period, starting low.
+    #[test]
+    fn a_breathing_light_eases_between_its_low_and_its_level_once_a_period() {
+        let mut face = moving_face("white", 4, PatternKind::Breathe, 6_000, 1);
+        let frames: Vec<u32> = play(&mut face, Mood::Resting, 0, 0, 600)
+            .iter()
+            .map(brightness)
+            .collect();
+        let mean = |level: u8| {
+            let mut steady = Face::new();
+            steady.light(Lit::of(true, "white", level).unwrap());
+            let frames = play(&mut steady, Mood::Resting, 0, 0, 300);
+            frames[100..].iter().map(brightness).sum::<u32>() / 200
+        };
+        let (low, high) = (mean(1), mean(4));
+        let second = &frames[300..];
+        let (least, most) = (*second.iter().min().unwrap(), *second.iter().max().unwrap());
+        assert!(least * 10 <= low * 13, "{least} against level 1's {low}");
+        assert!(
+            most * 10 >= high * 9 && most * 10 <= high * 11,
+            "{most} against {high}"
+        );
+        // Low at the start of each period, at its level half way.
+        assert!(frames[300] * 10 <= low * 13 + 10, "{}", frames[300]);
+        assert!(frames[450] * 10 >= high * 9, "{}", frames[450]);
+        // Smooth: no frame moves more than 3% of the way.
+        let range = most - least;
+        for pair in frames[20..].windows(2) {
+            assert!(
+                pair[0].abs_diff(pair[1]) * 100 <= range * 3,
+                "{pair:?} of {range}"
+            );
+        }
+    }
+
+    /// A candle at the product's ceiling (24) and the ring's 25 ms frames:
+    /// each pixel stays within a fifth under its level, as V1's did, its
+    /// colour that of the light, its neighbours close, and it still moves
+    /// (the reviewer on #1494: a swing from the lowest level broke dim
+    /// pixels' colour about five times a second).
+    #[test]
+    fn a_candle_flickers_shallow_with_close_neighbours_and_keeps_its_colour() {
+        for level in 3..=LEVELS {
+            let mut face = moving_face("orange", level, PatternKind::Candle, 1_000, 1);
+            let frames: Vec<[Rgb; PIXEL_COUNT]> = (0..120)
+                .map(|frame| face.render(Mood::Resting, 0, frame * 25_000, 24))
+                .collect();
+            let top = LEVEL_GLOW[usize::from(level) - 1].0 * 24.0;
+            let (floor, ceil) = ((top * 0.8).floor() - 1.0, top.ceil() + 1.0);
+            let mut apart = 0.0;
+            let mut pairs = 0.0;
+            for frame in &frames[20..] {
+                for (pixel, shown) in frame.iter().enumerate() {
+                    let red = f32::from(shown.red);
+                    assert!((floor..=ceil).contains(&red), "{level}: {shown:?}");
+                    // Orange's green is a third of its red, within the step
+                    // each of the two channels may round by.
+                    let green = f32::from(shown.green);
+                    assert!((green - red * 0.34).abs() <= 1.4, "{level}: {shown:?}");
+                    let next = frame[(pixel + 1) % PIXEL_COUNT];
+                    apart += (red - f32::from(next.red)).abs();
+                    pairs += 1.0;
+                }
+            }
+            assert!(
+                apart / pairs <= 2.0,
+                "{level}: neighbours {}",
+                apart / pairs
+            );
+            let one: Vec<u8> = frames[20..].iter().map(|frame| frame[0].red).collect();
+            assert!(
+                one.iter().max().unwrap() > one.iter().min().unwrap(),
+                "{level}: {one:?}"
+            );
+        }
+    }
+
+    /// A pulse: at the light's level, one soft brighter arc goes once
+    /// around the ring, never under the level; then the steady light.
+    #[test]
+    fn a_pulse_goes_once_around_over_its_level_and_then_is_steady() {
+        let mut face = moving_face("blue", 3, PatternKind::Pulse, 4_000, 1);
+        let frames = play(&mut face, Mood::Resting, 0, 0, 260);
+        let mut plain = Face::new();
+        plain.light(Lit::of(true, "blue", 3).unwrap());
+        let resting = play(&mut plain, Mood::Resting, 0, 0, 260);
+        let steady = (LEVEL_GLOW[2].0 * 48.0) as u8;
+        let brightest = |frame: &[Rgb; PIXEL_COUNT]| {
+            (0..PIXEL_COUNT)
+                .max_by_key(|&pixel| frame[pixel].blue)
+                .unwrap()
+        };
+        // Its head moves on around the ring through the period.
+        let heads: Vec<usize> = [20, 60, 100, 140, 180]
+            .iter()
+            .map(|&at| brightest(&frames[at]))
+            .collect();
+        for pair in heads.windows(2) {
+            let ahead = (pair[1] + PIXEL_COUNT - pair[0]) % PIXEL_COUNT;
+            assert!((1..PIXEL_COUNT / 2).contains(&ahead), "{heads:?}");
+        }
+        let peak = frames[20..190]
+            .iter()
+            .flat_map(|frame| frame.iter().map(|pixel| pixel.blue))
+            .max()
+            .unwrap();
+        assert!(peak >= steady + 5, "{peak} over {steady}");
+        for frame in &frames[20..] {
+            assert!(
+                frame.iter().all(|pixel| pixel.blue + 1 >= steady),
+                "{frame:?}"
+            );
+        }
+        // Done: the light as it rests with no pattern, its own slow breath
+        // and all, frame for frame once the face has eased back.
+        assert_eq!(frames[230..], resting[230..]);
+    }
+
+    /// A turn's faces and an ember never move with a pattern.
+    #[test]
+    fn a_pattern_moves_only_the_lamps_own_light_at_rest() {
+        let mut plain = Face::new();
+        plain.light(Lit::of(true, "white", 4).unwrap());
+        let mut breathing = moving_face("white", 4, PatternKind::Breathe, 6_000, 1);
+        for mood in [Mood::Listening, Mood::Thinking, Mood::Speaking] {
+            assert_eq!(
+                play(&mut plain, mood, 120, 0, 50),
+                play(&mut breathing, mood, 120, 0, 50),
+                "{mood:?}"
+            );
+        }
+        let mut ember = Face::new();
+        ember.light(Lit::of(false, "white", 4).unwrap());
+        let mut off = moving_face("white", 4, PatternKind::Candle, 1_500, 1);
+        off.light(Lit::of(false, "white", 4).unwrap());
+        assert_eq!(
+            play(&mut ember, Mood::Resting, 0, 0, 50),
+            play(&mut off, Mood::Resting, 0, 0, 50)
+        );
     }
 
     #[test]

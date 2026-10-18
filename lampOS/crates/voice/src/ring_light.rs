@@ -43,7 +43,7 @@
 //! (a colour that does not exist, a level outside 1 to 5) is passed over.
 use crate::{ring_face::Lit, ring_requests::Requests};
 use lamp_bus::{Bus, Publisher, Subscriber};
-use lamp_msgs::{Light, LightOutranked, LightReached, LightRequest};
+use lamp_msgs::{Light, LightOutranked, LightPattern, LightReached, LightRequest, PatternKind};
 use std::{io, path::Path, time::Duration};
 
 /// The name the ring's owner publishes under.
@@ -195,6 +195,13 @@ pub struct RingLight {
     /// Lights asked for that lapse, when switched on, and the one shown.
     requests: Option<(Subscriber, Requests)>,
     requested: Option<Light>,
+    /// The shown request's pattern, its asker and light, and since when it
+    /// moves (#940 item 3): from the first resting frame that draws it, and
+    /// a renewal keeps that, so a pulse plays once and is seen.
+    moving: Option<Moving>,
+    /// When each asker's last pulse began: a second inside
+    /// [`LightPattern::PULSE_GAP_US`] is drawn as already played.
+    pulses: Vec<(String, u64)>,
     /// Where a request's light is said reached, when switched on.
     reached: Option<Publisher>,
     /// Where the person's light is kept across a restart, when switched on.
@@ -205,6 +212,20 @@ pub struct RingLight {
     /// The request the face shows, until its light is said reached.
     reaching: Option<Reaching>,
 }
+
+/// A shown request's pattern, and its asker and light, so that only a new
+/// one starts it again, and since when on the ring's clock: none until a
+/// resting frame draws it.
+struct Moving {
+    source: String,
+    light: Light,
+    pattern: LightPattern,
+    since_us: Option<u64>,
+}
+
+/// At most this many askers' pulses are remembered: more than a minute's
+/// worth of every asker the ring keeps.
+const MOST_PULSES: usize = 2 * crate::ring_requests::MOST_SOURCES;
 
 /// A request's light the face shows: its asker, the light, since when
 /// resting frames have shown it running, the last such frame, whether it
@@ -262,6 +283,8 @@ impl RingLight {
                 drew: None,
                 requests: None,
                 requested: None,
+                moving: None,
+                pulses: Vec::new(),
                 reached: None,
                 outranked: None,
                 reaching: None,
@@ -439,6 +462,28 @@ impl RingLight {
                 });
             }
             let shown = requests.shown(now_us);
+            // Its pattern, started afresh only for a new asker, light or
+            // pattern.
+            let wanted = shown.and_then(|request| {
+                request
+                    .pattern
+                    .map(|pattern| (request.claim.source.as_str(), &request.light, pattern))
+            });
+            let same = match (&self.moving, wanted) {
+                (Some(moving), Some((source, light, pattern))) => {
+                    moving.source == source && moving.light == *light && moving.pattern == pattern
+                }
+                (None, None) => true,
+                _ => false,
+            };
+            if !same {
+                self.moving = wanted.map(|(source, light, pattern)| Moving {
+                    source: source.to_owned(),
+                    light: light.clone(),
+                    pattern,
+                    since_us: None,
+                });
+            }
             let light = shown.map(|request| &request.light);
             if light != self.requested.as_ref() {
                 self.requested = light.cloned();
@@ -483,6 +528,46 @@ impl RingLight {
     /// The light the ring is showing, as it says it.
     pub fn now(&self) -> &Light {
         &self.now
+    }
+
+    /// How the face's light moves, and since when (#940 item 3): the shown
+    /// request's pattern, none under a self-test or for the person's light.
+    pub fn pattern(&self) -> Option<(LightPattern, u64)> {
+        let moving = self.moving.as_ref().filter(|_| self.testing.is_none())?;
+        Some((moving.pattern, moving.since_us?))
+    }
+
+    /// A resting frame drew the face at `drawn_at_us`, showing the lamp's
+    /// own light or not: the shown request's pattern starts on the first
+    /// that does, never under a self-test. A pulse from an asker whose last
+    /// began within [`LightPattern::PULSE_GAP_US`] starts as already played
+    /// (the first builder on #940: "something came" twice is a nag), and
+    /// the minute counts from what was drawn, so a pulse a turn hid, or an
+    /// outranked one, is not counted (the reviewer on #1494).
+    fn start_moving(&mut self, drawn_at_us: u64, own_light: bool) {
+        let Some(moving) = self
+            .moving
+            .as_mut()
+            .filter(|moving| own_light && moving.since_us.is_none() && self.testing.is_none())
+        else {
+            return;
+        };
+        let mut since_us = drawn_at_us;
+        if moving.pattern.kind == PatternKind::Pulse {
+            let gap = LightPattern::PULSE_GAP_US;
+            self.pulses
+                .retain(|(_, at)| drawn_at_us.saturating_sub(*at) < gap);
+            if self.pulses.iter().any(|(asker, _)| *asker == moving.source) {
+                since_us = drawn_at_us.saturating_sub(u64::from(moving.pattern.period_ms) * 1_000);
+                eprintln!(
+                    "lamp-voice: ring: a second pulse from {} within a minute is not played",
+                    moving.source
+                );
+            } else if self.pulses.len() < MOST_PULSES {
+                self.pulses.push((moving.source.clone(), drawn_at_us));
+            }
+        }
+        moving.since_us = Some(since_us);
     }
 
     /// The light given to the face now: a test's, a request's that holds,
@@ -538,6 +623,7 @@ impl RingLight {
     /// said when it changes and once a second.
     pub fn drew(&mut self, drawn_at_us: u64, own_light: bool) {
         self.reach(drawn_at_us, own_light);
+        self.start_moving(drawn_at_us, own_light);
         let light = self.face().clone();
         if self.drew.as_ref().is_some_and(|(last, at)| {
             *last == light && drawn_at_us.saturating_sub(*at) < SAY_EVERY_US
@@ -881,6 +967,7 @@ mod tests {
                 until_us,
             },
             light: light(true, colour, 4),
+            pattern: None,
         }
     }
 
@@ -1158,6 +1245,100 @@ mod tests {
             std::thread::sleep(Duration::from_millis(2));
         }
         assert_eq!(ring.face(), &light(true, "white", 5));
+    }
+
+    /// #940 item 3: the shown request's pattern goes to the face from the
+    /// first resting frame that draws it; a renewal keeps that, a self-test
+    /// hides it, and a second pulse from the same asker within a minute of
+    /// one drawn is drawn as already played (the first builder on #940). A
+    /// pulse no frame drew (a turn's face over it) is not counted (the
+    /// reviewer on #1494).
+    #[test]
+    fn a_requests_pattern_moves_from_its_first_draw_and_pulses_once_a_minute() {
+        let root = Root::new("light-pattern");
+        let (mut ring, _) = RingLight::on(&root.0).unwrap();
+        ring.take_requests(&root.0, "boot-test").unwrap();
+        let bus = Bus::new(&root.0).unwrap();
+        let mut glows = bus
+            .publisher_declared(LightRequest::TOPIC, &LightRequest::declaration(), "skills")
+            .unwrap();
+        let mut tests = bus
+            .publisher_declared(TEST_TOPIC, &Light::declaration(), "selftest")
+            .unwrap();
+        let skill = lamp_msgs::Priority::Skill;
+        let with = |source: &str, until_us, kind, period_ms| {
+            let mut asked = request(source, skill, until_us, "green");
+            asked.pattern = Some(LightPattern {
+                kind,
+                period_ms,
+                low: 1,
+            });
+            asked
+        };
+        let mut at = 0u64;
+        ring.tick(at);
+        assert_eq!(ring.pattern(), None, "the person's light is steady");
+        let breath = with("skill:calm", 20_000_000, PatternKind::Breathe, 6_000);
+        glows.publish_json(1, &breath).unwrap();
+        looked(&mut ring, &mut at);
+        assert_eq!(ring.pattern(), None, "not drawn yet");
+        ring.drew(at, false);
+        assert_eq!(ring.pattern(), None, "a turn's face drew over it");
+        ring.drew(at, true);
+        let (pattern, since) = ring.pattern().unwrap();
+        assert_eq!((pattern.kind, since), (PatternKind::Breathe, at));
+        // A renewal keeps when it began.
+        glows.publish_json(2, &breath).unwrap();
+        looked(&mut ring, &mut at);
+        ring.drew(at, true);
+        assert_eq!(ring.pattern().unwrap().1, since);
+        // A self-test over it is steady, and the breath goes on after it.
+        tests.publish_json(3, &light(true, "red", 2)).unwrap();
+        looked(&mut ring, &mut at);
+        ring.drew(at, true);
+        assert_eq!(ring.pattern(), None);
+        at += TEST_HOLDS_US;
+        looked(&mut ring, &mut at);
+        assert_eq!(ring.pattern().unwrap().1, since);
+        // Given back: steady again.
+        glows
+            .publish_json(4, &with("skill:calm", 0, PatternKind::Breathe, 6_000))
+            .unwrap();
+        looked(&mut ring, &mut at);
+        assert_eq!(ring.pattern(), None);
+        // A pulse plays from its first draw; the same skill's next within a
+        // minute is drawn as played, another skill's is not.
+        let pulse = |source: &str, at: u64| with(source, at + 5_000_000, PatternKind::Pulse, 4_000);
+        // Asked, looked at, and drawn by a resting frame of the lamp's own
+        // light or another face: how long ago its pulse began, if it did.
+        let mut shown = |ring: &mut RingLight, at: &mut u64, number, source: &str, own| {
+            // Ticked first, as the ring always is: what lapsed is gone.
+            looked(ring, at);
+            glows.publish_json(number, &pulse(source, *at)).unwrap();
+            looked(ring, at);
+            ring.drew(*at, own);
+            ring.pattern().map(|(_, since)| *at - since)
+        };
+        assert_eq!(shown(&mut ring, &mut at, 5, "skill:news", true), Some(0));
+        at += 10_000_000;
+        assert_eq!(
+            shown(&mut ring, &mut at, 6, "skill:news", true),
+            Some(4_000_000),
+            "within the minute: played already"
+        );
+        at += 10_000_000;
+        assert_eq!(shown(&mut ring, &mut at, 7, "skill:mail", true), Some(0));
+        at += LightPattern::PULSE_GAP_US;
+        assert_eq!(
+            shown(&mut ring, &mut at, 8, "skill:news", true),
+            Some(0),
+            "a minute on, it plays"
+        );
+        // A pulse only a turn's face drew is not counted: the next plays.
+        at += 10_000_000;
+        assert_eq!(shown(&mut ring, &mut at, 9, "skill:quiet", false), None);
+        at += 10_000_000;
+        assert_eq!(shown(&mut ring, &mut at, 10, "skill:quiet", true), Some(0));
     }
 
     /// #940: two skills ask for the light at once. The newer is shown and

@@ -473,7 +473,30 @@ that takes the light (`src/ring_light.rs`). Started with
   while it stays hidden. A turn's face, a self-test and the privacy switch
   hide every request alike and are no loss, so nothing is said for them;
   a request outranked meanwhile is still told. The loser keeps its claim and is
-  shown by itself once what is over it lapses or is given back. A boot
+  shown by itself once what is over it lapses or is given back. A request
+  may carry a `pattern` (#940 item 3, `lamp_msgs/LightPattern`), and the
+  face moves the lamp's own light at rest in it, from the first resting
+  frame that draws that light (a renewal keeps it, a self-test never
+  starts it): `breathe`, the whole ring on a sine between the pattern's
+  `low` and the light's level, starting low, 4–12 s a breath (6 s when a
+  skill names none; under 5 s reads as anxious); `candle`, each pixel
+  wandering at most a fifth under the level, as V1's candle did, on two
+  slow waves of two and three lobes so neighbours stay close, 1–4 s a
+  wander, only at level 3 and up, where the ring keeps the colour's
+  channels at the product's ceiling (the reviewer on #1494: a swing from
+  the lowest level broke dim pixels' colour about five times a second);
+  `pulse`, at the light's level, one soft arc a sixth of the ring wide and
+  up to a third brighter going once around in 3–6 s (4 s by default, far
+  slower than the thinking face's point), then the light as it rests with
+  no pattern, its own slow breath and all, only at level 2 and up, where
+  the arc can be seen. The ring
+  plays one pulse a minute from an asker, counted from what it drew: a
+  second within it is drawn as already played and said in the voice's log
+  (the first builder on #940: "something came" twice is a nag), and a pulse
+  no frame drew (a turn over it, outranked) is not counted. V1's blink, notification flash
+  and rainbow are not taken: they read as a machine (CLAUDE.md's rule 8).
+  A turn's faces, a tap's, an ember and a self-test never move with it.
+  A ring without patterns shows the light steady: the field is optional. A boot
   clock that cannot be read is said once and the ring takes the person's
   light alone.
 
