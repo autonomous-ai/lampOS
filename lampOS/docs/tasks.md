@@ -478,7 +478,8 @@ hand rollback after it, stopped there, and hand-overs with them. A build
 now reads the state of the release after it:
 
 - **A field it doesn't know is passed over**, on the stored types: the
-  state, a task, its dispatch, read, observations, speech, close and audits. What a build writes is only what
+  state, a task, its dispatch, read, observations, speech, close and audits.
+  What a build writes is only what
   it knows, so if it saves that state, the newer fields are dropped, as if
   that release had never run. For #1425's `told`, a task told under it is
   then not closed by the newer build after a roll forward; its harness stays
@@ -495,8 +496,8 @@ now reads the state of the release after it:
   reviewer on #1512). It only answers an exact retry of that very request,
   which a restart refuses anyway (`stale_session` for the voice's trusted
   requests, `conflict` for the rest).
-- **A newer `schema`** is a change no older build may read: a new value in
-  a stored enum, a new required field, or a new field on a target. A build
+- **A newer `schema`** is a change no older build may read (the rule
+  below says which changes those are). A build
   that finds a `schema` above its own (1) keeps the store as it is,
   renamed `tasks.sqlite3.newer-<schema>-<unix seconds>` in the same folder
   (Harness's `HOME` beside it is not touched), and starts with an empty
@@ -515,7 +516,8 @@ now reads the state of the release after it:
   - an optional field whose absence would let an older build launch, close
     or speak more than the newer one would, such as "never close this one".
 
-  Any other new optional field (`#[serde(default)]`) needs nothing more. Not yet shown: `lamp-health` saying a store was set aside (only the
+  Any other new optional field (`#[serde(default)]`) needs nothing more. Not
+  yet shown: `lamp-health` saying a store was set aside (only the
   journal says so).
 
 Tests: `engine::tests::the_next_releases_state_opens_and_keeps_its_tasks`
