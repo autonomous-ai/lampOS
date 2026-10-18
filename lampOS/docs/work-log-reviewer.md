@@ -4,6 +4,50 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 09:08 merged #1421 (LAMP_UNCLEAR_HUM, off unless set); closed #1417
+- 09:07 #1448 reviewed at a997723f2: tests only (Linux); one P3 (the lock is the first field, dropped before the worker's channels); merge on green ARM64
+- 09:02 #1440 ready and green but conflicts with #1441's row in switches.md (adjacent rows); rebase asked
+- 09:02 merged #1441 (lamp-eyes --look-on-change, off unless set; detects each glance until 3 s still)
+- 09:00 merged #1423 (lamp-cloud: versions.firmware, iw bounded and a stuck one never waited for, no capability; off unless LAMP_CLOUD=on); one P3
+- 08:55 #1446 reviewed at c5e4c4ff5: on by default matches the 07:42 yes word for word; one P2 (two key lines untested: the engine from the named member and the staff kept with WHO; changing the first sends a named Codex to Claude Code); one P3; ARM64 green; the lamp run is the first builder's
+- 08:52 #1421 rebased onto #1436 (2fe5247c0): only its switches row, clean; merge on green ARM64
+- 08:47 #1444 reviewed at 839bc9933: ready (#1435's P3s fixed; gate 1951/0/11, ARM64 green) but on the first builder's 08:36 hold for a P1 (the print child inheriting the voice's real-time priority, older than both PRs). #1445 (43d42ce91) waits for the hold and #1444; one P3
+- 08:45 #1440 (413d9668d: P3s fixed, a row added), #1441 (142bf0b91: doc P3s, a row) and #1425 (24fe410fb: its row in the new form) rebased onto #1436, all clean
+- 08:38 #1446 ready (a hand-over to a missing target; step 3 on by default per the first builder's 07:42 yes); review started
+- 08:37 merged #1436 (switches.md counts worked out by a test from each row's Counted as)
+- 08:32 #1440 (6fea732e1) and #1441 (843b15439) moved but still conflict (count line, before #1394); both wait for #1436
+- 08:32 merged #1443 (hearing_replay scores the linear output at a chosen explained share, with onset_needed and the step)
+- 08:30 #1445 ready (voice print asked at 1.8 s; sits on #1444); review queued after #1444. #1423 moved to 09b880d51; re-check started. #1442 back to draft
+- 08:19 #1436 rebased to 5e9abe494 (PATIENCE row 'on', clean); merge on green ARM64. #1444 ready (#1435's P3s); review started
+- 08:17 #1436 reviewed at c9d479464: counts right row by row, one P3 (a duplicate row passes); needs a rebase over #1394. Posted the merge order on #705: #1436 first, then #1421/#1440/#1441/#1442 rebase once
+- 08:17 #1441 re-checked at 86d52d063: the P2 fixed (detect each glance until 3 s still, a walk-in test), P3s fixed, one doc P3; conflicts in switches.md; waits for #1436, then rebase and ARM64
+- 08:16 #1440 moved to 83a445389 (the bar's range now -90 to -30, a mistyped -20 refused); still conflicts in switches.md; waits for #1436
+- 08:16 #1421 green at caf5047df but conflicts again after #1394; rebase after #1436
+- 08:14 #1443 P3 fixed at 8bb600611 (onset_needed and Interruption's step); merge on green ARM64
+- 08:14 merged #1414 (fold-and-start.sh for lamp-4ace's step 4a; hold lifted 06:45)
+- 08:14 merged #1439 (speaking under --steady-rate in practice unknown; eyes.md says how fast it answers)
+- 08:13 #1442 reviewed at 50cea7d71: conflicts in switches.md (rebase); three P3s (warm fires on every line, not once per idle; no test of the GET off/on or that it carries no key; the 0.30 s is a connect cost, not a measured saving); ARM64 green on the old base
+- 08:12 #1440 ready but conflicts in switches.md after #1394; rebase asked (after #1436 if it lands first)
+- 08:11 #1423 reviewed at b08449320: one commit, clean; one P2 (wait() after killing a hung iw can still block the keepalive thread while iw sleeps in the driver; keep the killed child and try_wait it); gate 25/0/0, ARM64 green
+- 08:09 #1441 reviewed at 97b7f7701: one P2 (after a change the detector runs on one frame of the new still picture, then not for 3 s, so a missed face costs 3 s; keep detecting each glance for 3 s after a change), two P3s; ARM64 green
+- 08:07 #1394 merged by the first builder
+- 08:07 merged #1438 (lamp-update's bus test publishes the state last; tests only); closed #1437
+- 07:58 #1443 reviewed at 4670e311e: example and doc only; one P3 (7 in a row is a yield only after the reply's first 1.2 s, 10 before); merge on green ARM64
+- 07:57 #1414 at c868bb799: P3 fixed, hold lifted (06:45); #1421 rebased to caf5047df (count only); #1439 kept as two commits; all three merge on green ARM64
+- 07:54 #1439 P3 answered at 9788d6121 as a second commit; asked to fold into one
+- 07:54 #1423 (lamp-cloud P3s) and #1442 (LAMP_SECOND_WARM) ready; reviews started. #1440 moved to 491757998
+- 07:51 #1441 ready (lamp-eyes skips the detector on an empty room's unchanged frame, off unless set); review started
+- 07:49 merged #1435 (the voice says when a print was not back at its answer; journal line only, off unless set); three P3s
+- 07:47 #1394 rebased to 4e22ef037 (count line only): no P1/P2, clean; the first builder merges on green ARM64. #1440 ready (lamp-name rests while quiet, off unless set); review started
+- 07:44 #1439 reviewed at c99c097d9: docs and tests, off by default; one P3 ('always unknown' depends on looks landing over 500 ms apart: the window keeps exactly-2-s-old looks); merge on green ARM64
+- 07:41 merged #1430 (a recording keeps a held-back block's reference steps and replay-aec takes them; a replay-only guess too); one P3
+- 07:39 #1421 conflicts again after #1418; one more rebase asked
+- 07:39 noted #1418's merge on #1396 (stays open) and #1404 (to close by its owner)
+- 07:38 merged #1418 (lamp-cloud on lamp-voice, setup's account path, off unless LAMP_CLOUD=on; El approved)
+- 07:35 #1421 rebased to ba502cba5: Seventh's P3s (a comment and a ring-frame test assertion) and count 115; clean; merge on green ARM64. #1435 ready (the voice says when a print was not back; #829); review started
+- 07:30 #1421 re-checked at f86f5cf26: Seventh's three P2s fixed (each mutation fails the new loop test), code ready; conflicts in switches.md after #1397; rebase after #1418 lands
+- 07:20 #1418 rebased to 3491c6d66 (count lines only, clean); merge on green ARM64
+- 07:19 merged #1433 (a doc comment: setup's save-order test pins what lamp-cloud needs)
 - 07:16 merged #1431 (#1426's P3s: a run by hand keeps an installed build's fail; the build check tested)
 - 07:15 #1434 reviewed at 541fec889: four P2s (trace lines never written; a resent line goes alone, losing a continues line's first half; the 'spoken to the lamp' guard missing with no recorded yes to drop it, so room talk could go to the cloud twice; a fix-up commit leaves five commits that don't build), four P3s; asked the first builder for a yes or no on dropping the guard
 - 07:13 #1418 re-checked at 945e68e5e: no code findings, cloud-on.sh drop-in fixed with a test, lamp-06c1 plan matches; conflicts again in switches.md's count after #1397; merge after a rebase, range-diff and green ARM64
