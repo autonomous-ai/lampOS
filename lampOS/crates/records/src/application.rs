@@ -1,7 +1,7 @@
 use lamp_records::{
-    RunReport,
+    REPORT_SCHEMA_VERSION, RunReport,
     config::{Config, absolute_path, invalid},
-    json_file::{self, CONFIG_BYTES, REPORT_BYTES},
+    json_file::{self, CONFIG_BYTES, ReportRead},
     report::{RefusedInARow, Reporter, diagnostic_after},
     run,
 };
@@ -105,7 +105,7 @@ fn print(value: &impl serde::Serialize) -> io::Result<()> {
 
 fn synthetic(config: &Config, at_unix_s: u64, error: Option<String>) -> RunReport {
     RunReport {
-        schema_version: 1,
+        schema_version: REPORT_SCHEMA_VERSION,
         config_fingerprint: config.fingerprint(),
         at_unix_s,
         mode: "apply".into(),
@@ -116,10 +116,7 @@ fn synthetic(config: &Config, at_unix_s: u64, error: Option<String>) -> RunRepor
 }
 
 fn persist(config: &Config, path: &Path, result: &mut RunReport) {
-    let persisted = result
-        .validate()
-        .and_then(|()| json_file::write(path, result));
-    if let Err(error) = persisted {
+    if let Err(error) = json_file::write_report(path, result) {
         // An oversized/invalid result must not poison the next timer run.
         // Keep detailed outcomes on stdout and try a small, valid failure
         // receipt for the live reporter.
@@ -129,7 +126,7 @@ fn persist(config: &Config, path: &Path, result: &mut RunReport) {
             result.at_unix_s,
             Some("cannot persist full cleanup result; see cleanup stdout".into()),
         );
-        if json_file::write(path, &failure).is_err() {
+        if json_file::write_report(path, &failure).is_err() {
             eprintln!("lamp-records: cannot persist even the failure receipt");
         }
     }
@@ -205,14 +202,13 @@ fn reporting_with(
             fallback = synthetic(&config, at, None);
             &fallback
         } else {
-            match json_file::read_changed::<RunReport>(&result, REPORT_BYTES, result_stamp.as_ref())
-            {
-                Ok(Some((report, stamp))) => {
+            match json_file::read_report_changed(&result, result_stamp.as_ref(), at) {
+                Ok(Some((ReportRead::Current(report), stamp))) => {
                     cached = Some(report);
                     result_stamp = Some(stamp);
                 }
                 Ok(None) => {}
-                Err(_) => {
+                Ok(Some((ReportRead::SetAside, _))) | Err(_) => {
                     cached = None;
                     result_stamp = None;
                 }
@@ -303,9 +299,10 @@ fn command_with_reporting(
                         "report file must be outside record roots and the bus",
                     ));
                 }
-                // Refuse an unrelated existing file. Atomic prior receipts can
-                // be replaced; corrupted/unknown files need operator review.
-                match json_file::read::<RunReport>(path, REPORT_BYTES) {
+                // Retain a newer schema whole. Same-schema unknown values,
+                // corruption and unrelated files still require review before
+                // any cleanup runs.
+                match json_file::read_report_changed(path, None, now()?) {
                     Ok(_) => {}
                     Err(error) if error.kind() == io::ErrorKind::NotFound => {}
                     Err(_) => {

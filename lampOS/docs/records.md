@@ -200,10 +200,10 @@ The empty `processes` object is omitted, and old receipts without this field
 remain readable. The total observation bound is 131,072 (two passes of at
 most 65,536 processes); receipt reading bounds the example list before
 allocating extra entries. These details stay in stdout and the private
-receipt, not the one-second bus diagnostic. Use the matching Records binary
-for cleanup and reporting: an older reporter rejects the added field rather
-than trusting a result it does not understand. The supplied `enabled:false`
-default and the requirement for explicit `--apply` are unchanged.
+receipt, not the one-second bus diagnostic. Report readers tolerate added
+fields, including inside these observations; unknown reason values are still
+refused. The supplied `enabled:false` default and the requirement for explicit
+`--apply` are unchanged.
 
 ### Removal and recovery
 
@@ -305,6 +305,47 @@ and attempts a small failure receipt instead. If that also fails, the prior
 complete receipt and its original timestamp remain; failure is still printed
 and returned. A regression verifies that the next cleanup can replace the
 small failure receipt.
+
+### Persisted reports after a rollback
+
+Within schema version 1, readers ignore fields they do not know on `RunReport`,
+`RootReport`, `Disk`, `ProcessObservations` and `ProcessSkip`. Existing reports,
+including roots without `processes`, still read the same way. A save writes only
+the current build's fields, so fields added by a later build are not retained
+in its replacement. Required fields, known-field types, bounds and configuration
+fingerprint matching remain enforced. `ProcessSkipReason` still accepts only
+`gone`, `zombie` and `exiting`; unknown reason strings and unknown tagged values
+are refused, as is another `mode`. Configuration and fixture/wire readers stay
+strict.
+
+A future change that adds a required field, enum value or changes a field's
+meaning must bump `REPORT_SCHEMA_VERSION`; an optional field can keep it.
+When `check --apply --report` or an enabled reporter reads a greater schema
+version, it retains the whole file as `last.json.newer-<schema>-<unix s>` beside
+`last.json` (using the actual result filename). The journal records that once
+after a successful rename. Recognition still requires valid JSON within 8 MiB
+and a structurally recognizable envelope: an unsigned 64-bit schema, valid
+fingerprint, unsigned timestamp, a mode string of at most 128 decoded UTF-8
+bytes, boolean `enabled`, and at most four roots. Future mode values and the
+contents of future roots are not interpreted or trusted as cleanup evidence.
+An absent or invalid envelope is refused and remains in place; mode values in
+the supported schema still have to be `apply` or `dry_run`.
+
+Archival uses the writer's private-directory lock, checks the source identity
+again, refuses to overwrite an existing archive and syncs the parent directory.
+A changed source, unsafe file, unavailable lock or archival failure does not
+permit the report to be used or overwritten. The writer repeats this check
+before saving, so a newer report installed after cleanup preflight is retained
+too. Unknown values in the supported schema and malformed files remain intact;
+the failure-receipt fallback cannot replace them. An archive collision refuses
+that attempt and leaves both files intact.
+
+The reporter discards cached evidence after archival and reports the ordinary
+missing-result error. It creates no replacement file. Only a subsequent cleanup
+can produce a current receipt; `check` archives before cleanup, then follows
+the usual enablement and live-process safeguards. Disabled reporting still
+needs no receipt and does not archive one. This policy helps the next release
+roll back to this reader; it cannot change already-installed older readers.
 
 ## Commands and diagnostics
 

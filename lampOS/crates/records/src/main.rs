@@ -28,6 +28,7 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lamp_records::json_file::REPORT_BYTES;
     fn args(value: &str) -> io::Result<Command> {
         arguments(
             &value
@@ -186,6 +187,28 @@ mod tests {
         assert!(recovered.error.is_none());
         assert!(!recovered.enabled);
         assert!(!json_file::temporary_path(&path).unwrap().exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn failure_receipt_cannot_overwrite_an_unknown_supported_value() {
+        use std::{fs, os::unix::fs::PermissionsExt};
+        let dir = fs::canonicalize(env::temp_dir())
+            .unwrap()
+            .join(format!("lamp-records-unrecognized-{}", std::process::id()));
+        fs::create_dir(&dir).unwrap();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+        let path = dir.join("last.json");
+        let config = Config::customer_default();
+        let mut result = synthetic(&config, 10, None);
+        let mut unknown = serde_json::to_value(&result).unwrap();
+        unknown["mode"] = "later_mode".into();
+        let bytes = serde_json::to_vec(&unknown).unwrap();
+        fs::write(&path, &bytes).unwrap();
+        persist(&config, &path, &mut result);
+        assert!(result.error.is_some());
+        assert_eq!(fs::read(&path).unwrap(), bytes);
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1);
         fs::remove_dir_all(dir).unwrap();
     }
 }

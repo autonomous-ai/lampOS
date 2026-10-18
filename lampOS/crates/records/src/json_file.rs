@@ -1,8 +1,11 @@
 //! Bounded configuration/result files with descriptor-relative atomic writes.
-use crate::config::{absolute_path, invalid};
+use crate::{
+    RunReport,
+    config::{absolute_path, invalid},
+};
 use rustix::{
     fd::OwnedFd,
-    fs::{self, AtFlags, FileType, Mode, OFlags},
+    fs::{self, AtFlags, FileType, Mode, OFlags, RenameFlags},
 };
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
@@ -129,8 +132,21 @@ pub fn read_changed<T: DeserializeOwned>(
     prior: Option<&Stamp>,
 ) -> io::Result<Option<(T, Stamp)>> {
     let dir = parent(path, false)?;
+    let Some((bytes, stamp)) = read_bytes(&dir, path, limit, prior)? else {
+        return Ok(None);
+    };
+    let value = serde_json::from_slice(&bytes).map_err(|error| invalid(error.to_string()))?;
+    Ok(Some((value, stamp)))
+}
+
+fn read_bytes(
+    dir: &OwnedFd,
+    path: &Path,
+    limit: usize,
+    prior: Option<&Stamp>,
+) -> io::Result<Option<(Vec<u8>, Stamp)>> {
     let fd = open_read(
-        &dir,
+        dir,
         path.file_name().unwrap(),
         OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
     )?;
@@ -151,14 +167,78 @@ pub fn read_changed<T: DeserializeOwned>(
             "JSON file changed during read or exceeded its bound",
         ));
     }
-    let value = serde_json::from_slice(&bytes).map_err(|error| invalid(error.to_string()))?;
-    Ok(Some((value, before)))
+    Ok(Some((bytes, before)))
 }
 
 pub fn read<T: DeserializeOwned>(path: &Path, limit: usize) -> io::Result<T> {
     read_changed(path, limit, None)?
         .map(|(value, _)| value)
         .ok_or_else(|| io::Error::other("missing JSON result"))
+}
+
+/// A newer report is retained whole, never used as current cleanup evidence.
+#[derive(Debug)]
+pub enum ReportRead {
+    Current(RunReport),
+    SetAside,
+}
+
+fn decode_report(bytes: &[u8]) -> io::Result<Result<RunReport, u64>> {
+    match serde_json::from_slice::<RunReport>(bytes) {
+        Ok(report) => Ok(Ok(report)),
+        Err(_) => match crate::newer_report_schema(bytes)? {
+            Some(schema) => Ok(Err(schema)),
+            None => Err(invalid("unrecognized cleanup report")),
+        },
+    }
+}
+
+/// Read a changed report with the ordinary trust and size checks. A newer
+/// schema is moved aside under the same lock as writers; an observed
+/// replacement, collision or failure leaves it untrusted and is an error.
+pub fn read_report_changed(
+    path: &Path,
+    prior: Option<&Stamp>,
+    at_unix_s: u64,
+) -> io::Result<Option<(ReportRead, Stamp)>> {
+    let dir = parent(path, false)?;
+    let Some((bytes, stamp)) = read_bytes(&dir, path, REPORT_BYTES, prior)? else {
+        return Ok(None);
+    };
+    match decode_report(&bytes)? {
+        Ok(report) => Ok(Some((ReportRead::Current(report), stamp))),
+        Err(schema) => {
+            trusted_directory(&dir, true)?;
+            fs::flock(&dir, fs::FlockOperation::NonBlockingLockExclusive)?;
+            set_aside_report(&dir, path, &stamp, schema, at_unix_s)?;
+            Ok(Some((ReportRead::SetAside, stamp)))
+        }
+    }
+}
+
+fn set_aside_report(
+    dir: &OwnedFd,
+    path: &Path,
+    expected: &Stamp,
+    schema: u64,
+    at_unix_s: u64,
+) -> io::Result<()> {
+    // A writer may have replaced the result between its read and this lock.
+    // The private directory and cooperating-writer lock protect the rename;
+    // a changed source is never moved under an earlier result's identity.
+    if read_bytes(dir, path, REPORT_BYTES, Some(expected))?.is_some() {
+        return Err(invalid(
+            "cleanup result changed before it could be set aside",
+        ));
+    }
+    let name = path.file_name().unwrap();
+    let kept = format!("{}.newer-{schema}-{at_unix_s}", name.to_str().unwrap());
+    fs::renameat_with(dir, name, dir, kept.as_str(), RenameFlags::NOREPLACE)?;
+    fs::fsync(dir)?;
+    eprintln!(
+        "lamp-records: cleanup result is newer than this build (schema {schema}); kept as {kept}; awaiting a new cleanup result"
+    );
+    Ok(())
 }
 
 pub fn temporary_path(path: &Path) -> io::Result<PathBuf> {
@@ -200,8 +280,36 @@ pub fn write<T: Serialize>(path: &Path, value: &T) -> io::Result<()> {
     }
     let dir = parent(path, true)?;
     fs::flock(&dir, fs::FlockOperation::NonBlockingLockExclusive)?;
+    write_locked(&dir, path, &bytes)
+}
+
+/// Recheck the prior report while holding the writer lock, including when a
+/// newer build replaced it after the cleanup's preflight. Unknown same-schema
+/// values and malformed files are refused without overwriting them.
+pub fn write_report(path: &Path, report: &RunReport) -> io::Result<()> {
+    report.validate()?;
+    let bytes = serde_json::to_vec(report).map_err(io::Error::other)?;
+    if bytes.len() > REPORT_BYTES {
+        return Err(invalid("report exceeds its size bound"));
+    }
+    let dir = parent(path, true)?;
+    fs::flock(&dir, fs::FlockOperation::NonBlockingLockExclusive)?;
+    match read_bytes(&dir, path, REPORT_BYTES, None) {
+        Ok(Some((prior, stamp))) => {
+            if let Err(schema) = decode_report(&prior)? {
+                set_aside_report(&dir, path, &stamp, schema, report.at_unix_s)?;
+            }
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+        Ok(None) => unreachable!("an uncached read always returns the file"),
+    }
+    write_locked(&dir, path, &bytes)
+}
+
+fn write_locked(dir: &OwnedFd, path: &Path, bytes: &[u8]) -> io::Result<()> {
     let name = path.file_name().unwrap();
-    match fs::statat(&dir, name, AtFlags::SYMLINK_NOFOLLOW) {
+    match fs::statat(dir, name, AtFlags::SYMLINK_NOFOLLOW) {
         Ok(stat) => regular(&stat)?,
         Err(rustix::io::Errno::NOENT) => {}
         Err(error) => return Err(error.into()),
@@ -210,35 +318,35 @@ pub fn write<T: Serialize>(path: &Path, value: &T) -> io::Result<()> {
     // residue. Never remove a linked/special/untrusted replacement there.
     let temporary = temporary_path(path)?;
     let temp = temporary.file_name().unwrap().to_str().unwrap();
-    match fs::statat(&dir, temp, AtFlags::SYMLINK_NOFOLLOW) {
+    match fs::statat(dir, temp, AtFlags::SYMLINK_NOFOLLOW) {
         Ok(stat) => {
             regular(&stat)?;
             if stat.st_mode & 0o7777 != 0o600 {
                 return Err(invalid("temporary report file is not private"));
             }
-            fs::unlinkat(&dir, temp, AtFlags::empty())?;
+            fs::unlinkat(dir, temp, AtFlags::empty())?;
         }
         Err(rustix::io::Errno::NOENT) => {}
         Err(error) => return Err(error.into()),
     }
     let fd = fs::openat(
-        &dir,
+        dir,
         temp,
         OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
         Mode::RUSR | Mode::WUSR,
     )?;
     let mut file = File::from(fd);
     let result = (|| -> io::Result<()> {
-        file.write_all(&bytes)?;
+        file.write_all(bytes)?;
         file.sync_all()?;
-        fs::renameat(&dir, temp, &dir, name)?;
-        fs::fsync(&dir)?;
+        fs::renameat(dir, temp, dir, name)?;
+        fs::fsync(dir)?;
         Ok(())
     })();
     // After successful rename this name is absent. It was exclusively ours;
     // trusted private-parent ownership is the namespace contract here too.
     if result.is_err() {
-        let _ = fs::unlinkat(&dir, temp, AtFlags::empty());
+        let _ = fs::unlinkat(dir, temp, AtFlags::empty());
     }
     result
 }
@@ -264,6 +372,184 @@ mod tests {
         stdfs::set_permissions(&dir, stdfs::Permissions::from_mode(0o700)).unwrap();
         dir
     }
+
+    fn report() -> RunReport {
+        RunReport {
+            schema_version: crate::REPORT_SCHEMA_VERSION,
+            config_fingerprint: "0123456789abcdef".repeat(4),
+            at_unix_s: 17,
+            mode: "apply".into(),
+            enabled: false,
+            roots: vec![],
+            error: None,
+        }
+    }
+
+    fn newer() -> Vec<u8> {
+        let mut value = serde_json::to_value(report()).unwrap();
+        value["schema_version"] = 2.into();
+        value["mode"] = "later_mode".into();
+        value["roots"] = serde_json::json!([{"later_kind": "new_enum_value"}]);
+        serde_json::to_vec_pretty(&value).unwrap()
+    }
+
+    #[test]
+    fn current_report_ignores_added_fields_and_keeps_the_stamp_cache() {
+        let dir = scratch();
+        let path = dir.join("last.json");
+        let mut later = serde_json::to_value(report()).unwrap();
+        later["later"] = serde_json::json!({"kind": "future_detail"});
+        write(&path, &later).unwrap();
+        let (value, stamp) = read_report_changed(&path, None, 17).unwrap().unwrap();
+        let ReportRead::Current(value) = value else {
+            panic!("added fields must not set aside the current schema")
+        };
+        assert_eq!(
+            serde_json::to_value(&value).unwrap(),
+            serde_json::to_value(report()).unwrap()
+        );
+        assert!(
+            read_report_changed(&path, Some(&stamp), 18)
+                .unwrap()
+                .is_none()
+        );
+        write_report(&path, &value).unwrap();
+        assert_eq!(
+            stdfs::read(&path).unwrap(),
+            serde_json::to_vec(&value).unwrap()
+        );
+        assert_eq!(stdfs::read_dir(&dir).unwrap().count(), 1);
+        stdfs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn newer_report_is_kept_whole_once_without_creating_cleanup_evidence() {
+        let dir = scratch();
+        let path = dir.join("last.json");
+        let bytes = newer();
+        stdfs::write(&path, &bytes).unwrap();
+        let (value, _) = read_report_changed(&path, None, 17).unwrap().unwrap();
+        assert!(matches!(value, ReportRead::SetAside));
+        assert!(!path.exists());
+        let kept = dir.join("last.json.newer-2-17");
+        assert_eq!(stdfs::read(&kept).unwrap(), bytes);
+        assert_eq!(
+            read_report_changed(&path, None, 18).unwrap_err().kind(),
+            io::ErrorKind::NotFound
+        );
+        assert_eq!(stdfs::read_dir(&dir).unwrap().count(), 1);
+        write_report(&path, &report()).unwrap();
+        assert!(matches!(
+            read_report_changed(&path, None, 18).unwrap().unwrap().0,
+            ReportRead::Current(_)
+        ));
+        assert_eq!(stdfs::read(kept).unwrap(), bytes);
+        stdfs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn final_writer_rechecks_and_preserves_a_newer_report_before_replacing_it() {
+        let dir = scratch();
+        let path = dir.join("last.json");
+        write_report(&path, &report()).unwrap();
+        // The cleanup's preflight read an ordinary receipt. A newer writer
+        // installs its report before this cleanup reaches persistence.
+        read_report_changed(&path, None, 16).unwrap().unwrap();
+        let bytes = newer();
+        stdfs::write(&path, &bytes).unwrap();
+        write_report(&path, &report()).unwrap();
+        assert_eq!(
+            stdfs::read(dir.join("last.json.newer-2-17")).unwrap(),
+            bytes
+        );
+        assert_eq!(
+            stdfs::read(&path).unwrap(),
+            serde_json::to_vec(&report()).unwrap()
+        );
+        stdfs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn archive_collision_or_source_replacement_never_moves_or_overwrites_either_file() {
+        let dir = scratch();
+        let path = dir.join("last.json");
+        let kept = dir.join("last.json.newer-2-17");
+        let bytes = newer();
+        stdfs::write(&path, &bytes).unwrap();
+        stdfs::write(&kept, b"earlier archive").unwrap();
+        assert!(read_report_changed(&path, None, 17).is_err());
+        assert!(write_report(&path, &report()).is_err());
+        assert_eq!(stdfs::read(&path).unwrap(), bytes);
+        assert_eq!(stdfs::read(&kept).unwrap(), b"earlier archive");
+        let parent = parent(&path, true).unwrap();
+        let (_, prior) = read_bytes(&parent, &path, REPORT_BYTES, None)
+            .unwrap()
+            .unwrap();
+        write(&path, &report()).unwrap();
+        fs::flock(&parent, fs::FlockOperation::NonBlockingLockExclusive).unwrap();
+        assert!(set_aside_report(&parent, &path, &prior, 2, 18).is_err());
+        assert_eq!(
+            stdfs::read(&path).unwrap(),
+            serde_json::to_vec(&report()).unwrap()
+        );
+        assert!(!dir.join("last.json.newer-2-18").exists());
+        stdfs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn unrecognized_or_unknown_supported_values_are_preserved_on_read_and_write() {
+        let dir = scratch();
+        let path = dir.join("last.json");
+        let mut unknown_mode = serde_json::to_value(report()).unwrap();
+        unknown_mode["mode"] = "later_mode".into();
+        unknown_mode["later"] = true.into();
+        for bytes in [
+            b"{malformed".to_vec(),
+            br#"{"schema_version":2}"#.to_vec(),
+            serde_json::to_vec(&unknown_mode).unwrap(),
+        ] {
+            stdfs::write(&path, &bytes).unwrap();
+            assert!(read_report_changed(&path, None, 17).is_err());
+            assert!(write_report(&path, &report()).is_err());
+            assert_eq!(stdfs::read(&path).unwrap(), bytes);
+            assert_eq!(stdfs::read_dir(&dir).unwrap().count(), 1);
+        }
+        stdfs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn newer_report_still_requires_trusted_private_storage_and_the_file_byte_bound() {
+        let dir = scratch();
+        let target = dir.join("target.json");
+        let path = dir.join("last.json");
+        let bytes = newer();
+        stdfs::write(&target, &bytes).unwrap();
+        symlink(&target, &path).unwrap();
+        assert!(read_report_changed(&path, None, 17).is_err());
+        assert!(write_report(&path, &report()).is_err());
+        stdfs::remove_file(&path).unwrap();
+        stdfs::hard_link(&target, &path).unwrap();
+        assert!(read_report_changed(&path, None, 17).is_err());
+        assert!(write_report(&path, &report()).is_err());
+        assert_eq!(stdfs::read(&target).unwrap(), bytes);
+        stdfs::remove_file(&target).unwrap();
+        stdfs::set_permissions(&dir, stdfs::Permissions::from_mode(0o755)).unwrap();
+        assert!(read_report_changed(&path, None, 17).is_err());
+        assert_eq!(stdfs::read(&path).unwrap(), bytes);
+        stdfs::set_permissions(&dir, stdfs::Permissions::from_mode(0o700)).unwrap();
+        stdfs::set_permissions(&path, stdfs::Permissions::from_mode(0o666)).unwrap();
+        assert!(read_report_changed(&path, None, 17).is_err());
+        stdfs::set_permissions(&path, stdfs::Permissions::from_mode(0o600)).unwrap();
+        let mut oversized = bytes;
+        oversized.resize(REPORT_BYTES + 1, b' ');
+        stdfs::write(&path, &oversized).unwrap();
+        assert!(read_report_changed(&path, None, 17).is_err());
+        assert!(write_report(&path, &report()).is_err());
+        assert_eq!(stdfs::read(&path).unwrap(), oversized);
+        assert_eq!(stdfs::read_dir(&dir).unwrap().count(), 1);
+        stdfs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
     fn atomic_result_replaces_only_known_file_and_cache_detects_change() {
         let dir = scratch();

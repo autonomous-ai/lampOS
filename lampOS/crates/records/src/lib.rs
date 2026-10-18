@@ -23,6 +23,9 @@ pub const MAX_REPORT_ITEMS: usize = 16_384;
 pub const MAX_REPORT_ITEM_BYTES: usize = 1_024;
 pub const MAX_REPORT_ERROR_BYTES: usize = 4_096;
 pub const MAX_PROCESS_EXAMPLES: usize = 16;
+/// Added optional report fields keep this version. New required fields or
+/// enum values, or changes to a field's meaning, require a schema bump.
+pub const REPORT_SCHEMA_VERSION: u32 = 1;
 
 /// Reasons a pinned process could no longer own userspace session writes.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq)]
@@ -34,7 +37,6 @@ pub enum ProcessSkipReason {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
 pub struct ProcessSkip {
     pub pid: u32,
     pub reason: ProcessSkipReason,
@@ -49,7 +51,6 @@ fn process_examples<'de, D: Deserializer<'de>>(
 /// Observations from up to two process passes, not unique process counts.
 /// Examples exclude known kernel threads and never include process arguments.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
-#[serde(deny_unknown_fields)]
 pub struct ProcessObservations {
     pub gone: u32,
     pub zombie: u32,
@@ -212,7 +213,7 @@ fn report_error<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Str
 
 fn report_schema<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u32, D::Error> {
     let schema = u32::deserialize(deserializer)?;
-    if schema != 1 {
+    if schema != REPORT_SCHEMA_VERSION {
         return Err(de::Error::custom("unsupported report schema"));
     }
     Ok(schema)
@@ -257,16 +258,43 @@ fn report_unit<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::
     Ok(value)
 }
 
+/// Recognize a newer report without interpreting its nested schema. The
+/// existing envelope and encoded-file bound still apply; arbitrary JSON
+/// carrying only a version number is not a cleanup report to move aside.
+pub(crate) fn newer_report_schema(bytes: &[u8]) -> io::Result<Option<u64>> {
+    fn roots<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<de::IgnoredAny>, D::Error> {
+        sequence::<D, de::IgnoredAny, { config::MAX_ROOTS }>(deserializer)
+    }
+    #[derive(Deserialize)]
+    struct Envelope {
+        schema_version: u64,
+        #[serde(rename = "config_fingerprint", deserialize_with = "report_fingerprint")]
+        _fingerprint: String,
+        #[serde(rename = "at_unix_s")]
+        _at: u64,
+        #[serde(rename = "mode")]
+        _mode: Text<128>,
+        #[serde(rename = "enabled")]
+        _enabled: bool,
+        #[serde(rename = "roots", deserialize_with = "roots")]
+        _roots: Vec<de::IgnoredAny>,
+    }
+    let envelope: Envelope = serde_json::from_slice(bytes)
+        .map_err(|_| config::invalid("unrecognized cleanup report"))?;
+    Ok((envelope.schema_version > u64::from(REPORT_SCHEMA_VERSION))
+        .then_some(envelope.schema_version))
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 pub struct Disk {
     pub total_bytes: u64,
     /// Space available to an ordinary writer, excluding filesystem reserves.
     pub available_bytes: u64,
 }
 
+/// Persisted reports tolerate added fields; serialization writes only this
+/// build's fields. Known fields, enum values and all bounds remain checked.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct RunReport {
     #[serde(deserialize_with = "report_schema")]
     pub schema_version: u32,
@@ -289,7 +317,7 @@ impl RunReport {
     /// Check the same syntax and resource limits for values built in memory.
     /// Counters describe observations and are not reconstructed or corrected.
     pub fn validate(&self) -> io::Result<()> {
-        if self.schema_version != 1 {
+        if self.schema_version != REPORT_SCHEMA_VERSION {
             return Err(config::invalid("unsupported report schema"));
         }
         if !valid_fingerprint(&self.config_fingerprint) {
@@ -313,7 +341,6 @@ impl RunReport {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct RootReport {
     #[serde(deserialize_with = "report_path")]
     pub root: PathBuf,
@@ -504,7 +531,7 @@ mod tests {
     }
 
     #[test]
-    fn schema_mode_unknown_fields_and_numeric_types_fail_closed() {
+    fn schema_mode_and_numeric_types_fail_closed() {
         for (field, bad) in [
             ("schema_version", json!(0)),
             ("schema_version", json!(2)),
@@ -513,7 +540,6 @@ mod tests {
             ("mode", json!("other")),
             ("at_unix_s", json!(-1)),
             ("at_unix_s", json!(0.5)),
-            ("unexpected", json!(true)),
         ] {
             let mut value = report();
             value[field] = bad;
@@ -522,12 +548,84 @@ mod tests {
                 "{field}"
             );
         }
-        let mut value = report();
-        value["roots"][0]["unexpected"] = true.into();
-        assert!(serde_json::from_value::<RunReport>(value).is_err());
-        let mut value = report();
-        value["roots"][0]["disk"]["unexpected"] = true.into();
-        assert!(serde_json::from_value::<RunReport>(value).is_err());
+    }
+
+    #[test]
+    fn next_release_fields_are_ignored_at_every_persisted_level_and_not_written() {
+        let mut current = report();
+        current["roots"][0]["processes"] = json!({
+            "gone": 1, "zombie": 0, "exiting": 0, "kernel_threads": 0,
+            "examples": [{"pid": 42, "reason": "gone"}]
+        });
+        let mut later = current.clone();
+        for pointer in [
+            "",
+            "/roots/0",
+            "/roots/0/disk",
+            "/roots/0/processes",
+            "/roots/0/processes/examples/0",
+        ] {
+            later.pointer_mut(pointer).unwrap()["later"] =
+                json!({"kind": "future_detail", "values": [1, null, "new"]});
+        }
+        let decoded: RunReport = serde_json::from_value(later).unwrap();
+        decoded.validate().unwrap();
+        assert_eq!(serde_json::to_value(decoded).unwrap(), current);
+    }
+
+    #[test]
+    fn added_fields_do_not_hide_unknown_enum_values_or_missing_required_fields() {
+        for reason in [json!("later_reason"), json!({"kind": "later_reason"})] {
+            let mut value = report();
+            value["later"] = true.into();
+            value["roots"][0]["processes"] = json!({
+                "gone": 1, "zombie": 0, "exiting": 0, "kernel_threads": 0,
+                "examples": [{"pid": 42, "reason": reason, "later": true}],
+                "later": true
+            });
+            assert!(serde_json::from_value::<RunReport>(value).is_err());
+        }
+        for field in ["config_fingerprint", "mode", "enabled", "roots"] {
+            let mut value = report();
+            value["later"] = true.into();
+            value.as_object_mut().unwrap().remove(field);
+            assert!(serde_json::from_value::<RunReport>(value).is_err());
+        }
+    }
+
+    #[test]
+    fn newer_schema_requires_the_bounded_report_envelope_but_does_not_decode_its_roots() {
+        let mut later = report();
+        later["schema_version"] = json!(2);
+        later["mode"] = json!("later_mode");
+        later["roots"][0]["processes"] = json!({"later_reason": true});
+        let bytes = serde_json::to_vec(&later).unwrap();
+        assert_eq!(newer_report_schema(&bytes).unwrap(), Some(2));
+        assert!(serde_json::from_slice::<RunReport>(&bytes).is_err());
+        for (field, value) in [
+            ("schema_version", json!("2")),
+            ("config_fingerprint", json!("not a fingerprint")),
+            ("at_unix_s", json!(-1)),
+            ("mode", json!(17)),
+            ("mode", json!("m".repeat(129))),
+            ("enabled", json!(null)),
+            ("roots", json!(vec![json!({}); config::MAX_ROOTS + 1])),
+        ] {
+            let mut invalid = later.clone();
+            invalid[field] = value;
+            assert!(newer_report_schema(&serde_json::to_vec(&invalid).unwrap()).is_err());
+        }
+        assert!(newer_report_schema(br#"{"schema_version":2}"#).is_err());
+        assert!(newer_report_schema(&bytes[..bytes.len() - 1]).is_err());
+        later["schema_version"] = json!(u64::MAX);
+        assert_eq!(
+            newer_report_schema(&serde_json::to_vec(&later).unwrap()).unwrap(),
+            Some(u64::MAX)
+        );
+        assert_eq!(
+            newer_report_schema(&serde_json::to_vec(&report()).unwrap()).unwrap(),
+            None
+        );
     }
 
     #[test]

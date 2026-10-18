@@ -1,6 +1,6 @@
 //! Inventory, protect, plan, then apply to that inventory only.
 use crate::{
-    Disk, RootReport, RunReport,
+    Disk, REPORT_SCHEMA_VERSION, RootReport, RunReport,
     config::{Config, RootConfig},
     guard, plan,
     store::{Inventory, Removal, Store},
@@ -183,7 +183,7 @@ pub fn root_with(
 
 pub fn execute(config: &Config, now_unix_s: u64, apply: bool) -> RunReport {
     let mut report = RunReport {
-        schema_version: 1,
+        schema_version: REPORT_SCHEMA_VERSION,
         config_fingerprint: config.fingerprint(),
         at_unix_s: now_unix_s,
         mode: if apply { "apply" } else { "dry_run" }.into(),

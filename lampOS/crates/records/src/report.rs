@@ -5,14 +5,13 @@
 //! would become stale in lamp-health after five seconds. Neither this mapping
 //! nor publication scans records or takes ownership of an active writer.
 
-use crate::{Disk, RunReport};
+use crate::{Disk, REPORT_SCHEMA_VERSION as SCHEMA_VERSION, RunReport};
 use lamp_bus::{Bus, Publisher};
 use lamp_msgs::{Diagnostic, Level};
 use std::{io, path::Path, time::Instant};
 
 /// An hourly cleanup has missed a complete additional interval after this age.
 pub const STALE_AFTER_SECONDS: u64 = 2 * 60 * 60;
-const SCHEMA_VERSION: u32 = 1;
 const NAME: &str = "records";
 /// How the guard begins a refusal for a worker role the voice's list does
 /// not have, followed by the role in backticks (#1071).
