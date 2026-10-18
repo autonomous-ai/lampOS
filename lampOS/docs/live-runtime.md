@@ -274,7 +274,7 @@ keeps each line's blocks with their own sequence numbers as they are
 offered, starts the line again with `Supervisor::try_resend_for_session`
 (lamp-gemini keeps a request lost before any output open for that, only
 with `resend_lost_lines`), offers the kept blocks again as the queue has
-room with the capture time of then, and its End. End also waits for queue
+room with the capture time of now (each block is stamped as it is sent again), and its End. End also waits for queue
 space: if the last audio block fills the queue, the next worker tick tries
 again without blocking capture or control. The supervisor independently
 allows only one accepted resend per request, even if that replacement

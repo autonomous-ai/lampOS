@@ -393,11 +393,16 @@ impl Sight {
     }
 
     /// Call every tick with the request whose input is open, if any.
-    pub fn offer<C: Connect>(&mut self, request: Option<RequestId>, provider: &Supervisor<C>) {
-        let Some(request) = request else { return };
+    /// The request a picture went with, if one did.
+    pub fn offer<C: Connect>(
+        &mut self,
+        request: Option<RequestId>,
+        provider: &Supervisor<C>,
+    ) -> Option<RequestId> {
+        let request = request?;
         let now = Instant::now();
         if !self.due(request, now) {
-            return;
+            return None;
         }
         let outcome = self.picture(SystemTime::now()).and_then(|(jpeg, age)| {
             self.frames += 1;
@@ -408,17 +413,23 @@ impl Sight {
                 .map_err(|_| "the provider did not take it")
         });
         match outcome {
-            Ok((bytes, age)) => eprintln!(
-                "lamp-voice provider: sight: a picture of {bytes} bytes, {} ms old, went with request {} (look {})",
-                age.as_millis(),
-                request.get(),
-                self.looks
-            ),
-            Err(why) => eprintln!(
-                "lamp-voice provider: sight: no picture with request {} (look {}): {why}",
-                request.get(),
-                self.looks
-            ),
+            Ok((bytes, age)) => {
+                eprintln!(
+                    "lamp-voice provider: sight: a picture of {bytes} bytes, {} ms old, went with request {} (look {})",
+                    age.as_millis(),
+                    request.get(),
+                    self.looks
+                );
+                Some(request)
+            }
+            Err(why) => {
+                eprintln!(
+                    "lamp-voice provider: sight: no picture with request {} (look {}): {why}",
+                    request.get(),
+                    self.looks
+                );
+                None
+            }
         }
     }
 }

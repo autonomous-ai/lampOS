@@ -688,6 +688,10 @@ impl<C: Connect> Supervisor<C> {
     /// Let a request whose turn is lost before any output be started once
     /// more on a later connection ([`Self::try_resend_for_session`]). Off
     /// by default: input is then never replayed, as before (#705, Step B).
+    /// It keeps a turn lost at `InputOpen` or `AwaitingResponse`; its
+    /// caller may decline either (the voice's worker sends again only one
+    /// that had ended, at `AwaitingResponse`), and a declined one is cleared
+    /// when the caller retires it (Tests on #1434).
     pub fn resend_lost_lines(&mut self, on: bool) {
         self.resend_lost = on;
         if !on {
