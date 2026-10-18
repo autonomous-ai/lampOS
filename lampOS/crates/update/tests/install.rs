@@ -902,6 +902,26 @@ fn a_blank_lamp_gets_lamp_skills_with_welcome_back_and_greets_once() {
     assert!(skills.contains("--dir /var/lib/lampOS/skills"));
 }
 
+/// #1390: the product's tasks part closes the harness each task started once
+/// its answer is told (`--close-told`), so a person's computer doesn't keep
+/// an idle Claude Code session for every job the lamp ever handed over.
+#[test]
+fn the_tasks_part_closes_the_harness_a_told_task_started() {
+    let tasks = install::PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-tasks.service")
+        .unwrap()
+        .1;
+    let exec = section(tasks, "Service")
+        .into_iter()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    assert!(exec.contains(" --close-told "), "{exec}");
+    // As the person, as the product calls Harness: the agent id the lamp
+    // kept is the only guard on what it closes (docs/tasks.md).
+    assert!(exec.contains(" --harness-as-person "), "{exec}");
+}
+
 /// #811, from lamp-06c1: without Harness (its own installer's to put on the
 /// lamp), the tasks part is skipped by its unit's condition rather than
 /// failing ten times; the install says Harness is missing.
