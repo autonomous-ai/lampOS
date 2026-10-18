@@ -294,9 +294,27 @@ pub struct Speaking {
     /// `yes`, `no`, or `unknown` when the face is too small, turned, too
     /// new, or its landmarks jitter too much to tell.
     pub state: SpeakingState,
-    /// How much the mouth moved beyond its landmarks' own jitter, in
-    /// inter-ocular distances; 0 when `unknown`.
+    /// How much the mouth moved, on the scale of what judged it (`from`):
+    /// from YuNet's corners, beyond the landmarks' own jitter, in
+    /// inter-ocular distances a look (`yes` from 0.02); from Face Mesh V2,
+    /// the root mean square look-to-look change of the inner lips' gap over
+    /// the face's height (`yes` from 0.012). 0 when `unknown`. Two scores
+    /// are compared only when `from` is the same.
     pub score: f32,
+    /// What judged it. Absent from eyes before #1470, and then it is the
+    /// corners.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<SpeakingFrom>,
+}
+
+/// What a face's `speaking` was judged from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SpeakingFrom {
+    /// YuNet's two mouth corners against the eyes.
+    Corners,
+    /// Face Mesh V2's inner lips (`lamp-eyes --mouth-model`, #720).
+    Mesh,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1375,10 +1393,20 @@ mod tests {
         let speaking = Speaking {
             state: SpeakingState::Unknown,
             score: 0.0,
+            from: None,
         };
         assert_eq!(
             serde_json::to_string(&speaking).unwrap(),
             "{\"state\":\"unknown\",\"score\":0.0}"
+        );
+        let meshed = Speaking {
+            state: SpeakingState::Yes,
+            score: 0.02,
+            from: Some(SpeakingFrom::Mesh),
+        };
+        assert_eq!(
+            serde_json::to_string(&meshed).unwrap(),
+            "{\"state\":\"yes\",\"score\":0.02,\"from\":\"mesh\"}"
         );
         let read: Face = serde_json::from_str(
             "{\"id\":\"f1\",\"xmin\":0.1,\"ymin\":0.1,\"xmax\":0.2,\"ymax\":0.2,\"confidence\":0.9,\
@@ -1389,7 +1417,8 @@ mod tests {
             read.speaking,
             Some(Speaking {
                 state: SpeakingState::Yes,
-                score: 0.05
+                score: 0.05,
+                from: None,
             })
         );
     }

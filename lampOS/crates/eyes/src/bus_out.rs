@@ -103,7 +103,15 @@ pub fn edges(face: &faces::Face, filled: (usize, usize)) -> [f32; 4] {
 /// against. The angle's sign is taken from which side of the eyes the nose
 /// sits, positive to the picture's right, which is the face's own left if
 /// the picture is not mirrored. That has not been checked against a person.
-pub fn message(found: &[faces::Face], filled: (usize, usize), ids: &mut Ids, now_us: u64) -> Faces {
+/// `opens` is the mesh's `mouth_open` for each face found, by its index,
+/// where it was read (`--mouth-model`): the speaking judge then reads it.
+pub fn message(
+    found: &[faces::Face],
+    opens: &[Option<f32>],
+    filled: (usize, usize),
+    ids: &mut Ids,
+    now_us: u64,
+) -> Faces {
     let (width, height) = (filled.0.max(1) as f32, filled.1.max(1) as f32);
     let boxes: Vec<[f32; 4]> = found.iter().map(|face| edges(face, filled)).collect();
     let numbers = ids.of(&boxes, now_us);
@@ -111,19 +119,20 @@ pub fn message(found: &[faces::Face], filled: (usize, usize), ids: &mut Ids, now
         .iter()
         .zip(&boxes)
         .zip(numbers)
+        .enumerate()
         // A box with no size is not a face in the picture.
-        .filter(|((_, edges), _)| edges[0] < edges[2] && edges[1] < edges[3])
-        .map(|((face, edges), id)| {
+        .filter(|(_, ((_, edges), _))| edges[0] < edges[2] && edges[1] < edges[3])
+        .map(|(index, ((face, edges), id))| {
             let width_share = face.width / width;
             let from_middle = ((face.x + face.width / 2.0) / width * 2.0 - 1.0).abs();
             let measured = width_share >= facing::LEAST_WIDTH
                 && facing::marks_seen(&face.marks, width, height);
             let turn = measured.then(|| facing::yaw_deg(&face.marks)).flatten();
             let to_the_right = face.marks[2].0 >= (face.marks[0].0 + face.marks[1].0) / 2.0;
-            let speaking = ids
-                .mouths
-                .as_mut()
-                .map(|mouths| mouths.judge(id, &face.marks, turn, now_us));
+            let speaking = ids.mouths.as_mut().map(|mouths| {
+                let open = opens.get(index).copied().flatten();
+                mouths.judge(id, &face.marks, turn, open, now_us)
+            });
             Face {
                 speaking,
                 id: format!("f{id}"),
@@ -209,8 +218,14 @@ impl BusOut {
     }
 
     /// One look: what the detector found in it.
-    pub fn saw(&mut self, found: &[faces::Face], filled: (usize, usize), now_us: u64) {
-        let seen = message(found, filled, &mut self.ids, now_us);
+    pub fn saw(
+        &mut self,
+        found: &[faces::Face],
+        opens: &[Option<f32>],
+        filled: (usize, usize),
+        now_us: u64,
+    ) {
+        let seen = message(found, opens, filled, &mut self.ids, now_us);
         self.alive_at_us = now_us;
         let _ = self.faces.publish_json(now_us, &seen);
     }
@@ -274,6 +289,7 @@ mod tests {
                 face(240.0, 120.0, 160.0, 200.0, 0.0),
                 face(40.0, 100.0, 120.0, 150.0, 0.95),
             ],
+            &[],
             PICTURE,
             &mut ids,
             0,
@@ -299,6 +315,7 @@ mod tests {
         let turned = |nose| {
             message(
                 &[face(260.0, 100.0, 120.0, 150.0, nose)],
+                &[],
                 PICTURE,
                 &mut Ids::default(),
                 0,
@@ -314,11 +331,18 @@ mod tests {
     fn a_face_too_small_or_cut_off_has_no_angle_and_no_judgement() {
         let mut ids = Ids::default();
         // 40 of 640 across is under the least width that can be measured.
-        let small = message(&[face(300.0, 200.0, 40.0, 50.0, 0.0)], PICTURE, &mut ids, 0);
+        let small = message(
+            &[face(300.0, 200.0, 40.0, 50.0, 0.0)],
+            &[],
+            PICTURE,
+            &mut ids,
+            0,
+        );
         assert_eq!((small.faces[0].yaw, small.faces[0].facing), (None, None));
         // An eye outside the picture was guessed, not seen.
         let cut = message(
             &[face(-60.0, 100.0, 160.0, 200.0, 0.0)],
+            &[],
             PICTURE,
             &mut ids,
             0,
@@ -329,12 +353,13 @@ mod tests {
         // A box wholly outside has no size and is left out; none is a list of none.
         let outside = message(
             &[face(700.0, 100.0, 100.0, 100.0, 0.0)],
+            &[],
             PICTURE,
             &mut ids,
             0,
         );
         assert!(outside.faces.is_empty());
-        assert!(message(&[], PICTURE, &mut ids, 0).faces.is_empty());
+        assert!(message(&[], &[], PICTURE, &mut ids, 0).faces.is_empty());
     }
 
     #[test]
@@ -361,7 +386,7 @@ mod tests {
         std::fs::create_dir_all(&root).unwrap();
         let bus = Bus::new(&root).unwrap();
         let mut out = BusOut::on(&bus).unwrap();
-        out.saw(&[face(240.0, 120.0, 160.0, 200.0, 0.0)], PICTURE, 5);
+        out.saw(&[face(240.0, 120.0, 160.0, 200.0, 0.0)], &[], PICTURE, 5);
         out.tick(6);
         let latest = bus.latest(Faces::TOPIC).unwrap().unwrap();
         let seen: Faces = latest.parse().unwrap();
@@ -370,7 +395,7 @@ mod tests {
         assert_eq!(latest.header.expires_ms, Some(2_000));
         // With the bus gone nothing fails.
         std::fs::remove_dir_all(&root).unwrap();
-        out.saw(&[], PICTURE, 7);
+        out.saw(&[], &[], PICTURE, 7);
         out.tick(2_000_000);
         out.report(Camera::Open, 2_000_000);
     }
@@ -446,14 +471,14 @@ mod tests {
             face(40.0, 100.0, 120.0, 150.0, 0.0),
         ];
         let mut off = Ids::default();
-        let text = serde_json::to_string(&message(&looks, PICTURE, &mut off, 0)).unwrap();
+        let text = serde_json::to_string(&message(&looks, &[], PICTURE, &mut off, 0)).unwrap();
         assert!(!text.contains("speaking"), "{text}");
         let mut on = Ids {
             mouths: Some(speaking::Mouths::default()),
             ..Ids::default()
         };
         for look in 0..2u64 {
-            let seen = message(&looks, PICTURE, &mut on, look * 150_000);
+            let seen = message(&looks, &[], PICTURE, &mut on, look * 150_000);
             assert_eq!(seen.faces.len(), 2);
             for tracked in &seen.faces {
                 // New faces: too few looks to tell yet.

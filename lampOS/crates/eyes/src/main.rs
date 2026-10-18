@@ -7,7 +7,7 @@
 
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-eyes --device ABSOLUTE_PATH --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --usb VENDOR:PRODUCT@TOPOLOGY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there. With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\n";
+const USAGE: &str = "lamp-eyes --device ABSOLUTE_PATH --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --usb VENDOR:PRODUCT@TOPOLOGY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there. With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the journal says how open the largest\nface's mouth is each look, and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\n";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Usb {
@@ -43,6 +43,13 @@ struct Arguments {
     full_look_file: Option<PathBuf>,
     /// A full look's head settles on movement only (#842).
     full_look_movement: bool,
+    /// Face Mesh V2, to measure how open the largest face's mouth is a
+    /// look (#720). Nothing without it.
+    mouth_model: Option<PathBuf>,
+    /// The mesh only while the voice hears a line (#705's heat).
+    mouth_on_heard: bool,
+    /// ONNX Runtime for the mesh, the voice's pinned library, instead of tract.
+    mouth_runtime: Option<PathBuf>,
 }
 
 /// `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits each.
@@ -101,6 +108,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     let (mut recogniser, mut people, mut who_socket, mut known_file) = (None, None, None, None);
     let (mut leave_still, mut full_look, mut full_look_file) = (None, None, None);
     let (mut steady_rate, mut full_look_movement, mut look_on_change) = (None, None, None);
+    let (mut mouth_model, mut mouth_on_heard, mut mouth_runtime) = (None, None, None);
     while let Some(key) = args.next() {
         if key == "--help" {
             let alone = device.is_none()
@@ -121,6 +129,9 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                 && full_look_movement.is_none()
                 && full_look.is_none()
                 && full_look_file.is_none()
+                && mouth_model.is_none()
+                && mouth_on_heard.is_none()
+                && mouth_runtime.is_none()
                 && args.next().is_none();
             return if alone {
                 Ok(None)
@@ -182,6 +193,19 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
             Some("--full-look-file") if full_look_file.is_none() => {
                 full_look_file = Some(PathBuf::from(value));
             }
+            Some("--mouth-model") if mouth_model.is_none() => {
+                mouth_model = Some(PathBuf::from(value));
+            }
+            Some("--mouth-runtime") if mouth_runtime.is_none() => {
+                mouth_runtime = Some(PathBuf::from(value));
+            }
+            Some("--mouth-on-heard") if mouth_on_heard.is_none() => {
+                mouth_on_heard = Some(match value.to_str() {
+                    Some("on") => true,
+                    Some("off") => false,
+                    _ => return Err("--mouth-on-heard is on or off"),
+                });
+            }
             Some("--full-look") if full_look.is_none() => {
                 full_look = Some(value.to_str().and_then(size_of).ok_or(
                     "--full-look is WIDTHxHEIGHT, for example 1280x960, from 320x240 to 3264x2448",
@@ -217,6 +241,9 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         full_look,
         full_look_file,
         full_look_movement: full_look_movement.unwrap_or(false),
+        mouth_model,
+        mouth_on_heard: mouth_on_heard.unwrap_or(false),
+        mouth_runtime,
     };
     if result.full_look.is_some() != result.full_look_file.is_some()
         || (result.full_look_file.is_some() && result.full_look_file == result.sight_file)
@@ -225,6 +252,12 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     }
     if result.known_file.is_some() && result.who.is_none() {
         return Err("--known-file needs --recogniser, --people and --who-socket");
+    }
+    if result.mouth_on_heard && result.mouth_model.is_none() {
+        return Err("--mouth-on-heard needs --mouth-model");
+    }
+    if result.mouth_runtime.is_some() && result.mouth_model.is_none() {
+        return Err("--mouth-runtime needs --mouth-model");
     }
     for path in [
         &result.device,
@@ -244,6 +277,8 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
             .flat_map(|(model, people, socket)| [model, people, socket]),
     )
     .chain(&result.known_file)
+    .chain(&result.mouth_model)
+    .chain(&result.mouth_runtime)
     {
         if !path.is_absolute()
             || path.as_os_str().len() > 200
@@ -372,6 +407,25 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     }
 
     let detector = Detector::load(&arguments.model)?;
+    let mut mesh = match (&arguments.mouth_model, &arguments.mouth_runtime) {
+        (Some(model), Some(runtime)) => {
+            Some(lamp_eyes::mesh::Mesh::load_with_runtime(model, runtime)?)
+        }
+        (Some(model), None) => Some(lamp_eyes::mesh::Mesh::load(model)?),
+        (None, _) => None,
+    };
+    // With --mouth-on-heard on, the voice's lines (`voice/heard`), so the
+    // mesh runs only while one is heard.
+    let mut heard_lines = if arguments.mouth_on_heard {
+        Some(lamp_bus::Bus::from_environment()?.subscribe_typed(
+            lamp_msgs::Speech::TOPICS[0],
+            "eyes_mouth",
+            lamp_msgs::Speech::TYPE,
+        )?)
+    } else {
+        None
+    };
+    let mut heard = lamp_eyes::mesh::Heard::default();
     let mut who = match &arguments.who {
         Some((model, people_path, socket)) => {
             let recogniser = Recogniser::load(model)?;
@@ -946,8 +1000,46 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         if !faces.is_empty() {
                             any_face_at = Some(Instant::now());
                         }
+                        // How open the largest face's mouth is (#720), how far apart
+                        // its eyes, and how long the mesh took, for the journal and,
+                        // with LAMP_EYES_SPEAKING=on, for that face's `speaking`.
+                        let now_us = lamp_ipc::monotonic_us();
+                        if let Some(lines) = heard_lines.as_mut() {
+                            while let Ok(Some(message)) = lines.recv(Duration::ZERO) {
+                                // When the words were heard, by the voice's monotonic
+                                // clock, never later than now: lines that waited while
+                                // the camera was closed are as old as they are.
+                                if let Ok(line) = message.parse::<lamp_msgs::Speech>() {
+                                    heard.words(line.finished, message.header.at_us.min(now_us));
+                                }
+                            }
+                        }
+                        let mut opens = vec![None; faces.len()];
+                        if let Some(mesh) = mesh.as_mut()
+                            && (heard_lines.is_none() || heard.hears(now_us))
+                            && let Some((largest, face)) = faces
+                                .iter()
+                                .enumerate()
+                                .max_by(|a, b| a.1.height.total_cmp(&b.1.height))
+                        {
+                            let began = Instant::now();
+                            let open = mesh.mouth_open(&picture, face);
+                            let eyes = lamp_eyes::speaking::shape(&face.marks)
+                                .map_or(0.0, |shape| shape.1);
+                            match open {
+                                Ok(Some(open)) => {
+                                    opens[largest] = Some(open);
+                                    eprintln!(
+                                        "lamp-eyes: mouth open {open:.4} eyes {eyes:.0} px mesh {} ms",
+                                        began.elapsed().as_millis()
+                                    );
+                                }
+                                Ok(None) => {}
+                                Err(error) => eprintln!("lamp-eyes: mouth not read: {error}"),
+                            }
+                        }
                         if let Some(bus) = bus_out.as_mut() {
-                            bus.saw(&faces, picture.filled, lamp_ipc::monotonic_us());
+                            bus.saw(&faces, &opens, picture.filled, lamp_ipc::monotonic_us());
                         }
                         // Whose the near face is, when it is time to ask or
                         // someone is being remembered.
@@ -1085,6 +1177,45 @@ mod tests {
         "--body-socket",
         "/run/lampos-body/gaze.sock",
     ];
+
+    #[test]
+    fn the_mouth_model_is_none_unless_given_and_an_absolute_path() {
+        assert_eq!(parse(args(&FULL)).unwrap().unwrap().mouth_model, None);
+        let given = [
+            &FULL[..],
+            &["--mouth-model", "/opt/lampOS/eyes/models/face_mesh_v2.onnx"],
+        ]
+        .concat();
+        assert_eq!(
+            parse(args(&given)).unwrap().unwrap().mouth_model,
+            Some(PathBuf::from("/opt/lampOS/eyes/models/face_mesh_v2.onnx"))
+        );
+        assert!(
+            parse(args(
+                &[&FULL[..], &["--mouth-model", "face_mesh_v2.onnx"]].concat()
+            ))
+            .is_err()
+        );
+        let twice = [&given[..], &["--mouth-model", "/tmp/other.onnx"]].concat();
+        assert!(parse(args(&twice)).is_err());
+        let heard = [&given[..], &["--mouth-on-heard", "on"]].concat();
+        assert!(parse(args(&heard)).unwrap().unwrap().mouth_on_heard);
+        assert!(!parse(args(&given)).unwrap().unwrap().mouth_on_heard);
+        assert!(parse(args(&[&FULL[..], &["--mouth-on-heard", "on"]].concat())).is_err());
+        assert!(parse(args(&[&given[..], &["--mouth-on-heard", "yes"]].concat())).is_err());
+        let runtime = [
+            "--mouth-runtime",
+            "/opt/lampOS/voice/current/libonnxruntime.so.1.30.0",
+        ];
+        assert!(
+            parse(args(&[&given[..], &runtime[..]].concat()))
+                .unwrap()
+                .unwrap()
+                .mouth_runtime
+                .is_some()
+        );
+        assert!(parse(args(&[&FULL[..], &runtime[..]].concat())).is_err());
+    }
 
     #[test]
     fn faces_are_remembered_only_with_all_three_paths_and_the_known_file_needs_them() {

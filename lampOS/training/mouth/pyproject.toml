@@ -1,0 +1,15 @@
+[project]
+name = "lamp-mouth-model"
+version = "0.1.0"
+description = "Converts Google's MediaPipe Face Mesh V2 landmarks model to ONNX for #720. Never runs on the lamp."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "tf2onnx==1.16.1",
+    "tensorflow==2.15.1",
+    "onnx==1.15.0",
+    "onnxruntime==1.17.3",
+    "numpy<2",
+]
+
+[tool.uv]
+package = false

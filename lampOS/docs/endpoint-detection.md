@@ -82,7 +82,7 @@ too.
 | Crate | Linked by | Content |
 | --- | --- | --- |
 | `lamp-turn-end-wire` | `lamp-voice` (core) | Request and verdict types, the `Classifier` trait, the bounded frame format, the worker's serving loop, and the core-side supervisor `ProcessClassifier`. Depends only on `lamp-ipc`. |
-| `lamp-turn-end` | the worker only | Whisper features, pinned model loading with tract, the fast model (8-bit, ONNX Runtime loaded at run time with `--fast`), the installation self-check, `bench` and `agree`, and the `lamp-turn-end` binary. |
+| `lamp-turn-end` | the worker; lamp-eyes uses its ONNX Runtime pin and check for `--mouth-runtime` (#720) | Whisper features, pinned model loading with tract, the fast model (8-bit, ONNX Runtime loaded at run time with `--fast`), the installation self-check, `bench` and `agree`, and the `lamp-turn-end` binary. |
 
 ### Process boundary
 
