@@ -82,7 +82,11 @@ const _: () = assert!(ASKED_AT <= MOST_SAMPLES);
 /// voices on mic2 with the lamp quiet, cut as the worker prints them
 /// (`docs/verification/same-voice-20261018`, the first builder on #1445,
 /// 12:2x). There it is wrong about 1 in 13 times each way (7.5% at 0.455),
-/// and no same-voice pair fell under 0.27. The bar of 0.25 before it, set
+/// and no same-voice pair fell under 0.27. Its lines are all 1.5 s or
+/// longer: on the older recordings with the lamp quiet, cut the same way,
+/// it takes 31 of the 38 same-voice pairs with a line under 1.5 s for two
+/// voices (`docs/verification/same-voice-early-20261018`, the reviewer on
+/// #1508). The bar of 0.25 before it, set
 /// on clean clips off the lamp, let 43% of different voices pass as the
 /// same. With the lamp's voice in a print it is at chance, so the check
 /// stays off, and is at most one weak sign beside a face, lips and the
@@ -803,6 +807,9 @@ mod tests {
                 // A's voice, a little off: 0.90 against A's, 0.07 against
                 // the mixed one, under the bar.
                 3 => Ok(vec![0.9, 0.0, -0.436]),
+                // Another voice at 0.35 against A's: between the bar of 0.25
+                // set off the lamp and the labelled set's 0.45.
+                4 => Ok(vec![0.35, 0.0, 0.937]),
                 _ => Err("refused: none".into()),
             };
             self.waiting.push_back((request, print));
@@ -1323,6 +1330,36 @@ exec sleep 30"#,
         assert_eq!(voices.take_late_other(), None);
         said(&mut voices, 6, -1, 48_000);
         assert_eq!(voices.likeness(6), Some(1.0));
+    }
+
+    /// The bar is the labelled set's 0.45 (#1485; the reviewer on #1508):
+    /// a voice at 0.35 against the conversation's is another, whether its
+    /// print is back at its verdict or comes after it. At the bar of 0.25
+    /// before it, it was the conversation's voice.
+    #[test]
+    fn a_voice_at_0_35_against_the_conversations_is_another() {
+        let mut voices = Voices::new(StandIn::default());
+        said(&mut voices, 1, 1, 48_000);
+        voices.decided(1, true, false);
+        said(&mut voices, 2, 4, 48_000);
+        assert!(
+            voices.likeness(2).is_some_and(
+                |likeness| (likeness - 0.35).abs() < 0.01 && likeness < DIFFERENT_BELOW
+            )
+        );
+        // Late, and let out as the conversation going on: known after its
+        // answer for another voice's, and not kept as the conversation's.
+        voices.printer.slow = true;
+        said(&mut voices, 3, 4, 48_000);
+        voices.decided(3, true, true);
+        voices.printer.slow = false;
+        assert_eq!(voices.take_late_other(), Some(3));
+        said(&mut voices, 4, 4, 48_000);
+        assert!(
+            voices
+                .likeness(4)
+                .is_some_and(|likeness| (likeness - 0.35).abs() < 0.01)
+        );
     }
 
     #[test]
