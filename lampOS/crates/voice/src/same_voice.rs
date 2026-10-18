@@ -574,7 +574,7 @@ impl<P: Printer> Voices<P> {
             && answered == request
         {
             if new {
-                self.conversation.clear();
+                self.begin_afresh();
             }
             self.answered = None;
         }
@@ -693,10 +693,20 @@ impl<P: Printer> Voices<P> {
             }
             _ if going_on => self.keep(print),
             _ => {
-                self.conversation.clear();
+                self.begin_afresh();
                 self.keep(print);
             }
         }
+    }
+
+    /// A conversation of its own begins: no voice of the one before
+    /// counts, a late print from it neither ends this one nor becomes its
+    /// voice (Eighth on #829: a late "another voice" from before a named
+    /// call ended the call's own conversation at the next line).
+    fn begin_afresh(&mut self) {
+        self.conversation.clear();
+        self.late_other = None;
+        self.answered = None;
     }
 
     /// A line let out as the conversation going on, known since for another
@@ -715,14 +725,17 @@ impl<P: Printer> Voices<P> {
             return;
         }
         self.poll();
+        // Let out for itself, even with its print still to come: the next
+        // line is no part of the conversation before (Eighth on #829).
+        if !going_on {
+            self.begin_afresh();
+        }
         if let Some(print) = self.print(request).cloned() {
             self.adopt(request, print, going_on);
             return;
         }
         if self.print_coming(request) {
             self.answered = Some((request, !going_on));
-        } else if !going_on {
-            self.conversation.clear();
         }
     }
 }
@@ -1177,6 +1190,40 @@ exec sleep 30"#,
         assert_eq!(voices.conversation.len(), 1);
         said(&mut voices, 12, 1, 48_000);
         assert_eq!(voices.likeness(12), Some(0.0));
+    }
+
+    /// Eighth on #829: a line let out for itself begins a conversation of
+    /// its own, and a late "another voice" from the one before ends
+    /// nothing of it: neither one already known nor one whose print comes
+    /// after.
+    #[test]
+    fn a_new_conversation_ends_any_late_voice_of_the_one_before() {
+        let mut voices = Voices::new(StandIn::default());
+        said(&mut voices, 1, 1, 48_000);
+        voices.decided(1, true, false);
+        // B let out as A's conversation going on, its print known late:
+        // another voice.
+        voices.printer.slow = true;
+        said(&mut voices, 2, -1, 48_000);
+        assert_eq!(voices.likeness(2), None);
+        voices.decided(2, true, true);
+        voices.printer.slow = false;
+        voices.poll();
+        // B calls the lamp by name: hers is a conversation of its own.
+        said(&mut voices, 3, -1, 48_000);
+        voices.decided(3, true, false);
+        assert_eq!(voices.take_late_other(), None);
+        // A's line let out as B's conversation going on, its print late,
+        // then A calls by name before that print comes.
+        voices.printer.slow = true;
+        said(&mut voices, 4, 1, 48_000);
+        voices.decided(4, true, true);
+        said(&mut voices, 5, 1, 48_000);
+        voices.decided(5, true, false);
+        voices.printer.slow = false;
+        assert_eq!(voices.take_late_other(), None);
+        said(&mut voices, 6, 1, 48_000);
+        assert_eq!(voices.likeness(6), Some(1.0));
     }
 
     #[test]

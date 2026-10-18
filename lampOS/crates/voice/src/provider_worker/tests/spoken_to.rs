@@ -1128,6 +1128,50 @@ async fn with_a_voice_check_whose_every_print_comes_late_a_late_other_voice_ends
 /// Scene 3 at the lamp's lengths through the worker's own loop, with the
 /// prints as `prints` gives them: which of its five lines were played.
 async fn scene_3_with(prints: LatePrints) -> Vec<bool> {
+    scene_with(
+        prints,
+        &[
+            (1, 295, "Hey Lamp, what is the weather like in Hanoi today?"),
+            (-1, 119, "And what about tomorrow?"),
+            (-1, 158, "I should bring an umbrella then."),
+            (1, 222, "Yes, and we should leave a bit early."),
+            (-1, 214, "Okay, I will book the car for eight."),
+        ],
+    )
+    .await
+}
+
+/// Eighth on #829: on a lamp where every print comes after its verdict, B
+/// calls the lamp and follows up, and then A calls it by name while B's
+/// conversation is still going on. A's call begins a conversation of its
+/// own, so A's late print is no part of B's, and A's follow-up is
+/// answered. Taken as B's conversation going on, A's late print was
+/// another voice's than B's, and it ended A's conversation at A's next
+/// line.
+#[tokio::test(start_paused = true)]
+async fn with_a_voice_check_a_named_call_amid_anothers_conversation_begins_its_own() {
+    let _clock = logical_clock();
+    let every_line = LatePrints {
+        every_line: true,
+        ..LatePrints::default()
+    };
+    let played = scene_with(
+        every_line,
+        &[
+            (-1, 250, "Hey Lamp, what time is it in Tokyo?"),
+            (-1, 200, "And what is the date there?"),
+            (1, 295, "Hey Lamp, what is the weather like in Hanoi today?"),
+            (1, 200, "And what about tomorrow?"),
+        ],
+    )
+    .await;
+    assert_eq!(played, [true; 4]);
+}
+
+/// Lines (voice, `say` length in 10 ms blocks, words) at the lamp's
+/// lengths through the worker's own loop, with the prints as `prints`
+/// gives them: which of them were played.
+async fn scene_with(prints: LatePrints, lines: &[(i16, u64, &str)]) -> Vec<bool> {
     let _mark = OwnMark::kept();
     let _room = OwnRoom::fresh();
     let mut options = options(true, attention_now, crate::tools::Settings::default());
@@ -1153,13 +1197,7 @@ async fn scene_3_with(prints: LatePrints) -> Vec<bool> {
     // `say` length.
     const SENT: u64 = 30 + 60;
     let mut played = Vec::new();
-    for (voice, blocks, text) in [
-        (1, 295, "Hey Lamp, what is the weather like in Hanoi today?"),
-        (-1, 119, "And what about tomorrow?"),
-        (-1, 158, "I should bring an umbrella then."),
-        (1, 222, "Yes, and we should leave a bit early."),
-        (-1, 214, "Okay, I will book the car for eight."),
-    ] {
+    for &(voice, blocks, text) in lines {
         played.push(voice_line(&mut rig, &mut dial, false, voice, SENT + blocks, text, true).await);
     }
     rig.stop().await;
