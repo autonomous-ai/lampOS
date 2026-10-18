@@ -127,11 +127,58 @@ reset-owner code is changed by this task.
 A new database is prepared as `.schedule.sqlite3.init`, synced, and published
 without replacing an existing database. An interrupted, unpublished empty
 initialization can be recovered. An existing zero-byte database, corrupt
-database, unexpected schema/version, invalid engine snapshot, unsafe file, or
+database, unexpected SQLite schema/version, invalid engine snapshot, unsafe file, or
 WAL/SHM sidecar is refused rather than replaced with a blank schedule. A valid
 newly initialized schema with no snapshot receives its first engine state.
 Checked rollback journals can be recovered by SQLite. Do not remove a database
 or its journal to make a startup failure disappear; preserve them for recovery.
+
+The JSON snapshot is read one release forward, following the Tasks boundary in
+#1512. Unknown additive fields in the state, items, pending metadata, receipt
+envelope, deadlines, elapsed-clock descriptors, and known daily/weekly repeat
+variants are ignored. Existing identities, revisions, item and delivery IDs,
+text, bounds and deadline consistency are still checked. Opening a current
+snapshot does not rewrite it; ignored fields remain on disk until an ordinary
+mutation writes this build's known fields. Current files and exact readable
+mutation receipts continue to work unchanged.
+
+The cached last receipt is the exception to active-state refusal. Its stored
+request uses the strict live `Request`, `Guard` and `When` types. An unknown
+operation/tag, extra request field, unreadable receipt, or response that does
+not match this build's expected committed effect drops that cache in memory,
+with one journal line saying the last mutation receipt was dropped. No request
+fields are stripped to manufacture an exact match. Items and the committed
+revision are retained: retrying the original mutation with its old revision
+receives `conflict`, not another write. Read status and list/get to inspect the
+committed work before making a new guarded request. The next mutation replaces
+the discarded cache on disk; reopening before then can report its drop again.
+An invalid active item still refuses the store even if its receipt is also bad.
+
+Unknown enum/tag values in active persisted work are **refused**, not guessed
+or mapped to a default. This includes an unknown repeat kind or weekday. Live
+requests, clocks, public time descriptors and delivery-ledger inputs retain
+their strict deserializers. The tolerant deadline readers are private to this
+engine's stored items; they do not change a shared digest or wire shape.
+
+A numeric JSON `schema` newer than `1` is recognized before decoding its items.
+The owner closes SQLite, renames the complete database without replacing any
+existing file to `schedule.sqlite3.newer-<schema>-<fresh-store-id>`, and syncs the
+directory before creating the replacement database. It holds the directory
+lock throughout. After committing an empty schema-1 state with a fresh store
+identity, it writes one journal line naming the newer schema and retained file.
+The new store accepts normal work; none of the retained schedule is delivered,
+merged or silently deleted. A later restart uses the new store. Keep the retained
+database for an appropriate newer build or explicit recovery; this build does
+not restore it automatically.
+
+An existing archive name is never clobbered. Rename, sync or replacement failure
+refuses startup and poisons the owner; any already-renamed database remains
+retained. A backend without durable set-aside support refuses a newer snapshot.
+Invalid JSON, nonnumeric/old unsupported schema values and snapshots beyond the
+existing 1 MiB bound are still refused. This recovery applies to the JSON schema,
+not SQLite `user_version`, whose format checks remain strict. A future writer
+must bump the JSON schema for new enum values, required fields, raised bounds,
+or optional fields whose omission could change scheduling or delivery behavior.
 
 There is one storage owner, protected by a lifetime advisory lock. Each change
 is prepared on a copy, committed with `synchronous=FULL`, and followed by a
@@ -146,7 +193,8 @@ A failed write or sync can occur after the transaction reached disk. The owner
 stops accepting work after such a failure. Restart and inspect the committed
 state before deciding whether to retry; neither a transport timeout nor a sync
 error proves that the mutation did not happen. Files changed or replaced while
-owned stop further storage work. There is no automatic migration, remote
+owned stop further storage work. Setting a newer snapshot aside is not a
+migration of its reminders. There is no automatic migration, remote
 backup, factory-reset action, or expiry-based deletion in this component.
 
 ## Time rules

@@ -347,6 +347,51 @@ impl Store {
         self.poisoned
     }
 
+    /// Retain the complete database as `schedule.sqlite3.<label>` and start
+    /// empty under the same directory lock. No existing name is replaced.
+    /// Failure poisons this owner, including a failure after the rename.
+    pub fn set_aside(&mut self, label: &str) -> io::Result<String> {
+        if label.is_empty()
+            || label.len() > 64
+            || !label
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "a set-aside label is 1..64 letters, digits or '-'",
+            ));
+        }
+        let kept = format!("{DATABASE}.{label}");
+        let result = self.rename_and_start_empty(&kept);
+        if result.is_err() {
+            self.poisoned = true;
+        }
+        result
+    }
+
+    fn rename_and_start_empty(&mut self, kept: &str) -> io::Result<String> {
+        self.check_files()?;
+        // Closing first prevents this connection from writing to the retained
+        // database. The directory lock remains held throughout replacement.
+        let open = std::mem::replace(&mut self.db, Connection::open_in_memory().map_err(sql)?);
+        open.close().map_err(|(_, error)| sql(error))?;
+        unix::renameat_with(
+            &self.held,
+            DATABASE,
+            &self.held,
+            kept,
+            RenameFlags::NOREPLACE,
+        )?;
+        self.held.sync_all()?;
+        initialize(&self.path, &self.held)?;
+        self.file = open_file(&self.held, DATABASE, false)?;
+        self.db = connect(&self.path.join(DATABASE))?;
+        validate(&self.db)?;
+        self.check_files()?;
+        Ok(kept.to_owned())
+    }
+
     fn write(&mut self, bytes: &[u8]) -> io::Result<()> {
         self.check_files()?;
         let tx = self

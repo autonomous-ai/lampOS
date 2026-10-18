@@ -2,13 +2,20 @@
 //! then made visible. No publication or speech is a storage acknowledgement.
 use crate::{
     protocol::{Guard, MAX_PAGE_SIZE, MAX_REPLY_BYTES, Request},
-    store::Store,
+    store::{MAX_STATE_BYTES, Store},
     time::{self, ClockSample, Deadline, When},
 };
 use lamp_msgs::{ClockStamp, ScheduleDue, ScheduleNotice};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, fmt, io};
+
+mod stored;
+
+/// Optional stored metadata may be added without a bump. New enum values,
+/// required fields, larger bounds, or fields whose omission could schedule
+/// or deliver different work require a newer schema instead.
+const SCHEMA: u32 = 1;
 
 pub const MAX_ITEMS: usize = 128;
 pub const MAX_TEXT_BYTES: usize = 300;
@@ -17,6 +24,15 @@ pub const LATE_AFTER_MS: u64 = 1000;
 pub trait Persistence {
     fn load(&self) -> io::Result<Option<Vec<u8>>>;
     fn commit(&mut self, bytes: &[u8]) -> io::Result<()>;
+    /// Durably retain the current store under another name, without replacing
+    /// anything, and start an empty one. Backends without that operation refuse
+    /// newer schemas; they must never overwrite them with an empty snapshot.
+    fn set_aside(&mut self, _label: &str) -> io::Result<String> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "this persistence cannot set a newer schedule aside",
+        ))
+    }
 }
 
 impl Persistence for Store {
@@ -25,6 +41,9 @@ impl Persistence for Store {
     }
     fn commit(&mut self, bytes: &[u8]) -> io::Result<()> {
         self.commit(bytes)
+    }
+    fn set_aside(&mut self, label: &str) -> io::Result<String> {
+        self.set_aside(label)
     }
 }
 
@@ -58,20 +77,20 @@ fn bad_time(_: impl fmt::Display) -> Error {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct Pending {
     overdue_at_detection_ms: u64,
     recovered_late: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct Item {
     id: u64,
     text: String,
     created_unix_ms: i64,
     request_id: String,
+    #[serde(deserialize_with = "stored::deadline")]
     deadline: Deadline,
+    #[serde(default, deserialize_with = "stored::snooze")]
     snooze: Option<Deadline>,
     delivery: u64,
     pending: Option<Pending>,
@@ -84,20 +103,21 @@ impl Item {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct Receipt {
     request: Request,
     response: Value,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
 struct State {
     schema: u32,
     store_id: String,
     revision: u64,
     next_id: u64,
     items: Vec<Item>,
+    // Read separately: an unreadable retry cache must not hide valid items,
+    // nor may unknown request fields be stripped to manufacture an exact retry.
+    #[serde(skip_deserializing)]
     last_receipt: Option<Receipt>,
 }
 
@@ -127,7 +147,7 @@ impl State {
                 "Schedule state has an unsupported or invalid shape.",
             )
         };
-        if self.schema != 1
+        if self.schema != SCHEMA
             || !valid_id(&self.store_id)
             || self.next_id == 0
             || self.items.len() > MAX_ITEMS
@@ -228,6 +248,7 @@ impl State {
 
 pub struct Engine<P: Persistence> {
     persistence: P,
+    set_aside: Option<String>,
     state: State,
     zone: String,
     last_clock: ClockSample,
@@ -247,11 +268,37 @@ impl<P: Persistence> Engine<P> {
         time::validate_zone(zone).map_err(bad_time)?;
         now.check().map_err(bad_time)?;
         let bytes = persistence.load().map_err(storage)?;
-        let existing = bytes.is_some();
-        let state = match bytes {
-            Some(bytes) => serde_json::from_slice::<State>(&bytes).map_err(storage)?,
+        let mut set_aside = None;
+        let mut dropped_receipt = false;
+        let stored = match bytes {
+            Some(bytes) if bytes.is_empty() || bytes.len() > MAX_STATE_BYTES => {
+                return Err(storage("snapshot exceeds its byte bound"));
+            }
+            Some(bytes) => match stored::read(&bytes)? {
+                stored::Read::Current(state, dropped) => {
+                    dropped_receipt = dropped;
+                    Some(*state)
+                }
+                stored::Read::Newer(schema) => {
+                    // Validate before moving anything. The fresh identity also
+                    // gives the retained database a bounded, private-data-free name.
+                    if !valid_id(new_store_id) {
+                        return Err(storage("invalid new store identity"));
+                    }
+                    let kept = persistence
+                        .set_aside(&format!("newer-{schema}-{new_store_id}"))
+                        .map_err(storage)?;
+                    set_aside = Some((schema, kept));
+                    None
+                }
+            },
+            None => None,
+        };
+        let existing = stored.is_some();
+        let state = match stored {
+            Some(state) => state,
             None => State {
-                schema: 1,
+                schema: SCHEMA,
                 store_id: new_store_id.into(),
                 revision: 0,
                 next_id: 1,
@@ -265,15 +312,29 @@ impl<P: Persistence> Engine<P> {
                 .commit(&serde_json::to_vec(&state).map_err(storage)?)
                 .map_err(storage)?;
         }
+        if let Some((schema, kept)) = &set_aside {
+            eprintln!(
+                "schedule: storage was written by a newer build (schema {schema}, this build reads {SCHEMA}); it is set aside as {kept}, and this build starts with an empty store"
+            );
+        } else if dropped_receipt {
+            eprintln!("schedule: the last mutation receipt is not one this build reads; dropped");
+        }
         let recovered = state.items.iter().map(|item| item.id).collect();
         Ok(Self {
             persistence,
+            set_aside: set_aside.map(|(_, name)| name),
             state,
             zone: zone.into(),
             last_clock: now.clone(),
             recovered,
             failed: false,
         })
+    }
+
+    /// The retained database's name when opening a newer schema started a
+    /// fresh store. Nothing from the retained store is delivered or merged.
+    pub fn set_aside(&self) -> Option<&str> {
+        self.set_aside.as_deref()
     }
 
     pub fn failed(&self) -> bool {

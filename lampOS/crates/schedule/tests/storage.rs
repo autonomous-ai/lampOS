@@ -72,6 +72,76 @@ fn empty_store_and_last_committed_opaque_bytes_survive_reopen() {
 }
 
 #[test]
+fn set_aside_keeps_the_whole_database_and_directory_ownership() {
+    let scratch = Scratch::new();
+    let mut store = scratch.open();
+    store.commit(b"a newer snapshot").unwrap();
+    let original = fs::read(scratch.database()).unwrap();
+    let kept = store.set_aside("newer-2-test").unwrap();
+    assert_eq!(kept, "schedule.sqlite3.newer-2-test");
+    assert_eq!(fs::read(scratch.dir.join(&kept)).unwrap(), original);
+    let metadata = fs::metadata(scratch.dir.join(&kept)).unwrap();
+    assert_eq!(metadata.mode() & 0o7777, 0o600);
+    assert_eq!(metadata.nlink(), 1);
+    assert_eq!(store.load().unwrap(), None);
+    assert_eq!(
+        Store::open(&scratch.dir).err().unwrap().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    store.commit(b"fresh snapshot").unwrap();
+    drop(store);
+    assert_eq!(scratch.open().load().unwrap().unwrap(), b"fresh snapshot");
+    assert_eq!(fs::read(scratch.dir.join(kept)).unwrap(), original);
+}
+
+#[test]
+fn set_aside_rejects_bad_labels_and_never_replaces_an_existing_archive() {
+    let scratch = Scratch::new();
+    let mut store = scratch.open();
+    store.commit(b"original snapshot").unwrap();
+    let original = fs::read(scratch.database()).unwrap();
+    for bad in ["", "../x", "x/y", "a b", &"x".repeat(65)] {
+        assert_eq!(
+            store.set_aside(bad).unwrap_err().kind(),
+            io::ErrorKind::InvalidInput
+        );
+        assert!(!store.poisoned());
+        assert_eq!(fs::read(scratch.database()).unwrap(), original);
+    }
+    let kept = scratch.dir.join("schedule.sqlite3.newer-2-test");
+    private_file(&kept, b"an archive that must remain");
+    assert!(store.set_aside("newer-2-test").is_err());
+    assert!(store.poisoned());
+    assert!(store.load().is_err());
+    assert_eq!(fs::read(&kept).unwrap(), b"an archive that must remain");
+    assert_eq!(fs::read(scratch.database()).unwrap(), original);
+    drop(store);
+    assert_eq!(
+        scratch.open().load().unwrap().unwrap(),
+        b"original snapshot"
+    );
+}
+
+#[test]
+fn failure_after_set_aside_keeps_the_synced_archive_and_poisons_the_owner() {
+    let scratch = Scratch::new();
+    let mut store = scratch.open();
+    store.commit(b"newer snapshot to retain").unwrap();
+    let original = fs::read(scratch.database()).unwrap();
+    // Inject a replacement-initialization failure after the old DB is renamed.
+    private_file(&scratch.dir.join(INITIALIZING), b"not a SQLite database");
+    assert!(store.set_aside("newer-2-test").is_err());
+    assert!(store.poisoned());
+    assert!(store.load().is_err());
+    assert!(store.commit(b"must not overwrite anything").is_err());
+    assert!(!scratch.database().exists());
+    assert_eq!(
+        fs::read(scratch.dir.join("schedule.sqlite3.newer-2-test")).unwrap(),
+        original
+    );
+}
+
+#[test]
 fn exact_byte_bound_works_and_invalid_sizes_preserve_the_previous_value() {
     let scratch = Scratch::new();
     let mut store = scratch.open();

@@ -873,7 +873,7 @@ fn maximum_text_and_repeat_metadata_fit_a_whole_list_reply() {
     assert_eq!(e.revision(), before);
 }
 #[test]
-fn malformed_or_future_state_is_not_replaced_by_an_empty_store() {
+fn malformed_state_or_a_backend_without_set_aside_is_not_overwritten() {
     for bytes in [
         b"{cut".to_vec(),
         serde_json::to_vec(&json!({"schema":99})).unwrap(),
@@ -885,7 +885,7 @@ fn malformed_or_future_state_is_not_replaced_by_an_empty_store() {
     }
 }
 #[test]
-fn corrupt_persisted_item_ids_deadlines_and_receipts_fail_closed() {
+fn corrupt_persisted_item_ids_and_deadlines_fail_closed() {
     let disk = Disk::default();
     let mut e = open(disk.clone(), &now(0));
     set(&mut e, &now(0), 1);
@@ -899,19 +899,7 @@ fn corrupt_persisted_item_ids_deadlines_and_receipts_fail_closed() {
     v["items"][0]["deadline"]["local"] = "incoherent".into();
     variants.push(v);
     let mut v = original.clone();
-    v["last_receipt"]["request"] = json!({"op":"status"});
-    variants.push(v);
-    let mut v = original.clone();
     v["next_id"] = 1.into();
-    variants.push(v);
-    let mut v = original.clone();
-    v["last_receipt"]["response"]["id"] = 2.into();
-    variants.push(v);
-    let mut v = original.clone();
-    v["last_receipt"]["response"]["extra"] = "bad".into();
-    variants.push(v);
-    let mut v = original.clone();
-    v["last_receipt"]["response"]["delivery"] = 2.into();
     variants.push(v);
     let mut v = original;
     v["items"][0]["text"] = "".into();
