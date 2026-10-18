@@ -13,7 +13,11 @@
 //! A restart that finds the record muted and the marker present knows the mute
 //! was restored by the guard after a fault, not chosen.
 use lamp_bus::{Bus, Kind, Message, Notice, Publisher, Subscriber};
-use lamp_controls::{mute::MuteRecord, receiver::Receiver, touch_receiver::TouchReceiver};
+use lamp_controls::{
+    mute::MuteRecord,
+    receiver::Receiver,
+    touch_receiver::{LateSleep, TouchReceiver},
+};
 use lamp_msgs::{
     ControlGesture, ControlIntent, ControlsState, MuteReason, TouchEvent, TouchGesture,
     TouchSource, TouchState, VoiceMute,
@@ -154,6 +158,26 @@ pub struct Health {
 
 #[derive(Default)]
 struct Shared {
+    /// Held by the pump while it queues an input, and by a release from its
+    /// last look for an input in flight through its save (#1607, Jarvis on
+    /// #1592): no press can be queued between the look and the write.
+    quiet: std::sync::Mutex<()>,
+    /// A press found [`Self::quiet`] held, and waited: it came while a
+    /// release looked and saved, so the release keeps the guard (the
+    /// reviewer and the first builder on #1622). Only an input that could
+    /// carry a press ([`carries_press`]).
+    pressed_while_held: AtomicBool,
+    /// Inputs that could carry a press, queued and not yet taken: what a
+    /// release's look counts, not the routine states queued with them.
+    pressing: AtomicU64,
+    /// The `event_sequence` of the last Controls state and touch state
+    /// queued: one whose events moved on could carry a press.
+    controls_sequence: AtomicU64,
+    touch_sequence: AtomicU64,
+    /// Inputs that found [`Self::quiet`] held, whatever they were: a test
+    /// waits on it.
+    #[cfg(test)]
+    waited: AtomicU64,
     received: AtomicU64,
     rejected: AtomicU64,
     lost: AtomicU64,
@@ -222,6 +246,9 @@ enum Input {
 struct Queued {
     input: Input,
     generation: u64,
+    /// Could carry a press ([`carries_press`]), counted in
+    /// [`Shared::pressing`] until taken.
+    press: bool,
 }
 
 struct Pump {
@@ -281,6 +308,13 @@ pub struct HandControls {
     could_not_start: u32,
     /// The record was muted by the restart guard, not by the person.
     restored_after_fault: bool,
+    /// The late sleep window ([`Self::allow_late_sleep`]), given to the head
+    /// pads' receiver once the first Controls state is applied.
+    late_sleep: Option<LateSleep>,
+    /// Run while a release holds the press queue, after its look and before
+    /// its save (a test presses then).
+    #[cfg(test)]
+    while_held: Option<Box<dyn FnOnce() + Send>>,
     // One handle for the entire service, not one per supervised audio cycle.
     _pump: Option<Pump>,
 }
@@ -452,33 +486,18 @@ impl HandControls {
         // at most 4 KiB there (and before `save` writes anything), so a FIFO
         // or a huge file refuses with a line instead of hanging the voice
         // (Jarvis on #1548).
-        let mut stored = None;
-        let record = match &options.mute_record {
-            Some(path) => {
-                // A record this build cannot read never stops the voice: it
-                // reads as muted, and that is said once (#1505).
-                let (record, note) = MuteRecord::load_noting(path, &clock_id, now_us)?;
-                if let Some(note) = note {
-                    eprintln!("lamp-voice: {note}");
-                }
-                stored = stored_identity(path);
-                // Checks the private parent and first-use/rebased persistence
-                // now. A path that cannot store a mute may not open audio.
-                record.save(path)?;
-                record
-            }
-            None => MuteRecord::new(&clock_id)?,
+        let restored = match &options.mute_record {
+            Some(path) => restored_record(path, &clock_id, now_us)?,
+            None => Restored {
+                record: MuteRecord::new(&clock_id)?,
+                stored: None,
+                late_sleep: None,
+            },
         };
         let (sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
         let shared = Arc::new(Shared::default());
         let mut controls =
-            Self::from_parts(options.clone(), &clock_id, record, input, shared, now_us)?;
-        controls.mark_guard =
-            std::env::var(RESTORED_MUTE_ENVIRONMENT).ok().as_deref() == Some("on");
-        controls.never_listened =
-            std::env::var(NEVER_LISTENED_ENVIRONMENT).ok().as_deref() == Some("on");
-        controls.load_could_not_start();
-        controls.restore_guard_marker(stored);
+            Self::with_restored(options, &clock_id, restored, input, shared, now_us)?;
         let root = options
             .bus_root
             .clone()
@@ -504,6 +523,38 @@ impl HandControls {
             shared: Arc::clone(&controls.shared),
         });
         Ok(Some(controls))
+    }
+
+    /// The controls from what [`restored_record`] read: the switches, the
+    /// count of runs that could not start, the late sleep window and the
+    /// guard's marker. The pump is [`Self::restore`]'s.
+    fn with_restored(
+        options: &ControlsOptions,
+        clock_id: &str,
+        restored: Restored,
+        input: ChannelReceiver<Queued>,
+        shared: Arc<Shared>,
+        now_us: u64,
+    ) -> io::Result<Self> {
+        let mut controls = Self::from_parts(
+            options.clone(),
+            clock_id,
+            restored.record,
+            input,
+            shared,
+            now_us,
+        )?;
+        controls.mark_guard =
+            std::env::var(RESTORED_MUTE_ENVIRONMENT).ok().as_deref() == Some("on");
+        controls.never_listened =
+            std::env::var(NEVER_LISTENED_ENVIRONMENT).ok().as_deref() == Some("on");
+        controls.load_could_not_start();
+        // A hand held on the head while no voice ran is still taken (#1607).
+        if let Some(window) = restored.late_sleep {
+            controls.allow_late_sleep(window);
+        }
+        controls.restore_guard_marker(restored.stored);
+        Ok(controls)
     }
 
     fn from_parts(
@@ -539,6 +590,9 @@ impl HandControls {
             never_listened: false,
             could_not_start: 0,
             restored_after_fault: false,
+            late_sleep: None,
+            #[cfg(test)]
+            while_held: None,
             _pump: None,
         };
         controls.share_latch();
@@ -742,6 +796,9 @@ impl HandControls {
                 }
             };
             self.shared.queued.fetch_sub(1, Ordering::AcqRel);
+            if queued.press {
+                self.shared.pressing.fetch_sub(1, Ordering::AcqRel);
+            }
             consumed += 1;
             let now_us = now();
             if queued.generation != generation {
@@ -750,6 +807,15 @@ impl HandControls {
             match queued.input {
                 Input::State(state) => match self.receiver.observe(now_us, &state) {
                     Ok(effects) => {
+                        // The late sleep only once Controls' own state is
+                        // in, so a button's mute released in the same gap
+                        // is taken first and never refused behind the
+                        // hold's watermark (the reviewer on #1622).
+                        if let (Some(window), Some(touch)) =
+                            (self.late_sleep.take(), self.touch.as_mut())
+                        {
+                            touch.allow_late_sleep(window);
+                        }
                         if self.options.stop && effects.stop_requested {
                             observation.stop = true;
                             if let Some(stop) = state.latest_stop {
@@ -982,17 +1048,30 @@ impl HandControls {
         // A new run: nothing heard in it yet (#1567).
         self.heard = false;
         if !self.armed {
-            // Marker first: a fault between the two leaves an unmuted record
-            // with a marker, which restore discards.
-            self.set_guard_marker(true);
-            let mut guard = self.receiver.mute_record().clone();
-            guard.muted = true;
-            if let Err(error) = guard.save(&path) {
-                self.persistence_failed = true;
-                return Err(error);
-            }
-            self.armed = true;
+            self.arm_guard_at(&path)?;
         }
+        Ok(())
+    }
+
+    /// The restart guard stored again (a press came while a release saved).
+    fn arm_guard(&mut self) -> io::Result<()> {
+        match self.options.mute_record.clone() {
+            Some(path) => self.arm_guard_at(&path),
+            None => Ok(()),
+        }
+    }
+
+    fn arm_guard_at(&mut self, path: &Path) -> io::Result<()> {
+        // Marker first: a fault between the two leaves an unmuted record
+        // with a marker, which restore discards.
+        self.set_guard_marker(true);
+        let mut guard = self.receiver.mute_record().clone();
+        guard.muted = true;
+        if let Err(error) = guard.save(path) {
+            self.persistence_failed = true;
+            return Err(error);
+        }
+        self.armed = true;
         Ok(())
     }
 
@@ -1016,8 +1095,70 @@ impl HandControls {
 
     /// No control input sent and not yet read (#1567): a press still in the
     /// queue could be a mute the latch has not taken.
+    /// No input that could carry a press is queued and not yet taken
+    /// ([`carries_press`]): the routine Controls and touch states, each
+    /// republished every 100 ms with nothing new, and pets do not count, or
+    /// any teardown longer than a republish would keep the guard with
+    /// nobody having pressed (Fourth and the reviewer on #1632).
     pub fn nothing_in_flight(&self) -> bool {
-        self.shared.queued.load(Ordering::Acquire) == 0
+        self.shared.pressing.load(Ordering::Acquire) == 0
+    }
+
+    /// The guard released, as the latch was, only if no control is in flight
+    /// or taken unsaved; the press queue is held from that look through the
+    /// save, so none can be queued between them and written over (#1607,
+    /// Jarvis on #1592). A press that comes meanwhile is queued after the
+    /// save, and the next start takes it: a button's mute by its watermark,
+    /// a head's sleep by [`Self::allow_late_sleep`]. Whether it released.
+    ///
+    /// A press that comes while it looks and saves waits on the queue, and
+    /// says it waited: the guard is then put back, so the next start is
+    /// muted whatever the press was (the reviewer and the first builder on
+    /// #1622). The record's time is set to the look, the next voice's floor
+    /// for a hold made after it ([`restored_record`]).
+    pub fn release_if_still_quiet(&mut self) -> io::Result<bool> {
+        let shared = Arc::clone(&self.shared);
+        let _quiet = shared
+            .quiet
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        shared.pressed_while_held.store(false, Ordering::Release);
+        if !self.still_quiet() {
+            return Ok(false);
+        }
+        let looked = SystemTime::now();
+        #[cfg(test)]
+        if let Some(press) = self.while_held.take() {
+            press();
+        }
+        self.disarm_after_cleanup()?;
+        let pressed = shared.pressed_while_held.load(Ordering::Acquire);
+        if pressed {
+            self.arm_guard()?;
+        }
+        if let Some(path) = &self.options.mute_record {
+            // Best effort: without it the floor is the save's own write,
+            // a moment after the look.
+            let _ = std::fs::File::options()
+                .write(true)
+                .open(path)
+                .and_then(|file| file.set_modified(looked));
+        }
+        Ok(!pressed)
+    }
+
+    /// For a new owner (#1607): a hand held on the head to put the lamp to
+    /// sleep within `window`, while no voice ran, is taken on the first
+    /// touch state after the first Controls state is applied
+    /// ([`TouchReceiver::allow_late_sleep`]).
+    pub fn allow_late_sleep(&mut self, window: LateSleep) {
+        self.late_sleep = Some(window);
+    }
+
+    /// The press queue's lock, held by a test.
+    #[cfg(test)]
+    pub(crate) fn quiet_for_test(&self) -> std::sync::MutexGuard<'_, ()> {
+        self.shared.quiet.lock().unwrap()
     }
 
     /// Nothing in flight and nothing taken unsaved (#1567): no control the
@@ -1038,10 +1179,11 @@ impl HandControls {
         self.dirty = true;
     }
 
-    /// The count of control inputs sent and not yet read, for a test.
+    /// The count of control inputs that could carry a press, sent and not
+    /// yet read (what a release's look counts, #1632), for a test.
     #[cfg(test)]
-    pub(crate) fn queued_for_test(&self) -> &AtomicUsize {
-        &self.shared.queued
+    pub(crate) fn queued_for_test(&self) -> &AtomicU64 {
+        &self.shared.pressing
     }
 
     /// Whether `LAMP_GUARD_NEVER_LISTENED=on` (#1567).
@@ -1097,16 +1239,12 @@ impl HandControls {
     /// an update with nobody told (lamp-4ace, 18 Oct, 15:32 and 17:48).
     /// Whether it released.
     pub fn release_never_listened(&mut self) -> io::Result<bool> {
-        if !self.never_listened
-            || !self.armed
-            || self.heard
-            || self.dirty
-            || self.persistence_failed
-            || !self.nothing_in_flight()
-        {
+        if !self.never_listened || !self.armed || self.heard || self.persistence_failed {
             return Ok(false);
         }
-        self.disarm_after_cleanup()?;
+        if !self.release_if_still_quiet()? {
+            return Ok(false);
+        }
         // Advice for the health only: a count that cannot be kept changes no
         // permission.
         self.could_not_start = self.could_not_start.saturating_add(1);
@@ -1148,6 +1286,59 @@ impl HandControls {
 fn stored_identity(path: &Path) -> Option<(String, u64)> {
     let record: MuteRecord = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
     Some((record.clock_id, record.through_us))
+}
+
+/// The record at a voice's start (#1505): read, its stored identity for the
+/// guard's marker, saved again (checking the private parent and
+/// first-use/rebased persistence now: a path that cannot store a mute may
+/// not open audio), and the late sleep window it opens (#1607). A hold made
+/// while no voice ran is taken if it began after the record's watermark
+/// and was reached after the voice before last looked for input (the
+/// record's time, set to that look by [`HandControls::release_if_still_quiet`]),
+/// and before this start. No window without a time for the record.
+fn restored_record(path: &Path, clock_id: &str, now_us: u64) -> io::Result<Restored> {
+    // A record this build cannot read never stops the voice: it reads as
+    // muted, and that is said once (#1505).
+    let (record, note) = MuteRecord::load_noting(path, clock_id, now_us)?;
+    if let Some(note) = note {
+        eprintln!("lamp-voice: {note}");
+    }
+    // The stored record as it is on disk, before a new boot's rebase: what
+    // the guard's marker must still match (the reviewer on #997). Read only
+    // once `load_noting` has found a private regular file of at most 4 KiB
+    // there (and before `save` writes anything), so a FIFO or a huge file
+    // refuses with a line instead of hanging the voice (Jarvis on #1548).
+    let stored = stored_identity(path);
+    // Before this save writes the record again.
+    let looked_us = last_saved_us(path, now_us);
+    record.save(path)?;
+    let late_sleep = looked_us.map(|looked| LateSleep {
+        began_after_us: record.through_us,
+        reached_after_us: record.through_us.max(looked),
+        reached_before_us: now_us,
+    });
+    Ok(Restored {
+        record,
+        stored,
+        late_sleep,
+    })
+}
+
+/// What [`restored_record`] reads at a start.
+struct Restored {
+    record: MuteRecord,
+    /// The record's `clock_id` and `through_us` as stored, before a rebase.
+    stored: Option<(String, u64)>,
+    late_sleep: Option<LateSleep>,
+}
+
+/// When `path` was last written, on the monotonic clock of `now_us`: its
+/// age by the wall clock taken from now. None when it is not there or its
+/// time is ahead of the wall clock (#1607), so no late sleep is taken.
+fn last_saved_us(path: &Path, now_us: u64) -> Option<u64> {
+    let modified = path.symlink_metadata().ok()?.modified().ok()?;
+    let age = std::time::SystemTime::now().duration_since(modified).ok()?;
+    Some(now_us.saturating_sub(u64::try_from(age.as_micros()).unwrap_or(u64::MAX)))
 }
 
 /// Nothing there, or a regular file: never a link, a FIFO or a folder,
@@ -1307,24 +1498,68 @@ fn parse(message: Message, topic: Topic, now_unix_ms: u64) -> io::Result<Input> 
     }
 }
 
+/// Whether `input` could carry a press (#1607, Fourth and the reviewer on
+/// #1632): a head touch event, or a Controls or touch state whose events
+/// moved on since the last one queued (a new `latest_mute`, `latest_stop` or
+/// head event). Not the routine republish of the same state every 100 ms,
+/// nor a pet, which never changes the mute. One producer only.
+fn carries_press(input: &Input, shared: &Shared) -> bool {
+    let moved =
+        |seen: &AtomicU64, sequence: u64| seen.fetch_max(sequence, Ordering::AcqRel) < sequence;
+    match input {
+        Input::Touch(_) => true,
+        Input::State(state) => moved(&shared.controls_sequence, state.event_sequence),
+        Input::TouchState(state) => moved(&shared.touch_sequence, state.event_sequence),
+        Input::Pet(_) => false,
+    }
+}
+
 fn enqueue(sender: &SyncSender<Queued>, shared: &Shared, input: Input) -> bool {
+    let press = carries_press(&input, shared);
     let queued = Queued {
         input,
         generation: shared.discontinuities.load(Ordering::Acquire),
+        press,
+    };
+    // Not while a release looks for inputs in flight and saves (#1607); a
+    // press that has to wait says so, and the release keeps the guard.
+    let _quiet = match shared.quiet.try_lock() {
+        Ok(quiet) => quiet,
+        Err(std::sync::TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+        Err(std::sync::TryLockError::WouldBlock) => {
+            if press {
+                shared.pressed_while_held.store(true, Ordering::Release);
+            }
+            #[cfg(test)]
+            shared.waited.fetch_add(1, Ordering::AcqRel);
+            shared
+                .quiet
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        }
     };
     // Publish the reservation before the item, so a quiescent clear never
     // mistakes a producer in try_send for an empty queue. One producer only.
     shared.queued.fetch_add(1, Ordering::AcqRel);
+    if press {
+        shared.pressing.fetch_add(1, Ordering::AcqRel);
+    }
+    let unqueued = || {
+        shared.queued.fetch_sub(1, Ordering::AcqRel);
+        if press {
+            shared.pressing.fetch_sub(1, Ordering::AcqRel);
+        }
+    };
     match sender.try_send(queued) {
         Ok(()) => true,
         Err(TrySendError::Full(_)) => {
-            shared.queued.fetch_sub(1, Ordering::AcqRel);
+            unqueued();
             add(&shared.lost, 1);
             shared.fence();
             true
         }
         Err(TrySendError::Disconnected(_)) => {
-            shared.queued.fetch_sub(1, Ordering::AcqRel);
+            unqueued();
             false
         }
     }

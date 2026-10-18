@@ -990,17 +990,63 @@ Everything else keeps the guard as before: a fault while listening without
 a signal first, any fault with a control input in flight, a persistence
 fault, a privacy exit, and a crash or abort.
 
-**Known limit, accepted for now (the first builder, 18 Oct 20:48):** a head
-hold (sleep) made in the 4 s between processes (`RestartSec=4s`) is dropped
-by the next process's touch receiver, which takes no touch that began before
-it saw the source. After a fault that the guard would have muted, A or B
-then brings the lamp back listening against the person's sleep. Every clean
-restart has the same gap today; a button mute in the window is kept
-(`Receiver::observe` applies `latest_mute` by `through_us`). The switch
-stays off on the product until #1607 (the touch receiver keeps a hold that
-began after the stored `through_us` and the previous exit), and Monday's
-check with the owner tries a 3 s head hold in the window after the EBUSY
-run. There is no backstop that mutes:
+**A sleep made while no voice ran** (#1607; it was the first builder's
+accepted limit of 18 Oct 20:48). A head hold (sleep) made in the 4 s between
+processes (`RestartSec=4s`) used to be dropped by the next process's touch
+receiver, which takes no touch that began before it saw the source and none
+older than its freshness, so after a fault A or B would have brought the lamp
+back listening against the person's sleep. Now the start reads the record
+(`restored_record`): its watermark (`through_us`), and its file's time, which
+is when the voice before last looked for input. A release sets the file's
+time to its look (`HandControls::release_if_still_quiet`); otherwise it is
+the last save's write. From those it makes a one-shot window
+(`lamp_controls::touch_receiver::LateSleep`). A retained head **Hold asking
+for Sleep**, from the same Controls session and source reader and sequence,
+is then taken however old it is, and the lamp sleeps as for a fresh hold, if:
+- it **began after the watermark**, so it is not one the record already
+  holds;
+- it was **reached (its 3 s) after that last look**, so the voice before
+  never had it: a hand that came before the look and reached 3 s after it is
+  taken (the reviewer on #1622);
+- it was **reached before this start**, so a hold made minutes later, while
+  states were refused, is not taken late;
+- **no newer head event asks to wake**: a hold, then a tap, both while no
+  voice ran, leaves the lamp awake, as the person's last act woke it.
+
+The window is given to the touch receiver only once Controls' own state is
+applied, so a button mute released in the same gap is taken first and never
+refused behind the hold's watermark, and it is taken on the next touch state
+after that. Only Sleep: a late tap (a Wake), touch or reset is never taken,
+so the window can only close the microphones. With no record, or a file time
+ahead of the wall clock, there is no window, as before. A sleep the voice
+took and the person then woke never comes back: the sleep was saved with its
+hold's watermark, the wake with the clear's, and the tap asks to wake, each
+of which alone refuses it (the first builder on #1622).
+
+**A press while a release looks and saves** (#1607, Jarvis on #1592): the
+pump queues each input under the press queue's lock (`Shared::quiet`), and a
+release (A's at the end of the run, B's in the cycle's wrapper) holds that
+lock from its look for an input in flight through its save
+(`HandControls::release_if_still_quiet`). A press that comes meanwhile waits,
+and says it waited: the release then puts the guard back, so the next start
+is muted whatever the press was, and the press is queued after the save. The
+next start also takes it as above: a button's mute by its watermark, a
+head's sleep by the late window.
+
+**What counts as a press** (Fourth and the reviewer on #1632), at the look and
+during the save alike (`carries_press`): a head touch event, or a Controls or
+touch state whose `event_sequence` moved past the last one queued (a new
+mute, stop or head event in it). Controls and the head pads each republish
+their state every 100 ms with nothing new, so counting every queued input
+would have kept the guard on any teardown longer than a republish, and
+muted the next start with nobody having pressed. A routine state and a pet,
+which never changes the mute, do not count; `nothing_in_flight` counts only
+the press-carrying inputs queued and not yet taken (`Shared::pressing`).
+The release sets the record's time to its look, best effort; without it
+the floor is the save's own write, a moment later.
+
+The switch stays off on the product until Monday's check with the owner, which
+tries a 3 s head hold in the window after the EBUSY run. There is no backstop that mutes:
 a lamp that cannot start cannot hear, so muting it would only bring back a
 lamp muted after an update with nobody told. Tests:
 `hand_controls::tests::a_run_that_heard_nothing_releases_the_guard_and_is_counted`,
@@ -1015,6 +1061,18 @@ lamp muted after an update with nobody told. Tests:
 `a_link_where_the_count_is_kept_is_never_followed`,
 `coordinator::tests::termination::a_press_during_the_stops_teardown_keeps_the_guard`,
 `a_frame_or_a_spoken_startup_marks_the_run_heard`,
+`hand_controls::tests::a_head_hold_made_while_no_voice_ran_puts_the_next_one_to_sleep`,
+`a_hold_reached_after_the_last_look_is_taken_through_the_records_time`,
+`a_hold_then_a_tap_while_no_voice_ran_leaves_the_next_one_awake`,
+`the_late_window_waits_for_the_first_controls_state`,
+`a_sleep_the_person_woke_from_never_comes_back_at_the_next_start`,
+`a_tap_made_while_no_voice_ran_never_wakes_the_next_one`,
+`the_late_window_returns_only_a_sleep_hold`,
+`a_press_waits_while_a_release_looks_and_saves`,
+`only_a_press_during_the_releases_save_keeps_the_guard`,
+`routine_states_queued_at_the_look_do_not_keep_the_guard`,
+`the_records_time_is_the_releases_look_not_its_save`,
+`the_start_gives_the_records_window_to_its_controls`,
 `bus_out::tests::runs_that_could_not_start_are_a_warning_never_a_mute` and
 `a_run_starting_after_runs_that_could_not_start_says_the_count`.
 

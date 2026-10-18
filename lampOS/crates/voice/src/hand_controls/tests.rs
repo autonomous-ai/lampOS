@@ -1771,9 +1771,10 @@ fn the_guard_stands_when_off_or_with_a_control_in_flight() {
         "the switch is off"
     );
     owner.never_listened = true;
-    owner.shared.queued.fetch_add(1, Ordering::AcqRel);
+    // An unread input that could carry a press (#1632).
+    owner.shared.pressing.fetch_add(1, Ordering::AcqRel);
     assert!(!owner.release_never_listened().unwrap(), "an input unread");
-    owner.shared.queued.fetch_sub(1, Ordering::AcqRel);
+    owner.shared.pressing.fetch_sub(1, Ordering::AcqRel);
     let mute = gesture(ControlIntent::SoftwareMute, 1, 4_000_000);
     observe(
         &mut owner,
@@ -1872,5 +1873,499 @@ fn a_link_where_the_count_is_kept_is_never_followed() {
             .unwrap()
             .file_type()
             .is_symlink()
+    );
+}
+
+/// #1607 (Jarvis's R2 on #1592, flipped): the voice before last looks for
+/// input at 1.6 s; a hand held on the head from 1.51 s for 3.2 s, so the
+/// hold is reached at 4.51 s, while no voice runs; the next voice starts at
+/// 5.9 s. What it sees, with the late sleep `window` or none. Controls'
+/// own state comes first, as the window waits for it.
+fn a_hold_while_no_voice_ran(
+    window: Option<LateSleep>,
+    record: MuteRecord,
+) -> Vec<(u64, Observation, bool)> {
+    let directory = Directory::new();
+    let mut head = TestHead::new(CLOCK, START);
+    let _ = head.run(START + 500_000, false);
+    let _ = head.run(START + 3_700_000, true);
+    let _ = head.run(START + 4_900_000, false);
+    // The next voice starts as the head's last step ends.
+    let at = START + 4_900_000;
+    let (mut next, sender) = from_record(head_options(Some(&directory)), record, at);
+    if let Some(window) = window {
+        next.allow_late_sleep(window);
+    }
+    send(&next, &sender, Input::State(Box::new(state(1, at, None))));
+    feed(
+        &mut next,
+        &sender,
+        head.run(START + 6_000_000, false),
+        false,
+    )
+}
+
+/// The window [`restored_record`] would open for a voice starting at `at`
+/// whose record's watermark is `through` and whose voice before looked last
+/// at `looked`.
+fn window(through: u64, looked: u64, at: u64) -> LateSleep {
+    LateSleep {
+        began_after_us: through,
+        reached_after_us: through.max(looked),
+        reached_before_us: at,
+    }
+}
+
+fn asleep(seen: &[(u64, Observation, bool)]) -> bool {
+    seen.iter().all(|(_, seen, _)| seen.muted && seen.asleep)
+}
+
+fn listening(seen: &[(u64, Observation, bool)]) -> bool {
+    seen.iter().all(|(_, seen, _)| !seen.muted)
+}
+
+/// The hold is taken when it began after the watermark, was reached after
+/// the voice before last looked, and before this one started. A hand that
+/// came before the look and reached 3 s after it is taken: that voice never
+/// had the hold (the reviewer's P2 on #1622).
+#[test]
+fn a_head_hold_made_while_no_voice_ran_puts_the_next_one_to_sleep() {
+    let fresh = MuteRecord::new(CLOCK).unwrap();
+    let through = fresh.through_us;
+    let at = START + 4_900_000;
+    let hold = |window| a_hold_while_no_voice_ran(window, fresh.clone());
+    // Looked at 0.5 s, before the hand came: taken.
+    assert!(asleep(&hold(Some(window(through, START + 500_000, at)))));
+    // Looked at 1.6 s, after the hand came at 1.51 s but before 3 s of it.
+    let seen = hold(Some(window(through, START + 600_000, at)));
+    assert!(asleep(&seen), "{seen:?}");
+    // As before: no window, a look after the hold was reached, a watermark
+    // after the hand came, or a start before it was reached: the lamp
+    // listens.
+    assert!(listening(&hold(None)));
+    assert!(listening(&hold(Some(window(
+        through,
+        START + 3_600_000,
+        at
+    )))));
+    assert!(listening(&hold(Some(window(
+        START + 520_000,
+        START + 520_000,
+        at
+    )))));
+    assert!(listening(&hold(Some(window(
+        through,
+        START + 500_000,
+        START + 3_000_000
+    )))));
+}
+
+/// The reviewer's P3 on #1622: a hold, then a tap, both while no voice ran:
+/// the person's last act woke it, so the next voice stays awake.
+#[test]
+fn a_hold_then_a_tap_while_no_voice_ran_leaves_the_next_one_awake() {
+    let directory = Directory::new();
+    let mut head = TestHead::new(CLOCK, START);
+    let _ = head.run(START + 500_000, false);
+    let _ = head.run(START + 3_700_000, true);
+    let _ = head.run(START + 4_000_000, false);
+    let _ = head.run(START + 4_150_000, true);
+    let _ = head.run(START + 4_900_000, false);
+    let at = START + 4_900_000;
+    let fresh = MuteRecord::new(CLOCK).unwrap();
+    let through = fresh.through_us;
+    let (mut next, sender) = from_record(head_options(Some(&directory)), fresh, at);
+    next.allow_late_sleep(window(through, START + 500_000, at));
+    send(&next, &sender, Input::State(Box::new(state(1, at, None))));
+    let seen = feed(
+        &mut next,
+        &sender,
+        head.run(START + 6_000_000, false),
+        false,
+    );
+    assert!(listening(&seen), "{seen:?}");
+}
+
+/// The reviewer's P3 on #1622: the window waits for Controls' own state.
+/// Touch states before it take no late hold; the first touch state after
+/// it does.
+#[test]
+fn the_late_window_waits_for_the_first_controls_state() {
+    let directory = Directory::new();
+    let mut head = TestHead::new(CLOCK, START);
+    let _ = head.run(START + 500_000, false);
+    let _ = head.run(START + 3_700_000, true);
+    let _ = head.run(START + 4_900_000, false);
+    let at = START + 4_900_000;
+    let fresh = MuteRecord::new(CLOCK).unwrap();
+    let through = fresh.through_us;
+    let (mut next, sender) = from_record(head_options(Some(&directory)), fresh, at);
+    next.allow_late_sleep(window(through, START + 500_000, at));
+    let before = feed(
+        &mut next,
+        &sender,
+        head.run(START + 5_400_000, false),
+        false,
+    );
+    assert!(listening(&before), "no Controls state yet: {before:?}");
+    send(
+        &next,
+        &sender,
+        Input::State(Box::new(state(1, START + 5_400_000, None))),
+    );
+    let after = feed(
+        &mut next,
+        &sender,
+        head.run(START + 6_000_000, false),
+        false,
+    );
+    assert!(
+        after
+            .last()
+            .is_some_and(|(_, seen, _)| seen.muted && seen.asleep),
+        "{after:?}"
+    );
+}
+
+/// #1607: the late path is Sleep only. A lamp put to sleep, then tapped on
+/// the head while no voice ran, wakes only by a tap its voice sees: the
+/// next one stays asleep.
+#[test]
+fn a_tap_made_while_no_voice_ran_never_wakes_the_next_one() {
+    let directory = Directory::new();
+    let mut record = MuteRecord::new(CLOCK).unwrap();
+    assert!(record.request_sleep(START + 400_000));
+    let mut head = TestHead::new(CLOCK, START);
+    let _ = head.run(START + 500_000, false);
+    let _ = head.run(START + 650_000, true);
+    let _ = head.run(START + 4_900_000, false);
+    // The next voice starts as the head's last step ends.
+    let at = START + 4_900_000;
+    let through = record.through_us;
+    let (mut next, sender) = from_record(head_options(Some(&directory)), record, at);
+    next.allow_late_sleep(window(through, START + 450_000, at));
+    send(&next, &sender, Input::State(Box::new(state(1, at, None))));
+    let seen = feed(
+        &mut next,
+        &sender,
+        head.run(START + 6_000_000, false),
+        false,
+    );
+    assert!(asleep(&seen), "{seen:?}");
+}
+
+/// The record's time `seconds_before` the next start at `at_us`, as the
+/// voice before left it: [`restored_record`] reads it as that voice's last
+/// look.
+fn left_at(path: &Path, at_us: u64, looked_us: u64) {
+    let file = fs::File::options().write(true).open(path).unwrap();
+    let ago = std::time::Duration::from_micros(at_us - looked_us);
+    file.set_modified(SystemTime::now() - ago).unwrap();
+}
+
+/// The reviewer's P2 on #1622, through the start's own reading of the
+/// record: its time, the voice before's last look, is the floor; a hold
+/// reached after it is taken, one reached before it is not.
+#[test]
+fn a_hold_reached_after_the_last_look_is_taken_through_the_records_time() {
+    let at = START + 4_900_000;
+    let start = |looked: u64| {
+        let directory = Directory::new();
+        let path = directory.file();
+        MuteRecord::new(CLOCK).unwrap().save(&path).unwrap();
+        left_at(&path, at, looked);
+        let restored = restored_record(&path, CLOCK, at).unwrap();
+        let window = restored
+            .late_sleep
+            .expect("a window from the record's time");
+        // Read back within a few ms of the look; this start is the bound.
+        assert!(
+            window.reached_after_us.abs_diff(looked) < 50_000,
+            "{window:?}"
+        );
+        assert_eq!(window.reached_before_us, at);
+        let mut head = TestHead::new(CLOCK, START);
+        let _ = head.run(START + 500_000, false);
+        let _ = head.run(START + 3_700_000, true);
+        let _ = head.run(START + 4_900_000, false);
+        let (mut next, sender) = from_record(head_options(Some(&directory)), restored.record, at);
+        next.allow_late_sleep(window);
+        send(&next, &sender, Input::State(Box::new(state(1, at, None))));
+        feed(
+            &mut next,
+            &sender,
+            head.run(START + 6_000_000, false),
+            false,
+        )
+    };
+    // The hand came at 1.51 s and reached 3 s at 4.51 s.
+    assert!(asleep(&start(START + 600_000)));
+    assert!(listening(&start(START + 4_600_000)));
+}
+
+/// The first builder's question on #1622: a sleep the voice took, which the
+/// person then woke, never comes back at the next start. The sleep is saved
+/// as a mute with its hold's watermark, the wake is saved with the clear's,
+/// and the tap after the hold asks to wake: each alone refuses the hold.
+#[test]
+fn a_sleep_the_person_woke_from_never_comes_back_at_the_next_start() {
+    let directory = Directory::new();
+    let path = directory.file();
+    let (mut owner, sender) = fixture(head_options(Some(&directory)));
+    let mut head = TestHead::new(CLOCK, START);
+    feed(&mut owner, &sender, head.run(START + 500_000, false), false);
+    let held = feed(
+        &mut owner,
+        &sender,
+        head.run(START + 3_700_000, true),
+        false,
+    );
+    assert!(held.iter().any(|(_, seen, _)| seen.asleep));
+    owner.persist_muted().unwrap();
+    feed(
+        &mut owner,
+        &sender,
+        head.run(START + 4_800_000, false),
+        true,
+    );
+    let mut ticks = head.run(START + 5_000_000, true);
+    ticks.extend(head.run(START + 5_500_000, false));
+    let tapped = feed(&mut owner, &sender, ticks, true);
+    assert!(
+        tapped
+            .iter()
+            .any(|(_, seen, allowed)| *allowed && !seen.muted)
+    );
+    // The run stops; the next starts at 6 s, the record's time either the
+    // wake's save or (as if not kept) before the hold.
+    let at = START + 6_000_000;
+    for looked in [START + 5_400_000, START + 500_000] {
+        left_at(&path, at, looked);
+        let restored = restored_record(&path, CLOCK, at).unwrap();
+        assert!(!restored.record.muted);
+        let (mut next, next_sender) =
+            from_record(head_options(Some(&directory)), restored.record, at);
+        next.allow_late_sleep(restored.late_sleep.unwrap());
+        send(
+            &next,
+            &next_sender,
+            Input::State(Box::new(state(1, at, None))),
+        );
+        let seen = feed(
+            &mut next,
+            &next_sender,
+            head.run(at + 500_000, false),
+            false,
+        );
+        assert!(listening(&seen), "looked at {looked}: {seen:?}");
+    }
+}
+
+/// #1607 (the first builder's 21:39): while a release holds the press
+/// queue, from its look for inputs in flight through its save, a press
+/// waits; it is queued once the save is done, never between.
+#[test]
+fn a_press_waits_while_a_release_looks_and_saves() {
+    let directory = Directory::new();
+    let (owner, sender) = fixture(options(false, Some(&directory.file())));
+    let shared = Arc::clone(&owner.shared);
+    let held = owner.quiet_for_test();
+    let pressed = std::thread::spawn(move || {
+        let mute = gesture(ControlIntent::Pet, 1, 4_000_000);
+        enqueue(&sender, &shared, Input::Pet(mute))
+    });
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    assert_eq!(owner.shared.queued.load(Ordering::Acquire), 0, "waits");
+    drop(held);
+    assert!(pressed.join().unwrap());
+    assert_eq!(
+        owner.shared.queued.load(Ordering::Acquire),
+        1,
+        "queued after"
+    );
+}
+
+/// A release of an armed guard, with `queued` sent before its look (in the
+/// queue, not yet taken) and `during` sent while it has looked and is
+/// saving, `hold` long. Whether it released, and whether the record on disk
+/// is muted (the guard kept).
+fn release_with(
+    queued: Vec<Input>,
+    during: Option<Input>,
+    hold: std::time::Duration,
+) -> (bool, bool) {
+    let directory = Directory::new();
+    let (mut owner, sender) = fixture(options(false, Some(&directory.file())));
+    owner.arm_active().unwrap();
+    for input in queued {
+        send(&owner, &sender, input);
+    }
+    let shared = Arc::clone(&owner.shared);
+    let (sent_tx, sent_rx) = mpsc::channel();
+    owner.while_held = Some(Box::new(move || {
+        if let Some(input) = during {
+            let waiting = Arc::clone(&shared);
+            let sender = sender.clone();
+            std::thread::spawn(move || {
+                let _ = sent_tx.send(enqueue(&sender, &waiting, input));
+            });
+            let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while shared.waited.load(Ordering::Acquire) == 0 {
+                assert!(std::time::Instant::now() < until, "the input never waited");
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+        }
+        std::thread::sleep(hold);
+    }));
+    let released = owner.release_if_still_quiet().unwrap();
+    let saved = MuteRecord::load(&directory.file(), CLOCK, START).unwrap();
+    if let Ok(sent) = sent_rx.recv_timeout(std::time::Duration::from_secs(5)) {
+        assert!(sent, "queued once the save was done");
+    }
+    (released, saved.muted)
+}
+
+/// A Controls state with a new mute in it, the kind of input that carries a
+/// button's press.
+fn controls_mute(sequence: u64) -> Input {
+    let mute = gesture(ControlIntent::SoftwareMute, sequence, 4_000_000);
+    Input::State(Box::new(state(sequence + 1, 4_000_000, Some(mute))))
+}
+
+/// The reviewer's P2 on #1622 (the lock changes an outcome), and Fourth's
+/// and the reviewer's on #1632 (only what could carry a press): an input
+/// that could carry a press, made while a release has looked and is saving,
+/// keeps the guard, so the next start is muted; the routine Controls and
+/// touch states republished every 100 ms, and a pet, which never changes
+/// the mute, do not.
+#[test]
+fn only_a_press_during_the_releases_save_keeps_the_guard() {
+    let none = std::time::Duration::ZERO;
+    let mut head = TestHead::new(CLOCK, START);
+    let ticks = head.run(START + 500_000, false);
+    let (_, routine_touch, _) = ticks.last().cloned().unwrap();
+    let mut touched = head.run(START + 700_000, true);
+    let hand = touched
+        .iter_mut()
+        .find_map(|(_, _, events)| events.pop())
+        .expect("a head event");
+    let pet = Input::Pet(gesture(ControlIntent::Pet, 1, 4_000_000));
+    let routine_controls = Input::State(Box::new(state(1, START + 100_000, None)));
+    // Kept: a new mute in Controls' state, or a head event.
+    assert_eq!(
+        release_with(vec![], Some(controls_mute(1)), none),
+        (false, true)
+    );
+    assert_eq!(
+        release_with(vec![], Some(Input::Touch(Box::new(hand))), none),
+        (false, true)
+    );
+    // Released: the routine states, and a pet.
+    assert_eq!(
+        release_with(vec![], Some(routine_controls), none),
+        (true, false)
+    );
+    assert_eq!(
+        release_with(
+            vec![],
+            Some(Input::TouchState(Box::new(routine_touch))),
+            none
+        ),
+        (true, false)
+    );
+    assert_eq!(release_with(vec![], Some(pet), none), (true, false));
+    // And with nothing at all.
+    assert_eq!(release_with(vec![], None, none), (true, false));
+}
+
+/// The reviewer on #1632, the look: routine states still queued at the end
+/// of a run, which nothing takes before the release looks, do not keep the
+/// guard; a state with a new mute in it does.
+#[test]
+fn routine_states_queued_at_the_look_do_not_keep_the_guard() {
+    let none = std::time::Duration::ZERO;
+    let mut head = TestHead::new(CLOCK, START);
+    let (_, routine_touch, _) = head.run(START + 500_000, false).pop().unwrap();
+    let routine = vec![
+        Input::State(Box::new(state(1, START + 100_000, None))),
+        Input::State(Box::new(state(2, START + 200_000, None))),
+        Input::TouchState(Box::new(routine_touch)),
+    ];
+    assert_eq!(release_with(routine, None, none), (true, false));
+    assert_eq!(
+        release_with(vec![controls_mute(1)], None, none),
+        (false, true)
+    );
+}
+
+/// The reviewer's P3 on #1632: the release sets the record's time to its
+/// look, not to its save; the next start reads that as its floor.
+#[test]
+fn the_records_time_is_the_releases_look_not_its_save() {
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    owner.arm_active().unwrap();
+    owner.while_held = Some(Box::new(|| {
+        std::thread::sleep(std::time::Duration::from_millis(300))
+    }));
+    assert!(owner.release_if_still_quiet().unwrap());
+    let age = SystemTime::now()
+        .duration_since(fs::metadata(directory.file()).unwrap().modified().unwrap())
+        .unwrap();
+    assert!(
+        age >= std::time::Duration::from_millis(250),
+        "{age:?}: the save's time, not the look's"
+    );
+}
+
+/// Fourth's and the reviewer's P3 on #1632: the start gives the window it
+/// read from the record to the controls it makes.
+#[test]
+fn the_start_gives_the_records_window_to_its_controls() {
+    let directory = Directory::new();
+    let path = directory.file();
+    let at = START + 4_900_000;
+    MuteRecord::new(CLOCK).unwrap().save(&path).unwrap();
+    left_at(&path, at, START + 600_000);
+    let restored = restored_record(&path, CLOCK, at).unwrap();
+    let window = restored.late_sleep.expect("a window");
+    let (_sender, input) = mpsc::sync_channel(QUEUE_CAPACITY);
+    let controls = HandControls::with_restored(
+        &head_options(Some(&directory)),
+        CLOCK,
+        restored,
+        input,
+        Arc::new(Shared::default()),
+        at,
+    )
+    .unwrap();
+    assert_eq!(controls.late_sleep, Some(window));
+}
+
+/// #1607, the receiver itself: of what the head retained while no voice ran,
+/// the late window returns a Sleep hold and nothing else: never a tap, which
+/// asks to wake, nor a touch.
+#[test]
+fn the_late_window_returns_only_a_sleep_hold() {
+    let late = |hand_on_until: u64| {
+        let mut head = TestHead::new(CLOCK, START);
+        let _ = head.run(START + 500_000, false);
+        let _ = head.run(hand_on_until, true);
+        let _ = head.run(START + 4_900_000, false);
+        let next = head.run(START + 4_910_000, false);
+        let (at, state, _) = &next[0];
+        let mut receiver = lamp_controls::touch_receiver::TouchReceiver::new(CLOCK).unwrap();
+        receiver.allow_late_sleep(window(0, START + 500_000, START + 4_900_000));
+        receiver
+            .observe(*at, state)
+            .unwrap()
+            .into_iter()
+            .map(|event| event.gesture)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(late(START + 3_700_000), [lamp_msgs::TouchGesture::Hold]);
+    assert!(
+        late(START + 650_000).is_empty(),
+        "a tap and its touch: none"
     );
 }
