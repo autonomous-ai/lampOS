@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "usage: lamp-policy-replay --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,YYYY-MM-DD...] --models NAME[,NAME...] [--labels ABSOLUTE_FILE] [--only-labelled] [--endpoint URL] [--deadline-ms 10000] [--pace-ms 500] [--most N]\n       lamp-policy-replay --again ABSOLUTE_FILE --labels ABSOLUTE_FILE [--refit [--cost-ratio N]]\n       lamp-policy-replay --pictures --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,...] [--labels ABSOLUTE_FILE]\n       lamp-policy-replay --agreement --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,...]";
+const USAGE: &str = "usage: lamp-policy-replay --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,YYYY-MM-DD...] --models NAME[,NAME...] [--labels ABSOLUTE_FILE] [--only-labelled] [--endpoint URL] [--deadline-ms 10000] [--pace-ms 500] [--most N]\n       lamp-policy-replay --again ABSOLUTE_FILE --labels ABSOLUTE_FILE [--refit [--cost-ratio N]]\n       lamp-policy-replay --pictures --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,...] [--labels ABSOLUTE_FILE]\n       lamp-policy-replay --agreement --log-dir ABSOLUTE_DIR --days YYYY-MM-DD[,...] [--from YYYY-MM-DDTHH:MM:SSZ] [--until YYYY-MM-DDTHH:MM:SSZ]";
 const HELP: &str = "Asks each attention decision in the decisions logs of the days given again, of each\n\
 model given in turn (at most four), as it was asked on the day, and prints one line per\n\
 decision and a summary: each model's choice, probability and time, and the kinds of what\n\
@@ -29,7 +29,9 @@ an ignored request, in the fit and in the counts' cost.\n\
 taken for the line nearest it within 3 s, and asks nothing.\n\
 --agreement sets each decision a model made beside what the rule would have said of the same\n\
 context, counted by kind (room, conversation, the lamp speaking, the name's score), and names\n\
-the kinds of at least 20 decisions with no disagreement; it asks nothing (#705).\n\
+the kinds of at least 20 decisions with no disagreement; it asks nothing (#705). --from and\n\
+--until (UTC) keep only the decisions made from and before those moments: a night held out\n\
+from the days its kinds were picked on.\n\
 What was heard is sent to the decision model's service again, as on the day.";
 
 #[derive(Debug, PartialEq)]
@@ -54,6 +56,10 @@ enum Run {
     Agreement {
         log: PathBuf,
         days: Vec<String>,
+        /// Only decisions made from `from` and before `until`, in ms since
+        /// 1970 (UTC).
+        from: Option<u64>,
+        until: Option<u64>,
     },
 }
 
@@ -107,6 +113,7 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Option<Run>, String> {
     let mut again = None;
     let mut pictures = false;
     let mut agreement = false;
+    let (mut from, mut until) = (None, None);
     let mut only_labelled = false;
     let mut refit = false;
     let mut cost = None;
@@ -160,6 +167,15 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Option<Run>, String> {
                 }
                 models = Some(listed);
             }
+            "--from" | "--until" => {
+                let at = replay::utc_ms(&value)
+                    .ok_or(format!("{option} is a UTC moment, YYYY-MM-DDTHH:MM:SSZ"))?;
+                if option == "--from" {
+                    from = Some(at);
+                } else {
+                    until = Some(at);
+                }
+            }
             "--endpoint" => endpoint = value,
             "--deadline-ms" => deadline = number(&value, 1, 60_000)?,
             "--pace-ms" => pace = number(&value, 0, 10_000)?,
@@ -176,13 +192,25 @@ fn parse(args: impl Iterator<Item = String>) -> Result<Option<Run>, String> {
             _ => return Err(format!("{option} is not an option")),
         }
     }
+    // A window means something only to `--agreement` (the reviewer on #1539).
+    if !agreement && (from.is_some() || until.is_some()) {
+        return Err("--from and --until go with --agreement only".into());
+    }
     if agreement {
-        if seen.len() != 3 || pictures {
-            return Err("--agreement takes --log-dir and --days only".into());
+        let window = usize::from(from.is_some()) + usize::from(until.is_some());
+        if seen.len() != 3 + window || pictures {
+            return Err("--agreement takes --log-dir, --days, --from and --until only".into());
+        }
+        if let (Some(from), Some(until)) = (from, until)
+            && from >= until
+        {
+            return Err("--from must come before --until".into());
         }
         return Ok(Some(Run::Agreement {
             log: log.ok_or("--log-dir is required")?,
             days: days.ok_or("--days is required")?,
+            from,
+            until,
         }));
     }
     if pictures {
@@ -240,8 +268,16 @@ fn pictures(log: &Path, days: &[String], labels: Option<&PathBuf>) -> io::Result
     Ok(())
 }
 
-fn agreement(log: &Path, days: &[String]) -> io::Result<()> {
-    let (logged, unread) = replay::read(log, days)?;
+fn agreement(log: &Path, days: &[String], from: Option<u64>, until: Option<u64>) -> io::Result<()> {
+    let (mut logged, unread) = replay::read(log, days)?;
+    // Said first, so an empty table from a folder or day with no file reads
+    // apart from a window with no decisions (Fourth on #1539).
+    let read = logged.len();
+    replay::within(&mut logged, from, until);
+    println!(
+        "attention decisions read from the days given: {read}; within the window: {}",
+        logged.len()
+    );
     println!(
         "{}",
         replay::agreement_summary(&replay::agreement(&logged), AGREEMENT_LEAST)
@@ -326,7 +362,12 @@ fn main() -> ExitCode {
                 cost,
             } => again(lines, labels, *refit, *cost),
             Run::Pictures { log, days, labels } => pictures(log, days, labels.as_ref()),
-            Run::Agreement { log, days } => agreement(log, days),
+            Run::Agreement {
+                log,
+                days,
+                from,
+                until,
+            } => agreement(log, days, *from, *until),
         } {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
@@ -438,10 +479,32 @@ mod tests {
             Some(Run::Agreement {
                 log: "/d".into(),
                 days: vec!["2026-10-17".into(), "2026-10-18".into()],
+                from: None,
+                until: None,
+            })
+        );
+        assert_eq!(
+            parse(
+                "--agreement --log-dir /d --days 2026-10-18,2026-10-19 --from 2026-10-18T11:00:00Z --until 2026-10-19T00:00:00Z"
+                    .split_whitespace()
+                    .map(str::to_owned)
+            )
+            .unwrap(),
+            Some(Run::Agreement {
+                log: "/d".into(),
+                days: vec!["2026-10-18".into(), "2026-10-19".into()],
+                from: Some(1_792_321_200_000),
+                until: Some(1_792_368_000_000),
             })
         );
         for refused in [
             "--agreement --log-dir /d",
+            "--pictures --log-dir /d --days 2026-10-15 --from 2026-10-18T11:00:00Z",
+            "--again /r --labels /l --until 2026-10-18T11:00:00Z",
+            "--agreement --log-dir /d --days 2026-10-18 --from 2026-10-18T11:00:00",
+            "--agreement --log-dir /d --days 2026-10-18 --from 2026-10-18 --until 2026-10-19T00:00:00Z",
+            "--agreement --log-dir /d --days 2026-10-18 --from 2026-10-19T00:00:00Z --until 2026-10-18T11:00:00Z",
+            "--agreement --log-dir /d --days 2026-10-18 --from 2026-10-18T11:00:00Z --from 2026-10-18T12:00:00Z",
             "--agreement --log-dir /d --days 2026-10-15 --models m",
             "--agreement --pictures --log-dir /d --days 2026-10-15",
             "--again /r",

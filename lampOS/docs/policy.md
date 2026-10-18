@@ -1163,7 +1163,8 @@ through them as they are.
         [--labels ABSOLUTE_FILE] [--only-labelled] [--endpoint URL] \
         [--deadline-ms 10000] [--pace-ms 500] [--most N] > replay.jsonl
     lamp-policy-replay --again replay.jsonl --labels ABSOLUTE_FILE [--refit [--cost-ratio N]]
-    lamp-policy-replay --agreement --log-dir /var/lib/lampos-policy --days 2026-10-17,2026-10-18
+    lamp-policy-replay --agreement --log-dir /var/lib/lampos-policy --days 2026-10-17,2026-10-18 \
+        [--from 2026-10-18T11:00:00Z] [--until 2026-10-19T00:00:00Z]
 
 - **`--agreement`** (#705, the Policy's wait on a held call) asks nothing.
   For each decision a model made, it says what the rule (`fallback`) would
@@ -1178,7 +1179,14 @@ through them as they are.
   many of the model's were a following `stay_quiet`), then the kinds with at
   least 20 decisions and no disagreement: where the rule could decide
   without asking, once a night in shadow has borne it out (Fourth's
-  conditions on #705). 20 of 20 agreeing still leaves a true disagreement
+  conditions on #705). `--from` and `--until` (UTC,
+  `YYYY-MM-DDTHH:MM:SSZ`) keep only the decisions made from and before
+  those moments, so the night is counted apart from the days its kinds
+  were picked on: they are picked before the night and only tested on it.
+  A day past its month's end is refused, not rolled over. The run first
+  says how many decisions it read from the days and how many fall in the
+  window, so an empty table from a missing file reads apart from an empty
+  night. 20 of 20 agreeing still leaves a true disagreement
   rate up to about 14 % likely at 95 %, so the list is for the shadow night,
   not proof. A line cut inside a character is counted unread here and when
   asking, and passed over by `--pictures` (which counts no unread lines),
