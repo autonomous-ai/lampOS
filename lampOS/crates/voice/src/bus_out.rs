@@ -517,12 +517,15 @@ impl Waiting {
     /// Whether the microphones are held closed: by the switch, a mute, a
     /// hand, the restart guard or a switch that cannot be read. Not while
     /// the switch is first read or has read open, which every start of the
-    /// voice passes through, muted or not (the reviewer on #1551).
+    /// voice passes through, muted or not (the reviewer on #1551). Every
+    /// case is named, so a new one must be placed here (Fifth on #1565).
     pub fn closed(self) -> bool {
-        matches!(
-            self,
-            Self::Switch | Self::Muted | Self::Asleep | Self::RestartGuard | Self::Unreadable
-        )
+        match self {
+            Self::Switch | Self::Muted | Self::Asleep | Self::RestartGuard | Self::Unreadable => {
+                true
+            }
+            Self::Reading | Self::Opening => false,
+        }
     }
 
     /// From the switch as the wait last read it, whether it has gone
