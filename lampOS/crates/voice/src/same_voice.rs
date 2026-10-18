@@ -25,13 +25,14 @@
 //!   recordings it was right no more often than chance.
 //! - **Only a line of [`LEAST_SAMPLES`] or more**, of which the first
 //!   [`ASKED_AT`] are judged, asked for as soon as they are heard.
-//! - **The conversation's voice** is the last voice the lamp answered that
-//!   was long enough to know. An answered line too short to know keeps it,
-//!   unless it began a conversation of its own (answered for its name or a
-//!   face, not as one going on): then no voice is known.
-//! - **The rule:** a cosine under [`DIFFERENT_BELOW`] between the line's
-//!   print and the conversation's is another voice, and no conversation is
-//!   going on for it. The same voice, or no verdict, is as without the
+//! - **The conversation's voice** is the prints of the lines the lamp
+//!   answered in it that were long enough to know, the last [`KEPT`] of
+//!   them. An answered line too short to know keeps them, unless it began a
+//!   conversation of its own (answered for its name or a face, not as one
+//!   going on): then no voice is known.
+//! - **The rule:** a line's highest cosine against the conversation's
+//!   prints, under [`DIFFERENT_BELOW`], is another voice, and no
+//!   conversation is going on for it. The same voice, or no verdict, is as without the
 //!   model.
 use std::{
     collections::VecDeque,
@@ -112,7 +113,8 @@ const TIMING: Timing = Timing {
     ready_within: READY_WITHIN,
     answer_within: ANSWER_WITHIN,
 };
-/// Prints kept for lines not yet decided.
+/// Prints kept: of lines not yet decided, and of the conversation's
+/// answered lines.
 const KEPT: usize = 4;
 
 /// The provider worker's arguments for the model in the environment: an
@@ -455,8 +457,13 @@ pub struct Voices<P: Printer> {
     asked: VecDeque<u64>,
     /// Prints that have come, newest last.
     prints: VecDeque<(u64, Vec<f32>)>,
-    /// The voice of the conversation the lamp is in.
-    conversation: Option<Vec<f32>>,
+    /// The voice of the conversation the lamp is in: the prints of the
+    /// lines it answered in it, newest last, at most [`KEPT`]. A line is
+    /// judged by its highest cosine against them (the first builder on
+    /// #1445, after the Sixth's finding: on lamp-4ace on 18 October, one
+    /// print, likely mixed, was kept as the only one, and the same
+    /// speaker's next two lines fell to 0.14 and 0.24 against it).
+    conversation: VecDeque<Vec<f32>>,
     /// A line whose answer was let out and whose print is still to come,
     /// and whether it began a conversation of its own.
     answered: Option<(u64, bool)>,
@@ -478,7 +485,7 @@ impl<P: Printer> Voices<P> {
             clip: None,
             asked: VecDeque::new(),
             prints: VecDeque::new(),
-            conversation: None,
+            conversation: VecDeque::new(),
             answered: None,
             judged: None,
             late_other: None,
@@ -567,7 +574,7 @@ impl<P: Printer> Voices<P> {
             && answered == request
         {
             if new {
-                self.conversation = None;
+                self.conversation.clear();
             }
             self.answered = None;
         }
@@ -618,16 +625,33 @@ impl<P: Printer> Voices<P> {
     }
 
     /// How like the conversation's voice the line `request` is, when both
-    /// are known: the cosine of their prints. Once a line: asked again for
-    /// the same line, nothing.
+    /// are known: the highest cosine of its print against the
+    /// conversation's. Once a line: asked again for the same line, nothing.
     pub fn likeness(&mut self, request: u64) -> Option<f32> {
         self.poll();
         if self.judged == Some(request) {
             return None;
         }
-        let likeness = cosine(self.conversation.as_ref()?, self.print(request)?)?;
+        let likeness = self.likest(self.print(request)?)?;
         self.judged = Some(request);
         Some(likeness)
+    }
+
+    /// The highest cosine of `print` against the conversation's prints.
+    fn likest(&self, print: &[f32]) -> Option<f32> {
+        self.conversation
+            .iter()
+            .filter_map(|voice| cosine(voice, print))
+            .reduce(f32::max)
+    }
+
+    /// One more print of the conversation's voice, the oldest let go past
+    /// [`KEPT`].
+    fn keep(&mut self, print: Vec<f32>) {
+        if self.conversation.len() == KEPT {
+            self.conversation.pop_front();
+        }
+        self.conversation.push_back(print);
     }
 
     /// Why the line `request`, long enough to know, has no verdict from
@@ -641,26 +665,25 @@ impl<P: Printer> Voices<P> {
         if self.judged == Some(request) || !coming && self.print(request).is_none() {
             return None;
         }
-        match (&self.conversation, self.answered) {
-            (Some(_), _) => coming.then_some("its voice print was not back at its answer"),
-            (None, Some(_)) => Some("the conversation's voice print was not back at its answer"),
-            (None, None) => Some("no voice of the conversation is known"),
+        match (self.conversation.is_empty(), self.answered) {
+            (false, _) => coming.then_some("its voice print was not back at its answer"),
+            (true, Some(_)) => Some("the conversation's voice print was not back at its answer"),
+            (true, None) => Some("no voice of the conversation is known"),
         }
     }
 
     /// `print`, of the line `request` let out as the conversation going on
-    /// (`going_on`) or for itself, becomes the conversation's voice, unless
-    /// the line was let out as the conversation going on without being
-    /// judged and its print is another voice's. Then the conversation's
-    /// voice is kept, and the conversation is over (the Seventh on #1445: a
-    /// print that came after its verdict made the other person the
-    /// conversation's voice, so on a slow lamp scene 3 went on with B).
+    /// (`going_on`), is one more of the conversation's prints, unless the
+    /// line was let out without being judged and its print is another
+    /// voice's. Then the conversation's prints are kept as they were, and
+    /// the conversation is over (the Seventh on #1445: a print that came
+    /// after its verdict made the other person the conversation's voice, so
+    /// on a slow lamp scene 3 went on with B). Let out for itself, the line
+    /// began a conversation of its own, and its print is that one's voice.
     fn adopt(&mut self, request: u64, print: Vec<f32>, going_on: bool) {
-        let likeness = self
-            .conversation
-            .as_ref()
-            .filter(|_| going_on && self.judged != Some(request))
-            .and_then(|voice| cosine(voice, &print));
+        let likeness = (going_on && self.judged != Some(request))
+            .then(|| self.likest(&print))
+            .flatten();
         match likeness {
             Some(likeness) if likeness < DIFFERENT_BELOW => {
                 eprintln!(
@@ -668,7 +691,11 @@ impl<P: Printer> Voices<P> {
                 );
                 self.late_other = Some(request);
             }
-            _ => self.conversation = Some(print),
+            _ if going_on => self.keep(print),
+            _ => {
+                self.conversation.clear();
+                self.keep(print);
+            }
         }
     }
 
@@ -695,7 +722,7 @@ impl<P: Printer> Voices<P> {
         if self.print_coming(request) {
             self.answered = Some((request, !going_on));
         } else if !going_on {
-            self.conversation = None;
+            self.conversation.clear();
         }
     }
 }
@@ -721,8 +748,13 @@ mod tests {
             }
             self.asked.push((request, samples.len()));
             let print = match samples[0] {
-                1 => Ok(vec![1.0, 0.0]),
-                -1 => Ok(vec![0.0, 1.0]),
+                1 => Ok(vec![1.0, 0.0, 0.0]),
+                -1 => Ok(vec![0.0, 1.0, 0.0]),
+                // A's voice with something else in it: 0.30 against A's.
+                2 => Ok(vec![0.3, 0.0, 0.954]),
+                // A's voice, a little off: 0.90 against A's, under 0 against
+                // the mixed one.
+                3 => Ok(vec![0.9, 0.0, -0.436]),
                 _ => Err("refused: none".into()),
             };
             self.waiting.push_back((request, print));
@@ -1043,7 +1075,7 @@ exec sleep 30"#,
     }
 
     #[test]
-    fn another_voice_is_known_only_against_the_voice_the_lamp_last_answered() {
+    fn another_voice_is_known_only_against_the_conversation_the_lamp_last_answered_in() {
         let mut voices = Voices::new(StandIn::default());
         // No conversation yet: no verdict.
         said(&mut voices, 1, 1, 48_000);
@@ -1084,6 +1116,69 @@ exec sleep 30"#,
     /// becomes the conversation's voice. Another voice's is not taken, and
     /// the conversation is over; the same voice's is. One that began a
     /// conversation of its own becomes its voice unchecked.
+    /// The first builder on #1445 (10:3x), after the Sixth's finding: the
+    /// conversation keeps the print of each line the lamp answered in it,
+    /// and a line is judged by its highest cosine against them. On
+    /// lamp-4ace at 09:44, request 48's print (0.50 against 41's, likely
+    /// mixed) became the only one kept, and the same speaker's 49 and 50
+    /// fell to 0.14 and 0.24 against it.
+    #[test]
+    fn a_mixed_print_among_the_conversations_does_not_make_its_own_voice_another() {
+        let mut voices = Voices::new(StandIn::default());
+        said(&mut voices, 1, 1, 48_000);
+        voices.decided(1, true, false);
+        // A's line with something else in it: still A's, at 0.30, and kept.
+        said(&mut voices, 2, 2, 48_000);
+        assert!(
+            voices
+                .likeness(2)
+                .is_some_and(|likeness| (likeness - 0.3).abs() < 0.01)
+        );
+        voices.decided(2, true, true);
+        // A's next line is far from that one but near A's first: the
+        // conversation's voice. Against the mixed print alone it would be
+        // another voice.
+        said(&mut voices, 3, 3, 48_000);
+        assert!(
+            voices
+                .likeness(3)
+                .is_some_and(|likeness| (likeness - 0.9).abs() < 0.01)
+        );
+        voices.decided(3, true, true);
+        // Another voice is another against all of them.
+        said(&mut voices, 4, -1, 48_000);
+        assert_eq!(voices.likeness(4), Some(0.0));
+    }
+
+    /// The conversation keeps the last [`KEPT`] of its prints, and a line
+    /// that began a conversation of its own starts them afresh.
+    #[test]
+    fn the_conversation_keeps_its_last_prints_and_a_new_one_begins_afresh() {
+        let mut voices = Voices::new(StandIn::default());
+        said(&mut voices, 1, 2, 48_000);
+        voices.decided(1, true, false);
+        for request in 2..=(KEPT as u64 + 1) {
+            said(&mut voices, request, 1, 48_000);
+            voices.likeness(request);
+            voices.decided(request, true, true);
+        }
+        // The mixed first print is let go: A's slightly-off line is judged
+        // against A's prints alone.
+        assert_eq!(voices.conversation.len(), KEPT);
+        said(&mut voices, 10, 3, 48_000);
+        assert!(
+            voices
+                .likeness(10)
+                .is_some_and(|likeness| (likeness - 0.9).abs() < 0.01)
+        );
+        // B let out for her name: hers alone now.
+        said(&mut voices, 11, -1, 48_000);
+        voices.decided(11, true, false);
+        assert_eq!(voices.conversation.len(), 1);
+        said(&mut voices, 12, 1, 48_000);
+        assert_eq!(voices.likeness(12), Some(0.0));
+    }
+
     #[test]
     fn a_late_print_is_compared_before_it_becomes_the_conversations_voice() {
         let mut voices = Voices::new(StandIn::default());
