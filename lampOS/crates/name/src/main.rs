@@ -2,7 +2,11 @@
 //! lamp's name, and say when it was heard. See `docs/name.md`.
 use lamp_bus::{Bus, Notice, Publisher};
 use lamp_msgs::{Audio, Diagnostic, Level, NameHeard};
-use lamp_name::{hear::Hearer, said::Hearings};
+use lamp_name::{
+    hear::Hearer,
+    quiet::{self, Loudness, Quiet},
+    said::Hearings,
+};
 use std::{
     io::{self, Write},
     path::PathBuf,
@@ -10,12 +14,14 @@ use std::{
     time::{Duration, Instant},
 };
 
-const USAGE: &str = "usage: lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--bus-root ABSOLUTE_DIR]\n       lamp-name check MODELS_DIR FILE...";
+const USAGE: &str = "usage: lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--bus-root ABSOLUTE_DIR]\n       lamp-name check MODELS_DIR [--quiet-below DBFS] FILE...";
 const HELP: &str = "Hears the lamp's name in what its microphone hears. See docs/name.md.
 
   --models      a directory holding melspectrogram.onnx, embedding_model.onnx and name.onnx
   --microphone  whose sound to listen to, as the voice publishes it on the bus (mic2)
   --least       the score from which the name counts as heard, 0.5 to 1 (0.9)
+  --quiet-below a level in dBFS, -90 to -30: the models rest while the last 2.03 s held
+                no sample this loud, and give the same scores when one comes (off)
   --bus-root    the bus's directory (LAMP_BUS_ROOT, or /run/lampos-bus)
 
 It listens to MICROPHONE/audio and publishes name/rising as each hearing begins,
@@ -25,7 +31,8 @@ It keeps no sound and writes none down.
 lamp-name check MODELS_DIR FILE... runs the same models over files of sound (16 kHz, one
 channel, 16 bits, raw or WAV) and prints for each every time it would have said the name
 was heard (seconds into the file, and the score), its highest score and when, and then how
-long a step took: for trying the models where they are installed. It touches no bus.";
+long a step took: for trying the models where they are installed. With --quiet-below it
+rests as the program would, and says how many steps rested. It touches no bus.";
 
 /// The name it publishes under, and reports as.
 const NAME: &str = "name";
@@ -39,11 +46,13 @@ struct Arguments {
     models: PathBuf,
     microphone: String,
     least: f32,
+    quiet_below: Option<f32>,
     bus: Option<PathBuf>,
 }
 
 fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, String> {
     let (mut models, mut microphone, mut least, mut bus) = (None, None, None, None);
+    let mut quiet_below = None;
     while let Some(option) = arguments.next() {
         if option == "--help" || option == "-h" {
             return Ok(None);
@@ -77,6 +86,7 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
                     .ok_or("--least is a score from 0.5 to 1")?;
                 least.replace(score).is_some()
             }
+            "--quiet-below" => quiet_below.replace(bar(&value)?).is_some(),
             other => return Err(format!("unknown option {other}")),
         };
         if twice {
@@ -87,8 +97,18 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
         models: models.ok_or("--models is required")?,
         microphone: microphone.unwrap_or_else(|| "mic2".to_owned()),
         least: least.unwrap_or(DEFAULT_LEAST),
+        quiet_below,
         bus,
     }))
+}
+
+/// `--quiet-below`'s level, in dBFS.
+fn bar(value: &str) -> Result<f32, String> {
+    value
+        .parse()
+        .ok()
+        .filter(|db| quiet::BARS_DB.contains(db))
+        .ok_or_else(|| "--quiet-below is a level in dBFS from -90 to -30".to_owned())
 }
 
 /// One line to the journal. Never a score's cause: nothing of the sound
@@ -101,8 +121,13 @@ fn log(line: &str) {
 #[derive(Default)]
 struct Counted {
     steps: u64,
+    /// Steps not worked out while the room was quiet (`--quiet-below`).
+    rested: u64,
     heard: u64,
     busy: Duration,
+    /// The longest one block took: with `--quiet-below`, the start after a
+    /// rest, read on the lamp beside `sound_lost`.
+    longest: Duration,
     lost: u64,
 }
 
@@ -146,7 +171,11 @@ fn renew(heard: &mut Publisher, rising: &mut Publisher) {
 
 fn run(arguments: &Arguments) -> io::Result<()> {
     let started = Instant::now();
-    let mut hearer = Hearer::load(&arguments.models).map_err(io::Error::other)?;
+    let mut hearer = Quiet::new(
+        Hearer::load(&arguments.models).map_err(io::Error::other)?,
+        arguments.quiet_below,
+    );
+    let mut loudness = Loudness::default();
     let loaded = started.elapsed();
     let bus = match &arguments.bus {
         Some(root) => Bus::new(root)?,
@@ -163,10 +192,13 @@ fn run(arguments: &Arguments) -> io::Result<()> {
     let mut health: Publisher =
         bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), NAME)?;
     log(&format!(
-        "started models={} loaded_ms={} listening_to={topic} least={} bus_root={}",
+        "started models={} loaded_ms={} listening_to={topic} least={} quiet_below={} bus_root={}",
         arguments.models.display(),
         loaded.as_millis(),
         arguments.least,
+        arguments
+            .quiet_below
+            .map_or("off".to_owned(), |db| format!("{db}dBFS")),
         bus.root().display(),
     ));
     let mut hearings = Hearings::new(arguments.least);
@@ -221,10 +253,15 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                         .chunks_exact(2)
                         .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
                         .collect();
+                    loudness.add(&block);
+                    let rested_before = hearer.rested_steps;
                     let began = Instant::now();
                     match hearer.hear(&block) {
-                        Ok(scores) => {
-                            counted.busy += began.elapsed();
+                        Ok(quiet::Heard { scores, rested }) => {
+                            let took = began.elapsed();
+                            counted.busy += took;
+                            counted.longest = counted.longest.max(took);
+                            counted.rested += hearer.rested_steps - rested_before;
                             counted.steps += scores.len() as u64;
                             total_steps += scores.len() as u64;
                             for score in scores {
@@ -232,6 +269,12 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                                 if let Some(first) = hearings.rising(now) {
                                     let _ = rising.publish_json(at_us(now), &first);
                                 }
+                            }
+                            // The models rest, after this block's scores: a
+                            // window that held the name is behind, and a
+                            // hearing still open is over (as `check` does).
+                            if rested {
+                                name_said = name_said.or(hearings.cut(now));
                             }
                         }
                         Err(why) => {
@@ -269,16 +312,24 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             );
             renew(&mut heard, &mut rising);
         }
-        // A line a minute of what it did, while there was sound.
+        // A line a minute of what it did, while there was sound: with how
+        // loud each step's loudest sample was, the room's quiet and its
+        // calls, to set `--quiet-below` by.
         if now.duration_since(told) >= Duration::from_secs(60) {
             told = now;
-            if counted.steps > 0 {
+            let loudest = loudness.take();
+            if counted.steps + counted.rested > 0 {
                 log(&format!(
-                    "last minute: steps={} ms_a_step={:.1} heard={} sound_lost={} steps_in_all={total_steps}",
+                    "last minute: steps={} rested={} ms_a_step={:.1} longest_block_ms={:.1} heard={} sound_lost={} steps_in_all={total_steps}{}",
                     counted.steps,
-                    counted.busy.as_secs_f64() * 1e3 / counted.steps as f64,
+                    counted.rested,
+                    counted.busy.as_secs_f64() * 1e3 / counted.steps.max(1) as f64,
+                    counted.longest.as_secs_f64() * 1e3,
                     counted.heard,
                     counted.lost,
+                    loudest.map_or(String::new(), |(median, top)| format!(
+                        " loudest_db_p50={median:.1} loudest_db_p99={top:.1}"
+                    )),
                 ));
             }
             counted = Counted::default();
@@ -300,42 +351,54 @@ fn samples_of(bytes: &[u8]) -> Vec<i16> {
 }
 
 /// `check`: the models over files, as the loop gives them sound, 20 ms at
-/// a time.
-fn check(models: &str, files: &[String]) -> io::Result<()> {
-    let mut hearer = Hearer::load(std::path::Path::new(models)).map_err(io::Error::other)?;
-    let (mut steps, mut busy) = (0u64, Duration::ZERO);
+/// a time, rested as the loop rests them with `quiet_below`.
+fn check(models: &str, quiet_below: Option<f32>, files: &[String]) -> io::Result<()> {
+    let mut hearer = Quiet::new(
+        Hearer::load(std::path::Path::new(models)).map_err(io::Error::other)?,
+        quiet_below,
+    );
+    let (mut steps, mut worked, mut busy) = (0u64, 0u64, Duration::ZERO);
     for file in files {
         let samples = samples_of(&std::fs::read(file)?);
         hearer.forget();
         let mut hearings = Hearings::new(DEFAULT_LEAST);
-        let (mut highest, mut at_step, mut step) = (0f32, 0u64, 0u64);
+        let (mut highest, mut at_step) = (0f32, 0u64);
         // The first score is of the first 2.03 s; each later one of 80 ms more.
         let seconds = |step: u64| 2.03 + step.saturating_sub(1) as f64 * 0.08;
         let clock = Instant::now();
+        // The file's own time, not this machine's.
+        let at = |step: u64| clock + Duration::from_millis(80 * step);
+        let said = |heard: Option<lamp_msgs::NameHeard>, step: u64| {
+            if let Some(heard) = heard {
+                let began_s = seconds(step) - f64::from(heard.ago_ms) / 1e3;
+                println!("{file}\theard\t{began_s:.2}\t{:.4}", heard.score);
+            }
+        };
         for block in samples.chunks(320) {
             let began = Instant::now();
-            let scores = hearer.hear(block).map_err(io::Error::other)?;
+            let heard = hearer.hear(block).map_err(io::Error::other)?;
             busy += began.elapsed();
-            for score in scores {
-                step += 1;
+            // Each score is of a step counted back from the newest whole one.
+            let newest = hearer.steps() as u64;
+            let first = newest + 1 - heard.scores.len() as u64;
+            worked += heard.scores.len() as u64;
+            for (step, score) in (first..).zip(heard.scores) {
                 if score > highest {
                     (highest, at_step) = (score, step);
                 }
-                // The file's own time, not this machine's.
-                let now = clock + Duration::from_millis(80 * step);
-                if let Some(heard) = hearings.score(score, now) {
-                    let began_s = seconds(step) - f64::from(heard.ago_ms) / 1e3;
-                    println!("{file}\theard\t{began_s:.2}\t{:.4}", heard.score);
-                }
+                said(hearings.score(score, at(step)), step);
+            }
+            if heard.rested {
+                said(hearings.cut(at(newest)), newest);
             }
         }
-        steps += step;
+        steps += hearer.steps() as u64;
         println!("{file}\thighest\t{:.2}\t{highest:.4}", seconds(at_step));
     }
-    if steps > 0 {
+    if worked > 0 {
         eprintln!(
-            "lamp-name: {steps} steps of 80 ms, {:.2} ms each",
-            busy.as_secs_f64() * 1e3 / steps as f64
+            "lamp-name: {steps} steps of 80 ms, {worked} worked out, {:.2} ms each",
+            busy.as_secs_f64() * 1e3 / worked as f64
         );
     }
     Ok(())
@@ -346,11 +409,24 @@ fn main() -> ExitCode {
     // journal (`lamp_ipc::log_relay`).
     let _log = lamp_ipc::log_relay::guard();
     let given: Vec<String> = std::env::args().skip(1).collect();
-    if let [command, models, files @ ..] = given.as_slice()
+    if let [command, models, rest @ ..] = given.as_slice()
         && command == "check"
-        && !files.is_empty()
     {
-        return match check(models, files) {
+        let (quiet_below, files) = match rest {
+            [option, value, files @ ..] if option == "--quiet-below" => match bar(value) {
+                Ok(db) => (Some(db), files),
+                Err(why) => {
+                    eprintln!("lamp-name: {why}\n{USAGE}");
+                    return ExitCode::from(2);
+                }
+            },
+            files => (None, files),
+        };
+        if files.is_empty() {
+            eprintln!("lamp-name: check needs a file\n{USAGE}");
+            return ExitCode::from(2);
+        }
+        return match check(models, quiet_below, files) {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 eprintln!("lamp-name: {error}");
@@ -431,6 +507,7 @@ mod tests {
                 models: "/opt/lampOS/name/models".into(),
                 microphone: "mic2".into(),
                 least: 0.9,
+                quiet_below: None,
                 bus: None,
             }
         );
@@ -442,10 +519,18 @@ mod tests {
                 models: "/m".into(),
                 microphone: "mic1".into(),
                 least: 0.999,
+                quiet_below: None,
                 bus: Some("/run/lampos-bus".into()),
             }
         );
         assert_eq!(of("--help").unwrap(), None);
+        assert_eq!(
+            of("--models /m --quiet-below -55")
+                .unwrap()
+                .unwrap()
+                .quiet_below,
+            Some(-55.0)
+        );
     }
 
     #[test]
@@ -460,6 +545,11 @@ mod tests {
             "--models /m --bus-root relative",
             "--models /m --models /n",
             "--models /m --record /tmp/sound",
+            "--models /m --quiet-below -95",
+            "--models /m --quiet-below -10",
+            "--models /m --quiet-below -20",
+            "--models /m --quiet-below loud",
+            "--models /m --quiet-below -50 --quiet-below -60",
             "--models",
         ] {
             assert!(of(refused).is_err(), "{refused:?}");
@@ -471,8 +561,10 @@ mod tests {
     fn the_part_is_well_while_it_listens_and_says_when_no_sound_reaches_it() {
         let counted = Counted {
             steps: 100,
+            rested: 0,
             heard: 2,
             busy: Duration::from_millis(210),
+            longest: Duration::from_millis(4),
             lost: 1,
         };
         let well = report(true, false, None, &counted, 7);

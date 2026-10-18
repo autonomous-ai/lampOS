@@ -7,14 +7,19 @@
 //!
 //! - [`hear`]: three small models run every 80 ms over what the
 //!   microphone hears, and give a score for "the name was just said".
+//! - [`quiet`]: with `--quiet-below`, the models rest while the last
+//!   2.03 s held no sound, and give the same scores when it comes.
 //! - [`said`]: when a run of scores is one hearing, and what is said of it.
 //!
 //! It keeps no sound and writes none down: samples are held for about a
 //! fifth of a second, until they are the numbers the models work on, and
-//! of those the last two seconds' worth are kept.
+//! of those the last two seconds' worth are kept. With `--quiet-below` the
+//! newest 2.11 s of samples are also held in memory, to start the models
+//! on when a sound comes.
 
 // Nothing in this library prints: the program does.
 #![deny(clippy::print_stderr, clippy::print_stdout, clippy::dbg_macro)]
 
 pub mod hear;
+pub mod quiet;
 pub mod said;

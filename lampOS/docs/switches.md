@@ -1,7 +1,7 @@
 # Switches
 
 Every setting that turns a behaviour on in `lamp-voice`, `lamp-body`, `lamp-eyes`,
-`lamp-expression`, `lamp-skills`, `lamp-tasks`, `lamp-controls` and `lamp-cloud`: what it does,
+`lamp-expression`, `lamp-name`, `lamp-skills`, `lamp-tasks`, `lamp-controls` and `lamp-cloud`: what it does,
 what lamp-4ace and the product set, the pull request that added it with the lamp
 check it named, and the product default proposed for it. Made for the owner's
 question of 17 October, "why off?", and for switching lamp-4ace on group by
@@ -79,7 +79,8 @@ motion, since lamp-4ace's motors stay still until Monday: `LAMP_STAFF_NOTE`
 (the in-time/late count), `LAMP_SHORT_SOUNDS=quiet-room-checked`,
 `LAMP_ASKER_FIRST=record`, `LAMP_STOP_TOLD`, `LAMP_WAIT_KEEPS_ANSWER`,
 `LAMP_TASK_NEWS_AT_PAUSE`, `lamp-eyes --leave-still-faces` (one live night),
-`lamp-expression --offline-face` and `lamp-eyes --look-on-change` (one night).
+`lamp-expression --offline-face`, `lamp-eyes --look-on-change` (one night) and
+`lamp-name --quiet-below` (an hour's levels, then a night).
 
 ## The voice: hearing, turns, the ring and the backup voice
 
@@ -215,6 +216,7 @@ its lamp-4ace run is Monday's, with a person there.
 | `lamp-eyes --look-on-change` | `on`/`off`; off. With no face for 4 s, a glance like the last one detected is said to hold no face without the detector, which still runs every 3 s and at every glance until the picture has been still 3 s | — | — | #705 (heat) | A night on lamp-4ace: looks detected and ms a look before and after; a sit-down looked at within 0.6 s in the day | off until measured on lamp-4ace | About 20% of a core idle on lamp-4ace (104–130 ms a look, 16–17 looks per 10 s) down to about 4%; host tests only | until |
 | `lamp-eyes --leave-still-faces` | `on`/`off`; off. Leaves out a small, faint face at a fixed spot (a false face) | — | — | #766 | Host replay of lamp-4ace's night: 55 of 55 false faces left out, 0 people; not yet live | off now; on after one live night on lamp-4ace | The replay is strong, but a run on a lamp is still owed before it becomes the default | until |
 | `lamp-eyes` LAMP_EYES_SPEAKING | `on`; off. With `LAMP_BUS=on`, each face on `humans/faces/tracked` gets `speaking` (yes/no/unknown, score) from YuNet's five marks; nothing reads it yet | — | — | #720 | Offline only: synthetic faces at 60 px between the eyes and 0.3 px of jitter, looked at every 250 to 350 ms (still, nodding, nodding at a 20° tilt, turning, closer, talking, talking while moving) right in at least 90% of looks; at --steady-rate's 500 ms under half (eyes.md, "Whether a face is speaking") | off until YuNet's corner jitter on a still face at 0.5 and 1 m is measured on a lamp | It holds only for a near face (60 px, about 0.45 m) with steady marks; at 1 m (about 27 px) it does not, on the synthetic model; no reader exists yet | until |
+| `lamp-name --quiet-below` | dBFS, -90 to -30; off. The name's models rest while the last 2.03 s held no sample this loud, and give the same scores when one comes | — | — | #705 (heat) | The bar read on lamp-4ace with it off (the minute line's loudest step, empty room and quietest call), then the saving and `name/rising` with it on | off until the bar is set on lamp-4ace | About 12% of a core idle on lamp-4ace; exact scores shown on a stand-in and, on a laptop, with the real models | until |
 | `lamp-expression --enable` | flag; off (shadow). Publishes body and light requests instead of only planning | set | set | commit 6226dae33 (direct) | On lamp-4ace with the alive catalogue since 14 Oct, shown | on (already) | Without it Expression only plans, and nothing moves or lights | on |
 | `lamp-expression --head-touch` | flag; off. Leans into a held hand, sleeps on a 3 s hold, wakes on a tap | — | — | #849 | None shown: ARM64 binaries listed for a lamp run, no result recorded | off until shown, with the voice's LAMP_HEAD_TOUCH | Product Controls publish head touches (`--touch`), but nothing has been seen on a lamp | until |
 | `lamp-expression --kernel-clock` | flag; off. Time of day only once the kernel says the clock is set | — | set | #884 | Read-only on lamp-75c9 (chrony keeps the clock); nothing run with the network cut | on (already) | No battery clock, so without it a stale boot clock can bring a false night (install.md) | on |
