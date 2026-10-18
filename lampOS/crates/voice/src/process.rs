@@ -203,6 +203,27 @@ impl Worker {
         self.on_stop = Some(Box::new(end));
     }
 
+    /// Closes a cooperative fixture's input as its Stop is sent, on the
+    /// stopping thread, and waits there for the child's exit (observed, not
+    /// reaped), so a busy host cannot hold that exit past the shutdown's
+    /// 300 ms (#1249, #1569). A peer thread that waited to read the Stop
+    /// first could be scheduled too late.
+    #[cfg(test)]
+    pub(crate) fn end_on_stop(&mut self, input: std::process::ChildStdin) {
+        let pid = self.fixture_pid();
+        self.on_stop(move || {
+            drop(input);
+            crate::scenario_clock::wait_child_exited(pid, Instant::now() + Duration::from_secs(5))
+        });
+    }
+
+    /// The fixture's `on_stop`, taken out to be run by a shutdown that stops
+    /// several workers at once (#1569).
+    #[cfg(test)]
+    pub(crate) fn take_on_stop(&mut self) -> Option<Box<dyn FnOnce() -> io::Result<()> + Send>> {
+        self.on_stop.take()
+    }
+
     /// Runs the fixture's `on_stop`, once, right after a Stop was sent: by
     /// `shutdown`, or by a cleanup of its own (#1249). A fixture that failed
     /// to end its child is caught after, as any child is.

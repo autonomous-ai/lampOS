@@ -433,18 +433,19 @@ fn service_signal_child(
     mut trace: SessionState,
 ) {
     let dir = SessionDirectory::create().unwrap();
-    let (capture, capture_peer, capture_input) = Worker::cooperative_fixture(&dir.path, "capture");
-    let (speaker, speaker_peer, speaker_input) = Worker::cooperative_fixture(&dir.path, "speaker");
-    let (provider, provider_peer, provider_input) =
+    let (mut capture, capture_peer, capture_input) =
+        Worker::cooperative_fixture(&dir.path, "capture");
+    let (mut speaker, speaker_peer, speaker_input) =
+        Worker::cooperative_fixture(&dir.path, "speaker");
+    let (mut provider, provider_peer, provider_input) =
         Worker::cooperative_fixture(&dir.path, "provider");
-    let (privacy, privacy_peer, privacy_input) = Worker::cooperative_fixture(&dir.path, "privacy");
-    let peers = [
-        (capture_peer, capture_input),
-        (speaker_peer, speaker_input),
-        (provider_peer, provider_input),
-        (privacy_peer, privacy_input),
-    ]
-    .map(|(channels, input)| {
+    let (mut privacy, privacy_peer, privacy_input) =
+        Worker::cooperative_fixture(&dir.path, "privacy");
+    capture.end_on_stop(capture_input);
+    speaker.end_on_stop(speaker_input);
+    provider.end_on_stop(provider_input);
+    privacy.end_on_stop(privacy_input);
+    let peers = [capture_peer, speaker_peer, provider_peer, privacy_peer].map(|channels| {
         thread::spawn(move || {
             let mut channels = channels;
             let mut denied = false;
@@ -461,7 +462,6 @@ fn service_signal_child(
                 assert!(Instant::now() < deadline);
                 thread::sleep(Duration::from_millis(1));
             }
-            drop(input);
             // Keep the host mock endpoints alive through the supervisor's final
             // drain. macOS datagram close reports reset differently from Linux;
             // native worker socket teardown still needs target qualification.

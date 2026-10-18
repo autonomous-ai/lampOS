@@ -416,7 +416,8 @@ fn shutdown_after_unreadable(
     let directory = SessionDirectory::create().unwrap();
     let mut peers = Vec::new();
     let mut fixture = |role: &str| {
-        let (worker, mut channels, input) = Worker::cooperative_fixture(&directory.path, role);
+        let (mut worker, mut channels, input) = Worker::cooperative_fixture(&directory.path, role);
+        worker.end_on_stop(input);
         peers.push(thread::spawn(move || {
             let deadline = Instant::now() + Duration::from_secs(3);
             while !matches!(
@@ -426,7 +427,6 @@ fn shutdown_after_unreadable(
                 assert!(Instant::now() < deadline);
                 thread::sleep(Duration::from_millis(1));
             }
-            drop(input);
             channels
         }));
         worker

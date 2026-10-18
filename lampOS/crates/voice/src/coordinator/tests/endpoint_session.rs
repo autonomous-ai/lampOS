@@ -1638,21 +1638,25 @@ fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
     use crate::service_privacy::PhysicalMute;
     require_real_process_clock();
     let directory = SessionDirectory::create().unwrap();
-    let (speaker, speaker_peer, speaker_input) =
+    let (mut speaker, speaker_peer, speaker_input) =
         Worker::cooperative_fixture(&directory.path, "speaker");
-    let (capture, capture_peer, capture_input) =
+    let (mut capture, capture_peer, capture_input) =
         Worker::cooperative_fixture(&directory.path, "capture");
-    let (provider, provider_peer, provider_input) =
+    let (mut provider, provider_peer, provider_input) =
         Worker::cooperative_fixture(&directory.path, "provider");
-    let (privacy, privacy_peer, privacy_input) =
+    let (mut privacy, privacy_peer, privacy_input) =
         Worker::cooperative_fixture(&directory.path, "privacy");
+    speaker.end_on_stop(speaker_input);
+    capture.end_on_stop(capture_input);
+    provider.end_on_stop(provider_input);
+    privacy.end_on_stop(privacy_input);
     let peers = [
-        (speaker_peer, speaker_input, false),
-        (capture_peer, capture_input, false),
-        (provider_peer, provider_input, false),
-        (privacy_peer, privacy_input, true),
+        (speaker_peer, false),
+        (capture_peer, false),
+        (provider_peer, false),
+        (privacy_peer, true),
     ]
-    .map(|(mut channels, input, privacy)| {
+    .map(|(mut channels, privacy)| {
         thread::spawn(move || {
             let mut sent = false;
             let deadline = Instant::now() + Duration::from_secs(5);
@@ -1674,7 +1678,6 @@ fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
                 assert!(Instant::now() < deadline);
                 thread::sleep(Duration::from_millis(1));
             }
-            drop(input);
             channels
         })
     });
