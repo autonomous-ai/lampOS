@@ -1204,22 +1204,49 @@ async fn with_the_switch_and_a_voice_check_another_voice_is_no_part_of_the_conve
 }
 
 /// A stand-in `lamp-same-voice` that never gets ready, as one still
-/// loading its model: it says nothing and sleeps.
-fn loading_child() -> std::path::PathBuf {
-    use std::os::unix::fs::PermissionsExt;
-    let dir = std::env::temp_dir().join(format!(
-        "lamp-same-voice-loading-{}-{:x}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .subsec_nanos()
-    ));
-    std::fs::create_dir_all(&dir).unwrap();
-    let path = dir.join(crate::same_voice::EXECUTABLE);
-    std::fs::write(&path, "#!/bin/sh\nexec sleep 10\n").unwrap();
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
-    path
+/// loading its model: it says nothing and sleeps. Dropped, it kills the
+/// child and removes its folder, so the child ends with its test (the
+/// reviewer on #1445: nextest found it alive after the test, its standard
+/// error still open, and its folders were left in the temp dir).
+struct LoadingChild {
+    dir: std::path::PathBuf,
+}
+
+impl LoadingChild {
+    fn new() -> Self {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-same-voice-loading-{}-{:x}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .subsec_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(crate::same_voice::EXECUTABLE);
+        std::fs::write(
+            &path,
+            "#!/bin/sh\necho $$ > \"$(dirname \"$0\")/pid\"\nexec sleep 10\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        Self { dir }
+    }
+
+    fn program(&self) -> std::path::PathBuf {
+        self.dir.join(crate::same_voice::EXECUTABLE)
+    }
+}
+
+impl Drop for LoadingChild {
+    fn drop(&mut self) {
+        // The child's own id, as it wrote it before it slept.
+        if let Ok(pid) = std::fs::read_to_string(self.dir.join("pid")) {
+            let _ = std::process::Command::new("kill").arg(pid.trim()).status();
+        }
+        let _ = std::fs::remove_dir_all(&self.dir);
+    }
 }
 
 /// The first builder on #1445: while the same-voice child loads its model
@@ -1231,9 +1258,10 @@ fn loading_child() -> std::path::PathBuf {
 #[tokio::test(start_paused = true)]
 async fn a_child_still_loading_its_model_takes_nothing_from_the_worker() {
     let _clock = logical_clock();
+    let child = LoadingChild::new();
     let mut options = options(true, quiet_going_on, crate::tools::Settings::default());
     options.voices = Some(Box::new(crate::same_voice::Prints::start(
-        loading_child(),
+        child.program(),
         "model".into(),
     )));
     let mut rig = LiveRig::start_with(quick_policy(), options);

@@ -150,7 +150,13 @@ the end silence (18 October,
 [verification](verification/same-voice-early-20261018/README.md)): at
 3 s, 0.25 took none of the 37 for two voices (the lowest 0.28) and caught
 22 of the 29; at 1.8 s, none (the lowest 0.32) and 22; at 1.5 s, 6 and
-26. A minute of two real people at the lamp is to set it.
+26. **On the lamp it doesn't hold yet.** On lamp-4ace on 18 October
+(09:31–09:54, played voices, the first builder on #1445), one voice's own
+lines came out at 0.14 and 0.24 against its 1.8 s prints, and 6 of 17
+cosines for the conversation's voice were 0.25 to 0.31. A likely cause,
+the print's pre-roll holding the lamp's own last words, is on #829, with
+the run's prints to be labelled by speaker. A minute of two real people
+at the lamp is to set it.
 
 **What else the voice does with it** (the reviewer on #1030):
 - **Once a line.** A line's voice is judged, and said in the journal, once,
