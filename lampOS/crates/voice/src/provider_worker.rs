@@ -2152,28 +2152,16 @@ async fn serve_with_visual<C: Connect>(
                             // (the reviewer on #1030: every chunk of an
                             // answer said it again).
                             let mut other_voice = false;
-                            let judged = intake.handoff.voices.as_mut().filter(|_| going_on && attention.awaits_verdict(request)).map(|voices| {
-                                let likeness = voices.likeness(request);
-                                (likeness, likeness.is_none().then(|| voices.unjudged(request)).flatten())
+                            // The likeness, why there is none, and a late
+                            // "another voice" from a line before this one,
+                            // which ends the conversation for this line too
+                            // (the Seventh on #1445): never at a line that
+                            // called the lamp for itself (Eighth on #829,
+                            // `Voices::at_verdict`).
+                            let judged = intake.handoff.voices.as_mut().filter(|_| attention.awaits_verdict(request)).map(|voices| {
+                                voices.at_verdict(request, going_on, attention.called_for_itself())
                             });
-                            // A line let out before this one as the
-                            // conversation going on, whose print came after
-                            // its verdict, was another voice's: the
-                            // conversation is over, as for one held, and
-                            // this line is no part of it (the Seventh on
-                            // #1445). Taken here, at the next verdict, since
-                            // the lamp's answer to that line began the count
-                            // afresh.
-                            // Never at a line that called the lamp for
-                            // itself: that one begins a conversation of its
-                            // own, and a late voice from the one before
-                            // ends nothing of it (Eighth on #829).
-                            let late_other = intake
-                                .handoff
-                                .voices
-                                .as_mut()
-                                .filter(|_| attention.awaits_verdict(request) && !attention.called_for_itself())
-                                .and_then(|voices| voices.take_late_other());
+                            let late_other = judged.and_then(|at| at.late_other);
                             if let Some(late) = late_other {
                                 // Said, as every verdict's why is (Eighth on
                                 // #829: this one was silent).
@@ -2186,12 +2174,12 @@ async fn serve_with_visual<C: Connect>(
                             // the check for want of a print: said, never
                             // silently again (#829, lamp-4ace on 18 October,
                             // requests 18 and 19; the reviewer on #1435).
-                            if let Some((_, Some(why))) = judged.filter(|_| late_other.is_none())
+                            if let Some(why) = judged.and_then(|at| at.unjudged).filter(|_| late_other.is_none())
                                 && let Some(voices) = intake.handoff.voices.as_ref()
                             {
                                 voices.judged_without(request, why);
                             }
-                            let going_on = match judged.and_then(|(likeness, _)| likeness) {
+                            let going_on = match judged.and_then(|at| at.likeness) {
                                 _ if late_other.is_some() => false,
                                 Some(likeness) if likeness < crate::same_voice::DIFFERENT_BELOW => {
                                     eprintln!("lamp-voice provider: request {request}: another voice than the conversation's (cosine {likeness:.2}): no conversation is going on for it");

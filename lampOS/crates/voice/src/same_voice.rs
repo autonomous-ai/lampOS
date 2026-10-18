@@ -440,6 +440,14 @@ fn answer(line: &str, request: u64) -> Result<Vec<f32>, String> {
     Ok(print)
 }
 
+/// What the check says at a line's verdict ([`Voices::at_verdict`]).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AtVerdict {
+    pub likeness: Option<f32>,
+    pub unjudged: Option<&'static str>,
+    pub late_other: Option<u64>,
+}
+
 /// The line being heard.
 struct Clip {
     request: u64,
@@ -459,10 +467,10 @@ pub struct Voices<P: Printer> {
     prints: VecDeque<(u64, Vec<f32>)>,
     /// The voice of the conversation the lamp is in: the prints of the
     /// lines it answered in it, newest last, at most [`KEPT`]. A line is
-    /// judged by its highest cosine against them (the first builder on
-    /// #1445, after the Sixth's finding: on lamp-4ace on 18 October, one
-    /// print, likely mixed, was kept as the only one, and the same
-    /// speaker's next two lines fell to 0.14 and 0.24 against it).
+    /// judged by its highest cosine against them, so that one mixed print,
+    /// such as one with the lamp's tail in it, can't set the bar for every
+    /// line after it (the first builder on #1445, 10:3x, after the Sixth's
+    /// finding there).
     conversation: VecDeque<Vec<f32>>,
     /// A line whose answer was let out and whose print is still to come,
     /// and whether it began a conversation of its own.
@@ -707,6 +715,31 @@ impl<P: Printer> Voices<P> {
         self.conversation.clear();
         self.late_other = None;
         self.answered = None;
+    }
+
+    /// What the check says at the verdict of the line `request`, all at
+    /// once:
+    /// - how like the conversation's voice it is, and if it is long enough
+    ///   to know but has no likeness, why ([`Self::unjudged`]), both only
+    ///   when a conversation is going on for it (`going_on`);
+    /// - a line before it, let out as the conversation going on, known since
+    ///   for another voice's ([`Self::take_late_other`]). Never for a line
+    ///   that called the lamp for itself (`called`): that one begins a
+    ///   conversation of its own, and a late voice of the one before ends
+    ///   nothing of it (Eighth on #829). In a strict busy room a named call
+    ///   that nobody faces plays only as the conversation going on, so a
+    ///   late voice taken at it would hold the call.
+    pub fn at_verdict(&mut self, request: u64, going_on: bool, called: bool) -> AtVerdict {
+        let likeness = going_on.then(|| self.likeness(request)).flatten();
+        let unjudged = (going_on && likeness.is_none())
+            .then(|| self.unjudged(request))
+            .flatten();
+        let late_other = (!called).then(|| self.take_late_other()).flatten();
+        AtVerdict {
+            likeness,
+            unjudged,
+            late_other,
+        }
     }
 
     /// A line let out as the conversation going on, known since for another
@@ -1124,17 +1157,11 @@ exec sleep 30"#,
         assert_eq!(voices.likeness(9), Some(0.0));
     }
 
-    /// The Seventh on #1445: the print of a line let out as the
-    /// conversation going on, come after its verdict, is compared before it
-    /// becomes the conversation's voice. Another voice's is not taken, and
-    /// the conversation is over; the same voice's is. One that began a
-    /// conversation of its own becomes its voice unchecked.
     /// The first builder on #1445 (10:3x), after the Sixth's finding: the
     /// conversation keeps the print of each line the lamp answered in it,
-    /// and a line is judged by its highest cosine against them. On
-    /// lamp-4ace at 09:44, request 48's print (0.50 against 41's, likely
-    /// mixed) became the only one kept, and the same speaker's 49 and 50
-    /// fell to 0.14 and 0.24 against it.
+    /// and a line is judged by its highest cosine against them, so that a
+    /// mixed print kept among them doesn't make its own speaker's next line
+    /// another voice.
     #[test]
     fn a_mixed_print_among_the_conversations_does_not_make_its_own_voice_another() {
         let mut voices = Voices::new(StandIn::default());
@@ -1226,6 +1253,43 @@ exec sleep 30"#,
         assert_eq!(voices.likeness(6), Some(1.0));
     }
 
+    /// The reviewer on #1467: at the verdict of a line that called the lamp
+    /// for itself, no late "another voice" from before it is taken. In a
+    /// strict busy room a named call nobody faces plays only as the
+    /// conversation going on, so taking it there would hold the call. Let
+    /// out, the call drops it. A line that didn't call takes it.
+    #[test]
+    fn a_call_takes_no_late_voice_from_before_it_at_its_verdict() {
+        let late_before = |voices: &mut Voices<StandIn>| {
+            said(voices, 1, 1, 48_000);
+            voices.decided(1, true, false);
+            voices.printer.slow = true;
+            said(voices, 2, -1, 48_000);
+            voices.decided(2, true, true);
+            voices.printer.slow = false;
+            said(voices, 3, 1, 48_000);
+        };
+        let mut voices = Voices::new(StandIn::default());
+        late_before(&mut voices);
+        assert_eq!(voices.at_verdict(3, true, true).late_other, None);
+        voices.decided(3, true, false);
+        said(&mut voices, 4, 1, 48_000);
+        assert_eq!(voices.at_verdict(4, true, false).late_other, None);
+        let mut voices = Voices::new(StandIn::default());
+        late_before(&mut voices);
+        let at = voices.at_verdict(3, true, false);
+        assert_eq!(at.late_other, Some(2));
+        assert_eq!(at.likeness, Some(1.0));
+        // With no conversation going on for it, no likeness is asked.
+        said(&mut voices, 5, 1, 48_000);
+        assert_eq!(voices.at_verdict(5, false, false).likeness, None);
+    }
+
+    /// The Seventh on #1445: the print of a line let out as the
+    /// conversation going on, come after its verdict, is compared before it
+    /// becomes the conversation's voice. Another voice's is not taken, and
+    /// the conversation is over; the same voice's is. One that began a
+    /// conversation of its own becomes its voice unchecked.
     #[test]
     fn a_late_print_is_compared_before_it_becomes_the_conversations_voice() {
         let mut voices = Voices::new(StandIn::default());

@@ -324,15 +324,21 @@ speakers, both judged right.)
   conversation before. Before this, such a call was taken as the old
   conversation going on: its late print was another voice than the old
   speaker's, so it ended the caller's own conversation at the caller's next
-  line, as the 09:34 scene 3 on 18 October may have shown (the journal
-  will say). A line whose conversation ends this way says so at its
+  line. That was not what happened in the 09:34 scene 3 on 18 October: its
+  journal has no "known after its answer" line, and its "And what about
+  tomorrow?" (request 18) was judged another voice directly (the first
+  builder on #829 and #1445). A line whose conversation ends this way says so at its
   verdict: "no conversation is going on for it: request N's voice, known
   after its answer, was another's". Tests:
   `with_a_voice_check_a_named_call_amid_anothers_conversation_begins_its_own`
   (B calls and follows up, A calls by name while B's conversation is going
   on and follows up, every print late: all four answered; with the call
-  taken as B's conversation going on, A's follow-up is held) and
-  `a_new_conversation_ends_any_late_voice_of_the_one_before`.
+  taken as B's conversation going on, A's follow-up is held),
+  `a_new_conversation_ends_any_late_voice_of_the_one_before` and
+  `a_call_takes_no_late_voice_from_before_it_at_its_verdict` (`Voices::at_verdict`:
+  no late voice is taken at a call's verdict. The worker's passing of
+  `called_for_itself` there isn't tested through its loop: the strict busy
+  form and a name heard in the sound are process-wide settings no rig sets).
 - **The child is supervised, with bounds.** One that gives no answer to a
   line within 2 s (`ANSWER_WITHIN`) is killed and started again, with a
   journal line. One that ends 3 times in a row before it is ready
