@@ -1265,8 +1265,7 @@ fn a_mute_past_an_hour_leaves_the_reminder_to_the_one_hour_rule() {
         said.iter().rev().skip(1).all(|(_, _, owed)| *owed),
         "{said:?}"
     );
-    fixture.tick();
-    let late = fixture.parent().offer(monotonic_us()).unwrap();
+    let late = fixture.offer();
     assert_eq!(late.token, on_time.token);
     assert!(late.late, "{late:?}");
     assert!(
