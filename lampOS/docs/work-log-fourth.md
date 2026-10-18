@@ -4627,6 +4627,20 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **Housekeeping:** this checkout's target dir was 22 GB. I cleaned it after checking that no build used it (21.9 GiB freed). I also cleared a finished bisect from 18 Oct.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-19, 06:05 ICT: #1654 merged; #1659 (the misheard cut-in's "hm?") up, the reviewer's findings being fixed; the heard-as line gating; 22o read
+
+- **#1654 merged** (docs: the 49 take-6 count is the first builder's).
+- **#1659, `LAMP_MISHEARD_HUM`** (#828, the first builder's yes at 05:07): a cut-in held as misheard gets the head tap's "hm?" with the listening face and no model turn, and the next request is told it wasn't caught. Off unless set.
+  - Tests through the coordinator's loop (the hum begins 2 ms after the hold) and the worker's. Gate 2694/0.
+  - The reviewer at 06:03 found one P2 (the test can't fail for "once" or "cut-ins only") and three P3s (the note named a hum that may not play, `cut_in` always on the wire, whose count). All are being fixed now.
+- **The "Hey Mom" rerun, queue 22o** (#829): my recorder ran with 0 losses in 373 s.
+  - My cutter had two faults on its first real data: the bus never marks a transcript finished, and lamp-name's `at_us` is on its own clock. Both are fixed: topics are lined up by `at_unix_ms`, and each window comes from `voice/state`.
+  - Reread: lamp-name heard "Lamp" at 1.00 on all three "Hey man" requests. So it's the model's ears, not lost sound.
+- **The heard-as line,** `LAMP_NAME_NOTE_HEARD_AS` (#829, the first builder at 05:22): the name note says the name may have sounded like another word ("Mom", "man", "ma'am"). Off unless set. Gating; three mutations each fail a test.
+- **#1636's replacement:** folded and gated (2694/0) at `d96dcf7de` on `cc47736e9`, local. It goes up after 08:40.
+- **22n** (#1651's note A/B) didn't count: the off arms barely yielded, and the order ran on first. The alternated rerun is queue 22q, running now.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
