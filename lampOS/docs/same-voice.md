@@ -140,14 +140,15 @@ plainly not the conversation's is no part of it
   (cosine 0.91)".
 - **Why the highest of several, not the last one alone** (the first
   builder's decision on #1445, 10:3x, after the Sixth's finding there).
-  On lamp-4ace on 18 October at 09:44, with only the last answered line
-  kept, request 48 (0.50 against 41, the same speaker) became the
-  conversation's voice. The same speaker's 49 and 50 then fell to 0.14 and
-  0.24 against it and were held as another voice. Neither was the pre-roll
-  alone: 49 began 3.4 s after the lamp's reply. A middling print most
-  likely had something else in it, and kept as the only reference it set
-  the bar for every line after it. With the highest of the last four, one
-  mixed print can't. **Its cost:** another voice now passes if it is near
+  With only the last answered line kept, one mixed print, such as one
+  with the lamp's tail in it, would become the only reference and set the
+  bar for every line after it. With the highest of the last four, one
+  mixed print can't. This was decided on lamp-4ace's 09:31 run of
+  18 October, read at first as two of one speaker's lines (requests 49 and
+  50, 0.14 and 0.24) held against a middling print. The first builder
+  corrected that at 11:0x: 49 was Daniel and 50 Samantha, so both
+  verdicts were right, and that run shows no harm from the last print
+  alone. The fix stands as correct by itself. **Its cost:** another voice now passes if it is near
   any of the four, not only the last. So a kept print mixed towards the
   other person's voice would let that person's next line through as the
   conversation going on. Tests:
@@ -171,13 +172,20 @@ the end silence (18 October,
 [verification](verification/same-voice-early-20261018/README.md)): at
 3 s, 0.25 took none of the 37 for two voices (the lowest 0.28) and caught
 22 of the 29; at 1.8 s, none (the lowest 0.32) and 22; at 1.5 s, 6 and
-26. **On the lamp it doesn't hold yet.** On lamp-4ace on 18 October
-(09:31–09:54, played voices, the first builder on #1445), one voice's own
-lines came out at 0.14 and 0.24 against its 1.8 s prints, and 6 of 17
-cosines for the conversation's voice were 0.25 to 0.31. A likely cause,
-the print's pre-roll holding the lamp's own last words, is on #829, with
-the run's prints to be labelled by speaker. A minute of two real people
-at the lamp is to set it.
+26. **On the lamp's own recordings it doesn't hold** (the Sixth's
+script, run by the first builder on lamp-4ace on 18 October over every
+recorded set of 13–15 October: 137 clips of played `say` voices on mic2,
+the real CAM++, on #1445 at 11:0x). With the lamp quiet in both, the
+equal error was 14.3% (at 0.295). At 0.25, 85 of 793 same-voice pairs
+were read as two voices (11%) and 896 of 3,212 pairs of two as one
+(28%). With the lamp sounding over one or both it was 47.9%, chance. No
+bar separates them, so **the check stays off and is not to hold an
+answer** (the first builder's decision). Tuning waits on the labelled
+set recorded for it (#1445). If its quiet lines agree, #829 leans on
+facing, lip motion (#720) and the name instead, with this at most one
+weak sign among them. (An earlier note here, that one voice's own lines
+came out at 0.14 and 0.24 in the 09:31 run, was wrong: they were two
+speakers, both judged right.)
 
 **What else the voice does with it** (the reviewer on #1030):
 - **Once a line.** A line's voice is judged, and said in the journal, once,
