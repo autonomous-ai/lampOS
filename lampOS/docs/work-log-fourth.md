@@ -4607,6 +4607,26 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **A slip:** I edited a test file while the cut-in gate ran in the same checkout. I stopped that gate, amended, and gated again.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-19, 05:05 ICT: #1651 merged; its P3 as #1654; #1636's last fixes folded and gating; the "Hey Mom" recorder; the misheard cut-ins counted
+
+- **#1651 merged** (the cut-in note, `LAMP_CUT_IN_TOLD`, #828). The reviewer's P3 came after the merge, so it's #1654 (docs only: the 49 take-6 count is the first builder's). No finding on #1654.
+- **What to read off 22n** (#828): the bare stops with the note on, the time to the first sound, and the journal line on each committed cut-in. All three are in the first builder's scorer.
+- **The "Hey Mom" rerun** (#829): `cutins_audio.sh` and `request_audio.py`, beside `cutins.sh`.
+  - They record `mic2/audio` (what the model is sent), `voice/heard` and `name/heard` off the bus beside the serving voice, and cut each request's sound with any losses.
+  - Not `--diagnostics`, as I'd said at 04:07: `serve` refuses it, and a finite session skips the eyes and keeps its events in memory.
+  - Rehearsed with stubs. Not run on the lamp yet; the first builder runs it as queue 22o.
+- **#1636** (the same-voice rule, #829): the reviewer's 03:41 P2 and P3 are built.
+  - A statement whose print is late now ends the conversation. Two mutations fail its test.
+  - A second new test pins that a late-printed question ends nothing, and dropping the question check fails it.
+  - Everything is folded into one commit on `lamp-voice` `cc47736e9`. It's local and gating now, and goes up as a new PR after 08:40, replacing #1636.
+  - The first gate had one failure, a duplex test's socket reset under load. It passed 5 of 5 alone.
+- **The misheard cut-ins** (#828, the first builder at 04:56): counted before building.
+  - The ask-again fires: 53 of the 99 misheard cut-ins with words heard.
+  - The model said "Sorry?" after only 13 of 59 ask-agains, and went back to its story after about 40.
+  - I proposed a local "Sorry?" in place of the model's.
+- **Housekeeping:** this checkout's target dir was 22 GB. I cleaned it after checking that no build used it (21.9 GiB freed). I also cleared a finished bisect from 18 Oct.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
