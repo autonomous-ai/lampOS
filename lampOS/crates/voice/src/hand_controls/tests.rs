@@ -1674,3 +1674,31 @@ fn measure_the_idle_pumps_cpu() {
         used as f64 / 10.0
     );
 }
+
+/// #1505, harm 1: a mute record a newer build wrote (here a field this
+/// build does not know, saying unmuted) no longer stops the voice: it
+/// restores, muted, and the record is saved back as this build's own.
+/// Linux only, as the live bus tests: `restore` reads the kernel's boot id.
+#[test]
+#[cfg(target_os = "linux")]
+fn a_mute_record_from_a_newer_build_restores_muted() {
+    let directory = Directory::new();
+    fs::write(
+        directory.file(),
+        r#"{"version":1,"clock_id":"boot","muted":false,"through_us":5,"later":true}"#,
+    )
+    .unwrap();
+    fs::set_permissions(directory.file(), fs::Permissions::from_mode(0o600)).unwrap();
+    let options = ControlsOptions {
+        stop: true,
+        mute_record: Some(directory.file()),
+        bus_root: Some(directory.0.join("b")),
+        head_touch: false,
+    };
+    let owner = HandControls::restore(&options).unwrap().unwrap();
+    assert!(owner.muted());
+    let saved: serde_json::Value =
+        serde_json::from_slice(&fs::read(directory.file()).unwrap()).unwrap();
+    assert_eq!(saved["muted"], true);
+    assert!(saved.get("later").is_none(), "{saved}");
+}

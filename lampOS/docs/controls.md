@@ -878,7 +878,24 @@ clears it. New audio still requires fresh stable physical permission, verified
 old-worker destruction and the ordinary new-runtime readiness path.
 
 `MuteRecord` is loaded and its initial/rebased state saved before any worker is
-opened. Corrupt, future, exposed or interrupted state refuses startup. The mute
+opened. Corrupt, future-watermarked, exposed or interrupted state refuses
+startup. **A record from a newer build reads as muted** (#1505, harm 1): one
+with a `version` above 1, a field this build does not know, or a `reason` it
+does not know. It never stops the voice starting, and never reads as
+unmuted: it is the privacy mute (no reason), which only a fresh hold of the
+button or the base clears, whatever it said (a hold on the head asks for
+sleep, which a muted lamp ignores), and the voice says so once: `the mute
+record at … was written by a newer build, or is one this build cannot read
+(…): read as muted, until a fresh hold of the button or the base clears
+it`. Saved back, it is this build's own record from then on. What counts:
+**any** JSON object with a whole-number `version` of 1 or more whose strict
+read fails reads as muted, so a v1 record with a wrong type, a missing field
+or a duplicate key does too, not only one from a newer build. A record that
+reads but breaks this build's own rules still refuses (unmuted with a
+`reason`, an empty `clock_id`, a future watermark), and so does anything
+that is no such object (not JSON, an array, no or a non-whole `version`,
+`version` 0). Each fails closed (`MuteRecord::load_noting`; tests
+`crates/controls/tests/mute.rs`). The mute
 preference now survives a **machine reboot** as well as a service restart;
 timestamps are rebased to the new boot while the muted value is preserved.
 The same-boot release watermark prevents a retained pre-clear hold from
