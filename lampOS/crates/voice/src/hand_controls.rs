@@ -170,10 +170,11 @@ struct Shared {
     /// Inputs that could carry a press, queued and not yet taken: what a
     /// release's look counts, not the routine states queued with them.
     pressing: AtomicU64,
-    /// The `event_sequence` of the last Controls state and touch state
-    /// queued: one whose events moved on could carry a press.
-    controls_sequence: AtomicU64,
-    touch_sequence: AtomicU64,
+    /// The session and `event_sequence` of the last Controls state and touch
+    /// state queued: one whose events moved on, or from a new session (whose
+    /// count starts again), could carry a press (Fourth on #1632).
+    controls_seen: std::sync::Mutex<Option<(String, u64)>>,
+    touch_seen: std::sync::Mutex<Option<(String, u64)>>,
     /// Inputs that found [`Self::quiet`] held, whatever they were: a test
     /// waits on it.
     #[cfg(test)]
@@ -1504,14 +1505,34 @@ fn parse(message: Message, topic: Topic, now_unix_ms: u64) -> io::Result<Input> 
 /// head event). Not the routine republish of the same state every 100 ms,
 /// nor a pet, which never changes the mute. One producer only.
 fn carries_press(input: &Input, shared: &Shared) -> bool {
-    let moved =
-        |seen: &AtomicU64, sequence: u64| seen.fetch_max(sequence, Ordering::AcqRel) < sequence;
     match input {
         Input::Touch(_) => true,
-        Input::State(state) => moved(&shared.controls_sequence, state.event_sequence),
-        Input::TouchState(state) => moved(&shared.touch_sequence, state.event_sequence),
+        Input::State(state) => moved(
+            &shared.controls_seen,
+            &state.session_id,
+            state.event_sequence,
+        ),
+        Input::TouchState(state) => {
+            moved(&shared.touch_seen, &state.session_id, state.event_sequence)
+        }
         Input::Pet(_) => false,
     }
+}
+
+/// Whether `sequence` in `session` is past the last one seen there, which
+/// it then is. A new session's events count from nothing again, so after
+/// Controls restarts its first mute is a press, not one taken for an old
+/// number (Fourth on #1632).
+fn moved(seen: &std::sync::Mutex<Option<(String, u64)>>, session: &str, sequence: u64) -> bool {
+    let mut seen = seen
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let last = match seen.as_ref() {
+        Some((was, last)) if was == session => *last,
+        _ => 0,
+    };
+    *seen = Some((session.to_owned(), sequence.max(last)));
+    sequence > last
 }
 
 fn enqueue(sender: &SyncSender<Queued>, shared: &Shared, input: Input) -> bool {
@@ -1550,15 +1571,30 @@ fn enqueue(sender: &SyncSender<Queued>, shared: &Shared, input: Input) -> bool {
             shared.pressing.fetch_sub(1, Ordering::AcqRel);
         }
     };
+    // A state the queue could not take never reached the owner: its number
+    // is forgotten, so the next state from its topic counts as a press, not
+    // one taken for a number that was lost (the reviewer on #1632).
+    let forget = |dropped: &Queued| {
+        let seen = match dropped.input {
+            Input::State(_) => &shared.controls_seen,
+            Input::TouchState(_) => &shared.touch_seen,
+            Input::Touch(_) | Input::Pet(_) => return,
+        };
+        *seen
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = None;
+    };
     match sender.try_send(queued) {
         Ok(()) => true,
-        Err(TrySendError::Full(_)) => {
+        Err(TrySendError::Full(dropped)) => {
+            forget(&dropped);
             unqueued();
             add(&shared.lost, 1);
             shared.fence();
             true
         }
-        Err(TrySendError::Disconnected(_)) => {
+        Err(TrySendError::Disconnected(dropped)) => {
+            forget(&dropped);
             unqueued();
             false
         }
