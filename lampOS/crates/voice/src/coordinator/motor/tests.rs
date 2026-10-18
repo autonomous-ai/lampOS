@@ -920,7 +920,10 @@ fn evidence(motor: &mut OptionalMotor, c: &mut Controller, request: u64) -> Evid
 }
 #[test]
 fn idle_ready_never_inspects_moves_or_claims_listening() {
-    let (dir, mut m, mut c) = fixture("normal");
+    // Stepped, as the gate tests are: on the host clock the child has 20 ms
+    // to say it is inhibited and 250 ms to tear down after its Stop, and a
+    // loaded host's late exit was killed, so `finish` failed (#1569).
+    let (_scope, dir, mut m, mut c) = stepped_fixture("normal");
     wait(&mut m, &mut c, OptionalMotor::is_ready);
     assert_eq!(m.offers, 0);
     assert!(m.inspected_at_us.is_none());
@@ -959,7 +962,8 @@ fn configured_camera_or_original_permissions_are_required_before_spawn() {
 }
 #[test]
 fn readback_and_original_placement_are_required_and_bad_offers_do_not_enqueue() {
-    let (dir, mut m, mut c) = fixture("normal");
+    // Stepped, for the child's late exit, as `idle_ready_…` (#1569).
+    let (_scope, dir, mut m, mut c) = stepped_fixture("normal");
     wait(&mut m, &mut c, OptionalMotor::is_ready);
     let e = evidence(&mut m, &mut c, 1);
     let mut offer = MovementOffer {
@@ -1394,7 +1398,8 @@ fn late_started_callback_after_owner_replacement(host_pause: Duration) {
 
 #[test]
 fn explicit_current_segment_reaches_inert_counts_without_completing_voice() {
-    let (dir, mut motor, mut controller) = fixture("normal");
+    // Stepped, for the child's late exit, as `idle_ready_…` (#1569).
+    let (_scope, dir, mut motor, mut controller) = stepped_fixture("normal");
     wait(&mut motor, &mut controller, OptionalMotor::is_ready);
     let inspected = evidence(&mut motor, &mut controller, 1);
     motor.offer_inspection(inspected).unwrap();
