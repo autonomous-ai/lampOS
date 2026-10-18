@@ -921,6 +921,101 @@ answered as one. Since then the successor of a request given up carries a
 note that it is the rest of it; `--early-end-ms` stays off until the
 probe's `rest-labelled` and the five pause scenes have been run with it.
 
+## Measured on lamp-4ace, 18 Oct: where a turn's time goes
+
+Read-only scripts run by the first builder on lamp-4ace on 18 Oct, and
+removed after; each table was posted on #705, and each run is named below
+with its script's SHA-256 and the build the lamp ran in its window. Every
+figure is as measured there. None of it is a cause: where a pattern
+shows, it is written as a pattern. The boundary is the lamp's own, from
+the end of the person's speech to the first sound written, unless said.
+The lamp-cb94 lines are other runs (Thirteen's, and Twelve's first try),
+named where they appear.
+
+**Turns by kind** (`reply_times_twelve.py` v1, 17 Oct 19:00 to 18 Oct 06:00
+UTC; lamp-4ace on `88f83dd8c`, installed 23:31 on 17 Oct, for the whole
+window; #705 at 12:5x):
+
+| kind | turns | answered | median | p90 | max |
+|---|---|---|---|---|---|
+| ordinary | 273 | 139 | 1.24 s | 1.92 s | 3.31 s |
+| a function the lamp runs | 72 | 71 | 2.21 s | 2.70 s | 4.95 s |
+| a hand-over | 22 | 22 | 2.05 s | 2.67 s | 3.22 s |
+| held by the Policy | 11 | 2 | 15.30 s | 15.48 s | 15.48 s |
+
+The two held turns answered 15 s later are not slow replies: the Policy
+held a follow-up and the next turn answered it (#1465's case). They are a
+fault, counted in the row as one, not in its times.
+
+**A turn with a function, by stage** (v2, `6a8719b0e7b1`, same window;
+median / p90, seconds; #705 at 13:4x):
+
+| group | n | reply | the model to its call | ours | our answer to the model's audio | playout |
+|---|---|---|---|---|---|---|
+| light | 25 | 2.20 / 2.48 | 0.88 / 1.13 | 0.06 / 0.45 | 0.80 / 0.99 | 0.18 / 0.31 |
+| volume | 5 | 2.13 / 2.63 | 0.96 / 1.53 | 0.14 / 0.37 | 0.79 / 0.86 | 0.18 / 0.31 |
+| hand-over | 22 | 2.05 / 2.67 | 1.03 / 1.45 | 0.04 / 0.05 | 0.79 / 1.21 | 0.18 / 0.26 |
+| other | 41 | 2.24 / 2.75 | 0.86 / 1.27 | 0.04 / 0.50 | 0.77 / 1.13 | 0.18 / 0.31 |
+
+A function's turn is a plain turn to the call plus a second round trip of
+the model's after our answer: 0.80 s here. On lamp-cb94 it was 0.64 and
+0.66 s (Thirteen's run at 14:40, two turns only, `668378ff1`: too few to
+tell a difference from noise). A light turn is scored at the light's
+change since 18 Oct (the first builder's decision): the call plus ours,
+**0.94 s median** on the 25.
+
+**Ours in it** (`tool_times_ten.py`, `6291c060628f`, same window; median /
+p90, ms, calls that ran; #705 at 13:2x): for the light (n 33), all of ours
+**93 / 434**: the Policy's decision 1 / 398; the round trip to the actions
+part 43 / 72 (within it, the actions part's own time 16 / 46 and the socket
+and thread 22 / 49); and the next tick and the hand back 3 / 4. The p90 is
+the Policy: 10 of the 33 light calls were held for its decision.
+
+**The held call's wait** (`policy_wait_ten.py`, `e1c9163958aa`, one row per
+decision, same window; #705 at 14:21): 52 decisions matched; 51 came after
+the call. Jev's round trip, **552 / 968 ms**, is the whole of the wait (the
+utterance's close 96 / 102 ms, the voice's pickup 2 / 3 ms). It starts
+before the call (the utterance's last piece came 269 / 196 ms before it),
+so a held call waited **236 / 465 ms**. The Policy's rule
+(`attention::fallback`) would have said the same as Jev on 45 of the 51
+(`da9452c91b67`, #705 at 14:37). `lamp-policy --rule-decides` (#1524)
+decides named kinds by the rule; it is off unless set, its kinds come from
+`--agreement`.
+
+**Every turn over 2 s** (v3, `0baa92667825`, 17 Oct 19:00 to 18 Oct 09:00
+UTC; #705 at 16:19). Its window spans three installs: `88f83dd8c`; from
+13:5x +07 a mix (policy, memory and schedule on `0b0ee5b28`, #1425's
+`lamp-tasks`, the rest on `88f83dd8c`); and `3f4f3c5c3` from 07:41 UTC.
+There were 114 such turns. In every one the largest stage was the model's:
+the model to its call 76, the model after our answer 25, the model to its
+audio 13. Ours in them summed to medians of 0.05 s; in the slowest, the
+model's share was 70 to 92 %. **So the row's ceiling is the model's own
+time.** What is ours to move: a shorter second answer for the light and
+the volume (#1520, off unless set), the held call's wait (#1524), and
+scoring a light turn at its change (done).
+
+**The slow plain turns follow short asks** (`slow_turns_twelve.py` v2,
+`1e6dd35d16af`, with its bins; #705 at 17:45). A plain turn is slow here
+when the model's first audio comes over 2 s after the end. Share slow, by
+the person's speech and the session's age:
+
+| 17 Oct (00:00–24:00 +07), 285 plain turns | speech < 2 s | 2–4 s | > 4 s |
+|---|---|---|---|
+| all ages | 21 % (n 78) | 4 % (n 112) | 0 % (n 95) |
+| session < 5 min | 21 % (n 24) | 5 % (n 57) | 0 % (n 44) |
+| 5–15 min | 19 % (n 52) | 3 % (n 29) | 0 % (n 16) |
+| > 15 min | 50 % (n 2) | 0 % (n 26) | 0 % (n 35) |
+
+On 18 Oct to 17:45 +07 (307 turns), 8 % of asks under 2 s were slow
+against 4 % and 2 %, and the short asks early in a session again 21 % (n
+14). By age alone the medians differ by about 0.15 s (1.21 against 1.05 s
+on 17 Oct). Measured, not a cause: the slow tail is the short asks, in
+every age bin. An earlier, smaller look (v1, `b7e105244ebd`, 18 Oct 07:42
+to 08:38 UTC, four slow turns, all in the session the 14:41 install
+opened, during its battery) had read it as early in a session; the
+day-long bins above supersede it. What the short slow asks are (the name
+alone, or a short question) is the next read.
+
 ## What was not shown
 
 - **Nothing was timed.** No service was called, nothing ran on a lamp,
