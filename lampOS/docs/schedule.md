@@ -680,17 +680,26 @@ once it has read open, and a reminder pending then is no mute's, so it gives
 no line that would later hold back the real one (the reviewer on #1551).
 When they open, it is the first turn the voice's loop may take, said as any
 late reminder is, and resolved `said`; one that waited an hour or more
-follows the one-hour rule above. One cancelled meanwhile is withdrawn and
+follows the one-hour rule above. With `LAMP_REMINDER_PULSE=on` (and
+`LAMP_RING_ASLEEP=on`), the asleep face shows one soft pulse a minute while
+it is owed and the switch or a mute holds the microphones (not asleep), the
+first at its due time, for half an hour from then at most ([ring-choreography.md](ring-choreography.md), "The asleep face"). One cancelled meanwhile is withdrawn and
 never said, and the health stops saying it at once. On lamp-cb94 on 17
 October one came due 21 minutes into a mute, and nothing said it was owed.
-The ring's soft pulse a minute while one is owed waits for #1494's pattern
-to be on the lamp. Tests:
+Tests:
 `coordinator::tests::reminders::a_reminder_due_while_muted_is_owed_once_and_no_turn_begins`,
 `on_unmute_the_owed_reminder_is_offered_to_the_first_turn`,
 `a_reminder_cancelled_while_muted_is_never_said`,
 `a_mute_past_an_hour_leaves_the_reminder_to_the_one_hour_rule` (Schedule's
 clock moved past an hour during the wait; the provider is given the
-lateness) and `a_reminder_pending_at_a_start_is_owed_to_no_mute`.
+lateness) and `a_reminder_pending_at_a_start_is_owed_to_no_mute`; for the
+pulse, `the_muted_wait_tells_the_asleep_face_a_reminder_is_owed_only_while_it_may_pulse`,
+`a_pulse_held_back_keeps_the_time_it_was_owed_from`,
+`an_owed_reminder_pulses_under_the_switch_or_a_mute_and_never_asleep`,
+`a_pulse_switched_on_without_the_asleep_face_says_why_once`,
+`ring_asleep::tests::an_owed_reminder_pulses_from_when_it_was_owed_each_minute_for_half_an_hour`,
+`the_asleep_face_pulses_only_while_a_reminder_is_owed` and `lamp-ring`'s
+`an_owed_arc_goes_around_warm_and_never_above_the_peak`.
 
 Admission requires current microphone retention/privacy, ready provider, no
 reply, queued input, speaker receipt or draining/prospective utterance, and one

@@ -15,7 +15,7 @@ use lamp_ring::{
 use std::{
     io,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
     thread::JoinHandle,
@@ -42,6 +42,69 @@ const STEP: Duration = Duration::from_millis(10);
 pub const TAP_SHOWS: Duration = Duration::from_millis(1_000);
 /// Its fade in, and its fade out, each.
 pub const TAP_FADE: Duration = Duration::from_millis(250);
+
+/// The switch for a reminder's pulse over the asleep face (#1545): only
+/// with `LAMP_REMINDER_PULSE=on`, and only where the asleep face is shown.
+pub const PULSE_SWITCH: &str = "LAMP_REMINDER_PULSE";
+
+/// How a reminder owed while the microphones are off shows on the asleep
+/// face (#1545): one soft arc around the ring, taking `takes`, the first
+/// when it became owed and then one each `every`, and none once it has
+/// been owed for `for_at_most`, so a mute that lasts the night does not
+/// pulse all night (the journal and the health still say it is owed, and
+/// it is said when the microphones open).
+#[derive(Clone, Copy, Debug)]
+pub struct Pulses {
+    pub takes: Duration,
+    pub every: Duration,
+    pub for_at_most: Duration,
+}
+
+impl Pulses {
+    /// #1494's pulse's look: 4 s around, one a minute; half an hour of them.
+    pub const OWED: Self = Self {
+        takes: Duration::from_secs(4),
+        every: Duration::from_secs(60),
+        for_at_most: Duration::from_secs(30 * 60),
+    };
+
+    /// How far around a pulse is at `now` (0 to 1), if one is showing, for
+    /// a reminder owed `since`: one starting then and one each `every`
+    /// after, each for `takes`, none starting `for_at_most` after it. The
+    /// minute and the half-hour count from `since` whatever held the pulse
+    /// back meanwhile, so one missed is not made up and no hold starts the
+    /// half-hour again (Thirteen and the reviewer on #1581).
+    pub fn around(&self, since: Instant, now: Instant) -> Option<f32> {
+        let owed_for = now.saturating_duration_since(since);
+        let into = Duration::from_nanos((owed_for.as_nanos() % self.every.as_nanos()) as u64);
+        (owed_for - into < self.for_at_most && into < self.takes)
+            .then(|| into.as_secs_f32() / self.takes.as_secs_f32())
+    }
+}
+
+/// Whether the pulse's switch is on in this process's environment.
+pub fn pulse_enabled_from_environment() -> bool {
+    enabled(std::env::var(PULSE_SWITCH).ok().as_deref())
+}
+
+/// What the muted wait tells the asleep face at each look (#1545): since
+/// when the reminder owed has been owed, while its pulse may show now, and
+/// nothing otherwise. The painter reads it each frame.
+#[derive(Debug, Default)]
+pub struct Owed(Mutex<Option<Instant>>);
+
+impl Owed {
+    pub fn tell(&self, showing_since: Option<Instant>) {
+        if let Ok(mut owed) = self.0.lock() {
+            *owed = showing_since;
+        }
+    }
+
+    /// Since when it has been owed, while its pulse may show.
+    pub fn showing(&self) -> Option<Instant> {
+        self.0.lock().ok().and_then(|owed| *owed)
+    }
+}
 
 /// Whether the switch is on in this process's environment.
 pub fn enabled_from_environment() -> bool {
@@ -92,6 +155,8 @@ pub const STOP_DEADLINE: Duration = Duration::from_secs(1);
 /// device closed.
 pub struct Asleep {
     stop: Arc<AtomicBool>,
+    /// A reminder owed, as the muted wait tells it (#1545).
+    owed: Arc<Owed>,
     thread: Option<JoinHandle<()>>,
     done: Option<std::sync::mpsc::Receiver<()>>,
 }
@@ -110,7 +175,22 @@ impl Asleep {
         S: FrameSink + 'static,
         F: FnOnce() -> io::Result<AsleepRing<S>> + Send + 'static,
     {
-        Self::spawn(move |stop| paint(open, ceiling, stop))
+        Self::start_pulsing_with(open, ceiling, Pulses::OWED)
+    }
+
+    /// [`Self::start_with`], a reminder owed shown as `pulses` say.
+    pub fn start_pulsing_with<S, F>(open: F, ceiling: ChannelCeiling, pulses: Pulses) -> Self
+    where
+        S: FrameSink + 'static,
+        F: FnOnce() -> io::Result<AsleepRing<S>> + Send + 'static,
+    {
+        Self::spawn(move |stop, owed| paint(open, ceiling, (stop, owed), pulses))
+    }
+
+    /// Where the muted wait tells the face of a reminder owed (#1545):
+    /// while its pulse may show, the face pulses as [`Pulses`] say.
+    pub fn owed(&self) -> Arc<Owed> {
+        self.owed.clone()
     }
 
     /// The face for a tap on the head of a muted lamp: at once, for
@@ -137,17 +217,19 @@ impl Asleep {
         S: FrameSink + 'static,
         F: FnOnce() -> io::Result<AsleepRing<S>> + Send + 'static,
     {
-        Self::spawn(move |stop| paint_tapped(open, ceiling, shows, stop))
+        Self::spawn(move |stop, _| paint_tapped(open, ceiling, shows, stop))
     }
 
-    fn spawn(paint: impl FnOnce(&AtomicBool) -> io::Result<()> + Send + 'static) -> Self {
+    fn spawn(paint: impl FnOnce(&AtomicBool, &Owed) -> io::Result<()> + Send + 'static) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
+        let owed = Arc::new(Owed::default());
         let flag = stop.clone();
+        let owing = owed.clone();
         let (finished, done) = std::sync::mpsc::channel();
         let thread = std::thread::Builder::new()
             .name("ring-asleep".into())
             .spawn(move || {
-                if let Err(error) = paint(&flag) {
+                if let Err(error) = paint(&flag, &owing) {
                     eprintln!("lamp-voice ring: the asleep face stopped: {error}");
                 }
                 let _ = finished.send(());
@@ -155,6 +237,7 @@ impl Asleep {
             .ok();
         Self {
             stop,
+            owed,
             thread,
             done: Some(done),
         }
@@ -197,11 +280,13 @@ impl Drop for Asleep {
 }
 
 /// Wait [`AFTER`]; unless stopped by then, open the ring and paint the
-/// breathing face until stopped, then black.
+/// breathing face until stopped, then black. While a reminder `owed` may
+/// show, one soft arc goes around it as `pulses` say (#1545).
 fn paint<S: FrameSink>(
     open: impl FnOnce() -> io::Result<AsleepRing<S>>,
     ceiling: ChannelCeiling,
-    stop: &AtomicBool,
+    (stop, owed): (&AtomicBool, &Owed),
+    pulses: Pulses,
 ) -> io::Result<()> {
     if !wait(AFTER, stop) {
         return Ok(());
@@ -210,7 +295,15 @@ fn paint<S: FrameSink>(
     let began = Instant::now();
     while !stop.load(Ordering::SeqCst) {
         let since = began.elapsed();
-        if let Err(error) = ring.show(breath_at(since), ceiling_at(since, ceiling)) {
+        let (breath, under) = (breath_at(since), ceiling_at(since, ceiling));
+        let around = owed
+            .showing()
+            .and_then(|since| pulses.around(since, Instant::now()));
+        let shown = match around {
+            Some(around) => ring.show_owed(breath, around, under),
+            None => ring.show(breath, under),
+        };
+        if let Err(error) = shown {
             let _ = ring.shutdown();
             return Err(error);
         }
@@ -293,7 +386,6 @@ fn wait(length: Duration, stop: &AtomicBool) -> bool {
 mod tests {
     use super::*;
     use lamp_ring::EncodedFrame;
-    use std::sync::Mutex;
 
     #[derive(Clone, Default)]
     struct Frames(Arc<Mutex<Vec<EncodedFrame>>>);
@@ -464,5 +556,78 @@ mod tests {
         for value in [None, Some(""), Some("off"), Some("ON"), Some("1")] {
             assert!(!enabled(value), "{value:?}");
         }
+    }
+
+    /// #1545: the first pulse when it became owed (its due time), then one
+    /// on each minute from then, each 4 s around, none starting half an
+    /// hour on; one missed is not made up, the next comes on the minute.
+    #[test]
+    fn an_owed_reminder_pulses_from_when_it_was_owed_each_minute_for_half_an_hour() {
+        let pulses = Pulses::OWED;
+        let since = Instant::now();
+        let at = |seconds: u64| since + Duration::from_secs(seconds);
+        let around = |seconds: u64| pulses.around(since, at(seconds));
+        assert_eq!(around(0), Some(0.0), "at once");
+        assert_eq!(around(2), Some(0.5));
+        assert_eq!(around(4), None, "4 s around");
+        assert_eq!(around(59), None);
+        assert_eq!(around(60), Some(0.0), "a minute on");
+        assert_eq!(around(61), Some(0.25));
+        // Looked at again only at 90 s, after a hold: none until 120 s.
+        assert_eq!(around(90), None, "not made up");
+        assert_eq!(around(120), Some(0.0));
+        // The last starts at 29 minutes and goes all the way around.
+        assert_eq!(around(29 * 60), Some(0.0));
+        assert_eq!(around(29 * 60 + 3), Some(0.75));
+        assert_eq!(around(30 * 60), None, "half an hour owed");
+        assert_eq!(around(30 * 60 + 1), None);
+        assert_eq!(around(45 * 60), None);
+        // A look from just before `since` is the first pulse's start.
+        assert_eq!(pulses.around(at(1), since), Some(0.0));
+    }
+
+    /// Whether a frame lights a pixel the asleep face never does: a pulse.
+    fn pulsing(frame: &EncodedFrame) -> bool {
+        (0..lamp_ring::PIXEL_COUNT)
+            .filter(|index| index.abs_diff(lamp_ring::asleep::BOTTOM) > 2)
+            .any(|index| {
+                let offset = lamp_ring::PRIMER_BYTES + index * 24;
+                frame.bytes()[offset..offset + 24].contains(&0xFC)
+            })
+    }
+
+    /// The painter: no pulse while nothing is owed, and one going around
+    /// once the wait says a reminder is owed.
+    #[test]
+    fn the_asleep_face_pulses_only_while_a_reminder_is_owed() {
+        let frames = Frames::default();
+        let sink = frames.clone();
+        let pulses = Pulses {
+            takes: Duration::from_secs(2),
+            every: Duration::from_secs(60),
+            for_at_most: Duration::from_secs(60),
+        };
+        let asleep = Asleep::start_pulsing_with(move || AsleepRing::new(sink), ceiling(48), pulses);
+        std::thread::sleep(AFTER + Duration::from_millis(300));
+        let before = frames.0.lock().unwrap().len();
+        assert!(before > 2, "{before}");
+        asleep.owed().tell(Some(Instant::now()));
+        std::thread::sleep(Duration::from_millis(400));
+        let owed = frames.0.lock().unwrap().len();
+        asleep.owed().tell(None);
+        std::thread::sleep(Duration::from_millis(400));
+        asleep.stop();
+        let frames = frames.0.lock().unwrap();
+        assert!(
+            !frames[..before].iter().any(pulsing),
+            "nothing owed, no pulse"
+        );
+        assert!(frames[before..owed].iter().any(pulsing), "owed: a pulse");
+        // A frame or two may be on its way as it is told.
+        assert!(
+            !frames[owed + 2..].iter().any(pulsing),
+            "no longer owed or held: none"
+        );
+        assert_eq!(*frames.last().unwrap(), EncodedFrame::black());
     }
 }
