@@ -121,6 +121,7 @@ pub struct RingOptions<'a> {
     pub eye_strong: bool,
     pub head_touch: bool,
     pub light_requests: bool,
+    pub light_keep: Option<&'a std::path::Path>,
 }
 
 /// Supervisor-only lifetime selection. This removes the finite test ceiling,
@@ -133,7 +134,8 @@ pub struct RingOptions<'a> {
 /// same bus see a person ([`crate::ring_sight`]). With `head_touch`, a hand
 /// kept on the head dims it, a countdown to sleep ([`crate::ring_head`]).
 /// With `light_requests`, lights asked for that lapse are shown over the
-/// person's ([`crate::ring_requests`], #940).
+/// person's ([`crate::ring_requests`], #940). With `light_keep`, the
+/// person's light is kept there across a restart ([`crate::ring_light`]).
 #[cfg(target_os = "linux")]
 pub fn run_continuous(
     mut link: WorkerChannels,
@@ -147,8 +149,9 @@ pub fn run_continuous(
         eye_strong,
         head_touch,
         light_requests,
+        light_keep,
     } = options;
-    let light = bus_root.and_then(|root| match RingLight::on(root) {
+    let light = bus_root.and_then(|root| match RingLight::on_keeping(root, light_keep) {
         Ok((mut light, begins)) => {
             // Without them the ring still shows the person's light.
             if light_requests

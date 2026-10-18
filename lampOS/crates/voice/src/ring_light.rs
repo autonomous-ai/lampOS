@@ -27,6 +27,14 @@
 //! it asked for. A turn's face has colours of its own and never shows the
 //! lamp's light, so nothing is reached inside a turn (the reviewer on #1166).
 //!
+//! With `LAMP_LIGHT_KEEP=on` (the first builder on #1464) the person's light
+//! is also kept on disk ([`KEEP_PATH`]), written when it changes, at most
+//! once a second, so a lamp set warm at level 3 wakes up at level 3: the bus
+//! keeps it only in `/run`, which a restart empties. At start the bus's
+//! value comes first, so a light asked for since is never undone, then the
+//! kept one, then the first. Only the person's light is kept: a test, a
+//! request or a turn's face never is.
+//!
 //! Nothing here can stop the ring. A bus that cannot be used leaves the
 //! lamp with the light it has, and a request that is not a light there is
 //! (a colour that does not exist, a level outside 1 to 5) is passed over.
@@ -65,6 +73,13 @@ const FRAMES_APART_US: u64 = 100_000;
 /// The switch for lights asked for that lapse (#940), off unless `on`.
 pub const REQUESTS_ENVIRONMENT: &str = "LAMP_LIGHT_REQUESTS";
 const REQUESTS_FLAG: &str = "--light-requests";
+/// The switch for keeping the person's light across a restart, off unless
+/// `on`, and where it is kept (the reset wipes it).
+pub const KEEP_ENVIRONMENT: &str = "LAMP_LIGHT_KEEP";
+pub const KEEP_PATH: &str = "/var/lib/lampOS/light/person.json";
+const KEEP_FLAG: &str = "--light-keep";
+/// The kept light is written at most this often.
+pub const KEEP_EVERY_US: u64 = 1_000_000;
 
 /// The ring worker's flag for lights asked for that lapse, with
 /// `LAMP_LIGHT_REQUESTS=on`.
@@ -85,6 +100,56 @@ pub fn take(flags: &[String]) -> (bool, &[String]) {
         [flag, rest @ ..] if flag == REQUESTS_FLAG => (true, rest),
         _ => (false, flags),
     }
+}
+
+/// The ring worker's flag for keeping the person's light, with
+/// `LAMP_LIGHT_KEEP=on`.
+pub fn keep_arguments_from_environment() -> Vec<String> {
+    keep_arguments(std::env::var(KEEP_ENVIRONMENT).ok().as_deref())
+}
+
+fn keep_arguments(value: Option<&str>) -> Vec<String> {
+    match value {
+        Some("on") => vec![KEEP_FLAG.to_owned(), KEEP_PATH.to_owned()],
+        _ => Vec::new(),
+    }
+}
+
+/// Take a leading `--light-keep PATH` off the ring worker's flags.
+pub fn take_keep(flags: &[String]) -> (Option<&Path>, &[String]) {
+    match flags {
+        [flag, path, rest @ ..] if flag == KEEP_FLAG => (Some(Path::new(path)), rest),
+        _ => (None, flags),
+    }
+}
+
+/// The light kept at `path`, if it is one there is.
+fn kept_on_disk(path: &Path) -> Option<Light> {
+    let text = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str::<Light>(&text)
+        .ok()
+        .filter(|light| lit(light).is_some())
+}
+
+/// Write `light` to `path` whole: a file beside it, then a rename.
+fn keep_on_disk(path: &Path, light: &Light) -> io::Result<()> {
+    let mut beside = path.as_os_str().to_owned();
+    beside.push(".new");
+    let beside = std::path::PathBuf::from(beside);
+    std::fs::write(
+        &beside,
+        serde_json::to_vec(light).map_err(io::Error::other)?,
+    )?;
+    std::fs::rename(&beside, path)
+}
+
+/// Where the person's light is kept, what was last written and when, and
+/// whether the last write failed (said once until one succeeds).
+struct Keep {
+    path: std::path::PathBuf,
+    written: Option<Light>,
+    written_at_us: Option<u64>,
+    failing: bool,
 }
 
 fn unix_ms() -> u64 {
@@ -129,6 +194,8 @@ pub struct RingLight {
     requested: Option<Light>,
     /// Where a request's light is said reached, when switched on.
     reached: Option<Publisher>,
+    /// Where the person's light is kept across a restart, when switched on.
+    keep: Option<Keep>,
     /// The request the face shows, until its light is said reached.
     reaching: Option<Reaching>,
 }
@@ -150,6 +217,12 @@ impl RingLight {
     /// with: the one last asked for, if the bus keeps one that there is,
     /// or else the first.
     pub fn on(root: &Path) -> io::Result<(Self, Lit)> {
+        Self::on_keeping(root, None)
+    }
+
+    /// As [`RingLight::on`], and with `keep` the person's light is kept
+    /// there across a restart: begun with when the bus keeps none.
+    pub fn on_keeping(root: &Path, keep: Option<&Path>) -> io::Result<(Self, Lit)> {
         let bus = Bus::new(root)?;
         let [wanted, state] = Light::TOPICS;
         let asked = bus.subscribe_typed(wanted, SOURCE, Light::TYPE)?;
@@ -164,7 +237,10 @@ impl RingLight {
             .flatten()
             .and_then(|message| message.parse::<Light>().ok())
             .filter(|light| lit(light).is_some());
-        let now = kept.unwrap_or_else(first);
+        let on_disk = keep.and_then(kept_on_disk);
+        // What is on disk is already kept; a light from the bus is written.
+        let written = kept.is_none().then(|| on_disk.clone()).flatten();
+        let now = kept.or(on_disk).unwrap_or_else(first);
         let begins = lit(&now).unwrap_or(Lit::first());
         Ok((
             Self {
@@ -182,9 +258,46 @@ impl RingLight {
                 requested: None,
                 reached: None,
                 reaching: None,
+                keep: keep.map(|path| Keep {
+                    path: path.to_owned(),
+                    written,
+                    written_at_us: None,
+                    failing: false,
+                }),
             },
             begins,
         ))
+    }
+
+    /// Write the person's light where it is kept, when it is not what was
+    /// last written there and a second has gone since the last write: the
+    /// last change of a burst is written a second after the one before.
+    fn keep(&mut self, now_us: u64) {
+        let Some(keep) = self.keep.as_mut() else {
+            return;
+        };
+        if keep.written.as_ref() == Some(&self.now)
+            || keep
+                .written_at_us
+                .is_some_and(|at| now_us.saturating_sub(at) < KEEP_EVERY_US)
+        {
+            return;
+        }
+        keep.written_at_us = Some(now_us);
+        match keep_on_disk(&keep.path, &self.now) {
+            Ok(()) => {
+                keep.written = Some(self.now.clone());
+                keep.failing = false;
+            }
+            Err(error) => {
+                if !keep.failing {
+                    eprintln!(
+                        "lamp-voice ring: the person's light is not kept across a restart: {error}"
+                    );
+                }
+                keep.failing = true;
+            }
+        }
     }
 
     /// Also take lights asked for that lapse, on `light/request` on the bus
@@ -203,6 +316,7 @@ impl RingLight {
     /// on, if another than the one shown was asked for since the last
     /// call. What is shown is said when it changes and once a second.
     pub fn tick(&mut self, now_us: u64) -> Option<Lit> {
+        self.keep(now_us);
         let mut changed = None;
         let mut requested_changed = false;
         if now_us.saturating_sub(self.looked_at_us) >= LOOK_EVERY_US {
@@ -1086,5 +1200,98 @@ mod tests {
             std::thread::sleep(Duration::from_millis(2));
         }
         assert_eq!(ring.face(), &light(true, "white", 2));
+    }
+
+    fn kept(path: &Path) -> Option<Light> {
+        serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()
+    }
+
+    /// The first builder on #1464: with `LAMP_LIGHT_KEEP=on` a lamp set blue
+    /// at level 3 wakes up blue at level 3. The bus's value, a light asked
+    /// for since, comes before the kept one; a kept file that is not a light
+    /// is passed over; a burst of changes writes at most once a second and
+    /// never loses the last; only the person's light is kept.
+    #[test]
+    fn the_persons_light_is_kept_across_a_restart_when_switched_on() {
+        let disk = Root::new("light-keep-disk");
+        let path = disk.0.join("person.json");
+        let blue = light(true, "blue", 3);
+        let mut at = 0u64;
+        {
+            let root = Root::new("light-keep-1");
+            let (mut ring, begins) = RingLight::on_keeping(&root.0, Some(&path)).unwrap();
+            assert_eq!(begins, Lit::first());
+            let bus = Bus::new(&root.0).unwrap();
+            let mut asks = bus
+                .publisher_declared(Light::TOPICS[0], &Light::declaration(), "actions")
+                .unwrap();
+            let mut tests = bus
+                .publisher_declared(TEST_TOPIC, &Light::declaration(), "selftest")
+                .unwrap();
+            asks.publish_json(1, &light(true, "red", 5)).unwrap();
+            assert_eq!(taken(&mut ring, &mut at), Lit::of(true, "red", 5));
+            // The first tick wrote the first light; red waits its second.
+            assert_eq!(kept(&path), Some(first()));
+            std::thread::sleep(Duration::from_millis(2));
+            asks.publish_json(2, &blue).unwrap();
+            assert_eq!(taken(&mut ring, &mut at), Lit::of(true, "blue", 3));
+            ring.tick(at + 1);
+            assert_eq!(kept(&path), Some(first()));
+            // A second on, the last of the burst is written, not red.
+            at += KEEP_EVERY_US;
+            ring.tick(at);
+            assert_eq!(kept(&path), Some(blue.clone()));
+            // A self-test's colour is shown, never kept.
+            std::thread::sleep(Duration::from_millis(2));
+            tests.publish_json(3, &light(true, "green", 5)).unwrap();
+            assert_eq!(taken(&mut ring, &mut at), Lit::of(true, "green", 5));
+            at += KEEP_EVERY_US;
+            ring.tick(at);
+            assert_eq!(kept(&path), Some(blue.clone()));
+        }
+        // A restart: the bus is empty, the kept light is begun with, and
+        // said on `light/state` as the person's.
+        let root = Root::new("light-keep-2");
+        let (mut ring, begins) = RingLight::on_keeping(&root.0, Some(&path)).unwrap();
+        assert_eq!(begins, Lit::of(true, "blue", 3).unwrap());
+        assert_eq!(ring.now(), &blue);
+        ring.tick(at + LOOK_EVERY_US);
+        assert_eq!(state(&Bus::new(&root.0).unwrap()), Some(blue.clone()));
+        // Switched off, nothing on disk is read.
+        let off = Root::new("light-keep-off");
+        assert_eq!(RingLight::on(&off.0).unwrap().1, Lit::first());
+        // A light the bus keeps comes first, and is then written.
+        let asked = Root::new("light-keep-bus");
+        Bus::new(&asked.0)
+            .unwrap()
+            .publisher_declared(Light::TOPICS[0], &Light::declaration(), "actions")
+            .unwrap()
+            .publish_json(1, &light(true, "purple", 2))
+            .unwrap();
+        let (mut ring, begins) = RingLight::on_keeping(&asked.0, Some(&path)).unwrap();
+        assert_eq!(begins, Lit::of(true, "purple", 2).unwrap());
+        ring.tick(1);
+        assert_eq!(kept(&path), Some(light(true, "purple", 2)));
+        // Not a light there is: the first.
+        for text in ["nonsense", r#"{"on":true,"colour":"violet","level":3}"#] {
+            std::fs::write(&path, text).unwrap();
+            let root = Root::new("light-keep-bad");
+            assert_eq!(
+                RingLight::on_keeping(&root.0, Some(&path)).unwrap().1,
+                Lit::first()
+            );
+        }
+    }
+
+    #[test]
+    fn the_keep_switch_is_off_unless_on_and_its_flag_is_taken() {
+        assert!(keep_arguments(None).is_empty());
+        assert!(keep_arguments(Some("off")).is_empty());
+        let on = keep_arguments(Some("on"));
+        assert_eq!(on, ["--light-keep", KEEP_PATH]);
+        let rest = ["--other".to_owned()];
+        let flags: Vec<String> = on.iter().cloned().chain(rest.clone()).collect();
+        assert_eq!(take_keep(&flags), (Some(Path::new(KEEP_PATH)), &rest[..]));
+        assert_eq!(take_keep(&rest), (None, &rest[..]));
     }
 }
