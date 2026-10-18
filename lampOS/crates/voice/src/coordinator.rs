@@ -915,22 +915,8 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
             Ok(())
         },
         &mut || {
-            // A due reminder is kept offered while it waits, and said once
-            // the microphones open; meanwhile the journal, the trace and the
-            // health say it is owed (#1545).
-            let owed = match reminders.borrow_mut().as_mut() {
-                Some(reminders) => {
-                    let now = monotonic_us();
-                    reminders.poll(now);
-                    reminders.owed_while_muted(now)
-                }
-                None => None,
-            };
-            if owed == Some(true) {
-                record(
-                    &mut trace.borrow_mut(),
-                    json!({"kind":"reminder_owed_while_muted", "at_us":monotonic_us()}),
-                )?;
+            if let Some(reminders) = reminders.borrow_mut().as_mut() {
+                reminders.poll(monotonic_us());
             }
             let (allowed, asleep, restored) = match &mut *controls.borrow_mut() {
                 None => (true, false, false),
@@ -946,18 +932,32 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
                     (allowed, observation.asleep, controls.restored_after_fault())
                 }
             };
+            let now = monotonic_us();
+            let unreadable = unread_since.get().is_some_and(|since| {
+                now.saturating_sub(since) >= crate::bus_out::WAIT_UNREADABLE_AFTER_US
+            });
+            let waiting =
+                crate::bus_out::Waiting::of(slide.get(), unreadable, allowed, asleep, restored);
+            // A due reminder is kept offered while it waits, and said once
+            // the microphones open; meanwhile the journal, the trace and the
+            // health say it is owed (#1545). Only while the wait is closed:
+            // it also runs at every start while the switch is first read,
+            // and a reminder pending then is no mute's (the reviewer on
+            // #1551).
+            let owed = match reminders.borrow_mut().as_mut() {
+                Some(reminders) if waiting.closed() => reminders.owed_while_muted(now),
+                _ => None,
+            };
+            if owed == Some(true) {
+                record(
+                    &mut trace.borrow_mut(),
+                    json!({"kind":"reminder_owed_while_muted", "at_us":now}),
+                )?;
+            }
             // No session runs while it waits, so the wait says how the
             // voice is: its microphones off, and why (#1371).
             if let Some(health) = &mut health {
-                let now = monotonic_us();
-                let unreadable = unread_since.get().is_some_and(|since| {
-                    now.saturating_sub(since) >= crate::bus_out::WAIT_UNREADABLE_AFTER_US
-                });
-                health.report(
-                    now,
-                    crate::bus_out::Waiting::of(slide.get(), unreadable, allowed, asleep, restored),
-                    owed.is_some(),
-                );
+                health.report(now, waiting, owed.is_some());
             }
             Ok(allowed)
         },
@@ -971,11 +971,7 @@ fn muted_wait<F: FnMut() -> Option<crate::ring_asleep::Asleep>>(
     if let (Ok(crate::service_privacy::WaitOutcome::Allowed), Some(health)) =
         (&outcome, &mut health)
     {
-        let owed = reminders
-            .borrow()
-            .as_ref()
-            .is_some_and(|reminders| reminders.offer(monotonic_us()).is_some());
-        health.report(monotonic_us(), crate::bus_out::Waiting::Opening, owed);
+        health.report(monotonic_us(), crate::bus_out::Waiting::Opening, false);
     }
     outcome
 }

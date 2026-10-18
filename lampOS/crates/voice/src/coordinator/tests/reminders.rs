@@ -987,6 +987,22 @@ fn a_stop_ends_the_asking_and_an_unclear_after_it_is_never_taken() {
 fn muted_with_a_due_reminder(
     fixture: &mut RoundtripFixture,
     looks: usize,
+    between: impl FnMut(&mut RoundtripFixture, usize),
+) -> (Vec<String>, Vec<(lamp_msgs::Level, String, bool)>) {
+    waiting_with_a_due_reminder(
+        fixture,
+        Some(crate::privacy::PrivacyState::Muted),
+        looks,
+        between,
+    )
+}
+
+/// The same, with the switch read as `switch` (`None`: not read yet, the
+/// wait's first looks at every start of the voice).
+fn waiting_with_a_due_reminder(
+    fixture: &mut RoundtripFixture,
+    switch: Option<crate::privacy::PrivacyState>,
+    looks: usize,
     mut between: impl FnMut(&mut RoundtripFixture, usize),
 ) -> (Vec<String>, Vec<(lamp_msgs::Level, String, bool)>) {
     use crate::service_privacy::WaitOutcome;
@@ -1013,11 +1029,9 @@ fn muted_with_a_due_reminder(
         None::<crate::ring_asleep::TapFace<fn() -> Option<crate::ring_asleep::Asleep>>>,
         Some(crate::bus_out::WaitHealth::on(&bus).unwrap()),
         |on_state, gate| {
-            on_state(
-                crate::privacy::PrivacyState::Muted,
-                crate::process::new_boot().unwrap(),
-                1,
-            )?;
+            if let Some(switch) = switch {
+                on_state(switch, crate::process::new_boot().unwrap(), 1)?;
+            }
             for look in 0..looks {
                 between(fixture, look);
                 gate()?;
@@ -1079,10 +1093,11 @@ fn a_reminder_due_while_muted_is_owed_once_and_no_turn_begins() {
         Some(&(lamp_msgs::Level::Ok, owed, true)),
         "{said:?}"
     );
-    // The wait ends on the look that read the switch open: still owed.
+    // The wait ends on the look that read the switch open: the voice is
+    // opening, and owes nothing while it does (the reviewer on #1551).
     assert_eq!(
         said.last(),
-        Some(&(lamp_msgs::Level::Ok, String::new(), true)),
+        Some(&(lamp_msgs::Level::Ok, String::new(), false)),
         "{said:?}"
     );
     // The same attempt in a later muted wait is not said again.
@@ -1120,6 +1135,44 @@ fn on_unmute_the_owed_reminder_is_offered_to_the_first_turn() {
     assert_eq!(first.text, offer.text);
     assert!(fixture.received().is_empty());
     assert!(fixture.pending());
+    let said = commit_owed(&mut fixture, first.clone());
+    assert!(
+        matches!(said, ProviderInput::Reminder { text, late, late_by_ms, .. }
+        if text == first.text && late == first.late && late_by_ms == first.late_by_ms)
+    );
+}
+
+/// The owed reminder taken as the first turn after the wait, as the voice's
+/// loop takes it: what the provider is given.
+fn commit_owed(fixture: &mut RoundtripFixture, offer: crate::reminders::Offer) -> ProviderInput {
+    let mut owner = Controller::new(new_boot().unwrap(), now());
+    owner
+        .set_microphone_permission(now(), Permission::Allowed)
+        .unwrap();
+    let until = MonoTime::from_micros(monotonic_us() + 1_000_000);
+    owner
+        .set_capture(now(), CaptureState::RetainingUntil(until))
+        .unwrap();
+    owner
+        .set_admission(now(), AdmissionState::OpenUntil(until))
+        .unwrap();
+    let mut reply = None;
+    let mut queue = VecDeque::new();
+    let mut trace = SessionState::default();
+    commit_reminder_turn(
+        &mut owner,
+        &mut reply,
+        &mut queue,
+        offer,
+        fixture.parent(),
+        1,
+        PlayoutStart::default(),
+        &mut trace,
+        |_| Ok(()),
+    )
+    .unwrap();
+    assert_eq!(queue.len(), 1);
+    queue.pop_front().unwrap()
 }
 
 /// #1545: a reminder cancelled while the lamp is muted is no longer owed:
@@ -1169,29 +1222,89 @@ fn a_reminder_cancelled_while_muted_is_never_said() {
     );
 }
 
-/// #1545: a reminder that waited out the mute for an hour or more follows
-/// the one-hour rule after it: said only with someone at the lamp, never
-/// into an empty room, and the journal says it waits. While muted it is
-/// owed like any other.
+/// #1545, and the reviewer on #1551: a mute that lasts past an hour. The
+/// reminder came due on time; while the lamp waits muted, Schedule's clock
+/// moves on past `OVERDUE_MS`. It stays owed throughout. After unmute the
+/// offer is late by over an hour, so the one-hour rule holds it for
+/// someone at the lamp, and once it begins, the provider is given that
+/// lateness with its words.
 #[test]
-fn a_reminder_owed_over_an_hour_waits_for_someone_after_unmute() {
+fn a_mute_past_an_hour_leaves_the_reminder_to_the_one_hour_rule() {
     let mut fixture = RoundtripFixture::new();
-    let mut offer = fixture.offer();
-    offer.late = true;
-    offer.late_by_ms = Some(crate::reminders::OVERDUE_MS + 21 * 60_000);
-    let mut wait = crate::reminders::OverdueWait::default();
-    assert!(!wait.may_begin(&offer, false), "not into an empty room");
-    assert_eq!(wait.told(), Some(&offer.token));
-    assert!(wait.may_begin(&offer, true), "with someone at the lamp");
-    // On time, the same offer begins at once.
-    offer.late_by_ms = Some(21 * 60_000);
-    assert!(wait.may_begin(&offer, false));
-    assert_eq!(
-        fixture.parent().owed_while_muted(monotonic_us()),
-        Some(true)
+    let on_time = fixture.offer();
+    assert!(
+        on_time
+            .late_by_ms
+            .is_some_and(|ms| ms < crate::reminders::OVERDUE_MS),
+        "{on_time:?}"
     );
+    let (kinds, said) = muted_with_a_due_reminder(&mut fixture, 6, |fixture, look| {
+        if look == 3 {
+            fixture.advance_wall(crate::reminders::OVERDUE_MS + 21 * 60_000);
+        }
+        fixture.tick();
+    });
     assert_eq!(
-        fixture.parent().owed_while_muted(monotonic_us()),
-        Some(false)
+        kinds
+            .iter()
+            .filter(|kind| *kind == "reminder_owed_while_muted")
+            .count(),
+        1,
+        "the same attempt, owed once: {kinds:?}"
+    );
+    assert!(
+        said.iter().rev().skip(1).all(|(_, _, owed)| *owed),
+        "{said:?}"
+    );
+    fixture.tick();
+    let late = fixture.parent().offer(monotonic_us()).unwrap();
+    assert_eq!(late.token, on_time.token);
+    assert!(late.late, "{late:?}");
+    assert!(
+        late.late_by_ms
+            .is_some_and(|ms| ms >= crate::reminders::OVERDUE_MS),
+        "{late:?}"
+    );
+    let mut wait = crate::reminders::OverdueWait::default();
+    assert!(!wait.may_begin(&late, false), "not into an empty room");
+    assert!(wait.may_begin(&late, true), "with someone at the lamp");
+    let given = commit_owed(&mut fixture, late.clone());
+    assert!(
+        matches!(given, ProviderInput::Reminder { late: true, late_by_ms, .. }
+        if late_by_ms == late.late_by_ms),
+        "{given:?}"
+    );
+}
+
+/// The reviewer on #1551: the wait also runs at every start of the voice,
+/// while the switch is first read and once it has read open. A reminder
+/// pending then is owed to no mute: no line, no trace row, and the health
+/// says nothing of it. The person muting later in the same attempt still
+/// gets the line.
+#[test]
+fn a_reminder_pending_at_a_start_is_owed_to_no_mute() {
+    use crate::privacy::PrivacyState;
+    let mut fixture = RoundtripFixture::new();
+    fixture.offer();
+    for switch in [None, Some(PrivacyState::Allowed)] {
+        let (kinds, said) =
+            waiting_with_a_due_reminder(&mut fixture, switch, 4, |fixture, _| fixture.tick());
+        assert!(
+            !kinds.iter().any(|kind| kind == "reminder_owed_while_muted"),
+            "{switch:?}: {kinds:?}"
+        );
+        assert!(
+            said.iter().all(|(_, _, owed)| !owed),
+            "{switch:?}: {said:?}"
+        );
+    }
+    let (kinds, _) = muted_with_a_due_reminder(&mut fixture, 3, |fixture, _| fixture.tick());
+    assert_eq!(
+        kinds
+            .iter()
+            .filter(|kind| *kind == "reminder_owed_while_muted")
+            .count(),
+        1,
+        "{kinds:?}"
     );
 }

@@ -673,6 +673,11 @@ each attempt
 the session's trace gets `reminder_owed_while_muted`, and the voice's
 health while it waits adds "a reminder is owed, to be said when they open"
 and `reminder` `owed` to why the microphones are off (`bus_out::OWED`).
+Only while the wait holds them closed (`Waiting::closed`: the switch, a
+mute, a hand, the restart guard, a switch that cannot be read): the same
+wait runs at every start of the voice while the switch is first read and
+once it has read open, and a reminder pending then is no mute's, so it gives
+no line that would later hold back the real one (the reviewer on #1551).
 When they open, it is the first turn the voice's loop may take, said as any
 late reminder is, and resolved `said`; one that waited an hour or more
 follows the one-hour rule above. One cancelled meanwhile is withdrawn and
@@ -682,8 +687,10 @@ The ring's soft pulse a minute while one is owed waits for #1494's pattern
 to be on the lamp. Tests:
 `coordinator::tests::reminders::a_reminder_due_while_muted_is_owed_once_and_no_turn_begins`,
 `on_unmute_the_owed_reminder_is_offered_to_the_first_turn`,
-`a_reminder_cancelled_while_muted_is_never_said` and
-`a_reminder_owed_over_an_hour_waits_for_someone_after_unmute`.
+`a_reminder_cancelled_while_muted_is_never_said`,
+`a_mute_past_an_hour_leaves_the_reminder_to_the_one_hour_rule` (Schedule's
+clock moved past an hour during the wait; the provider is given the
+lateness) and `a_reminder_pending_at_a_start_is_owed_to_no_mute`.
 
 Admission requires current microphone retention/privacy, ready provider, no
 reply, queued input, speaker receipt or draining/prospective utterance, and one
