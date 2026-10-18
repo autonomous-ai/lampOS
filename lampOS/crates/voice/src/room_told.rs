@@ -487,6 +487,13 @@ const KEPT_FOR_US: u64 = QUIET_AFTER_US;
 /// often besides, so that a quiet room that has not changed for an hour
 /// is still taken back.
 const KEPT_EVERY_US: u64 = 30_000_000;
+/// Of the time no voice listened, at most this much counts toward a room
+/// not yet known going quiet: a restart is seconds, and a meeting may have
+/// begun in a longer gap (the reviewer on #1487). A quiet or busy room is
+/// kept as it was.
+const GAP_COUNTED_US: u64 = 30_000_000;
+/// Where Linux keeps this boot's id.
+pub const MACHINE_BOOT_FILE: &str = "/proc/sys/kernel/random/boot_id";
 
 /// The provider worker's arguments for the switches and the room's file
 /// in the environment.
@@ -587,9 +594,40 @@ impl Kept {
     }
 }
 
-/// `bytes` as the boot the room's file names.
-pub fn boot_hex(bytes: [u8; 16]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+/// The machine's boot, read from `path` as `lamp-schedule` reads
+/// [`MACHINE_BOOT_FILE`]: the boot the room's clocks are of. Never the
+/// voice's session `BootId`, which is drawn afresh for each session, so
+/// that no worker ever shared one with the worker before it and no room
+/// was taken back (the reviewer on #1487). None where it can't be read.
+fn boot_from(path: &std::path::Path) -> Option<String> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let boot = text.trim();
+    (!boot.is_empty()
+        && boot.len() <= 64
+        && boot
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() || byte == b'-'))
+    .then(|| boot.to_owned())
+}
+
+/// At the worker's start, with the room's file at `path` and the
+/// machine's boot read from `boot_file`: the journal's line, and the boot
+/// the room is kept under from now on. The room is taken back into `room`
+/// if it may be. Where the boot can't be read, nothing is taken back or
+/// kept.
+pub fn start_from(
+    path: &std::path::Path,
+    boot_file: &std::path::Path,
+    room: &mut RoomTold,
+    now_us: u64,
+) -> (Option<String>, Option<String>) {
+    let Some(boot) = boot_from(boot_file) else {
+        return (
+            Some("the room is not kept: this machine's boot could not be read".into()),
+            None,
+        );
+    };
+    (take_back_from(path, room, &boot, now_us), Some(boot))
 }
 
 impl RoomTold {
@@ -621,9 +659,16 @@ impl RoomTold {
         if age > KEPT_FOR_US {
             return Err(format!("it is {} s old", age / 1_000_000));
         }
+        // A room not yet known counts only the first of the gap as
+        // listened to.
+        let skipped = if kept.room == Room::Unknown {
+            age.saturating_sub(GAP_COUNTED_US)
+        } else {
+            0
+        };
         self.room = kept.room;
-        self.quiet_since_us = kept.quiet_since_us;
-        self.watching_since_us = kept.watching_since_us;
+        self.quiet_since_us = kept.quiet_since_us.map(|at| at + skipped);
+        self.watching_since_us = kept.watching_since_us.map(|at| at + skipped);
         self.last_talk_us = kept.last_talk_us;
         self.last_sound_us = kept.last_sound_us;
         Ok(age)
@@ -790,6 +835,75 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// The reviewer on #1487: the room is kept under the machine's boot.
+    /// Two workers started one after the other in one boot read the same
+    /// boot, so the second takes back the room the first kept. The voice's
+    /// session `BootId`, new for every session, is not what keys it: no
+    /// worker is given one here. Another boot's file is not taken, and with
+    /// no boot to read nothing is kept.
+    #[test]
+    fn two_workers_in_one_boot_share_the_room_under_the_machines_boot() {
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-room-boot-{}-{:x}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .subsec_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (path, boot_file) = (dir.join("room.json"), dir.join("boot_id"));
+        std::fs::write(&boot_file, "6d1f0f2e-9a3b-4c11-8f5e-0b7c3d2a1e44\n").unwrap();
+        // The first worker: no file yet, the boot read.
+        let mut first = RoomTold::new();
+        let (line, boot) = start_from(&path, &boot_file, &mut first, 0);
+        assert_eq!(line, None);
+        let boot = boot.unwrap();
+        assert_eq!(boot, "6d1f0f2e-9a3b-4c11-8f5e-0b7c3d2a1e44");
+        assert_eq!(first.at(0), Room::Unknown);
+        assert_eq!(first.at(301 * S), Room::Quiet);
+        keep_in(&path, &first, &boot, 301 * S, &mut None).unwrap();
+        // The second, a minute later, in the same boot.
+        let mut second = RoomTold::new();
+        let (line, again) = start_from(&path, &boot_file, &mut second, 361 * S);
+        assert_eq!(line.as_deref(), Some("the room as it was 60 s ago: quiet"));
+        assert_eq!(again.as_deref(), Some(boot.as_str()));
+        assert_eq!(second.at(361 * S), Room::Quiet);
+        // After a reboot, another boot: not taken.
+        std::fs::write(&boot_file, "00000000-0000-0000-0000-000000000000").unwrap();
+        let mut rebooted = RoomTold::new();
+        let (line, _) = start_from(&path, &boot_file, &mut rebooted, 362 * S);
+        assert_eq!(
+            line.as_deref(),
+            Some("the room's file is not taken: it is from another boot")
+        );
+        // No boot to read: nothing kept.
+        std::fs::remove_file(&boot_file).unwrap();
+        let (line, none) = start_from(&path, &boot_file, &mut RoomTold::new(), 363 * S);
+        assert_eq!(none, None);
+        assert!(line.is_some_and(|line| line.starts_with("the room is not kept")));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The reviewer on #1487: for a room not yet known, only the first
+    /// 30 s of the time no voice listened counts toward its five quiet
+    /// minutes. A voice up a minute, then down four, isn't quiet at once,
+    /// in case a meeting began meanwhile. A quiet room is kept as it was.
+    #[test]
+    fn a_room_not_yet_known_counts_only_the_first_of_a_long_gap() {
+        let mut before = RoomTold::new();
+        assert_eq!(before.at(0), Room::Unknown);
+        assert_eq!(before.at(60 * S), Room::Unknown);
+        let kept = before.kept("b", 60 * S);
+        let mut after = RoomTold::new();
+        assert!(after.take_back(&kept, "b", 300 * S).is_ok());
+        // Watched 60 s, then 30 s of the gap: quiet 210 s later than five
+        // minutes after it began, not at once.
+        assert_eq!(after.at(310 * S), Room::Unknown);
+        assert_eq!(after.at(509 * S), Room::Unknown);
+        assert_eq!(after.at(510 * S), Room::Quiet);
+    }
+
     #[test]
     fn the_room_files_flag_takes_a_short_absolute_path_after_the_switches() {
         assert_eq!(
@@ -808,7 +922,6 @@ mod tests {
         );
         assert_eq!(rest, ["--rest"]);
         assert!(take_file(&[FILE_FLAG.to_owned(), "room.json".into()]).is_err());
-        assert_eq!(boot_hex([0xab; 16]), "ab".repeat(16));
     }
 
     /// #828, the first builder at 10:14: three cut-ins over the lamp's

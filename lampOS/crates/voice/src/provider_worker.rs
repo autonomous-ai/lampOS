@@ -1054,16 +1054,23 @@ pub async fn run_with_continuation(
         let _ = THREAD_FILE.set(path);
     }
     // The room a voice that ended a moment ago was in (#1465): known at
-    // once, not after five minutes.
-    if let Some(path) = files.room_file {
-        let boot = crate::room_told::boot_hex(boot.bytes());
-        if let Ok(mut room) = crate::room_told::room().lock()
-            && let Some(line) =
-                crate::room_told::take_back_from(&path, &mut room, &boot, monotonic_us())
-        {
+    // once, not after five minutes. Kept under the machine's boot, never
+    // the session's (the reviewer on #1487).
+    if let Some(path) = files.room_file
+        && let Ok(mut room) = crate::room_told::room().lock()
+    {
+        let (line, kept_boot) = crate::room_told::start_from(
+            &path,
+            std::path::Path::new(crate::room_told::MACHINE_BOOT_FILE),
+            &mut room,
+            monotonic_us(),
+        );
+        if let Some(line) = line {
             eprintln!("lamp-voice provider: {line}");
         }
-        let _ = ROOM_FILE.set((path, boot));
+        if let Some(kept_boot) = kept_boot {
+            let _ = ROOM_FILE.set((path, kept_boot));
+        }
     }
     if let Some(root) = files.bus_root.clone() {
         let _ = BUS_ROOT.set(root);

@@ -1637,13 +1637,20 @@ The Policy read the room as `unknown` and held its `volume_up` (#1465).
 - The room and its clocks go to the file within a second of changing, and
   every 30 s besides: the room, when quiet began to be watched, when
   watching began, the last talk and the last sound, on the shared
-  monotonic clock, with the boot. Whole or not at all, owner-only, as the
-  thread's file. Nothing about requests goes: those end with the worker
-  that heard them.
+  monotonic clock, with the machine's boot
+  (`/proc/sys/kernel/random/boot_id`, as `lamp-schedule` reads it). Never
+  the voice's session id, which is drawn afresh for each session: keyed on
+  that, no worker would ever take back the room of the one before (the
+  reviewer on #1487). Where the boot can't be read, no room is kept, with
+  one line. Whole or not at all, owner-only, as the thread's file. Nothing
+  about requests goes: those end with the worker that heard them.
 - At the worker's start, a file from this boot written within the last
   five minutes is taken back. A quiet room is then quiet at once, and a
   busy one ends three minutes after its last talk, as it would have. The
-  time no voice was listening counts as nothing heard. An older file, or
+  time no voice was listening counts as nothing heard, except for a room
+  not yet known: of that gap only the first 30 s count toward its five
+  quiet minutes, in case a meeting began in a longer one (the reviewer on
+  #1487). An older file, or
   one from another boot, is not taken: the room may have changed in ways
   no voice heard.
 - The journal says what was taken ("the room as it was 41 s ago: quiet"),
@@ -1662,7 +1669,9 @@ restart in a quiet room, then the 10:57 follow-up: its `context.room`
 should read `quiet` (with Eighth's #1474 for the `volume_up` itself).
 
 Tests: `room_told::tests::a_room_kept_by_the_voice_before_is_taken_back_if_from_this_boot_and_under_five_minutes_old`,
-`the_room_goes_to_its_file_and_comes_back_from_it` and
+`the_room_goes_to_its_file_and_comes_back_from_it`,
+`two_workers_in_one_boot_share_the_room_under_the_machines_boot`,
+`a_room_not_yet_known_counts_only_the_first_of_a_long_gap` and
 `the_room_files_flag_takes_a_short_absolute_path_after_the_switches`.
 
 ## Switch
