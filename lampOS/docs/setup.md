@@ -107,7 +107,7 @@ targets), schedule `/var/lib/lampos-schedule/store`, voice sessions
 `/run/lampos-voice/thread.json`, the voice's first-output log
 `/var/lib/lampOS/voice/first-output`, what the voice has told of tasks
 `/var/lib/lampOS/voice/tasks-told` (its default, `LAMP_TASKS_TOLD`), the
-person's light kept across a restart `/var/lib/lampOS/light/person.json`
+person's light kept across a restart `/var/lib/lampOS/light` (emptied)
 (`LAMP_LIGHT_KEEP`), the
 policy's log `/var/lib/lampos-policy`, the person's parts of Harness under
 the tasks part's home (`/var/lib/lampos-tasks/.harness/` `auth`,
