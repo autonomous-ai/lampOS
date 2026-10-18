@@ -42,7 +42,8 @@ impl Rescue {
 
     /// The score the hearing rule judges at `step`: `name`, or where `name`
     /// reached the gate within the look back, the higher of it and `rescue`.
-    /// Steps missing between two calls (the models rested) open nothing.
+    /// Steps missing between two calls (the models rested) count as the
+    /// time they last: a gate reached before a rest under 1 s still opens.
     pub fn score(&mut self, step: u64, name: f32, rescue: f32) -> f32 {
         if self.recent.back().is_some_and(|(at, _)| *at >= step) {
             self.recent.clear();
@@ -87,13 +88,16 @@ mod tests {
         assert_eq!(rescue.score(16, 0.7, 0.2), 0.7);
     }
 
-    /// Steps the models rested through, and a forget, close the gate: a
-    /// score before them is not within a second of the one after.
+    /// A rest of 1 s or more, and a forget, close the gate: a score before
+    /// them is not within a second of the one after. A shorter rest counts
+    /// as the time it lasts (the reviewer on #1605).
     #[test]
-    fn a_rest_or_a_forget_closes_the_gate() {
+    fn a_rest_of_a_second_or_a_forget_closes_the_gate() {
         let mut rescue = Rescue::new(0.5);
         assert_eq!(rescue.score(10, 0.9, 0.0), 0.9);
-        // Rested from step 11 to step 40.
+        // Rested from step 11 to step 14: step 15 is within 13 of step 10.
+        assert_eq!(rescue.score(15, 0.1, 0.99), 0.99);
+        // Rested from step 16 to step 40.
         assert_eq!(rescue.score(41, 0.1, 0.99), 0.1);
         assert_eq!(rescue.score(42, 0.9, 0.0), 0.9);
         rescue.forget();
