@@ -82,6 +82,7 @@ impl Desk {
             sounds_checked: false,
             ask_unclear: false,
             name_in_passing_ignored: false,
+            remarks: false,
             policy_holds: holds.then(|| self.bus.clone()),
             follows_run: false,
             wait_for_room: false,
@@ -871,6 +872,27 @@ fn provider_patience_is_read_after_the_staff_note() {
     let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
     assert!(!files.provider_patience);
     let wrong: Vec<String> = [crate::config::PATIENCE_FLAG, crate::staff_note::FLAG]
+        .map(String::from)
+        .into();
+    assert!(parse_flags(dir, &wrong).is_err());
+}
+
+/// `--remarks` is read where the coordinator puts it, after
+/// `--provider-patience`, on both routes (#829, scene 3); out of its place
+/// it is refused.
+#[test]
+fn remarks_is_read_after_provider_patience() {
+    let dir = std::path::Path::new("/run/test");
+    let flags: Vec<String> = [crate::config::PATIENCE_FLAG, crate::remarks::FLAG]
+        .map(String::from)
+        .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.provider_patience && files.remarks);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert!(files.remarks);
+    let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
+    assert!(!files.remarks);
+    let wrong: Vec<String> = [crate::remarks::FLAG, crate::config::PATIENCE_FLAG]
         .map(String::from)
         .into();
     assert!(parse_flags(dir, &wrong).is_err());

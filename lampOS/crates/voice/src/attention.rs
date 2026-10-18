@@ -608,6 +608,7 @@ pub fn decide(
 }
 
 const TURNED: &str = "someone is turned to the lamp";
+const GOING_ON: &str = "a conversation with the lamp is going on";
 const SOUND_A_WORD: &str = "a short sound, heard as a short word said to the lamp";
 const SOUND_NEAR: &str = "a short sound, said close to the lamp";
 const SOUND_TURNED: &str = "a short sound, with someone turned to the lamp";
@@ -670,7 +671,7 @@ fn decide_called(
     } else if room != Room::Busy {
         Verdict::Play("the room is not known to be busy")
     } else if going_on {
-        Verdict::Play("a conversation with the lamp is going on")
+        Verdict::Play(GOING_ON)
     } else if called_in_text {
         Verdict::Play("the text shows it was called")
     } else if turned == Some(true) {
@@ -752,6 +753,9 @@ pub struct Attention {
     /// "The lamp" said in passing is no call ([`called_by_name`],
     /// `LAMP_NAME_IN_PASSING=ignored`).
     name_in_passing_ignored: bool,
+    /// A remark to the room is not a reply to the lamp in a busy room
+    /// (`LAMP_REMARKS=on`, [`crate::remarks`], #829).
+    remarks: bool,
     /// An answer is played only when the lamp was spoken to
     /// (`LAMP_SPOKEN_TO=on`, #829).
     spoken_to: bool,
@@ -787,6 +791,16 @@ pub struct Attention {
 const MOST_HEARD_BYTES: usize = 2_048;
 
 impl Attention {
+    /// Hold a remark to the room in a busy room ([`crate::remarks`]).
+    pub fn hold_remarks(&mut self, on: bool) {
+        self.remarks = on;
+    }
+
+    /// Whether remarks are held ([`Self::hold_remarks`]).
+    pub fn holds_remarks(&self) -> bool {
+        self.remarks
+    }
+
     /// Read the text's call with [`called_by_name`] from now on
     /// (`LAMP_NAME_IN_PASSING=ignored`, #829).
     pub fn ignore_name_in_passing(&mut self, ignored: bool) {
@@ -1370,6 +1384,24 @@ impl Attention {
                     && !(self.day_bars() && strict && room == Room::Busy) =>
             {
                 Verdict::Play(NAMED)
+            }
+            // #829, scene 3, with `LAMP_REMARKS=on`: a line let out only as
+            // the conversation going on, in a busy room, that asks nothing
+            // of the lamp and answers no question of its own, is a remark
+            // to the room ("I should bring an umbrella then.").
+            Verdict::Play(GOING_ON)
+                if self.remarks
+                    && room == Room::Busy
+                    && !called_in_text
+                    && !self.named
+                    && !self.named_sure
+                    && turned != Some(true)
+                    && !self.near
+                    && !self.addressed
+                    && !self.lamp_asked
+                    && crate::remarks::remark(&self.heard) =>
+            {
+                Verdict::Hold(crate::remarks::REMARK)
             }
             verdict => verdict,
         };
@@ -2197,6 +2229,148 @@ mod tests {
         );
         assert!(about_its_work("How is that TASK going?"));
         assert!(!about_its_work("I'll ask him about it."));
+    }
+
+    /// One line said in a busy room while a conversation with the lamp is
+    /// going on, nobody's face turned to it (`strict`, as lamp-4ace runs),
+    /// after the lamp's line that `asked` or not, with `LAMP_REMARKS` on or
+    /// off: its verdict.
+    fn said_in_a_busy_conversation(
+        remarks: bool,
+        asked: bool,
+        line: &str,
+        turned: Option<bool>,
+    ) -> Verdict {
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(true);
+        attention.hold_remarks(remarks);
+        attention.began_at(7, 4, 1_000_000);
+        attention.lamp_asked(asked);
+        attention.heard(line);
+        attention
+            .first_output_busy(7, Room::Busy, true, true, turned)
+            .unwrap()
+    }
+
+    /// #829, scene 3, and the night's scripted lines on lamp-4ace, by kind
+    /// (the first builder on #705, 18 October, 13:0x): with `LAMP_REMARKS`
+    /// the umbrella and the car (11) are held as remarks to the room, and
+    /// the 13 of ours said to the lamp still play (the 8 not ours are not
+    /// judged); without it, all play as today. Scene 3's lines are given as Gemini may write them
+    /// too, without their punctuation (Fourth, 13:01).
+    #[test]
+    fn with_remarks_a_remark_to_the_room_is_held_and_what_is_said_to_the_lamp_plays() {
+        let remark = Verdict::Hold(crate::remarks::REMARK);
+        for (line, asked, with) in [
+            ("I should bring an umbrella then.", false, remark),
+            ("i should bring an umbrella then", false, remark),
+            ("Okay, I will book the car for eight.", false, remark),
+            ("Yes, and we should leave a bit early.", false, remark),
+            ("And what about tomorrow?", false, GOING_ON),
+            ("and what about tomorrow", false, GOING_ON),
+            (
+                "Remember that my favourite colour is green.",
+                false,
+                GOING_ON,
+            ),
+            // The answers to the lamp's "Shall I start it?".
+            ("No, not now.", true, GOING_ON),
+            ("No thanks, not now.", true, GOING_ON),
+            ("write me a poem about the moon", false, GOING_ON),
+            ("Thanks, that's perfect.", false, GOING_ON),
+            // Another language: none of the cues, never held here.
+            ("Mai mình đi sớm nhé", false, GOING_ON),
+        ] {
+            assert_eq!(
+                said_in_a_busy_conversation(true, asked, line, Some(false)),
+                with,
+                "{line}"
+            );
+            assert_eq!(
+                said_in_a_busy_conversation(false, asked, line, Some(false)),
+                GOING_ON,
+                "{line}, off"
+            );
+        }
+        // A bare answer plays whatever the lamp asked, even with its
+        // question missed (the reviewer on #1499).
+        for answer in ["No, not now.", "Yes go ahead", "Sure", "Not now"] {
+            assert_eq!(
+                said_in_a_busy_conversation(true, false, answer, Some(false)),
+                GOING_ON,
+                "{answer}"
+            );
+        }
+        // And a remark after the lamp's question is the answer to it.
+        assert_eq!(
+            said_in_a_busy_conversation(
+                true,
+                true,
+                "I should bring an umbrella then.",
+                Some(false)
+            ),
+            GOING_ON
+        );
+        // The replies to the lamp's own question without its `?` that look
+        // like remarks (the reviewer's second probe on #1499): its question
+        // known by its words, through the thread, they play.
+        for (lamps_line, reply) in [
+            ("Which one would you like", "I'll take the second one"),
+            (
+                "What time should I set it for",
+                "I think around seven thirty",
+            ),
+            (
+                "What would you like to hear",
+                "I think some jazz would be nice",
+            ),
+        ] {
+            let mut thread = crate::thread::Thread::new();
+            let now = std::time::Instant::now();
+            thread.lamp(6, lamps_line, now);
+            let asked = thread.lamp_asked_with(7, true);
+            assert!(asked, "{lamps_line}");
+            assert!(!thread.lamp_asked_with(7, false), "{lamps_line}, off");
+            assert_eq!(
+                said_in_a_busy_conversation(true, asked, reply, Some(false)),
+                GOING_ON,
+                "{reply}"
+            );
+        }
+        // A face turned to the lamp, or none seen, decides for it as before.
+        for turned in [Some(true), None] {
+            let verdict = said_in_a_busy_conversation(
+                true,
+                false,
+                "I should bring an umbrella then.",
+                turned,
+            );
+            assert_eq!(verdict == remark, turned.is_none(), "{turned:?}");
+        }
+    }
+
+    /// Outside a busy room, or let out for its name, a remark plays as
+    /// before.
+    #[test]
+    fn with_remarks_a_remark_outside_a_busy_room_or_named_plays() {
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(true);
+        attention.hold_remarks(true);
+        attention.began_at(7, 4, 1_000_000);
+        attention.heard("I should bring an umbrella then.");
+        assert_eq!(
+            attention.first_output_busy(7, Room::Quiet, true, true, Some(false)),
+            Some(Verdict::Play("the room is not known to be busy"))
+        );
+        let mut attention = Attention::default();
+        attention.speak_when_spoken_to(true);
+        attention.hold_remarks(true);
+        attention.began_at(7, 4, 1_000_000);
+        attention.heard("Lamp, I should bring an umbrella then.");
+        assert_ne!(
+            attention.first_output_busy(7, Room::Busy, true, true, Some(false)),
+            Some(Verdict::Hold(crate::remarks::REMARK))
+        );
     }
 
     /// A busy room after the lamp's own news, with `strict` and no face, as

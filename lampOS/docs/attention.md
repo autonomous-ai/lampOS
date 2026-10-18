@@ -1700,6 +1700,96 @@ Tests: `room_told::tests::a_room_kept_by_the_voice_before_is_taken_back_if_from_
 `a_room_not_yet_known_counts_only_the_first_of_a_long_gap` and
 `the_room_files_flag_takes_a_short_absolute_path_after_the_switches`.
 
+## A remark to the room is not a reply (#829, scene 3)
+
+Off unless `LAMP_REMARKS=on` in the voice's environment (the worker's
+`--remarks`, right after `--provider-patience`; the first builder and
+Fourth on #705, 18 October 2026, 13:0x). Only with `LAMP_ATTENTION`, and
+on the Live route only: the second voice's rule has no conversation rule
+to narrow.
+
+In a busy room the rule lets out whatever is said while a conversation
+with the lamp is going on, whoever says it. In the battery's scene 3 on
+lamp-4ace on the night of 17 October, "I should bring an umbrella
+then.", said by one person to the other seconds after the lamp's weather
+answer, was answered 10 times in 10, and "Okay, I will book the car for
+eight." once. A person at the next desk does not answer a remark said
+across the room.
+
+With the switch, a line is held as `a remark to the room after the lamp's
+answer, in a busy room, asking nothing of the lamp` when all of these hold
+(`remarks.rs`, `Attention::first_output_busy`):
+
+- the room is busy, and it was let out only as `a conversation with the
+  lamp is going on`: not its name heard (or heard surely), not the text
+  calling it, nobody turned to the lamp, nobody close to it, not said to
+  it from close;
+- it does not answer the lamp's own question (`lamp_asked`);
+- **it looks like a remark** (`remarks::remark`): past "okay", "yes, and",
+  "so" and the like it begins with a person who does something ("I",
+  "we", "she", "they", "I'll", "we're"…), it has four words or more, and
+  it neither wants nor needs anything: a word that begins "need", "want",
+  "lik", "wonder", "wish", "hop", "lov" or "prefer" ("she needs", "I was
+  wondering", "I'd love"), or "too", "rather" or "use"; nor says the person
+  could not take something in ("I didn't catch that", "I can't read in this
+  light": "can't", "didn't", "don't", "not"… before "hear", "see", "catch",
+  "understand", "read", "follow" or "get");
+- and it asks nothing (`remarks::asks`): no `?`; no sentence that begins
+  with a question word or a helping verb, contractions included ("what's",
+  "whats", "how's": Gemini's transcript often drops the `?`), or with a
+  word that tells someone to do something ("remember", "tell", "turn",
+  "let's", "don't"…); no "you", "your", "lamp", "please" or "thanks";
+- every letter in it is plain ASCII (`remarks::english_letters`). A line in
+  another language has none of these cues, Vietnamese among them for its
+  marks, so it is never held here (Fourth, 13:01).
+
+A line is held for what it is, never for what it lacks (the reviewer on
+#1499): "Warmer.", "And tomorrow", "Lights off", "What's the weather
+tomorrow", "I need more light", "It's too dark in here" and "I'd like a
+poem about the sea" all play, and so does a bare answer ("Yes go ahead",
+"No, not now.", "Sure"), whatever the lamp asked.
+
+**The lamp's question, known by its end.** With the switch, the lamp
+asked also when the end of its newest line before the request, as it was
+said, has a `?` anywhere, or its last sentence asks without one: a
+helping verb and a person ("Shall I start it", "Would you like…", "Is
+there anything else"), a question word with a helping verb within two
+words after it ("Which one would you like", "What time should I set it
+for"), "how about", "or would", "Want me to…", or "let me know" (`Thread::lamp_asked_with`,
+`remarks::lamp_asked`). Not "Will do." or "Should be sunny tomorrow." The
+thread keeps only the first 400 bytes of what the lamp said, so a
+read-back "I can ask Claude Code to … Shall I start it?" longer than that
+lost its `?`; and Gemini's transcript of the lamp's words often has none.
+On the night of 17 October "No, not now." and "No thanks, not now.",
+answers to "Shall I start it?", were judged with `lamp_asked` unset six
+times. Each exchange now keeps the last 160 bytes of the lamp's words
+beside the first 400; not in the thread's file, which an older build
+reads with `deny_unknown_fields` and would refuse after a rollback (#1505),
+so after a voice restart a read-back longer than 400 bytes is known to have
+asked only once the lamp speaks again. This reaches the rule's other uses of `lamp_asked`
+too: a short sound that answers the lamp (`SOUND_ANSWERS`) and the unclear
+check (#926). Without the switch `lamp_asked` is as before.
+
+**What it costs.** A remark meant for the lamp that begins with a person
+("I really liked that story.") goes unanswered in a busy room unless the
+name is said or the person turns to it. A remark in another language is
+still answered there. Of the night's 32 lines the first builder's first
+filter would have held (on lamp-4ace's first-output records, 17 October
+19:00 to 18 October 07:00), the umbrella and the car (11) are held and
+the 13 of ours said to the lamp play: "Remember that my favourite colour
+is green." (6), the answers to "Shall I start it?" (6), and "write me a
+poem about the moon" heard without its name (1). The 8 lines heard in the
+office that are none of ours are not judged here.
+
+Tests: `remarks::tests::only_the_remarks_to_the_room_are_remarks` (with
+the reviewer's probe on #1499), `remarks::tests::a_bare_answer_is_never_a_remark`,
+`remarks::tests::a_line_in_another_language_is_never_a_remark`,
+`remarks::tests::the_lamps_question_is_known_by_how_it_ends`,
+`attention::tests::with_remarks_a_remark_to_the_room_is_held_and_what_is_said_to_the_lamp_plays`,
+`attention::tests::with_remarks_a_remark_outside_a_busy_room_or_named_plays`,
+`thread::tests::the_lamps_question_is_known_by_its_end_past_what_is_kept`,
+`provider_worker::tests::policy_holds::remarks_is_read_after_provider_patience`.
+
 ## Switch
 
 `LAMP_ATTENTION=on` in the voice unit (the worker's `--attention`). Off by
