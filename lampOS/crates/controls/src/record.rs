@@ -16,6 +16,9 @@ use std::{
     time::Duration,
 };
 
+/// How long [`Recorder::finish`] waits for the writer to drain and sync.
+const FINISH_WINDOW: Duration = Duration::from_millis(100);
+
 const QUEUE_CAPACITY: usize = 32;
 const TERMINAL_BYTES: u64 = 128;
 
@@ -280,6 +283,12 @@ impl Recorder {
     /// Give the optional writer a bounded finish window, then leave any stalled
     /// disk work behind. A timeout is incomplete evidence, not a successful log.
     pub fn finish(self) -> RecordStats {
+        self.finish_within(FINISH_WINDOW)
+    }
+
+    /// [`Self::finish`] with its window given: a test on a busy machine, whose
+    /// writer's last `sync_all` may take longer than the lamp's 100 ms.
+    pub fn finish_within(self, window: Duration) -> RecordStats {
         let Self {
             sender,
             done,
@@ -287,7 +296,7 @@ impl Recorder {
             ..
         } = self;
         drop(sender);
-        let finished = done.recv_timeout(Duration::from_millis(100)).is_ok();
+        let finished = done.recv_timeout(window).is_ok();
         RecordStats {
             written: counters.written.load(Ordering::Relaxed),
             dropped: counters.dropped.load(Ordering::Relaxed),

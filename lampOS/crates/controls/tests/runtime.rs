@@ -442,7 +442,12 @@ fn acquisition_recording_preserves_receipt_and_edge_times_and_replays() {
     for now in [1_005_000, 1_015_000, 1_045_000] {
         service.step(|| now);
     }
-    let stats = service.finish_recording().unwrap();
+    // The lamp's 100 ms finish window covers the writer's last `sync_all`,
+    // which a busy test machine can take longer over: five seconds here,
+    // still failing a writer that never finishes (#1542).
+    let stats = service
+        .finish_recording_within(Duration::from_secs(5))
+        .unwrap();
     assert!(stats.finished && !stats.failed);
     assert_eq!(stats.written, 3);
     assert_eq!(stats.dropped, 0);

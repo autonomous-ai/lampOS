@@ -549,7 +549,12 @@ fn privacy_only_touch_recording_replays_the_actual_tagged_acquisitions() {
         high.set(at != 0);
         service.step(|| at);
     }
-    let stats = service.finish_recording().unwrap();
+    // The lamp's 100 ms finish window covers the writer's last `sync_all`,
+    // which a busy test machine can take longer over: five seconds here,
+    // still failing a writer that never finishes (#1542).
+    let stats = service
+        .finish_recording_within(std::time::Duration::from_secs(5))
+        .unwrap();
     assert!(stats.finished && !stats.failed);
     assert_eq!(stats.dropped, 0);
     let records = lamp_controls::touch_replay::read(fs::File::open(&path).unwrap()).unwrap();

@@ -215,6 +215,17 @@ impl<R: PinReader> Service<R> {
         self.recorder.take().map(crate::record::Recorder::finish)
     }
 
+    /// [`Self::finish_recording`] with the writer's finish window given
+    /// ([`crate::record::Recorder::finish_within`]), for a test.
+    pub fn finish_recording_within(
+        &mut self,
+        window: std::time::Duration,
+    ) -> Option<crate::record::RecordStats> {
+        self.recorder
+            .take()
+            .map(|recorder| recorder.finish_within(window))
+    }
+
     fn record(
         &mut self,
         now_us: u64,
