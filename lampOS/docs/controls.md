@@ -878,7 +878,11 @@ clears it. New audio still requires fresh stable physical permission, verified
 old-worker destruction and the ordinary new-runtime readiness path.
 
 `MuteRecord` is loaded and its initial/rebased state saved before any worker is
-opened. Corrupt, future-watermarked, exposed or interrupted state refuses
+opened. No record at all is first use, unmuted; a folder that is missing or
+not private (0700) still refuses, at that first save. The voice reads the
+stored record's identity for the guard only after `load_noting` has found a
+private regular file of at most 4 KiB, so a FIFO or a huge file at the path
+refuses instead of blocking (Jarvis on #1548). Corrupt, future-watermarked, exposed or interrupted state refuses
 startup. **A record from a newer build reads as muted** (#1505, harm 1): one
 with a `version` above 1, a field this build does not know, or a `reason` it
 does not know. It never stops the voice starting, and never reads as
