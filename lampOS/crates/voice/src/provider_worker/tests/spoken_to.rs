@@ -795,7 +795,8 @@ async fn line(
 }
 
 /// The same, answered by the service or, when not `answered`, left alone:
-/// the worker then closes it as unanswered.
+/// the worker then closes it as unanswered. Said over the lamp, its voice
+/// could be heard.
 async fn voice_line(
     rig: &mut LiveRig,
     dial: &mut Dial,
@@ -805,6 +806,31 @@ async fn voice_line(
     text: &str,
     answered: bool,
 ) -> bool {
+    voice_line_over(
+        rig,
+        dial,
+        (over_the_lamp, over_the_lamp),
+        voice,
+        blocks,
+        text,
+        answered,
+    )
+    .await
+}
+
+/// The same, begun with a reply in hand (`over.0`) whose sound could be
+/// heard or not (`over.1`): `ProviderInput::Start`'s `over_the_lamp` and
+/// `over_the_lamps_voice`.
+async fn voice_line_over(
+    rig: &mut LiveRig,
+    dial: &mut Dial,
+    over: (bool, bool),
+    voice: i16,
+    blocks: u64,
+    text: &str,
+    answered: bool,
+) -> bool {
+    let (over_the_lamp, over_the_lamps_voice) = over;
     let owner = rig
         .owner
         .admit(real_time(), lamp_turn_owner::AdmittedInput::NewTurn)
@@ -823,7 +849,7 @@ async fn voice_line(
             over_the_lamp,
             after_stop: false,
             follows_on: false,
-            over_the_lamps_voice: false,
+            over_the_lamps_voice,
         })
         .unwrap();
     // Each block sent once the socket takes it, the coordinator's lease
@@ -1299,6 +1325,103 @@ async fn with_the_switch_and_a_voice_check_another_voice_is_no_part_of_the_conve
     assert!(
         scene(false, false, -1).await,
         "without the check it was held"
+    );
+}
+
+/// #829, lamp-4ace on 18 October (queue 15): each scene's call came while
+/// the line before it, left unanswered, still had its turn open, so it was
+/// admitted with a reply in hand that made no sound. It was never printed,
+/// and the conversation took the next speaker's voice: Samantha's "And what
+/// about tomorrow?" after Daniel's call, then her umbrella line as the
+/// conversation's own; in scene 5 her "Pepper", then Daniel's own "which of
+/// those names is more popular?" held as another voice. A call begun over a
+/// silent reply is printed now, and the scenes go as the first builder's
+/// table has them. A line begun while the lamp could be heard is still
+/// never judged.
+#[tokio::test(start_paused = true)]
+async fn with_a_voice_check_a_call_begun_over_a_silent_reply_gives_the_conversation_its_voice() {
+    let _clock = logical_clock();
+    // Begun with nothing in hand, over a silent reply in hand, and over the
+    // lamp's voice: `ProviderInput::Start`'s two marks.
+    const CLEAR: (bool, bool) = (false, false);
+    const SILENT: (bool, bool) = (true, false);
+    const VOICE: (bool, bool) = (true, true);
+    let scene = |lines: &'static [((bool, bool), i16, &'static str)]| async move {
+        let mut options = options(true, quiet_going_on, crate::tools::Settings::default());
+        options.voices = Some(Box::new(TwoVoices(Default::default())));
+        let mut rig = LiveRig::start_with(quick_policy(), options);
+        let mut dial = rig.ready().await;
+        let mut played = Vec::new();
+        for &(over, voice, text) in lines {
+            played.push(voice_line_over(&mut rig, &mut dial, over, voice, 150, text, true).await);
+        }
+        rig.stop().await;
+        played
+    };
+    // Scene 1: Daniel calls, Samantha follows up, then remarks.
+    assert_eq!(
+        scene(&[
+            (
+                SILENT,
+                1,
+                "Hey Lamp, what is the weather like in Hanoi today?"
+            ),
+            (CLEAR, -1, "And what about tomorrow?"),
+            (CLEAR, -1, "I should bring an umbrella then."),
+        ])
+        .await,
+        [true, false, false]
+    );
+    // Scene 5: Samantha's "Pepper" is another voice; Daniel calls again,
+    // over its silent reply in hand, and his own follow-up is his.
+    assert_eq!(
+        scene(&[
+            (
+                SILENT,
+                1,
+                "Hey Lamp, what is a good name for a small grey cat?"
+            ),
+            (
+                CLEAR,
+                -1,
+                "I think we should call her Pepper, she looks like one."
+            ),
+            (
+                SILENT,
+                1,
+                "Lamp, what about a name for a black kitten then?"
+            ),
+            (CLEAR, 1, "And which of those names is more popular?"),
+        ])
+        .await,
+        [true, false, true, true]
+    );
+    // The caller's own follow-up after a call begun over a silent reply.
+    assert_eq!(
+        scene(&[
+            (
+                SILENT,
+                1,
+                "Hey Lamp, what is the weather like in Hanoi today?"
+            ),
+            (CLEAR, 1, "And what about tomorrow?"),
+        ])
+        .await,
+        [true, true]
+    );
+    // Over the lamp's own voice the call is still never printed, and the
+    // line after it is judged as without the check.
+    assert_eq!(
+        scene(&[
+            (
+                VOICE,
+                1,
+                "Hey Lamp, what is the weather like in Hanoi today?"
+            ),
+            (CLEAR, -1, "And what about tomorrow?"),
+        ])
+        .await,
+        [true, true]
     );
 }
 
