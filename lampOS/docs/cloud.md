@@ -101,3 +101,13 @@ answers on `fd_channel`; a refused login backing off and said once; a dropped
 connection made and subscribed again. A backend in the test checks the ping's
 bearer and body, a failure said once, and a rotated broker kept. Not yet run
 against the company's broker or on a lamp.
+
+`tests/app_contract.rs` holds the fields the Autonomous app's device page
+reads, by name and type (Fourth on #1396): `versions.firmware`,
+`network.private_ip` and `host.hostname` of `system.info`; `volume`, `raw`
+and `max_volume` of `volume.get` and `volume.set`; `muted` and
+`hw_switch_muted` of `mic.get`. Each is checked in the real answer, as sent.
+The app reads them leniently, so a renamed or retyped field would otherwise
+go blank on its page unnoticed. `hw_switch_muted` is null while nothing reads
+the switch, and `versions.openclaw` and `versions.openclaw_detected` stay out
+of the reply: only V1's "Starting" rule waits for them.
