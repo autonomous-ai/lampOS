@@ -61,6 +61,13 @@ impl Drop for Paired {
     }
 }
 
+/// The capture and admission a rig says it has, renewed at each tick. The
+/// coordinator renews them every capture block, so the product's 100 ms
+/// (`INPUT_LEASE_US`) is never at risk there. Between a rig's ticks, a
+/// loaded host's await can last longer, and a lapsed lease revokes the turn
+/// (`StaleOwner`, #1569), so a rig's lease is the most the controller takes.
+const RIG_INPUT_LEASE_US: u64 = lamp_turn_owner::MAX_INPUT_LEASE_US;
+
 impl Paired {
     async fn new() -> Self {
         Self::with_capacity(lamp_gemini::MAX_WIRE_BYTES * 2).await
@@ -152,7 +159,7 @@ impl Paired {
 
     fn publish(&mut self) {
         let at = now();
-        let until = at.checked_add(INPUT_LEASE_US).unwrap();
+        let until = at.checked_add(RIG_INPUT_LEASE_US).unwrap();
         self.owner
             .set_capture(at, CaptureState::RetainingUntil(until))
             .unwrap();
@@ -1501,7 +1508,7 @@ mod duplex_through_the_worker {
         /// Fresh leases and authority from the harness's controller.
         fn publish(&mut self, h: &mut Harness) {
             let at = now();
-            let until = at.checked_add(INPUT_LEASE_US).unwrap();
+            let until = at.checked_add(RIG_INPUT_LEASE_US).unwrap();
             h.owner
                 .set_capture(at, CaptureState::RetainingUntil(until))
                 .unwrap();
