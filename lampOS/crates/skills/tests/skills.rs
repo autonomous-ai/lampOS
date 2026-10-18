@@ -2898,6 +2898,15 @@ enum Says {
     /// `began`, then, a step later, `dropped`: ended for a higher ask
     /// (#1239, `ended: by conversation`), as lamp-body says it (#1230).
     EndedBy,
+    /// `dropped` as [`Says::Dropped`], naming the asker, why and who holds
+    /// the body, as lamp-body says it under `--arbitration on` (#940).
+    Busy,
+    /// As [`Says::BeganOver`], with another skill's `nod` said dropped
+    /// first, which is not the run's.
+    AnothersFirst,
+    /// As [`Says::BeganOver`] for the first, and [`Says::Busy`] for the
+    /// second: the run's last clip dropped.
+    LastBusy,
 }
 
 impl StandInBody {
@@ -2945,15 +2954,22 @@ impl StandInBody {
             let began = clock.now();
             let mut next = Instant::now();
             let mut buffer = [0u8; 512];
-            let mut say = |name: &str, state| {
+            // Each gesture said, with whose it was and who holds the body
+            // for a drop told under arbitration.
+            let mut say = |name: &str, state, told: Option<(Option<String>, &str)>| {
+                let (source, by) = told.unzip();
                 let _ = gestures.publish_json(
                     1,
                     &BodyGesture {
                         name: name.to_owned(),
                         state,
+                        source: source.flatten(),
+                        why: by.map(|_| "dropped: busy, skill".to_owned()),
+                        by: by.map(str::to_owned),
                     },
                 );
             };
+            let mut heard = 0;
             loop {
                 let mut asked = None;
                 loop {
@@ -2966,19 +2982,31 @@ impl StandInBody {
                     }
                 }
                 let now = clock.now();
-                let name = asked.as_deref().map(|text| {
-                    serde_json::from_str::<serde_json::Value>(text).unwrap()["gesture"]
-                        .as_str()
-                        .unwrap()
-                        .to_owned()
-                });
+                let ask = asked
+                    .as_deref()
+                    .map(|text| serde_json::from_str::<serde_json::Value>(text).unwrap());
+                let name = ask
+                    .as_ref()
+                    .map(|ask| ask["gesture"].as_str().unwrap().to_owned());
+                let source = ask
+                    .as_ref()
+                    .and_then(|ask| ask["source"].as_str().map(str::to_owned));
+                heard += usize::from(name.is_some());
+                let busy = says == Says::Busy || (says == Says::LastBusy && heard == 2);
                 let now_us = u64::try_from((now - began).as_micros()).unwrap();
-                if says == Says::Dropped {
+                if says == Says::Dropped || busy {
                     if let Some(name) = name {
-                        say(&name, GestureState::Dropped);
+                        let told = busy.then_some((source, "skill:stretch-break"));
+                        say(&name, GestureState::Dropped, told);
                         let _ = took.send(now);
                     }
                 } else {
+                    if says == Says::AnothersFirst
+                        && let Some(name) = &name
+                    {
+                        let other = Some((Some("skill:other".to_owned()), "skill:nods"));
+                        say(name, GestureState::Dropped, other);
+                    }
                     // A hand on it: the clip is let go, and said over.
                     let pushed = bus
                         .latest(Hand::TOPIC)
@@ -2986,23 +3014,25 @@ impl StandInBody {
                         .flatten()
                         .and_then(|message| message.parse::<Hand>().ok())
                         .is_some_and(|hand| hand.pushed);
+                    let began_over =
+                        matches!(says, Says::BeganOver | Says::AnothersFirst | Says::LastBusy);
                     if pushed
-                        && says == Says::BeganOver
+                        && began_over
                         && let Some((_, _, name)) = body.playing.take()
                     {
-                        say(&name, GestureState::Over);
+                        say(&name, GestureState::Over, None);
                     }
                     if says == Says::EndedBy
                         && let Some((since, _, playing)) = &body.playing
                         && now_us > *since
                     {
-                        say(playing, GestureState::Dropped);
+                        say(playing, GestureState::Dropped, None);
                         body.playing = None;
                     }
                     let (taken, ended) = body.step(now_us, name.as_deref());
                     match (taken, asked, name) {
                         (Some(true), Some(text), Some(name)) => {
-                            say(&name, GestureState::Began);
+                            say(&name, GestureState::Began, None);
                             let _ = took.send(now);
                             if played.send((now, text)).is_err() {
                                 return;
@@ -3014,9 +3044,9 @@ impl StandInBody {
                         _ => {}
                     }
                     if let Some(name) = ended
-                        && says == Says::BeganOver
+                        && began_over
                     {
-                        say(&name, GestureState::Over);
+                        say(&name, GestureState::Over, None);
                     }
                 }
                 next += Duration::from_micros(BODY_STEP_US);
@@ -3252,7 +3282,7 @@ fn the_dance_asking(
         // Sent at the line's end, and taken (or said dropped) at once.
         taken.recv_timeout(Duration::from_secs(5)).unwrap();
         reached += 1;
-        if says != Says::Dropped {
+        if !matches!(says, Says::Dropped | Says::Busy) {
             played.push(gestures.recv_timeout(Duration::from_secs(5)).unwrap());
         }
         if push {
@@ -3263,18 +3293,23 @@ fn the_dance_asking(
             // The clip ends and nothing says so: past its length, the gap
             // and the 3 s the program waits for `over`.
             clock.skip_to(played[0].0 + nod + gap + Duration::from_millis(3_100));
-        } else if says == Says::BeganOver {
+        } else if matches!(says, Says::BeganOver | Says::AnothersFirst | Says::LastBusy) {
             // Nothing more is sent while the clip plays.
             std::thread::sleep(Duration::from_millis(300));
             assert!(taken.try_recv().is_err());
             // It ends at its length: the body says `over`, and the program
             // sends the next, which the body takes.
             clock.skip_to(played[0].0 + nod);
-            taken.recv_timeout(Duration::from_secs(5)).unwrap();
+            let second = taken.recv_timeout(Duration::from_secs(5)).unwrap();
             reached += 1;
-            played.push(gestures.recv_timeout(Duration::from_secs(5)).unwrap());
-            // The run is done once that one has played too.
-            clock.skip_to(played[1].0 + nod + gap);
+            if says == Says::LastBusy {
+                // Said dropped as it came: the run ends at its length.
+                clock.skip_to(second + nod + gap);
+            } else {
+                played.push(gestures.recv_timeout(Duration::from_secs(5)).unwrap());
+                // The run is done once that one has played too.
+                clock.skip_to(played[1].0 + nod + gap);
+            }
         }
     }
     let done = loop {
@@ -3338,6 +3373,44 @@ fn a_clip_the_body_said_dropped_is_followed_by_nothing() {
         "{}",
         done.why
     );
+}
+
+/// #940: under arbitration the body names whose a drop was, why and who
+/// holds the body; the run says so, and takes no other skill's drop of the
+/// same clip as its own.
+#[test]
+fn a_clip_dropped_for_another_skill_says_why_and_who_holds_the_body() {
+    let (_, played, _, done, reached) = the_dance_asking(false, Line::Said, Says::Busy, true);
+    assert!(played.is_empty(), "{played:?}");
+    assert_eq!(reached, 1, "{}", done.why);
+    assert!(
+        done.why.contains(
+            "gesture nod: not sent, the body dropped nod (dropped: busy, skill, held by \
+             skill:stretch-break), so nothing more is sent"
+        ),
+        "{}",
+        done.why
+    );
+    // The run's last clip has no next to wait on it: said at the run's end.
+    let (_, played, _, done, reached) = the_dance_asking(false, Line::Said, Says::LastBusy, true);
+    assert_eq!((played.len(), reached), (1, 2), "{}", done.why);
+    assert!(
+        done.why
+            .contains("the body dropped nod (dropped: busy, skill, held by skill:stretch-break)"),
+        "{}",
+        done.why
+    );
+    // Without the skill's switch (and so on a product lamp, the body's off
+    // too), the run says nothing new of a last clip dropped (the reviewer
+    // on #1473).
+    let (_, played, _, done, _) = the_dance_asking(false, Line::Said, Says::LastBusy, false);
+    assert_eq!(played.len(), 1, "{}", done.why);
+    assert!(!done.why.contains("the body dropped"), "{}", done.why);
+    // Another skill's nod dropped is not this run's: both are played.
+    let (_, played, _, done, reached) =
+        the_dance_asking(false, Line::Said, Says::AnothersFirst, true);
+    assert_eq!((played.len(), reached), (2, 2), "{}", done.why);
+    assert!(!done.why.contains("dropped"), "{}", done.why);
 }
 
 #[test]

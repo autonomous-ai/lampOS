@@ -1177,12 +1177,14 @@ struct Played {
 }
 
 /// A clip sent to the body, for the next to wait on: when it was sent, its
-/// length and `CLIP_GAP_US`, its name, and `body/gesture`, subscribed to
-/// before it was sent.
+/// length and `CLIP_GAP_US`, its name, the source it was sent with (the
+/// body's 64 characters of `skill:<name>`, with `LAMP_BODY_REQUESTS=on`),
+/// and `body/gesture`, subscribed to before it was sent.
 struct Sent {
     at: Instant,
     rest: Duration,
     name: String,
+    source: Option<String>,
     gestures: Option<Subscriber>,
 }
 
@@ -1191,6 +1193,34 @@ impl Sent {
     fn until(&self) -> Instant {
         self.at + self.rest
     }
+}
+
+/// Whether `gesture` is about the clip `name` sent with `source`: its
+/// name, and no other asker's, when the body names whose it was (#940).
+fn is_clip(gesture: &BodyGesture, name: &str, source: Option<&str>) -> bool {
+    gesture.name == name
+        && gesture
+            .source
+            .as_deref()
+            .is_none_or(|said| Some(said) == source)
+}
+
+/// A clip of the run's dropped by the body, as `body/gesture` said it:
+/// with `lamp-body --arbitration on`, why and who holds the body, and said
+/// in the journal too (#940); without, the words they always were, and no
+/// journal line (the reviewer on #1473: a product lamp's runs unchanged).
+fn dropped(gesture: &BodyGesture) -> String {
+    let Some(why) = &gesture.why else {
+        return format!("the body dropped {} (body/gesture)", gesture.name);
+    };
+    let held = gesture
+        .by
+        .as_deref()
+        .map_or(String::new(), |by| format!(", held by {by}"));
+    let said = format!("the body dropped {} ({why}{held})", gesture.name);
+    let who = gesture.source.as_deref().unwrap_or("a skill");
+    eprintln!("lamp-skills: {who}: {said}");
+    said
 }
 
 /// How long after a clip's length the next waits, at most, for the body to
@@ -1350,8 +1380,27 @@ fn perform(
             clock::sleep(Duration::from_micros(changed.lasting_us));
         }
     }
-    if let Some(last) = &played.last {
+    if let Some(last) = played.last.as_mut() {
         clock::sleep(last.until().saturating_duration_since(clock::now()));
+        // The last clip has no next to wait on it: one the body dropped or
+        // ended meanwhile is said here, why and who holds the body (#940).
+        // Only for a run that named itself to the body
+        // (`LAMP_BODY_REQUESTS=on`) and a drop the body told
+        // (`--arbitration on`): with both off, a run says what it always
+        // did (the reviewer on #1473).
+        let named = last.source.is_some();
+        if let Some(gestures) = last.gestures.as_mut().filter(|_| named) {
+            while let Ok(Some(message)) = gestures.recv(Duration::ZERO) {
+                if let Ok(gesture) = message.parse::<BodyGesture>()
+                    && gesture.state == GestureState::Dropped
+                    && gesture.why.is_some()
+                    && is_clip(&gesture, &last.name, last.source.as_deref())
+                {
+                    said.push(dropped(&gesture));
+                    break;
+                }
+            }
+        }
     }
     // A dim held until its trigger ends waits for that end, however long,
     // the ring's request renewed meanwhile when it is asked of the ring.
@@ -1453,6 +1502,8 @@ fn act(
                     at: clock::now(),
                     rest: Duration::from_micros(us + CLIP_GAP_US),
                     name,
+                    // As lamp-body keeps it: 64 characters at most.
+                    source: asker.map(|skill| format!("skill:{skill}").chars().take(64).collect()),
                 });
             }
             _ => {}
@@ -1507,16 +1558,13 @@ fn held_back(sent: &mut Sent, bus: &Bus) -> Option<String> {
             let Ok(gesture) = message.parse::<BodyGesture>() else {
                 continue;
             };
-            if gesture.name != sent.name {
+            if !is_clip(&gesture, &sent.name, sent.source.as_deref()) {
                 continue;
             }
             match gesture.state {
                 GestureState::Over => return stopped(),
                 GestureState::Dropped => {
-                    return Some(format!(
-                        "the body dropped {} (body/gesture), so nothing more is sent",
-                        sent.name
-                    ));
+                    return Some(format!("{}, so nothing more is sent", dropped(&gesture)));
                 }
                 GestureState::Began => {}
             }

@@ -104,6 +104,44 @@ pub fn ended(by: Priority) -> &'static str {
     }
 }
 
+/// An asker's name as its datagram gave it (`skill:dance`), kept in place
+/// so the motor loop never allocates for it, to say who lost the body and
+/// to whom on `body/gesture` (#940). At most [`Source::MOST`] bytes and
+/// printable: a longer or empty one is not kept (the fifth on #940), since
+/// it comes off a socket anyone on the lamp may write to.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Source {
+    bytes: [u8; Source::MOST],
+    len: u8,
+}
+
+impl Source {
+    pub const MOST: usize = 64;
+
+    pub fn new(text: &str) -> Option<Self> {
+        if text.is_empty() || text.len() > Self::MOST || text.chars().any(char::is_control) {
+            return None;
+        }
+        let mut bytes = [0; Self::MOST];
+        bytes[..text.len()].copy_from_slice(text.as_bytes());
+        Some(Self {
+            bytes,
+            len: text.len() as u8,
+        })
+    }
+
+    pub fn as_str(&self) -> &str {
+        // Whole UTF-8 by `new`, which copied a `str` whole.
+        std::str::from_utf8(&self.bytes[..usize::from(self.len)]).unwrap_or_default()
+    }
+}
+
+impl std::fmt::Debug for Source {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self.as_str(), formatter)
+    }
+}
+
 /// Who asked for a gesture or a move on the mood socket, as its datagram
 /// says, under `lamp-body --arbitration on`: neither, for every caller
 /// before #940.
@@ -378,6 +416,20 @@ fn keep(file: Move) -> &'static Clip {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The fifth on #940: an asker's name comes off a socket, so one longer
+    /// than 64 bytes, empty or with a control character is not kept.
+    #[test]
+    fn a_source_is_kept_whole_up_to_64_printable_bytes_or_not_at_all() {
+        let longest = format!("skill:{}", "a".repeat(58));
+        assert_eq!(Source::new(&longest).unwrap().as_str(), longest);
+        assert_eq!(Source::new("skill:café").unwrap().as_str(), "skill:café");
+        for refused in [format!("{longest}b"), String::new(), "skill:\u{7}".into()] {
+            assert_eq!(Source::new(&refused), None, "{refused:?}");
+        }
+        // Over 64 bytes in fewer characters: refused, never cut mid-letter.
+        assert_eq!(Source::new(&format!("skill:{}", "é".repeat(30))), None);
+    }
 
     struct Folder(PathBuf);
     impl Folder {

@@ -42,7 +42,7 @@ use crate::{
 use serde::Serialize;
 use std::{io, time::Duration};
 
-pub use crate::moves::{Asker, Priority};
+pub use crate::moves::{Asker, Priority, Source};
 
 /// One step: goals are written and all five joints read this often.
 pub const TICK: Duration = Duration::from_millis(20);
@@ -802,20 +802,50 @@ pub struct Glimpse {
 
 /// The gestures asked from outside that were taken or dropped on one step,
 /// in order: more than one when, say, one waiting is dropped as another
-/// is asked and that one begins in the same step. At most four are kept.
+/// is asked and that one begins in the same step. At most four are kept,
+/// each with who it was told of ([`Told`]), which is not serialized.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize)]
-pub struct Fates([Option<(&'static str, &'static str)>; 4]);
+#[serde(transparent)]
+pub struct Fates(
+    [Option<(&'static str, &'static str)>; 4],
+    #[serde(skip)] [Told; 4],
+);
+
+/// Under `Limits::arbitration`, whose a gesture dropped or ended was and
+/// who holds the body instead, as their datagrams named them (#940): what
+/// `body/gesture` tells the asker that lost. Never what decides who wins.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Told {
+    pub source: Option<Source>,
+    /// Only a skill or the conversation that named itself: never a hand,
+    /// a lamp that does not stand, or a pause (the fifth on #940).
+    pub by: Option<Source>,
+}
 
 impl Fates {
     /// One more, after those already said this step.
     pub fn push(&mut self, fate: (&'static str, &'static str)) {
-        if let Some(slot) = self.0.iter_mut().find(|slot| slot.is_none()) {
-            *slot = Some(fate);
+        self.push_told(fate, Told::default());
+    }
+
+    /// One more, with who it is told of.
+    pub fn push_told(&mut self, fate: (&'static str, &'static str), told: Told) {
+        if let Some(at) = self.0.iter().position(Option::is_none) {
+            self.0[at] = Some(fate);
+            self.1[at] = told;
         }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&'static str, &'static str)> + '_ {
         self.0.iter().flatten().copied()
+    }
+
+    /// Each with who it is told of.
+    pub fn iter_told(&self) -> impl Iterator<Item = ((&'static str, &'static str), Told)> + '_ {
+        self.0
+            .iter()
+            .zip(self.1)
+            .filter_map(|(fate, told)| fate.map(|fate| (fate, told)))
     }
 }
 
@@ -2469,7 +2499,7 @@ fn let_go<P: PortIo, R: Runtime>(
     rest: Duration,
     (news, asked): (
         &mut impl FnMut() -> Option<(Mood, u8)>,
-        &mut impl FnMut() -> (Asked, Priority),
+        &mut impl FnMut() -> (Asked, Priority, Option<Source>),
     ),
     watch: &mut impl FnMut(&Glimpse),
     template: Glimpse,
@@ -2483,7 +2513,7 @@ fn let_go<P: PortIo, R: Runtime>(
         if !matches!(bus.runtime.cancelled(), Ok(false)) {
             return Err(Stop::Cancelled);
         }
-        let (_, (asked_now, _)) = (news(), asked());
+        let (_, (asked_now, _, asked_source)) = (news(), asked());
         let failed = torque_off(bus, report, &mut holding);
         report.steps += 1;
         let read = bus.samples();
@@ -2496,9 +2526,13 @@ fn let_go<P: PortIo, R: Runtime>(
             }
             let mut glimpse = glimpse_of(template, report.steps, now, template.goals);
             if let Some(clip) = asked_now.gesture {
-                glimpse
-                    .gesture_fates
-                    .push((clip.name, "dropped: it has let go and lies limp"));
+                glimpse.gesture_fates.push_told(
+                    (clip.name, "dropped: it has let go and lies limp"),
+                    Told {
+                        source: asked_source,
+                        by: None,
+                    },
+                );
             }
             watch(&glimpse);
         }
@@ -2781,6 +2815,7 @@ pub(crate) fn run_alive(
 }
 
 /// The same, with who asked for each gesture (`Limits::arbitration`).
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn run_arbitrated(
     io: &mut impl PortIo,
@@ -2790,7 +2825,37 @@ pub(crate) fn run_arbitrated(
     standing: Option<Standing>,
     looking: Option<Looking>,
     news: impl FnMut() -> Option<(Mood, u8)>,
-    asked: impl FnMut() -> (Asked, Priority),
+    mut asked: impl FnMut() -> (Asked, Priority),
+    watch: impl FnMut(&Glimpse),
+) -> BodyReport {
+    run_told(
+        io,
+        runtime,
+        limits,
+        home,
+        standing,
+        looking,
+        news,
+        move || {
+            let (asked, priority) = asked();
+            (asked, priority, None)
+        },
+        watch,
+    )
+}
+
+/// The same, with the name each asker gave, to tell the one that lost the
+/// body and to whom on `body/gesture` (#940).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn run_told(
+    io: &mut impl PortIo,
+    runtime: &mut impl Runtime,
+    limits: Limits,
+    home: Option<[u16; 3]>,
+    standing: Option<Standing>,
+    looking: Option<Looking>,
+    news: impl FnMut() -> Option<(Mood, u8)>,
+    asked: impl FnMut() -> (Asked, Priority, Option<Source>),
     watch: impl FnMut(&Glimpse),
 ) -> BodyReport {
     let mut report = run_until_stopped(
@@ -2814,7 +2879,7 @@ fn run_until_stopped(
     standing: Option<Standing>,
     looking: Option<Looking>,
     news: impl FnMut() -> Option<(Mood, u8)>,
-    asked: impl FnMut() -> (Asked, Priority),
+    asked: impl FnMut() -> (Asked, Priority, Option<Source>),
     watch: impl FnMut(&Glimpse),
 ) -> BodyReport {
     let mut bus = Bus::new(io, runtime, standing);
@@ -2838,7 +2903,7 @@ fn run_on<P: PortIo, R: Runtime>(
     standing: Option<Standing>,
     looking: Option<Looking>,
     mut news: impl FnMut() -> Option<(Mood, u8)>,
-    mut asked: impl FnMut() -> (Asked, Priority),
+    mut asked: impl FnMut() -> (Asked, Priority, Option<Source>),
     mut watch: impl FnMut(&Glimpse),
 ) -> BodyReport {
     let mut standing = standing;
@@ -3659,9 +3724,13 @@ fn run_on<P: PortIo, R: Runtime>(
     let mut playing: Option<(&'static Clip, Duration)> = None;
     let mut pending: Option<(&'static Clip, Duration)> = None;
     // Under `Limits::arbitration`: who asked for the gesture playing and
-    // the one waiting (the body's own turn to a call is the
-    // conversation's), and whether one ended for another still eases out.
-    let (mut playing_by, mut pending_by) = (Priority::Conversation, Priority::Conversation);
+    // the one waiting, each priority with the name its asker gave (the
+    // body's own turn to a call is the conversation's, and names nobody),
+    // and whether one ended for another still eases out.
+    let (mut playing_by, mut pending_by): ((Priority, Option<Source>), (Priority, Option<Source>)) = (
+        (Priority::Conversation, None),
+        (Priority::Conversation, None),
+    );
     let mut yielding = false;
     // Such a gesture's ease back: steps since it ended, its offsets then and
     // how far they moved in the step before, counts a step.
@@ -3812,7 +3881,7 @@ fn run_on<P: PortIo, R: Runtime>(
             heard = Some((mood, level, now));
         }
         // What its eyes saw and a gesture asked of it, since the last step.
-        let (asked_now, asked_by) = asked();
+        let (asked_now, asked_by, asked_source) = asked();
         // Somebody in front of it: a face in several looks running.
         match asked_now.seen {
             Some(Seen { face: Some(_) }) if looking.is_some() => {
@@ -3911,7 +3980,13 @@ fn run_on<P: PortIo, R: Runtime>(
             if asked_now.paused {
                 if let Some((clip, _)) = pending.filter(|(clip, _)| from_outside(clip)) {
                     pending = None;
-                    gesture_fates.push((clip.name, "dropped: paused"));
+                    gesture_fates.push_told(
+                        (clip.name, "dropped: paused"),
+                        Told {
+                            source: pending_by.1,
+                            by: None,
+                        },
+                    );
                 }
                 if let Some((before, opened)) = pending_window.take()
                     && awake_until == opened
@@ -4070,57 +4145,84 @@ fn run_on<P: PortIo, R: Runtime>(
             }
         }
         if let Some(clip) = asked_now.gesture {
+            // Why it is dropped, if it is, and who holds the body then: a
+            // skill or the conversation that named itself, or nobody.
             let dropped = if asked_now.paused {
-                Some("dropped: paused")
+                Some(("dropped: paused", None))
             } else if leaving.is_some() {
-                Some("dropped: it is stopping")
+                Some(("dropped: it is stopping", None))
             } else if slumped {
-                Some("dropped: it let go and lies where it slumped")
+                Some(("dropped: it let go and lies where it slumped", None))
             } else if in_hand_now {
-                Some(if limits.arbitration {
-                    "dropped: held by a hand"
-                } else {
-                    "dropped: a hand holds it"
-                })
+                Some((
+                    if limits.arbitration {
+                        "dropped: held by a hand"
+                    } else {
+                        "dropped: a hand holds it"
+                    },
+                    None,
+                ))
             } else if standing.is_none() {
-                Some("dropped: it does not stand this run")
+                Some(("dropped: it does not stand this run", None))
             } else if !(playing.is_none() || idling) {
                 let by = playing
                     .filter(|(clip, _)| from_outside(clip))
-                    .map_or(Priority::Conversation, |_| playing_by);
+                    .map_or((Priority::Conversation, None), |_| playing_by);
                 if !limits.arbitration {
-                    Some("dropped: another gesture plays")
-                } else if asked_by > by {
+                    Some(("dropped: another gesture plays", None))
+                } else if asked_by > by.0 {
                     None
                 } else {
-                    Some(crate::moves::busy(by))
+                    Some((crate::moves::busy(by.0), by.1))
                 }
             } else if let Some((old, _)) = pending.filter(|_| limits.arbitration) {
                 let by = if from_outside(old) {
                     pending_by
                 } else {
-                    Priority::Conversation
+                    (Priority::Conversation, None)
                 };
-                (asked_by < by).then(|| crate::moves::busy(by))
+                (asked_by < by.0).then(|| (crate::moves::busy(by.0), by.1))
             } else {
                 None
             };
             match dropped {
-                Some(why) => gesture_fates.push((clip.name, why)),
+                Some((why, by)) => gesture_fates.push_told(
+                    (clip.name, why),
+                    Told {
+                        source: asked_source,
+                        by,
+                    },
+                ),
                 None => {
                     // Asked over a gesture playing: it ends now and eases
                     // out at the gesture's own step, and this one waits
                     // until it has.
+                    let ender = Told {
+                        source: None,
+                        by: asked_source,
+                    };
                     if let Some((old, _)) = playing.filter(|(old, _)| !idle::is_move(old)) {
                         if from_outside(old) {
-                            gesture_fates.push((old.name, crate::moves::ended(asked_by)));
+                            gesture_fates.push_told(
+                                (old.name, crate::moves::ended(asked_by)),
+                                Told {
+                                    source: playing_by.1,
+                                    ..ender
+                                },
+                            );
                         }
                         playing = None;
                         yielding = true;
                         easing_out = Some((0, gesture_now, gesture_moved));
                     }
                     if let Some((old, _)) = pending.filter(|(old, _)| from_outside(old)) {
-                        gesture_fates.push((old.name, "dropped: another was asked after it"));
+                        gesture_fates.push_told(
+                            (old.name, "dropped: another was asked after it"),
+                            Told {
+                                source: pending_by.1,
+                                ..ender
+                            },
+                        );
                     }
                     // Woken, it waits as long as rising takes; still
                     // rising, as long as the rest of the rise; and then as
@@ -4137,7 +4239,7 @@ fn run_on<P: PortIo, R: Runtime>(
                     let begins = (now + Duration::from_secs_f32(rising))
                         .max(earlier.map_or(now, |(_, since)| since));
                     pending = Some((clip, begins));
-                    pending_by = asked_by;
+                    pending_by = (asked_by, asked_source);
                     // It stays up for the whole of it: a window that ran
                     // out mid-clip, or `--awake-seconds` shorter than the
                     // rise, would fold it under the gesture.
@@ -4166,10 +4268,16 @@ fn run_on<P: PortIo, R: Runtime>(
             } else if now.saturating_sub(since) >= GESTURE_WAIT {
                 pending = None;
                 if from_outside(clip) {
-                    gesture_fates.push((
-                        clip.name,
-                        "dropped: stale, it was not standing 3 s after it could have been",
-                    ));
+                    gesture_fates.push_told(
+                        (
+                            clip.name,
+                            "dropped: stale, it was not standing 3 s after it could have been",
+                        ),
+                        Told {
+                            source: pending_by.1,
+                            by: None,
+                        },
+                    );
                 }
             }
         }
@@ -4195,7 +4303,13 @@ fn run_on<P: PortIo, R: Runtime>(
                 report.tipping.refused += 1;
                 report.tipping.last_refused = at;
                 if from_outside(clip) {
-                    gesture_fates.push((clip.name, "dropped: it would tip"));
+                    gesture_fates.push_told(
+                        (clip.name, "dropped: it would tip"),
+                        Told {
+                            source: playing_by.1,
+                            by: None,
+                        },
+                    );
                 }
             } else if mm >= cog::CLIP_MM * cog::WARN_SHARE {
                 report.tipping.close += 1;
@@ -5026,8 +5140,13 @@ fn run_on<P: PortIo, R: Runtime>(
                 if let Some((clip, _)) = playing.take() {
                     report.gestures_dropped += 1;
                     if from_outside(clip) {
-                        gesture_fates
-                            .push((clip.name, "dropped: a joint could not keep up with it"));
+                        gesture_fates.push_told(
+                            (clip.name, "dropped: a joint could not keep up with it"),
+                            Told {
+                                source: playing_by.1,
+                                by: None,
+                            },
+                        );
                     }
                 }
                 over_load[index] = 0;

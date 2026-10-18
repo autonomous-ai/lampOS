@@ -576,6 +576,32 @@ fn kept_of(
     }
 }
 
+/// What `body/gesture` says of the gesture [`kept_of`] drops (#940, the
+/// reviewer on #1473: two skills asking within one step): its name and
+/// why, whose it was and who keeps the body, as their datagrams named
+/// them. `kept_new`: the one read last was kept; `source`, its asker's;
+/// `held`, the name and asker of the one read before it, when it named one.
+/// Its asker and the one that keeps the body come back as
+/// `(source, by)`, for a `Told`.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn intake_dropped(
+    kept_new: bool,
+    source: Option<&str>,
+    held: Option<(&str, &str)>,
+) -> (
+    Option<lamp_body::moves::Source>,
+    Option<lamp_body::moves::Source>,
+) {
+    use lamp_body::moves::Source;
+    let held = held.and_then(|(_, asker)| Source::new(asker));
+    let asked = source.and_then(Source::new);
+    if kept_new {
+        (held, asked)
+    } else {
+        (asked, held)
+    }
+}
+
 /// What one datagram on the mood socket asks.
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
 #[derive(Debug, PartialEq)]
@@ -849,6 +875,9 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     // the body takes it; and who asked for the last one, for the journal.
     let gesture_asked = std::cell::Cell::new(None);
     let asked_by: std::cell::RefCell<Option<(&'static str, String)>> = Default::default();
+    // What was dropped as it was read, two asks in one step, to be told on
+    // `body/gesture` with the step's news.
+    let intake_told: std::cell::RefCell<Vec<lamp_body::bus_out::ToldNews>> = Default::default();
     let arbitration = arguments.arbitration;
     // Paused by the keeper (`lamp/pause`): it rests and takes nothing new
     // until resumed. Looked at with the moods, once a step.
@@ -876,9 +905,24 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                             let source = asker
                                 .source
                                 .map(|source| source.chars().take(64).collect::<String>());
-                            let (kept, dropped) = kept_of(gesture_asked.get(), asked, arbitration);
+                            let held = gesture_asked.get();
+                            let (kept, dropped) = kept_of(held, asked, arbitration);
                             gesture_asked.set(Some(kept));
                             if let Some((name, why)) = dropped {
+                                // The one read before, with its asker when it
+                                // named one and it is still that gesture.
+                                let before = asked_by.borrow().clone().filter(|(name, _)| {
+                                    held.is_some_and(|(clip, _)| clip.name == *name)
+                                });
+                                let (whose, by) = intake_dropped(
+                                    kept == asked,
+                                    source.as_deref(),
+                                    before.as_ref().map(|(name, asker)| (*name, asker.as_str())),
+                                );
+                                intake_told.borrow_mut().push((
+                                    (name, lamp_msgs::GestureState::Dropped, Some(why)),
+                                    lamp_body::body::Told { source: whose, by },
+                                ));
                                 let by = match (&source, &*asked_by.borrow()) {
                                     (Some(source), _) if name == clip.name => {
                                         format!(" (asked by {source})")
@@ -1083,7 +1127,8 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 eprintln!("lamp-body: step {} {line}", glimpse.step);
             }
         }
-        let gestures = gesture_said.step(glimpse);
+        let mut gestures: Vec<_> = intake_told.borrow_mut().drain(..).collect();
+        gestures.extend(gesture_said.step_told(glimpse));
         // Whether a face in view is looked at, when that changes: a skill's
         // look and the eyes' come on one socket and read the same.
         if (glimpse.face.is_some() || paused.get()) && glimpse.looks_dropped != looks_said {
@@ -1096,7 +1141,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 None => eprintln!("lamp-body: step {} a face is looked at", glimpse.step),
             }
         }
-        lamp_body::bus_out::tell(&gestures, glimpse.step, bus.as_mut(), |line| {
+        lamp_body::bus_out::tell_told(&gestures, glimpse.step, bus.as_mut(), arbitration, |line| {
             eprintln!("{line}");
         });
         // What the eyes report and where that has it look, at most every
@@ -1266,7 +1311,17 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
             } else {
                 asked
             };
-            (asked, priority)
+            // The name the kept gesture's asker gave, under arbitration
+            // only (`heard_asked` keeps none without it), to tell an asker
+            // that lost the body and to whom (#940).
+            let source = asked.gesture.and_then(|clip| {
+                asked_by
+                    .borrow()
+                    .as_ref()
+                    .filter(|(name, _)| *name == clip.name)
+                    .and_then(|(_, source)| lamp_body::moves::Source::new(source))
+            });
+            (asked, priority, source)
         },
         watch,
         || {
@@ -1945,6 +2000,41 @@ mod tests {
             heard(&long),
             Heard::Dropped("a datagram longer than 16 KiB, not read".into())
         );
+    }
+
+    /// The reviewer on #1473: two skills asking within one step. The one
+    /// `kept_of` drops is told on `body/gesture` too, with whose it was and
+    /// who keeps the body, whichever of the two was read first.
+    #[test]
+    fn a_gesture_dropped_as_it_is_read_is_told_whose_it_was_and_who_keeps_the_body() {
+        use lamp_body::moves::{Priority, Source};
+        let nod = (&lamp_body::clips::NOD, Priority::Skill);
+        let shy = (&lamp_body::clips::SHY, Priority::Skill);
+        // The second of equal priority is kept: the first is told.
+        let (kept, dropped) = kept_of(Some(nod), shy, true);
+        assert_eq!(kept, shy);
+        assert_eq!(dropped, Some(("nod", "dropped: busy, skill")));
+        let told = intake_dropped(
+            true,
+            Some("skill:dance"),
+            Some(("nod", "skill:stretch-break")),
+        );
+        assert_eq!(
+            told,
+            (
+                Source::new("skill:stretch-break"),
+                Source::new("skill:dance")
+            )
+        );
+        // A lower one read second is dropped: it is told who holds it.
+        let talking = (&lamp_body::clips::NOD, Priority::Conversation);
+        let (kept, dropped) = kept_of(Some(talking), shy, true);
+        assert_eq!(kept, talking);
+        assert_eq!(dropped, Some(("shy", "dropped: busy, conversation")));
+        let told = intake_dropped(false, Some("skill:dance"), Some(("nod", "voice")));
+        assert_eq!(told, (Source::new("skill:dance"), Source::new("voice")));
+        // Nobody named: nobody told of.
+        assert_eq!(intake_dropped(true, None, None), (None, None));
     }
 
     /// A gesture or a move may say who asks, and a priority that is not one

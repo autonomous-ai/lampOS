@@ -8968,6 +8968,153 @@ fn a_gesture_asked_higher_ends_the_one_playing_and_one_asked_no_higher_is_droppe
     );
 }
 
+/// An ask at a time, of a clip, at a priority, naming its asker or nobody.
+type NamedAsk = (Duration, &'static Clip, Priority, Option<&'static str>);
+/// A fate with whom it is told of.
+type ToldFate = ((&'static str, &'static str), Told);
+
+/// [`arbitrated_run`]'s run with arbitration, each ask naming its asker or
+/// nobody, through [`run_told`]: each fate with whom it is told of, and
+/// each step's gesture and goals.
+fn told_run(asks: Vec<NamedAsk>, seconds: u64) -> (Vec<ToldFate>, Vec<Step>) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(seconds));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        arbitration: true,
+        ..gesture_limits()
+    };
+    let time = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut asks = VecDeque::from(asks);
+    let (mut fates, mut seen) = (Vec::new(), Vec::new());
+    run_told(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Speaking, 60)),
+        move || match asks.front() {
+            Some((at, clip, by, source)) if time.get() >= *at => {
+                let asked = Asked {
+                    gesture: Some(*clip),
+                    ..Asked::default()
+                };
+                let told = (asked, *by, source.and_then(Source::new));
+                asks.pop_front();
+                told
+            }
+            _ => (Asked::default(), Priority::Conversation, None),
+        },
+        |glimpse| {
+            fates.extend(glimpse.gesture_fates.iter_told());
+            seen.push((
+                seen_at.get(),
+                glimpse.gesture,
+                glimpse.goals,
+                glimpse.arm_goals,
+            ));
+        },
+    );
+    (fates, seen)
+}
+
+/// #940, the fifth's conditions: a gesture dropped or ended says whose it
+/// was and who holds the body, as their datagrams named them; a holder
+/// that named nobody is not named. Who wins, and every goal written, is
+/// exactly as without names.
+#[test]
+fn a_gesture_dropped_or_ended_is_told_whose_it_was_and_who_holds_the_body() {
+    let (secs, ms) = (Duration::from_secs, Duration::from_millis);
+    let named = |text| Source::new(text);
+    let taken = |name| ((name, "taken: it plays"), Told::default());
+    let stretch = &crate::clips::STRETCHING;
+    let nod = &crate::clips::NOD;
+    let cases: [(Vec<NamedAsk>, _); 3] = [
+        // Two skills: the second is dropped, and told which holds the body.
+        (
+            vec![
+                (
+                    secs(8),
+                    stretch,
+                    Priority::Skill,
+                    Some("skill:stretch-break"),
+                ),
+                (secs(10), nod, Priority::Skill, Some("skill:dance")),
+            ],
+            vec![
+                taken("stretching"),
+                (
+                    ("nod", "dropped: busy, skill"),
+                    Told {
+                        source: named("skill:dance"),
+                        by: named("skill:stretch-break"),
+                    },
+                ),
+            ],
+        ),
+        // The conversation ends a skill's move: the skill is told by whom.
+        (
+            vec![
+                (
+                    secs(8),
+                    stretch,
+                    Priority::Skill,
+                    Some("skill:stretch-break"),
+                ),
+                (ms(11_200), nod, Priority::Conversation, Some("voice")),
+            ],
+            vec![
+                taken("stretching"),
+                (
+                    ("stretching", "ended: by conversation"),
+                    Told {
+                        source: named("skill:stretch-break"),
+                        by: named("voice"),
+                    },
+                ),
+                taken("nod"),
+            ],
+        ),
+        // A gesture of the conversation's that named nobody holds it.
+        (
+            vec![
+                (ms(500), nod, Priority::Conversation, None),
+                (ms(1_500), stretch, Priority::Skill, Some("skill:dance")),
+            ],
+            vec![
+                (
+                    ("stretching", "dropped: busy, conversation"),
+                    Told {
+                        source: named("skill:dance"),
+                        by: None,
+                    },
+                ),
+                taken("nod"),
+            ],
+        ),
+    ];
+    for (asks, told) in cases {
+        let unnamed = asks
+            .iter()
+            .map(|(at, clip, by, _)| (*at, *clip, *by))
+            .collect();
+        let (_, fates, moved) = arbitrated_run(true, unnamed, 16);
+        let (got, seen) = told_run(asks, 16);
+        assert_eq!(got, told);
+        assert_eq!(
+            got.iter().map(|(fate, _)| *fate).collect::<Vec<_>>(),
+            fates,
+            "the same fates as without names"
+        );
+        // And the same motion, step by step: the names only report (the
+        // fifth's first condition, the reviewer on #1473).
+        assert_eq!(seen, moved, "the same gestures and goals as without names");
+    }
+}
+
 /// A skill's move asked while a conversation's gesture waits for the lamp
 /// to stand does not take its place; one asked higher would.
 #[test]
