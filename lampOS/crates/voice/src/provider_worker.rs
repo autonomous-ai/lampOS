@@ -477,9 +477,10 @@ pub enum ProviderInput {
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         continues_cut_off: bool,
         /// The line began over the lamp's reply (a reply was in hand when it
-        /// was admitted): what was heard of it is the lamp's voice as much
-        /// as the person's, and the same-voice check never judges it
-        /// ([`crate::same_voice`], #829). Left off the wire when false.
+        /// was admitted), whether or not the reply had made a sound. It gets
+        /// no staff's note (`crate::staff_note`). The same-voice check goes by
+        /// `over_the_lamps_voice` instead, since a reply in hand is often
+        /// silent (#829). Left off the wire when false.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         over_the_lamp: bool,
         /// The first request after a hand or the lamp's head stopped its
@@ -497,8 +498,10 @@ pub enum ProviderInput {
         /// The line began while the lamp's own answer could be heard: its
         /// reply had sound or was playing, not only in hand. With
         /// `LAMP_CUT_INS_NOT_TALK=on`, left unanswered it isn't counted
-        /// toward a busy room (`crate::room_told`, #828). Left off the wire
-        /// when false.
+        /// toward a busy room (`crate::room_told`, #828). The same-voice
+        /// check never judges it: what was heard of it is the lamp's voice as
+        /// much as the person's ([`crate::same_voice`], #829). Left off the
+        /// wire when false.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         over_the_lamps_voice: bool,
     },
@@ -4756,8 +4759,15 @@ impl InputHandoff {
                 if over_the_lamps_voice && let Ok(mut room) = crate::room_told::room().lock() {
                     room.began_over_the_lamp(request.get());
                 }
+                // Judged unless the lamp's own voice could be heard as it
+                // began: a line begun while a silent reply was in hand is
+                // the person's alone. On lamp-4ace on 18 October each
+                // scene's call came while the line before it, left
+                // unanswered, still had its turn open, and was never
+                // printed, so the conversation took the next speaker's
+                // voice (#829: 64 such lines, none printed, 63 silent).
                 if let Some(voices) = self.voices.as_mut() {
-                    voices.began(request.get(), !over_the_lamp);
+                    voices.began(request.get(), !over_the_lamps_voice);
                 }
                 self.submitted = Some(SubmittedInput {
                     request,

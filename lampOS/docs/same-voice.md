@@ -110,9 +110,30 @@ plainly not the conversation's is no part of it
   the check; with the ask made to wait for the child, the service sees
   nothing more from the worker).
 - **Only what was said with the lamp quiet.** The coordinator marks a
-  `Start` that was admitted while a reply was in hand (`over_the_lamp`).
-  Such a line, and a turn the lamp began itself, is never judged: with the
-  lamp over it, the model hears the lamp (47.1% equal error, above).
+  `Start` that was admitted while the lamp's own reply could be heard: one
+  that had sound or was playing (`over_the_lamps_voice`). Such a line, and a
+  turn the lamp began itself, is never judged: with the lamp over it, the
+  model hears the lamp (47.1% equal error, above).
+  - **A line begun while a silent reply was in hand is judged** (#829,
+    18 October). Each of the A/B's scene calls came while the line before
+    it, left unanswered, still had its turn open, so it was taken for one
+    said over the lamp (`over_the_lamp`, a reply in hand), though the lamp
+    had said nothing.
+    - In the check-on arm, 64 lines were begun so, none was printed, and 63
+      had no sound from the lamp; 55 began with nothing in hand, and 52 were
+      printed.
+    - With no call printed, the conversation took the next speaker's voice:
+      Samantha's "And what about tomorrow?" after Daniel's call, then her
+      umbrella line as the conversation's own.
+    - When it judged, it was right 8 times of 8: six of Samantha's lines
+      against her own print (0.48–0.60), and two of Daniel's against hers
+      (0.14, 0.18).
+    - `over_the_lamp` itself still marks a reply in hand, for the staff
+      note (`crate::staff_note`).
+  - **What a call printed this way costs:** its print is asked for at
+    1.8 s and comes about 220 ms later in the child, as any line's does.
+    The call's reply never waits for it: a print not back at the verdict is
+    kept for the conversation when it comes (`Voices::decided`).
 - **Only a line of 1.5 s or more** (`LEAST_SAMPLES`). Its first 1.8 s
   (`ASKED_AT`: the request's 0.3 s pre-roll, then 1.5 s) are asked for as
   soon as they are heard, while the person is still talking or in the

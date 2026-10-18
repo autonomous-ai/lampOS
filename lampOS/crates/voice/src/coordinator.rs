@@ -9099,7 +9099,8 @@ fn commit_admitted_input(
         // model is told of a cut only after an end sent early.
         continues,
         continues_cut_off: false,
-        // Said over the lamp's reply: never judged for its voice (#829).
+        // Said with a reply in hand: no staff's note. Its voice is judged
+        // unless the lamp's could be heard (`over_the_lamps_voice`, #829).
         over_the_lamp: replacing,
         // The first request after a hand or the head stopped the lamp: the
         // model is told so (#829, 16:33).

@@ -19,10 +19,12 @@
 //!   [`ANSWER_WITHIN`] is killed and started again. Children that end
 //!   [`MOST_UNREADY`] times in a row before they are ready are not started
 //!   again: the journal says once that the check is off.
-//! - **Only what was said with the lamp quiet:** a line that began over the
-//!   lamp's reply (`ProviderInput::Start`'s `over_the_lamp`) is never
-//!   judged. Over the lamp's voice the model hears the lamp: on lamp-4ace's
-//!   recordings it was right no more often than chance.
+//! - **Only what was said with the lamp quiet:** a line that began while
+//!   the lamp's reply could be heard (`ProviderInput::Start`'s
+//!   `over_the_lamps_voice`) is never judged. Over the lamp's voice the model
+//!   hears the lamp: on lamp-4ace's recordings it was right no more often
+//!   than chance. One begun while a silent reply was in hand is judged:
+//!   each scene's call on 18 October came so, and none was printed (#829).
 //! - **Only a line of [`LEAST_SAMPLES`] or more**, of which the first
 //!   [`ASKED_AT`] are judged, asked for as soon as they are heard.
 //! - **The conversation's voice** is the prints of the lines the lamp
