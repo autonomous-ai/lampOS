@@ -1,0 +1,20 @@
+scene 1    0.60s PLAY  Daniel: Hey Lamp, tell me a story about a clever fox, at least five sentences long.
+scene 1   12.33s PLAY  Samantha: Lamp, stop. What is two plus two?
+scene 2    0.62s PLAY  Daniel: Hey Lamp, tell me a story about a sleepy dragon, at least five sentences long.
+scene 2   12.37s PLAY  Samantha: Wait, wait, wait.
+scene 3    0.62s PLAY  Samantha: Hey Lamp, tell me a story about a brave little robot, at least five sentences long.
+scene 3   12.09s PLAY  Karen: Hold on, I have a question. What day comes after Monday?
+scene 4    0.60s PLAY  Samantha: Hey Lamp, tell me a story about a pirate who lost his hat, at least five sentences long
+scene 4   12.36s PLAY  Daniel: Lamp, stop.
+scene 5    0.58s PLAY  Daniel: Hey Lamp, tell me a story about an owl who was afraid of the dark, at least five sentence
+scene 5   13.10s PLAY  Samantha: Actually, never mind the story. What is your favourite colour?
+scene 6    0.58s PLAY  Samantha: Hey Lamp, tell me a story about a lighthouse keeper, at least five sentences long.
+scene 6   12.06s PLAY  Karen: Okay, okay, that is enough.
+scene 7    0.61s PLAY  Karen: Hey Lamp, tell me a story about a snail who loved racing, at least five sentences long.
+scene 7   12.58s PLAY  Daniel: Hey Lamp, how many legs does a spider have?
+scene 8    0.60s PLAY  Daniel: Hey Lamp, tell me a story about a cat who could fly, at least five sentences long.
+scene 8   12.57s PLAY  Samantha: Stop.
+scene 9    0.59s PLAY  Samantha: Hey Lamp, tell me a story about a baker who never slept, at least five sentences long.
+scene 9   12.31s PLAY  Karen: Sorry to interrupt. Can you count to three?
+scene 10    0.60s PLAY  Karen: Hey Lamp, tell me a story about a tiny cloud looking for a home, at least five sentences 
+scene 10   12.91s PLAY  Daniel: No no no, tell me a joke instead.
