@@ -432,6 +432,47 @@ Mac at any threshold.
 4. **Played calls.** The 2026-10-14 checks played generated voices from a
    loudspeaker; the loudspeaker's muffling here is a guess too.
 
+## On the lamp's own recordings
+
+On lamp-4ace's mic2, through its speaker and canceller, this model heard
+the bare call in one voice of three (#705, 18 Oct, 12:59, per-call windows
+of `lamp-name check`): Daniel's two bare calls reached 0.82 and 0.57,
+Samantha's and Karen's four stayed at 0.02 to 0.30, and its "Hey Lamp"
+swung from 0.01 to 0.89. The installed file heard all six "Hey Lamp" at
+0.97 to 1.00 and no bare call over 0.21. So the generated voices do not
+carry over to this microphone, and lowering the bar would buy one voice.
+
+`training/name/lamp.py` learns from the lamp's own recordings instead, and
+judges a model only on voices it never heard:
+
+- `python lamp.py lines VOICES.txt`: from `say -v '?'`'s output, the play
+  list for the scenario player (`Voice|text|seconds`): per English voice
+  (up to twelve), five bare calls and three "Hey Lamp", 7 s each so the
+  lamp can answer, and three negatives (the word inside a sentence; "lamb",
+  "lab", "camp", "Lan"), 5 s each; "Lamp ơi" by a Vietnamese voice if
+  there is one. About 15 minutes.
+- `python lamp.py train --front DIR --plays PLAYED.tsv RECORD.jsonl
+  [--negatives RECORD.jsonl…] [--compare NAME.onnx…]`: the recordings
+  (`lamp-bus record DIR mic2/audio`, whose messages carry their own times,
+  so no anchor is needed) and each played line's start (`UNIX_MS`, voice,
+  kind). A call's steps from 0.35 s to 1.6 s after it began are its own,
+  the rest of it to 4 s (its words, the lamp's answer) neither, and every
+  other step a negative, with `--negatives` (an empty office, the lamp's
+  stories) all negative. It trains one model a fold of voices on the other
+  folds and scores each call only by the model that never heard its voice:
+  per voice, the calls heard at 0.5, 0.9 and 0.98, and false hearings an
+  hour of negatives by `said.rs`'s rule, beside the same for each
+  `--compare` model. Then one model on every voice, written as `name.onnx`.
+- The model is `train.py`'s "flat" shape on `[1, 16, 96]`, fitted with
+  scikit-learn's MLP, the scaling folded in: `lamp-name check` runs it as
+  it runs the installed file (shown on a stand-in, 18 Oct), and its ONNX
+  matches the fit to 2e-7.
+- `python lamp.py dry-run --front DIR WAV…` runs it all on speech files and
+  made-up plays; its numbers mean nothing.
+
+Not shown: any recording made for it. Played voices only, nothing of a
+person; recording people waits for the owner's yes.
+
 ## How to make it again
 
 From `lampOS/training/name/`, with `uv`, a network and about 60 GB of disk
