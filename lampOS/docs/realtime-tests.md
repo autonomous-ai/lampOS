@@ -1473,6 +1473,56 @@ today. The strict one keeps the guarantee the second-long wait gave.
 On this Mac, one at a time: `judges` 7.4 s to 0.6 s, `policy` 21.0 s to
 15.9 s, `progress` 9.0 s to 7.6 s, `hello` 6.9 s to 5.1 s. The rest of
 those is the lamp's own real-time windows (the pause, `NAME_BEFORE`,
-`WORDS_FOR`), which this leaves alone. No test pins the period:
-`the_policy_says_how_it_is_once_a_second_and_that_it_decides_without_a_model`
-passes at 20 ms, so it checks what the report says, not how often.
+`WORDS_FOR`), which this leaves alone. `the_policy_says_how_it_is_once_a_second_and_that_it_decides_without_a_model`
+passes at 20 ms, so it checks what the report says, not how often; since
+#1511, `the_lamps_policy_reports_once_a_second` pins `REPORT_EVERY` at 1 s.
+
+## Waits the tests chose themselves (#1128, 18 October)
+
+A read of the 26 slowest tests left after the earlier changes (the 13:00
+full run, 39102474827) found most of them waiting on a bound the test
+chose itself: a production constant passed as its own deadline, a fixed
+sleep, or a tool's whole `--seconds`. Each was cut without touching what
+the lamp runs and without dropping a check; #1530's withdrawal may now take
+up to its `WAIT` where it was looked at after 600 ms. Each test's comment
+says why. #1530, #1531, #1535 and #1536 were probed with a deliberate break
+that the test still fails; the others with runs under load, a stall or a
+slowed start. ARM64 seconds, before (the full run, or the other PR's run of
+the same hour) and after (the PR's own run):
+
+| PR | Test | It waited on | Now | ARM64 s |
+|---|---|---|---|---|
+| #1525 | skills' two host-clock tests | the skill put in after the start, found by `RELOAD_EVERY` (2 s) | put in before the start on the host's clock only | 6.52 → 4.52, 5.62 → 3.63 |
+| #1526 | bus `hz`, `record`, `keep-logs` | a fixed `--seconds` of 1.5, 2.5 and 2 | 0.5, 0.75 and 0.6, counted once each tool listens | 2.84 → 1.83, 2.61 → 0.86, 2.01 → 0.61 |
+| #1527 | records' full-pipe write | the fixtures' `HOST_WAIT` (4 s) as its deadline | its own 200 ms | 4.01 → 0.20 |
+| #1528 | motor preflight, child never exits | `WORKER_STARTUP_TIMEOUT` (3 s) | its own 1 s | 3.01 → 1.01 |
+| #1529 | provider_pair's abandoned turn | `KEPT_START_PATIENCE` (2.5 s) | a 500 ms patience set through `successor_start`; `provider_worker`'s own test holds the 2.5 s | 2.79 → 0.77 |
+| #1530 | progress_news' withdrawal | three fixed 600 ms sleeps | polls `waiting()` until let go, within `WAIT` | 2.14 → 0.94 |
+| #1531 | lamp-name's lease | two halves of 1 s against a 300 ms lease | halves of 0.5 s, the same cadence | 2.01 → 1.01 |
+| #1535 | hello_asks, nobody answering | `ASK_FOR_US` (2 s) on the host's clock | the voice's clock stepped to `ASK_FOR_US − 1` and `ASK_FOR_US` | 2.06 → 0.06 |
+| #1536 | the transport's held-up receiver | sleeps of 400 ms and 1.7 s | one clock stepped by the same, via `send_with` and `receive_with` | 2.11 → 0.004 |
+
+#1506 is the one change in the batch to what the lamp does: setup's address watcher ends
+when the join does, so five `lamp-setup::serve` tests no longer wait out
+its one-second sleep, and "set up" comes up to a second sooner (docs/setup.md).
+
+Kept as they are, each for its own reason:
+
+- `service_privacy`'s GPIO test waits the privacy worker's `UNAVAILABLE_WAIT`
+  three times: a mute-safety bound.
+- skills' host-clock tests keep their 2.5 s give-up and their one-second
+  pose: that is what they check.
+- `lamp-health`'s alive test keeps the lamp's own three-second lease, as its
+  comment says.
+- `lamp-surround`'s serve test keeps `--seconds 1`: whole seconds only, and a
+  SIGTERM sent just after the page answers can reach the process before its
+  handler is registered.
+- `provider_worker`'s burst test keeps the rig's 2 ms tick: the rig publishes
+  the coordinator's leases on every pass, so a tighter loop would flood the
+  worker's control socket.
+- `lamp-settings`' client deadline tests keep their 1 s: a shorter one cuts the
+  peer's margin under load, which #1280 showed fails.
+- voice-eval's `serve_session` tests spend their time in lockstep rounds,
+  over 32,000 of `POLL_US` (2 ms) for a scenario of about 65 s of logical
+  time. A shorter plan or a driver that jumps to the next thing due would cut
+  it. That is voice-eval's own design, proposed on #1128.
