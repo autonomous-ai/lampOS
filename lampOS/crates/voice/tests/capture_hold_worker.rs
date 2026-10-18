@@ -24,10 +24,11 @@ use lamp_voice::{
     options::{Microphone, NoiseSuppression, ReferenceClock, ReferenceRecovery},
     process::{SessionDirectory, new_boot},
     reference::{PRIME_FRAMES, hold},
+    stop_words::Source,
     transport::{ReferenceChannels, WorkerChannels},
     wire::{
-        ClockPrimed, Control, MicrophoneFrame, ReferenceControl, ReferenceFaultKind, RenderPayload,
-        RenderReference, WorkerEvent,
+        ClockPrimed, Control, MicrophoneFrame, ReferenceControl, ReferenceFaultKind,
+        ReferenceTrust, RenderPayload, RenderReference, WorkerEvent,
     },
 };
 use std::{
@@ -116,6 +117,12 @@ struct Heard {
     /// The block before the canceller's power, when the worker was asked
     /// for raw blocks (#1047).
     raw_power: Option<f64>,
+    /// The canceller's linear output's power, when the worker was asked
+    /// for linear blocks (#828).
+    linear_power: Option<f64>,
+    /// Whether `samples` passed the canceller (the reference trusted or
+    /// warming).
+    cancelled: bool,
 }
 
 /// One rig at a time. Each runs the capture worker's loop in real time,
@@ -186,7 +193,7 @@ impl Rig {
         busy_opens: usize,
         recovery: ReferenceRecovery,
     ) -> Self {
-        Self::start_asking(device_name, busy_opens, recovery, false)
+        Self::start_asking(device_name, busy_opens, recovery, Source::Processed)
     }
 
     /// The same, with the microphone's first `gone_opens` opens answered "no
@@ -196,22 +203,23 @@ impl Rig {
             device_name,
             (gone_opens, lamp_audio::device::errno::NODEV),
             ReferenceRecovery::Off,
-            false,
+            Source::Processed,
         )
     }
 
-    /// The same, with raw blocks asked for or not (`--raw-blocks`, #1047).
+    /// The same, with the stop words' blocks asked for or not
+    /// (`--raw-blocks`, #1047; `--linear-blocks`, #828).
     fn start_asking(
         device_name: &'static str,
         busy_opens: usize,
         recovery: ReferenceRecovery,
-        raw_blocks: bool,
+        stop_words: Source,
     ) -> Self {
         Self::start_failing(
             device_name,
             (busy_opens, lamp_audio::device::errno::BUSY),
             recovery,
-            raw_blocks,
+            stop_words,
         )
     }
 
@@ -219,9 +227,9 @@ impl Rig {
         device_name: &'static str,
         failed: (usize, i32),
         recovery: ReferenceRecovery,
-        raw_blocks: bool,
+        stop_words: Source,
     ) -> Self {
-        let mut rig = Self::spawn(device_name, failed, recovery, raw_blocks, false);
+        let mut rig = Self::spawn(device_name, failed, recovery, stop_words, false);
         rig.handshake();
         rig
     }
@@ -232,7 +240,7 @@ impl Rig {
             device_name,
             (0, lamp_audio::device::errno::BUSY),
             ReferenceRecovery::Off,
-            false,
+            Source::Processed,
             true,
         );
         rig.handshake();
@@ -244,7 +252,7 @@ impl Rig {
         device_name: &'static str,
         (failed_opens, errno): (usize, i32),
         recovery: ReferenceRecovery,
-        raw_blocks: bool,
+        stop_words: Source,
         record: bool,
     ) -> Self {
         // A test that failed while holding it leaves it poisoned; the next
@@ -287,7 +295,7 @@ impl Rig {
                 ReferenceClock::Capture,
                 recovery,
                 lamp_audio::Reference::AsGiven,
-                raw_blocks,
+                stop_words,
             )
             .map_err(|error| error.to_string())
         });
@@ -476,6 +484,12 @@ impl Rig {
                 raw_power: frame.raw.as_ref().map(|raw| {
                     assert_eq!(raw.len(), CAPTURE_SAMPLES);
                     raw.iter().map(|&s| f64::from(s).powi(2)).sum::<f64>() / CAPTURE_SAMPLES as f64
+                }),
+                cancelled: frame.reference != ReferenceTrust::Untrusted,
+                linear_power: frame.linear.as_ref().map(|linear| {
+                    assert_eq!(linear.len(), CAPTURE_SAMPLES);
+                    linear.iter().map(|&s| f64::from(s).powi(2)).sum::<f64>()
+                        / CAPTURE_SAMPLES as f64
                 }),
             });
         }
@@ -844,34 +858,68 @@ fn another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_
     );
 }
 
-/// #1047: asked for raw blocks, every frame also carries the block as the
-/// microphone recorded it, before the canceller: louder than what the
-/// canceller lets through of the lamp's echo (mic1, which holds the echo
-/// four blocks behind its render, as the first test here). Not asked, none.
+/// #1047 and #828: every frame also carries what the stop words were asked
+/// for, and only that (mic1, which holds the echo four blocks behind its
+/// render, as the first test here).
+/// - Raw blocks are the block as the microphone recorded it, before the
+///   canceller: louder than what the canceller lets through of the lamp's
+///   echo.
+/// - Linear blocks are the canceller's linear output, on every block it ran
+///   for: most of the echo is gone, but more is left than in the
+///   canceller's output, which its suppressor takes on from there. On this
+///   rig (x86_64 Linux, 19 October), over the last 100 blocks: raw 2.2e8,
+///   linear 0.9e6 to 1.1e6, the canceller's output 0.2e6 to 0.3e6.
+/// - With the canceller's output, nothing more.
 #[test]
-fn raw_blocks_carry_the_microphone_before_the_canceller_only_when_asked() {
+fn stop_words_blocks_carry_what_was_asked_only_when_asked() {
     warm_up();
     let name = Microphone::Mic1.device();
     let blocks = hold::blocks_for(name, ReferenceClock::Capture);
-    for raw_blocks in [true, false] {
+    // The raw blocks' power, from the first run, for the linear run's.
+    let mut raw_heard = None;
+    for source in [Source::Raw, Source::Linear, Source::Processed] {
         let signal = Signal::new(400);
-        let mut rig = Rig::start_asking(name, 0, ReferenceRecovery::Off, raw_blocks);
+        let mut rig = Rig::start_asking(name, 0, ReferenceRecovery::Off, source);
         rig.stream(&signal, 400);
         rig.settle(blocks);
         rig.end_with(Control::Stop);
         let frames = rig.finish();
-        assert!(!frames.is_empty());
-        assert!(
-            frames
-                .iter()
-                .all(|frame| frame.raw_power.is_some() == raw_blocks),
-            "raw blocks asked: {raw_blocks}"
-        );
-        if raw_blocks {
-            let last = &frames[frames.len() - 100..];
-            let raw: f64 = last.iter().filter_map(|frame| frame.raw_power).sum();
-            let clean: f64 = last.iter().map(|frame| frame.power).sum();
-            assert!(raw > clean, "raw {raw:.0}, after the canceller {clean:.0}");
+        assert!(frames.len() >= 200, "{source:?}: {} frames", frames.len());
+        for frame in &frames {
+            assert_eq!(
+                frame.raw_power.is_some(),
+                source == Source::Raw,
+                "{source:?}"
+            );
+            assert_eq!(
+                frame.linear_power.is_some(),
+                source == Source::Linear && frame.cancelled,
+                "{source:?}"
+            );
+        }
+        let last = &frames[frames.len() - 100..];
+        let clean: f64 = last.iter().map(|frame| frame.power).sum();
+        match source {
+            Source::Raw => {
+                let raw: f64 = last.iter().filter_map(|frame| frame.raw_power).sum();
+                assert!(raw > clean, "raw {raw:.0}, after the canceller {clean:.0}");
+                raw_heard = Some(raw);
+            }
+            Source::Linear => {
+                let linear: Vec<f64> = last.iter().filter_map(|frame| frame.linear_power).collect();
+                assert!(linear.len() >= 90, "{} of the last 100", linear.len());
+                let linear: f64 = linear.iter().sum();
+                let raw = raw_heard.unwrap();
+                assert!(
+                    linear * 10.0 < raw,
+                    "linear {linear:.0}, the raw blocks {raw:.0}"
+                );
+                assert!(
+                    linear > clean,
+                    "linear {linear:.0}, after the canceller {clean:.0}"
+                );
+            }
+            Source::Processed => {}
         }
     }
 }
@@ -933,7 +981,7 @@ fn mute_during_the_wait(device_name: &'static str, errno: i32) {
         device_name,
         (40, errno),
         ReferenceRecovery::Off,
-        false,
+        Source::Processed,
         false,
     );
     // Long enough for the first tries to fail: it is waiting.

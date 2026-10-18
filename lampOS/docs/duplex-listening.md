@@ -231,7 +231,11 @@ no person's stop came through yet).
 
 `LAMP_STOP_WORDS_SOURCE=raw`, with either: the stop words hear the
 microphone's block before the canceller, and the capture worker is given
-`--raw-blocks` in its argv, only then. Off by default.
+`--raw-blocks` in its argv, only then. `LAMP_STOP_WORDS_SOURCE=linear`: they
+hear the canceller's linear output, before its residual-echo suppressor,
+and the capture worker is given `--linear-blocks`, only then
+([stop-word.md](stop-word.md#a-stop-word-heard-over-the-lamps-voice-828-16-october)).
+Off by default.
 
 `LAMP_STOP_WORDS_HOLD=own-words`, with `heard-always`: a stop heard is
 acted on only once the lamp's own words, stamped ahead of when they were

@@ -2919,8 +2919,11 @@ fn spawn_rig(
     let capture_arguments = options.capture_arguments(
         diagnostic_directory.map(|p| p.join("capture-audio")),
         // Only for stop words that are listened for (#1047).
-        crate::stop_words::listen() != crate::stop_words::Listen::Off
-            && crate::stop_words::raw_source(),
+        if crate::stop_words::listen() == crate::stop_words::Listen::Off {
+            crate::stop_words::Source::Processed
+        } else {
+            crate::stop_words::source()
+        },
     )?;
     let speaker_arguments = AudioWorkerOptions {
         diagnostic_directory: diagnostic_directory.map(|p| p.join("render-audio")),
@@ -4167,8 +4170,9 @@ fn conversation_with_gate(
             Ok(Some(config)) => crate::stop_words::RelayEars::start(
                 {
                     eprintln!(
-                        "lamp-voice: stop words: {}, through the second voice's speech-to-text at {}",
+                        "lamp-voice: stop words: {}, from the {} blocks, through the second voice's speech-to-text at {}",
                         if always { "heard-always, all the lamp's speech" } else { "heard, in a yield" },
+                        crate::stop_words::source().as_str(),
                         crate::stop_words::where_heard(&config)
                     );
                     config
@@ -4178,7 +4182,7 @@ fn conversation_with_gate(
                 .map(|ears| {
                     if always {
                         crate::stop_words::StopWords::always(Box::new(ears))
-                            .with_cadence(crate::stop_words::raw_source())
+                            .with_source(crate::stop_words::source())
                             .with_hold(crate::stop_words::holds_for_own_words())
                     } else {
                         crate::stop_words::StopWords::new(Box::new(ears))
@@ -5562,8 +5566,9 @@ fn conversation_with_gate(
             {
                 loud_blocks.pop_front();
             }
-            // Before the canceller, for the stop words, when they asked.
-            let raw = frame.raw.take();
+            // Before the canceller, or its linear output, for the stop
+            // words, when they asked; otherwise they hear `samples`.
+            let words_block = frame.raw.take().or_else(|| frame.linear.take());
             let observation = ObservedAudio {
                 sequence: frame.frame_sequence,
                 captured_at_us: frame.read_completed_at_us,
@@ -5657,7 +5662,7 @@ fn conversation_with_gate(
                     replying,
                     sounding,
                     captured_at_us,
-                    raw.as_deref().unwrap_or(&samples),
+                    words_block.as_deref().unwrap_or(&samples),
                     trace,
                 )?;
             }
@@ -10718,6 +10723,7 @@ mod tests {
             .data
             .send(MicrophoneFrame {
                 raw: None,
+                linear: None,
                 epoch: 1,
                 dsp_epoch: 1,
                 privacy_generation: 2,
@@ -10878,6 +10884,7 @@ mod tests {
             .data
             .send(MicrophoneFrame {
                 raw: None,
+                linear: None,
                 epoch: 1,
                 dsp_epoch: 1,
                 privacy_generation: 2,

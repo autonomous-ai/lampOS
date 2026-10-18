@@ -1366,6 +1366,7 @@ fn run_loop_ringed(
             .data
             .send(crate::wire::MicrophoneFrame {
                 raw: None,
+                linear: None,
                 epoch: 1,
                 dsp_epoch: 1,
                 privacy_generation: owner.snapshot(now()).unwrap().microphone_generation(),

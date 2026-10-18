@@ -1047,11 +1047,10 @@ asked.
     stream was sent.
   - With `heard` (yields only), a yield's first, held blocks are still the
     canceller's output: only what follows is raw.
-  - Not offered: the canceller's linear output, before its residual-echo
-    suppressor. The canceller (`sonora`'s AEC3) computes it but gives no way
-    to read it out. Nor mic1: the first builder's recording there (22:55)
-    had the played request only 8 dB over the floor, and no words even in
-    the request.
+  - Not offered: mic1. The first builder's recording there (22:55) had
+    the played request only 8 dB over the floor, and no words even in the
+    request. (The canceller's linear output, which could not be read out
+    when this was written, is `linear` below.)
   - **Played three times, and no person's stop came through.** On
     lamp-4ace on 17 October at 01:46 (the first builder), 8 of 10 cut-ins
     stopped the story against 7 of 10 on the canceller's output, mostly by
@@ -1062,6 +1061,44 @@ asked.
     mic2 the lamp drowns a person 1 to 2 m off. Louder, Gemini's yield
     took over (4 of 5), which isn't a stop. Next (the first builder, 07:07):
     the canceller's linear output, before its residual suppressor.
+  - **On lamp-4ace on 19 October, 00:46–00:52** (`cfce52401`, ten played
+    cut-ins), the stream's results were the lamp's own story word by word.
+    "Stop." was heard once, as `"Stop. He"`, and stopped the lamp; "Lamp,
+    stop." was never written (the first builder on #828, 01:29).
+- **`LAMP_STOP_WORDS_SOURCE=linear`** (off unless set; #828, the first
+  builder at 01:29 on 19 October): the stream hears the canceller's linear
+  stage, before its residual-echo suppressor. That is the microphone,
+  high-pass filtered, less the echo the canceller's adaptive filter
+  predicts (`EchoProcessor::with_linear_output`).
+  - **The trade it is for:** the canceller's output suppresses a person's
+    short word along with the lamp's voice. The raw block keeps the word
+    but carries the lamp's voice loudest, so the speech-to-text returns the
+    lamp. Offline, Sixth's model on `aec_linear` caught about as many as on
+    `aec_only` (the first builder, 01:29).
+  - **How it gets there:** the capture worker is asked for it
+    (`--linear-blocks`, only then). It keeps the canceller's linear output,
+    as it does for `LAMP_VAD_INPUT`, and sends each block's beside the
+    cancelled one (`MicrophoneFrame::linear`). Once a minute it says on how
+    many blocks it sent it.
+  - **A block the canceller did not run for** (no reference yet, or none
+    trusted) has no linear output. The stop words then hear the block
+    handed on, which is the microphone's block as recorded.
+  - **As with `raw`:** the words are asked for every half second while the
+    lamp sounds, and `LAMP_STOP_WORDS_AUDIO` writes what the stream was
+    sent. With `heard`, a yield's first, held blocks are still the
+    canceller's output.
+  - **Which source a reply heard** is in its counts (`"source"`:
+    `processed`, `raw` or `linear`) and in the journal's start line.
+  - **Timing:** the linear output is one canceller block (4 ms) ahead of
+    the canceller's output.
+  - **Cost (rule 7), on an x86_64 Mac (i7-10700K, release build):**
+    - keeping the linear output adds 0.5 to 0.9 µs to the canceller's
+      ~106 µs a block (three runs of 6,000 blocks, with and without
+      alternating block by block);
+    - each frame's 160 more samples take 1.3 µs to encode and add 856
+      bytes, as the raw blocks do.
+
+    Not measured on a lamp.
 
 **`lamp-voice stt-check SECOND_CONFIG WAV`** is for finding out why, on
 the lamp, with its own configuration and a recording made for the purpose
@@ -1087,8 +1124,8 @@ the coordinator gives them, `plays_at_us`) and
 stamped with when they will play, the reply's queued audio ahead of them
 (the voice holds up to 30 s of it): stamped as their text came, a story's
 own "wait" read back from the raw microphone stopped the lamp (the
-reviewer on #1047). `tests/capture_hold_worker.rs::raw_blocks_carry_the_microphone_before_the_canceller_only_when_asked`
-is Linux only, in a binary the `pr` profile skips, and pushes to
+reviewer on #1047). `tests/capture_hold_worker.rs::stop_words_blocks_carry_what_was_asked_only_when_asked`
+(the raw, linear and canceller's blocks, #828) is Linux only, in a binary the `pr` profile skips, and pushes to
 `lamp-voice` use that profile too (`lampos-arm64.yml`). It runs in the
 nightly full run at 02:00, or before then with `gh workflow run
 lampos-arm64.yml --ref <branch> -f full=true`. The lamp's own words are
