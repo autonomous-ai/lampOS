@@ -3427,3 +3427,13 @@ wait on their owners and a lamp
   the light). Item 3's design (breathe, candle, pulse) is on #940, waiting
   for a yes. Drafts **#1362** and **#1365** wait on this afternoon. `cargo
   clean` at 11:51 (6.5 GiB).
+- **18 Oct, afternoon and evening.** Merged: #1469, #1473, #1476, #1495,
+  #1496, #1513, #1520 (with #1421 this morning). Up: **#1581** (#1545: a
+  reminder owed while the switch or a mute holds the microphones pulses on
+  the asleep face, the first at the due time, then once a minute for half
+  an hour; off unless `LAMP_REMINDER_PULSE=on`; the journal says once why
+  there is no pulse when the asleep face is off; 2060/0). **#1549** (a
+  session is told each thing it can't do right now) is ready, waiting on
+  tonight's queue 11; its last P3 fixed at `f59cadd3a`, docs only. #1466
+  and #1494 wait on a review, #1514 on a lamp check, #1362 and #1365 on
+  Monday. `cargo clean` at 18:4x (3.4 GiB).
