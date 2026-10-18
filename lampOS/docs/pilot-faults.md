@@ -289,8 +289,23 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   lamp-52e6 found the microphone busy (`snd_pcm_open failed with errno 16`)
   330 ms after the old process had gone, once in three restarts; the power
   cut that morning did the same. The capture worker now tries the open again
-  for up to 3 s (`BUSY_AT_START`) and says once that it was busy; any other
-  open failure, or busy for longer, ends the worker as before. Until
+  for up to 8 s (`BUSY_AT_START`); any other open failure, or busy for
+  longer, ends the worker as before. The bound was 3 s until lamp-4ace on
+  2026-10-18 (17:48, #1567): the mic was still busy 3.5 s after the new
+  voice started, most likely held by the desktop session's PulseAudio, whose
+  `module-udev-detect` opens a card nobody holds and keeps it until
+  `module-suspend-on-idle` lets go, 5 s idle by default. On the first busy
+  answer the worker says who holds the device, from `/proc/*/fd` links to
+  its `/dev/snd/pcmC<card>D<dev>c`, by pid and process name only (never the
+  command line): `lamp-voice: capture: microphone busy at start (held by
+  pulseaudio[80598], looked up in N ms); waiting up to 8 s`, or `holder not
+  visible` when no holder can be read. The scan runs on the capture thread
+  before the mic is open, so it stops after 100 ms (checked at every
+  descriptor too) or 4,096 `/proc` entries and says `holder not visible
+  (scan capped)`; `N` is the scan's measured time. A name that is no card (no `/proc/asound/<id>`: on the ReSpeaker and
+  XVF3800 images `device_micro2` is only an `asound.conf` alias) is not
+  looked up, and the line says `holder not looked up: device_micro2 is no
+  card`. Until
   2026-10-17 this held only for the scripted microphone: the check looked for
   a failed call named `open`, the scripted device's name for it, while ALSA
   names it `snd_pcm_open`, so on a lamp a busy microphone still ended the
@@ -305,7 +320,7 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   (`GONE_AT_START`), inside the coordinator's 25 s for input to be ready, and
   says once how long it waited. Longer, it ends the worker as before. Each
   reason's bound runs from its own first answer, so a microphone that comes
-  back from off USB and answers busy for a moment still gets its 3 s. A mute
+  back from off USB and answers busy for a moment still gets its 8 s. A mute
   during the wait opens nothing and ends the worker. Only the start is
   covered: a microphone lost mid-run still ends it. A wait that ended with
   the microphone open is said in one plain line, the same in three places:

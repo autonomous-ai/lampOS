@@ -45,10 +45,15 @@ const BARRIER_US: u64 = 100_000;
 /// At start the microphone may still be held for a moment by the voice that
 /// ran before (lamp-52e6, 2026-10-15: `systemctl restart lamp-voice` found it
 /// busy 330 ms after the old process had gone, and after a power cut too).
-/// Its open is tried again for this long before the worker gives up.
-const BUSY_AT_START: Duration = Duration::from_secs(3);
+/// Its open is tried again for this long before the worker gives up. 8 s,
+/// not the 3 s it was: on lamp-4ace on 2026-10-18 (17:48) PulseAudio's
+/// `module-udev-detect` most likely took the card 60 ms after the old voice
+/// let go, and it keeps a card until `module-suspend-on-idle` lets it go,
+/// 5 s idle by default; 3 s ran out first (#1567). 8 s covers those 5 s with
+/// margin, well inside the coordinator's 25 s for input to be ready.
+const BUSY_AT_START: Duration = Duration::from_secs(8);
 /// How often a busy microphone is tried again: often enough to take it soon
-/// after it is free, not on every 2 ms tick (1,500 opens in 3 s).
+/// after it is free, not on every 2 ms tick (4,000 opens in 8 s).
 const BUSY_RETRY: Duration = Duration::from_millis(50);
 /// At start the microphone may be off USB for a moment: on lamp-4ace on
 /// 2026-10-17 (12:29:20 and 12:49:06) the voice mic fell off for 4-5 s, the
@@ -74,6 +79,8 @@ struct OpenAtStart {
     /// Failed opens so far.
     failed: u32,
     next: Option<Instant>,
+    /// The holder of a busy microphone was looked up and said.
+    busy_said: bool,
 }
 
 impl OpenAtStart {
@@ -99,6 +106,12 @@ impl OpenAtStart {
         self.failed = self.failed.saturating_add(1);
         self.next = Some(now + retry);
         now.duration_since(since) < bound
+    }
+
+    /// True once, after the first busy answer: who holds the microphone is
+    /// looked up and said then, not on every try.
+    fn busy_first(&mut self) -> bool {
+        self.busy_since.is_some() && !std::mem::replace(&mut self.busy_said, true)
     }
 
     /// Whether to try the open on this tick.
@@ -480,6 +493,7 @@ pub fn capture_on<D: CaptureDevice>(
         echo_reference,
         hold::blocks_for(device, reference_clock),
         raw_blocks,
+        device,
     );
     // Invalidate input authority and close hardware before any filesystem acknowledgement wait.
     let close = microphone.control_lost();
@@ -516,6 +530,8 @@ fn capture_loop<D: CaptureDevice>(
     hold_blocks: usize,
     // Each frame also carries the block before the canceller (#1047).
     raw_blocks: bool,
+    // The ALSA name opened: whose it is when busy at start (#1567).
+    device: &str,
 ) -> Result<EndReason> {
     // A frame waits this many capture blocks before it is cancelled, so that
     // the canceller has its render first. Whatever still waits when this
@@ -695,7 +711,18 @@ fn capture_loop<D: CaptureDevice>(
                 microphone.reset()?;
                 let report = match microphone.prepare() {
                     Ok(report) => Some(report),
-                    Err(error) if at_start.waits(&error, Instant::now()) => None,
+                    Err(error) if at_start.waits(&error, Instant::now()) => {
+                        if at_start.busy_first() {
+                            let looked = Instant::now();
+                            let holder = crate::mic_holder::said(Path::new("/proc"), device);
+                            eprintln!(
+                                "lamp-voice: capture: microphone busy at start ({holder}, looked up in {} ms); waiting up to {} s",
+                                looked.elapsed().as_millis(),
+                                BUSY_AT_START.as_secs()
+                            );
+                        }
+                        None
+                    }
                     Err(error) => return Err(error.into()),
                 };
                 if let Some(report) = report {
@@ -2066,7 +2093,7 @@ mod open_at_start_tests {
     }
 
     /// A microphone off the bus at start is tried every 250 ms for 10 s, one
-    /// busy at start on every tick for 3 s, and only an open that failed so:
+    /// busy at start every 50 ms for 8 s, and only an open that failed so:
     /// by ALSA's own name for it, which the lamp's errors carry.
     #[test]
     fn a_microphone_gone_or_busy_at_start_is_waited_for_within_its_bound() {
@@ -2082,6 +2109,7 @@ mod open_at_start_tests {
         assert!(!wait.waits(&gone, at(10_000)));
         let mut back = OpenAtStart::default();
         assert!(back.waits(&gone, at(0)));
+        assert!(!back.busy_first(), "off USB is not busy");
         assert!(back.waits(&gone, at(250)));
         let waited = back.opened(at(4_500)).unwrap();
         assert_eq!(
@@ -2102,13 +2130,16 @@ mod open_at_start_tests {
         let busy = failed(OPEN_CALL, errno::BUSY);
         let mut wait = OpenAtStart::default();
         assert!(wait.waits(&busy, at(0)));
-        assert!(!wait.due(at(49)));
-        assert!(wait.due(at(50)), "busy is tried again every 50 ms");
-        assert!(wait.waits(&busy, at(2_999)));
-        assert!(!wait.waits(&busy, at(3_000)));
+        assert!(wait.busy_first(), "its holder is said on the first busy");
+        assert!(wait.waits(&busy, at(50)));
+        assert!(!wait.busy_first(), "and only once");
+        assert!(!wait.due(at(99)));
+        assert!(wait.due(at(100)), "busy is tried again every 50 ms");
+        assert!(wait.waits(&busy, at(7_999)));
+        assert!(!wait.waits(&busy, at(8_000)));
 
         // Gone for 4.5 s, then busy for a moment as it comes back: busy's
-        // 3 s run from its own first answer, and gone's 10 s from its own.
+        // 8 s run from its own first answer, and gone's 10 s from its own.
         let mut back = OpenAtStart::default();
         assert!(back.waits(&gone, at(0)));
         assert!(back.waits(&busy, at(4_500)));
@@ -2127,7 +2158,7 @@ mod open_at_start_tests {
         assert!(back.waits(&gone, at(2_000)));
         assert!(back.waits(&gone, at(11_999)));
         assert!(!back.waits(&gone, at(12_000)));
-        assert!(!back.waits(&busy, at(3_000)), "busy's own 3 s are over");
+        assert!(!back.waits(&busy, at(8_000)), "busy's own 8 s are over");
 
         for other in [
             failed(OPEN_CALL, errno::IO),
