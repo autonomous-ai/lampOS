@@ -430,6 +430,175 @@ fn peer(
     })
 }
 
+/// As [`peer`], for #1620: on its Stop this worker's side waits `late`, then
+/// finishes its recording, says so and closes its child's `input`, as a
+/// worker that takes that long to stop.
+fn late_peer(
+    channels: WorkerChannels,
+    recorder: Option<(Recorder, DiagnosticStarted)>,
+    late: Duration,
+    input: Option<std::process::ChildStdin>,
+) -> thread::JoinHandle<()> {
+    thread::spawn(move || {
+        let mut channels = channels;
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match channels.control.receive::<Control>() {
+                Ok(Some(Control::Stop)) => break,
+                Ok(_) => {}
+                Err(_) => return,
+            }
+            assert!(Instant::now() < deadline);
+            thread::sleep(Duration::from_millis(1));
+        }
+        thread::sleep(late);
+        if let Some((mut recorder, started)) = recorder {
+            let _ = recorder.try_privacy(PrivacyMeta {
+                at_us: monotonic_us(),
+                generation: 3,
+                open: false,
+            });
+            let report = recorder.finish(
+                EndMeta {
+                    at_us: monotonic_us(),
+                    reason: EndReason::PrivacyClosed,
+                },
+                crate::diagnostics::MAX_FINISH_WAIT,
+            );
+            let _ = channels.control.send(WorkerEvent::DiagnosticsFinished {
+                receipt: DiagnosticFinished::from_report(started, report),
+            });
+        }
+        drop(input);
+    })
+}
+
+/// #1620, for Seventh (the first builder's 00:56 on #705): at a fixture's
+/// finish, a worker that takes longer than the shared 750 ms
+/// (`DIAGNOSTIC_SHUTDOWN_GRACE`) to stop. Here the speaker's side finishes
+/// its recording 900 ms after its Stop, and the others at once.
+///
+/// What the run says must name what held the stop, and the microphone must
+/// be closed after. Today the forced stop's reason is overwritten by the
+/// diagnostic finish that failed after it, so the run says only that the
+/// diagnostic finish failed: on lamp-4ace, "diagnostic finish was not valid
+/// and acknowledged" (2 of 5 takes on 18 Oct). Red until #1620's fix, which
+/// makes this a plain test.
+#[test]
+#[should_panic(expected = "diagnostic finish")]
+fn a_speaker_that_misses_the_finish_deadline_is_named_and_the_microphone_is_closed() {
+    use std::os::unix::fs::PermissionsExt;
+    let output = std::env::temp_dir().join(format!("lv-1620-{}", monotonic_us()));
+    fs::create_dir(&output).unwrap();
+    fs::set_permissions(&output, fs::Permissions::from_mode(0o700)).unwrap();
+    let (mut owner, current, _) = active_reply();
+    let boot = owner.snapshot(now()).unwrap().boot();
+    let dir = SessionDirectory::create().unwrap();
+    let (mut capture, capture_peer, capture_input) =
+        Worker::cooperative_fixture(&dir.path, "capture");
+    let (mut speaker, speaker_peer, speaker_input) =
+        Worker::cooperative_fixture(&dir.path, "speaker");
+    let (mut provider, provider_peer, provider_input) =
+        Worker::cooperative_fixture(&dir.path, "provider");
+    let (mut privacy, privacy_peer, privacy_input) =
+        Worker::cooperative_fixture(&dir.path, "privacy");
+    capture.end_on_stop(capture_input);
+    provider.end_on_stop(provider_input);
+    privacy.end_on_stop(privacy_input);
+    let capture_recorder = synthetic_recorder(&output, boot, StreamKind::Capture);
+    let render_recorder = synthetic_recorder(&output, boot, StreamKind::Render);
+    let capture_start = DiagnosticStarted {
+        boot,
+        stream: DiagnosticStream::Capture,
+        started_at_us: capture_recorder.started_at_us(),
+    };
+    let render_start = DiagnosticStarted {
+        boot,
+        stream: DiagnosticStream::Render,
+        started_at_us: render_recorder.started_at_us(),
+    };
+    capture.diagnostic_start = Some(capture_start);
+    speaker.diagnostic_start = Some(render_start);
+    let peers = [
+        late_peer(
+            capture_peer,
+            Some((capture_recorder, capture_start)),
+            Duration::ZERO,
+            None,
+        ),
+        late_peer(
+            speaker_peer,
+            Some((render_recorder, render_start)),
+            Duration::from_millis(900),
+            Some(speaker_input),
+        ),
+        late_peer(provider_peer, None, Duration::ZERO, None),
+        late_peer(privacy_peer, None, Duration::ZERO, None),
+    ];
+    let mut rig = Rig {
+        second: None,
+        microphone: crate::options::Microphone::Mic2,
+        end_silence_blocks: None,
+        early_end_blocks: None,
+        faint_level: None,
+        camera: None,
+        motor: None,
+        provider,
+        capture,
+        speaker,
+        privacy,
+        privacy_controls: false,
+        ring: None.into(),
+        ring_channel_ceiling: None,
+        diagnostic_directory: Some(output.clone()),
+        noise_suppression: NoiseSuppression::On,
+        turn_taking: TurnTaking::VadOnly,
+        playout_start: PlayoutStart::default(),
+        fixture_at_ms: None,
+        endpoint: None,
+        call_wait_blocks: None,
+        cut_keeps_name: false,
+        asker_first: crate::asker_first::Mode::Off,
+        follows_on: false,
+        paused: Box::new(|| false),
+    };
+    let mut reply = Some(current);
+    let mut trace = SessionState::default();
+    // The fixture's run, ended by its stop as a SIGTERM ends one.
+    let stopped: Result<()> = Err(io::Error::new(
+        io::ErrorKind::Interrupted,
+        "directed run interrupted by SIGTERM",
+    )
+    .into());
+    let result = finish_active_run(
+        &mut rig, &mut owner, &mut reply, &mut trace, &mut None, stopped,
+    );
+    for peer in peers {
+        peer.join().unwrap();
+    }
+    drop(rig);
+    let _ = fs::remove_dir_all(&output);
+    // The microphone is closed after, whatever the run says.
+    assert_eq!(
+        owner.snapshot(now()).unwrap().microphone_permission(),
+        Permission::Denied
+    );
+    // The speaker missed the shared deadline and was stopped by force: the
+    // trace says so, and only the speaker.
+    let forced: Vec<_> = trace
+        .iter()
+        .filter(|row| row["kind"] == "worker_forced_shutdown")
+        .map(|row| row["worker"].clone())
+        .collect();
+    assert_eq!(forced, [json!("speaker")], "{forced:?}");
+    // The run says what held its stop: the speaker.
+    let said = result.unwrap_err().to_string();
+    assert!(
+        said.contains("speaker"),
+        "the run does not name the speaker: {said}"
+    );
+}
+
 fn service_signal_child(
     output: PathBuf,
     termination: Termination,
