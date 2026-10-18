@@ -512,3 +512,23 @@ fn going_on_asks_is_read_after_remarks() {
         .into();
     assert!(parse_flags(dir, &wrong).is_err());
 }
+
+/// `--cut-in-told` comes right after `--going-on-asks`, as the coordinator
+/// writes them (#828), on both routes.
+#[test]
+fn cut_in_told_is_read_after_going_on_asks() {
+    let dir = std::path::Path::new("/run/test");
+    let flags: Vec<String> = [crate::going_on_asks::FLAG, crate::cut_in_told::FLAG]
+        .map(String::from)
+        .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.going_on_asks && files.cut_in_told);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert!(files.cut_in_told);
+    let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
+    assert!(!files.cut_in_told);
+    let wrong: Vec<String> = [crate::cut_in_told::FLAG, crate::going_on_asks::FLAG]
+        .map(String::from)
+        .into();
+    assert!(parse_flags(dir, &wrong).is_err());
+}

@@ -48,6 +48,7 @@ pub mod camera_worker;
 pub mod capture_cores;
 pub mod choreography;
 pub mod config;
+pub mod cut_in_told;
 pub mod diagnostic_control;
 pub mod diagnostics;
 pub mod expression_out;
