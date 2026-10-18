@@ -380,7 +380,7 @@ fn zone_name_ok(zone: &str) -> bool {
 /// The compiled zone file for the place the model named, from `zones` (the
 /// system's [`ZONES`]), and its zone name: the name as given, spaces as
 /// underscores, or, for a name alone ("London", "New York"), the first of
-/// [`AREAS`] that has it. Nothing for a name that could leave the folder,
+/// `AREAS` that has it. Nothing for a name that could leave the folder,
 /// or a file that is not a zone file.
 pub fn zone_file(zones: &std::path::Path, place: &str) -> Option<(String, Vec<u8>)> {
     let place = place.trim().replace(' ', "_");
@@ -391,15 +391,20 @@ pub fn zone_file(zones: &std::path::Path, place: &str) -> Option<(String, Vec<u8
     if !zone_name_ok(&place) {
         return None;
     }
-    read(&place).or_else(|| {
-        (!place.contains('/'))
-            .then(|| {
-                AREAS
-                    .iter()
-                    .find_map(|area| read(&format!("{area}/{place}")))
-            })
-            .flatten()
-    })
+    // A name with no area is looked for in the areas only, and `UTC`: the
+    // folder's top-level `EST`, `MST` and `HST` have no summer time, so
+    // "EST" for the East Coast would be an hour off New York's half the
+    // year (the reviewer on #1552).
+    if !place.contains('/') {
+        return if place == "UTC" {
+            read(&place)
+        } else {
+            AREAS
+                .iter()
+                .find_map(|area| read(&format!("{area}/{place}")))
+        };
+    }
+    read(&place)
 }
 
 /// A zone's place as people say it: its last part, underscores as spaces
@@ -422,7 +427,9 @@ pub fn said_in(zone: &str, there: &[u8], here: Option<(&str, &[u8])>, now: i64) 
         aloud(hour, minute)
     );
     match here {
-        Some((home, _)) if home == zone => said.push_str(" That is the time here too."),
+        // The same zone file is the same time, whatever its name
+        // (`Asia/Saigon` is `Asia/Ho_Chi_Minh`).
+        Some((_, file)) if file == there => said.push_str(" That is the time here too."),
         Some((home, file)) => {
             if let Some((_, _, _, _, hour, minute, part)) = words(file, now) {
                 said.push_str(&format!(
@@ -436,19 +443,31 @@ pub fn said_in(zone: &str, there: &[u8], here: Option<(&str, &[u8])>, now: i64) 
     Some(said)
 }
 
-/// The lamp's own zone's name: `/etc/timezone`, as Debian keeps it, or the
-/// zone file `/etc/localtime` links to.
+/// The lamp's own zone's name: where `/etc/localtime` links, the zone file
+/// its time comes from, or `/etc/timezone`'s text, as Debian keeps it, only
+/// when that is no link (`zone_named`).
 pub fn zone_here() -> Option<String> {
-    let named = std::fs::read_to_string("/etc/timezone")
-        .ok()
-        .map(|text| text.trim().to_owned())
-        .filter(|zone| zone_name_ok(zone));
-    named.or_else(|| {
-        let link = std::fs::read_link("/etc/localtime").ok()?;
-        let link = link.to_str()?;
-        let zone = link.split_once("zoneinfo/")?.1;
-        zone_name_ok(zone).then(|| zone.to_owned())
-    })
+    zone_named(
+        std::fs::read_link("/etc/localtime").ok().as_deref(),
+        std::fs::read_to_string("/etc/timezone").ok().as_deref(),
+    )
+}
+
+/// The zone's name from where `/etc/localtime` links (`link`), whose file
+/// is the time the lamp keeps, and only when it is not a link from
+/// `/etc/timezone`'s text: `timedatectl set-timezone` changes the link and
+/// not the text, so a text left from the image would name another zone
+/// (the reviewer on #1552).
+fn zone_named(link: Option<&std::path::Path>, text: Option<&str>) -> Option<String> {
+    match link {
+        Some(link) => {
+            let zone = link.to_str()?.split_once("zoneinfo/")?.1;
+            zone_name_ok(zone).then(|| zone.to_owned())
+        }
+        None => text
+            .map(|text| text.trim().to_owned())
+            .filter(|zone| zone_name_ok(zone)),
+    }
 }
 
 /// What the model is told when it asks the time of `place`, now
@@ -789,6 +808,18 @@ mod tests {
                 "In Ho Chi Minh it is 4:40 in the afternoon, Sunday 18 October 2026. Said aloud: twenty to five in the afternoon. That is the time here too."
             )
         );
+        // An alias of the lamp's own zone is its own time too: the same
+        // file (the reviewer on #1552).
+        assert!(
+            said_in(
+                "Asia/Saigon",
+                &saigon,
+                Some(("Asia/Ho_Chi_Minh", &saigon)),
+                at
+            )
+            .unwrap()
+            .ends_with("That is the time here too.")
+        );
         let new_york = ruled(-18_000, "EST5EDT,M3.2.0,M11.1.0");
         assert!(
             said_in("America/New_York", &new_york, None, at)
@@ -818,6 +849,9 @@ mod tests {
         assert_eq!(found("London").as_deref(), Some("Europe/London"));
         assert_eq!(found("New York").as_deref(), Some("America/New_York"));
         assert_eq!(found(" UTC ").as_deref(), Some("UTC"));
+        // A top-level fixed zone is not a place (the reviewer on #1552).
+        std::fs::write(dir.join("EST"), ruled(-18_000, "EST5")).unwrap();
+        assert_eq!(found("EST"), None);
         for refused in [
             "Middle_Earth/Rivendell",
             "Europe/notes",
@@ -831,6 +865,19 @@ mod tests {
             assert_eq!(found(refused), None, "{refused:?}");
         }
         assert_eq!(place_name("America/Argentina/Buenos_Aires"), "Buenos Aires");
+        // The lamp's own zone is where `/etc/localtime` links, a stale
+        // `/etc/timezone` beside it notwithstanding.
+        let link = std::path::Path::new("/usr/share/zoneinfo/Asia/Ho_Chi_Minh");
+        assert_eq!(
+            zone_named(Some(link), Some("Etc/UTC\n")).as_deref(),
+            Some("Asia/Ho_Chi_Minh")
+        );
+        assert_eq!(
+            zone_named(None, Some("Etc/UTC\n")).as_deref(),
+            Some("Etc/UTC")
+        );
+        assert_eq!(zone_named(None, Some("../x")), None);
+        assert_eq!(zone_named(None, None), None);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

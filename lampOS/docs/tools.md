@@ -306,7 +306,10 @@ time, from its opening note, and nothing said whose it was.
   `place`, the place's time zone by its IANA name (`Europe/London`,
   `America/New_York`), which the model picks. A city's name alone ("London",
   "New York") is looked for in the usual areas (Europe, America, Asia,
-  Africa, Australia, Pacific, Atlantic, Indian). The zone file is read from
+  Africa, Australia, Pacific, Atlantic, Indian), and a name with no area is
+  taken only there or as `UTC`: the folder's top-level `EST`, `MST` and
+  `HST` have no summer time, so "EST" for the East Coast would be an hour
+  off New York's half the year (the reviewer on #1552). The zone file is read from
   `/usr/share/zoneinfo` with the voice's own reader (`local_time.rs`). Only
   `[A-Za-z0-9_+/-]` is taken, with no `..`, no `//` and no leading or
   trailing `/`, and the file must be a zone file. A slim zone file, which
@@ -317,9 +320,12 @@ time, from its opening note, and nothing said whose it was.
   `{"now":"In London it is 10:40 in the morning, Sunday 18 October 2026.
   Said aloud: twenty to eleven in the morning. Here in Ho Chi Minh it is
   4:40 in the afternoon."}`. The lamp's own place is its zone's last part,
-  from `/etc/timezone` or the zone file `/etc/localtime` links to, and is
-  left out when neither reads. Asked for its own zone, the answer ends
-  "That is the time here too." A place it has no zone for answers
+  from where `/etc/localtime` links, which is the time the lamp keeps, and
+  from `/etc/timezone` only when that is no link: `timedatectl
+  set-timezone` changes the link and not the file (the reviewer on #1552).
+  It is left out when neither reads. Asked for its own zone, or another
+  name for the same zone file (`Asia/Saigon`), the answer ends "That is
+  the time here too." A place it has no zone for answers
   `{"error":"I don't know the time in that place: it is not a time zone I
   know."}`, never the lamp's own time.
 - **The opening note says whose time it gives:** "… This is the time where
