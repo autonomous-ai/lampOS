@@ -2522,6 +2522,15 @@ mod tests {
     /// replies, as on the lamp. With it, the follow-up is answered, the two
     /// remarks are held and end the conversation, and the rest is held.
     fn scene_three_and_four(remarks: bool) -> Vec<bool> {
+        scene_three_and_four_with(remarks, false)
+    }
+
+    /// The same, with `LAMP_GOING_ON_ASKS` (`asks`, #1538) as well, the
+    /// Policy's decision on each line given before it is judged as lamp-4ace's
+    /// were at 14:44: "And what about tomorrow?" a `stay_quiet` said back to
+    /// the lamp (`follows_lamp` 0.66), every other line of the two people's
+    /// `stay_quiet` or `look_up` (the first builder on #1522, 15:14).
+    fn scene_three_and_four_with(remarks: bool, asks: bool) -> Vec<bool> {
         const S: u64 = 1_000_000;
         let start = std::time::Instant::now();
         let at = |us: u64| start + std::time::Duration::from_micros(us);
@@ -2531,6 +2540,7 @@ mod tests {
         let mut attention = Attention::default();
         attention.speak_when_spoken_to(true);
         attention.hold_remarks(remarks);
+        attention.ask_policy_when_going_on(asks);
         let lines = [
             (0, "Hey Lamp, what's the weather in Hanoi today?"),
             (6, "And what about tomorrow?"),
@@ -2554,6 +2564,15 @@ mod tests {
             attention.ended(request, began + S);
             let going_on = !room.talked_past_the_lamp() && thread.going_on(at(began + S));
             attention.lamp_asked(thread.lamp_asked_with(request, remarks));
+            if asks {
+                use crate::going_on_asks::Says;
+                let says = match request {
+                    17 => Says::Answer,
+                    18 => Says::Following,
+                    _ => Says::Not,
+                };
+                attention.policy_said(request, Some(says));
+            }
             let verdict = attention
                 .first_output_busy(request, Room::Busy, going_on, true, Some(false))
                 .unwrap();
@@ -2568,6 +2587,23 @@ mod tests {
             played.push(play);
         }
         played
+    }
+
+    /// The first builder on #705 (16:10): on scene 3 and scene 4's opening,
+    /// does either of the two halves of #1522's fix pass a line the other
+    /// holds? No: `LAMP_REMARKS` alone, `LAMP_GOING_ON_ASKS` alone with the
+    /// Policy's own decisions of 14:44, and the two together all answer the
+    /// call and "And what about tomorrow?" and hold the other seven. Only
+    /// what the room books differs: two remarks held end the conversation,
+    /// while a line the Policy holds is not talk, so each line after it is
+    /// asked of the Policy again.
+    #[test]
+    fn on_scene_three_the_two_halves_of_the_fix_hold_the_same_lines() {
+        let expected = [true, true, false, false, false, false, false, false, false];
+        assert_eq!(scene_three_and_four_with(true, false), expected);
+        assert_eq!(scene_three_and_four_with(false, true), expected);
+        assert_eq!(scene_three_and_four_with(true, true), expected);
+        assert_eq!(scene_three_and_four_with(false, false), [true; 9]);
     }
 
     #[test]

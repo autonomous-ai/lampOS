@@ -1890,7 +1890,10 @@ With the switch (`Attention::waits_for_policy`, `Attention::first_output_busy`):
 Tests: `going_on_asks::tests::a_line_going_on_is_played_on_answer_or_following_and_held_otherwise`,
 `policy_holds::tests::what_a_decision_says_of_a_line_going_on`,
 `attention::tests::with_the_switch_a_line_going_on_in_a_busy_room_is_the_lamps_only_as_the_policy_says`,
-and through the worker's own loop with the Policy's decisions on a bus:
+`attention::tests::on_scene_three_the_two_halves_of_the_fix_hold_the_same_lines`
+(scene 3 and scene 4's opening with `LAMP_REMARKS` alone, this switch alone
+with the Policy's decisions of 14:44, and both: the same two lines answered
+and seven held each way), and through the worker's own loop with the Policy's decisions on a bus:
 `provider_worker::tests::going_on_asks::with_the_switch_a_line_going_on_in_a_busy_room_is_played_only_as_the_policy_says`
 (the 14:44 lines with their decisions then: the car line and scene 4's
 opener held, "And what about tomorrow?" played at once, a `look_up` held,
