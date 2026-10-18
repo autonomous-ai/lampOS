@@ -156,6 +156,19 @@ fn source_for(gateway: Ipv4Addr) -> Option<Ipv4Addr> {
     }
 }
 
+/// Whether `child` is gone within `within`, looking every millisecond and
+/// never waiting past it: reaped if so, else handed back.
+fn gone_within(mut child: Child, within: Duration) -> Result<(), Child> {
+    let given_up = Instant::now() + within;
+    loop {
+        match child.try_wait() {
+            Ok(None) if Instant::now() < given_up => std::thread::sleep(Duration::from_millis(1)),
+            Ok(None) => return Err(child),
+            _ => return Ok(()),
+        }
+    }
+}
+
 /// The Wi-Fi's name, as `program` (`iw`) says it within `within`; empty on
 /// ethernet or without `iw`. One that does not answer in time is killed and
 /// handed back unless it is already gone: it is not waited for.
@@ -178,16 +191,7 @@ fn ssid(program: &Path, iface: &str, within: Duration) -> Result<String, Child> 
                 // A killed process is gone within a moment, unless the
                 // driver holds it: that one is handed back, not waited for.
                 let _ = child.kill();
-                let given_up = Instant::now() + KILL_GONE_WITHIN;
-                return loop {
-                    match child.try_wait() {
-                        Ok(None) if Instant::now() < given_up => {
-                            std::thread::sleep(Duration::from_millis(1));
-                        }
-                        Ok(None) => break Err(child),
-                        _ => break Ok(String::new()),
-                    }
-                };
+                return gone_within(child, KILL_GONE_WITHIN).map(|()| String::new());
             }
             // Not known whether it is still there: killed, and handed back
             // to be looked at again (El on #1423).
@@ -556,6 +560,25 @@ mod tests {
         for path in [answering, hung] {
             std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
         }
+    }
+
+    /// The reviewer on #1423: after the kill, `ssid()` looks for the child
+    /// for `KILL_GONE_WITHIN` and no longer. One still there (a `sleep 30`
+    /// never killed stands for an `iw` asleep in the driver) is handed back
+    /// in about that time, not waited for; one gone is reaped.
+    #[test]
+    fn a_child_still_there_after_the_kill_is_handed_back_not_waited_for() {
+        let living = Command::new("sleep").arg("30").spawn().unwrap();
+        let began = Instant::now();
+        let mut living = gone_within(living, KILL_GONE_WITHIN).unwrap_err();
+        let took = began.elapsed();
+        assert!(
+            took >= KILL_GONE_WITHIN && took < Duration::from_millis(500),
+            "{took:?}"
+        );
+        assert!(matches!(living.try_wait(), Ok(None)));
+        living.kill().unwrap();
+        assert_eq!(gone_within(living, Duration::from_secs(5)).ok(), Some(()));
     }
 
     /// The reviewer on #1423: an `iw` asleep in the driver outlives its
