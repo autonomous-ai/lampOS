@@ -380,7 +380,7 @@ fn zone_name_ok(zone: &str) -> bool {
 /// The compiled zone file for the place the model named, from `zones` (the
 /// system's [`ZONES`]), and its zone name: the name as given, spaces as
 /// underscores, or, for a name alone ("London", "New York"), the first of
-/// [`AREAS`] that has it. Nothing for a name that could leave the folder,
+/// `AREAS` that has it. Nothing for a name that could leave the folder,
 /// or a file that is not a zone file.
 pub fn zone_file(zones: &std::path::Path, place: &str) -> Option<(String, Vec<u8>)> {
     let place = place.trim().replace(' ', "_");
@@ -445,7 +445,7 @@ pub fn said_in(zone: &str, there: &[u8], here: Option<(&str, &[u8])>, now: i64) 
 
 /// The lamp's own zone's name: where `/etc/localtime` links, the zone file
 /// its time comes from, or `/etc/timezone`'s text, as Debian keeps it, only
-/// when that is no link ([`zone_named`]).
+/// when that is no link (`zone_named`).
 pub fn zone_here() -> Option<String> {
     zone_named(
         std::fs::read_link("/etc/localtime").ok().as_deref(),
