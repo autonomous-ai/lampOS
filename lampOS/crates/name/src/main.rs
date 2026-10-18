@@ -479,7 +479,11 @@ mod tests {
             .publisher_declared(NameHeard::RISING_TOPIC, &declared, NAME)
             .unwrap();
         let live = |topic: &str| bus.publishers(topic).unwrap().len();
-        for _ in 0..10 {
+        // Each half is half a second, still longer than the lease, renewed
+        // every 100 ms as before: what lapses is 200 ms past its lease at
+        // the check, and what is renewed is never within 200 ms of it
+        // (#1128).
+        for _ in 0..5 {
             renew(&mut heard, &mut rising);
             std::thread::sleep(Duration::from_millis(100));
         }
@@ -488,7 +492,7 @@ mod tests {
             (1, 1)
         );
         // The heartbeat as it was: only one renewed.
-        for _ in 0..10 {
+        for _ in 0..5 {
             let _ = heard.alive();
             std::thread::sleep(Duration::from_millis(100));
         }
