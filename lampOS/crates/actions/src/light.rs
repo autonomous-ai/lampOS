@@ -174,6 +174,18 @@ pub fn dimmer<L: Light>(light: &mut L) -> Outcome {
 /// light a little warmer" had no tool that does it).
 pub const WARMTH: [&str; 3] = ["white", "warm", "orange"];
 
+/// A colour of the warmth scale as an answer says it: `warm` is a warm
+/// white. Said bare, "a step cooler, warm now" came back as "Okay, warmed
+/// it up a step" (the first builder's light scene on lamp-4ace, 18 Oct, on
+/// #1367): the model heard the colour's name as the way it went.
+fn spoken(colour: &str) -> &str {
+    if colour == "warm" {
+        "warm white"
+    } else {
+        colour
+    }
+}
+
 /// One step warmer: white to warm, warm to orange. A light in another
 /// colour, asked for warmth, becomes warm. It comes on, at its level.
 pub fn warmer<L: Light>(light: &mut L) -> Outcome {
@@ -212,9 +224,13 @@ fn warmth<L: Light>(light: &mut L, warmer: bool) -> Outcome {
         return set(light, Wanted { on: true, ..now }, said);
     };
     let said = if on_scale {
-        format!("My light is a step {way}, {colour} now.")
+        format!(
+            "My light is a step {way}, from {} to {}.",
+            spoken(&now.colour),
+            spoken(colour)
+        )
     } else {
-        format!("My light is {colour} now.")
+        format!("My light is {} now.", spoken(colour))
     };
     set(
         light,
@@ -405,23 +421,25 @@ pub(crate) mod tests {
         let mut lamp = Fake::showing(light(true, "white", 3));
         assert_eq!(
             said(warmer(&mut lamp)),
-            "My light is a step warmer, warm now."
+            "My light is a step warmer, from white to warm white."
         );
         assert_eq!(
             said(warmer(&mut lamp)),
-            "My light is a step warmer, orange now."
+            "My light is a step warmer, from warm white to orange."
         );
         assert_eq!(
             said(warmer(&mut lamp)),
             "My light is already as warm as it goes, orange."
         );
+        // Cooler from orange is said with its way first and warm as a warm
+        // white, never as "warm now" (#1367's scene: "warmed it up a step").
         assert_eq!(
             said(cooler(&mut lamp)),
-            "My light is a step cooler, warm now."
+            "My light is a step cooler, from orange to warm white."
         );
         assert_eq!(
             said(cooler(&mut lamp)),
-            "My light is a step cooler, white now."
+            "My light is a step cooler, from warm white to white."
         );
         assert_eq!(
             said(cooler(&mut lamp)),
@@ -438,13 +456,13 @@ pub(crate) mod tests {
         );
         // Off the scale, no step: only what it is now.
         let mut blue = Fake::showing(light(true, "blue", 2));
-        assert_eq!(said(warmer(&mut blue)), "My light is warm now.");
+        assert_eq!(said(warmer(&mut blue)), "My light is warm white now.");
         let mut green = Fake::showing(light(true, "green", 4));
         assert_eq!(said(cooler(&mut green)), "My light is white now.");
         let mut dark = Fake::showing(light(false, "white", 1));
         assert_eq!(
             said(warmer(&mut dark)),
-            "My light is a step warmer, warm now."
+            "My light is a step warmer, from white to warm white."
         );
         assert_eq!(dark.asked, [light(true, "warm", 1)]);
         let mut dark_end = Fake::showing(light(false, "orange", 2));

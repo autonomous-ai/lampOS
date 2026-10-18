@@ -73,7 +73,7 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
             ),
             plain(
                 "volume_down",
-                "Make your own speaker quieter, when someone asks you to keep it down or says you are too loud.",
+                "Make your own speaker quieter, when someone asks you to keep it down or speak more quietly, or says you are too loud. Not for \"softer\" alone: that is your light (light_dimmer), unless they say it of your voice or sound.",
             ),
             plain(
                 "volume_mute",
@@ -105,7 +105,7 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
             ),
             plain(
                 "light_dimmer",
-                "Make your own light a step dimmer, keeping its colour, when someone says it is too bright or harsh, or asks for it softer or lower.",
+                "Make your own light a step dimmer, keeping its colour, when someone says it is too bright or harsh, or asks for it softer, a touch softer, gentler or lower. \"Softer\" with nothing said of your voice or sound is your light.",
             ),
             plain(
                 "light_warmer",
@@ -296,6 +296,18 @@ mod tests {
         assert!(said("light_brighter").contains("Not for white or whiter"));
         assert!(said("light_cooler").contains("whiter, a cooler white"));
         assert!(said("light_warmer").contains("warm included, use light_colour"));
+    }
+
+    /// The first builder's light scene on lamp-4ace (18 Oct, #1367): "a
+    /// touch softer, please" turned the volume down. "Softer" alone is the
+    /// light's, the volume's only when said of the voice or sound.
+    #[test]
+    fn softer_alone_is_the_light_not_the_volume() {
+        let all = catalog(true, true);
+        let said = |name: &str| all.iter().find(|f| f.name == name).unwrap().description;
+        assert!(said("light_dimmer").contains("a touch softer"));
+        assert!(said("light_dimmer").contains("nothing said of your voice or sound is your light"));
+        assert!(said("volume_down").contains("Not for \"softer\" alone: that is your light"));
     }
 
     #[test]
