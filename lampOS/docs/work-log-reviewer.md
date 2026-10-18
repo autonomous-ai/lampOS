@@ -4,6 +4,20 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 00:10 merged #1629 (third, policy hedge, off unless --hedge-after-ms), ARM64 green
+- 00:08 #1630 re-reviewed at be34df97e: both P2s and the P3s fixed (a rule-decided line is never sent, shown by probe); merge on green ARM64
+- 00:06 merged #1631 (fourth, #1627's P3s: same-voice.md numbers labelled, test runs scene 1 off too), ARM64 green
+- 00:00 merged #1628 (tests, reminder room-change test on its logical clock, #1569 row 21), ARM64 green
+- 23:58 #1629 re-reviewed at c129f0e85: the four P3s fixed, all 9 mutations caught, 80/80 clean; merge on green ARM64
+- 23:49 #1630 (third, policy connection probe): 2 P2s (with --rule-decides it can send words the lamp never sent; the reading rule counts the handshake), not ready
+- 23:49 #1631 (fourth, #1627's P3s): no finding; merge on green ARM64
+- 23:42 #1629 (third, policy hedge, off unless --hedge-after-ms): four P3s, 80/80 runs of hedge:: clean; merge on green ARM64
+- 23:28 #1494 rebuilt on #1466's d18347e75 (bd27d5c3d): same change, no finding; the first builder's after the lamp check
+- 23:26 merged #1627 (fourth, same-voice judges a line begun over a silent reply, off unless set), ARM64 green; P3s for a follow-up
+- 23:24 #1627 (fourth, same-voice over a silent reply): three P3s, off unless LAMP_SAME_VOICE_MODEL; merge on green ARM64 (queue 22e builds the PR head, so no push asked)
+- 23:03 #1466/#1494 (third, light outranked and patterns): order answered, #1466 then #1494; 3e3609fce is the 12:05 read rebased; the first builder's merge after the lamp check
+- 23:00 merged #1621 (third, LAMP_TURN_END_PRIORITY, off unless set), ARM64 green, the 22:27 P3s fixed
+- 22:55 merged #1626 (tests, head_tap's doc line back in place, #1619's P3), ARM64 green
 - 22:50 merged #1624 (tests, motor tests stepped or restarted on a timed-out start, #1569 rows 19-20), ARM64 green
 - 22:50 merged #1623 (tests, provider-pair rigs' lease 1 s, #1569 row 17), ARM64 green
 - 22:45 merged #1625 (fourth, test: a reminder into a busy room is no answer), ARM64 green
