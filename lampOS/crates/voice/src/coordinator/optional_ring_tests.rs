@@ -342,11 +342,42 @@ fn a_closed_ring_channel_does_not_create_input_readiness_or_stop_audio_authority
 #[test]
 fn audio_authority_failure_is_still_terminal_even_if_ring_is_disabled() {
     let directory = SessionDirectory::create().unwrap();
-    let (mut rig, peers) = fixture(&directory);
+    let (mut rig, mut peers) = fixture(&directory);
     rig.ring.disable("test ring fault");
     drop(peers.capture);
     let mut controller = Controller::new(new_boot().unwrap(), now());
-    assert!(rig.publish(controller.snapshot(now()).unwrap()).is_err());
+    // A child another test forks as `peers.capture` drops holds a copy of
+    // its socket until its exec (CLOEXEC), so for a moment the capture
+    // worker is still there: sent to, or full (Ten on #705, 18 Oct).
+    // Publish until a send is refused as gone, for at most 5 s, reading
+    // what the other workers were sent so that none of them fills, and it
+    // must be the capture worker that is gone.
+    let gone = |error: &io::Error| {
+        matches!(
+            error.kind(),
+            io::ErrorKind::ConnectionReset
+                | io::ErrorKind::ConnectionRefused
+                | io::ErrorKind::NotConnected
+                | io::ErrorKind::BrokenPipe
+        )
+    };
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    let refused = loop {
+        match rig.publish(controller.snapshot(now()).unwrap()) {
+            Err(error) if gone(&error) => break error,
+            _ => {
+                assert!(
+                    std::time::Instant::now() < until,
+                    "the capture worker was not gone after 5 s"
+                );
+                for peer in [&mut peers.speaker, &mut peers.privacy, &mut peers.provider] {
+                    while let Ok(Some(_)) = peer.control.receive::<Control>() {}
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
+    };
+    assert!(refused.to_string().starts_with("capture."), "{refused}");
 }
 
 #[test]
