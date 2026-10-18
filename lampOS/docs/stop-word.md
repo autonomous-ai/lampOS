@@ -999,8 +999,9 @@ asked.
 - **`LAMP_STOP_WORDS_COUNTS=/run/…/stop-words.json`** (an absolute path,
   off unless set; with `heard-always`): each reply's counts as JSON,
   written over at its end. Under `reply`: the blocks sent, the pauses its
-  words were asked for at (with the raw source, every half-second ask
-  among them, `asked_every_ms`), the results, whether a stop phrase was heard,
+  words were asked for at (with the raw or linear source, every half-second
+  ask among them, `asked_every_ms`), the source heard (`source`:
+  `processed`, `raw` or `linear`), the results, whether a stop phrase was heard,
   and what results heard (200 bytes each), each with its number in the
   reply (`n`, from 1) and whether it stopped the lamp: the reply's **last
   16 results**, and before them **every result whose words hold a stop
@@ -1075,6 +1076,12 @@ asked.
     but carries the lamp's voice loudest, so the speech-to-text returns the
     lamp. Offline, Sixth's model on `aec_linear` caught about as many as on
     `aec_only` (the first builder, 01:29).
+  - **It keeps much of the lamp's voice too.** On lamp-4ace's mic2 the
+    linear stage took only 3.1 to 4.1 dB of it out, and a person 10 dB under
+    the echo stayed 4 to 7 dB under (#828, 17 October 08:01;
+    [serve-runtime.md](serve-runtime.md)). The scripted rig's test, where
+    it is over 20 dB under the raw block, isn't a lamp's. Read the A/B
+    expecting the lamp's voice in the stream.
   - **How it gets there:** the capture worker is asked for it
     (`--linear-blocks`, only then). It keeps the canceller's linear output,
     as it does for `LAMP_VAD_INPUT`, and sends each block's beside the
