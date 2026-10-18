@@ -119,11 +119,13 @@ true (the reviewer on #1434):
   said to. A line lost with its connection has no attention verdict yet (that
   comes at a reply's first output), so the lamp cannot tell room talk from a
   line for it; the model judges the second copy as it judged the first, and
-  room talk is answered with silence as before. A line that went with
-  something (the line before it, a note, the eyes' picture), had any output or
-  tool call, or came before a mute, is never sent again. Whether a stricter
-  local test (its name heard, a face turned, near) is wanted before it is
-  turned on is the first builder's call (#705, 18 Oct). No preservation
+  room talk is answered with silence as before. A line that went with the line
+  before it or the eyes' picture, had any output or tool call, or came before
+  a mute, is never sent again; a note told beside it is told again with it.
+  No local "spoken to the lamp" test is added: the line already went to the
+  same service once, in the same conversation, so a resend shows it nothing
+  new, and such a test would miss the follow-ups said without the name that
+  are lost most often (the first builder on #705, 18 Oct 09:4x). No preservation
 of Gemini conversational memory across physical mute is claimed. There is no
 periodic context reset or timer-based reopen. A later stable unmute must satisfy
 the new runtime's ordinary readiness checks again.

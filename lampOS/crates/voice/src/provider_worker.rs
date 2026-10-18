@@ -4099,13 +4099,9 @@ impl InputHandoff {
                 // newest: `judge`'s `NewerLine` cannot come from here (Tests
                 // on #1434).
                 newer_line: false,
-                // A note told beside it, its first part, or the eyes'
-                // picture would not be on the next session.
-                attached: kept.attached
-                    || self
-                        .noted
-                        .as_ref()
-                        .is_some_and(|(noted, _)| *noted == kept.request.get()),
+                // Its first part, or the eyes' picture, would not be on the
+                // next session. A note told beside it is told again there.
+                attached: kept.attached,
             };
             if let Err(why) = crate::resend::judge(&lost) {
                 return self.give_up(loss, why);
@@ -4118,6 +4114,21 @@ impl InputHandoff {
                 "{}",
                 crate::resend::resent_record(request.get(), session.get(), now_us)
             );
+            // What it was told beside it (its name heard, only its name, a
+            // stop, following on) is told again on the new session, before
+            // its blocks and End (the reviewer on #1434, 09:30).
+            if let Some((_, text)) = self
+                .noted
+                .as_ref()
+                .filter(|(noted, _)| *noted == request.get())
+                && let Err(error) = input.note(request, text)
+            {
+                eprintln!(
+                    "lamp-voice provider: request {}: its note could not be told again on session {}: {error}",
+                    request.get(),
+                    session.get()
+                );
+            }
             self.submitted = Some(SubmittedInput {
                 request,
                 session,
@@ -4358,9 +4369,10 @@ impl InputHandoff {
                 // connection is lost before any output (#705, Step B).
                 if self.resend {
                     let mut kept = Kept::new(request, generation);
-                    // Half of an utterance, or told of a stop: the next
-                    // session would hear it without what went before.
-                    kept.attached = continues || continues_cut_off || after_stop;
+                    // Half of an utterance: the next session would hear it
+                    // without what went before. A note goes again with it
+                    // (`resend_upkeep`); a stop's is one.
+                    kept.attached = continues || continues_cut_off;
                     self.kept = Some(kept);
                 }
                 self.after_stop = after_stop.then_some(request);

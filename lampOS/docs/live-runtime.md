@@ -258,7 +258,10 @@ exception under `LAMP_RESEND_LOST_LINE=on` (the provider worker's
 `--resend-lost-line`, [`crate::resend`], #705): a line lost with its
 connection after it ended, before any output or tool call for it, is sent once more on the
 next ready session, under the same request, if its privacy generation is
-unchanged, it is at most 15 s long, no newer line has begun, the failure is
+unchanged, it is at most 15 s long, no newer line has begun, it did not go
+on from a line before it (`continues`, `continues_cut_off`) or with the eyes'
+picture (`Attached`; a note told beside it is told again on the new session,
+and a `--camera` frame is not yet counted, which no lamp unit uses), the failure is
 one a second try mends (a barrier, write or read timeout, a transport loss,
 a peer close, a go-away, a stalled response; never a quota, a refusal or a
 silent model) and the next session is ready within 5 s of its end. Its
