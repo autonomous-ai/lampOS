@@ -21,7 +21,7 @@ of the lines addressed to a similar name.
 
 ## The process
 
-    lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--stop-least SCORE] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--bus-root ABSOLUTE_DIR]
+    lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--stop-least SCORE] [--not-while-speaking on|off] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--bus-root ABSOLUTE_DIR]
     lamp-name check MODELS_DIR [--quiet-below DBFS] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...
 
 | Option | What it is | If left out |
@@ -29,6 +29,7 @@ of the lines addressed to a similar name.
 | `--models` | A directory holding `melspectrogram.onnx`, `embedding_model.onnx` and `name.onnx` | required |
 | `--microphone` | Whose sound to listen to: the topic `mic1/audio` or `mic2/audio` | `mic2` |
 | `--least` | The score from which the name counts as heard, from 0.5 to 1 | 0.9 |
+| `--not-while-speaking` | `on`: a hearing that began while `voice/state` said `speaking`, or within 0.6 s after, is not said ("Not its own voice") | off: every hearing is said |
 | `--quiet-below` | A level in dBFS, from -90 to -30: the models rest while the last 2.03 s held no sample this loud ("Resting while the room is quiet") | off: the models always run |
 | `--rescue-model` | A second name model of `name.onnx`'s shape, outside the models directory: where `name.onnx` reached `--rescue-gate` at a step or in the 1 s before it, that step's score is the higher of the two ("A second model to rescue a call", #1546). Refused unless its SHA-256 is `--rescue-sha256` | off: no second model |
 | `--rescue-sha256` | The rescue model's SHA-256, 64 lower-case hex digits; required with `--rescue-model` | — |
@@ -207,6 +208,47 @@ to 75 °C overnight, past the 70 at which it slows itself (#705). With
 - `lamp-name check MODELS_DIR --quiet-below DBFS FILE...` rests as the
   program does, and says how many steps were worked out.
 
+## Not its own voice
+
+The lamp's voice reaches its own microphone through the canceller, and its
+name in the lamp's own words can be heard: on lamp-4ace on 18 Oct (11:52)
+the installed model heard the lamp's "There you go, I've made the light
+warmer for you" at 0.990. Most readers of `name/heard` and `name/rising`
+take any hearing (#705, step 4: the voice marks the request in hand as
+called, tells the model so and starts its call's wait; only the body
+looks at whether the lamp speaks, and as the message arrives). With
+`--not-while-speaking on` (`src/not_self.rs`), `lamp-name` reads
+`voice/state` and passes over a hearing that began while it said
+`speaking`, or within 0.6 s after (a score reaches the bar a little after
+its sound, and the room rings on). Its first sign and its final word are
+judged once, together. A voice unheard for 2.5 s, or gone, is not speaking.
+Each one passed over is a journal line ("passed over a hearing that began
+while the lamp spoke", with its score), no sound, and the minute line counts
+them (`passed_over_in_all`). Any hearing that began within 3 s after the
+lamp stopped speaking, passed over or said, gives `after_speech_ms` (0
+inside a reply), so a lamp's own hearings say how far the 0.6 s tail has to
+reach: the tail is not measured yet. It counts from the first score at the
+bar, not from the sound, so a quick bare "Lamp" begun about 0.1 s after a
+reply can still be passed over. A hearing said at its first sign is said at
+its final word too, and one passed over is passed over at both, even when
+the voice is heard again between them.
+
+**What it costs:** a person who calls the lamp by name while it speaks, or
+within 0.6 s after, is not heard as calling it. Their words still reach
+the voice as a cut-in does (the duplex yield and the stop word do not read
+the name), without the name's sign: they lose the policy hold's override,
+the model's "you were called" and the body's look-up at the name. The lamp
+check plays a person's "Lamp, …" over a reply with the switch off and on:
+the lamp must still stop, answer and turn to them.
+
+**Tested** by `not_self.rs`: a hearing inside a reply is passed over at
+both its signs, and one just after the reply and its tail goes out
+(`a_hearing_inside_a_reply_is_passed_over_and_one_after_it_is_not`); a
+reply still going covers, a silent or gone voice does not. With no tail,
+no pairing of the two signs, or no end to an unheard reply, a test fails.
+Not shown: the lamp. The check is the same played scene as 18 Oct's
+(a "Lamp" in the lamp's own reply) with the switch off and on.
+
 ## How it says it is
 
 | Level | Message | When |
@@ -294,8 +336,8 @@ With it the lamp's health has six parts reporting.
   lamp's microphone held at that moment cannot be gone back to. It was
   between two played lines, while or just after the lamp answered.
 - **Its own tests are small**: the rule for a hearing (five), the options
-  and the report (four), resting (six), and two from the review of 14
-  October. The models are not in the repository, so no test here runs
+  and the report (four), resting (six), not its own voice (five), and two
+  from the review of 14 October. The models are not in the repository, so no test here runs
   them unless they are given (`tests/quiet_models.rs`, ignored);
   `lamp-name check` and the measurement above are what exercises them.
 - **The classifier's training** is outside the repository and was one

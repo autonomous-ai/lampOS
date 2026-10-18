@@ -1,9 +1,10 @@
 //! `lamp-name`: listen to what the microphone hears, on the bus, for the
 //! lamp's name, and say when it was heard. See `docs/name.md`.
 use lamp_bus::{Bus, Notice, Publisher};
-use lamp_msgs::{Audio, Diagnostic, Level, NameHeard, StopHeard};
+use lamp_msgs::{Audio, Diagnostic, Level, NameHeard, StopHeard, Voice, VoiceState};
 use lamp_name::{
     hear::Hearer,
+    not_self::Speaking,
     quiet::{self, Loudness, Quiet},
     rescue::Rescue,
     said::{Hearings, Stops},
@@ -59,6 +60,8 @@ struct Arguments {
     stop_least: Option<f32>,
     /// `--rescue-model`, its SHA-256 and its gate.
     rescue: Option<RescueModel>,
+    /// Pass over a hearing that began while the lamp spoke (#705).
+    not_while_speaking: bool,
     bus: Option<PathBuf>,
 }
 
@@ -135,6 +138,7 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
     let (mut models, mut microphone, mut least, mut bus) = (None, None, None, None);
     let (mut quiet_below, mut stop_least) = (None, None);
     let mut rescue = RescueGiven::default();
+    let mut not_while_speaking = None;
     while let Some(option) = arguments.next() {
         if option == "--help" || option == "-h" {
             return Ok(None);
@@ -170,6 +174,13 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
             }
             "--quiet-below" => quiet_below.replace(bar(&value)?).is_some(),
             "--stop-least" => stop_least.replace(stop_bar(&value)?).is_some(),
+            "--not-while-speaking" => not_while_speaking
+                .replace(match value.as_str() {
+                    "on" => true,
+                    "off" => false,
+                    _ => return Err("--not-while-speaking is on or off".into()),
+                })
+                .is_some(),
             // Given twice is said by `take`.
             "--rescue-model" => {
                 absolute(&value)?;
@@ -190,6 +201,7 @@ fn parse(mut arguments: impl Iterator<Item = String>) -> Result<Option<Arguments
         quiet_below,
         stop_least,
         rescue: rescue.done()?,
+        not_while_speaking: not_while_speaking.unwrap_or(false),
         bus,
     }))
 }
@@ -267,6 +279,17 @@ fn report(
         .with("sound_lost", counted.lost)
 }
 
+/// ` after_speech_ms=N` for a hearing that began within 3 s after the lamp
+/// stopped speaking (0 inside it), so the lamp's own hearings say how far
+/// `not_self::TAIL` has to reach; nothing otherwise.
+fn after_speech(speaking: &Speaking, name: &NameHeard, now: Instant) -> String {
+    speaking
+        .after_speech(Duration::from_millis(u64::from(name.ago_ms)), now)
+        .map_or(String::new(), |after| {
+            format!(" after_speech_ms={}", after.as_millis())
+        })
+}
+
 /// Both event topics are shown alive while no name is heard, so that a
 /// quiet longer than the bus's lease never takes either for gone (#891).
 fn renew(heard: &mut Publisher, rising: &mut Publisher) {
@@ -317,8 +340,14 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         }
         None => None,
     };
+    // When the lamp itself speaks, with `--not-while-speaking on`.
+    let mut voice = arguments
+        .not_while_speaking
+        .then(|| bus.subscribe_typed(VoiceState::TOPIC, NAME, VoiceState::TYPE))
+        .transpose()?;
+    let mut speaking = Speaking::default();
     log(&format!(
-        "started models={} loaded_ms={} listening_to={topic} least={} quiet_below={} stop_least={} rescue={} bus_root={}",
+        "started models={} loaded_ms={} listening_to={topic} least={} quiet_below={} stop_least={} rescue={} not_while_speaking={} bus_root={}",
         arguments.models.display(),
         loaded.as_millis(),
         arguments.least,
@@ -337,6 +366,11 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                 given.gate,
                 &given.sha256[..12]
             )),
+        if arguments.not_while_speaking {
+            "on"
+        } else {
+            "off"
+        },
         bus.root().display(),
     ));
     let mut hearings = Hearings::new(arguments.least);
@@ -352,6 +386,25 @@ fn run(arguments: &Arguments) -> io::Result<()> {
     loop {
         let message = sound.recv(Duration::from_millis(100))?;
         let now = Instant::now();
+        if let Some(voice) = voice.as_mut() {
+            while let Ok(Some(state)) = voice.recv(Duration::ZERO) {
+                if let Ok(state) = state.parse::<VoiceState>() {
+                    speaking.saw(state.state == Voice::Speaking, now);
+                }
+            }
+            if voice
+                .notices()
+                .iter()
+                .any(|notice| matches!(notice, Notice::SourceGone))
+            {
+                speaking.gone(now);
+            }
+        }
+        // Whether a hearing said now, begun `ago_ms` before, goes out.
+        let mut lets_through = |name: &NameHeard| {
+            voice.is_none()
+                || speaking.lets_through(Duration::from_millis(u64::from(name.ago_ms)), now)
+        };
         for notice in sound.notices() {
             match notice {
                 Notice::SourceGone => {
@@ -429,7 +482,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                                     counted.rescued += 1;
                                     rescued_in_hearing = true;
                                 }
-                                if let Some(first) = hearings.rising(now) {
+                                if let Some(first) = hearings.rising(now)
+                                    && lets_through(&first)
+                                {
                                     let _ = rising.publish_json(at_us(now), &first);
                                 }
                             }
@@ -451,12 +506,21 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             }
         }
         let name_said = name_said.or_else(|| hearings.tick(now));
-        if let Some(name) = name_said {
+        if let Some(name) = name_said
+            && !lets_through(&name)
+        {
+            log(&format!(
+                "passed over a hearing that began while the lamp spoke: score={:.3} began_ms_ago={}{}",
+                name.score,
+                name.ago_ms,
+                after_speech(&speaking, &name, now)
+            ));
+        } else if let Some(name) = name_said {
             total_heard += 1;
             counted.heard += 1;
             let _ = heard.publish_json(at_us(now), &name);
             log(&format!(
-                "heard its name: score={:.3} began_ms_ago={}{}",
+                "heard its name: score={:.3} began_ms_ago={}{}{}",
                 name.score,
                 name.ago_ms,
                 if rescue.is_none() {
@@ -465,6 +529,11 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                     " rescued=yes"
                 } else {
                     " rescued=no"
+                },
+                if voice.is_some() {
+                    after_speech(&speaking, &name, now)
+                } else {
+                    String::new()
                 }
             ));
             rescued_in_hearing = false;
@@ -495,7 +564,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             let loudest = loudness.take();
             if counted.steps + counted.rested > 0 {
                 log(&format!(
-                    "last minute: steps={} rested={} ms_a_step={:.1} longest_block_ms={:.1} heard={} stops={} rescued_steps={} sound_lost={} steps_in_all={total_steps}{}",
+                    "last minute: steps={} rested={} ms_a_step={:.1} longest_block_ms={:.1} heard={} stops={} rescued_steps={} sound_lost={} steps_in_all={total_steps} passed_over_in_all={}{}",
                     counted.steps,
                     counted.rested,
                     counted.busy.as_secs_f64() * 1e3 / counted.steps.max(1) as f64,
@@ -504,6 +573,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                     counted.stops,
                     counted.rescued,
                     counted.lost,
+                    speaking.passed_over,
                     loudest.map_or(String::new(), |(median, top)| format!(
                         " loudest_db_p50={median:.1} loudest_db_p99={top:.1}"
                     )),
@@ -760,6 +830,7 @@ mod tests {
                 quiet_below: None,
                 stop_least: None,
                 rescue: None,
+                not_while_speaking: false,
                 bus: None,
             }
         );
@@ -774,6 +845,7 @@ mod tests {
                 quiet_below: None,
                 stop_least: None,
                 rescue: None,
+                not_while_speaking: false,
                 bus: Some("/run/lampos-bus".into()),
             }
         );
@@ -784,6 +856,12 @@ mod tests {
                 .unwrap()
                 .quiet_below,
             Some(-55.0)
+        );
+        assert!(
+            of("--models /m --not-while-speaking on")
+                .unwrap()
+                .unwrap()
+                .not_while_speaking
         );
     }
 
@@ -912,6 +990,8 @@ mod tests {
             "--models /m --rescue-model /r.onnx --rescue-sha256 abab",
             "--models /m --rescue-model /r.onnx --rescue-sha256 abababababababababababababababababababababababababababababababab --rescue-gate 0.01",
             "--models /m --rescue-model /r.onnx --rescue-model /s.onnx --rescue-sha256 abababababababababababababababababababababababababababababababab",
+            "--models /m --not-while-speaking yes",
+            "--models /m --not-while-speaking on --not-while-speaking off",
             "--models",
         ] {
             assert!(of(refused).is_err(), "{refused:?}");
