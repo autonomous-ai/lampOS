@@ -3412,3 +3412,18 @@ wait on their owners and a lamp
   catalogue speaks, after #1067; #933). Missed the first builder's 15:48 and
   17:37 asks until 18:20, both done by 18:32. PR bodies now carry no
   attribution (joining.md). `cargo clean` after each.
+- **2026-10-18 11:51:** merged: **#1421** (`LAMP_UNCLEAR_HUM`: an empty sorry
+  owes one "hm", within 2 s, only with the switch). Re-checked **#1445**
+  (Fourth's real-time child; the `SCHED_BATCH` P2 taken). For #940
+  (designed on #940, the first builder's yes at 10:4x, Fifth's six
+  conditions at 11:1x): **#1466** (the ring tells a hidden request on
+  `light/outranked` who is over it; skills say so at the give-back; ARM64
+  green) and **#1473** (`body/gesture` names a drop's asker, why and holder
+  under `--arbitration on`; a skill takes only its own drop; 648/0). From
+  #1456's heat: **#1469** (`lamp-controls` sends touch and controls state
+  on change and every 100 ms, not every 20 ms; 20 ms only with privacy;
+  green, for the first builder's lamp check). From #1367's light scene:
+  **#1476** (cooler said "from orange to warm white"; "softer" alone is
+  the light). Item 3's design (breathe, candle, pulse) is on #940, waiting
+  for a yes. Drafts **#1362** and **#1365** wait on this afternoon. `cargo
+  clean` at 11:51 (6.5 GiB).
