@@ -489,7 +489,14 @@ fn expired_recorder_startup_watchdog_closes_the_listener_without_advancing_time(
     // Queue a real connection before expiring the accept budget. No assertion
     // requires Hello or Step delivery after that deadline has already passed.
     let mut peer = UnixStream::connect(&fixture.control_path).unwrap();
-    peer.set_nonblocking(true).unwrap();
+    // The read below waits for the close, as long as the fixture's watchdog:
+    // a process another test spawns at this moment holds the queued
+    // connection until it exits. Beside a thread spawning `sleep 0.3` in a
+    // loop, a read straight after the close found it still open in 151 and
+    // 157 of 300 rounds (none beside CPU load alone). This read found it
+    // closed in all 300, after at most 310 ms (#1569 row 28). The timeout
+    // is set now: macOS refuses it (EINVAL) once the peer has closed.
+    peer.set_read_timeout(Some(WATCHDOG)).unwrap();
     let expired = Instant::now().checked_sub(Duration::from_secs(1)).unwrap();
     let error = fixture.start_recorder(expired).unwrap_err();
     assert_eq!(
