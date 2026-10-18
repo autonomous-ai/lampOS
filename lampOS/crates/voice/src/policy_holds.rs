@@ -269,9 +269,11 @@ pub fn gate(
 /// The Policy's attention decisions, each its own turn's by number.
 pub struct Verdicts {
     decisions: lamp_bus::Subscriber,
-    /// What the Policy decided of each turn, by the turn's number. Of two
-    /// decisions about one turn (its words judged in two pieces), the newer.
-    decided: VecDeque<(u64, Verdict)>,
+    /// What the Policy decided of each turn, by the turn's number, and
+    /// whether its choice was `answer` (not `look_up`), for a line let out
+    /// only as a conversation going on ([`Self::says`]). Of two decisions
+    /// about one turn (its words judged in two pieces), the newer.
+    decided: VecDeque<(u64, Verdict, bool)>,
 }
 
 impl Verdicts {
@@ -316,22 +318,45 @@ impl Verdicts {
             ("stay_quiet", false) => Verdict::StayQuiet,
             _ => Verdict::TakenUp,
         };
-        if let Some(known) = self.decided.iter_mut().find(|(turn, _)| *turn == request) {
+        let answer = decision.choice == "answer";
+        if let Some(known) = self
+            .decided
+            .iter_mut()
+            .find(|(turn, _, _)| *turn == request)
+        {
             known.1 = verdict;
+            known.2 = answer;
             return;
         }
         if self.decided.len() == KEPT {
             self.decided.pop_front();
         }
-        self.decided.push_back((request, verdict));
+        self.decided.push_back((request, verdict, answer));
     }
 
     /// What the Policy decided of `request`, if it has yet.
     pub fn verdict(&self, request: u64) -> Option<Verdict> {
         self.decided
             .iter()
-            .find(|(turn, _)| *turn == request)
-            .map(|(_, verdict)| *verdict)
+            .find(|(turn, _, _)| *turn == request)
+            .map(|(_, verdict, _)| *verdict)
+    }
+
+    /// What the Policy's decision of `request` lets the lamp say of a line
+    /// let out only as a conversation going on, in a busy room
+    /// ([`crate::going_on_asks`], #1522): `answer`, or a `stay_quiet` said
+    /// back to the lamp ([`Verdict::StayQuietFollowing`]). `look_up` turns
+    /// to whoever spoke without speaking, so it says nothing.
+    pub fn says(&self, request: u64) -> Option<crate::going_on_asks::Says> {
+        use crate::going_on_asks::Says;
+        self.decided
+            .iter()
+            .find(|(turn, _, _)| *turn == request)
+            .map(|(_, verdict, answer)| match verdict {
+                Verdict::TakenUp if *answer => Says::Answer,
+                Verdict::StayQuietFollowing => Says::Following,
+                Verdict::TakenUp | Verdict::StayQuiet => Says::Not,
+            })
     }
 }
 
@@ -384,6 +409,48 @@ mod tests {
         value["answers"] = json!({"follows_lamp": 0.1});
         verdicts.took(&serde_json::from_value(value).unwrap());
         assert_eq!(verdicts.verdict(5), Some(Verdict::TakenUp));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// #1522: for a line going on in a busy room, `answer` says it is the
+    /// lamp's, a `stay_quiet` said back to the lamp says so too, and
+    /// `look_up` and any other `stay_quiet` say it is not; a newer decision
+    /// about the same turn takes the place of the older.
+    #[test]
+    fn what_a_decision_says_of_a_line_going_on() {
+        use crate::going_on_asks::Says;
+        let (mut verdicts, dir) = verdicts("says");
+        for (request, choice, follows) in [
+            (1, "answer", 0.1),
+            (2, "look_up", 0.1),
+            (3, "look_up", 0.9),
+            (4, "stay_quiet", 0.66),
+            (5, "stay_quiet", 0.3),
+        ] {
+            let mut value =
+                serde_json::to_value(decision("attention", choice, false, Some(request))).unwrap();
+            value["answers"] = json!({"follows_lamp": follows});
+            verdicts.took(&serde_json::from_value(value).unwrap());
+        }
+        let said: Vec<Option<Says>> = (1..=6).map(|request| verdicts.says(request)).collect();
+        assert_eq!(
+            said,
+            [
+                Some(Says::Answer),
+                Some(Says::Not),
+                Some(Says::Not),
+                Some(Says::Following),
+                Some(Says::Not),
+                None
+            ]
+        );
+        // The actions' verdicts are as they were: `look_up` takes the turn
+        // up for them.
+        assert_eq!(verdicts.verdict(2), Some(Verdict::TakenUp));
+        verdicts.took(&decision("attention", "stay_quiet", false, Some(1)));
+        assert_eq!(verdicts.says(1), Some(Says::Not));
+        verdicts.took(&decision("attention", "answer", false, Some(2)));
+        assert_eq!(verdicts.says(2), Some(Says::Answer));
         let _ = std::fs::remove_dir_all(dir);
     }
 

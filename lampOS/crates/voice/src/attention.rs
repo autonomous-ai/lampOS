@@ -756,6 +756,13 @@ pub struct Attention {
     /// A remark to the room is not a reply to the lamp in a busy room
     /// (`LAMP_REMARKS=on`, [`crate::remarks`], #829).
     remarks: bool,
+    /// In a busy room, a line let out only as the conversation going on
+    /// waits for the Policy's decision (`LAMP_GOING_ON_ASKS=on`,
+    /// [`crate::going_on_asks`], #1522).
+    going_on_asks: bool,
+    /// What the Policy said of a request, given before it is judged: by the
+    /// request's number, and `None` inside when nothing came in time.
+    policy_says: Option<(u64, Option<crate::going_on_asks::Says>)>,
     /// An answer is played only when the lamp was spoken to
     /// (`LAMP_SPOKEN_TO=on`, #829).
     spoken_to: bool,
@@ -799,6 +806,53 @@ impl Attention {
     /// Whether remarks are held ([`Self::hold_remarks`]).
     pub fn holds_remarks(&self) -> bool {
         self.remarks
+    }
+
+    /// In a busy room, let a line out only as the conversation going on
+    /// once the Policy has said it is the lamp's ([`crate::going_on_asks`]).
+    pub fn ask_policy_when_going_on(&mut self, on: bool) {
+        self.going_on_asks = on;
+    }
+
+    /// What the Policy said of `request` (`None`: nothing came in time),
+    /// for its verdict.
+    pub fn policy_said(&mut self, request: u64, says: Option<crate::going_on_asks::Says>) {
+        self.policy_says = Some((request, says));
+    }
+
+    /// Whether what the Policy said of `request` has been given, or that
+    /// nothing came in time ([`Self::policy_said`]).
+    pub fn policy_given(&self, request: u64) -> bool {
+        self.policy_says.is_some_and(|(of, _)| of == request)
+    }
+
+    /// Whether the first output of `request`, still to be judged, should
+    /// wait for the Policy's decision before it is: with the switch, in a
+    /// busy room, a conversation going on, and nothing else yet known to
+    /// show the line was said to the lamp ([`crate::going_on_asks`]). A
+    /// line this keeps waiting that is let out or held for another reason
+    /// once judged has only waited; the verdict itself is
+    /// [`Self::first_output_busy`]'s.
+    pub fn waits_for_policy(
+        &self,
+        request: u64,
+        room: Room,
+        going_on: bool,
+        turned: Option<bool>,
+    ) -> bool {
+        self.going_on_asks
+            && self.awaits_verdict(request)
+            && !self.policy_given(request)
+            && room == Room::Busy
+            && going_on
+            && own_request().load(Ordering::Acquire) != request
+            && !self.sound_in_hand()
+            && !self.called_for_itself()
+            && !self.after_call
+            && !self.named_sure
+            && turned != Some(true)
+            && !self.near
+            && !self.addressed
     }
 
     /// Read the text's call with [`called_by_name`] from now on
@@ -1402,6 +1456,25 @@ impl Attention {
                     && crate::remarks::remark(&self.heard) =>
             {
                 Verdict::Hold(crate::remarks::REMARK)
+            }
+            // #1522, with `LAMP_GOING_ON_ASKS=on`: in a busy room, a line
+            // let out only as the conversation going on is the lamp's only
+            // if the Policy says so.
+            Verdict::Play(GOING_ON)
+                if self.going_on_asks
+                    && room == Room::Busy
+                    && !called_in_text
+                    && !self.named
+                    && !self.named_sure
+                    && turned != Some(true)
+                    && !self.near
+                    && !self.addressed =>
+            {
+                crate::going_on_asks::verdict(
+                    self.policy_says
+                        .filter(|(of, _)| *of == request)
+                        .and_then(|(_, says)| says),
+                )
             }
             verdict => verdict,
         };
@@ -2229,6 +2302,76 @@ mod tests {
         );
         assert!(about_its_work("How is that TASK going?"));
         assert!(!about_its_work("I'll ask him about it."));
+    }
+
+    /// #1522, with `LAMP_GOING_ON_ASKS=on` (the first builder's decision on
+    /// #1522 at 15:14): in a busy room, a line let out only as the
+    /// conversation going on waits for the Policy and is played on `answer`
+    /// or on a `stay_quiet` said back to the lamp, held otherwise, and played
+    /// with no decision in time. A call in its words, a face turned to the
+    /// lamp, a room not known to be busy, or the switch off: as before, and
+    /// nothing waits.
+    #[test]
+    fn with_the_switch_a_line_going_on_in_a_busy_room_is_the_lamps_only_as_the_policy_says() {
+        use crate::going_on_asks::{self, Says};
+        let line = |asks: bool,
+                    room: Room,
+                    heard: &str,
+                    turned: Option<bool>,
+                    says: Option<(u64, Option<Says>)>| {
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.ask_policy_when_going_on(asks);
+            attention.began_at(7, 4, 1_000_000);
+            attention.heard(heard);
+            let waits = attention.waits_for_policy(7, room, true, turned);
+            if let Some((request, says)) = says {
+                attention.policy_said(request, says);
+            }
+            let verdict = attention
+                .first_output_busy(7, room, true, true, turned)
+                .unwrap();
+            (waits, verdict)
+        };
+        const CAR: &str = "Okay, I will book the car for eight.";
+        let busy = Room::Busy;
+        assert_eq!(
+            line(true, busy, CAR, None, Some((7, Some(Says::Not)))),
+            (true, Verdict::Hold(going_on_asks::NOT_THE_LAMPS))
+        );
+        assert_eq!(
+            line(true, busy, CAR, None, Some((7, Some(Says::Following)))),
+            (true, Verdict::Play(going_on_asks::FOLLOWING))
+        );
+        assert_eq!(
+            line(true, busy, CAR, None, Some((7, Some(Says::Answer)))),
+            (true, Verdict::Play(going_on_asks::ANSWER))
+        );
+        assert_eq!(
+            line(true, busy, CAR, None, Some((7, None))),
+            (true, Verdict::Play(going_on_asks::NO_DECISION))
+        );
+        // What the Policy said of another request is nothing of this one's.
+        assert_eq!(
+            line(true, busy, CAR, None, Some((6, Some(Says::Not)))).1,
+            Verdict::Play(going_on_asks::NO_DECISION)
+        );
+        // As before, and nothing waits: the switch off, a call in its
+        // words, a face turned to the lamp, a room not known to be busy.
+        let not_says = Some((7, Some(Says::Not)));
+        assert_eq!(line(false, busy, CAR, None, not_says), (false, GOING_ON));
+        for (room, heard, turned) in [
+            (busy, "Lamp, book the car for eight.", None),
+            (busy, CAR, Some(true)),
+            (Room::Quiet, CAR, None),
+            (Room::Unknown, CAR, None),
+        ] {
+            assert_eq!(
+                line(true, room, heard, turned, not_says),
+                (false, line(false, room, heard, turned, None).1),
+                "{room:?} {heard} {turned:?}"
+            );
+        }
     }
 
     /// One line said in a busy room while a conversation with the lamp is

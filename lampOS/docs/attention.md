@@ -1790,6 +1790,87 @@ the reviewer's probe on #1499), `remarks::tests::a_bare_answer_is_never_a_remark
 `thread::tests::the_lamps_question_is_known_by_its_end_past_what_is_kept`,
 `provider_worker::tests::policy_holds::remarks_is_read_after_provider_patience`.
 
+## A line going on in a busy room waits for the Policy (#1522)
+
+Off unless `LAMP_GOING_ON_ASKS=on` in the voice's environment (the
+worker's `--going-on-asks`, right after `--remarks`; the first builder's
+decision on #1522, 18 October 2026, 15:14). Only with `LAMP_ATTENTION` and
+`LAMP_BUS=on` (without the bus it says so and changes nothing), and on the
+Live route only (`going_on_asks.rs`).
+
+On lamp-4ace on 18 October at 14:44, on `3f4f3c5c3`, after Daniel's call
+in the battery's scene 3, every line of the two people's talk was let out
+as `a conversation with the lamp is going on`, each 2.4 to 6.8 s after the
+lamp's reply to the line before. "Okay, I will book the car for eight."
+was answered with the time. Then, across the 6 s gap to scene 4, the lamp
+spoke the two people's own words back. Each reply re-armed the
+conversation, so it never ended. The Policy had the room as busy, and its
+own decisions on those seven lines were `stay_quiet` 5, `look_up` 1 and a
+`stay_quiet` with `follows_lamp` 0.66 (Samantha's "And what about
+tomorrow?"). Over the day (17 October 17:00 to 18 October 08:10 UTC, both
+builds), 48 lines were let out as going on, all in a busy room. The Policy
+said `look_up` 20, `stay_quiet` 19 and a following `stay_quiet` 9: it would
+have held 39 (Fourth's `going_on_fourth.py`, run by the first builder on
+#1522 at 15:14).
+
+With the switch (`Attention::waits_for_policy`, `Attention::first_output_busy`):
+
+- **Which lines:** in a busy room, a line whose only reason to be played is
+  the conversation going on. Not one with its name heard (plainly or
+  close), the text calling it, a face turned to the lamp, a line said to it
+  from close, a head tap or a bare call just before. Those play as before,
+  at once. In a room not known to be busy nothing changes. With
+  `LAMP_REMARKS` too, a remark to the room (above) is held without asking.
+- **The Policy's word:** its attention decision on the line, by the line's
+  number, made for real (`policy_holds::Verdicts`, the same reader the
+  lamp's held actions use). Played on `answer` (`a conversation with the
+  lamp is going on, and the Policy took the line as the lamp's`) and on a
+  `stay_quiet` whose `follows_lamp` is 0.6 or more (`… and the Policy found
+  the line said back to the lamp`). Held on any other `stay_quiet` and on
+  `look_up`, which turns to whoever spoke without speaking (`a busy room: a
+  conversation with the lamp is going on, but the Policy judged the line
+  not for the lamp`).
+- **When it waits:** the Policy decides as the line's words end, and
+  Gemini's first output usually comes later, so the decision is often
+  there already and nothing waits. If it is not, the line's first output,
+  and everything after it, is kept until the decision comes, for at most
+  2 s (`policy_holds::WAIT`). Meanwhile the worker takes nothing more from
+  the service, as when its output is full, and still serves its control
+  (stop, privacy, retirement) on every tick. With no decision in 2 s the
+  line plays as without the switch (`… and no decision of the Policy's came
+  in time`): a Policy that is down must not make the lamp deaf in a
+  conversation. The journal says each wait (`its answer waits for the
+  Policy's decision`) and its end (`the Policy's decision came after N ms`,
+  `no decision of the Policy's came in N ms`, or `its turn ended while it
+  waited`).
+- **What it costs:** none of the day's 48 lines got `answer`, so what it
+  lets through, it lets through by `follows_lamp`. A follow-up said to the
+  lamp that the Policy doesn't read as said back to it is held (17 of the
+  33 lines said to the lamp on 16 October scored 0.6 or more; `policy_holds`).
+  A reply to the lamp's own question is judged the same way. A line that
+  waits is that much later: a held tool turn waits 0.18 s median and 0.47 s
+  p90 on Jev on lamp-4ace (Ten's table, #705, 18 October, 15:1x).
+- **Not shown:** none of it has run on a lamp. Its battery is scene 3, the
+  scene-4 gap, and the first speaker's own follow-ups (Fourth's A/B scenes
+  2 and 5, #705 at 14:58), counted for wanted lines held.
+
+Tests: `going_on_asks::tests::a_line_going_on_is_played_on_answer_or_following_and_held_otherwise`,
+`policy_holds::tests::what_a_decision_says_of_a_line_going_on`,
+`attention::tests::with_the_switch_a_line_going_on_in_a_busy_room_is_the_lamps_only_as_the_policy_says`,
+and through the worker's own loop with the Policy's decisions on a bus:
+`provider_worker::tests::going_on_asks::with_the_switch_a_line_going_on_in_a_busy_room_is_played_only_as_the_policy_says`
+(the 14:44 lines with their decisions then: the car line and scene 4's
+opener held, "And what about tomorrow?" played at once, a `look_up` held,
+the car line played without the switch),
+`…::with_the_switch_a_line_going_on_waits_for_a_late_decision_and_is_played_with_none`
+(a decision 300 ms after the first output: played only once `answer`
+comes, held on `stay_quiet`; none: played after 2 s),
+`…::with_the_switch_a_line_that_calls_the_lamp_does_not_wait`,
+`…::with_the_switch_a_line_whose_turn_ends_while_it_waits_is_let_go_at_once`
+(cancelled while it waits: let go on the next tick, none of its sound out,
+and the next call answered at once) and
+`…::going_on_asks_is_read_after_remarks`.
+
 ## Switch
 
 `LAMP_ATTENTION=on` in the voice unit (the worker's `--attention`). Off by
@@ -1836,6 +1917,12 @@ played only when the lamp was spoken to (above). `day-and-night` adds the
 day's own bars (the worker's `--spoken-to-by-day`, right after
 `--spoken-to`). Off by default; on in the product unit since 17 October
 (#1378), and on lamp-4ace by its drop-in.
+
+`LAMP_GOING_ON_ASKS=on` (the worker's `--going-on-asks`, right after
+`--remarks`; nothing without `LAMP_ATTENTION` and `LAMP_BUS=on`): in a busy
+room, a line let out only as a conversation going on waits up to 2 s for
+the Policy's decision and plays on `answer` or a `stay_quiet` said back to
+the lamp (above). Off by default; not on any lamp.
 
 `LAMP_CUT_INS_NOT_TALK=on` (the worker's `--cut-ins-not-talk`, right
 after `--room-facts`): a line said while the lamp's answer could be heard,
