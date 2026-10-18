@@ -3437,3 +3437,19 @@ wait on their owners and a lamp
   tonight's queue 11; its last P3 fixed at `f59cadd3a`, docs only. #1466
   and #1494 wait on a review, #1514 on a lamp check, #1362 and #1365 on
   Monday. `cargo clean` at 18:4x (3.4 GiB).
+- **18–19 Oct, the night.** Merged: #1581, #1588 (the light, volume and
+  reminders back renew a session told it can't use them; queue 22j passed
+  on lamp-4ace), #1614 and #1621 (`lamp-turn-end --no-spin` and
+  `--realtime-priority`; queue 22l: the first request's worst stall 10 ms
+  against 159 ms), #1629 and #1630 (the Policy's hedge and connection
+  probe), #1632, #1637 and #1640 (#1607's head hold in the restart window;
+  what counts as a press), #1466 (queue 22g passed). **#1494** rebased onto
+  #1466 (`23400cd87`), for queue 22p at about 06:45. Peer read of Tests'
+  #1650 (merged). Found: an actions restart took `lamp-skills`' tools with
+  it, so lamp-4ace had no skill functions from 04:03 (confirmed by the
+  first builder at 04:33). The fix is **#1656**: `lamp-skills` gets its own
+  `RuntimeDirectory=lampos-skills`, the voice reads it first
+  (`LAMP_SKILLS_DIR`) and the old folder for one release, and `lamp-skills`
+  makes it again if it goes (2152/0). **#1655** (keep actions' folder
+  across a restart, El's #1588 P3) waits as a draft until #1656 merges.
+  #1362 waits on Monday. `cargo clean` at 04:4x (3.3 GiB).
