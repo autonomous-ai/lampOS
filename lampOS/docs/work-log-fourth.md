@@ -4386,6 +4386,14 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **Disk:** my old `lamp-fourth-controls-target` (9.1 GB) and this run's target are removed from the podman VM.
 - **Held locally, not pushed:** `fourth/print-fixed-plan` (the child makes a plan for 1.8 s: 1.6× faster prints on the Mac, but 66 MB more at load and about 0.8 s more loading), until the lamp's print times are known.
 
+## 2026-10-18, 09:55 ICT: #1445's P1 fixed on the lamp; #1396's app piece back with me; #1422's fix in its runs
+
+- **#1445's P1 is fixed on lamp-4ace** (the first builder, 09:36): with `e7351fcb1` and the model set, no heartbeat expiry and no mute; `ps` shows the child `TS` at nice 10 beside the voice's `RR` 20 threads, and the model loaded in 5.3 s rather than 15.5 s. lamp-4ace has eight cores (his 09:19), not the four I'd repeated; corrected in the doc, the PR body and this log.
+- **The Third's re-check** (09:41): the fix is right; one P2 on the test, which on CI couldn't catch a child keeping its parent's class. Fixed at `18cfe2a2d` (the spawning thread takes `SCHED_BATCH` where `SCHED_RR` is refused); on Linux in my container it passes, and fails with the class call dropped. The Third has no findings left (09:47). The scene-3 rerun on the lamp is the first builder's.
+- **#1396, the app:** the first builder offered it to El (09:33), who can't reach the app's repository. It stays with me. I'd missed the first builder's 22:25 yes to push and his choice of (a): the branch is now pushed as a draft PR into `v3` (the app repository's #1, private). Claude Code's auto mode then refused a read as an external write, so I've put the push to the user and made no further writes there. The fields of `lamp-cloud`'s replies that the app's page reads are on #1396 for El's contract test, with one gap: no `versions.firmware`.
+- **Peer review:** Tests' #1451 (my crate's `program()` helper, macOS's first-exec check): approved.
+- **#1422:** `fourth/thread-lock` (local): every worker test rig holds one re-entrant lock on the process's conversation and room. Its runs (ten on `lamp-voice`, twenty with the fix) are going. A `reminders::transport` test fails 1 in 3 parallel runs on `lamp-voice` itself, unrelated.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
