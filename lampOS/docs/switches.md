@@ -78,8 +78,8 @@ failing scenes are for Sunday's two-people table (#829).
 motion, since lamp-4ace's motors stay still until Monday: `LAMP_STAFF_NOTE`
 (the in-time/late count), `LAMP_SHORT_SOUNDS=quiet-room-checked`,
 `LAMP_ASKER_FIRST=record`, `LAMP_STOP_TOLD`, `LAMP_WAIT_KEEPS_ANSWER`,
-`LAMP_TASK_NEWS_AT_PAUSE`, `lamp-eyes --leave-still-faces` (one live night) and
-`lamp-expression --offline-face`.
+`LAMP_TASK_NEWS_AT_PAUSE`, `lamp-eyes --leave-still-faces` (one live night),
+`lamp-expression --offline-face` and `lamp-eyes --look-on-change` (one night).
 
 ## The voice: hearing, turns, the ring and the backup voice
 
@@ -211,6 +211,7 @@ its lamp-4ace run is Monday's, with a person there.
 | `lamp-body --moves` | absolute folder; none. Loads NAME.json moves, played by name as gestures | — | — | #994 | Add --moves, check the start log, send a gesture on a standing lamp; not yet shown | off (no folder ships) | No move files ship, and who may ask for a move is not yet decided (#994) | off |
 | `lamp-eyes --full-look` | `WxH` with `--full-look-file`; off. One larger still when asked, after the head settles | — | — | #842 | Works end to end on lamp-4ace, answering since 16 Oct 03:17 (#842); held objects shown on lamp-52e6 | on, with LAMP_LOOK_FULL in the voice's units | Shown on both lamps; the two go on together | now |
 | `lamp-eyes --steady-rate` | `on`/`off`; off. Looks 2/s instead of 4/s while one face sits still | — | — | #1114 | Only an offline cost estimate (about 21% vs 11% of a core on lamp-4ace); lamp-52e6 still to measure | off until measured on a lamp | It halves the eyes' CPU but slows gaze correction (1.5 s vs 0.75 s), not yet seen on a lamp | until |
+| `lamp-eyes --look-on-change` | `on`/`off`; off. With no face for 4 s, a glance like the last one detected is said to hold no face without the detector, which still runs every 3 s and at every glance until the picture has been still 3 s | — | — | #705 (heat) | A night on lamp-4ace: looks detected and ms a look before and after; a sit-down looked at within 0.6 s in the day | off until measured on lamp-4ace | About 20% of a core idle on lamp-4ace (104–130 ms a look, 16–17 looks per 10 s) down to about 4%; host tests only | until |
 | `lamp-eyes --leave-still-faces` | `on`/`off`; off. Leaves out a small, faint face at a fixed spot (a false face) | — | — | #766 | Host replay of lamp-4ace's night: 55 of 55 false faces left out, 0 people; not yet live | off now; on after one live night on lamp-4ace | The replay is strong, but a run on a lamp is still owed before it becomes the default | until |
 | `lamp-eyes` LAMP_EYES_SPEAKING | `on`; off. With `LAMP_BUS=on`, each face on `humans/faces/tracked` gets `speaking` (yes/no/unknown, score) from YuNet's five marks; nothing reads it yet | — | — | #720 | Offline only: synthetic faces at 60 px between the eyes and 0.3 px of jitter, looked at every 250 to 350 ms (still, nodding, nodding at a 20° tilt, turning, closer, talking, talking while moving) right in at least 90% of looks; at --steady-rate's 500 ms under half (eyes.md, "Whether a face is speaking") | off until YuNet's corner jitter on a still face at 0.5 and 1 m is measured on a lamp | It holds only for a near face (60 px, about 0.45 m) with steady marks; at 1 m (about 27 px) it does not, on the synthetic model; no reader exists yet | until |
 | `lamp-expression --enable` | flag; off (shadow). Publishes body and light requests instead of only planning | set | set | commit 6226dae33 (direct) | On lamp-4ace with the alive catalogue since 14 Oct, shown | on (already) | Without it Expression only plans, and nothing moves or lights | on |

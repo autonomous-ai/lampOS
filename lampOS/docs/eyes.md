@@ -75,6 +75,51 @@ sees" with what has and has not been shown of it.
   per 10 s. The half rate itself is not measured on any lamp yet.
   Recognition (one print every 2 s, over 100 ms on the lamp) does not
   halve, so the saving is less than half of those numbers.
+- With `--look-on-change on` (off unless given; `src/change.rs`, #705, the
+  lamp's heat), once no face has been found for 4 s, and no full look or
+  remember is under way, a glance whose frame is like the last one the
+  detector ran on is said to hold no face without running the detector;
+  the detector still runs at least every 3 s, and at every glance until
+  the picture has been still for 3 s. So someone who walks in and sits
+  down is detected at each glance while they move and for 3 s after: a
+  frame the detector misses (dim light, half turned, at the edge) costs
+  one glance, not 3 s (the reviewer on #1441). With nobody in view the
+  glances cost lamp-4ace 104 to 130 ms of a core each, 16 or 17 every 10 s
+  (02:00 to 05:00 on 18 Oct, 0 faces): about 20 % of one core all night,
+  which a look every 3 s brings to about 4 % for a still room and a
+  still head. The frame is compared as a
+  32 by 24 grid of cells, each the mean grey of its pixels (ten by ten in
+  the working frame), against the last frame the detector ran on, not the
+  last one seen, so a slow change adds up: three cells or more 12 greys
+  brighter or darker are a change. A sensor's noise averages out over a
+  cell (no false change on a dark wall with ±20 greys a pixel, in the
+  reviewer's probe); a face at 0.15 of the height (`sight::LEAST_SIZE`,
+  the smallest the body turns to) changes six cells or more from 15 greys
+  of contrast. A smaller or fainter face, such as a co-worker's at 0.08
+  to 0.14 across the office, may change fewer and wait for the 3 s look. Someone coming into
+  view changes the picture, so the glance after it runs the detector, as
+  before; the head moving, the light changing or the sun moving are a
+  change too, and each change past the bar brings back detection at every
+  glance for 3 s (five glances): a head that idles every few seconds, or
+  a flickering light, keeps today's rate. Any face found, even
+  one too small to follow (but not one `--leave-still-faces` leaves out),
+  keeps every glance detected for 4 s. A glance not detected tells the
+  body, the bus and the known file what a look with no face tells them,
+  as often as today. **The trade the switch makes:** someone in view but
+  not found (their back turned, reading) who has kept still for 3 s and
+  then turns slowly to the camera, changing the picture less than the
+  bar, is found at the next 3 s look, not the next 600 ms one; the lamp
+  check should try it. Tests: `change.rs`'s
+  `noise_is_no_change_and_a_face_or_a_slow_drift_is`,
+  `an_empty_still_room_is_detected_every_three_seconds_and_a_change_at_once`,
+  `a_walk_in_and_sit_down_is_detected_at_every_glance_until_still_for_three_seconds`,
+  `without_the_switch_every_glance_is_detected` and
+  `a_face_an_ask_or_a_remember_is_never_an_empty_room`. Raising the bar to
+  40 cells, lowering it to 2 greys, waiting 6 s instead of 3, comparing
+  with the last frame seen, or never detecting a changed frame each fails
+  one of them. Not yet run
+  on a lamp: the saving and a sit-down's time to a look are to be measured
+  on lamp-4ace.
 - It sends one datagram per look to the body's gaze socket and nothing else
   anywhere:
 
@@ -93,7 +138,13 @@ sees" with what has and has not been shown of it.
   one file ("What the model sees", below). A line in the journal every ten
   seconds says how many frames came, how many were looked at, in how many
   there was a face and how long a look took, and ends `, steady` while it
-  looks half as often (only with `--steady-rate on`).
+  looks half as often (only with `--steady-rate on`). With
+  `--look-on-change on` it also says how many of the looks were unchanged
+  and not detected, and the detector's own time as "ms a detected look":
+  a skipped glance costs only the JPEG decode and the grid (not measured
+  on a lamp; the line's two numbers show it), so the line's "ms a look"
+  is then per glance, far under a detection's cost, and the heat
+  comparisons read "ms a detected look".
 - It never moves anything and decides nothing about the conversation. It
   recognises a face only for someone who asked the lamp to remember them
   ("Who is there", below), and nobody else.
@@ -821,7 +872,7 @@ that reads `yes` with the voice's speech is the one speaking.
 lamp-eyes --device /dev/video0 --lock-directory /home/WORKER/private-camera-locks --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/face_detection_yunet_2023mar.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock
 ```
 
-Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on` and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`.
+Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`.
 `--usb` is `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits; the
 lock directory must be private to the user it runs as. A camera that does not open, or fails, is tried again every five
 seconds while permission lasts. A start is given a 2 s budget (`OPEN_BUDGET_US`)

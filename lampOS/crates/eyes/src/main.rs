@@ -7,7 +7,7 @@
 
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-eyes --device ABSOLUTE_PATH --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --usb VENDOR:PRODUCT@TOPOLOGY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH]] [--leave-still-faces on|off] [--steady-rate on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there. With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\n";
+const USAGE: &str = "lamp-eyes --device ABSOLUTE_PATH --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --usb VENDOR:PRODUCT@TOPOLOGY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there. With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\n";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Usb {
@@ -35,6 +35,8 @@ struct Arguments {
     leave_still: bool,
     /// Look half as often while one face sits still (#705).
     steady_rate: bool,
+    /// With nobody in view, run no detector on a frame like the last (#705).
+    look_on_change: bool,
     /// The camera's size for a full look (#836), when one may be asked for.
     full_look: Option<(u32, u32)>,
     /// Where a full look's still is kept, apart from the working frame.
@@ -98,7 +100,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     let (mut sight_file, mut presence_file) = (None, None);
     let (mut recogniser, mut people, mut who_socket, mut known_file) = (None, None, None, None);
     let (mut leave_still, mut full_look, mut full_look_file) = (None, None, None);
-    let (mut steady_rate, mut full_look_movement) = (None, None);
+    let (mut steady_rate, mut full_look_movement, mut look_on_change) = (None, None, None);
     while let Some(key) = args.next() {
         if key == "--help" {
             let alone = device.is_none()
@@ -115,6 +117,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                 && known_file.is_none()
                 && leave_still.is_none()
                 && steady_rate.is_none()
+                && look_on_change.is_none()
                 && full_look_movement.is_none()
                 && full_look.is_none()
                 && full_look_file.is_none()
@@ -162,6 +165,13 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                     _ => return Err("--steady-rate is on or off"),
                 });
             }
+            Some("--look-on-change") if look_on_change.is_none() => {
+                look_on_change = Some(match value.to_str() {
+                    Some("on") => true,
+                    Some("off") => false,
+                    _ => return Err("--look-on-change is on or off"),
+                });
+            }
             Some("--full-look-movement") if full_look_movement.is_none() => {
                 full_look_movement = Some(match value.to_str() {
                     Some("on") => true,
@@ -203,6 +213,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         known_file,
         leave_still: leave_still.unwrap_or(false),
         steady_rate: steady_rate.unwrap_or(false),
+        look_on_change: look_on_change.unwrap_or(false),
         full_look,
         full_look_file,
         full_look_movement: full_look_movement.unwrap_or(false),
@@ -456,10 +467,20 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     let mut latest: Option<usize> = None;
     let mut looked_at = Instant::now();
     let mut face_at: Option<Instant> = None;
+    // When any face was last found, even one too small to follow: with
+    // `--look-on-change`, a frame like the last needs no detector only
+    // once nobody has been found for a while.
+    let mut any_face_at: Option<Instant> = None;
+    let mut change = arguments
+        .look_on_change
+        .then(lamp_eyes::change::Change::default);
     // Whether one face has sat still long enough to look half as often.
     let mut steady = lamp_eyes::steady::Steady::default();
     let (mut frames, mut looks, mut with_face, mut unreadable) = (0u32, 0u32, 0u32, 0u32);
     let mut spent = Duration::ZERO;
+    // Looks the detector ran on, and its time: with `--look-on-change` the
+    // 10 s line's "ms a look" counts the glances it skipped too.
+    let (mut detected, mut detecting) = (0u32, Duration::ZERO);
     let mut reported_at = Instant::now();
     // How the camera is, for the lamp's health.
     let mut camera = lamp_eyes::bus_out::Camera::Closed;
@@ -872,9 +893,29 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     let _ = kept.keep(&working);
                 }
             }
+            let empty_room = lamp_eyes::change::empty_room(
+                wanted.is_some(),
+                who.as_ref().is_some_and(|who| who.taking.is_some()),
+                any_face_at.map(|at| at.elapsed().as_micros() as u64),
+            );
             let found = Picture::from_jpeg(&frame[..used]).and_then(|picture| {
-                detector
-                    .find(&picture)
+                let detect = lamp_eyes::change::detect(
+                    change.as_mut(),
+                    &picture,
+                    empty_room,
+                    lamp_ipc::monotonic_us(),
+                );
+                // A frame like the last one the detector ran on, with
+                // nobody in it then: nobody in it now either.
+                let faces = if detect {
+                    let began = Instant::now();
+                    let faces = detector.find(&picture);
+                    (detected, detecting) = (detected + 1, detecting + began.elapsed());
+                    faces
+                } else {
+                    Ok(Vec::new())
+                };
+                faces
                     .map(|mut faces| {
                         if let Some(still) = still.as_mut() {
                             let now_us = lamp_ipc::monotonic_us();
@@ -885,6 +926,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     now_us,
                                 )
                             });
+                        }
+                        if !faces.is_empty() {
+                            any_face_at = Some(Instant::now());
                         }
                         if let Some(bus) = bus_out.as_mut() {
                             bus.saw(&faces, picture.filled, lamp_ipc::monotonic_us());
@@ -963,9 +1007,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         }
         if reported_at.elapsed() >= REPORT_EVERY {
             eprintln!(
-                "lamp-eyes: {frames} frames, looked at {looks}, a face in {with_face}, {unreadable} unreadable, {:.0} ms a look{}{}",
+                "lamp-eyes: {frames} frames, looked at {looks}, a face in {with_face}, {unreadable} unreadable, {:.0} ms a look{}{}{}",
                 spent.as_secs_f32() * 1e3 / (looks + unreadable).max(1) as f32,
                 if halved { ", steady" } else { "" },
+                change.as_mut().map_or(String::new(), |change| format!(
+                    ", {} of them unchanged and not detected, {:.0} ms a detected look",
+                    change.take_skipped(),
+                    detecting.as_secs_f32() * 1e3 / detected.max(1) as f32
+                )),
                 still.as_ref().map_or(String::new(), |still| format!(
                     ", {} still faces left out so far",
                     still.left_out
@@ -973,6 +1022,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             );
             (frames, looks, with_face, unreadable) = (0, 0, 0, 0);
             spent = Duration::ZERO;
+            (detected, detecting) = (0, Duration::ZERO);
             reported_at = Instant::now();
         }
         std::thread::sleep(Duration::from_millis(5));
@@ -1077,6 +1127,15 @@ mod tests {
         let keeping = [&FULL[..], &["--steady-rate", "off"]].concat();
         assert!(!parse(args(&keeping)).unwrap().unwrap().steady_rate);
         assert!(parse(args(&[&FULL[..], &["--steady-rate", "yes"]].concat())).is_err());
+        // Every glance is detected unless looking on change is asked for.
+        assert!(!value.look_on_change);
+        let on = [&FULL[..], &["--look-on-change", "on"]].concat();
+        assert!(parse(args(&on)).unwrap().unwrap().look_on_change);
+        let off = [&FULL[..], &["--look-on-change", "off"]].concat();
+        assert!(!parse(args(&off)).unwrap().unwrap().look_on_change);
+        assert!(parse(args(&[&FULL[..], &["--look-on-change", "yes"]].concat())).is_err());
+        let twice = [&on[..], &["--look-on-change", "on"]].concat();
+        assert!(parse(args(&twice)).is_err());
         // The newest frame is kept for the voice service only when asked.
         assert_eq!(value.sight_file, None);
         let seeing = [&FULL[..], &["--sight-file", "/run/lampos-eyes/sight.jpg"]].concat();
