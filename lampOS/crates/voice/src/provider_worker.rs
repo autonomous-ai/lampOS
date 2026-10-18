@@ -2061,16 +2061,23 @@ async fn serve_with_visual<C: Connect>(
                             // #1445). Taken here, at the next verdict, since
                             // the lamp's answer to that line began the count
                             // afresh.
+                            // Never at a line that called the lamp for
+                            // itself: that one begins a conversation of its
+                            // own, and a late voice from the one before
+                            // ends nothing of it (Eighth on #829).
                             let late_other = intake
                                 .handoff
                                 .voices
                                 .as_mut()
-                                .filter(|_| attention.awaits_verdict(request))
+                                .filter(|_| attention.awaits_verdict(request) && !attention.called_for_itself())
                                 .and_then(|voices| voices.take_late_other());
-                            if let Some(late) = late_other
-                                && let Ok(mut told) = crate::room_told::room().lock()
-                            {
-                                told.another_voice_held(late);
+                            if let Some(late) = late_other {
+                                // Said, as every verdict's why is (Eighth on
+                                // #829: this one was silent).
+                                eprintln!("lamp-voice provider: request {request}: no conversation is going on for it: request {late}'s voice, known after its answer, was another's");
+                                if let Ok(mut told) = crate::room_told::room().lock() {
+                                    told.another_voice_held(late);
+                                }
                             }
                             // A line long enough to know, judged as without
                             // the check for want of a print: said, never
@@ -2099,8 +2106,12 @@ async fn serve_with_visual<C: Connect>(
                             }
                             attention.set_night(night_read.is_some_and(|(_, night)| night));
                             let verdict = attention.first_output_busy(request, room, going_on, attention_busy, turned);
+                            // Let out as the conversation going on, or for
+                            // itself: a line that called the lamp begins a
+                            // conversation of its own, even while another
+                            // is going on (Eighth on #829).
                             if let (Some(voices), Some(verdict)) = (intake.handoff.voices.as_mut(), verdict) {
-                                voices.decided(request, matches!(verdict, crate::attention::Verdict::Play(_)), going_on);
+                                voices.decided(request, matches!(verdict, crate::attention::Verdict::Play(_)), going_on && !attention.called_for_itself());
                             }
                             if verdict.is_none()
                                 && !attention.judged(request)

@@ -1413,6 +1413,24 @@ impl Attention {
         self.verdict == Some(Verdict::Play(NAMED_NEAR))
     }
 
+    /// Whether the request in hand called the lamp for itself: its name
+    /// heard as it began or in its sound, its head tapped, or its words
+    /// calling it, as the rule reads them. Let out, such a line begins a
+    /// conversation of its own, whatever conversation was going on: the
+    /// same-voice check takes its voice as that one's, and judges it
+    /// against no earlier voice (Eighth on #829: a named call let out while
+    /// another person's conversation was going on was judged against that
+    /// person's voice).
+    pub fn called_for_itself(&self) -> bool {
+        self.named
+            || self.tapped
+            || if self.name_in_passing_ignored {
+                called_by_name(&self.heard)
+            } else {
+                called(&self.heard)
+            }
+    }
+
     /// Whether `request` is the request in hand and its answer is still
     /// to be judged: the first thing [`Self::first_output_busy`] checks.
     pub fn awaits_verdict(&self, request: u64) -> bool {

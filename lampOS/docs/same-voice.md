@@ -307,6 +307,24 @@ at the lamp is to set it.
   are answered and the other three held; with the late print taken
   unchecked, every line is played) and
   `a_late_print_is_compared_before_it_becomes_the_conversations_voice`.
+- **A call begins a conversation of its own, even amid another's** (Eighth
+  on #829). A line that called the lamp for itself, by its name heard, its
+  head tapped or its words, starts the conversation's prints afresh once
+  it's let out, even while another person's conversation is going on and
+  before its own print has come. Its voice is never judged late against
+  that person's, and starting afresh drops any late "another voice" of the
+  conversation before. Before this, such a call was taken as the old
+  conversation going on: its late print was another voice than the old
+  speaker's, so it ended the caller's own conversation at the caller's next
+  line, as the 09:34 scene 3 on 18 October may have shown (the journal
+  will say). A line whose conversation ends this way says so at its
+  verdict: "no conversation is going on for it: request N's voice, known
+  after its answer, was another's". Tests:
+  `with_a_voice_check_a_named_call_amid_anothers_conversation_begins_its_own`
+  (B calls and follows up, A calls by name while B's conversation is going
+  on and follows up, every print late: all four answered; with the call
+  taken as B's conversation going on, A's follow-up is held) and
+  `a_new_conversation_ends_any_late_voice_of_the_one_before`.
 - **The child is supervised, with bounds.** One that gives no answer to a
   line within 2 s (`ANSWER_WITHIN`) is killed and started again, with a
   journal line. One that ends 3 times in a row before it is ready
