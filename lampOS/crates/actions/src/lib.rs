@@ -44,6 +44,11 @@ pub struct Function {
 pub enum Outcome {
     /// What was established, as a sentence.
     Done(String),
+    /// Done, and nothing changed: it already was so ("My light is already
+    /// orange."). Said to the model as a `Done` is, and never answered
+    /// short, since there is no change to be the answer (the reviewer and
+    /// Third on #1520).
+    Already(String),
     /// Why it was not done, or could not be confirmed, as a sentence.
     Failed(String),
 }
@@ -51,10 +56,41 @@ impl Outcome {
     /// The line that answers the call.
     pub fn line(&self) -> Value {
         match self {
-            Self::Done(said) => json!({"ok": true, "result": {"result": said}}),
+            Self::Done(said) | Self::Already(said) => {
+                json!({"ok": true, "result": {"result": said}})
+            }
             Self::Failed(said) => json!({"ok": false, "error": said}),
         }
     }
+
+    /// The line that answers `name`, short when `short` and the call is
+    /// one of the light's or the volume's and was done: the model is told
+    /// to say only a word or two after it ([`SHORT_NEXT`]). The change is
+    /// the answer, seen or heard; the words after it only cost time
+    /// (`LAMP_SHORT_DONE`, the first builder on #705, 13:4x). What was
+    /// established is still told, and a call not done, or one that changed
+    /// nothing ([`Outcome::Already`]), is said as before.
+    pub fn line_for(&self, name: &str, short: bool) -> Value {
+        match self {
+            Self::Done(said) if short && is_short(name) => {
+                json!({"ok": true, "result": {"result": said, "next": SHORT_NEXT}})
+            }
+            _ => self.line(),
+        }
+    }
+}
+
+/// What the model is told to say after a light or volume change it asked
+/// for, with `LAMP_SHORT_DONE=on`.
+pub const SHORT_NEXT: &str = "It is done. About this change, say only a word or two, in your own words and not the same each time. Answer anything else they asked as you would.";
+
+/// The switch for [`SHORT_NEXT`]: `on` only.
+pub const SHORT_ENVIRONMENT: &str = "LAMP_SHORT_DONE";
+
+/// Whether `name` is answered short with the switch: the light's and the
+/// volume's functions, whose change is the answer.
+pub fn is_short(name: &str) -> bool {
+    name.starts_with("light_") || (name.starts_with("volume_") && !is_app_call(name))
 }
 
 /// The functions that can be carried out now.
@@ -139,6 +175,9 @@ pub fn catalog_file(functions: &[Function]) -> String {
 pub struct Executive<S, L> {
     pub sound: Option<sound::Volume<S>>,
     pub light: Option<L>,
+    /// The light's and the volume's calls answered short
+    /// ([`Outcome::line_for`]).
+    pub short: bool,
 }
 
 impl<S: sound::Mixer, L: light::Light> Executive<S, L> {
@@ -281,6 +320,42 @@ mod tests {
             10
         );
         assert!(catalog_file(&all).len() < 65_536);
+    }
+
+    #[test]
+    fn only_a_done_light_or_volume_call_is_answered_short_and_only_with_the_switch() {
+        let done = Outcome::Done("The light is warm now.".into());
+        let short =
+            json!({"ok": true, "result": {"result": "The light is warm now.", "next": SHORT_NEXT}});
+        for name in [
+            "light_warmer",
+            "light_colour",
+            "light_off",
+            "volume_up",
+            "volume_mute",
+        ] {
+            assert_eq!(done.line_for(name, true), short, "{name}");
+            assert_eq!(done.line_for(name, false), done.line(), "{name}");
+        }
+        // The app's numbers and anything else are not the light or the
+        // volume changed for the model.
+        for name in ["volume_level", "volume_to", "set_timer", "recall"] {
+            assert!(!is_short(name), "{name}");
+            assert_eq!(done.line_for(name, true), done.line(), "{name}");
+        }
+        let failed = Outcome::Failed("I could not confirm it changed.".into());
+        assert_eq!(failed.line_for("light_warmer", true), failed.line());
+        // Nothing changed: said as without the switch, for the model to say.
+        let already = Outcome::Already("My light is already orange.".into());
+        assert_eq!(already.line_for("light_colour", true), already.line());
+        assert_eq!(
+            already.line(),
+            json!({"ok": true, "result": {"result": "My light is already orange."}})
+        );
+        assert!(SHORT_NEXT.contains("a word or two"));
+        // No one word to repeat after every change (rule 8): no example,
+        // quoted or not.
+        assert!(!SHORT_NEXT.contains("such as") && !SHORT_NEXT.contains('"'));
     }
 
     #[test]

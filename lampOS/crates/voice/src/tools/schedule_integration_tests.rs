@@ -199,6 +199,7 @@ impl Actions {
             let mut executive = Executive {
                 sound: None::<lamp_actions::sound::Volume<NoMixer>>,
                 light: None::<NoLight>,
+                short: false,
             };
             lamp_actions::server::serve_reporting_with_schedule(
                 &path,
