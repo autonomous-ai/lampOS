@@ -69,6 +69,12 @@ every result on a lamp below names it. Newest first.
 - #1524 peer review (cut-in side): a rule decision never touches a stop or a
   yield (the Policy holds actions only), but any named kind with the lamp
   speaking always answers; P2 to refuse those kinds.
+- #1532 merged (docs): linear-gated's replayed figure, 10 of 19 and 2 false.
+- Today's ten cut-ins (`3f4f3c5c3`) from the trails: scenes 7 and 8 had no
+  reply playing, scene 2 was stopped by the stop words, and scene 4 is the
+  one hearing miss (a quiet line 1–5 % explained, scored 0). Cutting in went
+  0.50 → 0.55. `cutins.sh` now waits for the reply's first speaker write
+  before the cut (a sourced gate, on #828).
 
 ## 2026-10-17 — evening: #828 confounded, go-aways are the lamp's own
 
