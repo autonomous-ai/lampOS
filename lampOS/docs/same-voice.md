@@ -275,6 +275,38 @@ speakers, both judged right.)
   raised-voice line between a call and its follow-up. If those end the
   conversation, the fallback is to end it only when the other voice was
   near the lamp (`set_near`) or a second face is in view.
+  - **A question in the conversation's own voice goes on** (#829, 19
+    October). The cost above was measured on lamp-4ace in queue 22e's
+    check-on arm (01:19–01:56).
+    - In scene 5, Samantha's "Pepper", held as another voice (0.09–0.13),
+      ended Daniel's conversation. His "Lamp, what about a name for a black
+      kitten then?" (its bare "Lamp," never heard as the name) and "And
+      which of those names is more popular?" were then held in all three
+      rounds.
+    - In scene 4, a television's line (0.34, 0.41) ended his, and his "And
+      how long would that take by train?" was held.
+    - Now, when lines held as another voice are all that ended the
+      conversation since the lamp last spoke (`RoomTold::ended_only_by_another_voice`),
+      a line that asks something (`remarks::asks`) in the conversation's
+      own voice (likeness at or over the bar) goes on with it. The journal
+      says `the conversation's voice (cosine …), a question after another
+      voice's line: the conversation goes on`.
+    - **Still held:**
+      - a statement in that voice: the caller's talk to the other person,
+        scene 1's "Yes, and we should leave a bit early.";
+      - any line after talk left unanswered: #1030's 06:07 scene, where
+        Daniel's "But the client wants to meet in person." ends it by talk
+        before his "budget" question;
+      - another voice's next line, which is compared with the
+        conversation's prints and held.
+    - **Its cost:** the caller asking the other person a question right
+      after her line ("Do you really like Pepper?") is answered (the
+      first builder's yes, 19 October, 02:10).
+    - **Tests:**
+      `spoken_to::with_a_voice_check_a_question_in_the_conversations_voice_goes_on_after_another_voices_line`
+      (scene 5 and her line after it; scene 4; the statement held), with
+      #1030's `…_a_line_held_as_another_voice_counts_as_talk` unchanged;
+      `room_told::tests::a_conversation_is_over_only_by_another_voice_until_talk_or_the_lamp`.
   - **Off the lamp, on the battery's lines** (made with `say` in its two
     voices, 16 kHz, the real model, `lamp-same-voice pairs`): against
     Daniel's "Hey Lamp, … Hanoi", Samantha's umbrella line (1.58 s) has a

@@ -984,6 +984,85 @@ async fn with_the_switch_and_a_voice_check_a_line_held_as_another_voice_counts_a
     assert_eq!(scene(false).await, (true, true));
 }
 
+/// #829, lamp-4ace on 19 October (queue 22e): Samantha's "Pepper", held as
+/// another voice, ended Daniel's conversation, and his next questions to the
+/// lamp were held: "What about a name for a black kitten then?" (its
+/// "Lamp," not heard as the name) and "And which of those names is more
+/// popular?". So was scene 4's "And how long would that take by train?"
+/// after a television's line. A question in the conversation's own voice
+/// now goes on with it after only another voice's line, and her next line
+/// is still held. A statement in his voice there is still his talk to her
+/// (the reviewer on #1030, and `RoomTold::another_voice_held`).
+#[tokio::test(start_paused = true)]
+async fn with_a_voice_check_a_question_in_the_conversations_voice_goes_on_after_another_voices_line()
+ {
+    let _clock = logical_clock();
+    let scene = |lines: &'static [(i16, &'static str)]| async move {
+        let _mark = OwnMark::kept();
+        let _room = OwnRoom::fresh();
+        let mut options = options(true, attention_now, crate::tools::Settings::default());
+        options.voices = Some(Box::new(TwoVoices(Default::default())));
+        let mut rig = LiveRig::start_configured(
+            quick_policy(),
+            options,
+            BARRIER,
+            false,
+            Continuation::Off,
+            lamp_gemini::MAX_WIRE_BYTES * 2,
+            |config| {
+                config
+                    .timeouts(lamp_gemini::Timeouts {
+                        unanswered: Some(Duration::from_millis(100)),
+                        ..Default::default()
+                    })
+                    .unwrap()
+            },
+        );
+        let mut dial = rig.ready().await;
+        let mut played = Vec::new();
+        for &(voice, text) in lines {
+            played.push(voice_line(&mut rig, &mut dial, false, voice, 150, text, true).await);
+        }
+        rig.stop().await;
+        played
+    };
+    // Scene 5, and her line after the lamp's answer.
+    assert_eq!(
+        scene(&[
+            (1, "Hey Lamp, what is a good name for a small grey cat?"),
+            (-1, "I think we should call her Pepper, she looks like one."),
+            (1, "What about a name for a black kitten then?"),
+            (1, "And which of those names is more popular?"),
+            (-1, "I still like Pepper better."),
+        ])
+        .await,
+        [true, false, true, true, false]
+    );
+    // Scene 4: a television's line, then his question.
+    assert_eq!(
+        scene(&[
+            (1, "Hey Lamp, how far is it from Hanoi to Da Nang?"),
+            (
+                -1,
+                "In other news, heavy rain is expected across the north this weekend."
+            ),
+            (1, "And how long would that take by train?"),
+        ])
+        .await,
+        [true, false, true]
+    );
+    // A statement in his voice after her line is his talk to her.
+    assert_eq!(
+        scene(&[
+            (1, "Hey Lamp, what is the weather like in Hanoi today?"),
+            (-1, "I should bring an umbrella then."),
+            (1, "Yes, and we should leave a bit early."),
+        ])
+        .await,
+        [true, false, false]
+    );
+}
+
 /// Voice prints as [`TwoVoices`] makes them, but the other voice's at a
 /// cosine of 0.35 against the first's: between the bar of 0.25 set off the
 /// lamp and the labelled set's 0.45 (#1485).

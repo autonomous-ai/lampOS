@@ -1602,6 +1602,12 @@ impl Attention {
     pub fn answers_the_lamps_question(&self) -> bool {
         self.lamp_asked
     }
+
+    /// Whether what was heard of the request in hand asks something
+    /// ([`crate::remarks::asks`]).
+    pub fn asks_something(&self) -> bool {
+        crate::remarks::asks(&self.heard)
+    }
 }
 
 #[cfg(test)]

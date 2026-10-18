@@ -167,6 +167,10 @@ pub struct RoomTold {
     /// the lamp has spoken after it.
     talk_since_spoke: usize,
     talk_counted: u64,
+    /// Since the lamp last spoke, only lines held as another voice have
+    /// ended the conversation, no talk left unanswered
+    /// ([`Self::ended_only_by_another_voice`]).
+    other_voice_only: bool,
     /// When watching began.
     watching_since_us: Option<u64>,
     /// A line said over the lamp's reply and left unanswered is not counted
@@ -204,6 +208,7 @@ impl RoomTold {
             held_by_policy: None,
             talk_since_spoke: 0,
             talk_counted: 0,
+            other_voice_only: false,
             watching_since_us: None,
             cut_ins_not_talk: false,
             over_the_lamp: VecDeque::new(),
@@ -319,12 +324,19 @@ impl RoomTold {
     /// "Yes, and we should leave a bit early.", to the other person, would
     /// otherwise have been answered as the conversation still going on.
     /// A sound let through is no one's voice, and no talk: it ends nothing
-    /// (the reviewer on #1415).
+    /// (the reviewer on #1415). A question in the conversation's own voice
+    /// still goes on with it while nothing else has ended it
+    /// ([`Self::ended_only_by_another_voice`], #829).
     pub fn another_voice_held(&mut self, request: u64) {
         if self.sound == Some(request) {
             return;
         }
         if self.talk_only {
+            // Already ended by talk, it stays so; otherwise only another
+            // voice has ended it.
+            if !self.talked_past_the_lamp() {
+                self.other_voice_only = true;
+            }
             self.talk_counted = self.talk_counted.max(request);
             self.talk_since_spoke = self.talk_since_spoke.max(TALK_ENDS_CONVERSATION);
         }
@@ -399,6 +411,7 @@ impl RoomTold {
         }
         self.unanswered.clear();
         self.talk_since_spoke = 0;
+        self.other_voice_only = false;
         self.talk_counted = self.talk_counted.max(request);
         self.quiet_since_us = Some(now_us);
         self.last_sound_us = now_us;
@@ -430,6 +443,18 @@ impl RoomTold {
     /// that message") as the conversation going on.
     pub fn talked_past_the_lamp(&self) -> bool {
         self.talk_only && self.talk_since_spoke >= TALK_ENDS_CONVERSATION
+    }
+
+    /// Whether the conversation is over only because lines were held as
+    /// another voice since the lamp last spoke ([`Self::another_voice_held`]),
+    /// with no talk left unanswered. The same-voice check then lets a
+    /// question in the conversation's own voice go on with it (#829: on
+    /// lamp-4ace on 19 October, Samantha's "Pepper", held as another voice,
+    /// ended Daniel's conversation, and his "What about a name for a black
+    /// kitten then?" was held). A statement in that voice, or any line
+    /// after talk, still finds it over.
+    pub fn ended_only_by_another_voice(&self) -> bool {
+        self.talked_past_the_lamp() && self.other_voice_only
     }
 
     /// `request` ended with the lamp saying nothing. Whether it counts as
@@ -474,6 +499,7 @@ impl RoomTold {
         if request > self.talk_counted {
             self.talk_counted = request;
             self.talk_since_spoke = self.talk_since_spoke.saturating_add(1);
+            self.other_voice_only = false;
         }
         self.join_the_run(now_us);
         Left::Talk
@@ -1690,5 +1716,47 @@ mod tests {
         assert_eq!(after.at(100 * S), Room::Busy);
         assert_eq!(after.at(210 * S), Room::Busy);
         assert_eq!(after.at(212 * S), Room::Quiet);
+    }
+
+    /// #829: the conversation is over only by another voice until talk is
+    /// left unanswered, or the lamp speaks; talk first, then another voice,
+    /// is over by talk.
+    #[test]
+    fn a_conversation_is_over_only_by_another_voice_until_talk_or_the_lamp() {
+        const S: u64 = 1_000_000;
+        let mut room = RoomTold::new();
+        room.count_only_talk(true);
+        room.heard(1, S);
+        room.ended(1, 2 * S);
+        room.spoke(1, 3 * S);
+        assert!(!room.ended_only_by_another_voice());
+        room.heard(2, 4 * S);
+        room.ended(2, 5 * S);
+        room.another_voice_held(2);
+        assert!(room.talked_past_the_lamp() && room.ended_only_by_another_voice());
+        room.left_unanswered(2, 6 * S);
+        assert!(
+            room.ended_only_by_another_voice(),
+            "its own close counts no talk"
+        );
+        room.heard(3, 7 * S);
+        room.ended(3, 8 * S);
+        room.left_unanswered(3, 9 * S);
+        assert!(room.talked_past_the_lamp() && !room.ended_only_by_another_voice());
+        room.spoke(4, 10 * S);
+        assert!(!room.talked_past_the_lamp() && !room.ended_only_by_another_voice());
+        // Talk first, then another voice: over by talk.
+        for request in [5, 6] {
+            room.heard(request, request * 2 * S);
+            room.ended(request, request * 2 * S + S / 2);
+            room.left_unanswered(request, request * 2 * S + S);
+        }
+        assert!(room.talked_past_the_lamp());
+        room.another_voice_held(7);
+        assert!(!room.ended_only_by_another_voice());
+        // Without only talk counted, nothing is over.
+        let mut off = RoomTold::new();
+        off.another_voice_held(1);
+        assert!(!off.ended_only_by_another_voice());
     }
 }

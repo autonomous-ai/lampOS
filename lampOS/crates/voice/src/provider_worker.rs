@@ -2302,8 +2302,22 @@ async fn serve_with_visual<C: Connect>(
                             // (the Seventh on #1445): never at a line that
                             // called the lamp for itself (Eighth on #829,
                             // `Voices::at_verdict`).
+                            // Another voice's line, held, ended the
+                            // conversation for whoever spoke next; a question
+                            // in the conversation's own voice still goes on
+                            // with it (#829, lamp-4ace on 19 October:
+                            // Samantha's "Pepper" ended Daniel's, and his
+                            // next question to the lamp was held). Not after
+                            // talk left unanswered, and not a statement: the
+                            // caller's talk to the other person is still
+                            // theirs (the reviewer on #1030).
+                            let own_voice_may_go_on = !going_on
+                                && intake.handoff.voices.is_some()
+                                && attention.asks_something()
+                                && crate::room_told::room().lock().is_ok_and(|room| room.ended_only_by_another_voice())
+                                && crate::thread::THREAD.lock().is_ok_and(|thread| thread.going_on(Instant::now()));
                             let judged = intake.handoff.voices.as_mut().filter(|_| attention.awaits_verdict(request)).map(|voices| {
-                                voices.at_verdict(request, going_on, attention.called_for_itself())
+                                voices.at_verdict(request, going_on || own_voice_may_go_on, attention.called_for_itself())
                             });
                             let late_other = judged.and_then(|at| at.late_other);
                             if let Some(late) = late_other {
@@ -2318,7 +2332,7 @@ async fn serve_with_visual<C: Connect>(
                             // the check for want of a print: said, never
                             // silently again (#829, lamp-4ace on 18 October,
                             // requests 18 and 19; the reviewer on #1435).
-                            if let Some(why) = judged.and_then(|at| at.unjudged).filter(|_| late_other.is_none())
+                            if let Some(why) = judged.and_then(|at| at.unjudged).filter(|_| late_other.is_none() && going_on)
                                 && let Some(voices) = intake.handoff.voices.as_ref()
                             {
                                 voices.judged_without(request, why);
@@ -2329,6 +2343,10 @@ async fn serve_with_visual<C: Connect>(
                                     eprintln!("lamp-voice provider: request {request}: another voice than the conversation's (cosine {likeness:.2}): no conversation is going on for it");
                                     other_voice = true;
                                     false
+                                }
+                                Some(likeness) if own_voice_may_go_on => {
+                                    eprintln!("lamp-voice provider: request {request}: the conversation's voice (cosine {likeness:.2}), a question after another voice's line: the conversation goes on");
+                                    true
                                 }
                                 Some(likeness) => {
                                     eprintln!("lamp-voice provider: request {request}: the conversation's voice (cosine {likeness:.2})");
