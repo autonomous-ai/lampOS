@@ -34,7 +34,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 webpki-roots = "1"
 # A look's picture in a chat request (`second_provider`), as `lamp-gemini` pins it.
 base64 = "=0.22.1"
-rustix = { version = "=1.1.5", features = ["fs", "process", "net", "pipe", "stdio", "event"] }
+rustix = { version = "=1.1.5", features = ["fs", "process", "net", "pipe", "stdio", "event", "time", "thread"] }
 sonora-agc2 = "=0.2.0"
 sonora-simd = "=0.2.0"
 signal-hook = { version = "=0.4.4", default-features = false }

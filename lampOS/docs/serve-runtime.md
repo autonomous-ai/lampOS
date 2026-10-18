@@ -344,6 +344,60 @@ the ring worker's SPI write does while the SD/MMC host re-tunes (#911).
 Workers are started with a cleared environment, so the coordinator passes
 `LAMP_STALLS` and `LAMP_STALLS_DIR` on to each.
 
+
+## What each capture stage costs: `LAMP_CAPTURE_STAGES=on`
+
+On lamp-4ace on 18 October `worker capture` took 18 % of a core with nobody
+there, while its code benched flat out sums to 2–6 % at the lamp's scale
+(#705, 09:39). With `LAMP_CAPTURE_STAGES=on` (off unless set; the
+coordinator passes it to the capture worker only), that worker says once a
+minute on stderr (the journal) what each stage of its passes cost its own
+thread (`crates/voice/src/stage_cost.rs`, `CLOCK_THREAD_CPUTIME_ID`, so time
+it waited or was preempted is not counted). The line's shape (not measured
+numbers):
+
+```
+lamp-voice: capture: thread CPU P % on CPU C over the last 60 s, N passes, B blocks: read X ms (Y µs each of N), reference …, canceller …, detector …, encode …, rest of pass …, wait … (LAMP_CAPTURE_STAGES=on)
+```
+
+- `read`: the microphone's `try_read`, timed on every pass while it runs.
+- `reference`: each reference packet accepted and each block's step. Both
+  render into the canceller and the echo evidence's observer.
+- `canceller`: all of `EchoProcessor::capture`. That is AEC3, and also the
+  echo evidence's search (the work `LAMP_QUIET_EVIDENCE` skips) and the
+  steady reference, so a large `canceller` is not AEC3 alone.
+- `detector`: the speech detector; `encode`: the frame's encode and send.
+- `rest of pass`: the rest of each pass (control, sockets, authority).
+- `wait`: from one pass's end to the next's start: the sleep's own CPU,
+  and with `LAMP_STALLS=on` that diagnostic's own `getrusage` pair and two
+  clock reads a pass, and once a minute this line itself.
+
+Two switched paths, both off in the product unit: the stop words' raw
+stream (`--raw-blocks`, #1353) copies each block in `rest of pass` and is
+serialized in `encode`; the linear speech-detector input
+(`LAMP_VAD_INPUT=linear`, #1416) is copied inside `echo.capture`, so in
+`canceller`, and chosen in `detector`. `C` is the CPU the thread is on as
+the line is said (`sched_getcpu`, `-` off Linux): on lamp-4ace the small
+cores 0–5 and the big cores 6–7 differ about 2.7 times, so a minute is read
+with it. Each call's cost is printed to 0.1 µs.
+
+The share is the thread's whole CPU time against the wall clock. Read it
+beside each core's `scaling_cur_freq` and the thermal zones: a stage that
+costs more than its bench at the same code points at the core or the clock
+the worker gets. Its own cost: four clock reads a pass, eight a block and
+two a reference packet, about 3,000 a second, each a system call on Linux,
+and each stage's time carries about one of them (it matters for `read`, a
+few µs a call). On lamp-4ace on 18 October (the first builder, #1454, at
+`7b634c687`, when the line still came with `LAMP_STALLS=on`; nobody there,
+`worker capture` held on one core type with `taskset`) that cost was not
+measurable: the worker read 17.1–17.2 % of a core on the small cores and
+6.3 % on the big ones with the line, against 17.0–17.4 % and 6.5–7.2 %
+without it (`pidstat`, 09:54–09:59). Its split, per 10 ms block, small core
+then big: canceller 732–736 and 208–211 µs, detector 327–330 and 101–103 µs,
+read 180 and 80 µs, rest of pass 205 and 100 µs, wait 75 and 45 µs (each
+over the block's five passes), encode 92–93 and 43 µs, reference 98 and
+40 µs. It is a diagnostic, in no unit.
+
 ## A quieter pace while nothing happens: `LAMP_QUIET_PACE=on`
 
 The coordinator's loop passes every 2 ms whatever is happening. On lamp-4ace
