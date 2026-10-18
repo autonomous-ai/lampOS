@@ -4,6 +4,31 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 16:57 #1546 at bc2ae44bc: my P3 fixed (the other lines named in the docs), docs and comments only; waits for ARM64
+- 16:54 merged #1539 (ten, --agreement --from/--until for the shadow night), the Policy owner's yes, ARM64 green
+- 16:54 reviewed and merged #1543 (tests, lamp-controls' recording tests give the last fsync 5 s; the flake I reported), closed #1542
+- 16:52 re-checked #1498 at 7c666a641: the earlier P2 fixed (the mic polled for the whole wait, about 15 µs late on the rig); a new P2: the no-render rig test cannot pass (ReferenceLate after 24 frames) and turns ARM64 red; two P3s; fold to one
+- 16:49 re-checked #1538 at 3ba8c41d4: the lamp_asked P2 fixed; the 16:14 P2s (wanted follow-ups at follows_lamp 0.18–0.57 and a look_up at 0.9 held) not fixed; needs a rebase and fold (a merge commit and fix-ups)
+- 16:45 merged #1541 (eighth, docs: my four #1533 P3s), ARM64 green
+- 16:44 #1546 reviewed at 87336d077 (nine, training/name/lamp.py: speaking voices only, negatives held out by stretch, counted by source), one P3; waits for ARM64
+- 16:35 merged #1520 (twelve, LAMP_SHORT_DONE in lamp-actions, off unless set, the owner's yes), folded and rebased, ARM64 green
+- 16:34 #1539 rebased to a7ad0b294 after #1524, range-diff with no content change; waits for ARM64
+- 16:34 re-checked #1115 at 33bdb88c0: held joints' loads kept with the run's peaks, right, lamp-body 446/0; the first builder's merge after step 4
+- 16:31 reviewed and merged #1540 (tests, docs: realtime-tests.md records the #1128 batch; ARM64 figures checked against each PR's run)
+- 16:28 #1541 reviewed at 5600c0ac3 (eighth, docs: my four #1533 P3s), no findings; waits for ARM64
+- 16:23 #1539 at 904f88f16: P3s fixed, the Policy owner's yes at 16:12, but conflicts in replay/tests.rs after #1524 merged; asked to rebase
+- 16:23 merged #1524 (ten, lamp-policy --rule-decides, off unless set), the Policy's owner's yes at 15:58, ARM64 green
+- 16:22 merged #1518 (fifth, lamp-body's fold line and bad reads in the journal), folded, ARM64 green on the rerun (the first run failed controls' privacy_only_touch_recording…, a crate this PR doesn't touch)
+- 16:21 #1538 reviewed at 80d632053 (fourth, LAMP_GOING_ON_ASKS, the second half of #1522's fix): P2s with the peer reviews (replies to the lamp's question and wanted follow-ups held; lamp_asked read from the line before), three P3s; not ready
+- 16:17 #1520 rebased to 8ca2354dc: range-diff shows only #1495's spoken(name) kept in the Already line; waits for ARM64
+- 16:15 merged #1533 (eighth, LAMP_REMARKS: two remarks held end a busy room's conversation; half of #1522's fix), ARM64 green, four doc P3s left
+- 16:13 #1537 reviewed at efa2884af (seventh, directed-fixture --fixture-at-ms): two P2s (the start counts from the loop's start, not listening_ready; the tests don't run the real loop), P3s; not ready
+- 16:10 re-checked #1513 at 6f8860550: both P3s fixed (one read through Recalling::opened, tested through it), no findings, ARM64 green; the first builder's merge after the lamp check
+- 16:10 reviewed and merged #1536 (tests, the transport's held-up test on one stepped clock; #1128), ARM64 green
+- 16:10 on #705 to Tests: two privacy tests failed once each on ARM64 on PRs that don't touch them (privacy_worker losing_controls…, controls privacy_only_touch_recording…), both green on rerun
+- 16:09 merged #1532 (sixth, docs: linear-gated's replayed figure), ARM64 green on the rerun (the first run failed privacy_worker::losing_controls_ends_the_real_worker_cleanly_and_expires_its_lease, a test this docs PR doesn't touch)
+- 16:09 #1539 reviewed at c1a3f1d3d (ten, --agreement --from/--until for the shadow night): no blocking finding, two P3s (Feb 30 rolls over; the flags ignored outside --agreement); waits for ARM64 and the Policy owner's yes
+- 16:04 #1524 at d9e882077: Fourth (the Policy's owner) approved at 15:58; only policy.md changed since 9c878faaf; waits for ARM64
 - 15:59 reviewed and merged #1531 (tests, lamp-name's lease test halves; #1128), ARM64 green
 - 15:59 reviewed and merged #1530 (tests, progress_news waits for its note to be let go; #1128), ARM64 green
 - 15:58 reviewed and merged #1535 (tests, hello_asks steps the clock to the 2 s edge; #1128), ARM64 green
