@@ -15,6 +15,15 @@
 //! turn of the same number whose end of speech was decided at most a minute
 //! before it. What it prints is numbers and function names: no words that
 //! were heard or said.
+//!
+//! Every request admitted is a turn, also one cut before its end of speech
+//! (`cut`). Each also says how long the lamp sat idle before it (from the
+//! end of the request before, or from the run's `listening_ready` for its
+//! first), and the longest capture gap (`capture_gap`) it held. The
+//! summary keeps a run's first request and a turn after a long idle apart
+//! from the rest: on lamp-4ace on 18 Oct, two runs' first request after
+//! about six idle minutes stalled the microphone 135 and 172 ms and lost
+//! the second route (#1608), which only a journal line said.
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -27,6 +36,9 @@ const SIGNALS: &[&str] = &[crate::tools::NOT_FOR_ME, crate::attention::HEARD_MY_
 /// A first-output line belongs to a turn whose end of speech was decided at
 /// most this long before it.
 const MATCH_WITHIN_US: u64 = 60_000_000;
+/// A turn after at least this long with nothing going on is counted apart
+/// from the rest (#1608: the stalls came after about six idle minutes).
+pub const LONG_IDLE_US: u64 = 300_000_000;
 
 /// Every JSON line of the files under `root`, at any depth, whose names
 /// begin with `prefix` and end `.jsonl`, each with the folder it was in.
@@ -78,6 +90,23 @@ pub struct Turn {
     pub first_audio_us: Option<u64>,
     pub first_sound_us: Option<u64>,
     pub outcome: Option<String>,
+    /// When its input was admitted (`input_admitted`), and when it ended
+    /// (`turn_finished`).
+    pub admitted_us: Option<u64>,
+    pub finished_us: Option<u64>,
+    /// A request admitted but ended before its end of speech was decided
+    /// (no `local_endpoint`): it has no times after an end of speech, and
+    /// `endpoint_us` is its admission.
+    pub cut: bool,
+    /// The run's first request admitted.
+    pub first_of_run: bool,
+    /// How long nothing went on before it: from the end of the request
+    /// before (0 if that had not ended yet), or from the run's
+    /// `listening_ready` for its first.
+    pub idle_us: Option<u64>,
+    /// The longest capture gap that ended while it was the latest request
+    /// admitted and not yet finished.
+    pub stalled_us: Option<u64>,
 }
 
 impl Turn {
@@ -94,7 +123,7 @@ impl Turn {
 
     fn after(&self, at_us: Option<u64>) -> Option<f64> {
         at_us
-            .filter(|at| *at >= self.endpoint_us)
+            .filter(|at| !self.cut && *at >= self.endpoint_us)
             .map(|at| (at - self.endpoint_us) as f64 / 1_000.0)
     }
 
@@ -130,6 +159,10 @@ impl Turn {
             "audio_before_answer": audio_before_answer,
             "first_sound_ms": self.after(self.first_sound_us),
             "outcome": self.outcome,
+            "cut": self.cut,
+            "first_of_run": self.first_of_run,
+            "idle_ms": self.idle_us.map(|us| us as f64 / 1_000.0),
+            "stalled_ms": self.stalled_us.map(|us| us as f64 / 1_000.0),
         })
     }
 }
@@ -159,6 +192,26 @@ pub fn turns(events: &[(PathBuf, Value)], first: &[(PathBuf, Value)]) -> Vec<Tur
             entry.endpoint_us = entry.endpoint_us.min(at);
         }
     }
+    // A request admitted and ended before any end of speech (#1615 review,
+    // 21:56): still the run's first if it came first, and its stall counts.
+    for (folder, event) in events {
+        if event["kind"] == "input_admitted"
+            && let (Some(turn), Some(at)) = (number(event, "turn"), number(event, "at_us"))
+        {
+            let entry = by_turn
+                .entry((folder.clone(), turn))
+                .or_insert_with(|| Turn {
+                    run: folder.clone(),
+                    turn,
+                    endpoint_us: at,
+                    cut: true,
+                    ..Turn::default()
+                });
+            if entry.cut {
+                entry.endpoint_us = entry.endpoint_us.min(at);
+            }
+        }
+    }
     let earliest = |kept: &mut Option<u64>, at: u64| {
         *kept = Some(kept.map_or(at, |kept| kept.min(at)));
     };
@@ -174,11 +227,14 @@ pub fn turns(events: &[(PathBuf, Value)], first: &[(PathBuf, Value)]) -> Vec<Tur
             Some("speaker_first_write") => earliest(&mut entry.first_sound_us, at),
             Some("turn_finished") => {
                 entry.outcome = event["outcome"].as_str().map(str::to_owned);
+                earliest(&mut entry.finished_us, at);
             }
+            Some("input_admitted") => earliest(&mut entry.admitted_us, at),
             _ => {}
         }
     }
     let mut turns: Vec<Turn> = by_turn.into_values().collect();
+    idle_and_gaps(events, &mut turns);
     // Each first-output line goes to the turn of its number decided most
     // recently before it, within a minute.
     for (_, line) in first {
@@ -210,7 +266,8 @@ pub fn turns(events: &[(PathBuf, Value)], first: &[(PathBuf, Value)]) -> Vec<Tur
         let Some(turn) = turns
             .iter_mut()
             .filter(|turn| {
-                turn.turn == request
+                !turn.cut
+                    && turn.turn == request
                     && turn.endpoint_us <= at
                     && at - turn.endpoint_us <= MATCH_WITHIN_US
             })
@@ -230,6 +287,89 @@ pub fn turns(events: &[(PathBuf, Value)], first: &[(PathBuf, Value)]) -> Vec<Tur
     turns
 }
 
+/// Each turn's idle time before it, whether it is its run's first, and its
+/// longest capture gap (#1608). Turns are in run and turn order already
+/// (the map's key).
+fn idle_and_gaps(events: &[(PathBuf, Value)], turns: &mut [Turn]) {
+    let mut ready: BTreeMap<&PathBuf, u64> = BTreeMap::new();
+    let mut gaps: BTreeMap<&PathBuf, Vec<(u64, u64)>> = BTreeMap::new();
+    for (folder, event) in events {
+        let Some(at) = event["at_us"].as_u64() else {
+            continue;
+        };
+        match event["kind"].as_str() {
+            Some("listening_ready") => {
+                let kept = ready.entry(folder).or_insert(at);
+                *kept = (*kept).min(at);
+            }
+            Some("capture_gap") => {
+                if let Some(stalled) = event["stalled_us"].as_u64() {
+                    gaps.entry(folder).or_default().push((at, stalled));
+                }
+            }
+            _ => {}
+        }
+    }
+    // Runs are contiguous and in turn order (the map's key).
+    let mut from = 0;
+    while from < turns.len() {
+        let to = from
+            + turns[from..]
+                .iter()
+                .take_while(|turn| turn.run == turns[from].run)
+                .count();
+        let run = &turns[from].run;
+        let (ready, gaps) = (
+            ready.get(run).copied(),
+            gaps.get(run).map_or(&[][..], Vec::as_slice),
+        );
+        idle_and_gaps_of_run(&mut turns[from..to], ready, gaps);
+        from = to;
+    }
+}
+
+/// One run's turns: the first is its first request; each idle time runs
+/// from the end of the one before (finished, else first sound, else end of
+/// speech). A gap is stamped when it ended and goes to one turn only, the
+/// latest admitted whose window holds it; a window runs from admission to
+/// `turn_finished`, or to the next admission if it has none.
+fn idle_and_gaps_of_run(turns: &mut [Turn], ready: Option<u64>, gaps: &[(u64, u64)]) {
+    let begun: Vec<u64> = turns
+        .iter()
+        .map(|turn| turn.admitted_us.unwrap_or(turn.endpoint_us))
+        .collect();
+    let window_end: Vec<u64> = (0..turns.len())
+        .map(|i| {
+            turns[i]
+                .finished_us
+                .or_else(|| begun.get(i + 1).copied())
+                .unwrap_or(u64::MAX)
+                .max(begun[i])
+        })
+        .collect();
+    let mut previous = ready;
+    for (i, turn) in turns.iter_mut().enumerate() {
+        turn.first_of_run = i == 0;
+        turn.idle_us = previous.map(|end| begun[i].saturating_sub(end));
+        previous = Some(
+            turn.finished_us
+                .or(turn.first_sound_us)
+                .unwrap_or(turn.endpoint_us)
+                .max(begun[i]),
+        );
+    }
+    for (at, stalled) in gaps {
+        let Some(owner) = (0..turns.len())
+            .rev()
+            .find(|&i| begun[i] <= *at && *at <= window_end[i])
+        else {
+            continue;
+        };
+        let kept = &mut turns[owner].stalled_us;
+        *kept = Some(kept.map_or(*stalled, |kept| kept.max(*stalled)));
+    }
+}
+
 fn median(mut values: Vec<f64>) -> Option<f64> {
     if values.is_empty() {
         return None;
@@ -240,6 +380,36 @@ fn median(mut values: Vec<f64>) -> Option<f64> {
         values[middle]
     } else {
         (values[middle - 1] + values[middle]) / 2.0
+    })
+}
+
+/// The turns apart by what came before them (#1608): a run's first
+/// request, one after at least [`LONG_IDLE_US`] with nothing going on, and
+/// the rest. For each: how many, how many reached the speaker and the
+/// median time to it, and how many had a capture gap and the longest.
+fn by_idle(rows: &[Value]) -> Value {
+    let long_ms = LONG_IDLE_US as f64 / 1_000.0;
+    let group = |keep: &dyn Fn(&Value) -> bool| {
+        let mine: Vec<&Value> = rows.iter().filter(|row| keep(row)).collect();
+        let stalled: Vec<f64> = mine
+            .iter()
+            .filter_map(|row| row["stalled_ms"].as_f64())
+            .collect();
+        json!({
+            "turns": mine.len(),
+            "cut": mine.iter().filter(|row| row["cut"] == true).count(),
+            "answered": mine.iter().filter(|row| !row["first_sound_ms"].is_null()).count(),
+            "first_sound_ms": median(mine.iter().filter_map(|row| row["first_sound_ms"].as_f64()).collect()),
+            "stalled": stalled.len(),
+            "longest_stall_ms": stalled.iter().copied().reduce(f64::max),
+        })
+    };
+    let long = |row: &Value| row["idle_ms"].as_f64().is_some_and(|idle| idle >= long_ms);
+    json!({
+        "long_idle_ms": long_ms,
+        "first_of_run": group(&|row| row["first_of_run"] == true),
+        "after_long_idle": group(&|row| row["first_of_run"] != true && long(row)),
+        "rest": group(&|row| row["first_of_run"] != true && !long(row)),
     })
 }
 
@@ -270,7 +440,8 @@ pub fn summary(turns: &[Turn]) -> Value {
     };
     json!({
         "status": "turn_times_summary",
-        "turns": rows.len(),
+        "turns": rows.iter().filter(|row| row["cut"] != true).count(),
+        "cut": rows.iter().filter(|row| row["cut"] == true).count(),
         "plain": {
             "n": count("plain"),
             "first_output_ms": of("plain", "first_output_ms"),
@@ -299,6 +470,7 @@ pub fn summary(turns: &[Turn]) -> Value {
             "first_audio_ms": of("function", "first_audio_ms"),
             "first_sound_ms": of("function", "first_sound_ms"),
         },
+        "by_idle": by_idle(&rows),
         "boundary": "from the voice's end-of-speech decision (local_endpoint) to the first write the speaker accepted (speaker_first_write); acoustic onset unmeasured; calls only where a first-output file has voice_tool_call lines",
     })
 }
@@ -496,5 +668,219 @@ mod tests {
         assert_eq!(events[0].0, metadata);
         assert_eq!(lines_under(&root, "first-output-").unwrap().len(), 1);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// #1608: a run's first request after six idle minutes, its capture gap
+    /// counted to it and not the start's, a quick follow-up, and a turn after
+    /// another long idle, each kept apart in the summary; a run with no
+    /// `listening_ready` has a first request with no idle time.
+    #[test]
+    fn a_runs_first_request_and_one_after_a_long_idle_are_kept_apart_with_their_stalls() {
+        const S: u64 = 1_000_000;
+        let at = |folder: &str, value: Value| (PathBuf::from(folder), value);
+        let one = "/s/one/metadata";
+        let events = vec![
+            at(one, json!({"kind":"listening_ready","at_us":10 * S})),
+            // The start's own stall, before any request: no turn's.
+            at(
+                one,
+                json!({"kind":"capture_gap","stalled_us":160_000,"dropped_frames":0,"at_us":10 * S + S / 2}),
+            ),
+            // Request 1, six minutes later, with its stall 0.6 s in.
+            at(
+                one,
+                json!({"kind":"input_admitted","turn":1,"at_us":370 * S}),
+            ),
+            at(
+                one,
+                json!({"kind":"capture_gap","stalled_us":135_000,"dropped_frames":2,"at_us":370 * S + 600_000}),
+            ),
+            at(
+                one,
+                json!({"kind":"local_endpoint","turn":1,"at_us":372 * S}),
+            ),
+            at(
+                one,
+                json!({"kind":"speaker_first_write","turn":1,"at_us":373 * S}),
+            ),
+            at(
+                one,
+                json!({"kind":"turn_finished","turn":1,"at_us":375 * S,"outcome":"completed"}),
+            ),
+            // Request 2, five seconds after it.
+            at(
+                one,
+                json!({"kind":"input_admitted","turn":2,"at_us":380 * S}),
+            ),
+            at(
+                one,
+                json!({"kind":"local_endpoint","turn":2,"at_us":381 * S}),
+            ),
+            at(
+                one,
+                json!({"kind":"speaker_first_write","turn":2,"at_us":382 * S}),
+            ),
+            at(
+                one,
+                json!({"kind":"turn_finished","turn":2,"at_us":384 * S,"outcome":"completed"}),
+            ),
+            // Request 3, after another six minutes, not answered.
+            at(
+                one,
+                json!({"kind":"input_admitted","turn":3,"at_us":744 * S}),
+            ),
+            at(
+                one,
+                json!({"kind":"local_endpoint","turn":3,"at_us":745 * S}),
+            ),
+            at(
+                one,
+                json!({"kind":"turn_finished","turn":3,"at_us":746 * S,"outcome":"no_audio_answer"}),
+            ),
+            // Another run, with no listening_ready in its records.
+            at(
+                "/s/two/metadata",
+                json!({"kind":"local_endpoint","turn":1,"at_us":5 * S}),
+            ),
+            at(
+                "/s/two/metadata",
+                json!({"kind":"speaker_first_write","turn":1,"at_us":6 * S}),
+            ),
+        ];
+        let turns = turns(&events, &[]);
+        let rows: Vec<Value> = turns.iter().map(Turn::row).collect();
+        assert_eq!(rows.len(), 4);
+        let (first, second, third, other) = (&rows[0], &rows[1], &rows[2], &rows[3]);
+        assert_eq!(
+            (
+                first["first_of_run"].clone(),
+                first["idle_ms"].clone(),
+                first["stalled_ms"].clone()
+            ),
+            (json!(true), json!(360_000.0), json!(135.0))
+        );
+        assert_eq!(
+            (
+                second["first_of_run"].clone(),
+                second["idle_ms"].clone(),
+                second["stalled_ms"].clone()
+            ),
+            (json!(false), json!(5_000.0), Value::Null)
+        );
+        assert_eq!(third["idle_ms"], json!(360_000.0));
+        assert_eq!(
+            (other["first_of_run"].clone(), other["idle_ms"].clone()),
+            (json!(true), Value::Null)
+        );
+        let by = &summary(&turns)["by_idle"];
+        assert_eq!(by["first_of_run"]["turns"], 2);
+        assert_eq!(by["first_of_run"]["stalled"], 1);
+        assert_eq!(by["first_of_run"]["longest_stall_ms"], json!(135.0));
+        assert_eq!(by["first_of_run"]["first_sound_ms"], json!(1_000.0));
+        assert_eq!(by["after_long_idle"]["turns"], 1);
+        assert_eq!(by["after_long_idle"]["answered"], 0);
+        assert_eq!(by["rest"]["turns"], 1);
+        assert_eq!(by["rest"]["stalled"], 0);
+        // Numbers only: no words.
+        assert!(!summary(&turns).to_string().contains("heard"));
+    }
+
+    /// #1615 review, 21:56: a request cut before its end of speech, its
+    /// stall inside it, is still the run's first and its stall counted; the
+    /// request after it is not the first, and its idle runs from the cut
+    /// one's end.
+    #[test]
+    fn a_first_request_cut_before_its_end_of_speech_is_the_runs_first_with_its_stall() {
+        const S: u64 = 1_000_000;
+        let one = PathBuf::from("/s/one/metadata");
+        let at = |value: Value| (one.clone(), value);
+        let events = vec![
+            at(json!({"kind":"listening_ready","at_us":10 * S})),
+            at(json!({"kind":"input_admitted","turn":1,"at_us":370 * S})),
+            at(
+                json!({"kind":"capture_gap","stalled_us":135_000,"dropped_frames":2,"at_us":370 * S + 600_000}),
+            ),
+            at(json!({"kind":"turn_finished","turn":1,"at_us":371 * S,"outcome":"capture_gap"})),
+            at(json!({"kind":"input_admitted","turn":2,"at_us":375 * S})),
+            at(json!({"kind":"local_endpoint","turn":2,"at_us":376 * S})),
+            at(json!({"kind":"speaker_first_write","turn":2,"at_us":377 * S})),
+            at(json!({"kind":"turn_finished","turn":2,"at_us":379 * S,"outcome":"completed"})),
+        ];
+        // A first-output line for request 1 goes to no cut request.
+        let firsts = vec![first(1, "audio", 370 * S + 1)];
+        let turns = turns(&events, &firsts);
+        let rows: Vec<Value> = turns.iter().map(Turn::row).collect();
+        assert_eq!(rows.len(), 2);
+        let (cut, next) = (&rows[0], &rows[1]);
+        assert_eq!(
+            (
+                cut["cut"].clone(),
+                cut["first_of_run"].clone(),
+                cut["idle_ms"].clone(),
+                cut["stalled_ms"].clone()
+            ),
+            (json!(true), json!(true), json!(360_000.0), json!(135.0))
+        );
+        assert_eq!(
+            (cut["outcome"].clone(), cut["first_output"].clone()),
+            (json!("capture_gap"), Value::Null)
+        );
+        assert_eq!(
+            (
+                next["cut"].clone(),
+                next["first_of_run"].clone(),
+                next["idle_ms"].clone(),
+                next["first_sound_ms"].clone()
+            ),
+            (json!(false), json!(false), json!(4_000.0), json!(1_000.0))
+        );
+        let summary = summary(&turns);
+        assert_eq!(
+            (summary["turns"].clone(), summary["cut"].clone()),
+            (json!(1), json!(1))
+        );
+        let by = &summary["by_idle"];
+        assert_eq!(
+            (
+                by["first_of_run"]["turns"].clone(),
+                by["first_of_run"]["cut"].clone(),
+                by["first_of_run"]["longest_stall_ms"].clone()
+            ),
+            (json!(1), json!(1), json!(135.0))
+        );
+        assert_eq!(by["rest"]["turns"], 1);
+    }
+
+    /// #1615 review, 21:56: a gap goes to one turn only, the latest admitted
+    /// (the one being heard), and a turn with no `turn_finished` holds a gap
+    /// after its end of speech; an overlapping turn's idle time is 0.
+    #[test]
+    fn a_gap_goes_to_one_turn_and_an_unfinished_turn_holds_one_after_its_end_of_speech() {
+        const S: u64 = 1_000_000;
+        let one = PathBuf::from("/s/one/metadata");
+        let at = |value: Value| (one.clone(), value);
+        let events = vec![
+            at(json!({"kind":"listening_ready","at_us":0})),
+            at(json!({"kind":"input_admitted","turn":1,"at_us":10 * S})),
+            at(json!({"kind":"local_endpoint","turn":1,"at_us":11 * S})),
+            at(json!({"kind":"speaker_first_write","turn":1,"at_us":12 * S})),
+            // Request 2 is admitted while request 1 still plays.
+            at(json!({"kind":"input_admitted","turn":2,"at_us":13 * S})),
+            at(
+                json!({"kind":"capture_gap","stalled_us":180_000,"dropped_frames":0,"at_us":13 * S + S / 2}),
+            ),
+            at(json!({"kind":"turn_finished","turn":1,"at_us":14 * S,"outcome":"completed"})),
+            at(json!({"kind":"local_endpoint","turn":2,"at_us":15 * S})),
+            // The run ends mid-turn: no sound, no turn_finished.
+            at(
+                json!({"kind":"capture_gap","stalled_us":250_000,"dropped_frames":0,"at_us":15 * S + S / 2}),
+            ),
+        ];
+        let rows: Vec<Value> = turns(&events, &[]).iter().map(Turn::row).collect();
+        assert_eq!(rows[0]["stalled_ms"], Value::Null);
+        assert_eq!(
+            (rows[1]["idle_ms"].clone(), rows[1]["stalled_ms"].clone()),
+            (json!(0.0), json!(250.0))
+        );
     }
 }
