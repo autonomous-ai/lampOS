@@ -455,6 +455,10 @@ pub fn capture_on<D: CaptureDevice>(
     echo_reference: lamp_audio::Reference,
     raw_blocks: bool,
 ) -> Result<()> {
+    // The worker inherits the unit's RR 20 and all cores; with
+    // LAMP_CAPTURE_CORES its thread (and the ones it starts) keep to those
+    // cores. Unset, nothing; a bad value logs and keeps the default (#705).
+    crate::capture_cores::apply_from_environment();
     let mut recording = Recording::start(
         diagnostic_directory,
         controller,

@@ -41,8 +41,9 @@ signal-hook = { version = "=0.4.4", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # A thread's own page faults and switches over one pass (`stalls`, #1178;
-# `RUSAGE_THREAD` is Linux's).
-nix = { version = "=0.29.0", default-features = false, features = ["resource"] }
+# `RUSAGE_THREAD` is Linux's), and the capture worker's cores
+# (`capture_cores`, `sched_setaffinity`, #705).
+nix = { version = "=0.29.0", default-features = false, features = ["resource", "sched"] }
 gpiocdev = "=0.8.0"
 thread-priority = "=3.1.1"
 

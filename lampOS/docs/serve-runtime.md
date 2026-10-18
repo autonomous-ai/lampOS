@@ -171,6 +171,27 @@ through it. The processor reached 92 to 95 degrees C in twenty seconds of
 that load either way, which is its own limit on what else this lamp can be
 asked to do.
 
+### The capture worker's cores
+
+The workers inherit the unit's affinity as well as its priority: every one
+is `RR 20` on cores `0-7`, and the scheduler places it. lamp-4ace has two
+clusters: policy0 is cores 0-5, the six small cores (max 1794 MHz), and
+policy6 is cores 6-7, the two big cores (max 2002 MHz). On 18 October
+(09:54-09:59, the first builder on #705, `pidstat -t -u` every 10 s, a quiet
+room) `worker capture` took 17.0-17.4 % on small cores 0, 1, 2, 3 and 5,
+then moved to big core 6 and took 6.5-7.2 % there, with the small cores
+mostly at 1794 MHz and no zone over 69.5 degrees C: the core type, not the
+clock. `LAMP_CAPTURE_CORES=6-7` (off unless set, Linux only) keeps capture
+on the big cores: at its start the worker calls `sched_setaffinity` on its
+own thread, before the threads it starts, and logs one line with the cores
+and what `sched_getaffinity` reads back ("it took" or "it did not take").
+Unset, nothing is called. A value that is not a cpu-list (`6-7`, `6,7`,
+`6`), or that names a core not online, is logged and the default kept; the
+voice never stops for it. The supervisor passes it to the capture worker
+only. The risk: the eyes' detector also runs best on the big cores, and
+capture at `RR 20` always wins over it there, so the eyes lose about 7 % of
+one big core. The eyes are unchanged.
+
 A minute of what the harness itself does, concentrated (138 rounds of a
 log-in, a 16 MiB log read, a Python start and an 8 MiB synced write to the
 SD card), ended nothing at the default scheduling, so those two faults are

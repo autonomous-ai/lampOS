@@ -775,6 +775,10 @@ fn worker_command(
             role,
             var(crate::activity::INPUT_ENVIRONMENT).as_deref(),
         ))
+        .envs(capture_cores_worker_environment(
+            role,
+            var(crate::capture_cores::ENVIRONMENT),
+        ))
         .envs(person_name_worker_environment(
             role,
             var(crate::person::ENVIRONMENT).as_deref(),
@@ -835,6 +839,17 @@ fn vad_input_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "capture" && value == Some(std::ffi::OsStr::new("linear")))
         .then_some((crate::activity::INPUT_ENVIRONMENT, "linear"))
+}
+
+// The capture worker's cores (#705), to capture only, as set: the worker
+// parses it, and says so when it is not a cpu list.
+fn capture_cores_worker_environment(
+    role: &str,
+    value: Option<std::ffi::OsString>,
+) -> Option<(&'static str, std::ffi::OsString)> {
+    value
+        .filter(|_| role == "capture")
+        .map(|value| (crate::capture_cores::ENVIRONMENT, value))
 }
 
 // The typed name's file (#806), to the two workers that build the model's
@@ -984,6 +999,8 @@ mod tests {
                     "on"
                 } else if name == crate::activity::INPUT_ENVIRONMENT {
                     "linear"
+                } else if name == crate::capture_cores::ENVIRONMENT {
+                    "6-7"
                 } else if name == crate::person::ENVIRONMENT {
                     "/etc/lampOS/person/name"
                 } else {
@@ -1039,7 +1056,11 @@ mod tests {
             ),
             (
                 "capture",
-                vec!["LAMP_QUIET_EVIDENCE=on", "LAMP_VAD_INPUT=linear"],
+                vec![
+                    "LAMP_CAPTURE_CORES=6-7",
+                    "LAMP_QUIET_EVIDENCE=on",
+                    "LAMP_VAD_INPUT=linear",
+                ],
             ),
         ] {
             let status = worker_command(&script, &home.path, role, (boot, boot), &[], on)
