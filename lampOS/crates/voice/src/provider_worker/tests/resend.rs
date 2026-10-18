@@ -407,6 +407,10 @@ impl InputSink for LiveSink {
         true
     }
 
+    fn note(&self, request: RequestId, text: &str) -> lamp_gemini::Result<()> {
+        self.inner.note(request, text)
+    }
+
     fn live_session(&self) -> Option<SessionId> {
         SessionId::new(3).ok()
     }
@@ -421,19 +425,50 @@ impl InputSink for LiveSink {
     }
 }
 
-/// The reviewer on #1434 (07:14): what went with a line goes no further.
-/// The rest of a line cut off by a pause (`continues_cut_off`), one told of
-/// a stop, or one a note or the eyes' picture went with, is half of what the
-/// lost session heard: with a next session live, it is not sent again, its
-/// held `TurnFailed` is owed (`Attached`), and nothing is offered. The same
-/// line with nothing attached is sent again.
+/// The reviewer on #1434 (07:14, 09:30): what went with a line. The rest
+/// of a line cut off by a pause (`continues`, `continues_cut_off`), or one
+/// the eyes' picture went with, is half of what the lost session heard: with
+/// a next session live, it is not sent again, its held `TurnFailed` is owed
+/// (`Attached`), and nothing is offered. A note told beside it (here the
+/// lamp's name heard, which the product tells) goes again with it, on the
+/// new session, before its blocks. The same line with nothing beside it is
+/// sent again.
 #[test]
-fn a_held_line_that_went_with_something_is_not_sent_again_alone() {
+fn a_held_line_goes_again_with_its_note_but_not_without_its_first_part_or_picture() {
     let live = || LiveSink {
         inner: RecordingSink::default(),
         resent: Cell::new(false),
     };
-    // Attached at its Start (continues, continues_cut_off, after_stop).
+    // A Start that said `continues_cut_off`, through the worker's own submit.
+    let mut owner = controller();
+    let mut handoff = InputHandoff {
+        tolerate_outage: true,
+        resend: true,
+        ..InputHandoff::default()
+    };
+    let sink = RecordingSink::default();
+    let request = authorize(&mut owner, &mut handoff);
+    let cut_off = match start(request, &handoff) {
+        ProviderInput::Start {
+            session,
+            request,
+            privacy_generation,
+            ..
+        } => ProviderInput::Start {
+            session,
+            request,
+            privacy_generation,
+            continues: false,
+            continues_cut_off: true,
+            over_the_lamp: false,
+            after_stop: false,
+            follows_on: false,
+            over_the_lamps_voice: false,
+        },
+        other => other,
+    };
+    handoff.submit(cut_off, NOW, &sink).unwrap();
+    assert!(handoff.kept.as_ref().unwrap().attached);
     let (_owner, mut handoff, _, request) = held();
     handoff.kept.as_mut().unwrap().attached = true;
     let sink = live();
@@ -448,26 +483,35 @@ fn a_held_line_that_went_with_something_is_not_sent_again_alone() {
         (request, crate::resend::Refused::Attached)
     );
     assert!(sink.inner.calls.borrow().is_empty());
-    // A note told beside it (`noted`).
-    let (_owner, mut handoff, _, request) = held();
-    handoff.noted = Some((request, "(a note)".into()));
-    let sink = live();
-    handoff.resend_upkeep(&sink, NOW + 1_000);
-    assert!(!sink.resent.get());
-    assert_eq!(
-        handoff.unresent.pop_front().map(|owed| owed.why),
-        Some(crate::resend::Refused::Attached)
-    );
     // The eyes' picture went with it.
     let (_owner, mut handoff, _, request) = held();
     handoff.pictured(RequestId::new(request).unwrap());
     let sink = live();
     handoff.resend_upkeep(&sink, NOW + 1_000);
     assert!(!sink.resent.get());
-    // Nothing attached: sent again.
-    let (_owner, mut handoff, _, _) = held();
+    // Its name heard, told beside it: sent again, and told again first.
+    let (_owner, mut handoff, _, request) = held();
+    let note = note_text(None, request, crate::called::NOTE);
+    handoff.noted = Some((request, note.clone()));
     let sink = live();
     handoff.resend_upkeep(&sink, NOW + 1_000);
     assert!(sink.resent.get());
     assert!(handoff.unresent.is_empty());
+    assert_eq!(
+        sink.inner.calls.borrow().first(),
+        Some(&Call::Note(request, note))
+    );
+    // Nothing beside it: sent again, with no note.
+    let (_owner, mut handoff, _, _) = held();
+    let sink = live();
+    handoff.resend_upkeep(&sink, NOW + 1_000);
+    assert!(sink.resent.get());
+    assert!(
+        !sink
+            .inner
+            .calls
+            .borrow()
+            .iter()
+            .any(|call| matches!(call, Call::Note(..)))
+    );
 }

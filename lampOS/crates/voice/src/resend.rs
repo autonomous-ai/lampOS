@@ -85,8 +85,9 @@ pub struct Lost {
     pub newer_line: bool,
     /// Something went with it that the next session would not have: the
     /// line before it that it goes on from (`continues`,
-    /// `continues_cut_off`), a note (the stop, its name heard, only its
-    /// name, following on), or the eyes' picture (the reviewer on #1434).
+    /// `continues_cut_off`), or the eyes' picture (the reviewer on #1434).
+    /// A note told beside it (the stop, its name heard, only its name,
+    /// following on) is not: the worker tells it again.
     pub attached: bool,
 }
 
@@ -103,7 +104,7 @@ pub enum Refused {
     TooLate,
     Stage,
     Fault,
-    /// It went with a note, a picture or the line before it.
+    /// It went with the line before it or the eyes' picture.
     Attached,
     /// The next session refused to take it (`try_resend_for_session`).
     NotTaken,
@@ -123,7 +124,7 @@ impl Refused {
             Self::Stage => "it was not delivered, or had begun to be answered",
             Self::Fault => "a second try does not mend this failure",
             Self::Attached => {
-                "it went with a note, a picture or the line before it, which the next session would not have"
+                "it went with the line before it or the eyes' picture, which the next session would not have"
             }
             Self::NotTaken => "the next session did not take it",
         }
