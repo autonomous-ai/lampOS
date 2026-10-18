@@ -69,8 +69,17 @@ impl Block<'_> {
 }
 
 /// Seconds east of UTC in the zone of this compiled zone file at `now`
-/// (seconds since 1970 UTC).
+/// (seconds since 1970 UTC). Past the listed changes of a zone with summer
+/// time, nothing, as the lamp has always taken its own zone.
 pub fn offset_at(file: &[u8], now: i64) -> Option<i32> {
+    offset_with(file, now, false)
+}
+
+/// [`offset_at`], and with `ruled`, past the listed changes of a zone with
+/// summer time, its closing rule worked out ([`rule_offset`]): for another
+/// place's time only (`LAMP_TIME_PLACES`, #1547), whose zone file may be a
+/// slim one.
+fn offset_with(file: &[u8], now: i64, ruled: bool) -> Option<i32> {
     let first = block(file, 0, false)?;
     let (table, rule) = if file.get(4).is_some_and(|version| *version >= b'2') {
         let second = block(file, first.end, true)?;
@@ -88,13 +97,144 @@ pub fn offset_at(file: &[u8], now: i64) -> Option<i32> {
         }
         kind = usize::from(table.kinds[index]);
     }
-    // Past the listed changes a rule with a comma in it is summer time.
+    // Past the listed changes a rule with a comma in it is summer time:
+    // worked out, with `ruled`, where it is written as most zones write it
+    // ([`rule_offset`]); nothing otherwise.
     if !listed && rule.contains(&b',') {
-        return None;
+        return ruled.then(|| rule_offset(rule, now)).flatten();
     }
     let info = table.infos.get(kind * 6..kind * 6 + 4)?;
     let offset = i32::from_be_bytes(info.try_into().ok()?);
     (-86_400 < offset && offset < 86_400).then_some(offset)
+}
+
+/// The zone file's closing rule (RFC 8536 section 3.3, a POSIX TZ string
+/// between newlines), worked out at `now`: seconds east of UTC. Only the
+/// `Mm.w.d` form of the change dates, which every zone with summer time now
+/// uses; `Jn` and `n` give nothing.
+fn rule_offset(rule: &[u8], now: i64) -> Option<i32> {
+    let text = std::str::from_utf8(rule).ok()?.trim_matches('\n');
+    let (head, changes) = text.split_once(',')?;
+    let (start, end) = changes.split_once(',')?;
+    let (head, standard_west) = zone_offset(skip_name(head)?)?;
+    let head = skip_name(head)?;
+    let summer_west = if head.is_empty() {
+        standard_west - 3_600
+    } else {
+        let (rest, west) = zone_offset(head)?;
+        if !rest.is_empty() {
+            return None;
+        }
+        west
+    };
+    let (standard, summer) = (-standard_west, -summer_west);
+    // The change dates fall in the year of `now` where the lamp would be.
+    let year = civil((now + i64::from(standard)).div_euclid(86_400)).0;
+    let begins = change(start, year)? - i64::from(standard);
+    let ends = change(end, year)? - i64::from(summer);
+    let in_summer = if begins < ends {
+        begins <= now && now < ends
+    } else {
+        now >= begins || now < ends
+    };
+    let offset = if in_summer { summer } else { standard };
+    (-86_400 < offset && offset < 86_400).then_some(offset)
+}
+
+/// Past a zone's name in a POSIX TZ string: letters, or anything in `<>`.
+fn skip_name(text: &str) -> Option<&str> {
+    if let Some(rest) = text.strip_prefix('<') {
+        return rest.split_once('>').map(|(_, rest)| rest);
+    }
+    let letters = text.bytes().take_while(u8::is_ascii_alphabetic).count();
+    Some(&text[letters..])
+}
+
+/// A POSIX offset (`5`, `-3:30`, `+05:45:00`) at the start of `text`, in
+/// seconds west of UTC as POSIX writes it, and what follows it.
+fn zone_offset(text: &str) -> Option<(&str, i32)> {
+    let (sign, text) = match text.as_bytes().first()? {
+        b'-' => (-1, &text[1..]),
+        b'+' => (1, &text[1..]),
+        _ => (1, text),
+    };
+    let (rest, seconds) = clock(text)?;
+    Some((rest, sign * seconds))
+}
+
+/// `hh[:mm[:ss]]` at the start of `text`, in seconds, and what follows.
+fn clock(text: &str) -> Option<(&str, i32)> {
+    let mut rest = text;
+    let mut seconds = 0;
+    for (index, scale) in [3_600, 60, 1].into_iter().enumerate() {
+        if index > 0 {
+            match rest.strip_prefix(':') {
+                Some(after) => rest = after,
+                None => break,
+            }
+        }
+        let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+        if digits == 0 || digits > 3 {
+            return None;
+        }
+        seconds += rest[..digits].parse::<i32>().ok()? * scale;
+        rest = &rest[digits..];
+    }
+    Some((rest, seconds))
+}
+
+/// When a change written `Mm.w.d[/time]` falls in `year`, in seconds since
+/// 1970 on the local clock it is written in. The time may be negative or
+/// past 24 hours (RFC 8536 section 3.3.1).
+fn change(text: &str, year: i64) -> Option<i64> {
+    let (date, time) = match text.split_once('/') {
+        Some((date, time)) => {
+            let (sign, time) = match time.strip_prefix('-') {
+                Some(time) => (-1, time),
+                None => (1, time.strip_prefix('+').unwrap_or(time)),
+            };
+            let (rest, seconds) = clock(time)?;
+            if !rest.is_empty() {
+                return None;
+            }
+            (date, sign * seconds)
+        }
+        None => (text, 7_200),
+    };
+    let mut parts = date.strip_prefix('M')?.split('.');
+    let month: i64 = parts.next()?.parse().ok()?;
+    let week: i64 = parts.next()?.parse().ok()?;
+    let weekday: i64 = parts.next()?.parse().ok()?;
+    if parts.next().is_some()
+        || !(1..=12).contains(&month)
+        || !(1..=5).contains(&week)
+        || !(0..=6).contains(&weekday)
+    {
+        return None;
+    }
+    let first = days_from_civil(year, month, 1);
+    // 1970-01-01 was a Thursday: 4, counting Sunday as 0.
+    let first_weekday = (first + 4).rem_euclid(7);
+    let mut day = 1 + (weekday - first_weekday).rem_euclid(7) + (week - 1) * 7;
+    let next_month = if month == 12 {
+        days_from_civil(year + 1, 1, 1)
+    } else {
+        days_from_civil(year, month + 1, 1)
+    };
+    while day > next_month - first {
+        day -= 7;
+    }
+    Some((first + day - 1) * 86_400 + i64::from(time))
+}
+
+/// Days since 1970-01-01 of a date (Howard Hinnant's `days_from_civil`).
+fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = year.div_euclid(400);
+    let of_era = year - era * 400;
+    let of_year = (153 * (if month > 2 { month - 3 } else { month + 9 }) + 2) / 5 + day - 1;
+    let days = of_era * 365 + of_era / 4 - of_era / 100 + of_year;
+    era * 146_097 + days - 719_468
 }
 
 /// Year, month and day of a count of days since 1970-01-01.
@@ -147,7 +287,17 @@ fn words(
     file: &[u8],
     now: i64,
 ) -> Option<(&'static str, i64, &'static str, i64, i64, i64, &'static str)> {
-    let local = now.checked_add(i64::from(offset_at(file, now)?))?;
+    words_with(file, now, false)
+}
+
+/// [`words`], with the zone's closing rule worked out when `ruled`
+/// ([`offset_with`]).
+fn words_with(
+    file: &[u8],
+    now: i64,
+    ruled: bool,
+) -> Option<(&'static str, i64, &'static str, i64, i64, i64, &'static str)> {
+    let local = now.checked_add(i64::from(offset_with(file, now, ruled)?))?;
     let (days, seconds) = (local.div_euclid(86_400), local.rem_euclid(86_400));
     let (year, month, day) = civil(days);
     let (hour, minute) = (seconds / 3_600, seconds % 3_600 / 60);
@@ -191,6 +341,144 @@ pub fn said(file: &[u8], now: i64) -> Option<String> {
         "It is {hour}:{minute:02} {part}, {weekday} {day} {month} {year}. Said aloud: {} {part}.",
         aloud(hour, minute)
     ))
+}
+
+/// Where the system keeps its compiled zone files, one per place.
+pub const ZONES: &str = "/usr/share/zoneinfo";
+/// The areas a place's name alone is looked for in ("London" is
+/// `Europe/London`).
+const AREAS: [&str; 8] = [
+    "Europe",
+    "America",
+    "Asia",
+    "Africa",
+    "Australia",
+    "Pacific",
+    "Atlantic",
+    "Indian",
+];
+/// What the model is told when it asks the time of a place this lamp has no
+/// zone file for: never the lamp's own time in its place.
+pub const PLACE_UNKNOWN: &str =
+    "I don't know the time in that place: it is not a time zone I know.";
+
+/// Whether `zone` may name a file under [`ZONES`]: an IANA zone name such
+/// as `Europe/London` or `America/Argentina/Buenos_Aires`, with no way out
+/// of the folder.
+fn zone_name_ok(zone: &str) -> bool {
+    !zone.is_empty()
+        && zone.len() <= 64
+        && !zone.starts_with('/')
+        && !zone.ends_with('/')
+        && !zone.contains("..")
+        && !zone.contains("//")
+        && zone
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'+' | b'-' | b'/'))
+}
+
+/// The compiled zone file for the place the model named, from `zones` (the
+/// system's [`ZONES`]), and its zone name: the name as given, spaces as
+/// underscores, or, for a name alone ("London", "New York"), the first of
+/// [`AREAS`] that has it. Nothing for a name that could leave the folder,
+/// or a file that is not a zone file.
+pub fn zone_file(zones: &std::path::Path, place: &str) -> Option<(String, Vec<u8>)> {
+    let place = place.trim().replace(' ', "_");
+    let read = |zone: &str| {
+        let file = std::fs::read(zones.join(zone)).ok()?;
+        file.starts_with(b"TZif").then(|| (zone.to_owned(), file))
+    };
+    if !zone_name_ok(&place) {
+        return None;
+    }
+    read(&place).or_else(|| {
+        (!place.contains('/'))
+            .then(|| {
+                AREAS
+                    .iter()
+                    .find_map(|area| read(&format!("{area}/{place}")))
+            })
+            .flatten()
+    })
+}
+
+/// A zone's place as people say it: its last part, underscores as spaces
+/// (`America/New_York` is "New York").
+pub fn place_name(zone: &str) -> String {
+    zone.rsplit('/').next().unwrap_or(zone).replace('_', " ")
+}
+
+/// The time at `now` in the place of `zone` (its file `there`), for the
+/// model that asked for it ([`crate::tools::THE_TIME`], `LAMP_TIME_PLACES`,
+/// #1547): whose time it is, said aloud, and the lamp's own beside it, so
+/// it is never given as the other place's. On lamp-4ace on 18 October
+/// "what time is it in London" was answered with the lamp's own, in Ho
+/// Chi Minh City. `here` is the lamp's own zone's name and file, if known.
+pub fn said_in(zone: &str, there: &[u8], here: Option<(&str, &[u8])>, now: i64) -> Option<String> {
+    let (weekday, day, month, year, hour, minute, part) = words_with(there, now, true)?;
+    let place = place_name(zone);
+    let mut said = format!(
+        "In {place} it is {hour}:{minute:02} {part}, {weekday} {day} {month} {year}. Said aloud: {} {part}.",
+        aloud(hour, minute)
+    );
+    match here {
+        Some((home, _)) if home == zone => said.push_str(" That is the time here too."),
+        Some((home, file)) => {
+            if let Some((_, _, _, _, hour, minute, part)) = words(file, now) {
+                said.push_str(&format!(
+                    " Here in {} it is {hour}:{minute:02} {part}.",
+                    place_name(home)
+                ));
+            }
+        }
+        None => {}
+    }
+    Some(said)
+}
+
+/// The lamp's own zone's name: `/etc/timezone`, as Debian keeps it, or the
+/// zone file `/etc/localtime` links to.
+pub fn zone_here() -> Option<String> {
+    let named = std::fs::read_to_string("/etc/timezone")
+        .ok()
+        .map(|text| text.trim().to_owned())
+        .filter(|zone| zone_name_ok(zone));
+    named.or_else(|| {
+        let link = std::fs::read_link("/etc/localtime").ok()?;
+        let link = link.to_str()?;
+        let zone = link.split_once("zoneinfo/")?.1;
+        zone_name_ok(zone).then(|| zone.to_owned())
+    })
+}
+
+/// What the model is told when it asks the time of `place`, now
+/// (`LAMP_TIME_PLACES`): `Err` with what to say when the clock is known not
+/// to be set or the place is not known.
+pub fn now_in(place: &str) -> Result<Option<String>, &'static str> {
+    if unset_here() {
+        return Err(SAID_UNSET);
+    }
+    let Some((zone, there)) = zone_file(std::path::Path::new(ZONES), place) else {
+        return Err(PLACE_UNKNOWN);
+    };
+    let Some((file, now)) = here() else {
+        return Ok(None);
+    };
+    let home = zone_here();
+    let here = home.as_deref().map(|home| (home, file.as_slice()));
+    Ok(said_in(&zone, &there, here, now))
+}
+
+/// What the opening note adds with `LAMP_TIME_PLACES`: whose time it gives,
+/// and to ask the function for anywhere else.
+pub fn told_place(home: Option<&str>) -> String {
+    let here = home.map_or_else(
+        || "the time where you are".to_owned(),
+        |home| format!("the time where you are, in {}", place_name(home)),
+    );
+    format!(
+        " This is {here}. For the time anywhere else, call the_time with that place, never this time."
+    )
 }
 
 const NUMBERS: [&str; 31] = [
@@ -309,14 +597,21 @@ fn unset_here() -> bool {
     )
 }
 
-/// The same for this machine, now.
-pub fn told_here(clock: bool) -> Option<String> {
+/// The same for this machine, now; with `places` (`LAMP_TIME_PLACES`), a
+/// session that may ask the time is told whose time it is
+/// ([`told_place`]).
+pub fn told_here(clock: bool, places: bool) -> Option<String> {
     if unset_here() {
         return Some(TOLD_UNSET.to_owned());
     }
     let (file, now) = here()?;
     if clock {
-        told_with_clock(&file, now)
+        let told = told_with_clock(&file, now)?;
+        Some(if places {
+            told + &told_place(zone_here().as_deref())
+        } else {
+            told
+        })
     } else {
         told(&file, now)
     }
@@ -417,6 +712,127 @@ mod tests {
 
     // 2026-10-13 04:14:00 UTC, a Tuesday.
     const NOW: i64 = 1_791_864_840;
+
+    /// A zone file as a slim one is written: no change listed, its closing
+    /// rule only, so every moment is worked out from the rule.
+    fn ruled(standard: i32, rule: &str) -> Vec<u8> {
+        zone(b'2', &[], &[standard], rule)
+    }
+
+    /// #1547: the closing rule worked out across a change, both ways, on
+    /// the moments the platform's own zone files give (Python's zoneinfo,
+    /// 2026): London and New York in and out of summer time, Sydney's
+    /// summer across the new year, Tokyo with none.
+    #[test]
+    fn a_zone_s_closing_rule_is_worked_out_across_its_changes() {
+        let london = ruled(0, "GMT0BST,M3.5.0/1,M10.5.0");
+        let new_york = ruled(-18_000, "EST5EDT,M3.2.0,M11.1.0");
+        let sydney = ruled(36_000, "AEST-10AEDT,M10.1.0,M4.1.0/3");
+        let tokyo = ruled(32_400, "JST-9");
+        for (file, at, offset) in [
+            (&london, 1_774_744_200, 0),         // 29 Mar 00:30 UTC
+            (&london, 1_774_747_800, 3_600),     // 29 Mar 01:30 UTC
+            (&london, 1_792_888_200, 3_600),     // 25 Oct 00:30 UTC
+            (&london, 1_792_891_800, 0),         // 25 Oct 01:30 UTC
+            (&new_york, 1_793_511_000, -14_400), // 1 Nov 05:30 UTC
+            (&new_york, 1_793_514_600, -18_000), // 1 Nov 06:30 UTC
+            (&sydney, 1_768_435_200, 39_600),    // 15 Jan
+            (&sydney, 1_782_864_000, 36_000),    // 1 Jul
+            (&tokyo, 1_792_316_400, 32_400),
+        ] {
+            assert_eq!(offset_with(file, at, true), Some(offset), "{at}");
+        }
+        // A rule this does not work out gives nothing.
+        assert_eq!(
+            offset_with(&ruled(0, "XXX0YYY,J60,J300"), 1_792_316_400, true),
+            None
+        );
+        assert_eq!(
+            offset_with(&ruled(0, "GMT0BST,M3.6.0,M10.5.0"), 1_792_316_400, true),
+            None
+        );
+        // The lamp's own zone is taken as it always was: past the listed
+        // changes of a zone with summer time, nothing.
+        assert_eq!(offset_at(&london, 1_792_888_200), None);
+        assert_eq!(offset_at(&tokyo, 1_792_316_400), Some(32_400));
+    }
+
+    /// #1547: lamp-4ace on 18 October at 16:40, "what time is it in
+    /// London", answered with its own time. Now London's own, said aloud,
+    /// with the lamp's beside it; and the lamp's own place said once.
+    #[test]
+    fn another_place_s_time_names_the_place_and_the_lamp_s_own_beside_it() {
+        let saigon = ruled(25_200, "<+07>-7");
+        let london = ruled(0, "GMT0BST,M3.5.0/1,M10.5.0");
+        let at = 1_792_316_400; // 2026-10-18 09:40 UTC
+        assert_eq!(
+            said_in(
+                "Europe/London",
+                &london,
+                Some(("Asia/Ho_Chi_Minh", &saigon)),
+                at
+            )
+            .as_deref(),
+            Some(
+                "In London it is 10:40 in the morning, Sunday 18 October 2026. Said aloud: twenty to eleven in the morning. Here in Ho Chi Minh it is 4:40 in the afternoon."
+            )
+        );
+        assert_eq!(
+            said_in(
+                "Asia/Ho_Chi_Minh",
+                &saigon,
+                Some(("Asia/Ho_Chi_Minh", &saigon)),
+                at
+            )
+            .as_deref(),
+            Some(
+                "In Ho Chi Minh it is 4:40 in the afternoon, Sunday 18 October 2026. Said aloud: twenty to five in the afternoon. That is the time here too."
+            )
+        );
+        let new_york = ruled(-18_000, "EST5EDT,M3.2.0,M11.1.0");
+        assert!(
+            said_in("America/New_York", &new_york, None, at)
+                .unwrap()
+                .starts_with("In New York it is 5:40 in the morning, Sunday 18 October 2026.")
+        );
+        assert_eq!(
+            told_place(Some("Asia/Ho_Chi_Minh")),
+            " This is the time where you are, in Ho Chi Minh. For the time anywhere else, call the_time with that place, never this time."
+        );
+    }
+
+    /// A place is looked for under the zone folder only, by its zone name
+    /// or its name alone in the usual areas, and must be a zone file.
+    #[test]
+    fn a_place_is_found_by_its_zone_or_its_name_and_never_outside_the_zones() {
+        let dir = std::env::temp_dir().join(format!("lamp-zones-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        for zone in ["Europe/London", "America/New_York", "UTC"] {
+            let path = dir.join(zone);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, ruled(0, "GMT0BST,M3.5.0/1,M10.5.0")).unwrap();
+        }
+        std::fs::write(dir.join("Europe/notes"), "not a zone").unwrap();
+        let found = |place: &str| zone_file(&dir, place).map(|(zone, _)| zone);
+        assert_eq!(found("Europe/London").as_deref(), Some("Europe/London"));
+        assert_eq!(found("London").as_deref(), Some("Europe/London"));
+        assert_eq!(found("New York").as_deref(), Some("America/New_York"));
+        assert_eq!(found(" UTC ").as_deref(), Some("UTC"));
+        for refused in [
+            "Middle_Earth/Rivendell",
+            "Europe/notes",
+            "../etc/passwd",
+            "Europe/../UTC",
+            "/etc/localtime",
+            "Europe/",
+            "",
+            "Europe/London;rm",
+        ] {
+            assert_eq!(found(refused), None, "{refused:?}");
+        }
+        assert_eq!(place_name("America/Argentina/Buenos_Aires"), "Buenos Aires");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn it_reads_the_offset_now_from_a_zone_file_of_either_kind() {

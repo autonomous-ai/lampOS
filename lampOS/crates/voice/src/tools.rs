@@ -62,6 +62,11 @@ pub const THE_TIME: &str = "the_time";
 pub const CLOCK_ENVIRONMENT: &str = "LAMP_CLOCK";
 /// The provider worker's flag for it.
 pub const CLOCK_FLAG: &str = "--clock";
+/// Where the coordinator reads whether [`THE_TIME`] takes a place
+/// (`LAMP_TIME_PLACES`, #1547): `on` only, and only with [`CLOCK_ENVIRONMENT`].
+pub const PLACES_ENVIRONMENT: &str = "LAMP_TIME_PLACES";
+/// The provider worker's flag for it, right after [`CLOCK_FLAG`].
+pub const PLACES_FLAG: &str = "--time-places";
 /// Only the exact value `on` permits the six Schedule tool names.
 pub const SCHEDULE_TOOLS_ENVIRONMENT: &str = "LAMP_SCHEDULE_TOOLS";
 pub const SCHEDULE_TOOLS_FLAG: &str = "--schedule-tools";
@@ -102,6 +107,9 @@ pub struct Settings {
     pub memory: Option<PathBuf>,
     /// The model may call [`THE_TIME`].
     pub clock: bool,
+    /// [`THE_TIME`] takes a place, and its answer says whose time it is
+    /// (`--time-places`, #1547). Only with `clock`.
+    pub places: bool,
     /// Work handed to an agent elsewhere ([`crate::agent_tasks`]).
     pub tasks: Option<crate::agent_tasks::Place>,
     /// Schedule tools may be declared and routed to Actions.
@@ -129,6 +137,7 @@ pub fn arguments_from_environment() -> Vec<String> {
         std::env::var(ACTIONS_ENVIRONMENT).ok().as_deref(),
         std::env::var(crate::remember::ENVIRONMENT).ok().as_deref(),
         std::env::var(CLOCK_ENVIRONMENT).ok().as_deref(),
+        std::env::var(PLACES_ENVIRONMENT).ok().as_deref(),
     );
     flags.extend(crate::agent_tasks::arguments_from_environment());
     flags.extend(schedule_arguments(
@@ -183,6 +192,7 @@ fn arguments(
     exec: Option<&str>,
     memory: Option<&str>,
     clock: Option<&str>,
+    places: Option<&str>,
 ) -> Vec<String> {
     let mut arguments = Vec::new();
     if decline == Some("on") {
@@ -198,6 +208,9 @@ fn arguments(
     }
     if clock == Some("on") {
         arguments.push(CLOCK_FLAG.to_owned());
+        if places == Some("on") {
+            arguments.push(PLACES_FLAG.to_owned());
+        }
     }
     arguments
 }
@@ -242,6 +255,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
     {
         settings.clock = true;
         flags = rest;
+        if let [flag, rest @ ..] = flags
+            && flag == PLACES_FLAG
+        {
+            settings.places = true;
+            flags = rest;
+        }
     }
     let (tasks, mut flags) = crate::agent_tasks::take(flags)?;
     settings.tasks = tasks;
@@ -318,7 +337,30 @@ fn not_for_me() -> Tool {
     }
 }
 
-fn the_time() -> Tool {
+fn the_time(places: bool) -> Tool {
+    if places {
+        return Tool {
+            name: THE_TIME.into(),
+            description: "Call this whenever you need the time or the date: when someone asks what time \
+                          it is, what day it is, or how long until something. For the time somewhere \
+                          else, such as \"what time is it in London\", give the place as its time \
+                          zone; the time you know is only the time here. Then say it as it gives it \
+                          \"said aloud\", with its hour, and the place it names. Not for \"now\" or \
+                          \"today\" in a question about something else, and never say the time unless \
+                          you were asked for it."
+                .into(),
+            parameters: Some(json!({
+                "type": "object",
+                "properties": {
+                    "place": {
+                        "type": "string",
+                        "description": "The time zone of the place asked about, as its IANA name: Europe/London, America/New_York, Asia/Tokyo. Leave it out for the time here."
+                    }
+                }
+            })),
+            silent: false,
+        };
+    }
     Tool {
         name: THE_TIME.into(),
         description:
@@ -336,7 +378,23 @@ fn the_time() -> Tool {
 
 /// What the model is told when it asks the time: the lamp's clock now, in
 /// words, that it has not been set (`LAMP_KERNEL_CLOCK`), or that it could
-/// not be read.
+/// not be read. With `places` (`LAMP_TIME_PLACES`, #1547) and a `place`
+/// in the call's arguments, that place's time and the lamp's beside it, or
+/// that the place is not known: never the lamp's own as the place's.
+pub fn time_now_for(places: bool, args: &Value) -> Value {
+    match args.get("place").and_then(Value::as_str) {
+        Some(place) if places && !place.trim().is_empty() => {
+            match crate::local_time::now_in(place) {
+                Ok(Some(now)) => json!({ "now": now }),
+                Ok(None) => json!({"error": "My clock could not be read just now."}),
+                Err(why) => json!({ "error": why }),
+            }
+        }
+        _ => time_now(),
+    }
+}
+
+/// [`time_now_for`] with no place: the lamp's own time.
 pub fn time_now() -> Value {
     match crate::local_time::now_here() {
         Ok(Some(now)) => json!({ "now": now }),
@@ -354,7 +412,7 @@ pub fn declared(settings: &Settings) -> Vec<Tool> {
         tools.push(not_for_me());
     }
     if settings.clock {
-        tools.push(the_time());
+        tools.push(the_time(settings.places));
     }
     if settings.memory.is_some() {
         tools.extend(crate::remember::tools());
@@ -559,7 +617,7 @@ pub fn keeps_out(route: &Route, name: &str) -> bool {
 /// the route's to act on before this.
 pub fn answer(settings: &Settings, call: &ToolCall, request: u64, heard: bool) -> Value {
     match route(settings, &call.name) {
-        Route::Clock => time_now(),
+        Route::Clock => time_now_for(settings.places, &call.args),
         Route::Decline => declined(),
         Route::Nobody => unavailable(),
         route => {
@@ -870,6 +928,7 @@ mod tests {
             exec: None,
             memory: Some("/run/lampos-memory/memory.sock".into()),
             clock: true,
+            places: true,
             tasks: Some(crate::agent_tasks::Place {
                 directory: "/run/lampos-tasks".into(),
                 target: crate::agent_tasks::DEFAULT_TARGET.into(),
@@ -929,7 +988,7 @@ mod tests {
 
     #[test]
     fn schedule_flags_are_exact_independent_opt_ins_and_leave_old_arguments_unchanged() {
-        let old = arguments(Some("on"), Some("/run/actions"), None, Some("on"));
+        let old = arguments(Some("on"), Some("/run/actions"), None, Some("on"), None);
         for value in [
             None,
             Some("off"),
@@ -970,7 +1029,7 @@ mod tests {
     /// `on` and `skill`, as the parent reads them.
     #[test]
     fn schedule_speech_by_skill_gives_the_worker_its_flag() {
-        let old = arguments(Some("on"), Some("/run/actions"), None, Some("on"));
+        let old = arguments(Some("on"), Some("/run/actions"), None, Some("on"), None);
         for (speak, on) in [
             (Some("on"), true),
             (Some("skill"), true),
@@ -990,7 +1049,7 @@ mod tests {
 
     #[test]
     fn without_the_onboarding_switch_nothing_changes() {
-        let old: Vec<String> = arguments(Some("on"), None, None, Some("on"));
+        let old: Vec<String> = arguments(Some("on"), None, None, Some("on"), None);
         let (off, rest) = take(&old).unwrap();
         assert!(rest.is_empty());
         assert_eq!(off.onboarding, None);
@@ -1048,6 +1107,7 @@ mod tests {
             Some(dir.to_str().unwrap()),
             Some("/run/lampos-memory/memory.sock"),
             Some("on"),
+            None,
         );
         flags.extend([
             crate::agent_tasks::FLAG.into(),
@@ -1078,6 +1138,7 @@ mod tests {
                 exec: Some(dir.clone()),
                 memory: Some("/run/lampos-memory/memory.sock".into()),
                 clock: true,
+                places: false,
                 tasks: Some(place.clone()),
                 schedule_tools: true,
                 schedule_speak: true,
@@ -1372,13 +1433,14 @@ mod tests {
 
     #[test]
     fn only_on_and_an_absolute_path_become_flags_and_they_are_taken_from_the_front() {
-        assert!(arguments(None, None, None, None).is_empty());
+        assert!(arguments(None, None, None, None, None).is_empty());
         assert!(
             arguments(
                 Some("yes"),
                 Some("relative/dir"),
                 Some("memory.sock"),
-                Some("yes")
+                Some("yes"),
+                Some("on")
             )
             .is_empty()
         );
@@ -1387,6 +1449,7 @@ mod tests {
             Some("/run/lampos-actions"),
             Some("/run/lampos-memory/memory.sock"),
             None,
+            Some("on"),
         );
         let memory = crate::remember::FLAG;
         assert_eq!(
@@ -1605,7 +1668,7 @@ mod tests {
 
     #[test]
     fn the_time_is_declared_and_answered_here_only_when_switched_on() {
-        assert_eq!(arguments(None, None, None, Some("on")), [CLOCK_FLAG]);
+        assert_eq!(arguments(None, None, None, Some("on"), None), [CLOCK_FLAG]);
         let flags = [CLOCK_FLAG.to_owned(), "rest".to_owned()];
         let (settings, rest) = take(&flags).unwrap();
         assert!(settings.clock && !settings.decline && settings.exec.is_none());
@@ -1631,9 +1694,65 @@ mod tests {
         assert_eq!(route(&exec, THE_TIME), Route::Nobody);
         assert_eq!(route(&Settings::default(), THE_TIME), Route::Nobody);
         // Spoken, not silent: the model is to say what it is told.
-        assert!(!the_time().silent);
+        assert!(!the_time(false).silent);
         let told = time_now();
         assert!(told["now"].is_string() || told["error"].is_string());
+    }
+
+    /// #1547, `LAMP_TIME_PLACES`: only with the clock, right after its
+    /// flag. With it, the function takes a place and a place this lamp has
+    /// no zone for is said to be unknown, never given the lamp's own time;
+    /// without it, a place in the call is the lamp's own time as before.
+    #[test]
+    fn the_time_takes_a_place_only_with_its_switch() {
+        assert_eq!(
+            arguments(None, None, None, Some("on"), Some("on")),
+            [CLOCK_FLAG, PLACES_FLAG]
+        );
+        assert!(arguments(None, None, None, None, Some("on")).is_empty());
+        assert_eq!(
+            arguments(None, None, None, Some("on"), Some("yes")),
+            [CLOCK_FLAG]
+        );
+        let flags = [
+            CLOCK_FLAG.to_owned(),
+            PLACES_FLAG.to_owned(),
+            "rest".to_owned(),
+        ];
+        let (settings, rest) = take(&flags).unwrap();
+        assert!(settings.clock && settings.places);
+        assert_eq!(rest, ["rest"]);
+        // Out of its place it is not taken.
+        let (settings, rest) = take(&flags[1..]).unwrap();
+        assert!(!settings.clock && !settings.places);
+        assert_eq!(rest[0], PLACES_FLAG);
+        let with = |places: bool| Settings {
+            clock: true,
+            places,
+            ..Settings::default()
+        };
+        let declared_place = |settings: &Settings| {
+            declared(settings)
+                .into_iter()
+                .find(|tool| tool.name == THE_TIME)
+                .unwrap()
+                .parameters
+                .and_then(|parameters| parameters["properties"].get("place").cloned())
+        };
+        assert!(declared_place(&with(true)).is_some());
+        assert!(declared_place(&with(false)).is_none());
+        let nowhere = json!({"place": "Middle_Earth/Rivendell"});
+        assert_eq!(
+            time_now_for(true, &nowhere),
+            json!({"error": crate::local_time::PLACE_UNKNOWN})
+        );
+        assert_eq!(
+            time_now_for(true, &json!({"place": "../../etc/passwd"})),
+            json!({"error": crate::local_time::PLACE_UNKNOWN})
+        );
+        let unknown = json!({"error": crate::local_time::PLACE_UNKNOWN});
+        assert_ne!(time_now_for(false, &nowhere), unknown);
+        assert_ne!(time_now_for(true, &json!({})), unknown);
     }
 
     /// #803: marking a bad moment is declared, and routed, only when the

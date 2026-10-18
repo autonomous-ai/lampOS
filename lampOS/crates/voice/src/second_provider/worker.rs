@@ -313,6 +313,7 @@ pub fn serve(
     let thread = files.thread;
     let file = thread.clone();
     let clock = tools.clock;
+    let places = tools.places;
     // Each turn is one person's, as a Live session is (#764): whose it is,
     // counted from the eyes' known file as the Live worker counts it, opens
     // the thread for them and asks for their kept things. A Days note is
@@ -354,7 +355,7 @@ pub fn serve(
         let room = room_bus.as_ref().map(crate::bus_out::room_now);
         system_message(
             &character,
-            crate::agent_tasks::noted(crate::local_time::told_here(clock), tasks.as_ref())
+            crate::agent_tasks::noted(crate::local_time::told_here(clock, places), tasks.as_ref())
                 .as_deref(),
             &(memory + &facts(session_fact && !going_on, room)),
             file.as_deref(),

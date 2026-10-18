@@ -295,6 +295,53 @@ never to guess one, in place of the time it woke: a lamp has no battery
 clock, and after power with no internet its clock is its last saved time.
 Off unless set; with it off both are as above.
 
+**Another place's time** (#1547), with `LAMP_TIME_PLACES=on` as well (the
+worker's `--time-places`, right after `--clock`; nothing without
+`LAMP_CLOCK`). On lamp-4ace on 18 October at 16:40, in the same-voice A/B,
+"Hey Lamp, what time is it in London right now?" got "It's twenty to five
+in the afternoon in London.": the lamp's own time, in Ho Chi Minh City,
+said as London's (London was at 10:40). The model knew only the lamp's
+time, from its opening note, and nothing said whose it was.
+- **The function takes a place:** `the_time` is declared with an optional
+  `place`, the place's time zone by its IANA name (`Europe/London`,
+  `America/New_York`), which the model picks. A city's name alone ("London",
+  "New York") is looked for in the usual areas (Europe, America, Asia,
+  Africa, Australia, Pacific, Atlantic, Indian). The zone file is read from
+  `/usr/share/zoneinfo` with the voice's own reader (`local_time.rs`). Only
+  `[A-Za-z0-9_+/-]` is taken, with no `..`, no `//` and no leading or
+  trailing `/`, and the file must be a zone file. A slim zone file, which
+  lists no changes past its last rule change, has its closing rule worked
+  out (`Mm.w.d` dates; a `Jn` or `n` rule gives nothing). The lamp's own
+  time is read exactly as before.
+- **The answer names the place, and the lamp's own beside it:**
+  `{"now":"In London it is 10:40 in the morning, Sunday 18 October 2026.
+  Said aloud: twenty to eleven in the morning. Here in Ho Chi Minh it is
+  4:40 in the afternoon."}`. The lamp's own place is its zone's last part,
+  from `/etc/timezone` or the zone file `/etc/localtime` links to, and is
+  left out when neither reads. Asked for its own zone, the answer ends
+  "That is the time here too." A place it has no zone for answers
+  `{"error":"I don't know the time in that place: it is not a time zone I
+  know."}`, never the lamp's own time.
+- **The opening note says whose time it gives:** "… This is the time where
+  you are, in Ho Chi Minh. For the time anywhere else, call the_time with
+  that place, never this time."
+- **Off unless set;** without it the function, its answer and the note are
+  as above, byte for byte. Both voice routes take it.
+- **What it costs:** one zone file of a few kilobytes read in the voice,
+  in the call the model already made for a question about the time. Not
+  yet timed on the lamp; the check below measures first audio with and
+  without it.
+- **Not shown on a lamp:** "what time is it in London / New York / Tokyo /
+  here", five times each, checked against `TZ=… date`, with first audio
+  with and without it.
+
+Tests: `local_time::tests::a_zone_s_closing_rule_is_worked_out_across_its_changes`
+(London, New York and Sydney across their 2026 changes, on zone files with
+only the rule; the lamp's own zone still read as before),
+`…::another_place_s_time_names_the_place_and_the_lamp_s_own_beside_it`,
+`…::a_place_is_found_by_its_zone_or_its_name_and_never_outside_the_zones`
+and `tools::tests::the_time_takes_a_place_only_with_its_switch`.
+
 Why: a session is told the time when it opens, and may run for hours. On
 lamp-4ace on 2026-10-14 a session opened at 10:48 told someone at 11:17
 that it was "roughly around ten forty-five": it was doing as told ("this

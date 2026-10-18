@@ -2744,7 +2744,7 @@ impl ToolDesk {
         }
         match crate::tools::route(&self.settings, &call.name) {
             Route::Clock => {
-                let told = crate::tools::time_now();
+                let told = crate::tools::time_now_for(self.settings.places, &call.args);
                 let (sent, sent_us) = tell(&told);
                 self.line(
                     lineage.session,

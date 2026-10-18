@@ -1022,7 +1022,7 @@ impl Connect for Recalling {
         if !self.presents_handle() {
             resume = None;
         }
-        let mut time = crate::local_time::told_here(self.tools.clock);
+        let mut time = crate::local_time::told_here(self.tools.clock, self.tools.places);
         // Work asked of the staff is theirs, stories included (#854); said
         // after the persona, which asks for stories to be told gladly.
         time = crate::agent_tasks::noted(time, self.tools.tasks.as_ref());
