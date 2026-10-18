@@ -6,7 +6,7 @@
 //! the program's own clock when a message arrives, a message's `at_us` when
 //! a recording is replayed.
 use lamp_bus::Header;
-use lamp_msgs::{Faces, Light, SkillEvent, SkillStage, Speech};
+use lamp_msgs::{Faces, Light, LightPattern, PatternKind, SkillEvent, SkillStage, Speech};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
@@ -337,6 +337,17 @@ struct LightFile {
     lasting: Option<String>,
     dim: Option<u8>,
     until: Option<String>,
+    pattern: Option<PatternFile>,
+}
+
+/// How a skill's light moves, as its file says it (#940 item 3):
+/// `{ kind = "breathe", period = "6s", low = 1 }`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PatternFile {
+    kind: String,
+    period: Option<String>,
+    low: Option<u8>,
 }
 
 /// A skill as loaded: everything in it checked.
@@ -497,6 +508,8 @@ pub enum Call {
         colour: String,
         level: Option<u8>,
         lasting: Option<String>,
+        /// How it moves, asked of the ring with `LAMP_LIGHT_REQUESTS=on`.
+        pattern: Option<LightPattern>,
     },
     /// Steps dimmer, to the actions part's `light_dimmer`; with
     /// `until_ends`, held until the trigger stops holding, then given back.
@@ -576,6 +589,7 @@ impl Call {
                 colour,
                 level,
                 lasting,
+                pattern,
             } => {
                 let mut args = json!({ "colour": colour });
                 if let Some(level) = level {
@@ -583,6 +597,9 @@ impl Call {
                 }
                 if let Some(lasting) = lasting {
                     args["for"] = json!(lasting);
+                }
+                if let Some(pattern) = pattern {
+                    args["pattern"] = json!(pattern);
                 }
                 ("light", args)
             }
@@ -1348,20 +1365,65 @@ fn light_call(file: LightFile) -> Result<Call, String> {
             if until_ends {
                 return Err("until goes with dim".into());
             }
+            let pattern = file
+                .pattern
+                .map(|pattern| pattern_of(pattern, file.level))
+                .transpose()?;
             Ok(Call::Light {
                 colour,
                 level: file.level,
                 lasting: file.lasting,
+                pattern,
             })
         }
         (None, Some(steps)) if (1..=4).contains(&steps) => {
             if file.level.is_some() || file.lasting.is_some() {
                 return Err("dim takes no level and no for".into());
             }
+            if file.pattern.is_some() {
+                return Err("dim takes no pattern".into());
+            }
             Ok(Call::Dim { steps, until_ends })
         }
         _ => Err("a light is a colour (with a level and a for) or dim = 1 to 4".into()),
     }
+}
+
+/// A light file's pattern for a light at `level` (#940 item 3): a kind the
+/// ring plays, its period in its kind's bounds (its default when none),
+/// for a breath a low from 1 to under the level, 1 when none, and for a
+/// candle a level of 3 or more. A pattern needs the light's level named:
+/// it is the top a breath rises to, a candle dips under and a pulse rises
+/// over.
+fn pattern_of(file: PatternFile, level: Option<u8>) -> Result<LightPattern, String> {
+    let kind = match file.kind.as_str() {
+        "breathe" => PatternKind::Breathe,
+        "candle" => PatternKind::Candle,
+        "pulse" => PatternKind::Pulse,
+        other => {
+            return Err(format!(
+                "pattern kind {other:?} is not breathe, candle or pulse (no blink, flash or rainbow: a lamp is not a machine)"
+            ));
+        }
+    };
+    let Some(level) = level else {
+        return Err("a pattern needs the light's level, the top it moves up to".into());
+    };
+    let period_ms = match &file.period {
+        Some(period) => u32::try_from(duration_us(period)? / 1_000)
+            .map_err(|_| format!("pattern period {period:?} is too long"))?,
+        None => LightPattern::default_ms(kind),
+    };
+    if file.low.is_some() && kind != PatternKind::Breathe {
+        return Err("only a breath takes low: a candle dips a fifth under its level, and a pulse rises over it".into());
+    }
+    let pattern = LightPattern {
+        kind,
+        period_ms,
+        low: file.low.unwrap_or(1),
+    };
+    pattern.check(level).map_err(|why| why.0)?;
+    Ok(pattern)
 }
 
 /// Every skill folder under `root` but those whose name begins with a dot,

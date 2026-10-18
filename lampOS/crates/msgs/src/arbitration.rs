@@ -69,6 +69,110 @@ impl Claim {
 pub struct LightRequest {
     pub claim: Claim,
     pub light: Light,
+    /// How the light moves while it is shown, if it does (#940 item 3): a
+    /// ring without patterns shows the light steady.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<LightPattern>,
+}
+
+/// The ways a skill's light may move (#940 item 3), V1's effects judged by
+/// CLAUDE.md's rule 8: a lamp breathes, flickers like a candle, or sends one
+/// soft pulse around for "something came". It never blinks, flashes or
+/// cycles colours: those read as a machine.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PatternKind {
+    /// The whole ring eases between `low` and the light's level on a sine.
+    Breathe,
+    /// Each pixel wanders gently a little under the level, at most a fifth
+    /// as V1's candle did, its neighbours close; the colour never shifts.
+    /// Only at level 3 and up, where the ring keeps a colour's channels.
+    Candle,
+    /// At the light's level, one soft brighter arc goes slowly once around
+    /// the ring when the light is first drawn, then the steady light. Only
+    /// at level 2 and up, where the arc can be seen.
+    Pulse,
+}
+
+/// A light's movement: its kind, its time (a breath's, a candle's wander,
+/// the pulse's way around), and for a breath the level it goes down to,
+/// under the light's own, which is the top. A candle and a pulse do not
+/// use `low`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LightPattern {
+    pub kind: PatternKind,
+    pub period_ms: u32,
+    pub low: u8,
+}
+
+impl LightPattern {
+    /// A breath under 5 s reads as anxious on a desk: allowed from 4 s, and
+    /// 6 s when a skill names none (the first builder on #940).
+    pub const BREATHE_MS: std::ops::RangeInclusive<u32> = 4_000..=12_000;
+    pub const BREATHE_DEFAULT_MS: u32 = 6_000;
+    /// A candle's wander: 1 s at the quickest (the reviewer on #1494: at
+    /// 0.5 s the swing came twice a second).
+    pub const CANDLE_MS: std::ops::RangeInclusive<u32> = 1_000..=4_000;
+    pub const CANDLE_DEFAULT_MS: u32 = 1_500;
+    /// A pulse's way around: 3 s at the quickest, as designed on #940, far
+    /// slower than the thinking face's point (1.15 s a turn).
+    pub const PULSE_MS: std::ops::RangeInclusive<u32> = 3_000..=6_000;
+    pub const PULSE_DEFAULT_MS: u32 = 4_000;
+    /// The lowest level a candle may flicker at: under it, a fifth of a
+    /// level is less than a step of the ring's channels at the product's
+    /// ceiling, and a pixel's colour changes as it rounds.
+    pub const CANDLE_LEAST_LEVEL: u8 = 3;
+    /// The lowest level a pulse is asked at: at level 1 its arc is under a
+    /// step at the product's ceiling, and nobody would see it (the reviewer
+    /// on #1494).
+    pub const PULSE_LEAST_LEVEL: u8 = 2;
+    /// One pulse a minute from the same asker at most: "something came"
+    /// twice in a row is a nag, not a creature (the first builder on #940).
+    pub const PULSE_GAP_US: u64 = 60_000_000;
+
+    /// Its time when a skill names none.
+    pub fn default_ms(kind: PatternKind) -> u32 {
+        match kind {
+            PatternKind::Breathe => Self::BREATHE_DEFAULT_MS,
+            PatternKind::Candle => Self::CANDLE_DEFAULT_MS,
+            PatternKind::Pulse => Self::PULSE_DEFAULT_MS,
+        }
+    }
+
+    /// A pattern for a light at `level`: its time in its kind's bounds; a
+    /// breath's `low` from 1 to under the level; a candle at level 3 or up.
+    pub fn check(&self, level: u8) -> Result<(), Invalid> {
+        let bounds = match self.kind {
+            PatternKind::Breathe => Self::BREATHE_MS,
+            PatternKind::Candle => Self::CANDLE_MS,
+            PatternKind::Pulse => Self::PULSE_MS,
+        };
+        if !bounds.contains(&self.period_ms) {
+            return Err(Invalid(format!(
+                "a {:?} pattern takes {} to {} ms",
+                self.kind,
+                bounds.start(),
+                bounds.end()
+            )));
+        }
+        match self.kind {
+            PatternKind::Breathe if self.low < 1 || self.low >= level => Err(Invalid(
+                "a breath's low is from 1 to under the light's level".into(),
+            )),
+            PatternKind::Candle if level < Self::CANDLE_LEAST_LEVEL => Err(Invalid(format!(
+                "a candle flickers at level {} and up",
+                Self::CANDLE_LEAST_LEVEL
+            ))),
+            PatternKind::Pulse if level < Self::PULSE_LEAST_LEVEL => Err(Invalid(format!(
+                "a pulse is seen at level {} and up",
+                Self::PULSE_LEAST_LEVEL
+            ))),
+            _ if !(1..=5).contains(&self.low) => {
+                Err(Invalid("a pattern's low is a level, 1 to 5".into()))
+            }
+            _ => Ok(()),
+        }
+    }
 }
 
 impl LightRequest {
@@ -83,7 +187,12 @@ impl LightRequest {
 
     pub fn check(&self) -> Result<(), Invalid> {
         self.claim.check()?;
-        self.light.check()
+        self.light.check()?;
+        match &self.pattern {
+            Some(_) if !self.light.on => Err(Invalid("a light that is off has no pattern".into())),
+            Some(pattern) => pattern.check(self.light.level),
+            None => Ok(()),
+        }
     }
 }
 
@@ -200,6 +309,7 @@ mod tests {
         let request = LightRequest {
             claim: claim(Priority::Skill, 10_000_000),
             light: Light::new(true, "warm", 3).unwrap(),
+            pattern: None,
         };
         let text = serde_json::to_string(&request).unwrap();
         assert_eq!(
@@ -221,6 +331,86 @@ mod tests {
             (declared.type_name.as_str(), declared.kind),
             (LightRequest::TYPE, Kind::Event)
         );
+    }
+
+    /// #940 item 3: a pattern rides on the request, inside its kind's
+    /// bounds and under the light's level; without one the message is as
+    /// before.
+    #[test]
+    fn a_light_request_may_carry_a_pattern_within_its_bounds() {
+        let breath = LightPattern {
+            kind: PatternKind::Breathe,
+            period_ms: LightPattern::BREATHE_DEFAULT_MS,
+            low: 1,
+        };
+        let request = LightRequest {
+            claim: claim(Priority::Skill, 10_000_000),
+            light: Light::new(true, "warm", 3).unwrap(),
+            pattern: Some(breath),
+        };
+        let text = serde_json::to_string(&request).unwrap();
+        assert!(
+            text.ends_with(",\"pattern\":{\"kind\":\"breathe\",\"period_ms\":6000,\"low\":1}}"),
+            "{text}"
+        );
+        assert_eq!(
+            serde_json::from_str::<LightRequest>(&text).unwrap(),
+            request
+        );
+        assert!(request.check().is_ok());
+        let wrong = |pattern: LightPattern, on: bool| {
+            let mut request = request.clone();
+            request.pattern = Some(pattern);
+            request.light.on = on;
+            request.check().is_err()
+        };
+        for (kind, ms) in [
+            (PatternKind::Breathe, 3_999),
+            (PatternKind::Breathe, 12_001),
+            (PatternKind::Candle, 999),
+            (PatternKind::Pulse, 2_999),
+            (PatternKind::Pulse, 6_001),
+        ] {
+            let pattern = LightPattern {
+                kind,
+                period_ms: ms,
+                low: 1,
+            };
+            assert!(wrong(pattern, true), "{kind:?} {ms}");
+        }
+        assert!(wrong(LightPattern { low: 0, ..breath }, true));
+        assert!(
+            wrong(LightPattern { low: 3, ..breath }, true),
+            "low under the level"
+        );
+        assert!(wrong(breath, false), "a light off has no pattern");
+        for kind in [
+            PatternKind::Breathe,
+            PatternKind::Candle,
+            PatternKind::Pulse,
+        ] {
+            let pattern = LightPattern {
+                kind,
+                period_ms: LightPattern::default_ms(kind),
+                low: 2,
+            };
+            assert!(pattern.check(3).is_ok(), "{kind:?}'s default");
+        }
+        // A candle only from level 3; a pulse at any level, its low unused.
+        let candle = LightPattern {
+            kind: PatternKind::Candle,
+            period_ms: LightPattern::CANDLE_DEFAULT_MS,
+            low: 1,
+        };
+        assert!(candle.check(2).is_err());
+        assert!(candle.check(3).is_ok());
+        let pulse = LightPattern {
+            kind: PatternKind::Pulse,
+            period_ms: LightPattern::PULSE_DEFAULT_MS,
+            low: 1,
+        };
+        assert!(pulse.check(1).is_err(), "unseen at level 1");
+        assert!(pulse.check(2).is_ok());
     }
 
     #[test]

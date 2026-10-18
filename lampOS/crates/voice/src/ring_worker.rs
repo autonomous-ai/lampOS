@@ -629,10 +629,11 @@ fn service(
         // resting frame never delays a cue or a revocation. The ring refuses
         // it, with no write, unless nobody owns the lamp and it may listen.
         let at = monotonic_us();
-        if let Some(light) = light.as_mut()
-            && let Some(asked) = light.tick(at)
-        {
-            face.light(asked);
+        if let Some(light) = light.as_mut() {
+            if let Some(asked) = light.tick(at) {
+                face.light(asked);
+            }
+            face.pattern(light.pattern());
         }
         if let Some(ceiling) = resting
             && pending.is_none()
@@ -842,6 +843,7 @@ mod drawn_tests {
                         until_us: monotonic_us() + 20_000_000,
                     },
                     light: asked.clone(),
+                    pattern: None,
                 },
             )
             .unwrap();

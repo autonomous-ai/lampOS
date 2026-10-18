@@ -195,6 +195,7 @@ mod tests {
                 until_us,
             },
             light: Light::new(true, colour, 3).unwrap(),
+            pattern: None,
         }
     }
 

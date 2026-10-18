@@ -410,6 +410,7 @@ fn serve(
                 "skills",
             )?)),
             every: GLOW_EVERY,
+            pulses: Arc::default(),
         })
     } else {
         None
@@ -1772,7 +1773,12 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             body_ask(json!({ "move": clip }), asker),
             &sockets.mood,
         ),
-        Call::Light { colour, level, .. } => {
+        Call::Light {
+            colour,
+            level,
+            pattern,
+            ..
+        } => {
             let mut said = actions(
                 &format!("light {colour}"),
                 "light_colour",
@@ -1788,6 +1794,13 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
                     }
                     None => said.push_str(", its level is not known, so it is left"),
                 }
+            }
+            // A pattern is the ring's (#940 item 3): through the actions part
+            // the light is steady.
+            if pattern.is_some() {
+                said.push_str(&format!(
+                    ", steady: its pattern needs the ring's {REQUESTS_ENVIRONMENT}=on"
+                ));
             }
             said
         }

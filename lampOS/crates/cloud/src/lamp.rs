@@ -327,6 +327,7 @@ impl Real {
                 until_us,
             },
             light: light.clone(),
+            pattern: None,
         };
         out.publish_json(lamp_ipc::monotonic_us(), &request)
             .map(|_| ())

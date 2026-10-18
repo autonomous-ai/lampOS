@@ -3,8 +3,8 @@
 //! actions part's sockets stood in for.
 use lamp_bus::Bus;
 use lamp_msgs::{
-    BodyGesture, Faces, GestureState, Hand, Light, LightRequest, Priority, SkillEvent, SkillStage,
-    Speech, VoiceState,
+    BodyGesture, Faces, GestureState, Hand, Light, LightPattern, LightRequest, PatternKind,
+    Priority, SkillEvent, SkillStage, Speech, VoiceState,
 };
 use lamp_skills::{
     Admission, BODY_STEP_US, CLIP_GAP_US, Call, Engine, clip_us, load, load_all, read_recordings,
@@ -1187,6 +1187,89 @@ fn sitting(from: u64, to: u64, away: &[u64]) -> Vec<(u64, &'static str, &'static
     messages
 }
 
+/// #940 item 3: a light file's pattern is loaded into its call, its kind's
+/// period when it names none and a low of 1; a kind the ring does not play,
+/// a pattern without the light's level, a low at the level or a period out
+/// of bounds are refused when the skill loads.
+#[test]
+fn a_light_files_pattern_is_loaded_and_held_to_its_bounds() {
+    let dir = tempfile::tempdir().unwrap();
+    let with_light = |name: &str, light: &str| {
+        let skill = skill_with(
+            dir.path(),
+            name,
+            &STRETCH.replace(
+                r#"light = { colour = "warm", level = 2, for = "4s" }"#,
+                r#"light = "glow""#,
+            ),
+        );
+        fs::create_dir_all(skill.join("lights")).unwrap();
+        fs::write(skill.join("lights/glow.toml"), light).unwrap();
+        skill
+    };
+    let skill = with_light(
+        "calm",
+        "colour = \"warm\"\nlevel = 3\nfor = \"4s\"\npattern = { kind = \"breathe\" }\n",
+    );
+    let mut messages = vec![(0, "voice/state", r#"{"state":"resting"}"#)];
+    messages.extend(sitting(0, 3300, &[600, 1800]));
+    messages.sort_by_key(|message| message.0);
+    let runs = runs_at(&skill, &messages);
+    assert_eq!(
+        runs[0].1[2],
+        Call::Light {
+            colour: "warm".into(),
+            level: Some(3),
+            lasting: Some("4s".into()),
+            pattern: Some(LightPattern {
+                kind: PatternKind::Breathe,
+                period_ms: LightPattern::BREATHE_DEFAULT_MS,
+                low: 1,
+            }),
+        }
+    );
+    let candle = with_light(
+        "fire",
+        "colour = \"orange\"\nlevel = 4\npattern = { kind = \"candle\", period = \"2s\" }\n",
+    );
+    load(&candle).unwrap();
+    for (name, light, why) in [
+        (
+            "blinks",
+            "colour = \"warm\"\nlevel = 3\npattern = { kind = \"blink\" }\n",
+            "not breathe, candle or pulse",
+        ),
+        (
+            "levelless",
+            "colour = \"warm\"\npattern = { kind = \"breathe\" }\n",
+            "needs the light's level",
+        ),
+        (
+            "flat",
+            "colour = \"warm\"\nlevel = 3\npattern = { kind = \"breathe\", low = 3 }\n",
+            "under the light's level",
+        ),
+        (
+            "low-candle",
+            "colour = \"warm\"\nlevel = 4\npattern = { kind = \"candle\", low = 2 }\n",
+            "only a breath takes low",
+        ),
+        (
+            "dim-candle",
+            "colour = \"warm\"\nlevel = 2\npattern = { kind = \"candle\" }\n",
+            "a candle flickers at level 3 and up",
+        ),
+        (
+            "anxious",
+            "colour = \"warm\"\nlevel = 3\npattern = { kind = \"breathe\", period = \"3s\" }\n",
+            "4000 to 12000 ms",
+        ),
+    ] {
+        let error = load(&with_light(name, light)).unwrap_err();
+        assert!(error.contains(why), "{name}: {error}");
+    }
+}
+
 #[test]
 fn present_for_a_while_through_short_dropouts_once_a_sitting_and_only_while_resting() {
     let dir = tempfile::tempdir().unwrap();
@@ -1212,7 +1295,8 @@ fn present_for_a_while_through_short_dropouts_once_a_sitting_and_only_while_rest
             Call::Light {
                 colour: "warm".into(),
                 level: Some(2),
-                lasting: Some("4s".into())
+                lasting: Some("4s".into()),
+                pattern: None,
             }
         ]
     );
