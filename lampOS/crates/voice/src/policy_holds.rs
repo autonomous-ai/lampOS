@@ -34,7 +34,9 @@
 //!   as it did without the switch. While it waits nothing else waits: the
 //!   call is kept aside and looked at again on each tick of the worker.
 //! - **Held:** the action is not run, the model is told so ([`HELD`]) and
-//!   none of the turn's sound is let out.
+//!   none of the turn's sound is let out. Asked for again in the same turn
+//!   after it was told, it is told it will not be done ([`HELD_AGAIN`]) and
+//!   the turn ends (#1465).
 //! - **Withdrawn while it waits** (the service cancelled the call), or its
 //!   turn retired or its session gone: it is let go, neither run nor
 //!   answered, and that is looked at again right before it would run (the
@@ -93,7 +95,12 @@ pub const FOLLOWS_FROM: f32 = 0.6;
 /// reviewer on #1054).
 pub const IN_CONVERSATION_US: u64 = 20_000_000;
 /// What the model is told of an action held.
-pub const HELD: &str = "Not done: it was not clear that was said to you. Say nothing at all.";
+pub const HELD: &str = "Not done: it was not clear that was said to you. Do not call it again for this request. Say nothing at all.";
+/// What the model is told when it asks again in the same turn for an
+/// action held: the last answer, and the turn is ended (#1465: on lamp-4ace
+/// on 18 Oct the model asked 72 times in 49 s, each held, and the lamp said
+/// nothing for most of a minute).
+pub const HELD_AGAIN: &str = "Not done, and it will not be done for this request.";
 /// Turns whose decisions are kept: some minutes' worth.
 const KEPT: usize = 16;
 
@@ -151,6 +158,11 @@ pub fn take(flags: &[String]) -> (bool, &[String]) {
 /// What the model is told of an action held.
 pub fn held() -> Value {
     json!({"done": false, "next": HELD})
+}
+
+/// What the model is told of an action held again in the same turn.
+pub fn held_again() -> Value {
+    json!({"done": false, "next": HELD_AGAIN})
 }
 
 /// What becomes of an action kept aside.

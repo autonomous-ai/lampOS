@@ -206,6 +206,115 @@ async fn an_action_in_a_turn_the_policy_judged_not_for_the_lamp_is_not_done_and_
     rig.stop().await;
 }
 
+/// For `long` of the scenario's time, heartbeats kept: the worker's outputs,
+/// and every tool response the service was sent.
+async fn heard_for(
+    rig: &mut LiveRig,
+    dial: &mut Dial,
+    long: Duration,
+) -> (Vec<ProviderOutput>, Vec<serde_json::Value>) {
+    let until = crate::scenario_clock::instant() + long;
+    let (mut out, mut responses) = (Vec::new(), Vec::new());
+    while crate::scenario_clock::instant() < until {
+        rig.publish();
+        while let Some(wire) = rig.take() {
+            if let Wire::Output(output) = wire {
+                out.push(output);
+            }
+        }
+        while let Some(message) = dial.service.try_receive(Duration::ZERO).await {
+            if message.get("toolResponse").is_some() {
+                responses.push(message);
+            }
+        }
+        rig.tick(Duration::from_millis(2)).await;
+    }
+    (out, responses)
+}
+
+/// #1465, lamp-4ace on 18 Oct at 10:57: a follow-up the Policy judged not
+/// for the lamp, and the model asked for the held `volume_up` 72 times in
+/// 49 s, each answered "not done", while the person heard nothing. Bounded
+/// (Twelve's design on #1465): the first held call is told not to ask
+/// again, every later one that it will not be done, the turn is ended
+/// (`Interrupted`) once, nothing is run, and nothing of the turn's sound is
+/// let out. Every call is still answered, as every call is, so that the
+/// service is never left waiting on one (a Live session waits on an
+/// unanswered call); written first as "at most two answered", which would
+/// leave it waiting. Failed on `lamp-voice` before the bound: every call was
+/// answered "not done" alike and the turn went on.
+#[tokio::test(start_paused = true)]
+async fn a_held_call_asked_again_and_again_ends_its_turn_after_the_second() {
+    let _clock = logical_clock();
+    let mut desk = Desk::new("again");
+    let (mut rig, mut dial, request, told, _) =
+        asked_for_volume(&mut desk, true, Some("stay_quiet")).await;
+    assert_eq!(response(&told)["done"], false, "{told}");
+    let mut answers = Vec::new();
+    let mut out = Vec::new();
+    // The model asks again and again, as it did 72 times.
+    for call in 2..=6 {
+        dial.service.send(volume_up(&format!("v{call}"))).await;
+        let (more, responses) = heard_for(&mut rig, &mut dial, Duration::from_millis(100)).await;
+        answers.extend(responses.iter().map(response));
+        out.extend(more);
+    }
+    dial.service.send(provider_audio(9, 480)).await;
+    let (more, _) = heard_for(&mut rig, &mut dial, Duration::from_millis(300)).await;
+    out.extend(more);
+    let again = serde_json::json!({"done": false, "next": crate::policy_holds::HELD_AGAIN});
+    assert_eq!(answers, vec![again; 5], "its 5 later held calls");
+    assert_eq!(
+        out.iter()
+            .filter(|output| matches!(output, ProviderOutput::Interrupted { request: of } if *of == request))
+            .count(),
+        1,
+        "the turn was not ended once: {out:?}"
+    );
+    assert!(desk.asked.try_recv().is_err(), "a held call was run");
+    assert!(
+        !out.iter().any(
+            |output| matches!(output, ProviderOutput::Audio { request: of, .. } if *of == request)
+        ),
+        "{out:?}"
+    );
+    rig.stop().await;
+}
+
+/// The reviewer on #1471: two held calls in one message of the model's
+/// (the volume up and down) are both made before it was told, so neither is
+/// asking again. Both are answered [`crate::policy_holds::HELD`] and the
+/// turn is not ended for them.
+#[tokio::test(start_paused = true)]
+async fn two_held_calls_made_together_are_not_asking_again() {
+    let _clock = logical_clock();
+    let mut desk = Desk::new("together");
+    let mut rig = LiveRig::start_with(quick_policy(), desk.options(true));
+    let mut dial = rig.ready().await;
+    let request = rig.speak(&mut dial, false, true).await;
+    desk.decide(Some(request), "stay_quiet");
+    dial.service
+        .send(json!({"toolCall":{"functionCalls":[
+            {"id":"v1","name":"volume_up","args":{}},
+            {"id":"v2","name":"volume_down","args":{}}
+        ]}}))
+        .await;
+    let (out, responses) = heard_for(&mut rig, &mut dial, Duration::from_millis(300)).await;
+    let held = json!({"done": false, "next": crate::policy_holds::HELD});
+    assert_eq!(
+        responses.iter().map(response).collect::<Vec<_>>(),
+        vec![held.clone(), held],
+        "{responses:?}"
+    );
+    assert!(
+        !out.iter()
+            .any(|output| matches!(output, ProviderOutput::Interrupted { .. })),
+        "{out:?}"
+    );
+    assert!(desk.asked.try_recv().is_err(), "a held call was run");
+    rig.stop().await;
+}
+
 /// A turn the Policy took as the lamp's (`answer`, or `look_up`): the
 /// action runs, and its answer goes back as it would without the switch.
 #[tokio::test(start_paused = true)]
@@ -703,4 +812,65 @@ fn resend_lost_line_is_read_after_policy_holds() {
         .map(String::from)
         .into();
     assert!(parse_flags(dir, &wrong).is_err());
+}
+
+/// #1465, lamp-4ace on 2026-10-18 at 10:57: the Policy held a follow-up's
+/// `volume_up`, and the model asked for it again 72 times in 49 s, each
+/// held and answered the same, while the lamp said nothing. Now a model that
+/// asks again is told so once: the first held call is told not to ask
+/// again, the second is told it will not be done and ends
+/// the turn (handed on as interrupted, so the coordinator lets it go and
+/// listens). Nothing is run and none of its sound is let out. A call held
+/// once and not asked again ends as before, with no turn ended.
+#[tokio::test(start_paused = true)]
+async fn a_model_that_asks_again_for_a_held_action_is_told_it_will_not_be_done_and_its_turn_ends() {
+    let _clock = logical_clock();
+    let mut desk = Desk::new("held-again");
+    let (mut rig, mut dial, request, told, _) =
+        asked_for_volume(&mut desk, true, Some("stay_quiet")).await;
+    assert_eq!(
+        response(&told),
+        json!({"done": false, "next": crate::policy_holds::HELD})
+    );
+    assert!(crate::policy_holds::HELD.contains("Do not call it again"));
+    // The model asks again, and would go on.
+    dial.service.send(volume_up("v2")).await;
+    let told = rig.service_message(&mut dial).await;
+    assert_eq!(
+        response(&told),
+        json!({"done": false, "next": crate::policy_holds::HELD_AGAIN})
+    );
+    let out = outputs_for(&mut rig, Duration::from_millis(200)).await;
+    assert_eq!(
+        out.iter()
+            .filter(|output| matches!(output, ProviderOutput::Interrupted { request: of } if *of == request))
+            .count(),
+        1,
+        "{out:?}"
+    );
+    // A third ask is never run, and the turn is not ended twice.
+    dial.service.send(volume_up("v3")).await;
+    let out = outputs_for(&mut rig, Duration::from_millis(200)).await;
+    assert!(
+        !out.iter()
+            .any(|output| matches!(output, ProviderOutput::Interrupted { .. })),
+        "{out:?}"
+    );
+    assert!(desk.asked.try_recv().is_err(), "the executive was asked");
+    rig.stop().await;
+
+    // Held once and not asked again: as before, no turn ended.
+    let mut desk = Desk::new("held-once");
+    let (mut rig, _dial, _, told, _) = asked_for_volume(&mut desk, true, Some("stay_quiet")).await;
+    assert_eq!(
+        response(&told),
+        json!({"done": false, "next": crate::policy_holds::HELD})
+    );
+    let out = outputs_for(&mut rig, Duration::from_millis(300)).await;
+    assert!(
+        !out.iter()
+            .any(|output| matches!(output, ProviderOutput::Interrupted { .. })),
+        "{out:?}"
+    );
+    rig.stop().await;
 }

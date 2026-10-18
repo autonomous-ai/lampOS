@@ -1442,6 +1442,11 @@ async fn serve_with_visual<C: Connect>(
                 // The lamp's actions kept for the Policy's decision (#800),
                 // each let go if its turn was retired meanwhile.
                 desk.release(&provider, |request| intake.handoff.retired(request));
+                // A turn that asked again for an action held ends as one
+                // interrupted: the coordinator lets it go and listens (#1465).
+                for request in desk.take_ended() {
+                    output.push_back(Outbound::Output(ProviderOutput::Interrupted { request }));
+                }
                 // What the executive made of the calls it was asked.
                 desk.answer(&provider);
                 for (request, session, dropped) in desk.take_looks() {
@@ -2401,6 +2406,13 @@ struct ToolDesk {
     /// The newest request one of whose actions the Policy held: none of its
     /// sound is let out.
     quieted: Option<u64>,
+    /// The request whose actions the Policy held, when the first was
+    /// answered [`crate::policy_holds::HELD`], and whether the turn has been
+    /// ended since for asking again (#1465).
+    held: Option<(u64, u64, bool)>,
+    /// Requests ended here because they asked again for an action held:
+    /// the coordinator is told each, once, as a turn interrupted (#1465).
+    ended: Vec<u64>,
     /// Requests whose skill call was answered with `"look": true` since the
     /// worker last took them, with the call's session and why the look is
     /// dropped, if it is: the coordinator takes their look (#941).
@@ -2476,8 +2488,15 @@ impl ToolDesk {
             verdicts: None,
             parked: Vec::new(),
             quieted: None,
+            held: None,
+            ended: Vec::new(),
             looks: Vec::new(),
         }
+    }
+    /// The requests ended because they asked again for an action held,
+    /// since the last call (#1465).
+    fn take_ended(&mut self) -> Vec<u64> {
+        std::mem::take(&mut self.ended)
     }
     /// The first sound of an answer to `request` has come. Said once for a
     /// request, with how long before it the model said it heard the name,
@@ -2901,14 +2920,39 @@ impl ToolDesk {
                     }
                 }
                 crate::policy_holds::Gate::Hold => {
+                    // Once per turn: asked again after it was told, the turn
+                    // ends here, and the model is told so; it is never
+                    // answered `held` in a loop (#1465). A call made with
+                    // the first, before the model was told, is not asking
+                    // again.
+                    let again = match self.held {
+                        Some((turn, told_us, _)) if turn == request => parked.called_us > told_us,
+                        _ => {
+                            self.held = Some((request, monotonic_us(), false));
+                            false
+                        }
+                    };
+                    let told = if again {
+                        crate::policy_holds::held_again()
+                    } else {
+                        crate::policy_holds::held()
+                    };
                     let sent = provider
                         .try_tool_response(
                             parked.lineage.session,
                             &parked.call.id,
                             &parked.call.name,
-                            &crate::policy_holds::held(),
+                            &told,
                         )
                         .is_ok();
+                    if let Some((_, _, ended @ false)) = self.held.as_mut().filter(|_| again) {
+                        *ended = true;
+                        self.ended.push(request);
+                        eprintln!(
+                            "lamp-voice provider: request {request} asked again for an action held ({}); the turn is ended",
+                            parked.call.name
+                        );
+                    }
                     self.quieted = Some(request);
                     self.line(
                         parked.lineage.session,
