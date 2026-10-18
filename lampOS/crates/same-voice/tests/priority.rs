@@ -42,6 +42,7 @@ fn model_never_written() -> PathBuf {
 #[test]
 fn the_spawned_child_does_not_keep_the_voices_real_time_class() {
     let model = model_never_written();
+    let dir = model.parent().unwrap().to_path_buf();
     let (real_time, mut child) = std::thread::spawn(move || {
         let voice = libc::sched_param { sched_priority: 20 };
         let batch = libc::sched_param { sched_priority: 0 };
@@ -92,6 +93,8 @@ fn the_spawned_child_does_not_keep_the_voices_real_time_class() {
     };
     child.kill().unwrap();
     child.wait().unwrap();
+    // Its folder goes with it (the reviewer on #1445).
+    std::fs::remove_dir_all(&dir).unwrap();
     assert_eq!(
         policy,
         libc::SCHED_OTHER,
