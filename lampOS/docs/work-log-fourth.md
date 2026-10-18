@@ -4504,6 +4504,19 @@ A usage limit paused me from about 00:40 to 06:2x.
   - Tests for each, and mutations for the timer and the busy end.
 - **Waiting on my user:** writes to the app and backend repositories.
 
+## 2026-10-18, 20:26 ICT: #1589 and #1598 merged; #1594's review fixes; #1602 approved by Ten
+
+- **Merged:**
+  - #1589 (19:37): Jarvis's five P3s on #1575.
+  - #1598 (20:12): `LAMP_TIME_PLACES=on` in the product unit, beside `LAMP_CLOCK=on`; the reviewer found nothing.
+- **#1594** (#1522's three fixes, `5f6a14848`): Eighth's peer read (20:4x) and the reviewer (20:04) each found a P2, both now fixed in `147535e1a`, with the gate running:
+  - **The busy end:** a busy room ends a minute after the later of its last talk and the lamp's *first* answer since. Before, a call made more than a minute after the talk ended busy at once, and scene 3's talk after it was answered again. The first builder said yes at 19:58. The scene test now reads the room from `RoomTold` after gaps of 20 s and 70 s, and the mutation is caught.
+  - **A reply to the lamp's own question sets its timer:** "Ten minutes." to "For how long should I set it?". `busy_talk` is false when the line answers the lamp's question, and the mutation is caught.
+  - **The P3s:** known misses written as test rows, and the switches row naming `LAMP_POLICY_HOLDS_ACTIONS`.
+  - It needs merging by about 00:30 for queue 16's battery.
+- **#1602** (the reviewer's two P3s on #1589): Ten approved at 20:2x with 2 P3s, both being fixed. A lamp on a zone that names no place says "Here it is …", not "Here in UTC+7", and the sentence is built from its parts.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
