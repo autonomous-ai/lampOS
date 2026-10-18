@@ -80,6 +80,12 @@ impl Channel {
         })
     }
 
+    /// The socket, so a test can see which processes hold it.
+    #[cfg(all(test, target_os = "linux"))]
+    pub(crate) fn socket(&self) -> std::os::fd::BorrowedFd<'_> {
+        std::os::fd::AsFd::as_fd(&self.endpoint)
+    }
+
     /// Attach fixture observations before any send or receive attempt.
     #[cfg(test)]
     pub(crate) fn install_probe(&mut self) -> io::Result<probe::Probe> {
