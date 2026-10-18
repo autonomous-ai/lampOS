@@ -797,6 +797,16 @@ pub fn exchange_up_to(socket: &Path, line: &Value, deadline: Duration, most: u64
     let mut out = serde_json::to_vec(line).ok()?;
     out.push(b'\n');
     stream.write_all(&out).ok()?;
+    read_answer(&stream, most, left)
+}
+
+/// One line of JSON read back on `stream`, at most `most` bytes, inside
+/// what `left` gives.
+fn read_answer(
+    stream: &UnixStream,
+    most: u64,
+    left: impl Fn() -> Option<Duration>,
+) -> Option<Value> {
     let mut answer = Vec::new();
     let mut reader = BufReader::new(stream.try_clone().ok()?.take(most));
     loop {
@@ -979,6 +989,27 @@ mod tests {
         assert_eq!(kept.len(), count);
     }
     use std::os::unix::net::UnixListener;
+
+    /// #1604, the reviewer's P3: an answer whose sender has already closed
+    /// is read. macOS refuses that socket a read timeout (EINVAL), though the
+    /// answer is there (#1569). Half a line, then gone, is still nothing.
+    #[test]
+    fn an_answer_whose_sender_already_closed_is_read() {
+        let deadline = Instant::now() + Duration::from_secs(1);
+        let left = || {
+            deadline
+                .checked_duration_since(Instant::now())
+                .filter(|left| !left.is_zero())
+        };
+        let (stream, mut sender) = UnixStream::pair().unwrap();
+        sender.write_all(b"{\"ok\":true}\n").unwrap();
+        drop(sender);
+        assert_eq!(read_answer(&stream, 64, left), Some(json!({"ok": true})));
+        let (stream, mut sender) = UnixStream::pair().unwrap();
+        sender.write_all(b"{\"ok\"").unwrap();
+        drop(sender);
+        assert_eq!(read_answer(&stream, 64, left), None);
+    }
 
     fn directory(name: &str) -> PathBuf {
         let path = std::env::temp_dir().join(format!(
