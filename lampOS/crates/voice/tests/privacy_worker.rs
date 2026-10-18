@@ -311,9 +311,24 @@ impl Rig {
             if message.gap != 0 || message.publisher_restarted {
                 return Err(io::Error::other("privacy lease stream lost continuity"));
             }
-            let value =
-                MicrophonePrivacy::from_message(&message, &self.clock, monotonic_us(), wall_ms())
-                    .map_err(io::Error::other)?;
+            let now = monotonic_us();
+            let (value, fresh) =
+                match MicrophonePrivacy::from_message(&message, &self.clock, now, wall_ms()) {
+                    Ok(value) => (value, true),
+                    // Sound as of when it was published, and only too old by
+                    // now: this reader was held up past the lease's 50 ms on a
+                    // loaded machine. It is no lease any more and is passed
+                    // over, but its place in the order still counts (#1544).
+                    Err(error) => match MicrophonePrivacy::from_message(
+                        &message,
+                        &self.clock,
+                        message.header.at_us,
+                        message.header.at_unix_ms,
+                    ) {
+                        Ok(value) if message.header.at_us < now => (value, false),
+                        _ => return Err(io::Error::other(error)),
+                    },
+                };
             if value.controller_boot != boot_text(self.boot)
                 || self.last_lease.as_ref().is_some_and(|last| {
                     last.session_id != value.session_id
@@ -324,7 +339,9 @@ impl Rig {
                 return Err(io::Error::other("privacy lease identity/order changed"));
             }
             self.last_lease = Some(value.clone());
-            values.push(value);
+            if fresh {
+                values.push(value);
+            }
             if count == 31 {
                 return Err(io::Error::other("fixture lease drain overflow"));
             }
