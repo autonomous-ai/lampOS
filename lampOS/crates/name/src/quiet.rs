@@ -16,19 +16,19 @@
 //! Scores fall where they always did: on the steps counted from the last
 //! [`Quiet::forget`] (a start, a gap, lost sound), never from where the
 //! models last woke.
-use crate::hear::{Hearer, STEP, WINDOW};
+use crate::hear::{Hearer, STEP, Score, WINDOW};
 use std::collections::VecDeque;
 
 /// What gives the scores: [`Hearer`], or a test's stand-in.
 pub trait Models {
     /// More sound; a score for each step that became whole with it.
-    fn hear(&mut self, samples: &[i16]) -> Result<Vec<f32>, String>;
+    fn hear(&mut self, samples: &[i16]) -> Result<Vec<Score>, String>;
     /// Start again, as if nothing had been heard.
     fn forget(&mut self);
 }
 
 impl Models for Hearer {
-    fn hear(&mut self, samples: &[i16]) -> Result<Vec<f32>, String> {
+    fn hear(&mut self, samples: &[i16]) -> Result<Vec<Score>, String> {
         Hearer::hear(self, samples)
     }
 
@@ -85,7 +85,7 @@ pub struct Heard {
     /// back to: the last one is of the newest whole step. That holds for
     /// blocks of at most a step (`STEP`, 80 ms; the voice sends 20 ms): a
     /// longer block that rests may end past its last score.
-    pub scores: Vec<f32>,
+    pub scores: Vec<Score>,
     /// The models went to rest with this block: a hearing still open is
     /// over.
     pub rested: bool,
@@ -246,10 +246,10 @@ mod tests {
     }
 
     impl Models for Sums {
-        fn hear(&mut self, samples: &[i16]) -> Result<Vec<f32>, String> {
+        fn hear(&mut self, samples: &[i16]) -> Result<Vec<Score>, String> {
             let before = steps_by(self.samples.len());
             self.samples.extend(samples);
-            let scores: Vec<f32> = (before..steps_by(self.samples.len()))
+            let scores: Vec<Score> = (before..steps_by(self.samples.len()))
                 .map(|step| {
                     let end = WINDOW + step * STEP;
                     let sum = self.samples[end - WINDOW..end].iter().enumerate().fold(
@@ -259,7 +259,10 @@ mod tests {
                                 .wrapping_add(at as u64 ^ u64::from(sample.unsigned_abs()))
                         },
                     );
-                    (sum % 1_000_003) as f32 / 1_000_003.0
+                    Score {
+                        name: (sum % 1_000_003) as f32 / 1_000_003.0,
+                        stop: None,
+                    }
                 })
                 .collect();
             self.worked += scores.len();
@@ -318,7 +321,7 @@ mod tests {
                     .scores
                     .into_iter()
                     .enumerate()
-                    .map(|(at, score)| (last + 1 + at - count, score)),
+                    .map(|(at, score)| (last + 1 + at - count, score.name)),
             );
         }
         (all, quiet.models)

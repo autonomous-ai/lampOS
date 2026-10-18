@@ -13,6 +13,11 @@
 //!
 //! The first two are fixed and know nothing of lamps. The files are not in
 //! the repository: they are installed beside the program (`docs/name.md`).
+//!
+//! 4. With `--stop-least`, `stop.onnx` (`models/stop/`, #828) on the same
+//!    sixteen embeddings: how likely it is that "stop", "wait" or "hold on"
+//!    has just been said (`docs/stop-word.md`). It costs about 24 µs a step
+//!    beside the name's 9–10 ms, and is loaded only when asked for.
 use std::{collections::VecDeque, path::Path, sync::Arc};
 use tract_onnx::prelude::*;
 
@@ -40,6 +45,33 @@ const _: () = assert!(WINDOW == 32_480);
 
 /// The three files, by the names they are installed under.
 pub const FILES: [&str; 3] = ["melspectrogram.onnx", "embedding_model.onnx", "name.onnx"];
+/// The stop model, installed beside them, and the SHA-256 it must have
+/// (`models/stop/SOURCE.md`): another file under its name is refused.
+pub const STOP_FILE: &str = "stop.onnx";
+pub const STOP_SHA256: &str = "5fe07569e3d7c5adcdf496770deb306701b057ab8adce1d03ce901db3ce72d41";
+
+/// Whether `bytes` are the stop model: its pinned SHA-256.
+pub fn is_the_stop_model(bytes: &[u8]) -> Result<(), String> {
+    use sha2::{Digest, Sha256};
+    let digest: String = Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    if digest == STOP_SHA256 {
+        Ok(())
+    } else {
+        Err(format!(
+            "SHA-256 {digest}, not the stop model's {STOP_SHA256}"
+        ))
+    }
+}
+
+/// One step's scores: the name's, and the stop model's when it is loaded.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Score {
+    pub name: f32,
+    pub stop: Option<f32>,
+}
 
 type Plan = Arc<TypedRunnableModel>;
 
@@ -76,6 +108,8 @@ pub struct Hearer {
     mel: Plan,
     embedding: Plan,
     name: Plan,
+    /// `stop.onnx`, only with `--stop-least` ([`Hearer::with_stop`]).
+    stop: Option<Plan>,
     /// Samples not yet made into frames, on the scale of 16-bit sound.
     samples: Vec<f32>,
     /// Frames the second model may still need, and how many came before
@@ -97,6 +131,7 @@ impl Hearer {
             mel: load(&directory.join(mel), &[1, CHUNK])?,
             embedding: load(&directory.join(embedding), &[1, FRAMES, BINS, 1])?,
             name: load(&directory.join(name), &[1, CONTEXT, EMBEDDING])?,
+            stop: None,
             samples: Vec::with_capacity(CHUNK + STEP),
             frames: VecDeque::with_capacity(FRAMES + FRAMES_A_STEP),
             frames_gone: 0,
@@ -105,7 +140,11 @@ impl Hearer {
         };
         // Enough silence for one score: 2.9 s.
         let scores = hearer.hear(&vec![0i16; STEP * 36])?;
-        if scores.is_empty() || scores.iter().any(|score| !(0.0..=1.0).contains(score)) {
+        if scores.is_empty()
+            || scores
+                .iter()
+                .any(|score| !(0.0..=1.0).contains(&score.name))
+        {
             return Err(format!(
                 "the models in {} do not give a score for silence",
                 directory.display()
@@ -113,6 +152,29 @@ impl Hearer {
         }
         hearer.forget();
         Ok(hearer)
+    }
+
+    /// The stop model from `directory` as well, checked by its SHA-256 and
+    /// by a score for silence. Its scores come beside the name's.
+    pub fn with_stop(mut self, directory: &Path) -> Result<Self, String> {
+        let path = directory.join(STOP_FILE);
+        let bytes = std::fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
+        is_the_stop_model(&bytes).map_err(|why| format!("{}: {why}", path.display()))?;
+        let stop = load(&path, &[1, CONTEXT, EMBEDDING])?;
+        let silence = run(
+            &stop,
+            &[1, CONTEXT, EMBEDDING],
+            &[0.0; CONTEXT * EMBEDDING],
+            STOP_FILE,
+        )?;
+        if !silence
+            .first()
+            .is_some_and(|score| (0.0..=1.0).contains(score))
+        {
+            return Err(format!("{}: no score from 0 to 1", path.display()));
+        }
+        self.stop = Some(stop);
+        Ok(self)
     }
 
     /// Start again, as if nothing had been heard: after sound was lost,
@@ -128,7 +190,7 @@ impl Hearer {
     /// More of what the microphone hears, 16 kHz, one channel. A score
     /// for every step that became whole with it, oldest first: none for
     /// about the first two seconds after a start, then one every 80 ms.
-    pub fn hear(&mut self, samples: &[i16]) -> Result<Vec<f32>, String> {
+    pub fn hear(&mut self, samples: &[i16]) -> Result<Vec<Score>, String> {
         self.samples
             .extend(samples.iter().map(|sample| f32::from(*sample)));
         let mut scores = Vec::new();
@@ -184,10 +246,42 @@ impl Hearer {
                         .flat_map(|embedding| embedding.iter().copied())
                         .collect();
                     let score = run(&self.name, &[1, CONTEXT, EMBEDDING], &flat, FILES[2])?;
-                    scores.push(*score.first().ok_or("name.onnx: no score")?);
+                    let stop = match &self.stop {
+                        Some(stop) => Some(
+                            *run(stop, &[1, CONTEXT, EMBEDDING], &flat, STOP_FILE)?
+                                .first()
+                                .ok_or("stop.onnx: no score")?,
+                        ),
+                        None => None,
+                    };
+                    scores.push(Score {
+                        name: *score.first().ok_or("name.onnx: no score")?,
+                        stop,
+                    });
                 }
             }
         }
         Ok(scores)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The repository's `stop.onnx` is the pinned file; any other bytes are
+    /// refused with their SHA-256.
+    #[test]
+    fn only_the_pinned_stop_model_is_taken() {
+        let model = std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models/stop/stop.onnx"),
+        )
+        .unwrap();
+        assert_eq!(is_the_stop_model(&model), Ok(()));
+        let why = is_the_stop_model(b"not a model").unwrap_err();
+        assert!(
+            why.contains("not the stop model's") && why.contains(STOP_SHA256),
+            "{why}"
+        );
     }
 }

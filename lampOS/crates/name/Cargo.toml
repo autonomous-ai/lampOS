@@ -21,6 +21,8 @@ lamp-msgs = { path = "../msgs" }
 # Pure Rust ONNX inference, pinned as in lamp-turn-end and lamp-eyes.
 # Default features pull an unused transformer layer.
 tract-onnx = { version = "=0.23.8", default-features = false }
+# The stop model's pinned SHA-256, checked as it loads (`hear::STOP_SHA256`).
+sha2.workspace = true
 
 [lints]
 workspace = true

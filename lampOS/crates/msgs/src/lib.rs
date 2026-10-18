@@ -892,6 +892,40 @@ impl NameHeard {
     }
 }
 
+/// "Stop", "wait" or "hold on" was heard in what the microphone hears
+/// (`stop/heard`, #828): by `lamp-name`'s fourth model, `stop.onnx`, on the
+/// numbers it already makes for the name. A sign, never proof: talk sets
+/// it off now and then, and a word under a louder voice is missed. Said at
+/// the step the score first reaches the listener's bar, since a stop is
+/// wanted at once.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct StopHeard {
+    /// How sure the listener was, from 0 to 1, at that step.
+    pub score: f32,
+    /// How long before this was sent the score reached the bar, in
+    /// milliseconds.
+    pub ago_ms: u32,
+}
+
+impl StopHeard {
+    pub const TYPE: &str = "lamp_msgs/StopHeard";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "stop/heard";
+
+    /// Each hearing is over when it has been sent. None is promised.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+
+    /// The score is a share.
+    pub fn check(&self) -> Result<(), Invalid> {
+        if !(0.0..=1.0).contains(&self.score) {
+            return invalid(format!("score is {}: from 0 to 1", self.score));
+        }
+        Ok(())
+    }
+}
+
 /// Whether the lamp is paused (`lamp/pause`), as the keeper was last told
 /// (`docs/keeper.md`, "Named states and the pause"). A paused part does no
 /// new work and holds what it has; it is still running and ready.
@@ -1249,6 +1283,12 @@ pub fn name_topics() -> Vec<(&'static str, Declaration)> {
     vec![(NameHeard::RISING_TOPIC, NameHeard::declaration())]
 }
 
+/// A stop word heard (`stop/heard`, #828), separate from the original
+/// seventeen.
+pub fn stop_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(StopHeard::TOPIC, StopHeard::declaration())]
+}
+
 pub fn declaration_of(topic: &str) -> Option<Declaration> {
     first_topics()
         .into_iter()
@@ -1260,6 +1300,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(body_topics())
         .chain(arbitration_topics())
         .chain(name_topics())
+        .chain(stop_topics())
         .chain(mute_topics())
         .chain(tasks_topics())
         .chain(logging_topics())
@@ -1761,6 +1802,36 @@ mod tests {
         let mut loaded = board;
         loaded.cpu_load = 3.5;
         assert_eq!(loaded.check(), Ok(()));
+    }
+
+    #[test]
+    fn a_stop_heard_is_a_score_and_how_long_ago_it_reached_the_bar() {
+        let heard = StopHeard {
+            score: 0.93,
+            ago_ms: 0,
+        };
+        let text = "{\"score\":0.93,\"ago_ms\":0}";
+        round_trip(&heard, text);
+        needs::<StopHeard>(text, "ago_ms");
+        assert_eq!(heard.check(), Ok(()));
+        assert!(
+            StopHeard {
+                score: -0.1,
+                ..heard
+            }
+            .check()
+            .unwrap_err()
+            .0
+            .contains("score")
+        );
+        let declared = StopHeard::declaration();
+        assert_eq!((declared.kind, declared.period()), (Kind::Event, None));
+        assert_eq!(declaration_of(StopHeard::TOPIC), Some(declared));
+        assert!(
+            first_topics()
+                .iter()
+                .all(|(topic, _)| *topic != StopHeard::TOPIC)
+        );
     }
 
     #[test]

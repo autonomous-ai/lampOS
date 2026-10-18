@@ -6,7 +6,7 @@
 //! the score falls again, or after [`LONGEST`] if it does not. Its first
 //! sign is said as soon as the score reaches the bar ([`Hearings::rising`],
 //! `name/rising`, #782): a person looks up at their name as it is said.
-use lamp_msgs::NameHeard;
+use lamp_msgs::{NameHeard, StopHeard};
 use std::time::{Duration, Instant};
 
 /// A hearing is said after this long even if the score has not fallen.
@@ -99,6 +99,35 @@ impl Hearings {
     }
 }
 
+/// When a stop word is heard (#828, `docs/stop-word.md`): at the first step
+/// the stop model's score reaches the bar, said at once, since a stop is
+/// wanted now and not when the word is over; then nothing new for
+/// [`HOLD_OFF`], so one word is one hearing.
+pub struct Stops {
+    least: f32,
+    quiet_until: Option<Instant>,
+}
+
+impl Stops {
+    /// Scores of `least` or more are a stop word being heard.
+    pub fn new(least: f32) -> Self {
+        Self {
+            least,
+            quiet_until: None,
+        }
+    }
+
+    /// The stop model's score for a step: a hearing at the step it first
+    /// reaches the bar, outside the hold-off of the last one.
+    pub fn score(&mut self, score: f32, now: Instant) -> Option<StopHeard> {
+        if score < self.least || self.quiet_until.is_some_and(|until| now < until) {
+            return None;
+        }
+        self.quiet_until = Some(now + HOLD_OFF);
+        Some(StopHeard { score, ago_ms: 0 })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,6 +217,21 @@ mod tests {
             None
         );
         assert_eq!(hearings.tick(start + ms(5_000)), None);
+    }
+
+    #[test]
+    fn a_stop_word_is_said_at_the_step_it_reaches_the_bar_and_once_a_second() {
+        let start = Instant::now();
+        let mut stops = Stops::new(0.9);
+        assert_eq!(stops.score(0.89, start), None);
+        let heard = stops.score(0.93, start + ms(80)).unwrap();
+        assert_eq!((heard.score, heard.ago_ms), (0.93, 0));
+        // The same word, still over the bar: not said again.
+        assert_eq!(stops.score(0.99, start + ms(160)), None);
+        assert_eq!(stops.score(0.99, start + ms(80) + HOLD_OFF - ms(1)), None);
+        // A second later, another word is another hearing.
+        let again = stops.score(0.95, start + ms(80) + HOLD_OFF).unwrap();
+        assert_eq!(again.score, 0.95);
     }
 
     #[test]

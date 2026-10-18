@@ -21,8 +21,8 @@ of the lines addressed to a similar name.
 
 ## The process
 
-    lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--bus-root ABSOLUTE_DIR]
-    lamp-name check MODELS_DIR [--quiet-below DBFS] FILE...
+    lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--stop-least SCORE] [--bus-root ABSOLUTE_DIR]
+    lamp-name check MODELS_DIR [--quiet-below DBFS] [--stop-least SCORE] FILE...
 
 | Option | What it is | If left out |
 |---|---|---|
@@ -30,6 +30,7 @@ of the lines addressed to a similar name.
 | `--microphone` | Whose sound to listen to: the topic `mic1/audio` or `mic2/audio` | `mic2` |
 | `--least` | The score from which the name counts as heard, from 0.5 to 1 | 0.9 |
 | `--quiet-below` | A level in dBFS, from -90 to -30: the models rest while the last 2.03 s held no sample this loud ("Resting while the room is quiet") | off: the models always run |
+| `--stop-least` | A score from 0.5 to 1: also run `stop.onnx` (beside the others, its SHA-256 checked) on the same embeddings, and publish `stop/heard` at the step its score first reaches this, then nothing new for 1 s ([stop-word.md](stop-word.md), #1555). In `check`, a `FILE stop SECONDS SCORE` line per hearing | off: `stop.onnx` is not loaded |
 | `--bus-root` | The bus's directory | `LAMP_BUS_ROOT`, or `/run/lampos-bus` |
 
 It is its own process: with it gone the lamp talks on as before, and
