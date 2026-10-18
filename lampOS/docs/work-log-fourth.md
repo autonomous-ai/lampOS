@@ -4422,6 +4422,17 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **Gate flakes today**, each passing 3 of 3 alone: `fixture_provider`'s worker startup (13:3x) and a reminders lease (`StaleOwner`, 13:5x), both on a loaded Mac.
 - **Waiting on my user:** writes to the app and backend repositories (the backend's `lamp-v2` record, then the app's Lamp 2 page).
 
+## 2026-10-18, 14:58 ICT: the same-voice A/B for lamp-4ace; #1508's review follow-up; #1510 approved
+
+- **The "Several people" A/B** (the first builder's 14:08 on #705, which I'd missed until 14:5x): six two-person scenes for `scenario.py` with each line's expected verdict, the two drop-ins (`LAMP_SPOKEN_TO=on`, with and without `LAMP_SAME_VOICE_MODEL`) and the pass line. Posted at 14:58. Any build after 07:30Z has #1508's 0.45 bar. My prediction, from the recordings: the umbrella held; A's short "And in yen?" and the line after a TV line probably lost; about 2 of 9 judged wanted lines at risk.
+- **#1508 merged at 14:29** with three P3s. The follow-up is on `fourth/bar-045-short`, in its gate:
+  - the bar's cost for short lines in `same-voice.md` (0.45 takes 31 of 38 same-voice pairs with a line under 1.5 s, 8 of 37 longer);
+  - the labelled set has no line under 1.5 s;
+  - the older quiet sets disagree (same-voice median 0.47);
+  - two tests that fail with the bar at 0.25: one through the worker's loop, one for the late print alone.
+- **#1510** (Ten's replay): my P2 is fixed at `8f8c4def6` (a model's stay-quiet-following counts as taking the turn). 19 of 19 tests; approved.
+- **Waiting on my user:** writes to the app and backend repositories.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
