@@ -395,6 +395,13 @@ pub fn time_now_for(places: bool, args: &Value) -> Value {
                 Err(why) => json!({ "error": why }),
             }
         }
+        // With the switch every answer says whose time it is, the lamp's
+        // own too (the reviewer on #1589).
+        _ if places => match crate::local_time::now_here_named() {
+            Ok(Some(now)) => json!({ "now": now }),
+            Ok(None) => json!({"error": "My clock could not be read just now."}),
+            Err(unset) => json!({ "error": unset }),
+        },
         _ => time_now(),
     }
 }
