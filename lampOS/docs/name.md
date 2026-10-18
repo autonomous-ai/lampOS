@@ -21,8 +21,8 @@ of the lines addressed to a similar name.
 
 ## The process
 
-    lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--stop-least SCORE] [--bus-root ABSOLUTE_DIR]
-    lamp-name check MODELS_DIR [--quiet-below DBFS] [--stop-least SCORE] FILE...
+    lamp-name --models ABSOLUTE_DIR [--microphone mic1|mic2] [--least SCORE] [--quiet-below DBFS] [--stop-least SCORE] [--rescue-model ABSOLUTE_FILE --rescue-sha256 HEX [--rescue-gate SCORE]] [--bus-root ABSOLUTE_DIR]
+    lamp-name check MODELS_DIR [--quiet-below DBFS] [--stop-least SCORE] [--rescue-model FILE --rescue-sha256 HEX [--rescue-gate SCORE]] FILE...
 
 | Option | What it is | If left out |
 |---|---|---|
@@ -30,6 +30,9 @@ of the lines addressed to a similar name.
 | `--microphone` | Whose sound to listen to: the topic `mic1/audio` or `mic2/audio` | `mic2` |
 | `--least` | The score from which the name counts as heard, from 0.5 to 1 | 0.9 |
 | `--quiet-below` | A level in dBFS, from -90 to -30: the models rest while the last 2.03 s held no sample this loud ("Resting while the room is quiet") | off: the models always run |
+| `--rescue-model` | A second name model of `name.onnx`'s shape, outside the models directory: where `name.onnx` reached `--rescue-gate` at a step or in the 1 s before it, that step's score is the higher of the two ("A second model to rescue a call", #1546). Refused unless its SHA-256 is `--rescue-sha256` | off: no second model |
+| `--rescue-sha256` | The rescue model's SHA-256, 64 lower-case hex digits; required with `--rescue-model` | — |
+| `--rescue-gate` | A score from 0.05 to 0.95 | 0.5 |
 | `--stop-least` | A score from 0.5 to 1: also run `stop.onnx` (beside the others, its SHA-256 checked) on the same embeddings, and publish `stop/heard` at the step its score first reaches this, then nothing new for 1 s ([stop-word.md](stop-word.md), #1555). In `check`, a `FILE stop SECONDS SCORE` line per hearing | off: `stop.onnx` is not loaded |
 | `--bus-root` | The bus's directory | `LAMP_BUS_ROOT`, or `/run/lampos-bus` |
 
@@ -111,6 +114,42 @@ before they give a score again. A hearing that was open at that moment is
 said then, dated from its first high score (it was dated 0.8 s earlier
 than that until 2026-10-14, which left a call 0.7 s, not 1.5 s, to count
 for the request after it).
+
+## A second model to rescue a call
+
+The installed `name.onnx` almost never hears the name where it was not
+said, but through lamp-4ace's speaker and canceller it hears few bare
+"Lamp," calls. A model trained on the lamp's own recordings
+(`training/name/lamp.py`, [bare-name.md](bare-name.md)) hears far more
+calls, and far more that were not. With `--rescue-model` both run on the
+same sixteen embeddings (`src/rescue.rs`): a step's score is
+`name.onnx`'s, unless `name.onnx` reached the gate at that step or in the
+twelve before it (1 s), and then it is the higher of the two. So
+`name.onnx` says where a call may be, and the second model only how sure
+it is there. Everything after (the bar, a hearing, `name/rising`) judges
+that score as it judged `name.onnx`'s.
+
+Steps the models rested through, lost sound and a gap close the gate: a
+score before them is not within a second of one after. The file is given
+with its SHA-256, and another file under its name is refused at the
+start; it is checked by a score from 0 to 1 for silence.
+
+On the second sitting's recordings (18 Oct, 99 played calls, 18.9 min of
+held-out negatives: the lamp's answers, the room, near and mid lines, a
+quiet room), with the gate at 0.5: 51 calls heard at 0.98 against
+`name.onnx`'s 35, and no false hearing at 0.98 for either. At 0.3, 54
+calls and 3.2 false an hour; at 0.1, 66 and 6.3. The trained model alone
+heard 82, with 104.6 false an hour. One sitting of played voices: a sign,
+not proof. The trained model is the office's and stays on lamp-4ace; none
+is published.
+
+The journal says the rescue at the start (`rescue=PATH@GATE:SHA12…`),
+`rescued=yes` on a hearing one of whose steps reached the bar only by the
+second model, and `rescued_steps` in the minute line. `lamp-name check`
+takes the same three options. On a laptop (i7-13650HX, `check` over two
+recordings, five runs each) a step took a median 2.07 ms with the second
+model against 2.04 without: about 30 µs. On lamp-4ace it is measured as
+`stop.onnx` was (#1555).
 
 ## Resting while the room is quiet
 

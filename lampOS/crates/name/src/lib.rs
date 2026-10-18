@@ -10,6 +10,8 @@
 //! - [`quiet`]: with `--quiet-below`, the models rest while the last
 //!   2.03 s held no sound, and give the same scores when it comes.
 //! - [`said`]: when a run of scores is one hearing, and what is said of it.
+//! - [`rescue`]: with `--rescue-model`, a second name model rescues a call
+//!   the installed one half heard.
 //!
 //! It keeps no sound and writes none down: samples are held for about a
 //! fifth of a second, until they are the numbers the models work on, and
@@ -22,4 +24,5 @@
 
 pub mod hear;
 pub mod quiet;
+pub mod rescue;
 pub mod said;

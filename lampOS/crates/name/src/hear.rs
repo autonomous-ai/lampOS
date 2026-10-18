@@ -18,6 +18,10 @@
 //!    sixteen embeddings: how likely it is that "stop", "wait" or "hold on"
 //!    has just been said (`docs/stop-word.md`). It costs about 24 µs a step
 //!    beside the name's 9–10 ms, and is loaded only when asked for.
+//! 5. With `--rescue-model`, a second name model of the same shape on the
+//!    same sixteen embeddings, trained on the lamp's own recordings, its
+//!    SHA-256 given beside it (`rescue.rs`, #1546). Loaded only when asked
+//!    for.
 use std::{collections::VecDeque, path::Path, sync::Arc};
 use tract_onnx::prelude::*;
 
@@ -52,25 +56,31 @@ pub const STOP_SHA256: &str = "5fe07569e3d7c5adcdf496770deb306701b057ab8adce1d03
 
 /// Whether `bytes` are the stop model: its pinned SHA-256.
 pub fn is_the_stop_model(bytes: &[u8]) -> Result<(), String> {
+    has_sha256(bytes, STOP_SHA256, "the stop model's")
+}
+
+/// Whether `bytes` have the SHA-256 `expected` (lower-case hex), said as
+/// `whose` when they do not.
+pub fn has_sha256(bytes: &[u8], expected: &str, whose: &str) -> Result<(), String> {
     use sha2::{Digest, Sha256};
     let digest: String = Sha256::digest(bytes)
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect();
-    if digest == STOP_SHA256 {
+    if digest == expected {
         Ok(())
     } else {
-        Err(format!(
-            "SHA-256 {digest}, not the stop model's {STOP_SHA256}"
-        ))
+        Err(format!("SHA-256 {digest}, not {whose} {expected}"))
     }
 }
 
-/// One step's scores: the name's, and the stop model's when it is loaded.
+/// One step's scores: the name's, and the stop and rescue models' when
+/// they are loaded.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Score {
     pub name: f32,
     pub stop: Option<f32>,
+    pub rescue: Option<f32>,
 }
 
 type Plan = Arc<TypedRunnableModel>;
@@ -103,6 +113,29 @@ fn run(plan: &Plan, shape: &[usize], values: &[f32], what: &str) -> Result<Vec<f
         .collect())
 }
 
+/// A model on the sixteen embeddings beside `name.onnx`: its file at
+/// `path`, refused unless its SHA-256 is `sha256`, and checked by a score
+/// from 0 to 1 for silence.
+fn head(path: &Path, sha256: &str, whose: &str) -> Result<Plan, String> {
+    let bytes = std::fs::read(path).map_err(|error| format!("{}: {error}", path.display()))?;
+    has_sha256(&bytes, sha256, whose).map_err(|why| format!("{}: {why}", path.display()))?;
+    let plan = load(path, &[1, CONTEXT, EMBEDDING])?;
+    let what = path.display().to_string();
+    let silence = run(
+        &plan,
+        &[1, CONTEXT, EMBEDDING],
+        &[0.0; CONTEXT * EMBEDDING],
+        &what,
+    )?;
+    if !silence
+        .first()
+        .is_some_and(|score| (0.0..=1.0).contains(score))
+    {
+        return Err(format!("{what}: no score from 0 to 1"));
+    }
+    Ok(plan)
+}
+
 /// The listener: the models, and the little of the sound they still need.
 pub struct Hearer {
     mel: Plan,
@@ -110,6 +143,8 @@ pub struct Hearer {
     name: Plan,
     /// `stop.onnx`, only with `--stop-least` ([`Hearer::with_stop`]).
     stop: Option<Plan>,
+    /// The rescue model, only with `--rescue-model` ([`Hearer::with_rescue`]).
+    rescue: Option<Plan>,
     /// Samples not yet made into frames, on the scale of 16-bit sound.
     samples: Vec<f32>,
     /// Frames the second model may still need, and how many came before
@@ -132,6 +167,7 @@ impl Hearer {
             embedding: load(&directory.join(embedding), &[1, FRAMES, BINS, 1])?,
             name: load(&directory.join(name), &[1, CONTEXT, EMBEDDING])?,
             stop: None,
+            rescue: None,
             samples: Vec::with_capacity(CHUNK + STEP),
             frames: VecDeque::with_capacity(FRAMES + FRAMES_A_STEP),
             frames_gone: 0,
@@ -157,23 +193,19 @@ impl Hearer {
     /// The stop model from `directory` as well, checked by its SHA-256 and
     /// by a score for silence. Its scores come beside the name's.
     pub fn with_stop(mut self, directory: &Path) -> Result<Self, String> {
-        let path = directory.join(STOP_FILE);
-        let bytes = std::fs::read(&path).map_err(|error| format!("{}: {error}", path.display()))?;
-        is_the_stop_model(&bytes).map_err(|why| format!("{}: {why}", path.display()))?;
-        let stop = load(&path, &[1, CONTEXT, EMBEDDING])?;
-        let silence = run(
-            &stop,
-            &[1, CONTEXT, EMBEDDING],
-            &[0.0; CONTEXT * EMBEDDING],
-            STOP_FILE,
-        )?;
-        if !silence
-            .first()
-            .is_some_and(|score| (0.0..=1.0).contains(score))
-        {
-            return Err(format!("{}: no score from 0 to 1", path.display()));
-        }
-        self.stop = Some(stop);
+        self.stop = Some(head(
+            &directory.join(STOP_FILE),
+            STOP_SHA256,
+            "the stop model's",
+        )?);
+        Ok(self)
+    }
+
+    /// The rescue model at `path` as well (`rescue.rs`), checked by the
+    /// SHA-256 given for it and by a score for silence. Its scores come
+    /// beside the name's.
+    pub fn with_rescue(mut self, path: &Path, sha256: &str) -> Result<Self, String> {
+        self.rescue = Some(head(path, sha256, "the one given,")?);
         Ok(self)
     }
 
@@ -254,9 +286,18 @@ impl Hearer {
                         ),
                         None => None,
                     };
+                    let rescue = match &self.rescue {
+                        Some(rescue) => Some(
+                            *run(rescue, &[1, CONTEXT, EMBEDDING], &flat, "the rescue model")?
+                                .first()
+                                .ok_or("the rescue model: no score")?,
+                        ),
+                        None => None,
+                    };
                     scores.push(Score {
                         name: *score.first().ok_or("name.onnx: no score")?,
                         stop,
+                        rescue,
                     });
                 }
             }
@@ -282,6 +323,28 @@ mod tests {
         assert!(
             why.contains("not the stop model's") && why.contains(STOP_SHA256),
             "{why}"
+        );
+    }
+
+    /// A head (the rescue model) loads only with the SHA-256 given for it,
+    /// and must score silence from 0 to 1: the repository's `stop.onnx`
+    /// stands in, being of the same shape.
+    #[test]
+    fn a_head_loads_only_with_the_sha256_given_for_it() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models/stop/stop.onnx");
+        assert!(head(&path, STOP_SHA256, "the one given,").is_ok());
+        let wrong = "0".repeat(64);
+        let why = head(&path, &wrong, "the one given,").err().unwrap();
+        assert!(
+            why.contains(STOP_SHA256) && why.contains(&format!("not the one given, {wrong}")),
+            "{why}"
+        );
+        let missing = head(Path::new("/nonexistent/rescue.onnx"), STOP_SHA256, "x")
+            .err()
+            .unwrap();
+        assert!(
+            missing.starts_with("/nonexistent/rescue.onnx: "),
+            "{missing}"
         );
     }
 }
