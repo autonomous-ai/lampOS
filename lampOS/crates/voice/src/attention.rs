@@ -1591,13 +1591,16 @@ impl Attention {
         request == self.request && matches!(self.verdict, Some(Verdict::Hold(_)))
     }
 
-    /// Whether the calls of `request` are held too: as its answer is,
-    /// except when the Policy chose `look_up`, whose words are held and
-    /// whose call is left to the lamp's own gate for actions
-    /// ([`crate::going_on_asks::LOOKED_UP`], the first builder's ruling on
-    /// #1538).
-    pub fn holds_calls(&self, request: u64) -> bool {
-        self.holds(request) && self.verdict != Some(Verdict::Hold(crate::going_on_asks::LOOKED_UP))
+    /// Whether what was heard of the request in hand names a timer, a
+    /// reminder or the lamp ([`crate::going_on_asks::names_the_schedule`]).
+    pub fn names_the_schedule(&self) -> bool {
+        crate::going_on_asks::names_the_schedule(&self.heard)
+    }
+
+    /// Whether the request in hand answers the lamp's own question, as its
+    /// first output was judged ([`Self::lamp_asked`]).
+    pub fn answers_the_lamps_question(&self) -> bool {
+        self.lamp_asked
     }
 }
 
@@ -2598,30 +2601,68 @@ mod tests {
     /// the lamp (`follows_lamp` 0.66), every other line of the two people's
     /// `stay_quiet` or `look_up` (the first builder on #1522, 15:14).
     fn scene_three_and_four_with(remarks: bool, asks: bool) -> Vec<bool> {
+        scene_three_and_four_after(remarks, asks, 6)
+            .into_iter()
+            .map(|(play, _)| play)
+            .collect()
+    }
+
+    /// The same, the room made busy first by three lines of talk the lamp
+    /// left alone, the last of them `pause_s` seconds before the call, and
+    /// each line judged in the room `RoomTold` gives then (Eighth on #1594:
+    /// the scene had been given a busy room whatever `RoomTold` said).
+    /// Whether each line was played, and in what room.
+    fn scene_three_and_four_after(remarks: bool, asks: bool, pause_s: u64) -> Vec<(bool, Room)> {
+        use crate::going_on_asks::Says;
+        let lines = [
+            (
+                0,
+                "Hey Lamp, what's the weather in Hanoi today?",
+                Says::Answer,
+            ),
+            (6, "And what about tomorrow?", Says::Following),
+            (12, "I should bring an umbrella then.", Says::Not),
+            (15, "Yes, and we should leave a bit early.", Says::Not),
+            (18, "Okay, I will book the car for eight.", Says::Not),
+            // Scene 4's opening, 6 s after scene 3 ended.
+            (27, "Did you see the report from the client?", Says::Not),
+            (30, "Yes, I read it this morning.", Says::Not),
+            (33, "I know.", Says::Not),
+            (36, "We need to cut something before Friday.", Says::Not),
+        ];
+        lines_after_talk(remarks, asks, pause_s, &lines)
+    }
+
+    /// `lines` (when each is said after the call, in seconds; its words; the
+    /// Policy's decision on it, given with `asks`) as the worker judges
+    /// them, after three lines of talk the lamp left alone, the last of them
+    /// `pause_s` seconds before the first line: whether each was played, and
+    /// in what room.
+    fn lines_after_talk(
+        remarks: bool,
+        asks: bool,
+        pause_s: u64,
+        lines: &[(u64, &str, crate::going_on_asks::Says)],
+    ) -> Vec<(bool, Room)> {
         const S: u64 = 1_000_000;
         let start = std::time::Instant::now();
         let at = |us: u64| start + std::time::Duration::from_micros(us);
         let mut thread = crate::thread::Thread::new();
         let mut room = crate::room_told::RoomTold::new();
         room.count_only_talk(true);
+        room.end_busy_once_answered(asks);
+        for (request, before_s) in [(1, 11), (2, 6), (3, 1)] {
+            let began = (100 - pause_s - before_s) * S;
+            room.heard(request, began);
+            room.ended(request, began + S / 2);
+            room.left_unanswered(request, began + S);
+        }
         let mut attention = Attention::default();
         attention.speak_when_spoken_to(true);
         attention.hold_remarks(remarks);
         attention.ask_policy_when_going_on(asks);
-        let lines = [
-            (0, "Hey Lamp, what's the weather in Hanoi today?"),
-            (6, "And what about tomorrow?"),
-            (12, "I should bring an umbrella then."),
-            (15, "Yes, and we should leave a bit early."),
-            (18, "Okay, I will book the car for eight."),
-            // Scene 4's opening, 6 s after scene 3 ended.
-            (27, "Did you see the report from the client?"),
-            (30, "Yes, I read it this morning."),
-            (33, "I know."),
-            (36, "We need to cut something before Friday."),
-        ];
         let mut played = Vec::new();
-        for (request, (at_s, line)) in (17..).zip(lines) {
+        for (request, &(at_s, line, says)) in (17..).zip(lines) {
             let began = 100 * S + at_s * S;
             room.heard(request, began);
             attention.began_at(request, 4, began);
@@ -2632,16 +2673,11 @@ mod tests {
             let going_on = !room.talked_past_the_lamp() && thread.going_on(at(began + S));
             attention.lamp_asked(thread.lamp_asked_with(request, remarks));
             if asks {
-                use crate::going_on_asks::Says;
-                let says = match request {
-                    17 => Says::Answer,
-                    18 => Says::Following,
-                    _ => Says::Not,
-                };
                 attention.policy_said(request, Some(says));
             }
+            let now = room.at(began + S);
             let verdict = attention
-                .first_output_busy(request, Room::Busy, going_on, true, Some(false))
+                .first_output_busy(request, now, going_on, true, Some(false))
                 .unwrap();
             room.judged(request, Some(verdict), false);
             let play = matches!(verdict, Verdict::Play(_));
@@ -2651,9 +2687,82 @@ mod tests {
             } else {
                 room.left_unanswered(request, began + 2 * S);
             }
-            played.push(play);
+            played.push((play, now));
         }
         played
+    }
+
+    /// The reviewer's probe on #1594 (20:53): one of two people calls the
+    /// lamp and asks a follow-up, and then they talk on, a line every 6 s
+    /// for nearly two minutes, each held by the Policy, with one more
+    /// question to the lamp at 30 s. Their talk keeps the room busy: every
+    /// line of it is held, and both follow-ups are answered. When the lines
+    /// the Policy held counted for nothing, the room ended a minute after
+    /// the call, and every line from 66 s on was answered. The same with
+    /// `LAMP_REMARKS`: none of the lines is a remark.
+    #[test]
+    fn with_the_switch_two_people_talking_on_after_a_call_keep_their_room_busy() {
+        use crate::going_on_asks::Says;
+        const TALK: [&str; 6] = [
+            "The numbers look high this quarter.",
+            "Maybe the trip to Hanoi.",
+            "That sounds about right to me.",
+            "The client wants to meet in person.",
+            "Probably the train, not the car.",
+            "Friday works for the client.",
+        ];
+        let mut lines = vec![
+            (
+                0,
+                "Hey Lamp, what's the weather in Hanoi today?",
+                Says::Answer,
+            ),
+            (6, "And what about tomorrow?", Says::Following),
+        ];
+        for (at_s, talk) in (12..=120).step_by(6).zip(TALK.iter().cycle()) {
+            lines.push(if at_s == 30 {
+                (at_s, "And what about the weekend?", Says::Following)
+            } else {
+                (at_s, *talk, Says::Not)
+            });
+        }
+        for remarks in [false, true] {
+            let judged = lines_after_talk(remarks, true, 6, &lines);
+            let played: Vec<u64> = lines
+                .iter()
+                .zip(&judged)
+                .filter(|(_, (play, _))| *play)
+                .map(|((at_s, ..), _)| *at_s)
+                .collect();
+            assert_eq!(played, [0, 6, 30], "remarks {remarks}");
+            assert!(
+                judged.iter().all(|(_, room)| *room == Room::Busy),
+                "remarks {remarks}: {judged:?}"
+            );
+        }
+    }
+
+    /// Eighth's probe on #1594: two people talk, pause, and one of them calls
+    /// the lamp, as an office minute goes. After a pause of 20 s or of 70 s
+    /// the call and "And what about tomorrow?" are answered and the other
+    /// seven held, every line of scene 3 judged in a busy room. A minute from
+    /// the talk alone would have ended busy at the call made 70 s after it,
+    /// and answered the umbrella, "leave a bit early" and the car.
+    #[test]
+    fn with_both_switches_scene_three_after_a_pause_is_still_judged_in_a_busy_room() {
+        for pause_s in [20, 70] {
+            let judged = scene_three_and_four_after(true, true, pause_s);
+            let played: Vec<bool> = judged.iter().map(|(play, _)| *play).collect();
+            assert_eq!(
+                played,
+                [true, true, false, false, false, false, false, false, false],
+                "{pause_s} s"
+            );
+            assert!(
+                judged[..5].iter().all(|(_, room)| *room == Room::Busy),
+                "{pause_s} s: {judged:?}"
+            );
+        }
     }
 
     /// The first builder on #705 (16:10): on scene 3 and scene 4's opening,

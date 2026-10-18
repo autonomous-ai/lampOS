@@ -103,6 +103,9 @@ const QUIET_ENDS_RUN: usize = 2;
 /// With [`RoomTold::count_only_talk`], busy ends this long after the last
 /// thing left unanswered that counts as talk.
 const BUSY_ENDS_AFTER_US: u64 = 180_000_000;
+/// With [`RoomTold::end_busy_once_answered`] as well, busy ends this long
+/// after the lamp's first answer since the last talk.
+const BUSY_ENDS_ONCE_ANSWERED_US: u64 = 60_000_000;
 /// With [`RoomTold::count_only_talk`], this many things said and left
 /// unanswered since the lamp last spoke, and a conversation with it is no
 /// longer going on: the people have gone on talking to each other
@@ -153,6 +156,11 @@ pub struct RoomTold {
     talk_only: bool,
     held: Option<u64>,
     last_talk_us: Option<u64>,
+    /// The request whose line the Policy held as not the lamp's in a
+    /// conversation going on (`LAMP_GOING_ON_ASKS`), until it is closed: it
+    /// is talk for the busy room, its run and its clock, but doesn't end the
+    /// conversation ([`Self::judged`]).
+    held_by_policy: Option<u64>,
     /// How many things said were left unanswered as talk since the lamp
     /// last spoke, and the latest request counted or answered, so that a
     /// request is counted once however its end is learned, and never once
@@ -167,6 +175,11 @@ pub struct RoomTold {
     /// three requests is kept out whole (the reviewer on #1291).
     cut_ins_not_talk: bool,
     over_the_lamp: VecDeque<u64>,
+    /// Busy ends [`BUSY_ENDS_ONCE_ANSWERED_US`] after the lamp's first answer
+    /// since the last talk ([`Self::end_busy_once_answered`]), and when that
+    /// answer came.
+    ends_once_answered: bool,
+    answered_us: Option<u64>,
     room: Room,
     /// The session last told, and what it was told.
     told: Option<(u64, Room)>,
@@ -188,14 +201,31 @@ impl RoomTold {
             talk_only: false,
             held: None,
             last_talk_us: None,
+            held_by_policy: None,
             talk_since_spoke: 0,
             talk_counted: 0,
             watching_since_us: None,
             cut_ins_not_talk: false,
             over_the_lamp: VecDeque::new(),
+            ends_once_answered: false,
+            answered_us: None,
             room: Room::Unknown,
             told: None,
         }
+    }
+
+    /// With only talk counted, end a busy room [`BUSY_ENDS_ONCE_ANSWERED_US`]
+    /// after the lamp's first answer since the last talk, from now on, and
+    /// never later than [`BUSY_ENDS_AFTER_US`] after the talk
+    /// (`LAMP_GOING_ON_ASKS`, the first builder on #1522, 19:08). People
+    /// talk, then one of them turns to the lamp: on lamp-4ace at 18:51 a day
+    /// line said to the lamp 108 s after two people's talk was still in a
+    /// busy room, which the 180 s keep. While people go on talking it is
+    /// busy as before, their lines the Policy holds among them, so a call
+    /// answered amid their talk ends nothing (scene 3). A reminder the lamp
+    /// says is no answer ([`Self::spoke_unasked`]).
+    pub fn end_busy_once_answered(&mut self, on: bool) {
+        self.ends_once_answered = on;
     }
 
     /// A request began: something was heard.
@@ -309,6 +339,12 @@ impl RoomTold {
     /// lamp-4ace on 18 October at 14:44 the lamp answered every line of two
     /// people's talk and spoke their words back, its "conversation going on"
     /// re-armed by its own replies (#1522): two remarks held in a row end it.
+    /// One the Policy held as not the lamp's (`LAMP_GOING_ON_ASKS`) is talk
+    /// for the busy room, its run and its clock, so two people talking on
+    /// keep it busy, but it ends no conversation: their next question to the lamp is still
+    /// asked of the Policy (the reviewer on #1594, 20:53: held as nothing,
+    /// their talk let the room end a minute after the call, and from then on
+    /// every line of it was answered).
     pub fn judged(
         &mut self,
         request: u64,
@@ -320,13 +356,41 @@ impl RoomTold {
                 self.another_voice_held(request)
             }
             Some(crate::attention::Verdict::Hold(why)) if why == crate::remarks::REMARK => {}
+            Some(crate::attention::Verdict::Hold(why))
+                if why == crate::going_on_asks::NOT_THE_LAMPS =>
+            {
+                if self.talk_only {
+                    self.held_by_policy = Some(request);
+                }
+            }
             Some(crate::attention::Verdict::Hold(_)) => self.held(request),
             _ => {}
         }
     }
 
-    /// The lamp is speaking in `request`.
+    /// The lamp is speaking in `request`, an answer to someone.
     pub fn spoke(&mut self, request: u64, now_us: u64) {
+        self.sounded(request, now_us);
+        // The lamp's first answer since the last talk, not its newest: the
+        // minute runs from it (Eighth on #1594).
+        if self
+            .answered_us
+            .is_none_or(|answered| self.last_talk_us.is_some_and(|talk| answered < talk))
+        {
+            self.answered_us = Some(now_us);
+        }
+    }
+
+    /// The lamp is speaking in `request`, which nobody asked for: a reminder
+    /// it says on its own. As [`Self::spoke`], but it is no answer, so it
+    /// never starts a busy room's last minute (Jarvis on #1594: a reminder
+    /// rung into two people's pause had ended their busy room a minute
+    /// later, and their next line was judged in a quiet one).
+    pub fn spoke_unasked(&mut self, request: u64, now_us: u64) {
+        self.sounded(request, now_us);
+    }
+
+    fn sounded(&mut self, request: u64, now_us: u64) {
         if self.open.is_some_and(|(open, _)| open == request) {
             self.open = None;
         }
@@ -398,6 +462,11 @@ impl RoomTold {
             self.held = None;
             return Left::Held;
         }
+        if self.held_by_policy == Some(request) {
+            self.held_by_policy = None;
+            self.join_the_run(now_us);
+            return Left::Held;
+        }
         if over_the_lamp {
             self.last_talk_us = Some(now_us);
             return Left::OverTheLamp;
@@ -406,12 +475,18 @@ impl RoomTold {
             self.talk_counted = request;
             self.talk_since_spoke = self.talk_since_spoke.saturating_add(1);
         }
+        self.join_the_run(now_us);
+        Left::Talk
+    }
+
+    /// Something said and left alone at `now_us`, for the busy room: it joins
+    /// the run that makes a room busy, and the busy room's clock runs from it.
+    fn join_the_run(&mut self, now_us: u64) {
         if self.unanswered.len() == BUSY_RUN {
             self.unanswered.pop_front();
         }
         self.unanswered.push_back(now_us);
         self.last_talk_us = Some(now_us);
-        Left::Talk
     }
 
     /// Whether the latest `run` things left unanswered all fell inside a
@@ -436,11 +511,24 @@ impl RoomTold {
         } else {
             BUSY_RUN
         };
+        // Once the lamp has answered since the last talk, busy ends a minute
+        // after the later of the two: that talk and the lamp's first answer
+        // since it (Eighth on #1594). A minute after the talk alone would end
+        // it at a call made a minute or more after people stopped talking,
+        // and the talk after the call would then be answered as in a room
+        // not known to be busy, which undoes #1522's fix. Never later than
+        // the three minutes without the switch (Jarvis on #1594).
+        let busy_until = |talk: u64| match self.answered_us {
+            Some(answered) if self.ends_once_answered && answered > talk => answered
+                .saturating_add(BUSY_ENDS_ONCE_ANSWERED_US)
+                .min(talk.saturating_add(BUSY_ENDS_AFTER_US)),
+            _ => talk.saturating_add(BUSY_ENDS_AFTER_US),
+        };
         let talk_over = self.talk_only
             && self.room == Room::Busy
             && self
                 .last_talk_us
-                .is_some_and(|talk| now_us.saturating_sub(talk) >= BUSY_ENDS_AFTER_US);
+                .is_some_and(|talk| now_us >= busy_until(talk));
         // With only talk counted: five minutes with no talk between people
         // is a quiet room, whatever one person says to the lamp meanwhile.
         // Without it a room where someone keeps talking to the lamp from
@@ -1455,5 +1543,152 @@ mod tests {
         let flags = [FLAG.to_owned(), "x".to_owned()];
         assert_eq!(take(&flags), (true, &flags[1..]));
         assert_eq!(take(&flags[1..]), (false, &flags[1..]));
+    }
+
+    /// #1522 (the first builder, 19:08; Eighth on #1594): with
+    /// `LAMP_GOING_ON_ASKS`, once the lamp has answered since two people last
+    /// talked, their busy room ends a minute after the lamp's first answer
+    /// since that talk, not three minutes after the talk; while they go on
+    /// talking it stays busy. On lamp-4ace at 18:51 a day line 108 s after
+    /// the talk was still in a busy room. A call made more than a minute
+    /// after the talk keeps the room busy for a minute from its answer, so
+    /// the talk after it is still judged in a busy room. Without the switch,
+    /// three minutes.
+    #[test]
+    fn with_the_switch_a_busy_room_ends_a_minute_after_the_lamps_first_answer_since_its_talk() {
+        const S: u64 = 1_000_000;
+        let busy_then_answered = |on: bool| {
+            let mut room = RoomTold::new();
+            room.count_only_talk(true);
+            room.end_busy_once_answered(on);
+            for (request, at) in [(1, 10), (2, 20), (3, 30)] {
+                room.heard(request, at * S);
+                room.ended(request, at * S + S / 2);
+                room.left_unanswered(request, at * S + S);
+            }
+            assert_eq!(room.at(31 * S), Room::Busy);
+            // Someone turns to the lamp, and it answers.
+            room.heard(4, 36 * S);
+            room.ended(4, 37 * S);
+            room.spoke(4, 38 * S);
+            room
+        };
+        // The last talk was left at 31 s, the lamp's first answer since it
+        // came at 38 s: busy until a minute after that.
+        let mut room = busy_then_answered(true);
+        assert_eq!(room.at(97 * S), Room::Busy);
+        assert_eq!(room.at(99 * S), Room::Quiet);
+        // A later answer doesn't move it: the first one counts.
+        let mut room = busy_then_answered(true);
+        room.heard(6, 60 * S);
+        room.ended(6, 61 * S);
+        room.spoke(6, 62 * S);
+        assert_eq!(room.at(99 * S), Room::Quiet);
+        // A call answered 70 s after the talk (Eighth's probe): still busy
+        // at it and for a minute after, not quiet from the answer on.
+        let mut room = RoomTold::new();
+        room.count_only_talk(true);
+        room.end_busy_once_answered(true);
+        for (request, at) in [(1, 10), (2, 20), (3, 30)] {
+            room.heard(request, at * S);
+            room.ended(request, at * S + S / 2);
+            room.left_unanswered(request, at * S + S);
+        }
+        assert_eq!(room.at(31 * S), Room::Busy);
+        room.heard(4, 99 * S);
+        room.ended(4, 100 * S);
+        room.spoke(4, 101 * S);
+        assert_eq!(room.at(102 * S), Room::Busy);
+        assert_eq!(room.at(160 * S), Room::Busy);
+        assert_eq!(room.at(162 * S), Room::Quiet);
+        let mut room = busy_then_answered(false);
+        assert_eq!(room.at(92 * S), Room::Busy);
+        assert_eq!(room.at(212 * S), Room::Quiet);
+        // Talk after the answer: busy as before, three minutes from it.
+        let mut room = busy_then_answered(true);
+        room.heard(5, 40 * S);
+        room.ended(5, 41 * S);
+        room.left_unanswered(5, 42 * S);
+        assert_eq!(room.at(103 * S), Room::Busy);
+        assert_eq!(room.at(223 * S), Room::Quiet);
+    }
+
+    /// The reviewer and Jarvis on #1594, with `LAMP_GOING_ON_ASKS`, as the
+    /// first builder ruled (20:58): two people's lines the Policy holds keep
+    /// their busy room busy and end no conversation; a reminder the lamp
+    /// rings answers no one; the minute never runs past the three minutes;
+    /// and a restart, which keeps no answer, falls back to them.
+    #[test]
+    fn with_the_switch_held_talk_keeps_a_room_busy_and_a_reminder_or_a_restart_ends_nothing() {
+        const S: u64 = 1_000_000;
+        let busy = |on: bool| {
+            let mut room = RoomTold::new();
+            room.count_only_talk(true);
+            room.end_busy_once_answered(on);
+            for (request, at) in [(1, 10), (2, 20), (3, 30)] {
+                room.heard(request, at * S);
+                room.ended(request, at * S + S / 2);
+                room.left_unanswered(request, at * S + S);
+            }
+            assert_eq!(room.at(31 * S), Room::Busy);
+            room
+        };
+        let answered = |room: &mut RoomTold, request: u64, at: u64| {
+            room.heard(request, (at - 2) * S);
+            room.ended(request, (at - 1) * S);
+            room.spoke(request, at * S);
+        };
+        // A call answered at 38 s, then the two talk on every 6 s, each line
+        // held by the Policy: busy throughout, and the conversation with the
+        // lamp not ended, so a question to it is still asked of the Policy.
+        let held = crate::attention::Verdict::Hold(crate::going_on_asks::NOT_THE_LAMPS);
+        let mut room = busy(true);
+        answered(&mut room, 4, 38);
+        for (request, at) in (5..).zip((44..=200).step_by(6)) {
+            room.heard(request, at * S);
+            room.ended(request, at * S + S / 2);
+            room.judged(request, Some(held), false);
+            assert_eq!(room.left_unanswered(request, at * S + S), Left::Held);
+            assert_eq!(room.at(at * S + S), Room::Busy, "{at} s");
+            assert!(!room.talked_past_the_lamp(), "{at} s");
+        }
+        // The last of it left at 201 s: three minutes from it.
+        assert_eq!(room.at(380 * S), Room::Busy);
+        assert_eq!(room.at(382 * S), Room::Quiet);
+        // A reminder rung at 36 s, in their pause, answers no one: busy for
+        // three minutes from the talk, as without it.
+        let mut room = busy(true);
+        room.spoke_unasked(40, 36 * S);
+        assert_eq!(room.at(97 * S), Room::Busy);
+        assert_eq!(room.at(210 * S), Room::Busy);
+        assert_eq!(room.at(212 * S), Room::Quiet);
+        // Like any talk, two lines the Policy holds inside a minute make the
+        // quiet room busy again: they join the run as well as the clock.
+        for (request, at) in [(41, 220), (42, 230)] {
+            room.heard(request, at * S);
+            room.ended(request, at * S + S / 2);
+            room.judged(request, Some(held), false);
+            room.left_unanswered(request, at * S + S);
+        }
+        assert_eq!(room.at(231 * S), Room::Busy);
+        // A first answer 170 s after the talk: busy no longer than the three
+        // minutes, not a minute past them.
+        let mut room = busy(true);
+        answered(&mut room, 4, 201);
+        assert_eq!(room.at(210 * S), Room::Busy);
+        assert_eq!(room.at(212 * S), Room::Quiet);
+        // A new voice at 55 s, after an answer at 38 s, keeps the busy room
+        // and its talk but not the answer: three minutes from the talk, as
+        // without the switch, unless it answers again.
+        let mut room = busy(true);
+        answered(&mut room, 4, 38);
+        let kept = room.kept(BOOT, 55 * S);
+        let mut after = RoomTold::new();
+        after.count_only_talk(true);
+        after.end_busy_once_answered(true);
+        assert!(after.take_back(&kept, BOOT, 56 * S).is_ok());
+        assert_eq!(after.at(100 * S), Room::Busy);
+        assert_eq!(after.at(210 * S), Room::Busy);
+        assert_eq!(after.at(212 * S), Room::Quiet);
     }
 }

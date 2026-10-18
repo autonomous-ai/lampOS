@@ -1878,13 +1878,11 @@ With the switch (`Attention::waits_for_policy`, `Attention::first_output_busy`):
   lamp's held actions use). Played on `answer` (`a conversation with the
   lamp is going on, and the Policy took the line as the lamp's`) and on a
   `stay_quiet` whose `follows_lamp` is 0.6 or more (`… and the Policy found
-  the line said back to the lamp`). Held on any other `stay_quiet` (`a busy
-  room: a conversation with the lamp is going on, but the Policy judged the
-  line not for the lamp`), its calls with it, and on `look_up`, which turns
-  to whoever spoke without speaking (`… and the Policy chose to turn to
-  whoever spoke without the lamp speaking`), its calls left to the lamp's
-  own gate for actions. **The Policy's choice decides** (the first builder's
-  ruling on #1538, 16:51):
+  the line said back to the lamp`), and on `look_up` (`… and the Policy
+  turned to whoever spoke`). Held on any other `stay_quiet` (`a busy room: a
+  conversation with the lamp is going on, but the Policy judged the line
+  not for the lamp`), its calls with it. **The Policy's choice decides**
+  (the first builder's rulings on #1538, 16:51, and on #1522, 19:04):
   - **A `stay_quiet` with `follows_lamp` under 0.6 is held**, from 0.18 to
     0.57 as Jarvis's probe had them. The Policy chose silence, and
     `follows_lamp` under `FOLLOWS_FROM` says the line doesn't answer the
@@ -1895,15 +1893,59 @@ With the switch (`Attention::waits_for_policy`, `Attention::first_output_busy`):
     33 do, and so do 17 of the 46 not said to it. Tonight's battery sets
     the bar: if its wanted rows are held, `FOLLOWS_FROM` moves down from
     its own numbers. Until then it stays at 0.6.
-  - **A `look_up`'s speech is held, and its call runs.** `look_up` means
-    turn to whoever spoke without speaking, so the lamp's held actions
-    taking it up (`policy_holds::Verdict::TakenUp`) and this holding its
-    words agree, whatever its `follows_lamp`. A call the line makes is not
-    held here (`Attention::holds_calls`): it runs, or waits for the gate
-    for actions if `LAMP_POLICY_HOLDS_ACTIONS` is on, which runs it.
+  - **A `look_up` plays**, its words and its call (#1522, 19:04, replacing
+    16:51's "its speech is held"). Turning without speaking is right for the
+    lamp named in passing, not for a question put to it mid-conversation:
+    lamp-4ace's 18:44 battery held "What do you see right now?" for one.
+  - **No timer from talk.** In a busy room, a reply that follows the lamp
+    (a `stay_quiet` at `follows_lamp` 0.6 or more, which the gate for
+    actions lets set a timer or a reminder, #1040) sets nothing on the
+    schedule unless its words name a timer, a reminder or the lamp
+    (`going_on_asks::names_the_schedule`). On lamp-4ace at 18:4x Daniel's
+    "Yes, give me five minutes.", to Samantha, set a five-minute timer that
+    rang mid-day. Not when the line answers the lamp's own question: "Ten
+    minutes." to "For how long should I set it?" sets the timer asked for
+    (the reviewer on #1594). Only with the gate for actions on
+    (`LAMP_POLICY_HOLDS_ACTIONS`), which holds the call. Known misses, each
+    refused only on a following `stay_quiet` in a busy room: asks that name
+    no timer, reminder or the lamp ("Wake me at seven.", "Count down five
+    minutes.", "Set one for ten.").
   - **Of two decisions on one turn** (its words judged in two pieces), the
     newer one has heard more, so it wins, even where the older was more
     certain.
+- **A busy room ends sooner once the lamp is answering someone** (the
+  first builder on #1522, 19:08; Eighth on #1594). Once the lamp has
+  answered a line since the last talk between people, the busy room ends a
+  minute after the later of that talk and the lamp's first answer since it,
+  not three minutes after the talk (`RoomTold::end_busy_once_answered`).
+  While people go on talking it stays busy, so a call answered amid their
+  talk ends nothing, and scene 3 is held as before. A scene that starts
+  more than a minute after the talk is still busy at its call, and for a
+  minute from its answer: a minute from the talk alone would have ended it
+  at a call made 70 s after the talk, and the talk after the call would
+  have been answered. On lamp-4ace at 18:51 a day line said to
+  the lamp 108 s after two people's talk was still in a busy room, held by
+  the Policy. It's not ended on every line the lamp plays: scene 3's named
+  call is played first, and the umbrella line would then be answered in a
+  room not known to be busy.
+  - **Talk the Policy holds is still talk** for the busy room, its run and
+    its clock (the reviewer on #1594, 20:53; the first builder's ruling,
+    20:58; `RoomTold::judged`): two people talking on
+    after a call keep the room busy, each line held as not the lamp's.
+    Booked as nothing, their talk let the room end a minute after the call,
+    and every line from then on was answered. It ends no conversation,
+    though: their next question to the lamp is still asked of the Policy,
+    and answered on a following `stay_quiet`.
+  - **Never later than without the switch:** a first answer 170 s after
+    the talk ends busy at the three minutes, not a minute past them (Jarvis
+    on #1594).
+  - **A reminder the lamp rings answers no one** (`RoomTold::spoke_unasked`,
+    Jarvis): rung into two people's pause, it had ended their busy room a
+    minute later.
+  - **A restart forgets the first answer:** the room's file keeps the busy
+    room and its talk, not the answer, so a voice started again ends busy
+    three minutes after the talk, as without the switch, unless it answers
+    again (the first builder, 20:58, accepted it).
 - **When it waits:** the Policy decides as the line's words end, and
   Gemini's first output usually comes later, so the decision is often
   there already and nothing waits. If it is not, the line's first output,
@@ -1950,7 +1992,7 @@ with the Policy's decisions of 14:44, and both: the same two lines answered
 and seven held each way), and through the worker's own loop with the Policy's decisions on a bus:
 `provider_worker::tests::going_on_asks::with_the_switch_a_line_going_on_in_a_busy_room_is_played_only_as_the_policy_says`
 (the 14:44 lines with their decisions then: the car line and scene 4's
-opener held, "And what about tomorrow?" played at once, a `look_up` held,
+opener held, "And what about tomorrow?" played at once, a `look_up` played,
 the car line played without the switch),
 `…::with_the_switch_a_line_going_on_waits_for_a_late_decision_and_is_played_with_none`
 (a decision 300 ms after the first output: played only once `answer`
@@ -1960,10 +2002,23 @@ comes, held on `stay_quiet`; none: played after 2 s),
 ("Yes, go ahead." to "Shall I start it?" played at once on a `stay_quiet`
 at `follows_lamp` 0.4, and with no decision at all; after a line that
 asked nothing, held),
-`…::with_the_switch_a_look_up_holds_the_words_and_its_call_runs`
+`…::with_the_switch_a_look_up_plays_and_a_stay_quiet_holds_its_call_too`
 ("And turn yourself up a little." with `volume_up` first, the gate for
-actions off: on `look_up` the call runs and the words after it are held;
-on `stay_quiet` at 0.4, neither),
+actions off: on `look_up` the call runs and the words after it play; on
+`stay_quiet` at 0.4, neither),
+`…::with_the_switch_talk_in_a_busy_room_sets_no_timer_unless_it_names_one`
+("Yes, give me five minutes." on a following `stay_quiet`: no timer; "And
+set a timer for five minutes.": set),
+`room_told::tests::with_the_switch_a_busy_room_ends_a_minute_after_the_lamps_first_answer_since_its_talk`,
+`attention::tests::with_both_switches_scene_three_after_a_pause_is_still_judged_in_a_busy_room`
+(scene 3 after a pause of 20 s and of 70 s, each line in the room
+`RoomTold` gives: the call and the follow-up answered, the rest held),
+`attention::tests::with_the_switch_two_people_talking_on_after_a_call_keep_their_room_busy`
+(the reviewer's probe: two people talk on for nearly two minutes after a
+call, each line held by the Policy; every line in a busy room, held, and
+both questions to the lamp answered, with `LAMP_REMARKS` or without),
+`room_told::tests::with_the_switch_held_talk_keeps_a_room_busy_and_a_reminder_or_a_restart_ends_nothing`,
+`going_on_asks::tests::only_a_line_naming_a_timer_a_reminder_or_the_lamp_names_the_schedule`,
 `…::with_the_switch_a_shadow_decision_ends_the_wait_and_holds_nothing`
 (a `stay_quiet` in shadow before the line's answer: played at once; 300 ms
 after it: played then, not after 2 s),
