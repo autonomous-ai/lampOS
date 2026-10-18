@@ -86,11 +86,18 @@ pub struct Score {
 type Plan = Arc<TypedRunnableModel>;
 
 fn load(path: &Path, shape: &[usize]) -> Result<Plan, String> {
+    let bytes = std::fs::read(path).map_err(|error| format!("{}: {error}", path.display()))?;
+    load_bytes(&bytes, path, shape)
+}
+
+/// A model from the bytes already read from `path`: a pinned file is run
+/// from the bytes that were hashed, never opened again by its path.
+fn load_bytes(bytes: &[u8], path: &Path, shape: &[usize]) -> Result<Plan, String> {
     let said = |error: TractError| format!("{}: {error}", path.display());
     tract_onnx::onnx()
         .with_ignore_value_info(true)
         .with_ignore_output_shapes(true)
-        .model_for_path(path)
+        .model_for_read(&mut &bytes[..])
         .map_err(said)?
         .with_input_fact(0, f32::fact(shape).into())
         .map_err(said)?
@@ -119,7 +126,7 @@ fn run(plan: &Plan, shape: &[usize], values: &[f32], what: &str) -> Result<Vec<f
 fn head(path: &Path, sha256: &str, whose: &str) -> Result<Plan, String> {
     let bytes = std::fs::read(path).map_err(|error| format!("{}: {error}", path.display()))?;
     has_sha256(&bytes, sha256, whose).map_err(|why| format!("{}: {why}", path.display()))?;
-    let plan = load(path, &[1, CONTEXT, EMBEDDING])?;
+    let plan = load_bytes(&bytes, path, &[1, CONTEXT, EMBEDDING])?;
     let what = path.display().to_string();
     let silence = run(
         &plan,

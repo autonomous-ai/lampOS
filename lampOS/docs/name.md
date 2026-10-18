@@ -129,10 +129,15 @@ twelve before it (1 s), and then it is the higher of the two. So
 it is there. Everything after (the bar, a hearing, `name/rising`) judges
 that score as it judged `name.onnx`'s.
 
-Steps the models rested through, lost sound and a gap close the gate: a
-score before them is not within a second of one after. The file is given
-with its SHA-256, and another file under its name is refused at the
-start; it is checked by a score from 0 to 1 for silence.
+Lost sound and a gap close the gate: the steps are counted again from
+them, and no score before them is within a second of one after. A rest
+(`--quiet-below`) counts as the time it lasts, since its steps are counted
+though not worked out: one of 1 s or more closes the gate, and after a
+shorter one a gate reached just before it still opens the first steps
+after it, as on the same sound with no rest, where those steps are quiet.
+The file is given with its SHA-256, and another file under its name is
+refused at the start; the model is built from the bytes that were hashed,
+not read again, and is checked by a score from 0 to 1 for silence.
 
 On the second sitting's recordings (18 Oct, 99 played calls, 18.9 min of
 held-out negatives: the lamp's answers, the room, near and mid lines, a
