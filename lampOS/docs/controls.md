@@ -990,17 +990,34 @@ Everything else keeps the guard as before: a fault while listening without
 a signal first, any fault with a control input in flight, a persistence
 fault, a privacy exit, and a crash or abort.
 
-**Known limit, accepted for now (the first builder, 18 Oct 20:48):** a head
-hold (sleep) made in the 4 s between processes (`RestartSec=4s`) is dropped
-by the next process's touch receiver, which takes no touch that began before
-it saw the source. After a fault that the guard would have muted, A or B
-then brings the lamp back listening against the person's sleep. Every clean
-restart has the same gap today; a button mute in the window is kept
-(`Receiver::observe` applies `latest_mute` by `through_us`). The switch
-stays off on the product until #1607 (the touch receiver keeps a hold that
-began after the stored `through_us` and the previous exit), and Monday's
-check with the owner tries a 3 s head hold in the window after the EBUSY
-run. There is no backstop that mutes:
+**A sleep made while no voice ran** (#1607; it was the first builder's
+accepted limit of 18 Oct 20:48). A head hold (sleep) made in the 4 s between
+processes (`RestartSec=4s`) used to be dropped by the next process's touch
+receiver, which takes no touch that began before it saw the source and none
+older than its freshness, so after a fault A or B would have brought the lamp
+back listening against the person's sleep. Now `HandControls::restore` reads
+when the record was last saved (its file's age by the wall clock, before the
+restore saves it again: about when the voice before stopped) and opens a
+one-shot window on the touch receiver (`TouchReceiver::allow_late_sleep`):
+on the first touch state it takes, a retained head **Hold asking for Sleep**,
+from the same Controls session and source reader and sequence, that began
+after both the record's watermark (`through_us`) and that save, is taken
+however old it is, and the lamp sleeps as for a fresh hold. Only Sleep: a
+late tap (a Wake), touch or reset is never taken, so the window can only
+close the microphones. With no record, or a file time ahead of the wall
+clock, there is no window, as before. A button mute in the window was
+already kept (`Receiver::observe` applies `latest_mute` by `through_us`).
+
+**No press between the look and the save** (#1607, Jarvis on #1592): the
+pump queues each input under the press queue's lock (`Shared::quiet`), and a
+release (A's at the end of the run, B's in the cycle's wrapper) holds that
+lock from its look for an input in flight through its save
+(`HandControls::release_if_still_quiet`). A press that comes meanwhile is
+queued after the save, never between, and the next start takes it as above:
+a button's mute by its watermark, a head's sleep by the late window.
+
+The switch stays off on the product until Monday's check with the owner, which
+tries a 3 s head hold in the window after the EBUSY run. There is no backstop that mutes:
 a lamp that cannot start cannot hear, so muting it would only bring back a
 lamp muted after an update with nobody told. Tests:
 `hand_controls::tests::a_run_that_heard_nothing_releases_the_guard_and_is_counted`,
@@ -1015,6 +1032,10 @@ lamp muted after an update with nobody told. Tests:
 `a_link_where_the_count_is_kept_is_never_followed`,
 `coordinator::tests::termination::a_press_during_the_stops_teardown_keeps_the_guard`,
 `a_frame_or_a_spoken_startup_marks_the_run_heard`,
+`hand_controls::tests::a_head_hold_made_while_no_voice_ran_puts_the_next_one_to_sleep`,
+`a_tap_made_while_no_voice_ran_never_wakes_the_next_one`,
+`the_late_window_returns_only_a_sleep_hold`,
+`a_press_waits_while_a_release_looks_and_saves`,
 `bus_out::tests::runs_that_could_not_start_are_a_warning_never_a_mute` and
 `a_run_starting_after_runs_that_could_not_start_says_the_count`.
 

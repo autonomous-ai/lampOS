@@ -1874,3 +1874,130 @@ fn a_link_where_the_count_is_kept_is_never_followed() {
             .is_symlink()
     );
 }
+
+/// #1607 (Jarvis's R2 on #1592, flipped): the voice before stops at 1.5 s
+/// with its record saved; a hand held on the head from 1.51 s for 3.2 s,
+/// while no voice runs; the next voice starts at 5.9 s. What it sees, with
+/// the late sleep allowed after `late` or not at all.
+fn a_hold_while_no_voice_ran(
+    late: Option<u64>,
+    record: MuteRecord,
+) -> Vec<(u64, Observation, bool)> {
+    let directory = Directory::new();
+    let mut head = TestHead::new(CLOCK, START);
+    let _ = head.run(START + 500_000, false);
+    let _ = head.run(START + 3_700_000, true);
+    let _ = head.run(START + 4_900_000, false);
+    // The next voice starts as the head's last step ends.
+    let at = START + 4_900_000;
+    let (mut next, sender) = from_record(head_options(Some(&directory)), record, at);
+    if let Some(after) = late {
+        next.allow_late_sleep(after);
+    }
+    feed(
+        &mut next,
+        &sender,
+        head.run(START + 6_000_000, false),
+        false,
+    )
+}
+
+#[test]
+fn a_head_hold_made_while_no_voice_ran_puts_the_next_one_to_sleep() {
+    let saved = START + 500_000;
+    let fresh = MuteRecord::new(CLOCK).unwrap();
+    let asleep = |seen: &[(u64, Observation, bool)]| {
+        seen.iter().all(|(_, seen, _)| seen.muted && seen.asleep)
+    };
+    let listening = |seen: &[(u64, Observation, bool)]| seen.iter().all(|(_, seen, _)| !seen.muted);
+    // Allowed after the last save: the hold is taken, and the lamp sleeps.
+    let seen = a_hold_while_no_voice_ran(Some(saved), fresh.clone());
+    assert!(asleep(&seen), "{seen:?}");
+    // As before: without it, or with a hold begun before the last save,
+    // the hold is lost and the lamp listens.
+    assert!(listening(&a_hold_while_no_voice_ran(None, fresh.clone())));
+    assert!(listening(&a_hold_while_no_voice_ran(
+        Some(START + 600_000),
+        fresh
+    )));
+}
+
+/// #1607: the late path is Sleep only. A lamp put to sleep, then tapped on
+/// the head while no voice ran, wakes only by a tap its voice sees: the
+/// next one stays asleep.
+#[test]
+fn a_tap_made_while_no_voice_ran_never_wakes_the_next_one() {
+    let directory = Directory::new();
+    let mut record = MuteRecord::new(CLOCK).unwrap();
+    assert!(record.request_sleep(START + 400_000));
+    let mut head = TestHead::new(CLOCK, START);
+    let _ = head.run(START + 500_000, false);
+    let _ = head.run(START + 650_000, true);
+    let _ = head.run(START + 4_900_000, false);
+    // The next voice starts as the head's last step ends.
+    let at = START + 4_900_000;
+    let (mut next, sender) = from_record(head_options(Some(&directory)), record, at);
+    next.allow_late_sleep(START + 450_000);
+    let seen = feed(
+        &mut next,
+        &sender,
+        head.run(START + 6_000_000, false),
+        false,
+    );
+    assert!(
+        seen.iter().all(|(_, seen, _)| seen.muted && seen.asleep),
+        "{seen:?}"
+    );
+}
+
+/// #1607 (the first builder's 21:39): while a release holds the press
+/// queue, from its look for inputs in flight through its save, a press
+/// waits; it is queued once the save is done, never between.
+#[test]
+fn a_press_waits_while_a_release_looks_and_saves() {
+    let directory = Directory::new();
+    let (owner, sender) = fixture(options(false, Some(&directory.file())));
+    let shared = Arc::clone(&owner.shared);
+    let held = owner.quiet_for_test();
+    let pressed = std::thread::spawn(move || {
+        let mute = gesture(ControlIntent::Pet, 1, 4_000_000);
+        enqueue(&sender, &shared, Input::Pet(mute))
+    });
+    std::thread::sleep(std::time::Duration::from_millis(100));
+    assert_eq!(owner.shared.queued.load(Ordering::Acquire), 0, "waits");
+    drop(held);
+    assert!(pressed.join().unwrap());
+    assert_eq!(
+        owner.shared.queued.load(Ordering::Acquire),
+        1,
+        "queued after"
+    );
+}
+
+/// #1607, the receiver itself: of what the head retained while no voice ran,
+/// the late window returns a Sleep hold and nothing else: never a tap, which
+/// asks to wake, nor a touch.
+#[test]
+fn the_late_window_returns_only_a_sleep_hold() {
+    let late = |hand_on_until: u64| {
+        let mut head = TestHead::new(CLOCK, START);
+        let _ = head.run(START + 500_000, false);
+        let _ = head.run(hand_on_until, true);
+        let _ = head.run(START + 4_900_000, false);
+        let next = head.run(START + 4_910_000, false);
+        let (at, state, _) = &next[0];
+        let mut receiver = lamp_controls::touch_receiver::TouchReceiver::new(CLOCK).unwrap();
+        receiver.allow_late_sleep(START + 500_000);
+        receiver
+            .observe(*at, state)
+            .unwrap()
+            .into_iter()
+            .map(|event| event.gesture)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(late(START + 3_700_000), [lamp_msgs::TouchGesture::Hold]);
+    assert!(
+        late(START + 650_000).is_empty(),
+        "a tap and its touch: none"
+    );
+}

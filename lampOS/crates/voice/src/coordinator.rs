@@ -3474,14 +3474,18 @@ fn released_after_cleanup(
     controls: &mut HandControls,
     only_by_stop_first: bool,
 ) -> io::Result<bool> {
-    if only_by_stop_first && !controls.still_quiet() {
+    if !only_by_stop_first {
+        controls.disarm_after_cleanup()?;
+        return Ok(true);
+    }
+    // From the look through the save, no press can be queued (#1607).
+    let released = controls.release_if_still_quiet()?;
+    if !released {
         eprintln!(
             "lamp-voice: a control came during the stop's teardown; the guard is kept, so the next start is muted"
         );
-        return Ok(false);
     }
-    controls.disarm_after_cleanup()?;
-    Ok(true)
+    Ok(released)
 }
 
 /// A microphone that spoke before activation was open and gave audio: the
