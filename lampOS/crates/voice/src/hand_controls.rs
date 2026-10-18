@@ -409,7 +409,11 @@ impl HandControls {
         let now_us = lamp_ipc::monotonic_us();
         // The stored record as it is on disk, before a new boot's rebase:
         // what the guard's marker must still match (the reviewer on #997).
-        let stored = options.mute_record.as_deref().and_then(stored_identity);
+        // Read only once `load_noting` has found a private regular file of
+        // at most 4 KiB there (and before `save` writes anything), so a FIFO
+        // or a huge file refuses with a line instead of hanging the voice
+        // (Jarvis on #1548).
+        let mut stored = None;
         let record = match &options.mute_record {
             Some(path) => {
                 // A record this build cannot read never stops the voice: it
@@ -418,6 +422,7 @@ impl HandControls {
                 if let Some(note) = note {
                     eprintln!("lamp-voice: {note}");
                 }
+                stored = stored_identity(path);
                 // Checks the private parent and first-use/rebased persistence
                 // now. A path that cannot store a mute may not open audio.
                 record.save(path)?;
