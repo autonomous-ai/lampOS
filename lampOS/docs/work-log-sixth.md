@@ -5,6 +5,29 @@ list and the answers belong to the first builder (Queue #1722, continued from
 #705). Sixth shares lamp-52e6 through Fifth, with a scoped loan and exact
 restoration; every hardware result below names its lamp. Newest first.
 
+## 2026-10-19 — preserve completed journal scope, PR #1768
+
+Ready for lamp-voice: no. Draft #1768 at `2f2b75abd`; native ARM64 pending.
+
+- Next #1675 slice: `FinishedExchange` carries the owner already stored in
+  Thread to both legacy and Days journaling. A different face at completion
+  no longer reassigns the finished batch. Room/A/B and keep/forget exclusions
+  are covered. Request admission, direct tools, session snapshots and voice
+  matcher authorization are still separate work.
+- Based directly on integration `10e89aa4c`, independent of shadow PR #1694.
+  The rebased fixture was updated for the new DaysClient fields before the
+  passing final gate. One commit contains code, tests and English docs.
+- Local fmt and strict Voice all-target clippy pass; full Voice tests:
+  2,273 passed, 12 ignored. Workspace build passes. ARM64 run `39208475675`
+  is running. Issue handoff: #1675 comment `6260904459`.
+- #1748's earlier native run `39203751159` is now fully green on `d68cab679`.
+  Third's privacy read and hardware CPU/mute qualification remain pending.
+  Operator helper and artifact hash were delivered; no device operation.
+- Responded to the shared Mac's disk gate by cleaning completed Sixth-owned
+  caches after its failed compile had ended. Cargo reported 93.0 GiB removed;
+  available space reached 87.11 GiB. Source, evidence and frozen Step4 tools
+  were retained; subsequent build used two jobs.
+
 ## 2026-10-19 — opt-in mic1 export, PR #1748
 
 Ready for lamp-voice: no. Draft #1748 at `d68cab679`, stacked on #1707.
