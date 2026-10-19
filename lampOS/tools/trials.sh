@@ -101,7 +101,7 @@ DROPIN=zz-trial.conf
 # are the running lamp-skills' --dir, user and group, @MEMORY_DIR@ is
 # lamp-memory's --dir, and @SRC@ is TRIALS_SKILLS_SRC.
 # ---------------------------------------------------------------------------
-ROWS="light-out scenes activity forget reports nudges smoky dusty"
+ROWS="light-out scenes who-was-here activity forget reports nudges smoky dusty"
 # Rows not here, and why: printed by `list`.
 NOT_HERE="bedtime    Bedtime and Morning (#1732): a draft, not merged; three switches, --zone and its daily state, and it moves the body
 nudges     the other three nudges (#1957): sip-of-water, stand-up and wind-down are tried by hand, as rest-your-eyes is here
@@ -153,6 +153,23 @@ chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/light-scenes"
       CAUSE='call light_scene {"scene":"movie"}'
       PROOF='light-scenes Done'
       EXAMPLE="lamp-skills: light-scenes Done: light warm, the person's, kept"
+      IN="lamp-skills.service"
+      WAIT=30 ;;
+    who-was-here)
+      # #1989 (on lamp-voice): an installable skill whose one function,
+      # who_was_here, answers from the last 12 h of room/presence. Called as
+      # the voice calls it; its line: lamp-skills main.rs, the skill's Done.
+      ABOUT="who was here: who_was_here answers from the room's record (#1989)"
+      NOTE="a build with #1989, and socat or nc -U on the lamp for the call (else play \"Hey Lamp, was anyone here while I was out?\"). The lamp says a line. With the eyes' presence off (LAMP_PRESENCE) there is no record, and it says it can't tell: the call and its Done are what's tried here, not the record"
+      SETASIDE="copy @SKILLS_DIR@/who-was-here"
+      SETUP="rm -rf @SKILLS_DIR@/who-was-here && cp -a @SRC@/who-was-here @SKILLS_DIR@/who-was-here
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/who-was-here"
+      # No switch of its own: the marker restarts lamp-skills to load it.
+      SWITCHES="lamp-skills.service|LAMP_TRIAL=who-was-here"
+      CAUSE='call who_was_here {}'
+      PROOF='who-was-here Done'
+      # The why is its steps' own reports (lamp-skills main.rs): left out.
+      EXAMPLE='lamp-skills: who-was-here Done: …'
       IN="lamp-skills.service"
       WAIT=30 ;;
     activity)
