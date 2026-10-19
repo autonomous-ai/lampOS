@@ -354,3 +354,7 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   and merged (`e3134347a`). #1825 folded into one commit (`27e91fe74`) at the
   reviewer's ask. #1870 (draft): lamp-4ace's Policy, Schedule and Skills to
   `--zone system`; out of draft once #1825 is in. #1826 merged.
+- #1825 merged; #1870 ready. #1693 (4)'s run sheet is on #1693 (build 3265,
+  Live for scenes 4 and 6). twelve-P2 on #1722: memory's forget-all and
+  threads switches reach only the Live worker, not the DeepSeek route. A yes
+  to Tests on #1806.
