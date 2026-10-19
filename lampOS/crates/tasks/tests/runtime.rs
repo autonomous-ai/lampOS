@@ -3,7 +3,8 @@ use lamp_msgs::{AgentState, Diagnostic, Level, Sign, TaskStatus};
 use lamp_tasks::{
     engine::{Clock as Sample, WATCH_EARLY_MS},
     harness::{
-        Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, Observation, SignIn, Target,
+        AccountMachine, Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, Observation,
+        SignIn, Target,
     },
     progress::SETTLED_FOR_MS,
     runtime::{Adapter, Clock, Config, SetUpLater, WaitLane, request, serve_with_adapter},
@@ -95,6 +96,9 @@ struct Counts {
     closes: Mutex<Vec<(String, String)>>,
     /// Harness is signed out while set (#1676).
     signed_out: AtomicBool,
+    /// What `harness machines` lists, and how often it was asked (#1676).
+    machines: Mutex<Vec<AccountMachine>>,
+    machine_reads: AtomicUsize,
 }
 struct ScriptLane(Arc<Counts>);
 impl WaitLane for ScriptLane {
@@ -181,6 +185,10 @@ impl Adapter for Script {
             .unwrap()
             .push((machine.into(), id.into()));
         Ok(Closed::Closed)
+    }
+    fn machines(&self) -> Result<Vec<AccountMachine>, String> {
+        self.counts.machine_reads.fetch_add(1, Ordering::SeqCst);
+        Ok(self.counts.machines.lock().unwrap().clone())
     }
     fn signed_in(&self) -> Result<SignIn, String> {
         Ok(if self.counts.signed_out.load(Ordering::SeqCst) {
@@ -1268,6 +1276,7 @@ fn set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off() {
     s.config.set_up_later = Some(SetUpLater {
         targets: path.clone(),
         every: Duration::from_millis(50),
+        from_machines: None,
     });
     s.start();
     let report = tasks_diagnostic_until(&s, |d| said(d, "handovers_off").is_some());
@@ -1323,6 +1332,74 @@ fn set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off() {
     });
     assert!(said(&report, "targets_invalid").is_none());
     assert_eq!(told_targets(&s), 0);
+}
+
+/// #1676: with `--targets-from-machines`, a lamp signed in to Harness writes
+/// its targets from the person's machines and uses them with no restart: the
+/// first is `office`, the voice's own default. A machine added is added; the
+/// machines are not asked while signed out.
+#[test]
+fn targets_from_machines_are_written_and_used_while_signed_in() {
+    let mut s = Running::new(false);
+    s.stop();
+    let path = s.root.path().join("targets.json");
+    s.config.targets = BTreeMap::new();
+    s.config.set_up_later = Some(SetUpLater {
+        targets: path.clone(),
+        every: Duration::from_millis(50),
+        from_machines: Some(EngineKind::Claude),
+    });
+    let machine = |id: char, label: &str, current: bool| AccountMachine {
+        machine_id: id.to_string().repeat(32),
+        label: label.into(),
+        current,
+    };
+    *s.counts.machines.lock().unwrap() = vec![
+        machine('a', "lamp", true),
+        machine('b', "Office iMac", false),
+    ];
+    s.start();
+    let until = |count: usize| {
+        let start = Instant::now();
+        while told_targets(&s) != count {
+            assert!(
+                start.elapsed() < Duration::from_secs(5),
+                "not {count} targets"
+            );
+            thread::sleep(Duration::from_millis(10));
+        }
+    };
+    until(1);
+    assert_eq!(
+        s.ask(json!({"op":"targets"}))["targets"],
+        json!([{"alias":"office","engine":"claude"}])
+    );
+    let report = tasks_diagnostic_until(&s, |d| said(d, "handovers_off").is_none());
+    assert_eq!(said(&report, "signed_in").as_deref(), Some("yes"));
+
+    s.counts.signed_out.store(true, Ordering::SeqCst);
+    tasks_diagnostic_until(&s, |d| said(d, "signed_in").as_deref() == Some("no"));
+    let asked = s.counts.machine_reads.load(Ordering::SeqCst);
+    s.counts
+        .machines
+        .lock()
+        .unwrap()
+        .push(machine('c', "MacBook Air", false));
+    thread::sleep(Duration::from_millis(600));
+    assert_eq!(
+        s.counts.machine_reads.load(Ordering::SeqCst),
+        asked,
+        "asked while signed out"
+    );
+    assert_eq!(told_targets(&s), 1);
+
+    s.counts.signed_out.store(false, Ordering::SeqCst);
+    until(2);
+    let told = s.ask(json!({"op":"targets"}));
+    assert_eq!(
+        told["targets"],
+        json!([{"alias":"macbook-air","engine":"claude"},{"alias":"office","engine":"claude"}])
+    );
 }
 
 /// Without `serve --set-up-later` nothing of it is said, and the targets
@@ -1428,4 +1505,36 @@ fn a_store_set_aside_is_said_until_its_file_is_gone() {
     s.start();
     let (level, message, kept) = said(&s);
     assert_eq!((level, message.as_str(), kept), (Level::Ok, "", None));
+}
+
+/// #1676: `--targets-from-machines` takes an engine Harness knows, and only
+/// goes with `--set-up-later`, refused before anything is read.
+#[test]
+fn targets_from_machines_needs_an_engine_and_set_up_later() {
+    let refused = |args: &[&str]| {
+        let output = output_of(Command::new(env!("CARGO_BIN_EXE_lamp-tasks")).args(args));
+        assert!(!output.status.success(), "{args:?}");
+        String::from_utf8_lossy(&output.stderr).into_owned()
+    };
+    let base = [
+        "serve",
+        "--enable",
+        "--targets",
+        "/does-not-exist",
+        "--harness",
+        "/does-not-exist",
+    ];
+    let without = refused(&[&base[..], &["--targets-from-machines", "claude"]].concat());
+    assert!(without.contains("only with --set-up-later"), "{without}");
+    let unknown = refused(
+        &[
+            &base[..],
+            &["--set-up-later", "--targets-from-machines", "gpt"],
+        ]
+        .concat(),
+    );
+    assert!(
+        unknown.contains("needs claude, codex or opencode"),
+        "{unknown}"
+    );
 }

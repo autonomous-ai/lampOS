@@ -554,6 +554,22 @@ impl Cli {
         parse_auth_status(&reply.stdout).map_err(str::to_string)
     }
 
+    /// The machines on the person's account (`harness machines --json`,
+    /// `serve --targets-from-machines`). A read only.
+    pub fn machines(&self) -> Result<Vec<AccountMachine>, String> {
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run(
+                &["machines".into(), "--json".into()],
+                self.config.read_timeout,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("machines_failed".into());
+        }
+        parse_machines(&reply.stdout).map_err(str::to_string)
+    }
+
     /// A second adapter on the same CLI and settings, for `wait`
     /// (`serve --push-wait`): held for minutes, it must never take the one
     /// operation lane launches and reads share.
@@ -886,29 +902,63 @@ struct Machine {
     #[serde(rename = "machineId")]
     machine_id: String,
     current: bool,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    hostname: Option<String>,
 }
 
-fn machines(bytes: &[u8], target: &str) -> Result<(), &'static str> {
-    let text = std::str::from_utf8(bytes).map_err(|_| "preflight_invalid_reply")?;
+/// One machine on the person's account, as `harness machines --json` lists
+/// it (openharness `cli.ts` `machinesListCommand`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AccountMachine {
+    pub machine_id: String,
+    /// Its own name, else the hostname of the computer that last connected
+    /// it, as Harness names it; empty with neither.
+    pub label: String,
+    /// The machine this CLI runs as: the lamp itself.
+    pub current: bool,
+}
+
+/// What `harness machines --json` says: one object a line, newest first,
+/// each with a full machine id, unique, and at most one `current`. Other
+/// fields are passed over.
+pub fn parse_machines(bytes: &[u8]) -> Result<Vec<AccountMachine>, &'static str> {
+    let invalid = "machines_invalid_reply";
+    let text = std::str::from_utf8(bytes).map_err(|_| invalid)?;
     let mut ids = BTreeSet::new();
+    let mut listed = Vec::new();
     let mut current = 0;
     for line in text.lines() {
-        if line.trim().is_empty() {
-            return Err("preflight_invalid_reply");
+        if line.trim().is_empty() || ids.len() >= 256 {
+            return Err(invalid);
         }
-        if ids.len() >= 256 {
-            return Err("preflight_invalid_reply");
-        }
-        let machine: Machine = serde_json::from_str(line).map_err(|_| "preflight_invalid_reply")?;
-        if !machine_id(&machine.machine_id) || !ids.insert(machine.machine_id) {
-            return Err("preflight_invalid_reply");
+        let machine: Machine = serde_json::from_str(line).map_err(|_| invalid)?;
+        if !machine_id(&machine.machine_id) || !ids.insert(machine.machine_id.clone()) {
+            return Err(invalid);
         }
         current += usize::from(machine.current);
         if current > 1 {
-            return Err("preflight_invalid_reply");
+            return Err(invalid);
         }
+        let label = [machine.name, machine.hostname]
+            .into_iter()
+            .flatten()
+            .map(|value| value.trim().to_owned())
+            .find(|value| !value.is_empty())
+            .unwrap_or_default();
+        listed.push(AccountMachine {
+            machine_id: machine.machine_id,
+            label,
+            current: machine.current,
+        });
     }
-    if ids.contains(target) {
+    Ok(listed)
+}
+
+fn machines(bytes: &[u8], target: &str) -> Result<(), &'static str> {
+    let listed = parse_machines(bytes).map_err(|_| "preflight_invalid_reply")?;
+    if listed.iter().any(|machine| machine.machine_id == target) {
         Ok(())
     } else {
         Err("machine_unavailable")
