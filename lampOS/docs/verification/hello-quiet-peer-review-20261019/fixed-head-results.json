@@ -1,0 +1,74 @@
+{
+  "head": "d923d46cf3b13bd14860ad1d048e0e9de31a4f7a",
+  "steps": [
+    {
+      "stage": "policy",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-policy",
+        "--lib",
+        "second_review_",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 16.39,
+      "log_sha256": "ee208b0befee13ca13523f0b8823e51669bf7d17b9e7fb29ad53363f57343253",
+      "summaries": [
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 176 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "stage": "producer",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::tests::held_verdict_is_published_before_the_queued_transcript_is_consumed",
+        "--",
+        "--exact"
+      ],
+      "exit_code": 0,
+      "seconds": 61.75,
+      "log_sha256": "7beddfc85523f4e43744ee236a8b3dac11ae69b6f58d84d4175f38e12f4688df",
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2053 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "stage": "census",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice-eval",
+        "--lib",
+        "export::tests::the_bus_topics_hold_every_topic_the_messages_name",
+        "--",
+        "--exact"
+      ],
+      "exit_code": 0,
+      "seconds": 66.1,
+      "log_sha256": "7b8c81e81eb576835d04de76f11ef8518d70b26a9498bac7aca9507cf1fb9d07",
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 321 filtered out; finished in 0.00s"
+      ]
+    }
+  ],
+  "review_only": true,
+  "source_changes": "The independent regressions modify only the Policy inline test module and Voice second-provider test module in a source-only copy. All other tracked source files match the clean pinned checkout.",
+  "patch_sha256": "7288a99f7891511025859a9104c75b0a3f0ff21ffe235adab3d660258ab5fdcc",
+  "native_arm64": {
+    "record": "fixed-head-arm64.json",
+    "head": "d923d46cf3b13bd14860ad1d048e0e9de31a4f7a",
+    "run": 39217912208,
+    "conclusion": "success",
+    "nextest_passed": 7376,
+    "nextest_skipped": 48,
+    "log_sha256": "0357695e2c24e133cad0103c06f95ce69956d332ec286fbb0b7179513d20c52e"
+  }
+}

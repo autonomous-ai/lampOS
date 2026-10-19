@@ -1,0 +1,205 @@
+{
+  "purpose": "Focused preflight before final credited-queue scope fix; not a full workspace gate.",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.58,
+      "log_name": "second-music-scope-preflight-v2-fmt.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": [],
+      "latency_lines": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 15.82,
+      "log_name": "second-music-scope-preflight-v2-clippy.log",
+      "log_sha256": "5f2aa135997ba0a469709fb5ac62832635569a17ce4ab9a19577e5dd2304ede0",
+      "summaries": [],
+      "latency_lines": []
+    },
+    {
+      "stage": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "requested_audio",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 35.51,
+      "log_name": "second-music-scope-preflight-v2-tests.log",
+      "log_sha256": "3e57d86d463ffb1e477e012bbe7c115aafba729ca613c99f0f824f584e907b18",
+      "summaries": [
+        {
+          "passed": 38,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2097
+        }
+      ],
+      "latency_lines": [
+        "test coordinator::tests::requested_audio::prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_after_retirement ... requested audio prepared host handoff: first=548us repeated=650us; target<=250000us; authored speaker IPC acceptance, acoustic onset unmeasured"
+      ]
+    },
+    {
+      "stage": "scoped_audio",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "scoped_audio",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.15,
+      "log_name": "second-music-scope-preflight-v2-scoped_audio.log",
+      "log_sha256": "0362e090b20633d6b558206c67c9efa41f856d47f02ed962d6014888f85578e2",
+      "summaries": [
+        {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2133
+        }
+      ],
+      "latency_lines": []
+    },
+    {
+      "stage": "scoped_memory",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "memory_scope",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.15,
+      "log_name": "second-music-scope-preflight-v2-scoped_memory.log",
+      "log_sha256": "6d737d39adbb6278884ca41b4d22756d8237d25740f4f1843d3d6c54880d1a49",
+      "summaries": [
+        {
+          "passed": 9,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2126
+        }
+      ],
+      "latency_lines": []
+    },
+    {
+      "stage": "admitted_memory",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "scoped_memory_with_audio_context",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.14,
+      "log_name": "second-music-scope-preflight-v2-admitted_memory.log",
+      "log_sha256": "e6280f628ec769b20e24ad972c6fc32de71d708e447af188c7d4ef9e7061e196",
+      "summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2134
+        }
+      ],
+      "latency_lines": []
+    },
+    {
+      "stage": "revoked_result",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "revoked_tool_result",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.14,
+      "log_name": "second-music-scope-preflight-v2-revoked_result.log",
+      "log_sha256": "6ae694c3ff13190b73832f07d364e7753ef24dfd70d4177d779788859ed6facb",
+      "summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2134
+        }
+      ],
+      "latency_lines": []
+    },
+    {
+      "stage": "verdict_order",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "a_held_verdict_is_told_before_its_words_are_taken",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.14,
+      "log_name": "second-music-scope-preflight-v2-verdict_order.log",
+      "log_sha256": "c09ee2aa417283031354a5f2e1c8dd90f63f8acf0ade22abeac71a4d599dd6a9",
+      "summaries": [
+        {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "filtered_out": 2134
+        }
+      ],
+      "latency_lines": []
+    }
+  ],
+  "followup": "Independent static review found scope revocation could leave an offer in the final credit-blocked transport queue on both routes. A separate correction and new gate are required."
+}

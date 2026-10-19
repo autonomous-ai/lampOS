@@ -1,0 +1,55 @@
+{
+  "head": "253baed5dacc105c43f102bc2d8a5dd817d8bdd5",
+  "parent": "22c9c730bd2def711d0099f2c3b54b26af8e6765",
+  "previous_preparation": "4a0d423270e800e938704ed1288d4ef526eaf83a",
+  "previous_parent": "f21d697ce64f904459d36404099e8ed71d834d2c",
+  "checks": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator.rs",
+      "owned_added_removed_line_multiset_preserved": true,
+      "new_parent_added_removed_line_multiset_preserved": true,
+      "sha256": "7c9f126951d66c453e571d813caf4b07385d2ef3b702922b79edf37b87e28682"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/cloud.rs",
+      "owned_added_removed_line_multiset_preserved": true,
+      "new_parent_added_removed_line_multiset_preserved": true,
+      "sha256": "76e8e5a0322f1de0f72de31168c4945e30c2ea60b9ca86d57aa9158b2d40f5c9"
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "owned_added_removed_line_multiset_preserved": true,
+      "new_parent_added_removed_line_multiset_preserved": true,
+      "sha256": "6d4c0d5f1b58ae535aedf21eb2fb2fd07b3d1c5c9bf8d4780df5c56cbbbd8f21"
+    },
+    {
+      "path": "lampOS/docs/switches.md",
+      "owned_added_removed_line_multiset_preserved": true,
+      "new_parent_added_removed_line_multiset_preserved": true,
+      "sha256": "1e456ee3f361ac3593997bad53f9e188653b21f2e66b22627199f1faac6baf61"
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider.rs",
+      "owned_added_removed_line_multiset_preserved": true,
+      "new_parent_added_removed_line_multiset_preserved": true,
+      "sha256": "7b2a1ab501ad173d6505209d38d7129406db33e5f6bef63aaa52b0fda1beadad"
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "owned_added_removed_line_multiset_preserved": true,
+      "new_parent_added_removed_line_multiset_preserved": true,
+      "sha256": "ad39bffbb56774568f55352021a1dd009c354605c3a44f374aaaec15d578c1ed"
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "sha256": "d2ff8d363e8f2c80d38a8aeff7a2fb08039ba19e6ccb27305b9fb7f8df9c0b94",
+      "resolution": "The only conflict joins Music audio off/on text-isolation coverage with the new parent clock off/on assertions into four cases; the parent relay credentials, link probing/watch and clock handling are retained alongside the owned runner and final-send checks."
+    }
+  ],
+  "unchanged_from_parent": [
+    "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+    "lampOS/crates/tasks/tests/runtime.rs"
+  ],
+  "limits": "Static integration review plus exact added/removed-line multiset comparisons. Source tests and ARM64 remain separately required; this is not runtime or device evidence.",
+  "review": "Independent source review found no P1/P2 in the reviewed coordinator files; Engine and worker delta preservation were reviewed separately."
+}

@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "measured_on": "2026-10-19",
+  "evidence_kind": "supplemental synthetic direct-PCM; no acoustic channel or STT",
+  "platform": {
+    "system": "macOS",
+    "version": "26.6.2",
+    "build": "25G83",
+    "architecture": "arm64"
+  },
+  "scorer": {
+    "name": "lamp-name",
+    "build_profile": "debug",
+    "sha256": "d1f961e51e3386d192e44026929aaf0b845e0eacd9490e4645d87e28c1241944",
+    "hash_unchanged_before_and_after": true
+  },
+  "model_release": "https://github.com/autonomous-ai/lampOS/releases/tag/models-2026-10-16",
+  "frontend_version": "openWakeWord v0.5.1",
+  "model_sha256": {
+    "melspectrogram.onnx": "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f",
+    "embedding_model.onnx": "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f",
+    "name.onnx": "1d238ca7c468bc3b22d6de94155abaec422f7433693e0696302f20157e9af50f"
+  },
+  "generation_tools_sha256": {
+    "say": "a0c75425dfcaaf5316fe255f9d7be0748a1a24041dccaf50cfc73dbe02e18016",
+    "afconvert": "7f7e15790bf80ad2496a2a67e3208b76fddb658e9bd5abaed04b8d080b53358e"
+  },
+  "measurement_driver_sha256": "14988b4786a009d197b526a773fad9ad004f8f2d4823c506a75b5d7b4bf96e01",
+  "configuration": {
+    "synthetic_voices": [
+      "A",
+      "B",
+      "C"
+    ],
+    "spoken_language": "English",
+    "speech_rate_words_per_minute": 175,
+    "sample_rate_hz": 16000,
+    "channels": 1,
+    "format": "signed little-endian PCM16",
+    "leading_silence_ms": [
+      0,
+      500,
+      1000,
+      2500
+    ],
+    "trailing_silence_ms": 3200,
+    "trim": "literal zero samples at source beginning and end only",
+    "hearing_threshold": 0.9,
+    "quiet_below": null,
+    "rescue_model": null,
+    "stop_model": null
+  },
+  "counts": {
+    "distinct_utterances": 36,
+    "positive_utterances": 12,
+    "negative_utterances": 24,
+    "padded_inputs": 144,
+    "successful_scorer_processes": 144,
+    "heard_events_at_0_9": 8
+  },
+  "audited_source_sha256": {
+    "crates/name/src/main.rs": "360b5442ca165665c1ae37d246400cf60fd797a57b061ee1ef200322582262e2",
+    "crates/name/src/hear.rs": "57f9653ee01a760f156927823999f8838705dcdc7a8c481fb0b4e6ae5b5507ab",
+    "crates/name/src/quiet.rs": "c267b0416d08452b24b98593f43477caf4aa97165a2254c6ea38813541bf1ad8",
+    "crates/name/src/said.rs": "83398b1a179792312e9417474f148599440d40946b215ddd63631a53c72bf910",
+    "crates/name/src/rescue.rs": "f80e9e677d7c1adfe067d5cda48e9a73596adde6f57ea851afdf60b709b0cf62",
+    "crates/name/Cargo.toml": "220f8746fec57eb4b260050a526ac4c649db6886292b1cb3f1cc56b0d2c25b0b",
+    "deploy/product/models.json": "deda226dc6b3492d7c244c892f4cae3e53de7f74b1db17db108e3b430dde4ef7"
+  },
+  "source_provenance_limit": "These source hashes record the audited source snapshot; they are not an independent reproducible-build attestation for the pre-existing scorer.",
+  "publication_limits": [
+    "Synthetic voice identifiers are anonymized.",
+    "No generated audio, binary, source script, or raw command log is included.",
+    "Referenced played/acoustic fixtures and their onset manifest were unavailable.",
+    "No rescue model was evaluated.",
+    "No acoustic or STT result, false-rate qualification, or latency qualification is claimed."
+  ]
+}

@@ -1,0 +1,289 @@
+pair_id,model,voice,phrase_id,synthetic_text,positive,lead_ms,tail_ms,sample_rate_hz,total_frames,speech_frames,pcm_sha256,maximum_score,maximum_input_time_s,hearing_count,hearing_scores_json,hearing_input_times_s_json,exit_code
+P000,primary,A,bare,Lamp,true,0,3200,16000,58217,7017,6625ae1f782d7ad51ec52ae76e452c3dfa699c1ffe7c1f01ae8115f6d63f964c,0.0002,2.03,0,[],[],0
+P000,candidate,A,bare,Lamp,true,0,3200,16000,58217,7017,6625ae1f782d7ad51ec52ae76e452c3dfa699c1ffe7c1f01ae8115f6d63f964c,0.1806,2.51,0,[],[],0
+P001,primary,A,bare,Lamp,true,500,3200,16000,66217,7017,110c61e7dede0a521df9dc021b6e2184dce3efd4ae5e224c6248dc3227e3cdb0,0.0002,2.51,0,[],[],0
+P001,candidate,A,bare,Lamp,true,500,3200,16000,66217,7017,110c61e7dede0a521df9dc021b6e2184dce3efd4ae5e224c6248dc3227e3cdb0,0.1806,2.99,0,[],[],0
+P002,primary,A,bare,Lamp,true,1000,3200,16000,74217,7017,214f68fd0b81c3fb8113c18e7c97d0b30bb12d2f6f910809981e98fa8953ecd7,0.8137,2.03,0,[],[],0
+P002,candidate,A,bare,Lamp,true,1000,3200,16000,74217,7017,214f68fd0b81c3fb8113c18e7c97d0b30bb12d2f6f910809981e98fa8953ecd7,0.1806,3.47,0,[],[],0
+P003,primary,A,bare,Lamp,true,2500,3200,16000,98217,7017,6bd467d6af10812115c75191a5884ba911555e0475eadf1bfd586528ce55dcb0,0.8404,3.39,0,[],[],0
+P003,candidate,A,bare,Lamp,true,2500,3200,16000,98217,7017,6bd467d6af10812115c75191a5884ba911555e0475eadf1bfd586528ce55dcb0,0.6882,2.83,0,[],[],0
+P004,primary,A,initial,"Lamp, set a timer for five minutes",true,0,3200,16000,88221,37021,7f411c0008e8b8e1056c09965236d759027ae7010966f718c392d76eea0501bc,0.0001,3.95,0,[],[],0
+P004,candidate,A,initial,"Lamp, set a timer for five minutes",true,0,3200,16000,88221,37021,7f411c0008e8b8e1056c09965236d759027ae7010966f718c392d76eea0501bc,0.1806,4.35,0,[],[],0
+P005,primary,A,initial,"Lamp, set a timer for five minutes",true,500,3200,16000,96221,37021,77bd00d2b84195430f0f14c5a6340a1159f49bee35aa6829aee6b7f6b57f0f4d,0.0001,4.51,0,[],[],0
+P005,candidate,A,initial,"Lamp, set a timer for five minutes",true,500,3200,16000,96221,37021,77bd00d2b84195430f0f14c5a6340a1159f49bee35aa6829aee6b7f6b57f0f4d,0.1806,4.91,0,[],[],0
+P006,primary,A,initial,"Lamp, set a timer for five minutes",true,1000,3200,16000,104221,37021,d6d6a86cd67fb4155a2d2d538d5c30b7ac5ab4bf68a77d4caee62c561fd3ddb6,0.0737,2.03,0,[],[],0
+P006,candidate,A,initial,"Lamp, set a timer for five minutes",true,1000,3200,16000,104221,37021,d6d6a86cd67fb4155a2d2d538d5c30b7ac5ab4bf68a77d4caee62c561fd3ddb6,0.1806,5.39,0,[],[],0
+P007,primary,A,initial,"Lamp, set a timer for five minutes",true,2500,3200,16000,128221,37021,84e07c0574e65d117a7ac3bc5387e6b4ad62d8fe4d16229115b352ddcd95bf8f,0.9537,3.39,1,[0.9537],[3.39],0
+P007,candidate,A,initial,"Lamp, set a timer for five minutes",true,2500,3200,16000,128221,37021,84e07c0574e65d117a7ac3bc5387e6b4ad62d8fe4d16229115b352ddcd95bf8f,0.4564,2.83,0,[],[],0
+P008,primary,A,trailing,"Thank you, Lamp",true,0,3200,16000,71259,20059,8c1b54c0ed6b08f06cf143a5636fc618d788a5b8895b5a22a4479e8a3088b130,0.0004,2.51,0,[],[],0
+P008,candidate,A,trailing,"Thank you, Lamp",true,0,3200,16000,71259,20059,8c1b54c0ed6b08f06cf143a5636fc618d788a5b8895b5a22a4479e8a3088b130,0.7087,2.11,0,[],[],0
+P009,primary,A,trailing,"Thank you, Lamp",true,500,3200,16000,79259,20059,d13dd1cd35f3d62faf1caf11fbfb55c3f2993151aed3c35f67945d4bacdffb0d,0.0078,2.27,0,[],[],0
+P009,candidate,A,trailing,"Thank you, Lamp",true,500,3200,16000,79259,20059,d13dd1cd35f3d62faf1caf11fbfb55c3f2993151aed3c35f67945d4bacdffb0d,0.6727,2.43,0,[],[],0
+P010,primary,A,trailing,"Thank you, Lamp",true,1000,3200,16000,87259,20059,00cce14b761e1c0b3609942a258215d2301192e7b61905522de90f89fd512e99,0.0077,2.75,0,[],[],0
+P010,candidate,A,trailing,"Thank you, Lamp",true,1000,3200,16000,87259,20059,00cce14b761e1c0b3609942a258215d2301192e7b61905522de90f89fd512e99,0.9462,2.67,1,[0.9462],[2.59],0
+P011,primary,A,trailing,"Thank you, Lamp",true,2500,3200,16000,111259,20059,fea4f6b33226ea0bdc7f6a7372bccc833551d5dc852f5f6b2832ad1bc87d02f4,0.0078,4.27,0,[],[],0
+P011,candidate,A,trailing,"Thank you, Lamp",true,2500,3200,16000,111259,20059,fea4f6b33226ea0bdc7f6a7372bccc833551d5dc852f5f6b2832ad1bc87d02f4,0.6727,4.43,0,[],[],0
+P012,primary,A,hey,Hey Lamp,true,0,3200,16000,60476,9276,d9f6593eb08fea4ef71945a47d975a7a6919c762998c0760a9392e4db88c816a,0.0003,2.03,0,[],[],0
+P012,candidate,A,hey,Hey Lamp,true,0,3200,16000,60476,9276,d9f6593eb08fea4ef71945a47d975a7a6919c762998c0760a9392e4db88c816a,0.1806,2.67,0,[],[],0
+P013,primary,A,hey,Hey Lamp,true,500,3200,16000,68476,9276,6f4acdb9966bf711f67e9fb3bc70f20b4c39e4225e5fab708379b06fc9c2cdc1,0.0005,2.35,0,[],[],0
+P013,candidate,A,hey,Hey Lamp,true,500,3200,16000,68476,9276,6f4acdb9966bf711f67e9fb3bc70f20b4c39e4225e5fab708379b06fc9c2cdc1,0.662,2.03,0,[],[],0
+P014,primary,A,hey,Hey Lamp,true,1000,3200,16000,76476,9276,9182829634a18cfa82da2d60bdb8ca31041ffb8a7f5b3a915727406906a516ae,1,2.03,1,[1],[2.03],0
+P014,candidate,A,hey,Hey Lamp,true,1000,3200,16000,76476,9276,9182829634a18cfa82da2d60bdb8ca31041ffb8a7f5b3a915727406906a516ae,0.78,2.03,0,[],[],0
+P015,primary,A,hey,Hey Lamp,true,2500,3200,16000,100476,9276,6bf25bea3822465d9cf9f8a73f8f0c01ce50138c2aa76c20cdee18971c8e6072,1,3.23,1,[1],[3.15],0
+P015,candidate,A,hey,Hey Lamp,true,2500,3200,16000,100476,9276,6bf25bea3822465d9cf9f8a73f8f0c01ce50138c2aa76c20cdee18971c8e6072,0.9931,3.07,1,[0.9931],[2.99],0
+P016,primary,A,near_lamb,Lamb is my favourite dish.,false,0,3200,16000,75058,23858,f5d1e1731de4d107d0b82d7125cd0b94f19bf588f4ea6160f52e954a4f554c0d,0.0001,3.15,0,[],[],0
+P016,candidate,A,near_lamb,Lamb is my favourite dish.,false,0,3200,16000,75058,23858,f5d1e1731de4d107d0b82d7125cd0b94f19bf588f4ea6160f52e954a4f554c0d,0.1806,3.55,0,[],[],0
+P017,primary,A,near_lamb,Lamb is my favourite dish.,false,500,3200,16000,83058,23858,91d9e7d277167f6d61080ebddba9a12dd25dee688d07f690baf46565c00a372c,0.0001,3.63,0,[],[],0
+P017,candidate,A,near_lamb,Lamb is my favourite dish.,false,500,3200,16000,83058,23858,91d9e7d277167f6d61080ebddba9a12dd25dee688d07f690baf46565c00a372c,0.1806,4.03,0,[],[],0
+P018,primary,A,near_lamb,Lamb is my favourite dish.,false,1000,3200,16000,91058,23858,fbd982038a6ee146ac3f202cf2aa7c59f02e57f4f3a1a342c728d8c824e02c91,0.0001,4.19,0,[],[],0
+P018,candidate,A,near_lamb,Lamb is my favourite dish.,false,1000,3200,16000,91058,23858,fbd982038a6ee146ac3f202cf2aa7c59f02e57f4f3a1a342c728d8c824e02c91,0.1806,4.59,0,[],[],0
+P019,primary,A,near_lamb,Lamb is my favourite dish.,false,2500,3200,16000,115058,23858,8654008d2028f46093e955281a41ae11fb9704220326a7e8ad9b54789cdc8db3,0.0003,2.67,0,[],[],0
+P019,candidate,A,near_lamb,Lamb is my favourite dish.,false,2500,3200,16000,115058,23858,8654008d2028f46093e955281a41ae11fb9704220326a7e8ad9b54789cdc8db3,0.8823,2.91,0,[],[],0
+P020,primary,A,near_land,Land the plane carefully.,false,0,3200,16000,72903,21703,f5c6207e7084d69ebafe150d4b6db6208d81e463488e666553d48f083c9f40ab,0.0002,2.59,0,[],[],0
+P020,candidate,A,near_land,Land the plane carefully.,false,0,3200,16000,72903,21703,f5c6207e7084d69ebafe150d4b6db6208d81e463488e666553d48f083c9f40ab,0.1806,3.39,0,[],[],0
+P021,primary,A,near_land,Land the plane carefully.,false,500,3200,16000,80903,21703,a675fb33a75698f6ad111f6f788d9b311dd9aae3ab0112c4bd75f1c83ce8099b,0.0002,3.47,0,[],[],0
+P021,candidate,A,near_land,Land the plane carefully.,false,500,3200,16000,80903,21703,a675fb33a75698f6ad111f6f788d9b311dd9aae3ab0112c4bd75f1c83ce8099b,0.1806,3.95,0,[],[],0
+P022,primary,A,near_land,Land the plane carefully.,false,1000,3200,16000,88903,21703,ab51bc40d463e4ccd71bba7dde00df0b3a3df53d9886af789fdc3998f469aa9a,0.0002,3.95,0,[],[],0
+P022,candidate,A,near_land,Land the plane carefully.,false,1000,3200,16000,88903,21703,ab51bc40d463e4ccd71bba7dde00df0b3a3df53d9886af789fdc3998f469aa9a,0.1806,4.43,0,[],[],0
+P023,primary,A,near_land,Land the plane carefully.,false,2500,3200,16000,112903,21703,94b3ad4653a8d3d72ec3a6b9e13e4e8b36ee6c8f6216943c91eab8eb3ae554dc,0.0003,2.67,0,[],[],0
+P023,candidate,A,near_land,Land the plane carefully.,false,2500,3200,16000,112903,21703,94b3ad4653a8d3d72ec3a6b9e13e4e8b36ee6c8f6216943c91eab8eb3ae554dc,0.7206,2.91,0,[],[],0
+P024,primary,A,near_lab,The lab is closed today.,false,0,3200,16000,73053,21853,614fbf94a7f7b398b699719d2046aa7df35571e2e5c2090ea659efba3613724b,0.0004,2.59,0,[],[],0
+P024,candidate,A,near_lab,The lab is closed today.,false,0,3200,16000,73053,21853,614fbf94a7f7b398b699719d2046aa7df35571e2e5c2090ea659efba3613724b,0.1806,3.47,0,[],[],0
+P025,primary,A,near_lab,The lab is closed today.,false,500,3200,16000,81053,21853,b17c6f6db18418ac9779250a98db61e7acb754e1af878bde613ffa0a7166ccff,0.0005,3.07,0,[],[],0
+P025,candidate,A,near_lab,The lab is closed today.,false,500,3200,16000,81053,21853,b17c6f6db18418ac9779250a98db61e7acb754e1af878bde613ffa0a7166ccff,0.1806,3.95,0,[],[],0
+P026,primary,A,near_lab,The lab is closed today.,false,1000,3200,16000,89053,21853,33b6e3775779b488a12006a0f7cc35efcbc9a1cd05c07496ba6af16daffc4f9b,0.001,3.55,0,[],[],0
+P026,candidate,A,near_lab,The lab is closed today.,false,1000,3200,16000,89053,21853,33b6e3775779b488a12006a0f7cc35efcbc9a1cd05c07496ba6af16daffc4f9b,0.1806,4.43,0,[],[],0
+P027,primary,A,near_lab,The lab is closed today.,false,2500,3200,16000,113053,21853,1b3c18de9bbd041d83c3dfa5b02fe811016cb43e54f747f1c143c874af6ed100,0.0005,5.07,0,[],[],0
+P027,candidate,A,near_lab,The lab is closed today.,false,2500,3200,16000,113053,21853,1b3c18de9bbd041d83c3dfa5b02fe811016cb43e54f747f1c143c874af6ed100,0.6785,2.91,0,[],[],0
+P028,primary,A,near_plan,We should plan the trip tomorrow.,false,0,3200,16000,76063,24863,daefbee8edca2166bc4c6c803fb48b6230c6b1b14ae843c7e901286bbce72743,0.0001,3.23,0,[],[],0
+P028,candidate,A,near_plan,We should plan the trip tomorrow.,false,0,3200,16000,76063,24863,daefbee8edca2166bc4c6c803fb48b6230c6b1b14ae843c7e901286bbce72743,0.1806,3.63,0,[],[],0
+P029,primary,A,near_plan,We should plan the trip tomorrow.,false,500,3200,16000,84063,24863,f4c8a29c37ca17035458a79d2b3f47fc54e3b7d4e793df885b0af3cc0a414c8d,0.0006,2.35,0,[],[],0
+P029,candidate,A,near_plan,We should plan the trip tomorrow.,false,500,3200,16000,84063,24863,f4c8a29c37ca17035458a79d2b3f47fc54e3b7d4e793df885b0af3cc0a414c8d,0.1806,4.11,0,[],[],0
+P030,primary,A,near_plan,We should plan the trip tomorrow.,false,1000,3200,16000,92063,24863,50b918a22fdd8c24bbe5f9d10c9e8a858ebf385749ec2d86da5f01ef8d132add,0.0003,2.83,0,[],[],0
+P030,candidate,A,near_plan,We should plan the trip tomorrow.,false,1000,3200,16000,92063,24863,50b918a22fdd8c24bbe5f9d10c9e8a858ebf385749ec2d86da5f01ef8d132add,0.1806,4.59,0,[],[],0
+P031,primary,A,near_plan,We should plan the trip tomorrow.,false,2500,3200,16000,116063,24863,07cb94486f8ef2fed9c2d7bf744c9dbe936e31a54113c62216e1aa4bde8383a8,0.0006,4.35,0,[],[],0
+P031,candidate,A,near_plan,We should plan the trip tomorrow.,false,2500,3200,16000,116063,24863,07cb94486f8ef2fed9c2d7bf744c9dbe936e31a54113c62216e1aa4bde8383a8,0.2402,2.83,0,[],[],0
+P032,primary,A,mention_kitchen,I left the lamp on in the kitchen.,false,0,3200,16000,77981,26781,a7750976fbd50ffcd015c1ec012f2fda9947200dc7fc89a0e0e0aca850a174fe,0.0002,3.23,0,[],[],0
+P032,candidate,A,mention_kitchen,I left the lamp on in the kitchen.,false,0,3200,16000,77981,26781,a7750976fbd50ffcd015c1ec012f2fda9947200dc7fc89a0e0e0aca850a174fe,0.1806,3.71,0,[],[],0
+P033,primary,A,mention_kitchen,I left the lamp on in the kitchen.,false,500,3200,16000,85981,26781,3906c9c4ec7850f935619b2a06c2981cde95ef43b260b867f969155a9f19dadd,0.0002,3.79,0,[],[],0
+P033,candidate,A,mention_kitchen,I left the lamp on in the kitchen.,false,500,3200,16000,85981,26781,3906c9c4ec7850f935619b2a06c2981cde95ef43b260b867f969155a9f19dadd,0.1806,4.27,0,[],[],0
+P034,primary,A,mention_kitchen,I left the lamp on in the kitchen.,false,1000,3200,16000,93981,26781,f603e24d38c04eb5ae509ffbef11ccd111e643ebfa5109cfdb643eb5474037a8,0.0002,4.27,0,[],[],0
+P034,candidate,A,mention_kitchen,I left the lamp on in the kitchen.,false,1000,3200,16000,93981,26781,f603e24d38c04eb5ae509ffbef11ccd111e643ebfa5109cfdb643eb5474037a8,0.1806,4.75,0,[],[],0
+P035,primary,A,mention_kitchen,I left the lamp on in the kitchen.,false,2500,3200,16000,117981,26781,90ac13e21e50e823a87cf82d85cd5ac3d4a4e21fc0bcc2fc0904f42ec0ce6886,0.0003,2.67,0,[],[],0
+P035,candidate,A,mention_kitchen,I left the lamp on in the kitchen.,false,2500,3200,16000,117981,26781,90ac13e21e50e823a87cf82d85cd5ac3d4a4e21fc0bcc2fc0904f42ec0ce6886,0.2362,2.91,0,[],[],0
+P036,primary,A,mention_lamp,The lamp is on.,false,0,3200,16000,65551,14351,da5c6228608e5908789c6a0d8bca380a68d22df63a75e9101825da2bd42f4876,0.0002,2.51,0,[],[],0
+P036,candidate,A,mention_lamp,The lamp is on.,false,0,3200,16000,65551,14351,da5c6228608e5908789c6a0d8bca380a68d22df63a75e9101825da2bd42f4876,0.1806,2.99,0,[],[],0
+P037,primary,A,mention_lamp,The lamp is on.,false,500,3200,16000,73551,14351,208def5ad32120a180c8deefc1175a843a32ee161203da40616631f245bddf2e,0.0005,2.75,0,[],[],0
+P037,candidate,A,mention_lamp,The lamp is on.,false,500,3200,16000,73551,14351,208def5ad32120a180c8deefc1175a843a32ee161203da40616631f245bddf2e,0.1806,3.47,0,[],[],0
+P038,primary,A,mention_lamp,The lamp is on.,false,1000,3200,16000,81551,14351,ea7447e1147acad66a11133f82faa74ba724e58b3b7898bfe14133461e4b8033,0.0006,3.23,0,[],[],0
+P038,candidate,A,mention_lamp,The lamp is on.,false,1000,3200,16000,81551,14351,ea7447e1147acad66a11133f82faa74ba724e58b3b7898bfe14133461e4b8033,0.1806,3.95,0,[],[],0
+P039,primary,A,mention_lamp,The lamp is on.,false,2500,3200,16000,105551,14351,9dc4a6219b627bd9608ba817517e45d6dbe822ad4c2887a3d60e666d9d2cfdee,0.0018,3.07,0,[],[],0
+P039,candidate,A,mention_lamp,The lamp is on.,false,2500,3200,16000,105551,14351,9dc4a6219b627bd9608ba817517e45d6dbe822ad4c2887a3d60e666d9d2cfdee,0.9815,2.99,1,[0.9815],[2.99],0
+P040,primary,A,no_name_timer,Set a timer for five minutes,false,0,3200,16000,78226,27026,d6921768be7fbd975ecd45f82e37661f06ab0899db9f803750f8c5b47cd7f646,0.0001,3.31,0,[],[],0
+P040,candidate,A,no_name_timer,Set a timer for five minutes,false,0,3200,16000,78226,27026,d6921768be7fbd975ecd45f82e37661f06ab0899db9f803750f8c5b47cd7f646,0.1806,3.79,0,[],[],0
+P041,primary,A,no_name_timer,Set a timer for five minutes,false,500,3200,16000,86226,27026,d80d3d40b72790175a1c55ee329398f078e7a29fa23d4b38e4cffc99e6ff07bd,0.0001,3.79,0,[],[],0
+P041,candidate,A,no_name_timer,Set a timer for five minutes,false,500,3200,16000,86226,27026,d80d3d40b72790175a1c55ee329398f078e7a29fa23d4b38e4cffc99e6ff07bd,0.1806,4.27,0,[],[],0
+P042,primary,A,no_name_timer,Set a timer for five minutes,false,1000,3200,16000,94226,27026,3f6e1719562a35985121008f3020314d89a8a5c33408b08117b8b8efce301e3f,0.0001,4.35,0,[],[],0
+P042,candidate,A,no_name_timer,Set a timer for five minutes,false,1000,3200,16000,94226,27026,3f6e1719562a35985121008f3020314d89a8a5c33408b08117b8b8efce301e3f,0.1806,4.75,0,[],[],0
+P043,primary,A,no_name_timer,Set a timer for five minutes,false,2500,3200,16000,118226,27026,2c923a54089a38da4d10c30bc2cbc7302d88e7ac45a454d736e0494a4405ded5,0.0002,2.67,0,[],[],0
+P043,candidate,A,no_name_timer,Set a timer for five minutes,false,2500,3200,16000,118226,27026,2c923a54089a38da4d10c30bc2cbc7302d88e7ac45a454d736e0494a4405ded5,0.1889,2.75,0,[],[],0
+P044,primary,A,no_name_thanks,Thank you,false,0,3200,16000,61362,10162,6b2603527ada4c46a1231d73b58a582ff62cf4c0e5329a50a1a59c53a910f617,0.0001,2.19,0,[],[],0
+P044,candidate,A,no_name_thanks,Thank you,false,0,3200,16000,61362,10162,6b2603527ada4c46a1231d73b58a582ff62cf4c0e5329a50a1a59c53a910f617,0.1806,2.67,0,[],[],0
+P045,primary,A,no_name_thanks,Thank you,false,500,3200,16000,69362,10162,718ffd7ce71fcdfd5aae650af50124aa8697fca976f30b4a0ca482d229f2e626,0.0002,2.75,0,[],[],0
+P045,candidate,A,no_name_thanks,Thank you,false,500,3200,16000,69362,10162,718ffd7ce71fcdfd5aae650af50124aa8697fca976f30b4a0ca482d229f2e626,0.1806,3.23,0,[],[],0
+P046,primary,A,no_name_thanks,Thank you,false,1000,3200,16000,77362,10162,8379d39a613bd95e9597d56196ce46505e58c4b330c06c50cd7e92a4ac4a3d00,0.0002,3.23,0,[],[],0
+P046,candidate,A,no_name_thanks,Thank you,false,1000,3200,16000,77362,10162,8379d39a613bd95e9597d56196ce46505e58c4b330c06c50cd7e92a4ac4a3d00,0.1806,3.71,0,[],[],0
+P047,primary,A,no_name_thanks,Thank you,false,2500,3200,16000,101362,10162,7805abd6003525ac40bc72682e205a40f9a0c3af00dcaa4ba1919cf7305446d3,0.0004,2.67,0,[],[],0
+P047,candidate,A,no_name_thanks,Thank you,false,2500,3200,16000,101362,10162,7805abd6003525ac40bc72682e205a40f9a0c3af00dcaa4ba1919cf7305446d3,0.1927,2.75,0,[],[],0
+P048,primary,B,bare,Lamp,true,0,3200,16000,59093,7893,79c0f0d18b0212eff008f393bc2179ebd6272731d21ee988427b78e2ab94c4d4,0.0002,2.03,0,[],[],0
+P048,candidate,B,bare,Lamp,true,0,3200,16000,59093,7893,79c0f0d18b0212eff008f393bc2179ebd6272731d21ee988427b78e2ab94c4d4,0.1806,2.59,0,[],[],0
+P049,primary,B,bare,Lamp,true,500,3200,16000,67093,7893,ef8de973e4450bde1535730bb9828335ff47af7156bc67e636989ec0939f39ce,0.0003,2.43,0,[],[],0
+P049,candidate,B,bare,Lamp,true,500,3200,16000,67093,7893,ef8de973e4450bde1535730bb9828335ff47af7156bc67e636989ec0939f39ce,0.1806,3.07,0,[],[],0
+P050,primary,B,bare,Lamp,true,1000,3200,16000,75093,7893,3922e38c77ebfca7f1cc5d0f796e5c0599d43257b532ea9778f1c8772c87f79e,0.315,2.03,0,[],[],0
+P050,candidate,B,bare,Lamp,true,1000,3200,16000,75093,7893,3922e38c77ebfca7f1cc5d0f796e5c0599d43257b532ea9778f1c8772c87f79e,0.1806,3.55,0,[],[],0
+P051,primary,B,bare,Lamp,true,2500,3200,16000,99093,7893,3e098eac1e09ee07c701bd72fdc56e87c1f9f01f4318e9be6dd94dde05c76a32,0.4747,3.55,0,[],[],0
+P051,candidate,B,bare,Lamp,true,2500,3200,16000,99093,7893,3e098eac1e09ee07c701bd72fdc56e87c1f9f01f4318e9be6dd94dde05c76a32,0.7731,2.91,0,[],[],0
+P052,primary,B,initial,"Lamp, set a timer for five minutes",true,0,3200,16000,91664,40464,172ea97f9f8bedbb7c6e3740b82d5f77ca91b0214d996a341afe3af0424d8978,0.0001,4.19,0,[],[],0
+P052,candidate,B,initial,"Lamp, set a timer for five minutes",true,0,3200,16000,91664,40464,172ea97f9f8bedbb7c6e3740b82d5f77ca91b0214d996a341afe3af0424d8978,0.1806,4.59,0,[],[],0
+P053,primary,B,initial,"Lamp, set a timer for five minutes",true,500,3200,16000,99664,40464,07fbea14de655aaaea5862d0978b7915c968a6ff60e1b63f5a0f9b8cae277426,0.0001,4.67,0,[],[],0
+P053,candidate,B,initial,"Lamp, set a timer for five minutes",true,500,3200,16000,99664,40464,07fbea14de655aaaea5862d0978b7915c968a6ff60e1b63f5a0f9b8cae277426,0.1806,5.07,0,[],[],0
+P054,primary,B,initial,"Lamp, set a timer for five minutes",true,1000,3200,16000,107664,40464,c17c0535db182bd58f4b64076717f5a83c73997e353f267f45919f27a5ad1596,0.7534,2.03,0,[],[],0
+P054,candidate,B,initial,"Lamp, set a timer for five minutes",true,1000,3200,16000,107664,40464,c17c0535db182bd58f4b64076717f5a83c73997e353f267f45919f27a5ad1596,0.1806,5.63,0,[],[],0
+P055,primary,B,initial,"Lamp, set a timer for five minutes",true,2500,3200,16000,131664,40464,b1d164e62a188430f3d87f88f5e537a15240eef3ca55ae204feaf0a21c64f518,0.9222,3.47,1,[0.9222],[3.47],0
+P055,candidate,B,initial,"Lamp, set a timer for five minutes",true,2500,3200,16000,131664,40464,b1d164e62a188430f3d87f88f5e537a15240eef3ca55ae204feaf0a21c64f518,0.7142,2.83,0,[],[],0
+P056,primary,B,trailing,"Thank you, Lamp",true,0,3200,16000,74177,22977,7988725899065fa3ee3d40ce4b763e197ec96252f860c15204cc6fd02bfbe429,0.0007,2.91,0,[],[],0
+P056,candidate,B,trailing,"Thank you, Lamp",true,0,3200,16000,74177,22977,7988725899065fa3ee3d40ce4b763e197ec96252f860c15204cc6fd02bfbe429,0.1806,3.47,0,[],[],0
+P057,primary,B,trailing,"Thank you, Lamp",true,500,3200,16000,82177,22977,cc517ccf948e783591fd4df130d9075174f0a643257f090d3c9f6391ce8ed334,0.0042,2.35,0,[],[],0
+P057,candidate,B,trailing,"Thank you, Lamp",true,500,3200,16000,82177,22977,cc517ccf948e783591fd4df130d9075174f0a643257f090d3c9f6391ce8ed334,0.1806,4.03,0,[],[],0
+P058,primary,B,trailing,"Thank you, Lamp",true,1000,3200,16000,90177,22977,4668c858114e41dc1d5e049e04679af343e7167485f93d169c81a787c2a5130d,0.0043,2.83,0,[],[],0
+P058,candidate,B,trailing,"Thank you, Lamp",true,1000,3200,16000,90177,22977,4668c858114e41dc1d5e049e04679af343e7167485f93d169c81a787c2a5130d,0.1806,4.51,0,[],[],0
+P059,primary,B,trailing,"Thank you, Lamp",true,2500,3200,16000,114177,22977,78d298334081344b12d9a81fbe9e6cbc5af816bf7df4f25d93436004cd5c9e98,0.0042,4.35,0,[],[],0
+P059,candidate,B,trailing,"Thank you, Lamp",true,2500,3200,16000,114177,22977,78d298334081344b12d9a81fbe9e6cbc5af816bf7df4f25d93436004cd5c9e98,0.2356,2.83,0,[],[],0
+P060,primary,B,hey,Hey Lamp,true,0,3200,16000,62220,11020,911f6df4c962f3956adab6322939a7b64715981238b4fbf8325f84f088303427,0.0004,2.11,0,[],[],0
+P060,candidate,B,hey,Hey Lamp,true,0,3200,16000,62220,11020,911f6df4c962f3956adab6322939a7b64715981238b4fbf8325f84f088303427,0.1806,2.75,0,[],[],0
+P061,primary,B,hey,Hey Lamp,true,500,3200,16000,70220,11020,b07f692d0b4a2d3e46378f50fe0a75c8265a49d28067b22b0d8a240ecd1c3907,0.0007,2.67,0,[],[],0
+P061,candidate,B,hey,Hey Lamp,true,500,3200,16000,70220,11020,b07f692d0b4a2d3e46378f50fe0a75c8265a49d28067b22b0d8a240ecd1c3907,0.1913,2.03,0,[],[],0
+P062,primary,B,hey,Hey Lamp,true,1000,3200,16000,78220,11020,9657f97bcdab09493198b38dfe1393a2eed30f7859bec0b95c99a5d07348e572,1,2.03,1,[1],[2.03],0
+P062,candidate,B,hey,Hey Lamp,true,1000,3200,16000,78220,11020,9657f97bcdab09493198b38dfe1393a2eed30f7859bec0b95c99a5d07348e572,0.8597,2.03,0,[],[],0
+P063,primary,B,hey,Hey Lamp,true,2500,3200,16000,102220,11020,db43a9de3ab83a4413b409ea9dfcd488d58361b5e6894d52c502b712f1cfe8ab,1,3.47,1,[1],[3.23],0
+P063,candidate,B,hey,Hey Lamp,true,2500,3200,16000,102220,11020,db43a9de3ab83a4413b409ea9dfcd488d58361b5e6894d52c502b712f1cfe8ab,0.9134,3.07,1,[0.9134],[3.07],0
+P064,primary,B,near_lamb,Lamb is my favourite dish.,false,0,3200,16000,77455,26255,7b950390c4cd71fc6e7ee46e1ec91380376d2ae40f0778240c5ac33d26c63655,0.0001,3.31,0,[],[],0
+P064,candidate,B,near_lamb,Lamb is my favourite dish.,false,0,3200,16000,77455,26255,7b950390c4cd71fc6e7ee46e1ec91380376d2ae40f0778240c5ac33d26c63655,0.1806,3.71,0,[],[],0
+P065,primary,B,near_lamb,Lamb is my favourite dish.,false,500,3200,16000,85455,26255,1ccd48af9431d419f1f62ab9df20b5be40c76fa197b08e10c5916fb04079947c,0.0001,3.79,0,[],[],0
+P065,candidate,B,near_lamb,Lamb is my favourite dish.,false,500,3200,16000,85455,26255,1ccd48af9431d419f1f62ab9df20b5be40c76fa197b08e10c5916fb04079947c,0.1806,4.19,0,[],[],0
+P066,primary,B,near_lamb,Lamb is my favourite dish.,false,1000,3200,16000,93455,26255,265a15c894f1771b1d4316c1a629340681e34d7d352281e14f81cb6ed9bb0251,0.0011,2.03,0,[],[],0
+P066,candidate,B,near_lamb,Lamb is my favourite dish.,false,1000,3200,16000,93455,26255,265a15c894f1771b1d4316c1a629340681e34d7d352281e14f81cb6ed9bb0251,0.1806,4.67,0,[],[],0
+P067,primary,B,near_lamb,Lamb is my favourite dish.,false,2500,3200,16000,117455,26255,289375ed5d27753e2c3ee96e4e15bfbf4de0bd5dfd791bf1659e4a5a86348300,0.0005,3.55,0,[],[],0
+P067,candidate,B,near_lamb,Lamb is my favourite dish.,false,2500,3200,16000,117455,26255,289375ed5d27753e2c3ee96e4e15bfbf4de0bd5dfd791bf1659e4a5a86348300,0.9327,2.91,1,[0.9327],[2.91],0
+P068,primary,B,near_land,Land the plane carefully.,false,0,3200,16000,73062,21862,3c8fdedad563715147d8816fb12e88e78a3969ee3850a4651a4ee8a5855e3265,0.0002,2.99,0,[],[],0
+P068,candidate,B,near_land,Land the plane carefully.,false,0,3200,16000,73062,21862,3c8fdedad563715147d8816fb12e88e78a3969ee3850a4651a4ee8a5855e3265,0.1806,3.47,0,[],[],0
+P069,primary,B,near_land,Land the plane carefully.,false,500,3200,16000,81062,21862,7a801bc92598e5f7e47cfdda4a58a2432b66a7fc67eb0369e990640ee0f41567,0.0001,3.47,0,[],[],0
+P069,candidate,B,near_land,Land the plane carefully.,false,500,3200,16000,81062,21862,7a801bc92598e5f7e47cfdda4a58a2432b66a7fc67eb0369e990640ee0f41567,0.1806,3.95,0,[],[],0
+P070,primary,B,near_land,Land the plane carefully.,false,1000,3200,16000,89062,21862,651c275d717d8253d04710235fd87985828d40f4fe27d5ce3b17b1ce0a80d96f,0.078,2.03,0,[],[],0
+P070,candidate,B,near_land,Land the plane carefully.,false,1000,3200,16000,89062,21862,651c275d717d8253d04710235fd87985828d40f4fe27d5ce3b17b1ce0a80d96f,0.1806,4.43,0,[],[],0
+P071,primary,B,near_land,Land the plane carefully.,false,2500,3200,16000,113062,21862,db578f6eed758b97d84fbb86046a81eacc6f9a4108ccfa0dc02020166620cdfe,0.0341,3.55,0,[],[],0
+P071,candidate,B,near_land,Land the plane carefully.,false,2500,3200,16000,113062,21862,db578f6eed758b97d84fbb86046a81eacc6f9a4108ccfa0dc02020166620cdfe,0.6295,2.99,0,[],[],0
+P072,primary,B,near_lab,The lab is closed today.,false,0,3200,16000,75220,24020,6cb65313ff7a04ab51113464caf0e3c079f2b6883a5b4da258faea763959891a,0.0008,2.75,0,[],[],0
+P072,candidate,B,near_lab,The lab is closed today.,false,0,3200,16000,75220,24020,6cb65313ff7a04ab51113464caf0e3c079f2b6883a5b4da258faea763959891a,0.1806,3.55,0,[],[],0
+P073,primary,B,near_lab,The lab is closed today.,false,500,3200,16000,83220,24020,449ef64f7c3945e16a47c1162f9b4259a36d68a80ed2587f77e7e2ae3e2f40ec,0.002,3.23,0,[],[],0
+P073,candidate,B,near_lab,The lab is closed today.,false,500,3200,16000,83220,24020,449ef64f7c3945e16a47c1162f9b4259a36d68a80ed2587f77e7e2ae3e2f40ec,0.1806,4.03,0,[],[],0
+P074,primary,B,near_lab,The lab is closed today.,false,1000,3200,16000,91220,24020,ec56b45c43aef24e469b0f697d7e60b617d41de0c1024eccfc984b9ac82f67b5,0.0011,3.71,0,[],[],0
+P074,candidate,B,near_lab,The lab is closed today.,false,1000,3200,16000,91220,24020,ec56b45c43aef24e469b0f697d7e60b617d41de0c1024eccfc984b9ac82f67b5,0.1806,4.59,0,[],[],0
+P075,primary,B,near_lab,The lab is closed today.,false,2500,3200,16000,115220,24020,16ed08d7bd3dc5298cd9cb1348504ecabe504bf8aa2deebdc6ee5de0d5cb972e,0.002,5.23,0,[],[],0
+P075,candidate,B,near_lab,The lab is closed today.,false,2500,3200,16000,115220,24020,16ed08d7bd3dc5298cd9cb1348504ecabe504bf8aa2deebdc6ee5de0d5cb972e,0.1908,2.83,0,[],[],0
+P076,primary,B,near_plan,We should plan the trip tomorrow.,false,0,3200,16000,78165,26965,5ea29e6fa8254e6137ee14f0ae98af80e6f2fe0c11775b16f68a720ad0a41700,0.0002,3.31,0,[],[],0
+P076,candidate,B,near_plan,We should plan the trip tomorrow.,false,0,3200,16000,78165,26965,5ea29e6fa8254e6137ee14f0ae98af80e6f2fe0c11775b16f68a720ad0a41700,0.1806,3.79,0,[],[],0
+P077,primary,B,near_plan,We should plan the trip tomorrow.,false,500,3200,16000,86165,26965,df3301fec2e71a00fdc934ed6c4352a485ee2a9d2bae8626b1b418a479458caa,0.0002,3.79,0,[],[],0
+P077,candidate,B,near_plan,We should plan the trip tomorrow.,false,500,3200,16000,86165,26965,df3301fec2e71a00fdc934ed6c4352a485ee2a9d2bae8626b1b418a479458caa,0.1806,4.27,0,[],[],0
+P078,primary,B,near_plan,We should plan the trip tomorrow.,false,1000,3200,16000,94165,26965,6a0982d2e1ad9869e6d2d1842a87800e23f83e2f11f45c61828008beb03317a7,0.0001,4.27,0,[],[],0
+P078,candidate,B,near_plan,We should plan the trip tomorrow.,false,1000,3200,16000,94165,26965,6a0982d2e1ad9869e6d2d1842a87800e23f83e2f11f45c61828008beb03317a7,0.1806,4.75,0,[],[],0
+P079,primary,B,near_plan,We should plan the trip tomorrow.,false,2500,3200,16000,118165,26965,e5c419cd30ce6c34e49e371ca8b2f180e7c0f3c362dbc554598c38b8f20e8dcc,0.0002,2.67,0,[],[],0
+P079,candidate,B,near_plan,We should plan the trip tomorrow.,false,2500,3200,16000,118165,26965,e5c419cd30ce6c34e49e371ca8b2f180e7c0f3c362dbc554598c38b8f20e8dcc,0.1806,2.03,0,[],[],0
+P080,primary,B,mention_kitchen,I left the lamp on in the kitchen.,false,0,3200,16000,79725,28525,0528e45e8fe6c96ea9fa667e4919303de5d65d03c14684a9cfb5ad5df227b987,0.0003,3.39,0,[],[],0
+P080,candidate,B,mention_kitchen,I left the lamp on in the kitchen.,false,0,3200,16000,79725,28525,0528e45e8fe6c96ea9fa667e4919303de5d65d03c14684a9cfb5ad5df227b987,0.1806,3.87,0,[],[],0
+P081,primary,B,mention_kitchen,I left the lamp on in the kitchen.,false,500,3200,16000,87725,28525,00054dc5846ebabe82e0b9982146259191480117926dbf96f43262afcb4836cf,0.0003,3.87,0,[],[],0
+P081,candidate,B,mention_kitchen,I left the lamp on in the kitchen.,false,500,3200,16000,87725,28525,00054dc5846ebabe82e0b9982146259191480117926dbf96f43262afcb4836cf,0.1806,4.35,0,[],[],0
+P082,primary,B,mention_kitchen,I left the lamp on in the kitchen.,false,1000,3200,16000,95725,28525,a7c63acbcd266c273a1fc0a7379caa4743ed8b6169c73555017a4402e8bbbedd,0.0004,4.35,0,[],[],0
+P082,candidate,B,mention_kitchen,I left the lamp on in the kitchen.,false,1000,3200,16000,95725,28525,a7c63acbcd266c273a1fc0a7379caa4743ed8b6169c73555017a4402e8bbbedd,0.1806,4.83,0,[],[],0
+P083,primary,B,mention_kitchen,I left the lamp on in the kitchen.,false,2500,3200,16000,119725,28525,81966957ca06c3990a59da54338234838c9f37aa5a0be173b7affbaf19cb4dc8,0.0003,5.87,0,[],[],0
+P083,candidate,B,mention_kitchen,I left the lamp on in the kitchen.,false,2500,3200,16000,119725,28525,81966957ca06c3990a59da54338234838c9f37aa5a0be173b7affbaf19cb4dc8,0.277,2.83,0,[],[],0
+P084,primary,B,mention_lamp,The lamp is on.,false,0,3200,16000,66319,15119,e53aec4a2e3dec4b65bc91f40e01555f62cd25e640439396364509da169ab247,0.0003,2.51,0,[],[],0
+P084,candidate,B,mention_lamp,The lamp is on.,false,0,3200,16000,66319,15119,e53aec4a2e3dec4b65bc91f40e01555f62cd25e640439396364509da169ab247,0.1806,2.99,0,[],[],0
+P085,primary,B,mention_lamp,The lamp is on.,false,500,3200,16000,74319,15119,92d08b2337ef936a7f42f72e565ddd2e1f8fde5f77d1df1458fa56b4b0b8476a,0.0003,3.07,0,[],[],0
+P085,candidate,B,mention_lamp,The lamp is on.,false,500,3200,16000,74319,15119,92d08b2337ef936a7f42f72e565ddd2e1f8fde5f77d1df1458fa56b4b0b8476a,0.1806,3.55,0,[],[],0
+P086,primary,B,mention_lamp,The lamp is on.,false,1000,3200,16000,82319,15119,aff06bcabc95486083834be7ae3b4b8d49644f3fbb238253a65712af2f28d28a,0.0003,3.55,0,[],[],0
+P086,candidate,B,mention_lamp,The lamp is on.,false,1000,3200,16000,82319,15119,aff06bcabc95486083834be7ae3b4b8d49644f3fbb238253a65712af2f28d28a,0.4933,2.51,0,[],[],0
+P087,primary,B,mention_lamp,The lamp is on.,false,2500,3200,16000,106319,15119,03d3cc5478c628052fef8fbc05333efca6bc2a89195d04c38a3846024120782b,0.0004,2.67,0,[],[],0
+P087,candidate,B,mention_lamp,The lamp is on.,false,2500,3200,16000,106319,15119,03d3cc5478c628052fef8fbc05333efca6bc2a89195d04c38a3846024120782b,0.2603,2.83,0,[],[],0
+P088,primary,B,no_name_timer,Set a timer for five minutes,false,0,3200,16000,80821,29621,4bd405e0d6d5dc02fde90bb9e9371c42fa637610388a5d7961e12f0ae48596b5,0.0001,3.47,0,[],[],0
+P088,candidate,B,no_name_timer,Set a timer for five minutes,false,0,3200,16000,80821,29621,4bd405e0d6d5dc02fde90bb9e9371c42fa637610388a5d7961e12f0ae48596b5,0.1806,3.95,0,[],[],0
+P089,primary,B,no_name_timer,Set a timer for five minutes,false,500,3200,16000,88821,29621,18a9d26ad879651febad04584ced5471e5db4a757b99812ab13d9fb71758588f,0.0002,3.95,0,[],[],0
+P089,candidate,B,no_name_timer,Set a timer for five minutes,false,500,3200,16000,88821,29621,18a9d26ad879651febad04584ced5471e5db4a757b99812ab13d9fb71758588f,0.1806,4.43,0,[],[],0
+P090,primary,B,no_name_timer,Set a timer for five minutes,false,1000,3200,16000,96821,29621,77bfda81249eaed188ea5cbe969d23c6333492f4f758ef5ac269da23b207ceaa,0.0001,4.51,0,[],[],0
+P090,candidate,B,no_name_timer,Set a timer for five minutes,false,1000,3200,16000,96821,29621,77bfda81249eaed188ea5cbe969d23c6333492f4f758ef5ac269da23b207ceaa,0.1806,4.91,0,[],[],0
+P091,primary,B,no_name_timer,Set a timer for five minutes,false,2500,3200,16000,120821,29621,7dcb3216b9792b0e1be32f049bf9e8c75dad3c0ac6eb6b6a7156f8468e16d1fa,0.0002,5.95,0,[],[],0
+P091,candidate,B,no_name_timer,Set a timer for five minutes,false,2500,3200,16000,120821,29621,7dcb3216b9792b0e1be32f049bf9e8c75dad3c0ac6eb6b6a7156f8468e16d1fa,0.1971,2.75,0,[],[],0
+P092,primary,B,no_name_thanks,Thank you,false,0,3200,16000,63401,12201,3658c61c77d664756b2d82cfb5905e5c168e437870467fc1d1fad8cde48bc878,0.0001,2.43,0,[],[],0
+P092,candidate,B,no_name_thanks,Thank you,false,0,3200,16000,63401,12201,3658c61c77d664756b2d82cfb5905e5c168e437870467fc1d1fad8cde48bc878,0.1806,2.83,0,[],[],0
+P093,primary,B,no_name_thanks,Thank you,false,500,3200,16000,71401,12201,d701b9b8bd35a27f2a9f16cd37d69fa4dda2b8c4f7bc04c5d5936de53224a983,0.0001,2.91,0,[],[],0
+P093,candidate,B,no_name_thanks,Thank you,false,500,3200,16000,71401,12201,d701b9b8bd35a27f2a9f16cd37d69fa4dda2b8c4f7bc04c5d5936de53224a983,0.1806,3.31,0,[],[],0
+P094,primary,B,no_name_thanks,Thank you,false,1000,3200,16000,79401,12201,d05975f786a607ea4a9d6882f39e28d9770b44d1e9be5de298fa0be56cc4fd31,0.0001,3.47,0,[],[],0
+P094,candidate,B,no_name_thanks,Thank you,false,1000,3200,16000,79401,12201,d05975f786a607ea4a9d6882f39e28d9770b44d1e9be5de298fa0be56cc4fd31,0.1806,3.79,0,[],[],0
+P095,primary,B,no_name_thanks,Thank you,false,2500,3200,16000,103401,12201,420c95b296d513cde14232f25c7e44f84c176191154c801fb64aa43999107c24,0.0002,2.75,0,[],[],0
+P095,candidate,B,no_name_thanks,Thank you,false,2500,3200,16000,103401,12201,420c95b296d513cde14232f25c7e44f84c176191154c801fb64aa43999107c24,0.2362,2.83,0,[],[],0
+P096,primary,C,bare,Lamp,true,0,3200,16000,59074,7874,0bf9ca600d3cda99944c49a1556a85cd917b9e01a7dddc83bab58f27e897f714,0.0001,2.19,0,[],[],0
+P096,candidate,C,bare,Lamp,true,0,3200,16000,59074,7874,0bf9ca600d3cda99944c49a1556a85cd917b9e01a7dddc83bab58f27e897f714,0.1806,2.59,0,[],[],0
+P097,primary,C,bare,Lamp,true,500,3200,16000,67074,7874,99fb8f397f8f2a8643a0fd8b83dde77d68ed1ec4d4f072e02b7ad7ec6f314cd4,0.0002,2.43,0,[],[],0
+P097,candidate,C,bare,Lamp,true,500,3200,16000,67074,7874,99fb8f397f8f2a8643a0fd8b83dde77d68ed1ec4d4f072e02b7ad7ec6f314cd4,0.5749,2.11,0,[],[],0
+P098,primary,C,bare,Lamp,true,1000,3200,16000,75074,7874,f3abbe1298a8ee6fb1412a5efcc4a52c715f20e576bf242cab580d7424efbd44,0.6455,2.03,0,[],[],0
+P098,candidate,C,bare,Lamp,true,1000,3200,16000,75074,7874,f3abbe1298a8ee6fb1412a5efcc4a52c715f20e576bf242cab580d7424efbd44,0.3286,2.67,0,[],[],0
+P099,primary,C,bare,Lamp,true,2500,3200,16000,99074,7874,3b901bfb2a612d284cc21d87e5eba6493a4bdc4d511040fd8048d661a62277c2,0.9272,3.55,1,[0.9272],[3.47],0
+P099,candidate,C,bare,Lamp,true,2500,3200,16000,99074,7874,3b901bfb2a612d284cc21d87e5eba6493a4bdc4d511040fd8048d661a62277c2,0.8804,2.91,0,[],[],0
+P100,primary,C,initial,"Lamp, set a timer for five minutes",true,0,3200,16000,90121,38921,bf279b997a2c059d14feb8fc2062582ec9becce9617fd536ea620ed95b245ec0,0.0001,4.11,0,[],[],0
+P100,candidate,C,initial,"Lamp, set a timer for five minutes",true,0,3200,16000,90121,38921,bf279b997a2c059d14feb8fc2062582ec9becce9617fd536ea620ed95b245ec0,0.1806,4.51,0,[],[],0
+P101,primary,C,initial,"Lamp, set a timer for five minutes",true,500,3200,16000,98121,38921,801dacb9d9aec091c5d3cddaf1fd452084a9229fcb53ca94d020248625bff181,0.0001,4.59,0,[],[],0
+P101,candidate,C,initial,"Lamp, set a timer for five minutes",true,500,3200,16000,98121,38921,801dacb9d9aec091c5d3cddaf1fd452084a9229fcb53ca94d020248625bff181,0.9042,2.11,1,[0.9042],[2.11],0
+P102,primary,C,initial,"Lamp, set a timer for five minutes",true,1000,3200,16000,106121,38921,a32db74f1a889db19d28e541508d56673ecedfee6ec40cfccd596c455ef5dc69,0.3281,2.03,0,[],[],0
+P102,candidate,C,initial,"Lamp, set a timer for five minutes",true,1000,3200,16000,106121,38921,a32db74f1a889db19d28e541508d56673ecedfee6ec40cfccd596c455ef5dc69,0.3846,2.67,0,[],[],0
+P103,primary,C,initial,"Lamp, set a timer for five minutes",true,2500,3200,16000,130121,38921,a2e2057195d7796d64af174451d24022293da916a78d1f91553d0ed319c00db0,0.5701,3.47,0,[],[],0
+P103,candidate,C,initial,"Lamp, set a timer for five minutes",true,2500,3200,16000,130121,38921,a2e2057195d7796d64af174451d24022293da916a78d1f91553d0ed319c00db0,0.9206,3.31,1,[0.9206],[3.31],0
+P104,primary,C,trailing,"Thank you, Lamp",true,0,3200,16000,73005,21805,5a73347ba9d966e49223adc1ba5d2a7079bf6a7f9e88df22085578dc03835f68,0.0001,2.75,0,[],[],0
+P104,candidate,C,trailing,"Thank you, Lamp",true,0,3200,16000,73005,21805,5a73347ba9d966e49223adc1ba5d2a7079bf6a7f9e88df22085578dc03835f68,0.5637,2.03,0,[],[],0
+P105,primary,C,trailing,"Thank you, Lamp",true,500,3200,16000,81005,21805,46a25ab1c7127b5421da3706c270e8f311f700d183f4cdb42000d849e35ed019,0.0967,2.35,0,[],[],0
+P105,candidate,C,trailing,"Thank you, Lamp",true,500,3200,16000,81005,21805,46a25ab1c7127b5421da3706c270e8f311f700d183f4cdb42000d849e35ed019,0.9523,2.35,1,[0.9523],[2.27],0
+P106,primary,C,trailing,"Thank you, Lamp",true,1000,3200,16000,89005,21805,6d813129acb5735662672c43ec95fef5a2aa37302214fdf6028108c4ad4ebf90,0.05,2.83,0,[],[],0
+P106,candidate,C,trailing,"Thank you, Lamp",true,1000,3200,16000,89005,21805,6d813129acb5735662672c43ec95fef5a2aa37302214fdf6028108c4ad4ebf90,0.8028,2.91,0,[],[],0
+P107,primary,C,trailing,"Thank you, Lamp",true,2500,3200,16000,113005,21805,15ec41c66b7caff2aa10cadaab7b38b459c513228b79519d1c3439de4054635a,0.0967,4.35,0,[],[],0
+P107,candidate,C,trailing,"Thank you, Lamp",true,2500,3200,16000,113005,21805,15ec41c66b7caff2aa10cadaab7b38b459c513228b79519d1c3439de4054635a,0.9523,4.35,1,[0.9523],[4.27],0
+P108,primary,C,hey,Hey Lamp,true,0,3200,16000,62422,11222,fc9c684fb57b4001a2075e866dd28a6453540afb2543a8eb9294d70ddc7fc3c2,0.0003,2.11,0,[],[],0
+P108,candidate,C,hey,Hey Lamp,true,0,3200,16000,62422,11222,fc9c684fb57b4001a2075e866dd28a6453540afb2543a8eb9294d70ddc7fc3c2,0.1806,2.75,0,[],[],0
+P109,primary,C,hey,Hey Lamp,true,500,3200,16000,70422,11222,e44a148d05c0547c25dd8d3524ccf1e7f63929b0d38e830d0476176f6fc7cf69,0.0002,2.51,0,[],[],0
+P109,candidate,C,hey,Hey Lamp,true,500,3200,16000,70422,11222,e44a148d05c0547c25dd8d3524ccf1e7f63929b0d38e830d0476176f6fc7cf69,0.1806,3.23,0,[],[],0
+P110,primary,C,hey,Hey Lamp,true,1000,3200,16000,78422,11222,5fb5ae3e5f03aa811ef92374e41ebec2910bc3ed0024b280e282e56c3a1a9a9b,0.7672,2.03,0,[],[],0
+P110,candidate,C,hey,Hey Lamp,true,1000,3200,16000,78422,11222,5fb5ae3e5f03aa811ef92374e41ebec2910bc3ed0024b280e282e56c3a1a9a9b,0.1806,3.79,0,[],[],0
+P111,primary,C,hey,Hey Lamp,true,2500,3200,16000,102422,11222,1b325e8357cd4b0586defaa20c2aebfd9e28f51fc1d2772dd9495fe9a9517af6,0.9104,3.47,1,[0.9104],[3.47],0
+P111,candidate,C,hey,Hey Lamp,true,2500,3200,16000,102422,11222,1b325e8357cd4b0586defaa20c2aebfd9e28f51fc1d2772dd9495fe9a9517af6,0.1806,2.03,0,[],[],0
+P112,primary,C,near_lamb,Lamb is my favourite dish.,false,0,3200,16000,74880,23680,08fa5e4dd2b40face49489245fc4d17644c17e6c3f410f5f9eade92c4378b8e4,0.0001,3.15,0,[],[],0
+P112,candidate,C,near_lamb,Lamb is my favourite dish.,false,0,3200,16000,74880,23680,08fa5e4dd2b40face49489245fc4d17644c17e6c3f410f5f9eade92c4378b8e4,0.1806,3.55,0,[],[],0
+P113,primary,C,near_lamb,Lamb is my favourite dish.,false,500,3200,16000,82880,23680,8ced820332fc35c47cc879dea05deca16ec9dfbd741129eb81b87a0decb1359a,0.0003,2.83,0,[],[],0
+P113,candidate,C,near_lamb,Lamb is my favourite dish.,false,500,3200,16000,82880,23680,8ced820332fc35c47cc879dea05deca16ec9dfbd741129eb81b87a0decb1359a,0.1806,4.03,0,[],[],0
+P114,primary,C,near_lamb,Lamb is my favourite dish.,false,1000,3200,16000,90880,23680,0b287a863a4c059a2c38e676c2a48b4b1a517ba2528acaf355cd75ed636c047b,0.0001,3.31,0,[],[],0
+P114,candidate,C,near_lamb,Lamb is my favourite dish.,false,1000,3200,16000,90880,23680,0b287a863a4c059a2c38e676c2a48b4b1a517ba2528acaf355cd75ed636c047b,0.1806,4.51,0,[],[],0
+P115,primary,C,near_lamb,Lamb is my favourite dish.,false,2500,3200,16000,114880,23680,ffa6bbdc792e4f0efc0080ba14d67e8de4cfbcd1c8d333043eaf6bc18e885086,0.0003,4.83,0,[],[],0
+P115,candidate,C,near_lamb,Lamb is my favourite dish.,false,2500,3200,16000,114880,23680,ffa6bbdc792e4f0efc0080ba14d67e8de4cfbcd1c8d333043eaf6bc18e885086,0.8597,2.91,0,[],[],0
+P116,primary,C,near_land,Land the plane carefully.,false,0,3200,16000,72549,21349,e2f895b4b433ef9b738853105fe5ddf81af4d16896239763cb5f288c7846ab99,0.0001,2.91,0,[],[],0
+P116,candidate,C,near_land,Land the plane carefully.,false,0,3200,16000,72549,21349,e2f895b4b433ef9b738853105fe5ddf81af4d16896239763cb5f288c7846ab99,0.1806,3.39,0,[],[],0
+P117,primary,C,near_land,Land the plane carefully.,false,500,3200,16000,80549,21349,3adab0240364c2419383ca9c19e84c7cabc9245ec38f9427d8e3f5a47ccadeed,0.0078,2.43,0,[],[],0
+P117,candidate,C,near_land,Land the plane carefully.,false,500,3200,16000,80549,21349,3adab0240364c2419383ca9c19e84c7cabc9245ec38f9427d8e3f5a47ccadeed,0.1806,3.87,0,[],[],0
+P118,primary,C,near_land,Land the plane carefully.,false,1000,3200,16000,88549,21349,19622aa3463293ec62a2e1589b434de3d444aba0721cc5211508e93cc9671c13,0.0023,2.91,0,[],[],0
+P118,candidate,C,near_land,Land the plane carefully.,false,1000,3200,16000,88549,21349,19622aa3463293ec62a2e1589b434de3d444aba0721cc5211508e93cc9671c13,0.1806,4.43,0,[],[],0
+P119,primary,C,near_land,Land the plane carefully.,false,2500,3200,16000,112549,21349,550eb3be8d88bcaaac859bde012ee361da0b924afae1902029547036dd5e75cf,0.0078,4.43,0,[],[],0
+P119,candidate,C,near_land,Land the plane carefully.,false,2500,3200,16000,112549,21349,550eb3be8d88bcaaac859bde012ee361da0b924afae1902029547036dd5e75cf,0.7148,2.83,0,[],[],0
+P120,primary,C,near_lab,The lab is closed today.,false,0,3200,16000,73669,22469,0d8502429ae285b36b92c7a28463fd1bc1becd85cc21824cda907b412b5a2eb9,0.0045,2.59,0,[],[],0
+P120,candidate,C,near_lab,The lab is closed today.,false,0,3200,16000,73669,22469,0d8502429ae285b36b92c7a28463fd1bc1becd85cc21824cda907b412b5a2eb9,0.1806,3.47,0,[],[],0
+P121,primary,C,near_lab,The lab is closed today.,false,500,3200,16000,81669,22469,f7ded7a7564a0d973335a85d9086578d0ad8c1098945ae6a511ed5f7476edd9f,0.0051,3.07,0,[],[],0
+P121,candidate,C,near_lab,The lab is closed today.,false,500,3200,16000,81669,22469,f7ded7a7564a0d973335a85d9086578d0ad8c1098945ae6a511ed5f7476edd9f,0.1806,3.95,0,[],[],0
+P122,primary,C,near_lab,The lab is closed today.,false,1000,3200,16000,89669,22469,3a6707e28d6bf0f0005a0c98f5d8ad721c0065a0f93b76a44ccffa27eb9d7f34,0.0018,3.63,0,[],[],0
+P122,candidate,C,near_lab,The lab is closed today.,false,1000,3200,16000,89669,22469,3a6707e28d6bf0f0005a0c98f5d8ad721c0065a0f93b76a44ccffa27eb9d7f34,0.1806,4.51,0,[],[],0
+P123,primary,C,near_lab,The lab is closed today.,false,2500,3200,16000,113669,22469,38284e4b92350d9103693e5e6dad9675a4d1dad1574393492ff00dd0b0b4a206,0.0051,5.07,0,[],[],0
+P123,candidate,C,near_lab,The lab is closed today.,false,2500,3200,16000,113669,22469,38284e4b92350d9103693e5e6dad9675a4d1dad1574393492ff00dd0b0b4a206,0.8601,2.99,0,[],[],0
+P124,primary,C,near_plan,We should plan the trip tomorrow.,false,0,3200,16000,77391,26191,f9306a0a15cf530275b42b3803957bea6c7fb47d95b16eb0fdf31fe8851ed834,0.0001,3.23,0,[],[],0
+P124,candidate,C,near_plan,We should plan the trip tomorrow.,false,0,3200,16000,77391,26191,f9306a0a15cf530275b42b3803957bea6c7fb47d95b16eb0fdf31fe8851ed834,0.1806,3.71,0,[],[],0
+P125,primary,C,near_plan,We should plan the trip tomorrow.,false,500,3200,16000,85391,26191,90104c6783c9a5721194ab57cce51589159aebd9d0b01d110bdc1ace94334e65,0.0001,3.71,0,[],[],0
+P125,candidate,C,near_plan,We should plan the trip tomorrow.,false,500,3200,16000,85391,26191,90104c6783c9a5721194ab57cce51589159aebd9d0b01d110bdc1ace94334e65,0.1806,4.19,0,[],[],0
+P126,primary,C,near_plan,We should plan the trip tomorrow.,false,1000,3200,16000,93391,26191,b889ebaa63be5a207eab3ada97f0d3457f7878e58a9a59cd02a0edaa52af2479,0.0002,4.19,0,[],[],0
+P126,candidate,C,near_plan,We should plan the trip tomorrow.,false,1000,3200,16000,93391,26191,b889ebaa63be5a207eab3ada97f0d3457f7878e58a9a59cd02a0edaa52af2479,0.1806,4.67,0,[],[],0
+P127,primary,C,near_plan,We should plan the trip tomorrow.,false,2500,3200,16000,117391,26191,cc2dbc65a90de91945c6961597c0b87292a1b1408de4eed0a379655b6a754797,0.0001,2.67,0,[],[],0
+P127,candidate,C,near_plan,We should plan the trip tomorrow.,false,2500,3200,16000,117391,26191,cc2dbc65a90de91945c6961597c0b87292a1b1408de4eed0a379655b6a754797,0.1806,2.03,0,[],[],0
+P128,primary,C,mention_kitchen,I left the lamp on in the kitchen.,false,0,3200,16000,80533,29333,d951f369742beb4da914172526890e16e8eddb1e1fc5b846f754e31f9938a7f4,0.0002,3.39,0,[],[],0
+P128,candidate,C,mention_kitchen,I left the lamp on in the kitchen.,false,0,3200,16000,80533,29333,d951f369742beb4da914172526890e16e8eddb1e1fc5b846f754e31f9938a7f4,0.1806,3.87,0,[],[],0
+P129,primary,C,mention_kitchen,I left the lamp on in the kitchen.,false,500,3200,16000,88533,29333,40dc4f02f1fd47124e729b77ca1e4de88b155b91a41c5b263e05a2db743e0ebc,0.0001,3.95,0,[],[],0
+P129,candidate,C,mention_kitchen,I left the lamp on in the kitchen.,false,500,3200,16000,88533,29333,40dc4f02f1fd47124e729b77ca1e4de88b155b91a41c5b263e05a2db743e0ebc,0.1806,4.43,0,[],[],0
+P130,primary,C,mention_kitchen,I left the lamp on in the kitchen.,false,1000,3200,16000,96533,29333,117a767a09fd720cd94a3116fa139c0c5cc1e9ac5971e8c0cfc8778f6543ccfb,0.0002,2.43,0,[],[],0
+P130,candidate,C,mention_kitchen,I left the lamp on in the kitchen.,false,1000,3200,16000,96533,29333,117a767a09fd720cd94a3116fa139c0c5cc1e9ac5971e8c0cfc8778f6543ccfb,0.1806,4.91,0,[],[],0
+P131,primary,C,mention_kitchen,I left the lamp on in the kitchen.,false,2500,3200,16000,120533,29333,8c9533ba068e12c0a221b2b3f344d49b6120c803e0a2e264e3a15bf4a7e4ccbc,0.0002,3.95,0,[],[],0
+P131,candidate,C,mention_kitchen,I left the lamp on in the kitchen.,false,2500,3200,16000,120533,29333,8c9533ba068e12c0a221b2b3f344d49b6120c803e0a2e264e3a15bf4a7e4ccbc,0.2002,2.83,0,[],[],0
+P132,primary,C,mention_lamp,The lamp is on.,false,0,3200,16000,65847,14647,5f502645e3b1281fc4fd2c96c49e7ba81961109e96ccd12155cb28ea443357d0,0.0002,2.51,0,[],[],0
+P132,candidate,C,mention_lamp,The lamp is on.,false,0,3200,16000,65847,14647,5f502645e3b1281fc4fd2c96c49e7ba81961109e96ccd12155cb28ea443357d0,0.1806,2.99,0,[],[],0
+P133,primary,C,mention_lamp,The lamp is on.,false,500,3200,16000,73847,14647,14e537c5196838ba2ad36dcc13ecbd100d3b2c5612895b1a38727bbcba10c676,0.0002,2.91,0,[],[],0
+P133,candidate,C,mention_lamp,The lamp is on.,false,500,3200,16000,73847,14647,14e537c5196838ba2ad36dcc13ecbd100d3b2c5612895b1a38727bbcba10c676,0.1806,3.47,0,[],[],0
+P134,primary,C,mention_lamp,The lamp is on.,false,1000,3200,16000,81847,14647,7a16c7ada939f5fc2bcd4d54535d4c38685e5edca4f90dbe56da51ed4861e50e,0.0002,3.47,0,[],[],0
+P134,candidate,C,mention_lamp,The lamp is on.,false,1000,3200,16000,81847,14647,7a16c7ada939f5fc2bcd4d54535d4c38685e5edca4f90dbe56da51ed4861e50e,0.1806,3.95,0,[],[],0
+P135,primary,C,mention_lamp,The lamp is on.,false,2500,3200,16000,105847,14647,6649434cd2f20a595225e0a7563a87e26e54f9ad7ce6e029e8559648d80703c6,0.002,3.07,0,[],[],0
+P135,candidate,C,mention_lamp,The lamp is on.,false,2500,3200,16000,105847,14647,6649434cd2f20a595225e0a7563a87e26e54f9ad7ce6e029e8559648d80703c6,0.4499,2.91,0,[],[],0
+P136,primary,C,no_name_timer,Set a timer for five minutes,false,0,3200,16000,79448,28248,70f40dc680a167ac51b787f851f24af4abe5c3cf8f41805d15c861c5f8e0a1d1,0.0001,3.39,0,[],[],0
+P136,candidate,C,no_name_timer,Set a timer for five minutes,false,0,3200,16000,79448,28248,70f40dc680a167ac51b787f851f24af4abe5c3cf8f41805d15c861c5f8e0a1d1,0.1806,3.87,0,[],[],0
+P137,primary,C,no_name_timer,Set a timer for five minutes,false,500,3200,16000,87448,28248,7a3b8f3b5f4117ee39e8d6a209b3fcf968e6ac73ee4a6703620d5b6879049bd0,0.0001,3.87,0,[],[],0
+P137,candidate,C,no_name_timer,Set a timer for five minutes,false,500,3200,16000,87448,28248,7a3b8f3b5f4117ee39e8d6a209b3fcf968e6ac73ee4a6703620d5b6879049bd0,0.1806,4.35,0,[],[],0
+P138,primary,C,no_name_timer,Set a timer for five minutes,false,1000,3200,16000,95448,28248,e57102b1a7efb7e1d5dbc61503b2c83e4bd8d59f1e44d393a7e1bd189f04b3c8,0.0001,4.43,0,[],[],0
+P138,candidate,C,no_name_timer,Set a timer for five minutes,false,1000,3200,16000,95448,28248,e57102b1a7efb7e1d5dbc61503b2c83e4bd8d59f1e44d393a7e1bd189f04b3c8,0.1806,4.83,0,[],[],0
+P139,primary,C,no_name_timer,Set a timer for five minutes,false,2500,3200,16000,119448,28248,fac8af9256479ff9ef99d004657d582ba1ff95f0f7dc3bc7258c2ef9144be5c0,0.0002,2.67,0,[],[],0
+P139,candidate,C,no_name_timer,Set a timer for five minutes,false,2500,3200,16000,119448,28248,fac8af9256479ff9ef99d004657d582ba1ff95f0f7dc3bc7258c2ef9144be5c0,0.1881,2.75,0,[],[],0
+P140,primary,C,no_name_thanks,Thank you,false,0,3200,16000,61989,10789,817c468c54874a903b2a1db44a09635279f852b6329a5322027f9db1ad7a8b8f,0.0001,2.27,0,[],[],0
+P140,candidate,C,no_name_thanks,Thank you,false,0,3200,16000,61989,10789,817c468c54874a903b2a1db44a09635279f852b6329a5322027f9db1ad7a8b8f,0.1806,2.75,0,[],[],0
+P141,primary,C,no_name_thanks,Thank you,false,500,3200,16000,69989,10789,82394502cfd55d11a2ff32ae682035b103cc9fb0623d99783d295af68352c9a0,0.0001,2.75,0,[],[],0
+P141,candidate,C,no_name_thanks,Thank you,false,500,3200,16000,69989,10789,82394502cfd55d11a2ff32ae682035b103cc9fb0623d99783d295af68352c9a0,0.1806,3.23,0,[],[],0
+P142,primary,C,no_name_thanks,Thank you,false,1000,3200,16000,77989,10789,86c0819e129c0ff3f3bc35c3667f716cbe484ba5cd21ec19f0aba0bde065cfa5,0.0001,3.23,0,[],[],0
+P142,candidate,C,no_name_thanks,Thank you,false,1000,3200,16000,77989,10789,86c0819e129c0ff3f3bc35c3667f716cbe484ba5cd21ec19f0aba0bde065cfa5,0.1806,3.71,0,[],[],0
+P143,primary,C,no_name_thanks,Thank you,false,2500,3200,16000,101989,10789,7da9eb1e17a1e99e31bf2c3746faa2f81da74d2ebf435fbaf2821ee74a4085e1,0.0003,2.67,0,[],[],0
+P143,candidate,C,no_name_thanks,Thank you,false,2500,3200,16000,101989,10789,7da9eb1e17a1e99e31bf2c3746faa2f81da74d2ebf435fbaf2821ee74a4085e1,0.1806,2.03,0,[],[],0

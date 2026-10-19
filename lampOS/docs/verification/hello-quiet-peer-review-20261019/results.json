@@ -1,0 +1,49 @@
+{
+  "review_head": "6428774ff7d4cac9b20948df96ce79701d0b5315",
+  "patch_sha256": "3fcaa4b6d0af0a56423d0c4c71a5a49cce94e8a5eff7ead17938fb5d76c7cf72",
+  "review_only": true,
+  "stages": [
+    {
+      "command": "cargo test -p lamp-policy --lib second_review_ -- --test-threads=1",
+      "passed": 2,
+      "failed": 2,
+      "ignored": 0,
+      "filtered": 173,
+      "note": "First four Policy regressions only; default-off controls pass."
+    },
+    {
+      "command": "cargo test -p lamp-voice-eval --lib export::tests::the_bus_topics_hold_every_topic_the_messages_name -- --exact",
+      "passed": 0,
+      "failed": 1,
+      "ignored": 0,
+      "filtered": 321,
+      "note": "Existing consumer test, unchanged from the reviewed head."
+    },
+    {
+      "command": "cargo test -p lamp-voice --lib second_provider::tests::held_verdict_is_published_before_the_queued_transcript_is_consumed -- --exact",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 2052,
+      "note": "Characterizes the producer order with a callback barrier; it does not assert the desired Policy result."
+    },
+    {
+      "command": "cargo test -p lamp-policy --lib second_review_a_second_route_ -- --test-threads=1",
+      "passed": 1,
+      "failed": 1,
+      "ignored": 0,
+      "filtered": 177,
+      "note": "After adding the ordering pair; heard-before-verdict is the passing control."
+    }
+  ],
+  "native": {
+    "head": "6428774ff7d4cac9b20948df96ce79701d0b5315",
+    "run": 39213394277,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39213394277",
+    "conclusion": "failure",
+    "summary": "6799/7322 tests run: 6798 passed (1 leaky), 1 failed, 48 skipped",
+    "failed_test": "lamp-voice-eval export::tests::the_bus_topics_hold_every_topic_the_messages_name",
+    "failure": "voice/turn",
+    "failed_log_sha256": "6fe80df6b0debaefdcbb16e5bf1595731c694c97819b284d9a84f59fed5bbca5"
+  }
+}

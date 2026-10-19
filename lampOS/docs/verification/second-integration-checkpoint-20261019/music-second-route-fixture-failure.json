@@ -1,0 +1,149 @@
+{
+  "head": "96cee8e30fe4257f7f017a04a87572c8c31fc51a",
+  "integration_base": "f21d697ce64f904459d36404099e8ed71d834d2c",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "source_only": true,
+  "source_file_count": 1608,
+  "source_tree_sha256": "8206b2fd70c8ff5a29a62ae55d3deca1023d5a6f25ba4728d98a3ffa23d02823",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.72,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 24.91,
+      "log_sha256": "3cd7c701af825f68be295091edbe8290b0ddd59c0fbf30ed40a00d9878d57223",
+      "summaries": []
+    },
+    {
+      "stage": "second_provider",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 34.16,
+      "log_sha256": "916a60beffb77be7c283edea89c119b60d9ba11dfc89d582674a8371569990bc",
+      "summaries": [
+        "test result: ok. 235 passed; 0 failed; 0 ignored; 0 measured; 2073 filtered out; finished in 5.79s"
+      ]
+    },
+    {
+      "stage": "requested_audio",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "requested_audio",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 1.76,
+      "log_sha256": "e63f33de18487263ca19acdfb587b53218b13da9fc96f5797cfcdc504d81d43c",
+      "summaries": [
+        "test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 2262 filtered out; finished in 1.59s"
+      ]
+    },
+    {
+      "stage": "accepted_decline",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "accepted_decline",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "seconds": 0.34,
+      "log_sha256": "bfb897be1625b1e57906d81be98831d1d7ff5fc6f2666137e610845f181ed99e",
+      "summaries": [
+        "test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 2305 filtered out; finished in 0.18s"
+      ]
+    }
+  ],
+  "scope": "Focused combined integration preflight; filters overlap and are not a complete workspace gate.",
+  "changed_source_sha256": {
+    "lampOS/crates/actions/src/caps_service.rs": "a234c895537fc1aa838f0a97df71ecdb698063a37b46cde22e280cb0144fde82",
+    "lampOS/crates/actions/src/lib.rs": "27d8dec297237884a82dcf0e35f058d3ce0b782bae4b5aaf5b0731bcd4aa5adb",
+    "lampOS/crates/actions/src/main.rs": "7302f299c8afc56a56334bd60039fb5771d082516b48c9a6a6350630a57034ca",
+    "lampOS/crates/actions/src/server.rs": "2429abbeca08aaedaba685cb17bee4fba14ed4c7af0132bec76474234658001e",
+    "lampOS/crates/actions/src/sound.rs": "8251258895bb5dce813569bfd3f07d629b8419161f5e52b5b9f3318d9347e089",
+    "lampOS/crates/actions/src/speaker_state.rs": "13f017aa44f2abc817be76365b5b2fcba9d579417f7daab4e79f078c600cbd72",
+    "lampOS/crates/actions/tests/speaker_state.rs": "8406f85cdb9c76be58e462b6e9b12f715c12d71bbc7b221c0d6d7cd154a74445",
+    "lampOS/crates/msgs/src/lib.rs": "f9c0ac0f6a83b745f9abfaeb993b82272d4dd8d280384afc38ad08e7cd0a6d91",
+    "lampOS/crates/msgs/src/requested_audio.rs": "289bb4ee3bea350a23dd9bf1ebb32c81199e602ba3e8f02018eaacbdadb61c80",
+    "lampOS/crates/msgs/src/speaker_state.rs": "1012463d9e90e2b099281e165b937a5d2e55fbb465cdadf105a60b1a86533986",
+    "lampOS/crates/skills/examples/render_relaxing_music.rs": "c9decd0ee3d0644abfda79322fa1962bd2bbbebfd41ba3e2acc4a100cc62588b",
+    "lampOS/crates/skills/src/lib.rs": "7da1752feb948e567d72f0b272da7ddf307f673678391765d990c0bea90f687d",
+    "lampOS/crates/skills/src/main.rs": "0bb25f4e9100ffa92bebf3b7a1cee4cd1f6736a9f52bcecef64134f1fe8da97c",
+    "lampOS/crates/skills/src/requested_audio.rs": "26630b2dcbf8d54de8d1d4e52efd56793f2d743fb7c42347e3c83e431530621e",
+    "lampOS/crates/skills/tests/requested_audio.rs": "e608bf84761c52c2f83d86c774cf6047021a7686d7a421e4646115e41aa5fccd",
+    "lampOS/crates/voice-eval/src/export.rs": "1909c98a6e9a76f4a29b31bd2f0d55bca658de59b9dffbff429113fdc25e66a2",
+    "lampOS/crates/voice/src/coordinator.rs": "c4a1df66c18728e4c1164c0365b95eece56a76ffcbb7c0a014248e10cbac789d",
+    "lampOS/crates/voice/src/coordinator/cloud.rs": "e5137cefd6a712b58e73807ffa4d72499183b3fe34090c32109dce0271071046",
+    "lampOS/crates/voice/src/coordinator/hand.rs": "23304e21fc597be2cc9fef0e852cdefac7a3ca1febf4c105b349df4a657de1f4",
+    "lampOS/crates/voice/src/coordinator/notices.rs": "6e96a7fd5d65d02db4de9fccc0086302e276cb0c0ac8d951091c7b458b119160",
+    "lampOS/crates/voice/src/coordinator/requested_media.rs": "2ca1dca818da78a65f2b2804a600b5e4e5350029ebad60cb668c70836d3b56d9",
+    "lampOS/crates/voice/src/coordinator/second.rs": "215a0a1f4a4614b59d465e06705f991d56001030c27f022235fc043a4afcf2d1",
+    "lampOS/crates/voice/src/coordinator/speaker_tone.rs": "a805e6fd30388d43257ef5ded04f6bcb635e6dba48785b5ae0abca6b834c33ee",
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "8da610b020e18cc993f883a573f212e5f058890e8f253ff6d77d1bce824c0b74",
+    "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": "58fa301fd2581c0b64c3a8dd445a1c76a514df4c88ae16e6d33d4a6ccad0205c",
+    "lampOS/crates/voice/src/fixture_provider.rs": "ca9597e324229d149c953ceb30fd7272f04629a95964101f79eb436592e2d27d",
+    "lampOS/crates/voice/src/lib.rs": "72be641ba0edb932776e16abea0bc761a91ff12b229ed60874509eaf68d164ef",
+    "lampOS/crates/voice/src/provider_worker.rs": "61f81a7c3764acb5b1db158db4a7fd21767133bb6b96b175fd2e0f8dffe730bb",
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": "96f1f09ea0f55eaee19c6d42d943d58ce68415548f694763af9f5898d9e4dc7c",
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": "37a64324c9c065453c94343a88a3e124d8d72b595c901b040b3233f94f221974",
+    "lampOS/crates/voice/src/requested_audio.rs": "d3f7da187e6209773daa5faf270b5b9175aa5598092fbc71af3f7fd4b7fa4f20",
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": "fb50115cca8b54047ff69d62addeb572c6153a8a34775820bf330ba482534708",
+    "lampOS/crates/voice/src/say.rs": "5f17b0fa6f9a711d6b3bbe8f5208d279dafbe118c719f535e0b061a9ead4f916",
+    "lampOS/crates/voice/src/second_provider.rs": "4ff3ad1c914dd4bc275f5c281c9fa879c15fc482f3aa92cb50637de1aae85e4c",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "03d9ad33d95fb7d5e873a06b5a3d5b52db911dee8c25806ec00434e51e947ea6",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "5e09004795c9a7329e47c14463568158edc47ab4f5b75a5ea2f6456b41b3525d",
+    "lampOS/crates/voice/src/tools.rs": "ee46a1d99631245c2eea5b01d60b43cba94e0959a264bbea35a85c66aea34b9c",
+    "lampOS/examples/relaxing-music/LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "lampOS/examples/relaxing-music/PROVENANCE.md": "7510ee01ce0a28d3f62c2e5185b16d1bdb9fd937eede66b71e7f4417d6514a54",
+    "lampOS/examples/relaxing-music/README.md": "b8b58c617c7c60b444f80dc5236d0d5f1d50e3cfb74e815a909755740180ed1e",
+    "lampOS/examples/relaxing-music/SKILL.md": "e861f46fc135c2c593c3aa7396b37ce380f689d5277780049ac07333b9b6358c",
+    "lampOS/examples/relaxing-music/score.rs": "d0bcc0f5553b61b2b46697fb8ee33d5f657e423d78f55a8fb66a59afc5249ad9",
+    "lampOS/examples/relaxing-music/skill.toml": "17217242610421b8d6bd9b37c477386d26673ee61daf768b44bd56664984921b"
+  },
+  "failure": "The negative fake Skills peer immediately closed its wake connection during Drop. macOS rejected SO_RCVTIMEO on the already-disconnected accepted socket with EINVAL; both accepted-decline tests failed during fake-peer shutdown. Prior-action and Skills stages were not reached."
+}
