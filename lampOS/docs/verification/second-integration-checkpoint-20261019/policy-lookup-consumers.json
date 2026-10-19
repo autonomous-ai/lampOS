@@ -1,0 +1,35 @@
+{
+  "integration_base": "e9d84fbee72731300594a0762eae7a9ba33040a5",
+  "grep_command": [
+    "rg",
+    "-n",
+    "\\b(LOOKUP_GATE|slow_lookup|a_slow_lookup_is_not_waited_for_past_the_deadline_and_is_not_begun_twice)\\b",
+    "crates/"
+  ],
+  "grep_output_sha256": "d91b4b968516f2c60fab5b4cfbe1dc0f74ac3c73a99663d45e3edd51919e41dd",
+  "matched_files": [
+    "crates/policy/src/decide/tests.rs"
+  ],
+  "changed_crates": [
+    "lamp-policy"
+  ],
+  "reverse_dependency_closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-policy",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "workspace_crates": 42,
+  "validation": "Only a private cfg(test) fixture changes. The changed-name grep matches this Policy test module alone, so the complete Policy host suite is the applicable test gate; no production library interface or downstream source changes. The metadata reverse-dependency closure is retained for context. Automatic ARM64 CI tests the complete workspace on the PR merge checkout.",
+  "head": "0040b45576a8d467a4925523b26dfad102c6e416",
+  "applicable_host_test_packages": [
+    "lamp-policy"
+  ]
+}
