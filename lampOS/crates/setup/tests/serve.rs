@@ -64,6 +64,7 @@ impl Root {
             timezone_file: self.0.join("etc/timezone"),
             zone_env: self.0.join("etc/zone.env"),
             backend: self.0.join("etc/backend.json"),
+            reports: self.0.join("etc/reports.json"),
             web_start: vec![],
             web_stop: vec![],
             free_port: vec![],
@@ -102,6 +103,7 @@ fn a_request_is_checked_before_anything_is_touched() {
             timezone: Some("Asia/Ho_Chi_Minh".into()),
             // A port alone is no link.
             backend: None,
+            share_reports: false,
         }
     );
     // The key is the user's (the owner, #806, 16:13). Without one, a lamp
@@ -814,7 +816,9 @@ async fn v1s_routes_answer_in_v1s_shapes() {
         json!({"status": 1, "message": null, "data": {"phase": "idle", "lan_ip": "", "error": "",
                "mac": "lamp-4ace", "run": 0, "set_up_completed": false, "runtime_phase": "",
                // Not V1's: the app tells its two Lamps apart by it (#1396).
-               "generation": "lamp-v2"}})
+               "generation": "lamp-v2",
+               // Not V1's: the person's answer on reports, read only (#1683).
+               "share_reports": false}})
     );
     let before = SCANS.load(Ordering::Relaxed);
     let (code, body) = call(&app, "GET", "/api/network", Value::Null).await;
@@ -1204,4 +1208,130 @@ fn a_null_or_a_number_in_a_link_field_never_fails_setup() {
     let mut body = app_body();
     body["fd_channel"] = Value::Null;
     assert_eq!(backend_link(&request(body)).unwrap_err(), ["fd_channel"]);
+}
+
+/// #1683: only the JSON `true` is a yes to health and crash reports; an app
+/// that doesn't ask, V1's page and a link all mean no.
+#[test]
+fn only_a_json_true_is_a_yes_to_reports() {
+    let config = Root::new().config(false);
+    for (given, yes) in [
+        (Some(json!(true)), true),
+        (Some(json!(false)), false),
+        (None, false),
+        (Some(Value::Null), false),
+        (Some(json!("true")), false),
+        (Some(json!(1)), false),
+        (Some(json!({"share": true})), false),
+    ] {
+        let mut body = good();
+        if let Some(given) = given.clone() {
+            body["share_reports"] = given;
+        }
+        assert_eq!(
+            check(&request(body), &config).unwrap().share_reports,
+            yes,
+            "{given:?}"
+        );
+    }
+}
+
+/// The answer is kept at every setup, a no included, and one that can't be
+/// kept never fails the setup: reports then stay off.
+#[test]
+fn the_answer_on_reports_is_kept_and_its_failure_is_no_failed_setup() {
+    #[derive(Default)]
+    struct Answer {
+        kept: Vec<bool>,
+        fails: bool,
+    }
+    impl Save for Answer {
+        fn credential(&mut self, _: &str) -> io::Result<()> {
+            Ok(())
+        }
+        fn name(&mut self, _: &str) -> io::Result<()> {
+            Ok(())
+        }
+        fn timezone(&mut self, _: &str) -> io::Result<()> {
+            Ok(())
+        }
+        fn backend(&mut self, _: &Backend) -> io::Result<()> {
+            Ok(())
+        }
+        fn reports(&mut self, share: bool) -> io::Result<()> {
+            if self.fails {
+                return Err(io::Error::other("disk full"));
+            }
+            self.kept.push(share);
+            Ok(())
+        }
+        fn marker(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    let config = Root::new().config(false);
+    for (share, fails) in [(true, false), (false, false), (true, true)] {
+        let mut body = good();
+        body["share_reports"] = json!(share);
+        let accepted = check(&request(body), &config).unwrap();
+        let status = Arc::new(Mutex::new(Status::new("lamp-4ace".into())));
+        let mut save = Answer {
+            fails,
+            ..Answer::default()
+        };
+        run(
+            &status,
+            &accepted,
+            "VN",
+            &mut Lamp::new(true),
+            &mut save,
+            || Some("192.168.1.23".into()),
+        );
+        assert!(status.lock().unwrap().set_up_completed);
+        assert_eq!(save.kept, if fails { vec![] } else { vec![share] });
+        // The status says what was kept: a yes not kept is a no.
+        assert_eq!(status.lock().unwrap().share_reports, share && !fails);
+    }
+}
+
+/// `lamp-cloud` runs as `lampos` and reads the answer where it is: 0644, the
+/// wording's version beside it. The 5 s reset removes it.
+#[test]
+fn the_answer_on_reports_is_written_readable_and_the_reset_removes_it() {
+    let root = Root::new();
+    let config = root.config(false);
+    Files(&config).reports(true).unwrap();
+    let mode = fs::metadata(&config.reports).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o644);
+    let written: Value = serde_json::from_slice(&fs::read(&config.reports).unwrap()).unwrap();
+    assert_eq!(
+        (&written["share"], &written["asked"]),
+        (&json!(true), &json!(1))
+    );
+    assert!(written["at"].as_str().unwrap().ends_with('Z'));
+    Files(&config).reports(false).unwrap();
+    let written: Value = serde_json::from_slice(&fs::read(&config.reports).unwrap()).unwrap();
+    assert_eq!(written["share"], false);
+    let own: Config =
+        serde_json::from_str(include_str!("../fixtures/serve-own-page.json")).unwrap();
+    assert_eq!(
+        own.reports,
+        std::path::Path::new("/etc/lampOS/setup/reports.json")
+    );
+    let plan: Value =
+        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+    let wiped = |path: &str| {
+        plan["wipe"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|wiped| wiped == path)
+    };
+    assert!(wiped("/etc/lampOS/setup/reports.json"));
+    // lamp-cloud's own record of a later no and the queue, with its folder.
+    assert!(wiped("/var/lib/lampos-cloud"));
+    assert_eq!(
+        lamp_setup::serve::reports_record(false, std::time::UNIX_EPOCH),
+        json!({"share": false, "asked": 1, "at": "1970-01-01T00:00:00Z"})
+    );
 }

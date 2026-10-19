@@ -144,6 +144,9 @@ pub struct Settings {
     /// The skills are reached through one function, `use_skill`
     /// ([`crate::use_skill`], `LAMP_USE_SKILL=on`), not one each.
     pub use_skill: bool,
+    /// The person may stop health and crash reports by voice
+    /// ([`crate::reports_stop`], `LAMP_REPORTS=on`, #1683).
+    pub reports_stop: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -187,6 +190,11 @@ pub fn arguments_from_environment() -> Vec<String> {
     }
     flags.extend(crate::use_skill::arguments(
         std::env::var(crate::use_skill::ENVIRONMENT).ok().as_deref(),
+    ));
+    flags.extend(crate::reports_stop::arguments(
+        std::env::var(crate::reports_stop::ENVIRONMENT)
+            .ok()
+            .as_deref(),
     ));
     flags
 }
@@ -361,6 +369,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         settings.use_skill = true;
         flags = rest;
     }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::reports_stop::FLAG
+    {
+        settings.reports_stop = true;
+        flags = rest;
+    }
     Ok((settings, flags))
 }
 
@@ -525,6 +539,12 @@ fn core_tools(settings: &Settings) -> Vec<Tool> {
     if settings.onboarding.is_some() {
         tools.extend(crate::onboarding::tools());
     }
+    // A system function, never a skill (#1683): before the executive's and
+    // the skills', so it is never the one cut past 32; a skill cut for it is
+    // named on the setup line (#1706).
+    if settings.reports_stop {
+        tools.push(crate::reports_stop::tool());
+    }
     if let Some(directory) = &settings.exec {
         let room = lamp_gemini::MAX_TOOLS - tools.len();
         tools.extend(
@@ -587,6 +607,7 @@ fn voices_own(name: &str) -> bool {
         || crate::marked::is_tool(name)
         || crate::onboarding::is_tool(name)
         || name == crate::use_skill::NAME
+        || crate::reports_stop::is_tool(name)
 }
 
 /// The skills' folder that runs `name`, when the executive does not.
@@ -671,6 +692,8 @@ pub enum Route {
     Mark(PathBuf),
     /// A step of the first meeting reported, through this onboarding file.
     Onboarding(PathBuf),
+    /// Health and crash reports stopped, through `lamp-cloud` on the bus.
+    ReportsStop,
     /// A skill named in a call of `use_skill` ([`crate::use_skill`]), with
     /// the settings that find it: made the skill's own call when it is run.
     UseSkill(Box<Settings>),
@@ -718,6 +741,13 @@ pub fn route(settings: &Settings, name: &str) -> Route {
             .onboarding
             .clone()
             .map_or(Route::Nobody, Route::Onboarding);
+    }
+    if crate::reports_stop::is_tool(name) {
+        return if settings.reports_stop {
+            Route::ReportsStop
+        } else {
+            Route::Nobody
+        };
     }
     match (&settings.exec, name) {
         (_, NOT_FOR_ME) if settings.decline => Route::Decline,
@@ -856,6 +886,14 @@ pub fn run_call(
         }
         Route::Mark(session) => ("the marks", crate::marked::run(session, call, heard)),
         Route::Onboarding(file) => ("the onboarding", crate::onboarding::run(file, call)),
+        Route::ReportsStop => (
+            "the reports",
+            crate::reports_stop::run(
+                &mut crate::reports_stop::Bus(lamp_bus::Bus::from_environment().ok()),
+                heard,
+                crate::reports_stop::ANSWER_WITHIN,
+            ),
+        ),
         Route::UseSkill(settings) => {
             let skills = skill_tools(settings);
             match crate::use_skill::translate(call, crate::use_skill::offered(&skills)) {
@@ -1203,6 +1241,7 @@ mod tests {
             names_checked: true,
             mark: Some("/var/lib/lampos-voice/session".into()),
             onboarding: Some("/var/lib/lampos-voice/onboarding.json".into()),
+            reports_stop: true,
         };
         let mut tools = declared(&settings);
         tools.push(crate::attention::name_tool());
@@ -1443,6 +1482,7 @@ mod tests {
                 names_checked: false,
                 mark: None,
                 onboarding: None,
+                reports_stop: false,
             }
         );
         assert_eq!(rest, ["--session", "7"]);
@@ -2267,6 +2307,34 @@ mod tests {
         let (settings, rest) = take(&flags).unwrap();
         assert!(settings.decline && settings.use_skill);
         assert_eq!(rest, ["rest"]);
+    }
+
+    /// #1683: `reports_stop` is the voice's own, declared and routed only
+    /// with its switch, taken after `use_skill`'s flag, and never a catalog's.
+    #[test]
+    fn stopping_reports_is_declared_and_routed_only_with_its_switch() {
+        let plain = Settings::default();
+        assert!(
+            declared(&plain)
+                .iter()
+                .all(|tool| tool.name != crate::reports_stop::NAME)
+        );
+        assert_eq!(route(&plain, crate::reports_stop::NAME), Route::Nobody);
+        let mut flags = crate::use_skill::arguments(Some("on"));
+        flags.extend(crate::reports_stop::arguments(Some("on")));
+        flags.push("rest".into());
+        let (on, rest) = take(&flags).unwrap();
+        assert!(on.use_skill && on.reports_stop);
+        assert_eq!(rest, ["rest"]);
+        let names: Vec<String> = declared(&on).into_iter().map(|tool| tool.name).collect();
+        assert!(
+            names.contains(&crate::reports_stop::NAME.to_owned()),
+            "{names:?}"
+        );
+        assert_eq!(route(&on, crate::reports_stop::NAME), Route::ReportsStop);
+        assert!(voices_own(crate::reports_stop::NAME));
+        // Off, the flag is never given.
+        assert!(crate::reports_stop::arguments(None).is_empty());
     }
 
     /// The reviewer on #1706: the setup line's two notes with `use_skill`,

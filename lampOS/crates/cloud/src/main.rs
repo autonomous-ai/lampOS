@@ -3,16 +3,21 @@
 //! `LoadCredential=`, setup's account (`account`), the voice's key (`key`)
 //! and `lamp-update`'s state (`build`), so it runs as `lampos` and no file
 //! is widened. A login a ping rotated is kept in its own state folder.
+//!
+//! `lamp-cloud exit-note UNIT`: run by systemd as `ExecStopPost=` of a
+//! lampOS unit (`deploy/product/exit-note.conf`), it keeps what systemd
+//! says of that stop for the reports (#1683), and nothing for a `success`.
 use lamp_cloud::account::{self, Account};
 use lamp_cloud::lamp::{self, Places, Real, Ring, Texts, Wifi};
 use lamp_cloud::wire::Identity;
-use lamp_cloud::{beat, online, ping};
-use std::path::PathBuf;
+use lamp_cloud::{beat, online, ping, reports};
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Duration;
 use tokio::sync::watch;
 
-const USAGE: &str = "usage: lamp-cloud [--bus-root ABSOLUTE_DIR]\n\
+const USAGE: &str = "usage: lamp-cloud [--bus-root ABSOLUTE_DIR] | lamp-cloud exit-note UNIT\n\
   With LAMP_CLOUD=on, and CREDENTIALS_DIRECTORY holding account, key and build\n\
   (the unit's LoadCredential=); a rotated login is kept in STATE_DIRECTORY.";
 
@@ -35,9 +40,63 @@ fn identity(lamp: &Real) -> Identity {
     }
 }
 
+/// `exit-note UNIT`: systemd's `$SERVICE_RESULT`, `$EXIT_CODE` and
+/// `$EXIT_STATUS` for one stop of `UNIT`, with `systemctl show`'s restarts
+/// and run time, kept in `/run/lampos-exits`. Always succeeds: a note that
+/// cannot be kept must never make a stop fail.
+fn exit_note(unit: &str) -> ExitCode {
+    let given = |name: &str| std::env::var(name).unwrap_or_default();
+    let (result, code, status) = (
+        given("SERVICE_RESULT"),
+        given("EXIT_CODE"),
+        given("EXIT_STATUS"),
+    );
+    let boot = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
+        .map(|boot| boot.trim().to_owned())
+        .unwrap_or_default();
+    let at_us = lamp_ipc::monotonic_us();
+    let none = BTreeMap::new();
+    if reports::exit_note(unit, &result, &code, &status, at_us, &boot, &none).is_none() {
+        return ExitCode::SUCCESS;
+    }
+    let shown = reports::bounded_output(
+        Path::new("/usr/bin/systemctl"),
+        &[
+            "show",
+            unit,
+            "-p",
+            "NRestarts",
+            "-p",
+            "ExecMainStartTimestampMonotonic",
+            "-p",
+            "ExecMainExitTimestampMonotonic",
+        ],
+    )
+    .map(|text| reports::shown(&text))
+    .unwrap_or_default();
+    if let Some(note) = reports::exit_note(unit, &result, &code, &status, at_us, &boot, &shown)
+        && let Err(error) = reports::write_exit_note(Path::new(reports::EXITS), &note)
+    {
+        say(&format!(
+            "the exit note could not be kept ({})",
+            error.kind()
+        ));
+    }
+    ExitCode::SUCCESS
+}
+
 fn main() -> ExitCode {
     let mut bus_root = None;
     let mut arguments = std::env::args().skip(1);
+    if std::env::args().nth(1).as_deref() == Some("exit-note") {
+        return match std::env::args().nth(2) {
+            Some(unit) => exit_note(&unit),
+            None => {
+                eprintln!("{USAGE}");
+                ExitCode::from(2)
+            }
+        };
+    }
     while let Some(argument) = arguments.next() {
         match (argument.as_str(), arguments.next()) {
             ("--bus-root", Some(root)) if root.starts_with('/') => {
@@ -82,6 +141,20 @@ fn main() -> ExitCode {
         Some(root) => lamp_bus::Bus::new(&root).ok(),
         None => lamp_bus::Bus::from_environment().ok(),
     };
+    // Health and crash reports (#1683): only with LAMP_REPORTS=on too, and
+    // then only with the person's yes, read at each send.
+    let shared = reports::on_from_environment()
+        .then(|| std::env::var_os("STATE_DIRECTORY"))
+        .flatten()
+        .map(|state| {
+            reports::Shared::new(reports::Reports::open(reports::Places::product(Path::new(
+                &state,
+            ))))
+        });
+    let reporting = shared
+        .clone()
+        .map(|shared| (shared, reports::Lamp::new(bus.clone())));
+    let report_build = reports::Build::of(&build);
     let mut lamp = Real {
         places: Places::default(),
         bus,
@@ -90,6 +163,7 @@ fn main() -> ExitCode {
         wifi: Wifi::default(),
         ring: Ring::default(),
         texts: Texts::on(lamp_cloud::chat::on_from_environment()),
+        reports: shared,
     };
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -111,6 +185,7 @@ fn main() -> ExitCode {
         wifi: Wifi::default(),
         ring: Ring::default(),
         texts: Texts::default(),
+        reports: None,
     };
     runtime.block_on(async move {
         let looks = async move {
@@ -142,10 +217,17 @@ fn main() -> ExitCode {
             &mut keep,
         );
         let staying = online::run(accounts, me, &mut lamp, &mut said_too, ping::FIRST);
+        let reporting = async move {
+            match reporting {
+                Some((shared, sources)) => reports::run(shared, sources, report_build).await,
+                None => std::future::pending().await,
+            }
+        };
         tokio::select! {
             () = pinging => {}
             () = staying => {}
             () = looks => {}
+            () = reporting => {}
         }
     });
     ExitCode::from(1)

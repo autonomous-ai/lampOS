@@ -3002,6 +3002,7 @@ impl ToolDesk {
                     | Route::Faces(..)
                     | Route::Mark(_)
                     | Route::Onboarding(_)
+                    | Route::ReportsStop
             )
         {
             let (sent, sent_us) = tell(&crate::tools::declined());
@@ -3126,7 +3127,8 @@ impl ToolDesk {
             | Route::Tasks(_)
             | Route::Faces(..)
             | Route::Mark(_)
-            | Route::Onboarding(_))
+            | Route::Onboarding(_)
+            | Route::ReportsStop)
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
                 self.run(provider, lineage, call, route, called_us);
@@ -3139,6 +3141,7 @@ impl ToolDesk {
             | Route::Faces(..)
             | Route::Mark(_)
             | Route::Onboarding(_)
+            | Route::ReportsStop
             | Route::Nobody => {
                 let (sent, sent_us) = tell(&crate::tools::unavailable());
                 self.line(
@@ -3182,6 +3185,7 @@ impl ToolDesk {
                 | Route::Tasks(_)
                 | Route::Faces(..)
                 | Route::Mark(_)
+                | Route::ReportsStop
         ) {
             self.acted = Some(request);
             // Something done is the lamp answering, words or none (#829,

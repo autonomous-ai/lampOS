@@ -96,6 +96,7 @@ What lamp-4ace's units read today (`deploy/lamp-4ace/`):
 | Time zone | Schedule takes `--zone Asia/Ho_Chi_Minh`; Memory, Expression and the policy take `--utc-offset-minutes 420` | `/etc/localtime` and `/etc/timezone`, and `/etc/lampOS/zone.env` again (#820). The product's memory and Expression take `--zone system`, which follows `/etc/localtime` across daylight saving and without a restart; schedule (`LAMP_ZONE`) and skills (`LAMP_UTC_OFFSET_MINUTES`) read `zone.env`. A zone the parts' own zone data lacks leaves `zone.env` as install wrote it, since schedule would not start on it. The voice reads `/etc/localtime` itself. |
 | The person's name | Read by the voice with `LAMP_PERSON_NAME` (the product unit sets it, #806): told to the model after its character, and the hello's name when no face is known (`crates/voice/src/person.rs`) | A private file, one line: `/etc/lampOS/person/name`. |
 | The backend's link | `lamp-cloud`, when it is on (`LAMP_CLOUD=on`, #1418) | `/etc/lampOS/setup/backend.json` (`backend` in the settings), root's, 0600, written after the zone and before the key. It holds the fields above when the request carries a whole link: an endpoint, a port (a number, or digits), both channels, each field at most 512 bytes with no space or control character (the password may hold spaces). A missing or broken link writes nothing; when the request named one (an `mqtt_endpoint`) the journal gets one line naming the fields that were missing or not valid, never their values. The device's id, the endpoint, the port and both channels are needed; the base, the username and the password may be empty. Neither a broken link nor one that cannot be written fails setup: the lamp joins the Wi-Fi and talks, and only its place in the app waits. The password never appears in a debug line, and a crashed write's temporary file is removed at start. |
+| The person's answer on health and crash reports | `lamp-cloud`, with `LAMP_REPORTS=on` (#1683, `cloud.md`, "Health and crash reports") | `/etc/lampOS/setup/reports.json` (`reports` in the settings), root's, **0644** so `lamp-cloud` (as `lampos`) reads it where it is: `{"share": bool, "asked": 1, "at": "<RFC 3339 UTC>"}`, written after the backend's link and before the key, at every setup, a no included. `share` is true only for the JSON `true` in the request's `share_reports`; absent, `false`, `null`, `"true"`, `1` or anything else is no, so V1's page, this crate's own page and an app that doesn't ask all mean no. `asked` is the question's wording, so a later wording asking for more starts at no. Best effort: a write that fails is a no and never a failed setup. |
 
 ## The person's data, which reset wipes
 
@@ -117,7 +118,7 @@ and `logs`: the sign-in, the pairings and what they left; not `.harness`
 whole, which is Harness itself, its CLI and its own Node, and not the
 Harness service `install` set up, #934; Nine on #1016), the user's key
 (`/etc/lampOS/voice/credential` and `/etc/lampOS/policy/jev.key`, #806,
-16:13), the name, the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), the Wi-Fi configuration and the setup marker. Kept: the
+16:13), the name, the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration and the setup marker. Kept: the
 software, its releases, the update key, the touch calibration and other
 per-lamp facts, and physical privacy.
 
@@ -241,6 +242,8 @@ holds no check past its time, and three attempts in a row start one lookup.
 ## The setup server (built, off unless set)
 
 Its `GET /api/device/setup/status` answers V1's fields, plus one of its own: `"generation": "lamp-v2"`. The backend keeps one device type, `lamp`, for both generations, so the Autonomous app sets both up as one Lamp product and learns which Lamp it set up from this field; `lamp-cloud` says the same on every MQTT reply (#1396, decided 19 Oct, replacing the two products decided on 17 Oct).
+
+It also says `"share_reports"`, read only: true only when the last setup kept the person's yes to health and crash reports (#1683), so the app can show it after a reconnect. The app changes it later through `lamp-cloud` (`reports.set`, `cloud.md`), never here.
 
 ```sh
 lamp-setup serve --config SERVE.json --plan PLAN.json --enable
@@ -487,7 +490,7 @@ person's key or the account's password.
 for f in /var/lib/lampos-setup/done /etc/lampOS/voice/credential \
          /etc/lampOS/policy/jev.key /etc/lampOS/person/name \
          /etc/localtime /etc/timezone /etc/lampOS/zone.env \
-         /etc/lampOS/setup/backend.json \
+         /etc/lampOS/setup/backend.json /etc/lampOS/setup/reports.json \
          /etc/wpa_supplicant/wpa_supplicant-wlan0.conf; do
   sudo stat -c '%a %U %n' "$f" 2>/dev/null || echo "missing $f"
 done
@@ -506,11 +509,12 @@ readlink /etc/localtime
 | `/etc/timezone` | the phone's zone, on the same condition | kept |
 | `/etc/lampOS/zone.env` | `LAMP_ZONE` and today's offset, 644, on the same condition and only for a zone the parts' own zone data has too; else as install wrote it | kept |
 | `/etc/lampOS/setup/backend.json` (the app's link) | 600 root, **only when the app's request carried a whole link** | wiped |
+| `/etc/lampOS/setup/reports.json` (the answer on reports, #1683) | 644 root, at every setup, a no included, unless the write failed | wiped |
 | `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf` | 600 root | wiped |
 
 Setup saves them in this order: the name, the zone, the backend's link, the
-key, then the marker. So a marker means all the others were written, but
-the backend's link: that one is best effort, and a marker with no
+answer on reports, the key, then the marker. So a marker means all the others were written, but
+the backend's link and the answer on reports: those are best effort, and a marker with no
 `backend.json` is what a failed write leaves (its journal line is below). The
 reset plan (`reset-plan-product.json`) also wipes the person's stores
 (memory, faces, tasks and Harness's sign-in, schedule, the Policy's and

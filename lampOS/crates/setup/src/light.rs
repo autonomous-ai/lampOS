@@ -384,6 +384,9 @@ impl<S: Save> Save for ReleasingSave<'_, S> {
     fn backend(&mut self, link: &crate::serve::Backend) -> io::Result<()> {
         self.save.backend(link)
     }
+    fn reports(&mut self, share: bool) -> io::Result<()> {
+        self.save.reports(share)
+    }
     fn marker(&mut self) -> io::Result<()> {
         if let Some(light) = self.light {
             light.release();

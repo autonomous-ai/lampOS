@@ -8,9 +8,12 @@
 use crate::account::Account;
 use crate::answer::{Lamp, QUIET_WHEN_DONE, answer};
 use crate::wire::{Command, Identity, parse};
+use rumqttc::Outgoing;
 use rumqttc::v5::mqttbytes::QoS;
 use rumqttc::v5::mqttbytes::v5::{ConnectProperties, Packet};
 use rumqttc::v5::{AsyncClient, Event, MqttOptions};
+use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::watch;
 
@@ -93,6 +96,81 @@ pub fn rfc3339(at: SystemTime) -> String {
     )
 }
 
+/// What was handed to the client, so the broker's acknowledgement of a
+/// report can be told from the rest (#1683). The client numbers publishes
+/// as it sends them, in the order they were handed over, so each handed
+/// publish is noted in that order: a report's `seq`, or none.
+#[derive(Default)]
+struct Handed {
+    in_order: VecDeque<Option<u64>>,
+    by_packet: HashMap<u16, u64>,
+}
+
+impl Handed {
+    fn publish(
+        &mut self,
+        client: &AsyncClient,
+        topic: &str,
+        payload: String,
+        report: Option<u64>,
+    ) -> bool {
+        let handed = client
+            .try_publish(topic, QoS::AtLeastOnce, false, payload)
+            .is_ok();
+        if handed {
+            self.in_order.push_back(report);
+        }
+        handed
+    }
+
+    /// The client sent the next one as packet `pkid`.
+    fn sent(&mut self, pkid: u16) {
+        if let Some(Some(seq)) = self.in_order.pop_front() {
+            self.by_packet.insert(pkid, seq);
+        }
+    }
+
+    /// The report the broker acknowledged as `pkid`, if it was one.
+    fn acked(&mut self, pkid: u16) -> Option<u64> {
+        self.by_packet.remove(&pkid)
+    }
+
+    /// The connection went: the client drops what it had not had
+    /// acknowledged (a clean start), so the lamp sends it again.
+    fn lost(&mut self) {
+        self.in_order.clear();
+        self.by_packet.clear();
+    }
+}
+
+/// The reports due, handed to the client while online, on
+/// `<fd_channel>/report` with the device's id (`crate::reports::topic`).
+fn hand_reports(
+    reports: &Option<Arc<crate::reports::Shared>>,
+    client: &AsyncClient,
+    account: &Account,
+    id: &str,
+    handed: &mut Handed,
+) {
+    let Some(shared) = reports else {
+        return;
+    };
+    let topic = crate::reports::topic(account.fd_channel.as_str());
+    for (seq, bytes) in shared.with(|reports| reports.due(id)) {
+        if !handed.publish(client, &topic, bytes, Some(seq)) {
+            shared.with(|reports| reports.unhand(Some(seq)));
+        }
+    }
+}
+
+/// Waits for the reports' wake, or forever without reports.
+async fn woken(reports: &Option<Arc<crate::reports::Shared>>) {
+    match reports {
+        Some(shared) => shared.wake.notified().await,
+        None => std::future::pending().await,
+    }
+}
+
 /// Where `run` says what happens: one line for each change of state.
 pub trait Say {
     fn line(&mut self, line: &str);
@@ -145,6 +223,11 @@ async fn session(
 ) {
     let (client, mut events) = AsyncClient::new(options(account), 64);
     let mut wait = first;
+    // Health and crash reports, with their switch (#1683): handed over only
+    // while connected, and kept until the broker acknowledges them.
+    let reports = lamp.reports();
+    let mut handed = Handed::default();
+    let mut connected = false;
     // Pieces of the answers to texts, looked for between the broker's
     // events (#1673, `crate::chat`).
     let mut tick = tokio::time::interval(crate::chat::TICK);
@@ -173,13 +256,12 @@ async fn session(
                     let me = identity.borrow().clone();
                     for data in lamp.chat_events(crate::chat::now_ms()) {
                         let event = me.data(&now(), "chat.event", &Ok(Some(data))).to_string();
-                        let _ = client.try_publish(
-                            account.fd_channel.as_str(),
-                            QoS::AtLeastOnce,
-                            false,
-                            event,
-                        );
+                        handed.publish(&client, account.fd_channel.as_str(), event, None);
                     }
+                }
+                () = woken(&reports), if connected => {
+                    let id = identity.borrow().id.clone();
+                    hand_reports(&reports, &client, account, &id, &mut handed);
                 }
             }
         };
@@ -188,8 +270,13 @@ async fn session(
                 wait = first;
                 let _ = client.try_subscribe(account.fa_channel.as_str(), QoS::AtLeastOnce);
                 let info = identity.borrow().info(&now()).to_string();
-                let _ =
-                    client.try_publish(account.fd_channel.as_str(), QoS::AtLeastOnce, false, info);
+                handed.publish(&client, account.fd_channel.as_str(), info, None);
+                connected = true;
+                if let Some(shared) = &reports {
+                    shared.with(|reports| reports.connected());
+                }
+                let id = identity.borrow().id.clone();
+                hand_reports(&reports, &client, account, &id, &mut handed);
                 tell(
                     say,
                     format!(
@@ -205,16 +292,24 @@ async fn session(
                 }
                 let me = identity.borrow().clone();
                 if let Some(reply) = reply(&me, lamp, &message.payload, &now()) {
-                    let _ = client.try_publish(
-                        account.fd_channel.as_str(),
-                        QoS::AtLeastOnce,
-                        false,
-                        reply,
-                    );
+                    handed.publish(&client, account.fd_channel.as_str(), reply, None);
+                }
+                // `reports.set` may have put a last word in the queue.
+                hand_reports(&reports, &client, account, &me.id, &mut handed);
+            }
+            Ok(Event::Outgoing(Outgoing::Publish(pkid))) => handed.sent(pkid),
+            Ok(Event::Incoming(Packet::PubAck(ack))) => {
+                if let (Some(seq), Some(shared)) = (handed.acked(ack.pkid), &reports) {
+                    shared.with(|reports| reports.acked(seq));
                 }
             }
             Ok(_) => {}
             Err(error) => {
+                connected = false;
+                handed.lost();
+                if let Some(shared) = &reports {
+                    shared.with(|reports| reports.unhand(None));
+                }
                 // The error names a code or an I/O kind, never the login.
                 tell(say, format!("offline, trying again: {error}"));
                 tokio::time::sleep(wait).await;
@@ -552,6 +647,59 @@ mod tests {
         assert_eq!(refused["status"], "failure");
         assert_eq!(refused["error"], crate::wire::not_here("chat.send"));
         assert!(lamp.texts.is_empty());
+    }
+
+    /// #1683, against the test broker: a report goes on `<fd_channel>/report`
+    /// at QoS 1 with `info`'s id and leaves the queue on the broker's ack;
+    /// one a dropped connection took before its ack goes again on the next.
+    #[tokio::test]
+    async fn reports_go_below_the_channel_and_leave_the_queue_on_the_ack() {
+        for behaves in [Broker::Takes, Broker::DropsOnce] {
+            let places = crate::reports::tests::places("online");
+            std::fs::write(&places.setup, r#"{"share":true,"asked":1}"#).unwrap();
+            let shared = crate::reports::Shared::new(crate::reports::Reports::open(places));
+            shared
+                .with(|reports| {
+                    reports.health(1_792_296_000, None, &crate::reports::Seen::default())
+                })
+                .unwrap();
+            let (port, seen) = broker(behaves, Vec::new()).await;
+            let (accounts_tx, accounts) = watch::channel(Some(account(port)));
+            let (_identity_tx, me) = watch::channel(identity());
+            let reports = shared.clone();
+            let lamp = tokio::spawn(async move {
+                let mut lamp = Fake {
+                    reports: Some(reports),
+                    ..Fake::default()
+                };
+                let mut say = |_: &str| {};
+                run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            });
+            let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+            while shared.with(|reports| reports.queued()) > 0
+                && tokio::time::Instant::now() < deadline
+            {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            drop(accounts_tx);
+            lamp.await.unwrap();
+            assert_eq!(shared.with(|reports| reports.queued()), 0, "acked");
+            let sent = publishes(&seen.lock().unwrap());
+            let reports: Vec<_> = sent
+                .iter()
+                .filter(|(topic, _)| topic == "fd/d-42/report")
+                .collect();
+            assert!(!reports.is_empty(), "{sent:?}");
+            assert!(reports.iter().all(|(_, report)| report["seq"] == 1
+                && report["id"] == "d-42"
+                && report["kind"] == "health"));
+            // Never a reply on the channel itself.
+            assert!(
+                sent.iter()
+                    .filter(|(topic, _)| topic == "fd/d-42")
+                    .all(|(_, reply)| reply["type"] != "report")
+            );
+        }
     }
 
     /// #1673: `poll` makes the connection itself, so the texts' tick beside it

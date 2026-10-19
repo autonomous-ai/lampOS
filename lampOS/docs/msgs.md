@@ -473,3 +473,17 @@ are not carried yet: a bus message is at most 60,000 bytes. A `ChatIn`
 lasts `CHAT_ANSWER_WITHIN` (60 s), the minute `lamp-cloud` waits for its
 answer before it ends the run, so one still queued after that is passed
 over, never answered (the reviewer on #1713).
+
+## The reports contract
+
+Added by Jarvis on 2026-10-19 (#1683). The types live in `src/reports.rs`
+and are re-exported at the crate root; `reports_topics()` and
+`declaration_of()` find their topics, and `first_topics()` is unchanged.
+
+| Type | Topic | Kind | Period / lifespan | Meaning |
+|---|---|---|---|---|
+| `ReportsRequest` | `reports/request` | event | none / none | A part asks for health and crash reports to stop: `share`. `lamp-cloud` takes only `false` from the bus, which anything on the lamp can write ([cloud.md](cloud.md), "Health and crash reports") |
+| `ReportsState` | `reports/state` | latest | 5 s / 15 s | Whether reports are being sent (`share`: the switch on and the person's yes) and how many wait (`queued`) |
+
+Published by the voice's `reports_stop` (`reports/request`) and
+`lamp-cloud` (`reports/state`), only with `LAMP_REPORTS=on`.

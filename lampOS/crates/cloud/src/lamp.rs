@@ -66,6 +66,8 @@ pub struct Real {
     pub ring: Ring,
     /// Texts from the app and the answers to them (#1673).
     pub texts: Texts,
+    /// Health and crash reports, with `LAMP_REPORTS=on` (#1683).
+    pub reports: Option<std::sync::Arc<crate::reports::Shared>>,
 }
 
 /// Texts from the app (`crate::chat`, #1673): whether they are taken, the
@@ -511,6 +513,10 @@ impl Lamp for Real {
         self.texts.on && self.bus.is_some()
     }
 
+    fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
+        self.reports.clone()
+    }
+
     fn new_run(&mut self, now_ms: u64) -> String {
         self.texts.stream.new_run(now_ms)
     }
@@ -646,6 +652,7 @@ mod tests {
             wifi: Wifi::default(),
             ring: Ring::default(),
             texts: Texts::default(),
+            reports: None,
         };
         let level = Volume {
             volume: 35,
@@ -754,6 +761,7 @@ mod tests {
             wifi: Wifi::default(),
             ring: Ring::default(),
             texts: Texts::default(),
+            reports: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
         // No ring yet.
