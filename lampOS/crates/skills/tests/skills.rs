@@ -7,8 +7,8 @@ use lamp_msgs::{
     Priority, SkillEvent, SkillStage, Speech, VoiceState,
 };
 use lamp_skills::{
-    Admission, BODY_STEP_US, CLIP_GAP_US, Call, Engine, clip_us, load, load_all, read_recordings,
-    run_tests, tools_file,
+    Admission, BODY_STEP_US, CLIP_GAP_US, Call, Engine, Permissions, SkillKind, clip_us, load,
+    load_all, read_recordings, run_tests, tools_file,
 };
 use std::{
     ffi::OsStr,
@@ -283,6 +283,421 @@ fn the_loader_refuses_what_it_cannot_do() {
     assert!(load(&skill).unwrap_err().contains("folder"));
 }
 
+/// A copy of the repository's skill `name` in `dir`, with `from` in its
+/// `skill.toml` changed to `to`.
+fn repo_skill_with(dir: &Path, name: &str, from: &str, to: &str) -> PathBuf {
+    let skill = dir.join(name);
+    copy(&skills_root().join(name), &skill);
+    let toml = fs::read_to_string(skill.join("skill.toml")).unwrap();
+    assert!(toml.contains(from), "{name}: {from}");
+    fs::write(skill.join("skill.toml"), toml.replacen(from, to, 1)).unwrap();
+    skill
+}
+
+/// The owner, 19 Oct: core skills are always on the lamp, as a phone's own
+/// apps; the rest are installed. Desk tutor and its marks wait for the full
+/// look in the product. Every one says its version.
+#[test]
+fn every_skill_folder_says_its_kind_and_version() {
+    let (skills, errors) = load_all(&skills_root());
+    assert!(errors.is_empty(), "{errors:?}");
+    let named = |kind| -> Vec<&str> {
+        skills
+            .iter()
+            .filter(|skill| skill.kind == kind)
+            .map(|skill| skill.name.as_str())
+            .collect()
+    };
+    assert_eq!(
+        named(SkillKind::Core),
+        [
+            "dance",
+            "reminders",
+            "stretch-break",
+            "stuffy-air",
+            "task-news",
+            "welcome-back"
+        ]
+    );
+    assert_eq!(
+        named(SkillKind::Installable),
+        ["desk-tutor", "desk-tutor-marks"]
+    );
+    for skill in &skills {
+        assert_eq!(skill.version.as_deref(), Some("1.0.0"), "{}", skill.name);
+    }
+}
+
+/// `kind` is core or installable, installable when it says none; a version
+/// is three whole numbers.
+#[test]
+fn a_skills_kind_and_version_are_read_and_checked() {
+    let dir = tempfile::tempdir().unwrap();
+    let with = |name: &str, line: &str| {
+        skill_with(
+            dir.path(),
+            name,
+            &format!("{line}\n{}", AT_ONCE.trim_start()),
+        )
+    };
+    assert_eq!(
+        load(&with("plain", "")).unwrap().kind,
+        SkillKind::Installable
+    );
+    assert_eq!(
+        load(&with("own", "kind = \"core\"")).unwrap().kind,
+        SkillKind::Core
+    );
+    assert_eq!(
+        load(&with(
+            "theirs",
+            "kind = \"installable\"\nversion = \"2.13.0\""
+        ))
+        .unwrap()
+        .version
+        .as_deref(),
+        Some("2.13.0")
+    );
+    let error = load(&with("app", "kind = \"app\"")).unwrap_err();
+    assert!(error.contains("\"core\" or \"installable\""), "{error}");
+    for version in ["1.0", "1.0.0.0", "01.0.0", "1.0.0-beta", "v1.0.0", ""] {
+        let error = load(&with("versioned", &format!("version = {version:?}"))).unwrap_err();
+        assert!(error.contains("MAJOR.MINOR.PATCH"), "{version}: {error}");
+    }
+}
+
+/// Least privilege: a skill reads and does only what its `[permissions]`
+/// lists; one that reads or does more is not loaded, and why says what it
+/// lacks.
+#[test]
+fn a_skill_reads_and_does_only_what_its_permissions_declare() {
+    let dir = tempfile::tempdir().unwrap();
+    for (skill, from, to, why) in [
+        (
+            "welcome-back",
+            "topics = [\"humans/faces/tracked\", \"voice/state\"]",
+            "topics = [\"humans/faces/tracked\"]",
+            "not permitted: a [[while]] reads voice/state, and voice/state is not in [permissions] topics",
+        ),
+        (
+            "welcome-back",
+            "topics = [\"humans/faces/tracked\", \"voice/state\"]",
+            "topics = [\"voice/state\"]",
+            "not permitted: a trigger reads humans/faces/tracked",
+        ),
+        (
+            "welcome-back",
+            "speak = true\n",
+            "",
+            "not permitted: say needs speak = true in [permissions]",
+        ),
+        (
+            "welcome-back",
+            "light = true\n",
+            "",
+            "not permitted: light needs light = true in [permissions]",
+        ),
+        (
+            "welcome-back",
+            "body = true\n",
+            "",
+            "not permitted: body.gaze needs body = true in [permissions]",
+        ),
+        // A look at a face reads the faces, whatever starts the skill.
+        (
+            "reminders",
+            "topics = [\"schedule/due\", \"humans/faces/tracked\", \"voice/state\"]",
+            "topics = [\"schedule/due\", \"voice/state\"]",
+            "not permitted: a look at a face reads humans/faces/tracked",
+        ),
+        // What was heard is a person's words: [again] needs them declared.
+        (
+            "dance",
+            "topics = [\"voice/heard\"]",
+            "topics = []",
+            "not permitted: [again] reads voice/heard",
+        ),
+        (
+            "dance",
+            "body = true\n",
+            "",
+            "not permitted: body.gesture needs body = true",
+        ),
+        (
+            "stuffy-air",
+            "light = true\n",
+            "",
+            "not permitted: light needs light = true",
+        ),
+        (
+            "task-news",
+            "speak = true\n",
+            "",
+            "not permitted: say needs speak = true",
+        ),
+        // The camera's picture for the model.
+        (
+            "desk-tutor",
+            "look = true\n",
+            "",
+            "not permitted: look needs look = true",
+        ),
+        (
+            "desk-tutor",
+            "look = true\n",
+            "look = true\ncamera = true\n",
+            "unknown field `camera`",
+        ),
+        (
+            "welcome-back",
+            "\"voice/state\"]",
+            "\"voice/state\", \"Voice/State\"]",
+            "\"Voice/State\" is not a topic",
+        ),
+        (
+            "welcome-back",
+            "\"voice/state\"]",
+            "\"voice/state\", \"voice/state\"]",
+            "[permissions] topics lists one twice",
+        ),
+        (
+            "welcome-back",
+            "speak = true\n",
+            "speak = true\nactions = [\"Volume-Up\"]\n",
+            "\"Volume-Up\" is not a function",
+        ),
+    ] {
+        let folder = dir
+            .path()
+            .join(why.replace([' ', '/', '[', ']', '"', '`'], "_"));
+        let copied = repo_skill_with(&folder, skill, from, to);
+        let error = load(&copied).unwrap_err();
+        assert!(error.contains(why), "{skill}: {to}: {error}");
+    }
+    // No table at all: it may do nothing, so a skill that does anything is
+    // refused, its first read first.
+    let skill = skill_with(dir.path(), "none", "[permissions]\n");
+    fs::write(skill.join("skill.toml"), AT_ONCE).unwrap();
+    let error = load(&skill).unwrap_err();
+    assert!(error.contains("not permitted: a trigger reads"), "{error}");
+    // Declaring more than it reads is allowed; the program subscribes only
+    // to what it reads.
+    let skill = repo_skill_with(
+        &dir.path().join("more"),
+        "welcome-back",
+        "\"voice/state\"]",
+        "\"voice/state\", \"air/state\"]",
+    );
+    let engine = Engine::new(vec![load(&skill).unwrap()], true);
+    assert_eq!(engine.topics(), ["humans/faces/tracked", "voice/state"]);
+}
+
+/// A skill that has the voice say the person's reminder or the news of
+/// their work reads those words, so it declares their topic: a skill
+/// started by the air could otherwise say the person's reminders at its own
+/// moment (the reviewer on #1698, 08:39). It reads them through the voice,
+/// so the program does not listen to the topic for it.
+#[test]
+fn a_say_of_the_persons_reminder_or_task_news_reads_its_topic() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = |topics: &str, from: &str| {
+        format!(
+            "[permissions]\ntopics = [{topics}]\nspeak = true\n\
+             [trigger]\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\n\
+             [ask]\npolicy = \"reminder\"\n\
+             [[do]]\nsay = {{ from = \"{from}\" }}\n"
+        )
+    };
+    for (from, topic) in [("schedule", "schedule/due"), ("tasks", "tasks/status")] {
+        let skill = skill_with(
+            &dir.path().join(from),
+            "stuffy-says",
+            &toml("\"air/state\"", from),
+        );
+        let error = load(&skill).unwrap_err();
+        assert_eq!(
+            error,
+            format!(
+                "not permitted: a say from {from} reads {topic}, and {topic} is not in [permissions] topics"
+            )
+        );
+        let skill = skill_with(
+            &dir.path().join(format!("{from}-declared")),
+            "stuffy-says",
+            &toml(&format!("\"air/state\", \"{topic}\""), from),
+        );
+        let engine = Engine::new(vec![load(&skill).unwrap()], true);
+        assert_eq!(engine.topics(), ["air/state"]);
+    }
+    // Reminders and Task news say those words, and declare them.
+    for name in ["reminders", "task-news"] {
+        load(&skills_root().join(name)).unwrap();
+    }
+}
+
+/// A function the model calls is one skill's. The reviewer's probe on
+/// #1698 (08:39): an installable `a-dance` with `tool = "dance"`, first by
+/// folder, took core Dance's function from the model without a word. Core
+/// skills take their tools' names first, then the installable ones by
+/// folder, and a skill whose tool's name is taken is not loaded, with why.
+#[test]
+fn a_tool_is_one_skills_a_core_skills_first() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    copy(&skills_root().join("dance"), &skills.join("dance"));
+    let installable = |name: &str, tool: &str| {
+        skill_with(
+            &skills,
+            name,
+            &format!(
+                "tool = \"{tool}\"\n[permissions]\nspeak = true\n[[do]]\nsay = \"Say you will.\"\n"
+            ),
+        )
+    };
+    installable("a-dance", "dance");
+    installable("b-wiggle", "wiggle");
+    installable("c-wiggle", "wiggle");
+    let (loaded, errors) = load_all(&skills);
+    let names: Vec<&str> = loaded.iter().map(|skill| skill.name.as_str()).collect();
+    assert_eq!(names, ["b-wiggle", "dance"]);
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert!(
+        errors[0].ends_with(
+            "a-dance: its tool \"dance\" is the core skill dance's: a function the model calls is one skill's, \
+             a core skill's first"
+        ),
+        "{errors:?}"
+    );
+    assert!(
+        errors[1].ends_with("c-wiggle: its tool \"wiggle\" is the installable skill b-wiggle's: a function the model calls is one skill's, a core skill's first"),
+        "{errors:?}"
+    );
+    let tools = tools_file(&loaded);
+    let dance: Vec<&serde_json::Value> = tools["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|tool| tool["name"] == "dance")
+        .collect();
+    assert_eq!(dance.len(), 1);
+    assert!(
+        dance[0]["description"]
+            .as_str()
+            .unwrap()
+            .starts_with("When someone asks the lamp to dance"),
+        "{tools}"
+    );
+    let mut engine = Engine::new(loaded, true);
+    assert_eq!(
+        engine
+            .tool("dance", &serde_json::Value::Null, 0)
+            .unwrap()
+            .skill,
+        "dance"
+    );
+    // The list says so too, as the program loads them.
+    let listed = lamp_skills::package::list(&skills).unwrap();
+    let line = listed
+        .lines()
+        .find(|line| line.starts_with("a-dance "))
+        .unwrap();
+    assert!(
+        line.contains("not loaded: its tool \"dance\" is the core skill dance's"),
+        "{listed}"
+    );
+}
+
+/// The gate itself, as the program asks it where each call leaves: the
+/// body, the light, the voice and the look each need their permission, and
+/// the actions part's functions are the light's with `light`, any other only
+/// by name.
+#[test]
+fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
+    let none = Permissions::default();
+    let calls = [
+        (Call::Gaze { face: None }, "body"),
+        (Call::Gesture("nod".into()), "body"),
+        (
+            Call::Mood {
+                mood: "reading".into(),
+                lasting_us: 1_000_000,
+            },
+            "body",
+        ),
+        (
+            Call::Light {
+                colour: "warm".into(),
+                level: None,
+                lasting: None,
+                pattern: None,
+            },
+            "light",
+        ),
+        (
+            Call::Dim {
+                steps: 1,
+                until_ends: false,
+            },
+            "light",
+        ),
+        (Call::Say("Hello.".into()), "speak"),
+        (Call::SayFrom(lamp_skills::Source::Tasks, Some(3)), "speak"),
+        (
+            Call::Sound {
+                name: "ding".into(),
+                path: "/x/ding.wav".into(),
+            },
+            "speak",
+        ),
+        (Call::Look, "look"),
+    ];
+    for (call, key) in &calls {
+        let why = none.refuses(call).unwrap();
+        assert!(why.contains(&format!("needs {key} = true")), "{why}");
+        let given = Permissions {
+            speak: *key == "speak",
+            light: *key == "light",
+            body: *key == "body",
+            look: *key == "look",
+            ..Permissions::default()
+        };
+        assert_eq!(given.refuses(call), None, "{call:?}");
+        // Only that one: every other key's calls are still refused.
+        for (other, other_key) in &calls {
+            if other_key != key {
+                assert!(given.refuses(other).is_some(), "{key} gave {other:?}");
+            }
+        }
+    }
+    assert_eq!(none.refuses(&Call::AfterSay), None);
+    assert_eq!(none.refuses(&Call::Ends), None);
+    assert!(none.refuses_reading("voice/state").is_some());
+    let lit = Permissions {
+        light: true,
+        topics: vec!["voice/state".into()],
+        ..Permissions::default()
+    };
+    assert_eq!(lit.refuses_reading("voice/state"), None);
+    assert!(lit.refuses_reading("voice/heard").is_some());
+    for name in lamp_skills::LIGHT_ACTIONS {
+        assert!(none.refuses_action(name).unwrap().contains("light = true"));
+        assert_eq!(lit.refuses_action(name), None);
+    }
+    assert!(
+        lit.refuses_action("volume_up")
+            .unwrap()
+            .contains("not in [permissions] actions")
+    );
+    let named = Permissions {
+        actions: vec!["volume_up".into()],
+        ..Permissions::default()
+    };
+    assert_eq!(named.refuses_action("volume_up"), None);
+    assert!(named.refuses_action("light_colour").is_some());
+    assert_eq!(none.said(), "nothing");
+    assert_eq!(lit.said(), "reads voice/state; light");
+}
+
 /// A WAV of `frames` frames of a steady `level`, as `spec` says.
 fn wav(path: &Path, spec: hound::WavSpec, frames: usize, level: i16) {
     fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -409,7 +824,7 @@ fn a_short_sound_loads_and_a_long_loud_or_other_one_is_refused_with_why() {
             "sound, in a skill with a tool",
         ),
     ] {
-        fs::write(skill.join("skill.toml"), CHIMES.replace(from, to)).unwrap();
+        fs::write(skill.join("skill.toml"), granted(&CHIMES.replace(from, to))).unwrap();
         let error = load(&skill).unwrap_err();
         assert!(error.contains(why), "{to}: {error}");
     }
@@ -1120,7 +1535,24 @@ fn the_program_does_nothing_without_the_skip() {
     );
 }
 
-/// A skill folder named `name` in `dir` with this `skill.toml`.
+/// Everything the tests' own skills read and use, for the tests of other
+/// things than permissions: a skill without `[permissions]` may do nothing.
+const GRANTED: &str = "\n[permissions]\n\
+                       topics = [\"air/indoor\", \"air/state\", \"humans/faces/tracked\", \"schedule/due\", \
+                       \"tasks/status\", \"voice/heard\", \"voice/state\"]\n\
+                       speak = true\nlight = true\nbody = true\nlook = true\n";
+
+/// `toml` with [`GRANTED`], unless it says its own `[permissions]`.
+fn granted(toml: &str) -> String {
+    if toml.contains("[permissions]") {
+        toml.to_owned()
+    } else {
+        format!("{toml}{GRANTED}")
+    }
+}
+
+/// A skill folder named `name` in `dir` with this `skill.toml`, given
+/// everything it uses unless it says its own `[permissions]`.
 fn skill_with(dir: &Path, name: &str, toml: &str) -> PathBuf {
     let skill = dir.join(name);
     fs::create_dir_all(&skill).unwrap();
@@ -1129,7 +1561,7 @@ fn skill_with(dir: &Path, name: &str, toml: &str) -> PathBuf {
         format!("---\nname: {name}\ndescription: A test.\n---\n"),
     )
     .unwrap();
-    fs::write(skill.join("skill.toml"), toml).unwrap();
+    fs::write(skill.join("skill.toml"), granted(toml)).unwrap();
     skill
 }
 
@@ -1875,6 +2307,157 @@ fn an_expired_queued_call_is_never_committed() {
     let taken = Admission::default();
     assert!(taken.commit());
     assert!(!taken.cancel());
+}
+
+/// The owner, 19 Oct: installable skills go on and off a running lamp.
+/// Desk tutor, packed for the Store and installed beside Dance, a core
+/// skill, reaches the voice's functions at the program's next look at its
+/// folder, and goes again when removed; the program is never restarted,
+/// and Dance can't be removed.
+#[test]
+fn an_installable_skill_goes_on_and_off_a_running_lamp_with_nothing_restarted() {
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("si")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    let skills = root.join("skills");
+    copy(&skills_root().join("dance"), &skills.join("dance"));
+    let tools = root.join("tools");
+    let clock = Clock::at(root);
+    let mut running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                skills.as_os_str(),
+                "--bus-root".as_ref(),
+                root.join("bus").as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+            ])
+            .args(clock.args())
+            .spawn()
+            .unwrap(),
+    );
+    clock.started();
+    let functions = || -> Vec<String> {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            // Written whole (renamed into place) or removed.
+            match fs::read_to_string(tools.join("tools.json")) {
+                Ok(text) => {
+                    let file: serde_json::Value = serde_json::from_str(&text).unwrap();
+                    return file["tools"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|tool| tool["name"].as_str().unwrap().to_owned())
+                        .collect();
+                }
+                Err(_) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(20))
+                }
+                Err(error) => panic!("no tools file: {error}"),
+            }
+        }
+    };
+    let settled = |wanted: &[&str]| {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            let now = functions();
+            if now == wanted {
+                return;
+            }
+            assert!(Instant::now() < deadline, "{now:?}, not {wanted:?}");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    };
+    settled(&["dance"]);
+    let command = |args: &[&OsStr]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args(args)
+            .output()
+            .unwrap();
+        (
+            out.status.code(),
+            String::from_utf8_lossy(&out.stdout).into_owned(),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+        )
+    };
+    let source = root.join("src/desk-tutor");
+    copy(&skills_root().join("desk-tutor"), &source);
+    let (code, said, _) = command(&[
+        "pack".as_ref(),
+        "--out".as_ref(),
+        root.as_os_str(),
+        source.as_os_str(),
+    ]);
+    assert_eq!(code, Some(0));
+    let package = root.join("desk-tutor-1.0.0.tar");
+    assert_eq!(said.trim(), format!("packed {}", package.display()));
+    let (code, said, error) = command(&[
+        "install".as_ref(),
+        "--dir".as_ref(),
+        skills.as_os_str(),
+        package.as_os_str(),
+    ]);
+    assert_eq!(code, Some(0), "{error}");
+    assert!(said.starts_with("installed desk-tutor 1.0.0"), "{said}");
+    clock.skip(RELOAD);
+    // In folder order: Dance's, then Desk tutor's.
+    settled(&["dance", "check_my_work"]);
+    let (code, listed, _) = command(&["list".as_ref(), "--dir".as_ref(), skills.as_os_str()]);
+    assert_eq!(code, Some(0));
+    let mut lines: Vec<&str> = listed.lines().collect();
+    // Last, what the skills give the model, against a session's room.
+    let functions = lines.pop().unwrap_or_default();
+    assert!(
+        functions.starts_with(
+            "The skills here give the model 2 functions (dance, check_my_work). A session takes 32"
+        ),
+        "{listed}"
+    );
+    assert!(said.contains(functions), "{said}");
+    let listed: Vec<Vec<&str>> = lines
+        .iter()
+        .map(|line| line.split_whitespace().take(3).collect())
+        .collect();
+    assert_eq!(
+        listed,
+        [
+            ["NAME", "KIND", "VERSION"],
+            ["dance", "core", "1.0.0"],
+            ["desk-tutor", "installable", "1.0.0"]
+        ]
+    );
+    // A core skill stays, and says why.
+    let (code, said, error) = command(&[
+        "remove".as_ref(),
+        "--dir".as_ref(),
+        skills.as_os_str(),
+        "dance".as_ref(),
+    ]);
+    assert_eq!((code, said.as_str()), (Some(1), ""));
+    assert_eq!(
+        error.trim(),
+        "lamp-skills: dance is a core skill: it comes with the lamp and can't be removed"
+    );
+    let (code, said, error) = command(&[
+        "remove".as_ref(),
+        "--dir".as_ref(),
+        skills.as_os_str(),
+        "desk-tutor".as_ref(),
+    ]);
+    assert_eq!(code, Some(0), "{error}");
+    assert!(said.starts_with("removed desk-tutor"), "{said}");
+    clock.skip(RELOAD);
+    settled(&["dance"]);
+    // The same program throughout.
+    assert!(running.0.try_wait().unwrap().is_none());
+    let (code, _, error) = command(&["install".as_ref()]);
+    assert_eq!(code, Some(2));
+    assert!(error.contains("lamp-skills install [--dir DIR]"), "{error}");
 }
 
 #[test]
@@ -2812,7 +3395,7 @@ fn a_skills_own_move_loads_as_the_body_takes_it_and_a_bad_one_is_refused_with_wh
         ("body = { move = \"../sway\" }", "not a file name in moves/"),
     ] {
         let toml = AT_ONCE.replace("body = { look_at = \"face\" }", step);
-        fs::write(skill.join("skill.toml"), toml).unwrap();
+        fs::write(skill.join("skill.toml"), granted(&toml)).unwrap();
         let error = load(&skill).unwrap_err();
         assert!(error.contains(why), "{step}: {error}");
     }

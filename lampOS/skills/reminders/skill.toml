@@ -3,6 +3,18 @@
 # keeps the reminder's words and its delivery (#939, (c)): this says when,
 # and looks.
 needs = ["voice", "eyes", "body"]
+# Comes with the lamp and is always there (docs/skills.md, "Core and
+# installable skills"): a reminder someone set is said when it is due.
+kind = "core"
+version = "1.0.0"
+
+# What it may read and use, and nothing more: what is due, the faces to
+# look up at, the voice's state (#1667 waits for a talk to end on it), the
+# look and the voice's reminder.
+[permissions]
+topics = ["schedule/due", "humans/faces/tracked", "voice/state"]
+speak = true
+body = true
 
 [trigger]
 topic = "schedule/due"

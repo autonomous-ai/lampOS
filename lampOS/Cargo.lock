@@ -2117,8 +2117,11 @@ dependencies = [
  "lamp-local-time",
  "lamp-msgs",
  "lamp-voice",
+ "libc",
  "serde",
  "serde_json",
+ "sha2",
+ "tar",
  "tempfile",
  "toml",
 ]

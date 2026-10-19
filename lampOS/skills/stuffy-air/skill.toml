@@ -4,6 +4,18 @@
 # skill's. Written to lamp-skills' schema (docs/skills.md, "The schema, as
 # lamp-skills reads it").
 needs = ["air", "body", "light"]
+# Comes with the lamp and is always there (docs/skills.md, "Core and
+# installable skills"): on a lamp whose sensor doesn't answer it does
+# nothing.
+kind = "core"
+version = "1.0.0"
+
+# What it may read and use, and nothing more: the air, the voice's state,
+# the droop and a shade of dim. It never speaks.
+[permissions]
+topics = ["air/state", "voice/state"]
+light = true
+body = true
 
 [trigger]
 topic = "air/state"

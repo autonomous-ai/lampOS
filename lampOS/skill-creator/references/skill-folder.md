@@ -40,6 +40,12 @@ description is always in the lamp's instructions; keep it to one line.
 
 ```toml
 needs = ["eyes", "body"]            # the parts it uses: eyes, ears, air, voice, body, light, ...
+kind = "installable"                # an owner's skill is always installable; core ones come with the lamp
+version = "1.0.0"                   # MAJOR.MINOR.PATCH; a package needs it
+
+[permissions]                       # what it may read and use, and nothing else
+topics = ["humans/faces/tracked", "voice/state"]   # every topic its trigger and conditions read
+body = true                         # the look at the face and the stretch
 
 [trigger]                           # what starts it
 topic = "humans/faces/tracked"      # on faces, no field: it holds while a face is in view
@@ -63,6 +69,26 @@ body = { look_at = "face" }
 [[do]]
 body = { gesture = "stretching" }
 ```
+
+### What it may use (`[permissions]`)
+
+**A skill without `[permissions]` may do nothing**, and the runtime refuses
+one that reads or does anything its permissions do not give, saying what it
+lacks in its journal. Give exactly what the skill uses, no more: the owner
+sees the list (`lamp-skills list`), and so will the Store.
+
+| Key | Gives |
+|---|---|
+| `topics` | The topics it reads: each one a trigger or a `[[while]]` names, `humans/faces/tracked` for `body = { look_at = "face" }`, `voice/heard` for a tool's `[again]`, `schedule/due` for `say = { from = "schedule" }` and `tasks/status` for `say = { from = "tasks" }` |
+| `speak` | `say` (a note or `{ from = ... }`) and `sound` |
+| `light` | `light` steps |
+| `body` | `look_at`, `gesture`, `move`, `mood` |
+| `look` | `look = true`: the camera's picture goes to the model |
+| `actions` | The actions part's functions called by name. No step calls one yet: leave it out |
+
+`kind` is `installable` for every skill an owner makes (leave it out, or
+write it). `core` is for the skills that come with the lamp; the runtime's
+`lamp-skills install` refuses one.
 
 ### The trigger (`[trigger]`)
 
@@ -105,6 +131,11 @@ description.
 needs = ["eyes", "voice", "light"]
 tool = "check_my_work"              # a lowercase letter, then lowercase letters, digits and _, at most 48
 
+[permissions]
+speak = true
+light = true
+look = true
+
 [[do]]
 light = { colour = "white", for = "20s" }
 look = true                         # the voice's full look at what is in front of the lamp
@@ -113,6 +144,8 @@ say = "Tutor: a hint or a question, never the answer."
 
 - The `SKILL.md` description is what the model reads to decide when to call
   it: say **when to call**, in the person's words, at most 1,024 bytes.
+- The `tool` name is the skill's alone on the lamp: one another skill
+  already has (`dance`, `check_my_work`, `show_verdict`) is refused.
 - No trigger, no `[ask]`. Its `[[while]]` conditions still hold it back.
 - **A tool takes no arguments.** "Focus for 25 minutes" cannot pass the 25:
   a number the person says is for the voice's own tools (a timer is the
