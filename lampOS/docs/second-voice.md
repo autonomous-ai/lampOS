@@ -661,7 +661,8 @@ When the coordinator switches (below):
 
 - **Character:** the instruction of the Live route's `provider.json`
   (`ProviderConfig::instruction`, the version without a camera), then the
-  time and place as a Live session is told them, then the memory note (the
+  time and place (the time as the request is built, "Second only" below),
+  then the memory note (the
   Days note frozen for the process, or the memory writer's, read for each
   turn), then the conversation thread in the room the rest leave of
   16,384 bytes. Built when each turn's chat begins.
@@ -1102,6 +1103,20 @@ after a take-over, but now for every turn:
   Hanoi" was answered "You asking what the weather's like here today?",
   "Night!" came at 1 pm (the character's example), and a poem had two
   lines. A text is typed, not heard, and is not told it.
+- **The time, as it is asked** (`local_time::told_asked_here`, spoken
+  turns and texts): each request is built as it is asked, so it is told
+  the time then, exactly and with the words a person says it in, "It is
+  7:49 in the evening, Monday 19 October 2026. Said aloud: seven
+  forty-nine in the evening.", and to answer the time, the date and "how long
+  until" from it. A Live session is told the time it opened and to call
+  `the_time` first, which on this route cost a round: on lamp-4ace on
+  19 Oct "what time is it?" called it, and that round's first event came
+  2100 ms later; with `LAMP_SECOND_FEW_TOOLS`, `the_time` behind
+  `more_functions`, two rounds. So `the_time` is here only for another
+  place's time (`worker::time_elsewhere`): with `LAMP_TIME_PLACES` it is
+  told `worker::TIME_ELSEWHERE` and needs its place; without it, it is
+  not given. Whether DeepSeek then answers with no call is not yet shown
+  on a lamp.
 - **The lamp's place** (`LAMP_PLACE`, "Hanoi, Vietnam"): told beside the
   time, "You are in Hanoi, Vietnam. When someone asks about the weather,
   the news or anything nearby without naming a place, they mean Hanoi,

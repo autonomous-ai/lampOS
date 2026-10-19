@@ -331,6 +331,18 @@ pub fn told_with_clock(file: &[u8], now: i64) -> Option<String> {
     ))
 }
 
+/// The same for a request built as it is asked (the second route, #1712):
+/// the time then, exactly and in the words a person says it in
+/// ([`said`]), to answer from. On lamp-4ace on 2026-10-19 the second
+/// route, told [`told_with_clock`]'s "call the_time first", spent a round
+/// on "what time is it?" whose first event came 2100 ms later.
+pub fn told_asked(file: &[u8], now: i64) -> Option<String> {
+    Some(format!(
+        "\n\nThe time\n{} Your clock read this as you were asked: when someone asks the time or the date, or how long until something, answer from it.",
+        said(file, now)?
+    ))
+}
+
 /// The time at `now`, exactly, for the model that asked
 /// ([`crate::tools::THE_TIME`]), with the words a person would say it in:
 /// on lamp-4ace on 2026-10-14 the model, given "6:23 in the evening", said
@@ -755,6 +767,22 @@ pub fn told_here(clock: bool, places: bool) -> Option<String> {
     } else {
         told(&file, now)
     }
+}
+
+/// [`told_asked`] for this machine, now; with `places`
+/// (`LAMP_TIME_PLACES`), whose time it is and to ask
+/// [`crate::tools::THE_TIME`] for anywhere else ([`told_place`]).
+pub fn told_asked_here(places: bool) -> Option<String> {
+    if unset_here() {
+        return Some(TOLD_UNSET.to_owned());
+    }
+    let (file, now) = here()?;
+    let told = told_asked(&file, now)?;
+    Some(if places {
+        told + &told_place(zone_here().as_deref())
+    } else {
+        told
+    })
 }
 
 /// The time now where the lamp stands, exactly, in words; `Err` with what
@@ -1252,6 +1280,24 @@ mod tests {
             opening.contains("You woke on Tuesday 13 October 2026, around 11:14 in the morning")
         );
         assert!(opening.contains("call the_time first") && !opening.contains("roughly"));
+    }
+
+    /// #1712: a request built as it is asked (the second route) is told
+    /// the time then, exactly and said aloud, to answer from, never to
+    /// call the_time for it nor that it may be old.
+    #[test]
+    fn a_request_built_as_it_is_asked_is_told_the_time_to_answer_from() {
+        let saigon = zone(b'2', &[], &[25_200], "<+07>-7");
+        assert_eq!(
+            told_asked(&saigon, NOW).unwrap(),
+            "\n\nThe time\nIt is 11:14 in the morning, Tuesday 13 October 2026. Said aloud: eleven fourteen in the morning. Your clock read this as you were asked: when someone asks the time or the date, or how long until something, answer from it."
+        );
+        assert!(
+            told_asked(&saigon, NOW + 33 * 60)
+                .unwrap()
+                .contains("11:47")
+        );
+        assert_eq!(told_asked(b"TZif", NOW), None);
     }
 
     #[test]
