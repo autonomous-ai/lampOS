@@ -445,6 +445,22 @@ impl RoomTold {
         self.talk_only && self.talk_since_spoke >= TALK_ENDS_CONVERSATION
     }
 
+    /// Someone called the lamp for itself in `request` (its name, a face
+    /// turned to it) and the rule let it out (the second route, #1712).
+    /// With [`Self::count_only_talk`], the talk left alone before the call
+    /// ends no conversation the call began, as the lamp speaking ends that
+    /// count, and the call itself, left unanswered, is no talk. On lamp-4ace
+    /// on 19 October the owner's answers were cut before their first word
+    /// by the next line, so the lamp never spoke, the office's talk before
+    /// still counted, and the owner's lines without the name were held.
+    pub fn called(&mut self, request: u64) {
+        if self.talk_only {
+            self.talk_since_spoke = 0;
+            self.other_voice_only = false;
+            self.talk_counted = self.talk_counted.max(request);
+        }
+    }
+
     /// How many lines were left unanswered as talk since the lamp last
     /// spoke, as [`Self::talked_past_the_lamp`] counts them: for the journal.
     pub fn left_alone_since_spoke(&self) -> usize {
@@ -889,6 +905,30 @@ pub fn keep_in(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #1712: a call let out ends the count of talk past the lamp, as the
+    /// lamp speaking does, and is no talk itself if it ends unanswered.
+    #[test]
+    fn a_call_let_out_ends_the_count_of_talk_past_the_lamp() {
+        let mut room = RoomTold::new();
+        room.count_only_talk(true);
+        for request in 1..=3 {
+            room.unanswered(request, 1_000_000 * request);
+        }
+        assert!(room.talked_past_the_lamp());
+        room.called(4);
+        assert!(!room.talked_past_the_lamp());
+        assert_eq!(room.left_alone_since_spoke(), 0);
+        room.unanswered(4, 5_000_000);
+        assert_eq!(room.left_alone_since_spoke(), 0, "the call is no talk");
+        room.unanswered(5, 6_000_000);
+        room.unanswered(6, 7_000_000);
+        assert!(room.talked_past_the_lamp(), "talk after it still counts");
+        // Without the switch, nothing is counted either way.
+        let mut plain = RoomTold::new();
+        plain.called(1);
+        assert!(!plain.talked_past_the_lamp());
+    }
 
     const S: u64 = 1_000_000;
 
