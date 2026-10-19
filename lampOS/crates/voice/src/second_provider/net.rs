@@ -18,7 +18,7 @@ pub use chat::{Chat, ChatEvent, ChatStream, Declare, GEMINI_REASONING, Message, 
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
 pub use sentences::Sentences;
 pub use stt::{Early, Replies, SttStream, check as stt_check};
-pub use tts::{PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream};
+pub use tts::{PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream, default_model};
 
 /// To open a connection, TLS included.
 pub(crate) const CONNECT: Duration = Duration::from_secs(10);

@@ -493,6 +493,10 @@ pub fn services(
     let gemini = config.gemini.clone();
     let hosted = config.hosted.clone();
     let fallback = config.tts_provider.name();
+    let configured_model = config
+        .tts_model
+        .clone()
+        .unwrap_or_else(|| super::net::default_model(config.tts_provider).to_owned());
     let key = (route.chat == Some(ChatRoute::Gemini) || route.gemini_speech)
         .then(|| gemini_key(provider, credentials))
         .transpose()?;
@@ -543,6 +547,9 @@ pub fn services(
                 hosted.deepseek_model
             );
         }
+    }
+    if !route.gemini_speech {
+        eprintln!("lamp-voice second: the voice is {fallback}, model {configured_model}");
     }
     if route.gemini_speech
         && let Some(call) = call(&gemini.speech_model)

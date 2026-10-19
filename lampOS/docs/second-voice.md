@@ -55,6 +55,7 @@ refused (unknown fields are refused).
 | `tts_credential_file` | no | empty or absent: `llm_credential_file` |
 | `tts_provider` | no | `openai` (the default) or `elevenlabs`; anything else is refused |
 | `tts_voice` | no | the voice; absent: OpenAI `nova`, ElevenLabs `Rachel` |
+| `tts_model` | no | the voice's model (letters, digits, `-` `.` `_`); absent: OpenAI `tts-1`, ElevenLabs `eleven_flash_v2_5`. `LAMP_SECOND_SPEECH_MODEL` goes over it (the owner on 19 Oct: "use v4 turbo", `eleven_v4_turbo`) |
 | `llm_extra` | no | fields the chat request also carries, for an OpenAI-compatible endpoint that needs its own (DeepSeek's `{"thinking":{"type":"disabled"}}`, a model's `reasoning_effort`); at most 16, never `model`, `messages`, `stream`, `tools` or `tool_choice` |
 | `gemini_base_url` | no | Google's Gemini API for `LAMP_SECOND_CHAT=gemini` and `LAMP_SECOND_SPEECH=gemini`; absent: `https://generativelanguage.googleapis.com/v1beta` |
 | `gemini_credential_file` | — | no longer read, and refused by name if given: Gemini's key is the voice unit's credential `gemini.key` (below) |

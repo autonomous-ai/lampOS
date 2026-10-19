@@ -30,6 +30,8 @@ struct Raw {
     tts_provider: Option<String>,
     #[serde(default)]
     tts_voice: Option<String>,
+    #[serde(default)]
+    tts_model: Option<String>,
     /// Fields the configured chat request also carries, for an
     /// OpenAI-compatible endpoint that needs its own (a model's reasoning
     /// setting, say). The request's own fields cannot be replaced.
@@ -187,6 +189,9 @@ pub struct SecondConfig {
     pub tts_key: Key,
     pub tts_provider: TtsProvider,
     pub tts_voice: Option<String>,
+    /// The configured voice's model (`tts_model`, or [`SPEECH_MODEL_ENV`]);
+    /// absent, the provider's own default (`net::tts::default_model`).
+    pub tts_model: Option<String>,
     /// `llm_extra`; empty when absent.
     pub llm_extra: serde_json::Map<String, serde_json::Value>,
     pub gemini: Gemini,
@@ -345,6 +350,7 @@ pub fn load_from_path(path: &Path) -> io::Result<SecondConfig> {
         tts_key: key(&tts_file)?,
         tts_provider,
         tts_voice: given(raw.tts_voice),
+        tts_model: given(raw.tts_model).map(gemini_model).transpose()?,
         llm_extra,
         gemini,
     })
@@ -458,7 +464,7 @@ fn gemini_model(name: String) -> io::Result<String> {
     {
         return Err(invalid(
             io::ErrorKind::InvalidInput,
-            "a Gemini model name is letters, digits, '-', '.' and '_'",
+            "a model name is letters, digits, '-', '.' and '_'",
         ));
     }
     Ok(name)
@@ -489,8 +495,13 @@ impl SecondConfig {
         if let Some(url) = given(GEMINI_BASE_URL_ENV)? {
             self.gemini.base_url = checked_url(url).map_err(named(GEMINI_BASE_URL_ENV))?;
         }
+        // The chosen voice's model: Gemini's, or the configured voice's
+        // (ElevenLabs, OpenAI); only the voice in use reads its own (#1712:
+        // the owner, "use v4 turbo").
         if let Some(model) = given(SPEECH_MODEL_ENV)? {
-            self.gemini.speech_model = gemini_model(model).map_err(named(SPEECH_MODEL_ENV))?;
+            let model = gemini_model(model).map_err(named(SPEECH_MODEL_ENV))?;
+            self.gemini.speech_model = model.clone();
+            self.tts_model = Some(model);
         }
         if let Some(terms) = given(KEY_TERMS_ENV)? {
             self.stt_key_terms = key_terms(&terms).map_err(named(KEY_TERMS_ENV))?;
@@ -689,6 +700,18 @@ mod tests {
             .unwrap();
         assert_eq!(set.gemini.base_url, relay);
         assert_eq!(set.gemini.speech_model, "gemini-3.8-flash-tts");
+        assert_eq!(set.tts_model.as_deref(), Some("gemini-3.8-flash-tts"));
+        assert_eq!(route().tts_model, None, "the provider's own default");
+        let (_, turbo) = written(
+            "tts-model",
+            r#","tts_provider":"elevenlabs","tts_model":"eleven_v4_turbo""#,
+        );
+        assert_eq!(
+            load_from_path(&turbo).unwrap().tts_model.as_deref(),
+            Some("eleven_v4_turbo")
+        );
+        let (_, odd) = written("tts-model-odd", r#","tts_model":"../x""#);
+        assert!(load_from_path(&odd).is_err());
         assert_eq!(set.gemini.chat_model, GEMINI_CHAT_MODEL);
         let unset = route().with_environment(|_| Some("".into())).unwrap();
         assert_eq!(unset.gemini, route().gemini);

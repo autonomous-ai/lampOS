@@ -15,6 +15,15 @@ const OPENAI_VOICE: &str = "nova";
 /// lamp-52e6 on 2026-10-15, two sentences each: `eleven_flash_v2_5` 0.60
 /// and 0.68 s to the first audio, `eleven_v4_turbo` (V1's) 0.81 and 1.30 s.
 const ELEVENLABS_MODEL: &str = "eleven_flash_v2_5";
+
+/// The model a provider is asked for when none is set (`tts_model`,
+/// `LAMP_SECOND_SPEECH_MODEL`).
+pub fn default_model(provider: TtsProvider) -> &'static str {
+    match provider {
+        TtsProvider::OpenAi => OPENAI_MODEL,
+        TtsProvider::ElevenLabs => ELEVENLABS_MODEL,
+    }
+}
 const ELEVENLABS_HOSTS: &[&str] = &[
     "api.elevenlabs.io",
     "api.us.elevenlabs.io",
@@ -83,8 +92,10 @@ pub(crate) fn request(
     base_url: &str,
     key: &str,
     voice: Option<&str>,
+    model: Option<&str>,
     text: &str,
 ) -> Result<Option<Request>> {
+    let model = model.unwrap_or(default_model(provider));
     let base = openai_base(base_url);
     let spoken = without_tags(text);
     if spoken.trim().is_empty() {
@@ -98,7 +109,7 @@ pub(crate) fn request(
             header: "authorization",
             value: format!("Bearer {key}"),
             body: json!({
-                "model": OPENAI_MODEL,
+                "model": model,
                 "input": spoken.trim(),
                 "voice": voice.unwrap_or(OPENAI_VOICE),
                 "response_format": "pcm",
@@ -130,7 +141,7 @@ pub(crate) fn request(
                 // speed applies (V1).
                 body: json!({
                     "text": text,
-                    "model_id": ELEVENLABS_MODEL,
+                    "model_id": model,
                     "voice_settings": {"speed": 1.0},
                 }),
             }
@@ -159,16 +170,21 @@ pub struct Tts {
     base_url: String,
     key: String,
     voice: Option<String>,
+    /// The model asked for; absent, the provider's default.
+    model: Option<String>,
 }
 
 impl Tts {
     pub fn new(config: &SecondConfig) -> Result<Self> {
-        Self::with(
-            config.tts_provider,
-            &config.tts_base_url,
-            config.tts_key.expose(),
-            config.tts_voice.as_deref(),
-        )
+        Ok(Self {
+            model: config.tts_model.clone(),
+            ..Self::with(
+                config.tts_provider,
+                &config.tts_base_url,
+                config.tts_key.expose(),
+                config.tts_voice.as_deref(),
+            )?
+        })
     }
 
     pub(crate) fn with(
@@ -183,6 +199,7 @@ impl Tts {
             base_url: base_url.to_owned(),
             key: key.to_owned(),
             voice: voice.map(str::to_owned),
+            model: None,
         })
     }
 
@@ -194,6 +211,7 @@ impl Tts {
             &self.base_url,
             &self.key,
             self.voice.as_deref(),
+            self.model.as_deref(),
             text,
         )?
         else {
@@ -301,13 +319,55 @@ impl Packets {
 mod tests {
     use super::*;
 
+    /// #1712, the owner: "use v4 turbo". The model set is asked for; absent,
+    /// the provider's default.
+    #[test]
+    fn the_model_set_is_asked_for() {
+        let turbo = request(
+            TtsProvider::ElevenLabs,
+            PROXY,
+            "k",
+            None,
+            Some("eleven_v4_turbo"),
+            "Hi.",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(turbo.body["model_id"], "eleven_v4_turbo");
+        let flash = request(TtsProvider::ElevenLabs, PROXY, "k", None, None, "Hi.")
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            flash.body["model_id"],
+            default_model(TtsProvider::ElevenLabs)
+        );
+        let openai = request(
+            TtsProvider::OpenAi,
+            PROXY,
+            "k",
+            None,
+            Some("gpt-4o-mini-tts"),
+            "Hi.",
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(openai.body["model"], "gpt-4o-mini-tts");
+    }
+
     const PROXY: &str = "https://campaign-api.autonomous.ai/api/v1/ai";
 
     #[test]
     fn openai_speech_is_asked_as_v1_did() {
-        let request = request(TtsProvider::OpenAi, PROXY, "k", None, "Hi [laughs] there.")
-            .unwrap()
-            .unwrap();
+        let request = request(
+            TtsProvider::OpenAi,
+            PROXY,
+            "k",
+            None,
+            None,
+            "Hi [laughs] there.",
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(
             request,
             Request {
@@ -322,7 +382,7 @@ mod tests {
 
     #[test]
     fn elevenlabs_goes_through_the_proxy_path_unless_direct() {
-        let proxied = request(TtsProvider::ElevenLabs, PROXY, "k", None, "Hi.")
+        let proxied = request(TtsProvider::ElevenLabs, PROXY, "k", None, None, "Hi.")
             .unwrap()
             .unwrap();
         assert_eq!(
@@ -344,6 +404,7 @@ mod tests {
             "https://api.elevenlabs.io/v1/",
             "k",
             Some("Ngan"),
+            None,
             "Hello.",
         )
         .unwrap()
@@ -352,12 +413,27 @@ mod tests {
             direct.url,
             "https://api.elevenlabs.io/v1/text-to-speech/a3AkyqGG4v8Pg7SWQ0Y3/stream?output_format=pcm_24000"
         );
-        let by_id = request(TtsProvider::ElevenLabs, PROXY, "k", Some("abc123"), "Hi.")
-            .unwrap()
-            .unwrap();
+        let by_id = request(
+            TtsProvider::ElevenLabs,
+            PROXY,
+            "k",
+            Some("abc123"),
+            None,
+            "Hi.",
+        )
+        .unwrap()
+        .unwrap();
         assert!(by_id.url.contains("/text-to-speech/abc123/stream"));
         assert_eq!(
-            request(TtsProvider::ElevenLabs, PROXY, "k", Some("../x"), "Hi.").unwrap_err(),
+            request(
+                TtsProvider::ElevenLabs,
+                PROXY,
+                "k",
+                Some("../x"),
+                None,
+                "Hi."
+            )
+            .unwrap_err(),
             Error::Url
         );
     }
@@ -366,7 +442,7 @@ mod tests {
     fn only_tags_ask_for_nothing() {
         for provider in [TtsProvider::OpenAi, TtsProvider::ElevenLabs] {
             assert_eq!(
-                request(provider, PROXY, "k", None, " [sigh] ").unwrap(),
+                request(provider, PROXY, "k", None, None, " [sigh] ").unwrap(),
                 None
             );
         }
