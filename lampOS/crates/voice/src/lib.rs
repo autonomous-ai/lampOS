@@ -63,6 +63,7 @@ pub mod known_faces;
 pub mod listen_gaps;
 pub mod local_time;
 pub mod marked;
+pub mod messages;
 pub mod mic_holder;
 pub mod misheard_hum;
 pub mod person;

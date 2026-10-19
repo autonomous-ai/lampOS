@@ -579,3 +579,38 @@ fn misheard_hum_is_read_after_cut_in_told() {
         .into();
     assert!(parse_flags(dir, &wrong).is_err());
 }
+
+/// #1673: `--messages` comes after `--misheard-hum` and `--holding-answer`,
+/// on both routes' parsers, as the coordinator passes them.
+#[test]
+fn messages_is_read_after_misheard_hum_and_the_holding_answer() {
+    let dir = std::path::Path::new("/run/test");
+    let all: Vec<String> = [
+        crate::misheard_hum::FLAG,
+        crate::holding_answer::FLAG,
+        crate::messages::FLAG,
+    ]
+    .map(String::from)
+    .into();
+    let (_, _, files, _) = parse_flags(dir, &all).unwrap();
+    assert!(files.misheard_hum && files.holding_answer && files.messages);
+    let held_first: Vec<String> = [crate::messages::FLAG, crate::holding_answer::FLAG]
+        .map(String::from)
+        .into();
+    assert!(parse_flags(dir, &held_first).is_err());
+    let flags: Vec<String> = [crate::misheard_hum::FLAG, crate::messages::FLAG]
+        .map(String::from)
+        .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.misheard_hum && files.messages);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert!(files.messages);
+    let (_, _, files, _) = parse_flags(dir, &flags[1..]).unwrap();
+    assert!(files.messages && !files.misheard_hum);
+    let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
+    assert!(!files.messages);
+    let wrong: Vec<String> = [crate::messages::FLAG, crate::misheard_hum::FLAG]
+        .map(String::from)
+        .into();
+    assert!(parse_flags(dir, &wrong).is_err());
+}

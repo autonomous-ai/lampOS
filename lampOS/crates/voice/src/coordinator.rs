@@ -2884,6 +2884,7 @@ fn provider_arguments(
     if crate::holding_answer::on() {
         arguments.push(crate::holding_answer::FLAG.to_owned());
     }
+    arguments.extend(crate::messages::arguments_from_environment());
     if let Some(camera) = camera {
         arguments.extend(camera.source.arguments());
     }
@@ -2920,6 +2921,13 @@ fn spawn_rig(
     let routes = second::routes_from_environment(
         lifetime.continuous() && matches!(source, ProviderSource::Gemini(_)),
     )?;
+    // Texts are answered by the second route's worker (#1673): without it,
+    // `lamp-cloud` refuses each one, and the journal says why, once.
+    if crate::messages::on_from_environment() && !routes.has_second() {
+        eprintln!(
+            "lamp-voice: LAMP_MESSAGES=on, but texts need the second route (LAMP_VOICE_SECOND_CONFIG), which is not set: each text is refused"
+        );
+    }
     let arguments = provider_arguments(
         source,
         &options,
