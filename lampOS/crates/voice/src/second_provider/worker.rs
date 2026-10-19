@@ -3458,6 +3458,63 @@ mod tests {
         assert!(!place.accounts && !place.machine_names);
     }
 
+    /// Tests' map on #1712 (20:11), (2): `LAMP_ROOM_FILE` on the second route
+    /// as the only voice. The room this route keeps (`keeping_room`) goes to
+    /// its file at the worker's tick, and the next worker in the same boot
+    /// starts from it: a busy room is still busy. The room is kept under the
+    /// machine's boot (`room_told::MACHINE_BOOT_FILE`), which only Linux has,
+    /// so elsewhere this says so and checks nothing. In tests the room is
+    /// the thread's own, so each worker is a thread of its own.
+    #[test]
+    fn as_the_only_voice_the_room_goes_to_its_file_and_the_next_worker_starts_from_it() {
+        if !Path::new(crate::room_told::MACHINE_BOOT_FILE).exists() {
+            eprintln!(
+                "no machine boot file here (not Linux): the room is not kept, nothing checked"
+            );
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-second-room-file-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("room.json");
+        let first = path.clone();
+        std::thread::spawn(move || {
+            let mut tick = super::keeping_room(false, false, Some(&first), None);
+            let now = monotonic_us();
+            {
+                let mut room = crate::room_told::room().lock().unwrap();
+                for request in 1..=3 {
+                    room.heard(request, now);
+                    room.ended(request, now);
+                    room.unanswered(request, now);
+                }
+                assert_eq!(room.at(now), crate::room_told::Room::Busy);
+            }
+            tick(now);
+        })
+        .join()
+        .unwrap();
+        assert!(path.exists(), "the room went to its file");
+        let second = path.clone();
+        let taken = std::thread::spawn(move || {
+            let _tick = super::keeping_room(false, false, Some(&second), None);
+            let mut room = crate::room_told::room().lock().unwrap();
+            room.at(monotonic_us())
+        })
+        .join()
+        .unwrap();
+        assert_eq!(
+            taken,
+            crate::room_told::Room::Busy,
+            "the next worker's room"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// Tests' map on #1712 (20:11), (2): `LAMP_ATTENTION=busy-near` on the
     /// second route. With `--attention-near` this route samples the room
     /// microphone's rise over its quiet from the bus (`ears/level`,
