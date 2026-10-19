@@ -359,7 +359,7 @@ fn said_ahead_the_lamps_sound_reaches_the_planner_in_time() {
 fn the_held_turn_pair_is_taken_whole_by_the_rest_catalogue() {
     use lamp_voice::expression_out::{Resumable, ResumableSaid};
     let catalogue =
-        Catalogue::from_json(include_str!("../../expression/rest-behaviours.json")).unwrap();
+        Catalogue::from_json(include_str!("../../../expression/rest-behaviours.json")).unwrap();
     let mut engine = Engine::new(catalogue, true, BOOT).unwrap();
     let mut timing = Timing::new(BOOT, "voice-run-1");
     let mut second = Resumable::default();

@@ -57,7 +57,8 @@ The group is a nextest filterset, written twice in `.config/nextest.toml`
 identical. Until 2026-10-17 it was written a third time, as the `pr`
 profile's exclusion:
 
-- the whole test binary `lamp-voice::capture_hold_worker` (the evaluator's
+- `lamp-voice`'s `capture_hold_worker` tests, a module of its one integration
+  binary since #1806 (`binary_id(lamp-voice::it) & test(/^capture_hold_worker::/)`; the evaluator's
   four, `serve_session`, `physical_loopback`, `serve_relay` and
   `final_dispatch`, and six of `lamp-memory::health`'s seven tests left on
   2026-10-17, below);

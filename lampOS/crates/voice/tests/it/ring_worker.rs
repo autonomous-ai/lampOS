@@ -282,13 +282,15 @@ fn late_startup_black_write_is_reported_once_on_stderr() {
         rig.finish().unwrap();
         return;
     }
+    // Its name as the test binary lists it: under this module's path in
+    // the one binary of `lamp-voice`'s tests (#1806), bare at a crate root.
+    let name = "late_startup_black_write_is_reported_once_on_stderr";
+    let name = match module_path!().split_once("::") {
+        Some((_, module)) => format!("{module}::{name}"),
+        None => name.to_owned(),
+    };
     let output = std::process::Command::new(std::env::current_exe().unwrap())
-        .args([
-            "--exact",
-            "late_startup_black_write_is_reported_once_on_stderr",
-            "--nocapture",
-            "--test-threads=1",
-        ])
+        .args(["--exact", &name, "--nocapture", "--test-threads=1"])
         .env(CHILD, "1")
         .output()
         .unwrap();
