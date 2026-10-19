@@ -164,6 +164,21 @@ run "\n\nit drooped well\n" --only 3; check "row 3" 0 $?
 has "row 3: by hand said" "$T/out" "By hand: the builder runs this row from its run sheet"
 has "row 3: waits for the try" "$T/out" "Enter once the try is done"
 has "row 3: the words logged" "$T/log" "row 3: it drooped well"
+# A row's own question, in place of "Did it pass?", its answer logged.
+cat >"$T/rows7" <<'EOF'
+row | 1 | A choice | still | 1 min
+do | x
+watch | y
+lamp | step
+question | Which reads as alive, A or B?
+end
+EOF
+reset
+printf '\nB\n' | ARM_ROWS_FILE=$T/rows7 "$SCRIPT" >"$T/out" 2>&1; check "a row's question" 0 $?
+has "the row's question asked" "$T/out" "Which reads as alive, A or B?"
+hasnt "not the usual one" "$T/out" "Did it pass?"
+has "its answer logged" "$T/log" "row 1: B"
+
 # A row by hand with a proof: the proof only after the try.
 cat >"$T/rows4" <<'EOF'
 row | 1 | By hand, with a proof | still | 1 min

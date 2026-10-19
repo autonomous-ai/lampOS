@@ -62,6 +62,8 @@ LOG=${ARM_LOG:-./arm-hour-$(date '+%Y%m%d-%H%M').log}
 #   back   a command on the lamp that puts it back ("mac: COMMAND" on the
 #          Mac); all of them run, in order, after the row, whatever happened
 #   sheet  where the run sheet is
+#   question  the row's own question after its proof, in place of "Did it
+#          pass?"; the answer is logged as it is given
 # A row with no steps is done by hand: its two lines, then the question.
 # ---------------------------------------------------------------------------
 # Read with read, not $(cat <<...): bash 3.2 counts quotes inside a here-doc
@@ -98,10 +100,14 @@ back | [ ! -d /var/lib/lampos-fifth/row1 ] || sudo bash /var/lib/lampos-fifth/ro
 back | rm -rf /tmp/fifth-row1
 back | mac: rm -rf /tmp/fifth-row1
 end
-row | 2 | Moves with its words while it speaks | moves | 5 min
-do | Ask for a short story and listen.
-watch | The head nods on stressed words and sways between sentences, never jerks.
-sheet | #1067, #1953 (no run sheet yet)
+row | 2 | Moves with its words while it speaks | moves | 10 min
+do | Listen to the same two-minute story twice, A then B, hands near the arm. Say "stop" at any jerk.
+watch | A nods on most words; B about once a sentence, on a word that stands out. Each nod about 2 degrees, a small roll as a sentence begins, one soft settle when the story ends. Nothing jerks.
+sheet | #2034, Thirteen, 20 Oct 04:13 (#2030 in the build; #1759's speaking-ab.sh, 7b19b8bba or later)
+tell | The build has #2030. Take the lamp's own speaking section out of its catalogue first, as Thirteen's sheet says.
+tell | Arm A, dense: jq '.speaking += {"sentence_nods":0,"stress_step":0,"nod_spacing_us":0}' crates/expression/alive-behaviours.json >dense.json, then speaking-ab.sh --arms on --seconds 200 --speaking dense.json with "Hey Lamp, tell me a two-minute story about a cat who loved the rain."
+tell | Arm B, sparse: speaking-ab.sh --arms on --seconds 200 --speaking crates/expression/alive-behaviours.json, the same line. Note each arm's starts=, ends= and offsets= lines.
+question | Which reads as alive, A or B? (and both arms' starts=)
 end
 row | 3 | "Look for my keys" | moves | 5 min
 do | Say "Hey Lamp, look for my keys." Say "stop" to end it.
@@ -411,7 +417,9 @@ $steps
 EOF
 
   if [[ $failed == 0 ]]; then
-    answer=$(ask "  Did it pass? (y, n, or a few words; q to stop)")
+    local question
+    question=$(printf '%s\n' "$lines" | field question | head -1)
+    answer=$(ask "  ${question:-Did it pass? (y, n, or a few words)} (q to stop)")
     [[ $answer == q ]] && stop
     case $answer in
       y) log "row $ROW passed" ;;
