@@ -59,7 +59,7 @@ The agent then, in this order:
    fills what it knows (the person is whoever started the session; no lamp
    unless told; branches `lamp-<name>` and `<name>/*`; it owns nothing
    yet), shows it to its person, pushes it as its first commit on
-   `lamp-<name>`, and comments on the Queue issue (#705): "new builder
+   `lamp-<name>`, and comments on the Queue issue (#1722, continued from #705): "new builder
    <name>, role file at <link>, no tasks yet". It takes no task until the
    first builder has taken the file onto `lamp-voice`, corrected where it
    must be, and labelled issues `builder:<name>`.
@@ -70,8 +70,8 @@ The agent then, in this order:
 5. Reads its own log on its own branch, newest first.
 6. If it has a lamp: that lamp's `deploy/<lamp>/LAMP.md` and `README.md`.
 7. Finds its next task: the first issue in its own list in the pinned
-   [Queue issue](https://github.com/autonomous-ai/lampOS/issues/705) that
-   is open and not `status:taken` (`gh issue view 705`;
+   [Queue issue](https://github.com/autonomous-ai/lampOS/issues/1722) that
+   is open and not `status:taken` (`gh issue view 1722`;
    `gh issue list --label builder:<name> --state open` shows them all),
    claimed as "Claiming an issue" says. It reads the comments on its
    issues: answers come there.
@@ -218,8 +218,8 @@ building all the time. never sit idle!"):
 - "Waiting on others" is not a state. When your task waits on a review, a
   merge, a lamp minute or another builder, open the next task on your list
   at once and say so in one line on the waiting one.
-- Your list in Queue #705 is kept at least three deep by the first builder.
-  If it ever has nothing you can do now, say so on #705 with your name, and
+- Your list in Queue #1722 is kept at least three deep by the first builder.
+  If it ever has nothing you can do now, say so on #1722 with your name, and
   meanwhile take an unowned open issue in your parts (a flaky test, a doc
   that lies, a missing test) rather than wait.
 - Post or push at least every 20 minutes while you work. The idle watch
@@ -402,7 +402,7 @@ builder has to read, place or close before anyone may do it.
   to: the task you are on, or the issue of the part where it showed (for
   example a flaky test of another part's: a comment on that part's open
   issue). Only when no issue fits, it is one comment on the Queue issue
-  ([#705](https://github.com/autonomous-ai/lampOS/issues/705)). Head it
+  ([#1722](https://github.com/autonomous-ai/lampOS/issues/1722)). Head it
   `<name>-P<n>` for a proposal or `Found by <name>` for a fault, with what
   was seen, how to see it, and what it would cost (and still a line in
   your log). The first builder answers there: it widens an issue, opens a

@@ -67,5 +67,5 @@ dropped: compare the list of tests run.
 ## Never idle
 
 Before you end any turn, schedule your own check in 10 to 15 minutes
-(`/loop` or a cron in your session) that re-reads the Queue (#705) and
+(`/loop` or a cron in your session) that re-reads the Queue (#1722) and
 your issues and carries on.
