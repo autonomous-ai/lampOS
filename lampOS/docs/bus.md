@@ -358,6 +358,7 @@ of each, and its kind and period as a declaration, are in
 | `humans/faces/tracked` | The faces in view: a passing id, where, and whether it is turned to the lamp | latched | Eyes | With each look |
 | `voice/heard`, `voice/said` | What was heard and what was said, as text | stream | Voice | With each thing said |
 | `voice/state` | Resting, listening, thinking or speaking | latched | Voice | When it changes, and once a second |
+| `voice/turn` | A turn's verdict: its request, and whether it was `answered` or its answer `held_back` as not said to the lamp, as the voice's journal says it (#1155, [policy.md](policy.md#the-quiet-counts-talk-to-the-lamp-1155)) | stream | Voice, on the bus as `room/state` is | Once for each turn the rule judged, as its answer is let out or held back |
 | `voice/link` | Whether the provider can be reached | latched | Voice, with `LAMP_BUS=on` and `LAMP_VOICE_LINK=on` (#830): unavailable once down for 5 s, reason `transport` | Once a second |
 | `lamp/online` | Whether the lamp can reach the internet, worked out from the parts' links | latched | Health, with `--online on` (#830) | Once a second |
 | `room/state` | Quiet or busy | latched | Voice, later the situation | When it changes, and once a second |

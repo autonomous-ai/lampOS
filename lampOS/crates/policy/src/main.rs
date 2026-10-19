@@ -32,7 +32,7 @@ use std::{
     time::Duration,
 };
 
-const USAGE: &str = "usage: lamp-policy --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR [--endpoint URL] [--model NAME] [--deadline-ms N] [--hedge-after-ms N] [--bus-root ABSOLUTE_DIR] [--progress] [--hello] [--utc-offset-minutes N | --zone system|NAME] [--act progress] [--act hello] [--rules] [--act attention] [--attention-next] [--rule-decides KIND[;KIND...]] [--gate] [--images MODEL [--sight-file ABSOLUTE_PATH]]";
+const USAGE: &str = "usage: lamp-policy --key-file ABSOLUTE_PATH --log-dir ABSOLUTE_DIR [--endpoint URL] [--model NAME] [--deadline-ms N] [--hedge-after-ms N] [--bus-root ABSOLUTE_DIR] [--progress] [--hello] [--utc-offset-minutes N | --zone system|NAME] [--act progress] [--act hello] [--hello-quiet to-the-lamp] [--rules] [--act attention] [--attention-next] [--rule-decides KIND[;KIND...]] [--gate] [--images MODEL [--sight-file ABSOLUTE_PATH]]";
 const HELP: &str = "The lamp's policy, in shadow mode: judges whether each thing the voice hears was said to\n\
 the lamp, publishes the decision on the bus (policy/decisions) and writes it down. Nothing\n\
 acts on it. See docs/policy.md.\n\
@@ -60,6 +60,11 @@ acts on it. See docs/policy.md.\n\
   --hello        also judge whether a hello the voice holds (voice/arrival) is said now, with\n\
                  a connection of its own to the same model. Off unless set\n\
   --act hello    the hello decisions act: say_now says the hello, wait keeps it. Needs --hello\n\
+  --hello-quiet to-the-lamp\n\
+                 the hello's 15 s quiet counts only talk to the lamp or by it: a turn the voice held\n\
+                 back as not said to it (voice/turn) is taken back from the quiet, and the model\n\
+                 judges a hello at the lull. Never while the voice listens, thinks or speaks. Needs\n\
+                 --hello. Off unless set: all talk counts\n\
   --act attention  \"is this said to the lamp?\" is published with shadow false, so that the voice\n\
                  holds the lamp's actions on a stay_quiet (LAMP_POLICY_HOLDS_ACTIONS=on); speech\n\
                  is not held. Off unless set\n\
@@ -112,6 +117,9 @@ struct Arguments {
     /// off unless set.
     hello: bool,
     act_hello: bool,
+    /// The hello's quiet counts only talk to the lamp or by it
+    /// (`--hello-quiet to-the-lamp`, #1155): off unless set.
+    hello_quiet_to_the_lamp: bool,
     /// The attention decisions act (`--act attention`, #800): off unless
     /// set.
     act_attention: bool,
@@ -141,6 +149,7 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
     let (mut progress, mut utc_offset_minutes) = (false, None);
     let (mut hello, mut act_progress, mut act_hello) = (false, false, false);
     let mut act_attention = false;
+    let mut hello_quiet = None;
     let mut rules = false;
     let mut zone = None;
     let mut gate = false;
@@ -203,6 +212,15 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
                 }
                 model.replace(value).is_some()
             }
+            "--hello-quiet" => match value.as_str() {
+                "to-the-lamp" => hello_quiet.replace(value).is_some(),
+                _ => {
+                    return Err(
+                        "--hello-quiet takes to-the-lamp: the quiet counts only talk to the lamp or by it"
+                            .into(),
+                    );
+                }
+            },
             // The questions that may act: each named once.
             "--act" => match value.as_str() {
                 "progress" => std::mem::replace(&mut act_progress, true),
@@ -283,6 +301,9 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
     if act_hello && !hello {
         return Err("--act hello needs --hello".into());
     }
+    if hello_quiet.is_some() && !hello {
+        return Err("--hello-quiet needs --hello".into());
+    }
     if zone.is_some() && utc_offset_minutes.is_some() {
         return Err("--zone and --utc-offset-minutes are one or the other".into());
     }
@@ -307,6 +328,7 @@ fn parse(arguments: impl Iterator<Item = String>) -> Result<Option<Arguments>, S
         act_progress,
         hello,
         act_hello,
+        hello_quiet_to_the_lamp: hello_quiet.is_some(),
         act_attention,
         rules,
         gate,
@@ -333,6 +355,9 @@ fn questions(arguments: &Arguments) -> String {
     }
     if arguments.hello {
         said.push_str(" hello=true");
+    }
+    if arguments.hello_quiet_to_the_lamp {
+        said.push_str(" hello_quiet=to-the-lamp");
     }
     if arguments.rules {
         said.push_str(" rules=true");
@@ -442,6 +467,7 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             act: arguments.act_hello,
             gate: arguments.gate,
             rules: arguments.rules,
+            quiet_to_the_lamp: arguments.hello_quiet_to_the_lamp,
             ..hello::Options::new(arguments.deadline, local.clone())
         };
         let hello = Hello::start(judge()?, options)?;
@@ -535,6 +561,7 @@ mod tests {
                 act_progress: false,
                 hello: false,
                 act_hello: false,
+                hello_quiet_to_the_lamp: false,
                 act_attention: false,
                 rules: false,
                 gate: false,
@@ -561,6 +588,7 @@ mod tests {
                 act_progress: false,
                 hello: false,
                 act_hello: false,
+                hello_quiet_to_the_lamp: false,
                 act_attention: false,
                 rules: false,
                 gate: false,
@@ -607,6 +635,17 @@ mod tests {
             .unwrap();
         assert!(greeting.hello && greeting.act_hello && greeting.images.is_some());
         assert_eq!(questions(&greeting), " hello=true act=hello");
+        assert!(!greeting.hello_quiet_to_the_lamp);
+        // The hello's quiet counting only talk to the lamp (#1155).
+        let quieter =
+            of("--log-dir /d --key-file /k --hello --act hello --hello-quiet to-the-lamp")
+                .unwrap()
+                .unwrap();
+        assert!(quieter.hello_quiet_to_the_lamp);
+        assert_eq!(
+            questions(&quieter),
+            " hello=true hello_quiet=to-the-lamp act=hello"
+        );
         // And acting on it.
         let acting = of("--log-dir /d --progress --act progress --key-file /k")
             .unwrap()
@@ -775,6 +814,10 @@ mod tests {
             "--key-file /k --log-dir /d --progress --rules --rules",
             "--key-file /k --log-dir /d --progress --act hello",
             "--key-file /k --log-dir /d --hello --hello",
+            "--key-file /k --log-dir /d --hello-quiet to-the-lamp",
+            "--key-file /k --log-dir /d --hello --hello-quiet",
+            "--key-file /k --log-dir /d --hello --hello-quiet all",
+            "--key-file /k --log-dir /d --hello --hello-quiet to-the-lamp --hello-quiet to-the-lamp",
             "--key-file /k --log-dir /d --hello --act hello --act hello",
             "--key-file /k --log-dir /d --gate",
             "--key-file /k --log-dir /d --hello --gate",

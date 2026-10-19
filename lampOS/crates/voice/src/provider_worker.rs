@@ -1470,6 +1470,16 @@ async fn serve_with_visual<C: Connect>(
             })
             .ok()
     });
+    // Each turn's verdict, as the journal says it below (#1155).
+    let mut turn_out = BUS_ROOT.get().and_then(|root| {
+        crate::bus_out::TurnOut::on(root)
+            .map_err(|error| {
+                eprintln!(
+                    "lamp-voice provider: turns' verdicts are not published on the bus: {error}"
+                )
+            })
+            .ok()
+    });
     // The lamp's name as the part that listens for it hears it, for the
     // rule below. With no such part, or no bus, the rule goes by the text
     // alone, as it did.
@@ -2595,6 +2605,13 @@ async fn serve_with_visual<C: Connect>(
                                 .filter(|(of, _)| *of == request)
                                 .map(|(_, rise)| format!(" (the room microphone {rise:.1} dB over its quiet)"))
                                 .unwrap_or_default();
+                            if let (Some(out), Some(verdict)) = (turn_out.as_mut(), verdict.as_ref()) {
+                                let told = match verdict {
+                                    crate::attention::Verdict::Hold(_) => lamp_msgs::TurnVerdict::HeldBack,
+                                    _ => lamp_msgs::TurnVerdict::Answered,
+                                };
+                                out.tell(request, told, monotonic_us());
+                            }
                             match verdict {
                                 Some(crate::attention::Verdict::Hold(why)) => {
                                     eprintln!("lamp-voice provider: request {request}: its answer is held back: {why}{rise}");

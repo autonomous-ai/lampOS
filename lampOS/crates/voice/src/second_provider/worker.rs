@@ -484,6 +484,22 @@ pub fn serve(
                 .and_then(|mut heeding| heeding.heed(request, said, heard, from))
         }));
     }
+    // Each judged turn's verdict on the bus, for the Policy's hello (#1155).
+    if let Some(root) = files.bus_root.as_deref() {
+        match crate::bus_out::TurnOut::on(root) {
+            Ok(out) => {
+                let out = Mutex::new(out);
+                engine = engine.telling_verdicts(Arc::new(move |request, verdict| {
+                    if let Ok(mut out) = out.lock() {
+                        out.tell(request, verdict, lamp_ipc::monotonic_us());
+                    }
+                }));
+            }
+            Err(error) => eprintln!(
+                "lamp-voice second: turns' verdicts are not published on the bus: {error}"
+            ),
+        }
+    }
     if checked {
         let file = thread.clone();
         engine = engine.answering_the_lamp(Arc::new(move |request| {

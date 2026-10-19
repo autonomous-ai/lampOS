@@ -492,6 +492,13 @@ nothing owed, a provider ready) is not said at once:
    old, and the policy is asked again. Someone new arriving drops what was
    asked for the one before.
 
+The policy waits a hello while anyone talks to the lamp, and for 15 s
+after. With `lamp-policy --hello-quiet to-the-lamp` (#1155) those 15 s
+count only talk to the lamp or by it: the voice says each turn's verdict
+on `voice/turn`, and a turn whose answer it held back as not said to the
+lamp is taken back from the quiet
+([policy.md](policy.md#the-quiet-counts-talk-to-the-lamp-1155)).
+
 The session record gets one line for each answer acted on:
 `{"kind":"hello_policy","at_us":…,"arrival":…,"answer":"say_now|wait|shadow|none","waited_ms":…}`,
 and the journal "a hello is due; asking the policy (arrival N)" and "the
