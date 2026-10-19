@@ -587,6 +587,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      so Harness's own updates change `cli.js` and never the launcher that
      `lamp-tasks` checks (its executable identity). With `SHELL=/bin/sh` its
      one PATH line goes into `~/.profile` in that home.
+   - **What it trusts** (the reviewer on #1777): a script fetched from
+     `cdn.autonomous.ai` runs as `lampos`, the user every lampOS part runs
+     as, and its sha256 checks come from the same CDN, so they guard against
+     a bad download, not a bad CDN. That's the installer the first builder
+     and the lead chose (19 Oct 10:41), as Harness's team publishes it.
    - **Then:** Harness at boot as above, with its record, unless already
      recorded; then `systemctl restart lamp-tasks.service`, only when
      something changed.
