@@ -13,7 +13,9 @@ StateDirectoryMode=0700
 RuntimeDirectory=lampos-schedule
 RuntimeDirectoryMode=0700
 # The clock: timedatectl says it is synchronized on this lamp, without systemd-timesyncd's marker, so trust is asserted.
-ExecStart=/opt/lampOS/schedule/f1aa728502c6f9d00939141acd84aa16531efd328b876bbb103d543c107baa78/lamp-schedule serve --enable --dir /var/lib/lampos-schedule/store --socket /run/lampos-schedule/call.sock --zone Asia/Ho_Chi_Minh --bus-root /run/lampos-bus --trust-clock
+# --zone system: a new reminder is set in the zone setup last pointed /etc/localtime at, followed
+# without a restart (#820, #1825; needs a lamp-schedule with #1825); was --zone Asia/Ho_Chi_Minh.
+ExecStart=/opt/lampOS/schedule/f1aa728502c6f9d00939141acd84aa16531efd328b876bbb103d543c107baa78/lamp-schedule serve --enable --dir /var/lib/lampos-schedule/store --socket /run/lampos-schedule/call.sock --zone system --bus-root /run/lampos-bus --trust-clock
 Restart=on-failure
 RestartSec=5s
 SyslogIdentifier=lamp-schedule
