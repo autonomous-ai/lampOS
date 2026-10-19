@@ -66,12 +66,17 @@ fn a_text_goes_on_the_bus_and_its_answer_comes_back_as_v1s_chat_events() {
     let run = ack["run_id"].as_str().unwrap().to_owned();
     assert_eq!(ack["session_id"], "s1");
 
-    let text: ChatIn = heard
+    let message = heard
         .recv(Duration::from_secs(1))
         .unwrap()
-        .expect("the text on chat/in")
-        .parse()
-        .unwrap();
+        .expect("the text on chat/in");
+    // Meaningful as long as its run waits, and passed over after: a text
+    // the app has given up on is never answered (the reviewer on #1713).
+    assert_eq!(
+        message.header.expires_ms,
+        Some(lamp_msgs::CHAT_ANSWER_WITHIN.as_millis() as u64)
+    );
+    let text: ChatIn = message.parse().unwrap();
     assert_eq!(text.run_id, run);
     assert_eq!(text.text, "What time is it?");
     assert!(!text.speak);

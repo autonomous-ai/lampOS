@@ -6,6 +6,13 @@
 use crate::Invalid;
 use lamp_bus::{Declaration, Kind};
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+
+/// How long a text waits for its answer: `lamp-cloud` then ends its run as
+/// a fault for the app, and a text still on `chat/in` by then is passed
+/// over unanswered, its functions never run ([`ChatIn::declaration`]'s
+/// lifespan; the reviewer on #1713).
+pub const CHAT_ANSWER_WITHIN: Duration = Duration::from_secs(60);
 
 /// The most text one message carries, in bytes: well inside a bus message
 /// (60,000 bytes in all, `docs/bus.md`).
@@ -24,8 +31,8 @@ pub struct ChatIn {
     pub session_id: Option<String>,
     /// What they wrote.
     pub text: String,
-    /// Whether the lamp says the reply aloud too (V1's `speak`). Off unless
-    /// asked: a text from another room never makes the lamp talk.
+    /// V1's `speak`, carried and ignored: the lamp never says a text's reply
+    /// aloud, whatever the app asks (`docs/messages.md`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub speak: bool,
 }
@@ -35,9 +42,10 @@ impl ChatIn {
     pub const VERSION: u32 = 1;
     pub const TOPIC: &str = "chat/in";
 
-    /// A text sent: no period, nothing kept.
+    /// A text sent: no period, nothing kept, and meaningful for
+    /// [`CHAT_ANSWER_WITHIN`]: a subscriber is not handed one older.
     pub fn declaration() -> Declaration {
-        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event).lasting(CHAT_ANSWER_WITHIN)
     }
 
     pub fn check(&self) -> Result<(), Invalid> {
@@ -154,6 +162,14 @@ mod tests {
             text: text.into(),
             speak: false,
         }
+    }
+
+    /// The reviewer on #1713: a text the app has given up on is never
+    /// answered after, so `chat/in` lasts as long as a run waits.
+    #[test]
+    fn a_text_lasts_as_long_as_its_run_waits() {
+        assert_eq!(ChatIn::declaration().lifespan(), Some(CHAT_ANSWER_WITHIN));
+        assert_eq!(ChatOut::declaration().lifespan(), None);
     }
 
     #[test]

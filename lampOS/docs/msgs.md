@@ -460,11 +460,14 @@ and are re-exported at the crate root; `chat_topics()` and
 
 | Type | Topic | Kind | Period / lifespan | Meaning |
 |---|---|---|---|---|
-| `ChatIn` | `chat/in` | event | none / none | A text the person sent from the Autonomous app ([messages.md](messages.md)): the `run_id` `lamp-cloud` acked it with, the app's `session_id` if it gave one, the text, and `speak` (say the reply aloud too; off unless asked) |
+| `ChatIn` | `chat/in` | event | none / 60 s | A text the person sent from the Autonomous app ([messages.md](messages.md)): the `run_id` `lamp-cloud` acked it with, the app's `session_id` if it gave one, the text, and `speak` (say the reply aloud too; off unless asked) |
 | `ChatOut` | `chat/out` | event | none / none | A piece of the lamp's answer: the `run_id` it answers (none only for task news), the `session_id`, the `ChatPart` (`delta`, `final`, `error`, `task_news`) and its text |
 
 Published by `lamp-cloud` (`chat/in`) and the voice (`chat/out`). `check()`
 holds a run or session name to 1 to 64 letters, digits, `-`, `_`, `.` or
 `:`, and a text to 16,000 bytes; a `ChatIn` has words in it, and a `ChatOut`
 carries a run unless it is task news, which never does. Photos and files
-are not carried yet: a bus message is at most 60,000 bytes.
+are not carried yet: a bus message is at most 60,000 bytes. A `ChatIn`
+lasts `CHAT_ANSWER_WITHIN` (60 s), the minute `lamp-cloud` waits for its
+answer before it ends the run, so one still queued after that is passed
+over, never answered (the reviewer on #1713).

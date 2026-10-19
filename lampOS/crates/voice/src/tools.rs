@@ -781,6 +781,37 @@ pub fn answer(settings: &Settings, call: &ToolCall, request: u64, heard: bool) -
     }
 }
 
+/// What the model is told when a call about faces comes from anything but
+/// the person at the lamp.
+pub const FACES_IN_PERSON: &str =
+    "Faces are kept and forgotten only when the person asks at the lamp, in person.";
+
+/// [`answer`] for a typed conversation, a text from the Autonomous app
+/// (#1673): nobody at the lamp is the one asking, so nothing is run as
+/// theirs. The memory is the room's, never the person's in view, and a call
+/// about faces is refused, as for every request not heard at the lamp (the
+/// reviewer on #1713).
+pub fn answer_typed(settings: &Settings, call: &ToolCall, request: u64) -> Value {
+    match route(settings, &call.name) {
+        Route::Memory(socket) => {
+            let began = std::time::Instant::now();
+            let (told, answered) = crate::remember::run_for(&socket, call, ASK_DEADLINE, None);
+            eprintln!(
+                "lamp-voice second: text request {request} asked for {}; the room's memory {} in {} ms; the answer was sent",
+                call.name,
+                if answered {
+                    "answered"
+                } else {
+                    "did not answer"
+                },
+                began.elapsed().as_millis()
+            );
+            told
+        }
+        _ => answer(settings, call, request, false),
+    }
+}
+
 /// What the model is told when a call could not be run: words it can say.
 pub fn unavailable() -> Value {
     json!({"error": "That part of me is not running right now, so I could not do it."})
@@ -816,6 +847,10 @@ pub fn run_call(
             "the schedule through the executive",
             ask_schedule(directory, call, deadline),
         ),
+        // A face is the person's at the lamp: only words they said there
+        // may keep or forget one, never a request the lamp wrote or a text
+        // from the app (the reviewer on #1713), as for marks.
+        Route::Faces(..) if !heard => ("the eyes", (json!({"error": FACES_IN_PERSON}), false)),
         Route::Faces(socket, checked) => {
             ("the eyes", crate::known_faces::run(socket, call, *checked))
         }
@@ -1027,6 +1062,54 @@ fn fault(tool: &Tool) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The reviewer on #1713: a face is kept or forgotten only on words
+    /// heard at the lamp. An unheard request, a text from the app or one the
+    /// lamp wrote, never reaches the eyes; a heard one does.
+    #[test]
+    fn a_face_is_kept_or_forgotten_only_on_words_heard_at_the_lamp() {
+        let dir = std::env::temp_dir().join(format!("tools-faces-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let socket = dir.join("eyes.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let route = Route::Faces(socket.clone(), false);
+        for name in [crate::known_faces::REMEMBER, crate::known_faces::FORGET] {
+            let call = ToolCall {
+                id: String::new(),
+                name: name.into(),
+                args: json!({"name": "Sam"}),
+            };
+            let (whom, (told, answered)) = run_call(&route, &call, 1, false);
+            assert_eq!(whom, "the eyes");
+            assert_eq!(told["error"], FACES_IN_PERSON, "{name}");
+            assert!(!answered);
+            assert!(listener.accept().is_err(), "{name} reached the eyes");
+        }
+        // Heard: it goes to the eyes (here nobody answers, which is told).
+        let call = ToolCall {
+            id: String::new(),
+            name: crate::known_faces::FORGET.into(),
+            args: json!({"name": "Sam"}),
+        };
+        let asking = std::thread::spawn(move || run_call(&route, &call, 2, true));
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        let reached = loop {
+            if let Ok((stream, _)) = listener.accept() {
+                break Some(stream);
+            }
+            if std::time::Instant::now() > deadline {
+                break None;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        assert!(reached.is_some(), "a heard forget never reached the eyes");
+        drop(reached);
+        let (_, (told, _)) = asking.join().unwrap();
+        assert_ne!(told["error"], FACES_IN_PERSON);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     /// #799: a function the link would refuse is left out and named; the
     /// rest are kept, and the link takes them.
