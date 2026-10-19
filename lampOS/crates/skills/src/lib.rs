@@ -7,7 +7,8 @@
 //! a recording is replayed.
 use lamp_bus::Header;
 use lamp_msgs::{
-    Faces, Light, LightPattern, LightRequest, PatternKind, SkillEvent, SkillStage, Speech,
+    Faces, Light, LightPattern, LightRequest, PatternKind, SkillEvent, SkillStage, Speech, Voice,
+    VoiceState,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -15,11 +16,15 @@ use std::{
     collections::{BTreeMap, HashMap},
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 pub mod clock;
+pub mod daily;
 pub mod glow;
+pub mod limits;
 pub mod package;
+pub mod routine;
 
 /// Whether the body plays `name` on its mood socket: one of the clips in its
 /// own table (`lamp_body::clips::ALL`), but `idle`, which is the body's own.
@@ -35,6 +40,9 @@ pub fn clip_us(name: &str) -> Option<u64> {
 /// With `LAMP_BODY_REQUESTS=on`, each gesture and move a skill sends on the
 /// body's mood socket says who asks (#940).
 pub const BODY_REQUESTS_ENVIRONMENT: &str = "LAMP_BODY_REQUESTS";
+/// The engine's local clock value, produced internally rather than by a
+/// bus publisher. Clock triggers still pass the usual conditions and gate.
+pub const LOCAL_CLOCK_TOPIC: &str = "clock/local";
 
 /// A gesture's or a move's datagram for the body's mood socket. With
 /// `skill`, it says who asks, `skill:<name>` at `skill` priority, as a body
@@ -112,6 +120,7 @@ const MOST_WAIT_US: u64 = 3_600_000_000;
 /// How long a face message counts when its header names no lifespan: the
 /// eyes' two seconds. A value on another topic counts until it is replaced.
 const FACE_LIFESPAN_MS: u64 = 2_000;
+const ROUTINE_VOICE_FRESH_US: u64 = 3_000_000;
 /// How long a held run's trigger topic may say nothing, when its newest
 /// value names no lifespan, before the run ends (#1021: until the air part
 /// says its readings expire).
@@ -120,6 +129,9 @@ pub const SILENT_ENDS_US: u64 = 15 * 60 * 1_000_000;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SkillFile {
+    /// Installed core skills can remain disabled until their lamp check.
+    #[serde(default = "enabled_by_default")]
+    enabled: bool,
     #[serde(default)]
     needs: Vec<String>,
     /// `core` (comes with the lamp and is never removed) or `installable`
@@ -148,6 +160,8 @@ struct SkillFile {
     still: Option<String>,
     /// Local hours when the skill never starts itself.
     quiet: Option<QuietFile>,
+    /// Output ceilings are independent of a presentation's permission.
+    limits: Option<routine::LimitsFile>,
     #[serde(rename = "do")]
     steps: Vec<StepFile>,
 }
@@ -240,6 +254,13 @@ struct TriggerFile {
     /// On `humans/faces/tracked`: only a face at least this share of the
     /// picture's height counts.
     near: Option<f32>,
+    /// An explicitly observed empty face list, never a missing camera.
+    present: Option<bool>,
+    /// Local hours in which this trigger can hold.
+    during: Option<QuietFile>,
+    /// Consume at most one chance per local window, durably before acting.
+    #[serde(default)]
+    once_per_day: bool,
     absent_for: Option<String>,
     #[serde(rename = "for")]
     lasting: Option<String>,
@@ -286,6 +307,10 @@ struct StepFile {
     say: Option<toml::Value>,
     /// A file in `sounds/`, by its name without `.wav`.
     sound: Option<String>,
+    /// A fixed quiet cue rendered by the Say owner, without an asset file.
+    cue: Option<String>,
+    /// A leased rest intent, admitted by Expression's existing owner.
+    rest: Option<routine::RestFile>,
     look: Option<bool>,
     /// `"say"`: this step and every one after it wait for the say to end.
     after: Option<String>,
@@ -473,8 +498,9 @@ const MOST_PERMITTED: usize = 32;
 pub struct Permissions {
     /// The topics it reads: those its triggers and `[[while]]` conditions
     /// name, `humans/faces/tracked` for a look at a face, `voice/heard`
-    /// for a tool's `[again]`, and `schedule/due` or `tasks/status` for a
-    /// say from the voice's reminder or task news ([`Skill::reads`]).
+    /// for a tool's `[again]`, `voice/state` for a routine's quiet gate,
+    /// and `schedule/due` or `tasks/status` for a say from the voice's
+    /// reminder or task news ([`Skill::reads`]).
     #[serde(default)]
     pub topics: Vec<String>,
     /// The actions part's functions it may call by name, beyond the
@@ -495,19 +521,27 @@ pub struct Permissions {
     /// what is in front of the lamp (`look`).
     #[serde(default)]
     pub look: bool,
+    /// It may install declarative light and volume ceilings. This grants
+    /// no presentation or generic action, and no restoration of a setting.
+    #[serde(default)]
+    pub output_limits: bool,
 }
 
 impl Permissions {
     /// Why a skill with these permissions may not make `call`, if not.
     pub fn refuses(&self, call: &Call) -> Option<String> {
         let (key, given) = match call {
-            Call::Gaze { .. } | Call::Gesture(_) | Call::Move(_) | Call::Mood { .. } => {
-                ("body", self.body)
-            }
+            Call::Gaze { .. }
+            | Call::Gesture(_)
+            | Call::Move(_)
+            | Call::Mood { .. }
+            | Call::Rest(_) => ("body", self.body),
             Call::Light { .. } | Call::Dim { .. } | Call::Out { .. } | Call::Show { .. } => {
                 ("light", self.light)
             }
-            Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. } => ("speak", self.speak),
+            Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. } | Call::Cue => {
+                ("speak", self.speak)
+            }
             Call::Look => ("look", self.look),
             Call::AfterSay | Call::Ends => return None,
         };
@@ -516,6 +550,14 @@ impl Permissions {
                 "{} needs {key} = true in [permissions], which it does not give",
                 call.named().0
             )
+        })
+    }
+
+    /// Why new output ceilings may not be installed. Cleanup of ceilings
+    /// already accepted belongs to the service even after this is revoked.
+    pub fn refuses_output_limits(&self) -> Option<String> {
+        (!self.output_limits).then(|| {
+            "[limits] needs output_limits = true in [permissions], which it does not give".into()
         })
     }
 
@@ -549,6 +591,7 @@ impl Permissions {
             ("light", self.light),
             ("body", self.body),
             ("look", self.look),
+            ("output_limits", self.output_limits),
         ]
         .into_iter()
         .filter_map(|(name, given)| given.then_some(name))
@@ -637,6 +680,8 @@ pub fn version_ok(version: &str) -> bool {
 pub struct Skill {
     pub name: String,
     pub description: String,
+    pub enabled: bool,
+    pub limits: Option<routine::Limits>,
     pub needs: Vec<String>,
     /// Core or installable.
     pub kind: SkillKind,
@@ -663,14 +708,27 @@ pub struct Skill {
 }
 
 impl Skill {
+    pub fn is_routine(&self) -> bool {
+        self.limits.is_some()
+            || self
+                .steps
+                .iter()
+                .any(|(_, step)| matches!(step, Step::Call(Call::Rest(_))))
+    }
+
+    fn scheduled_run(&self, trigger: Option<&Trigger>) -> bool {
+        self.is_routine()
+            || trigger.is_some_and(|trigger| trigger.during.is_some() || trigger.once_per_day)
+    }
     /// Every topic the skill reads, once each, and what reads it: what the
     /// program listens to for it ([`Skill::listens`]), and the topic of what
     /// a `say = { from = … }` has the voice say, `schedule/due` for the
     /// person's reminder and `tasks/status` for the news of their work
     /// ([`Source::topic`]). A skill may have the person's own words said at
-    /// its moment only if it declares them. What the program reads to make a
-    /// step safely (the light shown, the voice's state, the body's clips, a
-    /// hand, the pause) is its own, not the skill's.
+    /// its moment only if it declares them. A routine also declares the
+    /// voice state its quiet gate requires, even without a `[[while]]`.
+    /// Output-owner receipts and other safety bookkeeping (the light shown,
+    /// the body's clips, a hand, the pause) belong to the program itself.
     pub fn reads(&self) -> Vec<(String, &'static str)> {
         let mut reads = self.listens();
         for (_, step) in &self.steps {
@@ -690,8 +748,9 @@ impl Skill {
     /// The topics the program subscribes to for the skill ([`Engine::topics`]),
     /// once each, and what reads it: its triggers, its `[[while]]`
     /// conditions, a look at a face (the faces the eyes see), and a tool's
-    /// `[again]` (what was heard). A say's words come from the voice, so
-    /// their topic is read ([`Skill::reads`]) and not listened to.
+    /// `[again]` (what was heard), and a routine's quiet Voice gate. A say's
+    /// words come from the voice, so their topic is read ([`Skill::reads`])
+    /// and not listened to.
     fn listens(&self) -> Vec<(String, &'static str)> {
         let looks = self
             .steps
@@ -711,6 +770,10 @@ impl Skill {
                 self.again
                     .is_some()
                     .then(|| (Speech::TOPICS[0].to_owned(), "[again]")),
+            )
+            .chain(
+                self.is_routine()
+                    .then(|| (VoiceState::TOPIC.to_owned(), "a routine's quiet gate")),
             )
             .collect();
         let mut seen = Vec::new();
@@ -757,6 +820,7 @@ enum Test {
     /// A face in the list of `humans/faces/tracked`, at least this share of
     /// the picture's height.
     Faces(f32),
+    NoFaces,
     Equals(String, Value),
     NotEquals(String, Value),
     Above(String, f64),
@@ -766,6 +830,8 @@ enum Test {
 impl Test {
     fn holds(&self, value: &Value) -> bool {
         match self {
+            Self::NoFaces => serde_json::from_value::<Faces>(value.clone())
+                .is_ok_and(|faces| faces.check().is_ok() && faces.faces.is_empty()),
             Self::Faces(near) => value["faces"].as_array().is_some_and(|faces| {
                 faces.iter().any(|face| {
                     face["ymax"].as_f64().unwrap_or(0.0) - face["ymin"].as_f64().unwrap_or(0.0)
@@ -826,6 +892,12 @@ pub struct Trigger {
     /// someone talking when the moment comes, and the lamp acts once the
     /// talk ends. 0: a chance held back is spent.
     pub wait_us: u64,
+    pub during: Option<daily::Window>,
+    pub once_per_day: bool,
+}
+
+fn enabled_by_default() -> bool {
+    true
 }
 
 /// One call a step makes, as the program sends it and a test expects it.
@@ -834,7 +906,9 @@ pub enum Call {
     /// To the body's gaze socket, as the eyes send a face: its centre from
     /// the middle of the picture (-1 to 1) and its height as a share of it.
     /// Before a run it names no face.
-    Gaze { face: Option<(f32, f32, f32)> },
+    Gaze {
+        face: Option<(f32, f32, f32)>,
+    },
     /// A gesture by name, to the body's mood socket.
     Gesture(String),
     /// A move of the skill's own (`moves/NAME.json`), checked as the body
@@ -864,10 +938,16 @@ pub enum Call {
     /// A light show (`shows/NAME.toml`): each frame's light in turn, held
     /// its while, then the light given back (#1679). Only in a skill its
     /// tool alone starts: never on its own.
-    Show { name: String, frames: Vec<Frame> },
+    Show {
+        name: String,
+        frames: Vec<Frame>,
+    },
     /// Steps dimmer, to the actions part's `light_dimmer`; with
     /// `until_ends`, held until the trigger stops holding, then given back.
-    Dim { steps: u8, until_ends: bool },
+    Dim {
+        steps: u8,
+        until_ends: bool,
+    },
     /// The light goes out (#1677): asked of the ring only
     /// (`LAMP_LIGHT_REQUESTS=on`) as the light shown, off, faded into over
     /// `over_ms` when given; with `until_ends`, held until the trigger stops
@@ -891,7 +971,12 @@ pub enum Call {
     Look,
     /// A short sound of the skill's own, `sounds/NAME.wav` (checked at load,
     /// [`check_sound`]), played by the voice through its say service.
-    Sound { name: String, path: PathBuf },
+    Sound {
+        name: String,
+        path: PathBuf,
+    },
+    Cue,
+    Rest(routine::Rest),
     /// The calls after this wait for the say to end: the skill's own say, or
     /// in a skill its tool starts, the line the model says after the call.
     AfterSay,
@@ -1033,6 +1118,8 @@ impl Call {
             }
             Self::Look => ("look", json!({})),
             Self::Sound { name, .. } => ("sound", json!({ "sound": name })),
+            Self::Cue => ("sound", json!({ "cue": "hum" })),
+            Self::Rest(rest) => ("rest", json!({ "op": rest.op })),
             Self::AfterSay => ("after_say", json!({})),
             Self::Ends => ("ends", json!({})),
         }
@@ -1161,6 +1248,14 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             "trigger name {name:?}: 1 to 64 lowercase letters, digits and _"
         ));
     }
+    let during = file
+        .during
+        .map(|window| daily::Window::parse(&window.from, &window.to))
+        .transpose()
+        .map_err(|error| format!("during: {error}"))?;
+    if file.once_per_day && (during.is_none() || file.name.is_none() || file.each.is_some()) {
+        return Err("once_per_day needs a named trigger with during, and no each".into());
+    }
     let each = match (file.each, file.key) {
         (None, None) => None,
         (Some(list), Some(key)) if !list.is_empty() && !key.is_empty() => {
@@ -1194,7 +1289,23 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             );
         }
     };
-    let mut test = test(&file.topic, file.field, file.equals, file.above, file.below)?;
+    let mut test = match file.present {
+        None => test(&file.topic, file.field, file.equals, file.above, file.below)?,
+        Some(present)
+            if file.topic == Faces::TOPIC
+                && file.field.is_none()
+                && file.equals.is_none()
+                && file.above.is_none()
+                && file.below.is_none() =>
+        {
+            if present {
+                Test::Faces(0.0)
+            } else {
+                Test::NoFaces
+            }
+        }
+        Some(_) => return Err("present is only for a face trigger without a field test".into()),
+    };
     match (file.near, &mut test) {
         (None, _) => {}
         (Some(near), Test::Faces(least)) if (0.0..=1.0).contains(&near) => *least = near,
@@ -1218,6 +1329,8 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         rearm_line,
         cooldown_us: optional(&file.cooldown)?,
         wait_us,
+        during,
+        once_per_day: file.once_per_day,
     })
 }
 
@@ -1452,10 +1565,14 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             && step.light.is_none()
             && step.say.is_none()
             && step.sound.is_none()
+            && step.cue.is_none()
+            && step.rest.is_none()
             && step.look.is_none()
             && step.show.is_none()
         {
-            return Err("a [[do]] step names body, light, say, sound, look or show".into());
+            return Err(
+                "a [[do]] step names body, light, say, sound, cue, rest, look or show".into(),
+            );
         }
         if let Some(on) = &step.on
             && !names.contains(&on)
@@ -1489,7 +1606,12 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 }
                 // One note to the model a call: what it says is the same for
                 // every choice.
-                if step.say.is_some() || step.sound.is_some() || step.look.is_some() {
+                if step.say.is_some()
+                    || step.sound.is_some()
+                    || step.cue.is_some()
+                    || step.rest.is_some()
+                    || step.look.is_some()
+                {
                     return Err("a step for some choices only makes body, light or show".into());
                 }
                 Some(Only::Choice(values.clone()))
@@ -1676,6 +1798,18 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             check_sound(&path).map_err(|why| format!("{place}: {why}"))?;
             steps.push(Step::Call(Call::Sound { name, path }));
         }
+        if let Some(cue) = step.cue {
+            if cue != "hum" || file.tool.is_some() {
+                return Err("cue is hum, only in a skill without a tool".into());
+            }
+            steps.push(Step::Call(Call::Cue));
+        }
+        if let Some(rest) = step.rest {
+            if file.tool.is_some() || triggers.iter().any(|trigger| trigger.each.is_some()) {
+                return Err("rest is only for automatic, non-item triggers".into());
+            }
+            steps.push(Step::Call(Call::Rest(rest.checked()?)));
+        }
         ons.resize(steps.len(), on);
     }
     let steps: Vec<(Option<Only>, Step)> = ons.into_iter().zip(steps).collect();
@@ -1711,7 +1845,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             .filter(|(on, step)| {
                 matches!(
                     step,
-                    Step::Call(Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. })
+                    Step::Call(Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. } | Call::Cue)
                 ) && match on {
                     None => true,
                     Some(Only::Trigger(on)) => Some(on) == name,
@@ -1754,6 +1888,12 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             );
         }
     }
+    if file.limits.is_some() {
+        limits::source(&name)?;
+        if let Some(why) = file.permissions.refuses_output_limits() {
+            return Err(format!("not permitted: {why}"));
+        }
+    }
     let kind = SkillKind::read(file.kind.as_deref())?;
     if let Some(version) = &file.version
         && !version_ok(version)
@@ -1766,6 +1906,8 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
     let skill = Skill {
         name,
         description,
+        enabled: file.enabled,
+        limits: file.limits.map(routine::LimitsFile::checked).transpose()?,
         needs: file.needs,
         kind,
         version: file.version,
@@ -2069,13 +2211,15 @@ fn pattern_of(file: PatternFile, level: Option<u8>) -> Result<LightPattern, Stri
     Ok(pattern)
 }
 
-/// Every skill folder under `root` but those whose name begins with a dot,
-/// and why each other one did not load.
+/// Every enabled skill under `root`, and why each other folder did not
+/// load. Disabled skills are still validated and reserve their tool names
+/// in the complete inventory ([`load_each`]).
 pub fn load_all(root: &Path) -> (Vec<Skill>, Vec<String>) {
     let (mut skills, mut errors) = (Vec::new(), Vec::new());
     for (folder, loaded) in load_each(root) {
         match loaded {
-            Ok(skill) => skills.push(skill),
+            Ok(skill) if skill.enabled => skills.push(skill),
+            Ok(_) => {}
             Err(why) => errors.push(format!("{}: {why}", folder.display())),
         }
     }
@@ -2083,8 +2227,9 @@ pub fn load_all(root: &Path) -> (Vec<Skill>, Vec<String>) {
 }
 
 /// Every skill folder under `root` but those whose name begins with a dot,
-/// in the folders' order, each loaded or why not. A tool's name is one
-/// skill's: the core skills take theirs first, then the installable ones,
+/// in the folders' order, including disabled skills, each loaded or why
+/// not. A tool's name is one skill's: the core skills take theirs first,
+/// then the installable ones,
 /// each in the folders' order, and a skill whose tool's name is taken is not
 /// loaded. So an installable skill never takes a core skill's function from
 /// the model, and no second skill of a name is passed over without a word
@@ -2159,6 +2304,10 @@ struct Watch {
 /// A trigger that held: what was said of it, and the calls to make.
 #[derive(Debug)]
 pub struct Run {
+    /// Scheduled runs belong to their original definitions. Ordinary runs
+    /// retain legacy revalidation across reloads. An allocation identity
+    /// cannot wrap back to an earlier generation.
+    generation: Option<Arc<()>>,
     pub skill: String,
     pub events: Vec<SkillEvent>,
     pub calls: Vec<Call>,
@@ -2176,6 +2325,7 @@ pub struct Run {
 }
 
 pub struct Engine {
+    generation: Arc<()>,
     skills: Vec<Skill>,
     /// By skill name and trigger, kept across reloads, so an edit does not
     /// forget a cooldown.
@@ -2193,6 +2343,10 @@ pub struct Engine {
     ask_policy: bool,
     /// The local time: minutes east of UTC, and one moment on both clocks.
     clock: Option<(i32, u64, u64)>,
+    /// A daily chance is durable before its calls or Policy question leave.
+    daily: Option<daily::Journal>,
+    /// The first storage failure is reported once; reloads do not retry it.
+    daily_faulted: bool,
 }
 
 fn event(skill: &str, stage: SkillStage, why: String, allowed: Option<bool>) -> SkillEvent {
@@ -2209,7 +2363,8 @@ impl Engine {
     /// Without it, or `asking_the_policy`, nothing a skill starts is done.
     pub fn new(skills: Vec<Skill>, skip_ask: bool) -> Self {
         Self {
-            skills,
+            generation: Arc::new(()),
+            skills: skills.into_iter().filter(|skill| skill.enabled).collect(),
             watches: HashMap::new(),
             latest: HashMap::new(),
             holding: HashMap::new(),
@@ -2218,6 +2373,8 @@ impl Engine {
             skip_ask,
             ask_policy: false,
             clock: None,
+            daily: None,
+            daily_faulted: false,
         }
     }
 
@@ -2225,6 +2382,14 @@ impl Engine {
     /// and act only on its `say_now` (`LAMP_SKILLS_ASK=policy`).
     pub fn asking_the_policy(mut self) -> Self {
         self.ask_policy = true;
+        self
+    }
+
+    /// Without a writable journal, once-per-day triggers stay quiet.
+    /// Explicitly installing a journal clears a latched daily storage fault.
+    pub fn with_daily_journal(mut self, journal: daily::Journal) -> Self {
+        self.daily = Some(journal);
+        self.daily_faulted = false;
         self
     }
 
@@ -2249,6 +2414,7 @@ impl Engine {
     /// for [`SILENT_ENDS_US`]. Its spell is over with it.
     pub fn tick(&mut self, now_us: u64) -> Vec<Run> {
         let mut runs = Vec::new();
+        let moment = self.local_moment(now_us);
         for skill in &self.skills {
             for (index, trigger) in skill.triggers.iter().enumerate() {
                 let Some(watch) = self.watches.get_mut(&(skill.name.clone(), index)) else {
@@ -2258,11 +2424,17 @@ impl Engine {
                     continue;
                 };
                 if watch.open
-                    && now_us.saturating_sub(*at_us) >= lifespan_us.unwrap_or(SILENT_ENDS_US)
+                    && (now_us.saturating_sub(*at_us) >= lifespan_us.unwrap_or(SILENT_ENDS_US)
+                        || trigger.during.as_ref().is_some_and(|window| {
+                            moment
+                                .as_ref()
+                                .is_none_or(|moment| !window.contains(moment.minute))
+                        }))
                 {
                     watch.open = false;
                     watch.since_us = None;
                     runs.push(Run {
+                        generation: None,
                         skill: skill.name.clone(),
                         events: Vec::new(),
                         calls: vec![Call::Ends],
@@ -2276,6 +2448,29 @@ impl Engine {
         runs
     }
 
+    /// A wall-clock sample drives clock triggers even in a silent room.
+    /// There is no synthetic event when no skill uses the local clock.
+    pub fn clock_tick(&mut self, now_us: u64) -> Vec<Run> {
+        if !self.skills.iter().any(|skill| {
+            skill
+                .triggers
+                .iter()
+                .any(|trigger| trigger.topic == LOCAL_CLOCK_TOPIC)
+        }) {
+            return Vec::new();
+        }
+        let value = match self.local_moment(now_us) {
+            Some(moment) => json!({"known": true, "day": moment.day, "minute": moment.minute}),
+            None => json!({"known": false}),
+        };
+        self.observe(
+            LOCAL_CLOCK_TOPIC,
+            now_us,
+            &serde_json::to_vec(&value).unwrap(),
+            Some(500),
+        )
+    }
+
     /// Minutes since local midnight at `now_us`, if the local time is known.
     fn local_minute(&self, now_us: u64) -> Option<u16> {
         let (offset, at_us, unix_ms) = self.clock?;
@@ -2284,14 +2479,35 @@ impl Engine {
         Some(minutes.rem_euclid(1_440) as u16)
     }
 
+    /// New scheduled behavior needs a recent, plausible local clock.
+    /// Existing quiet-hours semantics remain unchanged.
+    fn local_moment(&self, now_us: u64) -> Option<daily::Moment> {
+        let (offset, at_us, unix_ms) = self.clock?;
+        let elapsed = now_us.checked_sub(at_us)?;
+        if elapsed > 120_000_000 {
+            return None;
+        }
+        daily::Moment::at(
+            &lamp_local_time::LocalTime::Offset(offset),
+            unix_ms.checked_add(elapsed / 1_000)?,
+        )
+        .ok()
+    }
+
     /// The skills loaded again. A timed condition keeps when it began to
     /// hold only if it is the same condition as before. A run held until its
     /// trigger ends ends now, as at a normal end, if its skill is gone, no
     /// longer holds anything until its trigger ends, or no longer has that
     /// trigger (the same place in the skill on the same topic): nothing else
     /// would ever end it (the reviewer on #1066). Those ends are returned.
+    /// Pending scheduled runs cannot be approved against new definitions.
+    /// Their daily claims remain consumed; ordinary runs still revalidate.
     pub fn replace(&mut self, skills: Vec<Skill>) -> Vec<Run> {
-        let old = std::mem::replace(&mut self.skills, skills);
+        self.generation = Arc::new(());
+        let old = std::mem::replace(
+            &mut self.skills,
+            skills.into_iter().filter(|skill| skill.enabled).collect(),
+        );
         let mut ends = Vec::new();
         for ((name, index), watch) in &mut self.watches {
             if !watch.open {
@@ -2312,6 +2528,7 @@ impl Engine {
             watch.open = false;
             watch.since_us = None;
             ends.push(Run {
+                generation: None,
                 skill: name.clone(),
                 events: Vec::new(),
                 calls: vec![Call::Ends],
@@ -2433,6 +2650,9 @@ impl Engine {
         skill: &Skill,
         now_us: u64,
     ) -> bool {
+        if skill.is_routine() && !Self::routine_voice_fresh(latest, now_us) {
+            return false;
+        }
         skill
             .conditions
             .iter()
@@ -2447,6 +2667,18 @@ impl Engine {
             })
     }
 
+    fn routine_voice_fresh(
+        latest: &HashMap<String, (Value, u64, Option<u64>)>,
+        now_us: u64,
+    ) -> bool {
+        latest.get(VoiceState::TOPIC).is_some_and(|(value, at, _)| {
+            *at <= now_us
+                && now_us - *at < ROUTINE_VOICE_FRESH_US
+                && serde_json::from_value::<VoiceState>(value.clone())
+                    .is_ok_and(|voice| voice.state == Voice::Resting)
+        })
+    }
+
     /// A run asked of the Policy, when its answer comes: its calls made
     /// again at `now_us` (a look at where the face is now), if one of its
     /// triggers still holds on its topic's newest value that lasts and its
@@ -2458,6 +2690,16 @@ impl Engine {
     /// its watch, nothing would ever give back what it held.
     pub fn still(&self, run: &Run, now_us: u64) -> Option<Vec<Call>> {
         let skill = self.skills.iter().find(|skill| skill.name == run.skill)?;
+        let trigger = run
+            .from
+            .as_ref()
+            .and_then(|(index, _)| skill.triggers.get(*index));
+        if run.generation.as_ref().map_or_else(
+            || skill.scheduled_run(trigger),
+            |generation| !Arc::ptr_eq(&self.generation, generation),
+        ) {
+            return None;
+        }
         if skill.holds_until_ends()
             && !run.from.as_ref().is_some_and(|(index, _)| {
                 self.watches
@@ -2468,6 +2710,15 @@ impl Engine {
             return None;
         }
         let holds = |trigger: &Trigger, item: Option<&String>| {
+            if trigger.once_per_day && self.daily_faulted {
+                return false;
+            }
+            if trigger.during.as_ref().is_some_and(|window| {
+                self.local_moment(now_us)
+                    .is_none_or(|moment| !window.contains(moment.minute))
+            }) {
+                return false;
+            }
             Self::fresh(&self.latest, &trigger.topic, now_us).is_some_and(|value| {
                 match (&trigger.each, item) {
                     (Some((list, key)), Some(name)) => {
@@ -2520,6 +2771,7 @@ impl Engine {
         // A timed condition held only while its topic's value lasted: after a
         // value that expired, it begins again.
         let lasted = Self::fresh(&self.latest, topic, now_us).is_some();
+        let routine_voice_lasted = Self::routine_voice_fresh(&self.latest, now_us);
         self.latest
             .insert(topic.to_owned(), (value.clone(), now_us, lifespan_us));
         for skill in &self.skills {
@@ -2528,6 +2780,8 @@ impl Engine {
                     continue;
                 }
                 let key = (skill.name.clone(), index);
+                let lasted = lasted
+                    && (!skill.is_routine() || topic != VoiceState::TOPIC || routine_voice_lasted);
                 if condition.test.holds(&value) && lasted {
                     self.holding.entry(key).or_insert(now_us);
                 } else if condition.test.holds(&value) {
@@ -2539,11 +2793,13 @@ impl Engine {
         }
         let mut runs = Vec::new();
         let minute = self.local_minute(now_us);
+        let moment = self.local_moment(now_us);
         // What a run held until its trigger stops holding is given back
         // when it does.
         let ends = |watch: &mut Watch, skill: &Skill, runs: &mut Vec<Run>| {
             if std::mem::take(&mut watch.open) {
                 runs.push(Run {
+                    generation: None,
                     skill: skill.name.clone(),
                     events: Vec::new(),
                     calls: vec![Call::Ends],
@@ -2563,6 +2819,17 @@ impl Engine {
                     continue;
                 }
                 let watch = self.watches.entry((skill.name.clone(), index)).or_default();
+                if trigger.during.as_ref().is_some_and(|window| {
+                    moment
+                        .as_ref()
+                        .is_none_or(|moment| !window.contains(moment.minute))
+                }) {
+                    ends(watch, skill, &mut runs);
+                    // Time outside the window cannot count toward a duration
+                    // or leave an old presence edge waiting for tomorrow.
+                    *watch = Watch::default();
+                    continue;
+                }
                 if let Some((list, key)) = &trigger.each {
                     // Each item on its own: one that holds where, in the
                     // trigger's last message, it did not, or was not in the
@@ -2586,6 +2853,9 @@ impl Engine {
                         let held = format!("{key} {name} of {list} on {topic} came to hold");
                         let run = decide(
                             skill,
+                            skill
+                                .scheduled_run(Some(trigger))
+                                .then_some(&self.generation),
                             held,
                             (self.skip_ask, self.ask_policy),
                             question(skill),
@@ -2695,6 +2965,47 @@ impl Engine {
                     continue;
                 }
                 watch.waiting_us = None;
+                if trigger.once_per_day && (self.skip_ask || self.ask_policy) {
+                    if self.daily_faulted {
+                        continue;
+                    }
+                    let day = moment.as_ref().and_then(|moment| {
+                        trigger
+                            .during
+                            .as_ref()?
+                            .occurrence_day(moment.day, moment.minute)
+                    });
+                    let claim = match (&mut self.daily, day, trigger.name.as_deref()) {
+                        (Some(journal), Some(day), Some(name)) => {
+                            journal.claim(&skill.name, name, day)
+                        }
+                        _ => Err(std::io::Error::other(
+                            "daily trigger needs a writable journal and a known local clock",
+                        )),
+                    };
+                    match claim {
+                        Ok(true) => {}
+                        Ok(false) => continue,
+                        Err(error) => {
+                            self.daily_faulted = true;
+                            runs.push(Run {
+                                generation: Some(self.generation.clone()),
+                                skill: skill.name.clone(),
+                                events: vec![event(
+                                    &skill.name,
+                                    SkillStage::Answered,
+                                    format!("daily chance withheld: {error}"),
+                                    Some(false),
+                                )],
+                                calls: Vec::new(),
+                                ask: None,
+                                queue: false,
+                                from: Some((index, None)),
+                            });
+                            continue;
+                        }
+                    }
+                }
                 let held = match trigger.when {
                     When::Appears => format!(
                         "it appeared on {topic} after {} s without",
@@ -2715,6 +3026,9 @@ impl Engine {
                 }
                 let run = decide(
                     skill,
+                    skill
+                        .scheduled_run(Some(trigger))
+                        .then_some(&self.generation),
                     held,
                     (self.skip_ask, self.ask_policy),
                     question,
@@ -2778,6 +3092,7 @@ impl Engine {
         }
         self.tool_ran.insert(skill.name.clone(), now_us);
         Ok(Run {
+            generation: skill.scheduled_run(None).then(|| self.generation.clone()),
             skill: skill.name.clone(),
             events: vec![event(
                 &skill.name,
@@ -2872,6 +3187,7 @@ fn question(skill: &Skill) -> Value {
 /// when the run may go ahead.
 fn decide(
     skill: &Skill,
+    generation: Option<&Arc<()>>,
     held: String,
     (skip_ask, ask_policy): (bool, bool),
     question: Value,
@@ -2887,6 +3203,7 @@ fn decide(
         ),
     ];
     let run = |events, calls, ask| Run {
+        generation: generation.cloned(),
         skill: skill.name.clone(),
         events,
         calls,
@@ -3035,10 +3352,11 @@ fn calls(
 /// never runs one, since a lamp that moves for a text nobody in the room sent
 /// looks wrong (#1673, the first builder, 19 Oct). A key of the file's own,
 /// not of each tool, which the voice's function declarations refuse.
+/// Both lists include enabled skills only, even when given the inventory.
 pub fn tools_file(skills: &[Skill]) -> Value {
     let mut tools: Vec<Value> = Vec::new();
     let mut moving: Vec<&str> = Vec::new();
-    for skill in skills {
+    for skill in skills.iter().filter(|skill| skill.enabled) {
         if let Some(name) = &skill.tool
             && !tools.iter().any(|tool| tool["name"] == *name)
         {

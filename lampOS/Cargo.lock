@@ -2116,6 +2116,7 @@ dependencies = [
  "lamp-ipc",
  "lamp-local-time",
  "lamp-msgs",
+ "lamp-schedule",
  "lamp-voice",
  "libc",
  "serde",

@@ -299,8 +299,10 @@ fn repo_skill_with(dir: &Path, name: &str, from: &str, to: &str) -> PathBuf {
 /// look in the product. Every one says its version.
 #[test]
 fn every_skill_folder_says_its_kind_and_version() {
-    let (skills, errors) = load_all(&skills_root());
-    assert!(errors.is_empty(), "{errors:?}");
+    let skills: Vec<_> = lamp_skills::load_each(&skills_root())
+        .into_iter()
+        .map(|(folder, skill)| skill.unwrap_or_else(|why| panic!("{}: {why}", folder.display())))
+        .collect();
     let named = |kind| -> Vec<&str> {
         skills
             .iter()
@@ -311,6 +313,7 @@ fn every_skill_folder_says_its_kind_and_version() {
     assert_eq!(
         named(SkillKind::Core),
         [
+            "bedtime-morning",
             "dance",
             "light-out",
             "light-scenes",
@@ -330,6 +333,62 @@ fn every_skill_folder_says_its_kind_and_version() {
     for skill in &skills {
         assert_eq!(skill.version.as_deref(), Some("1.0.0"), "{}", skill.name);
     }
+    assert_eq!(
+        skills
+            .iter()
+            .filter(|skill| !skill.enabled)
+            .map(|skill| skill.name.as_str())
+            .collect::<Vec<_>>(),
+        ["bedtime-morning"],
+        "every existing scene and skill retains its enabled default"
+    );
+}
+
+#[test]
+fn disabled_skills_enter_neither_tools_nor_body_metadata() {
+    let dir = tempfile::tempdir().unwrap();
+    let bedtime = load(&skills_root().join("bedtime-morning")).unwrap();
+    assert!(!bedtime.enabled && bedtime.permissions.body);
+    let disabled = load(&skill_with(
+        dir.path(),
+        "disabled-body",
+        "enabled = false\ntool = \"disabled_stretch\"\n[permissions]\nbody = true\n[[do]]\nbody = { gesture = \"stretching\" }\n",
+    ))
+    .unwrap();
+    let quiet = load(&skill_with(
+        dir.path(),
+        "quiet-tool",
+        "tool = \"quiet_note\"\n[permissions]\nspeak = true\n[[do]]\nsay = \"Answer briefly.\"\n",
+    ))
+    .unwrap();
+    let moving = load(&skill_with(
+        dir.path(),
+        "moving-tool",
+        "tool = \"small_stretch\"\n[permissions]\nbody = true\n[[do]]\nbody = { gesture = \"stretching\" }\n",
+    ))
+    .unwrap();
+    // Passing the full inventory directly must not advertise disabled
+    // tools or include their body grant in the text-origin restriction.
+    let mut inventory = vec![bedtime, disabled];
+    assert_eq!(tools_file(&inventory), serde_json::json!({"tools":[]}));
+    inventory.push(quiet);
+    assert_eq!(
+        tools_file(&inventory),
+        serde_json::json!({"tools":[{"name":"quiet_note","description":"A test."}]}),
+        "a catalogue with no enabled body tool keeps its original shape"
+    );
+    inventory.push(moving);
+    assert_eq!(
+        tools_file(&inventory),
+        serde_json::json!({
+            "tools":[
+                {"name":"quiet_note","description":"A test."},
+                {"name":"small_stretch","description":"A test."}
+            ],
+            "body":["small_stretch"]
+        }),
+        "the enabled body tool remains identified for text refusal"
+    );
 }
 
 /// `kind` is core or installable, installable when it says none; a version
@@ -609,6 +668,29 @@ fn a_tool_is_one_skills_a_core_skills_first() {
         line.contains("not loaded: its tool \"dance\" is the core skill dance's"),
         "{listed}"
     );
+    // Disabled core inventory still reserves its name ahead of the
+    // alphabetically earlier installable copy, without exposing a tool.
+    let path = skills.join("dance/skill.toml");
+    fs::write(
+        &path,
+        format!("enabled = false\n{}", fs::read_to_string(&path).unwrap()),
+    )
+    .unwrap();
+    let (live, errors) = load_all(&skills);
+    assert_eq!(
+        live.iter()
+            .map(|skill| skill.name.as_str())
+            .collect::<Vec<_>>(),
+        ["b-wiggle"]
+    );
+    assert_eq!(errors.len(), 2);
+    let inventory = lamp_skills::load_each(&skills);
+    assert!(inventory.iter().any(|(_, result)| {
+        result
+            .as_ref()
+            .is_ok_and(|skill| skill.name == "dance" && !skill.enabled)
+    }));
+    assert_eq!(tools_file(&live)["tools"].as_array().unwrap().len(), 1);
 }
 
 /// The gate itself, as the program asks it where each call leaves: the
@@ -646,7 +728,15 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
             },
             "light",
         ),
+        (
+            Call::Show {
+                name: "calm".into(),
+                frames: Vec::new(),
+            },
+            "light",
+        ),
         (Call::Say("Hello.".into()), "speak"),
+        (Call::Cue, "speak"),
         (Call::SayFrom(lamp_skills::Source::Tasks, Some(3)), "speak"),
         (
             Call::Sound {
@@ -656,6 +746,27 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
             "speak",
         ),
         (Call::Look, "look"),
+        (
+            Call::Rest(lamp_skills::routine::Rest {
+                op: lamp_msgs::ExpressionRestOp::Rest,
+                during: Some(lamp_skills::daily::Window::parse("22:00", "06:00").unwrap()),
+            }),
+            "body",
+        ),
+        (
+            Call::Rest(lamp_skills::routine::Rest {
+                op: lamp_msgs::ExpressionRestOp::Wake,
+                during: None,
+            }),
+            "body",
+        ),
+        (
+            Call::Rest(lamp_skills::routine::Rest {
+                op: lamp_msgs::ExpressionRestOp::Cancel,
+                during: None,
+            }),
+            "body",
+        ),
     ];
     for (call, key) in &calls {
         let why = none.refuses(call).unwrap();
@@ -702,6 +813,90 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
     assert!(named.refuses_action("light_colour").is_some());
     assert_eq!(none.said(), "nothing");
     assert_eq!(lit.said(), "reads voice/state; light");
+    assert!(
+        none.refuses_output_limits()
+            .unwrap()
+            .contains("output_limits = true")
+    );
+    assert!(
+        lit.refuses_output_limits().is_some(),
+        "light is not a cap grant"
+    );
+    let capped = Permissions {
+        output_limits: true,
+        ..Permissions::default()
+    };
+    assert_eq!(capped.refuses_output_limits(), None);
+    assert_eq!(capped.said(), "output_limits");
+    for (call, _) in &calls {
+        assert!(
+            capped.refuses(call).is_some(),
+            "a cap grant allowed {call:?}"
+        );
+    }
+    assert!(capped.refuses_action("caps_put").is_some());
+}
+
+#[test]
+fn routines_need_each_output_grant_and_their_implicit_voice_read() {
+    let dir = tempfile::tempdir().unwrap();
+    let text = r#"
+enabled = false
+[trigger]
+topic = "fixture/routine"
+field = "ready"
+equals = true
+[ask]
+policy = "nudge"
+[permissions]
+topics = ["fixture/routine", "voice/state"]
+speak = true
+body = true
+output_limits = true
+[limits]
+during = { from = "22:00", to = "06:00" }
+volume_raw_max = 35
+[[do]]
+rest = { op = "wake" }
+cue = "hum"
+"#;
+    let folder = skill_with(dir.path(), "routine-check", text);
+    let skill = load(&folder).unwrap();
+    assert!(!skill.enabled);
+    assert_eq!(
+        skill.reads(),
+        [
+            ("fixture/routine".into(), "a trigger"),
+            ("voice/state".into(), "a routine's quiet gate")
+        ]
+    );
+    for (from, to, why) in [
+        ("speak = true", "speak = false", "needs speak = true"),
+        ("body = true", "body = false", "needs body = true"),
+        (
+            "output_limits = true",
+            "output_limits = false",
+            "needs output_limits = true",
+        ),
+        (
+            "topics = [\"fixture/routine\", \"voice/state\"]",
+            "topics = [\"fixture/routine\"]",
+            "a routine's quiet gate reads voice/state",
+        ),
+        (
+            "output_limits = true",
+            "output_limits = true\noutputs = true",
+            "unknown field `outputs`",
+        ),
+    ] {
+        fs::write(folder.join("skill.toml"), text.replacen(from, to, 1)).unwrap();
+        let error = load(&folder).unwrap_err();
+        assert!(error.contains(why), "{from}: {error}");
+    }
+    let loaded = text.replace("enabled = false", "enabled = true");
+    fs::write(folder.join("skill.toml"), loaded).unwrap();
+    let engine = Engine::new(vec![load(&folder).unwrap()], true);
+    assert_eq!(engine.topics(), ["fixture/routine", "voice/state"]);
 }
 
 /// A WAV of `frames` frames of a steady `level`, as `spec` says.
@@ -6171,6 +6366,14 @@ fn the_loader_holds_kept_lights_shows_turns_and_choices_to_their_rules() {
         ),
         (
             format!("{TOOL}[[do]]\nif_choice = [\"a\"]\nsay = \"Hi.\"\n"),
+            "body, light or show",
+        ),
+        (
+            format!("{TOOL}[[do]]\nif_choice = [\"a\"]\ncue = \"hum\"\n"),
+            "body, light or show",
+        ),
+        (
+            format!("{TOOL}[[do]]\nif_choice = [\"a\"]\nrest = {{ op = \"wake\" }}\n"),
             "body, light or show",
         ),
         (

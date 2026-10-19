@@ -1,0 +1,98 @@
+[
+  {
+    "attempt": "before permissions integration",
+    "commands": [
+      {
+        "stage": "fmt",
+        "command": "cargo fmt --all --check",
+        "exit_code": 0,
+        "seconds": 3.52,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "clippy",
+        "command": "cargo clippy --workspace --all-targets -- -D warnings",
+        "exit_code": 0,
+        "seconds": 26.22,
+        "log_sha256": "5727798c17b851448b332bda8191739c90b9afbfe8bd8efb2ac75371c9f02ba7"
+      },
+      {
+        "stage": "tests",
+        "command": "cargo test --workspace -- --test-threads=1",
+        "exit_code": 101,
+        "seconds": 1125.49,
+        "log_sha256": "1bd72ad633d17a59b7913ac7702a5b1b89257f46f822552b74c54542930749d1"
+      }
+    ],
+    "test_totals": {
+      "passed": 6993,
+      "failed": 1,
+      "ignored": 44
+    },
+    "failure": "lamp-voice-eval::export::tests::the_bus_topics_hold_every_topic_the_messages_name: output/caps missing from topic census"
+  },
+  {
+    "attempt": "after permissions integration, stale generated message artifacts",
+    "commands": [
+      {
+        "stage": "fmt",
+        "command": "cargo fmt --all --check",
+        "exit_code": 0,
+        "seconds": 3.29,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "clippy",
+        "command": "cargo clippy --workspace --all-targets -- -D warnings",
+        "exit_code": 0,
+        "seconds": 18.44,
+        "log_sha256": "f26f8f8e3056834328f3246c18bfba642edd5878efb6697021f336029eea0136"
+      },
+      {
+        "stage": "tests",
+        "command": "cargo test --workspace -- --test-threads=1",
+        "exit_code": 101,
+        "seconds": 6.67,
+        "log_sha256": "62fec064e9fc96f238dd808abed3ae303417c72fdcb1c918cb9b1c2c1ae572a8"
+      }
+    ],
+    "test_totals": null,
+    "failure": "Compilation stopped before tests: stale lamp-msgs artifacts lacked OutputCap/OutputCaps exports; unchanged source compiled after cargo clean -p lamp-msgs."
+  },
+  {
+    "attempt": "first rebased standalone gate",
+    "base": "d9ba8d0f2a5070569fef3225a0924cdcdc005aba",
+    "commands": [
+      {
+        "stage": "fmt",
+        "command": "cargo fmt --all --check",
+        "exit_code": 0,
+        "seconds": 3.55,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "clippy",
+        "command": "cargo clippy --workspace --all-targets -- -D warnings",
+        "exit_code": 0,
+        "seconds": 132.34,
+        "log_sha256": "5cc7260e40837d03a2ce491972370224f8b26efc372cf9325826b3e270ad6724"
+      },
+      {
+        "stage": "tests",
+        "command": "cargo test --workspace -- --test-threads=1",
+        "exit_code": 101,
+        "seconds": 214.19,
+        "log_sha256": "5a06aecea05cb11120f680fa7ddcfb5957f30170eec95e66fd7d8f57ba526ffe"
+      }
+    ],
+    "test_totals": {
+      "passed": 56,
+      "failed": 1,
+      "ignored": 0,
+      "measured": 0,
+      "filtered_out": 0
+    },
+    "failure": "A stop request could win the loop boundary after a cap storage failure and hide that known failure behind a successful server exit. Readiness and the restriction remained fail-quiet.",
+    "correction": "The server checks the sticky failure before returning from normal shutdown, without additional storage, bus or mixer work."
+  }
+]

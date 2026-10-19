@@ -92,6 +92,7 @@ pub mod remember;
 pub mod reminders;
 pub mod resend;
 pub mod ring_asleep;
+pub mod ring_caps;
 pub mod ring_face;
 pub mod ring_head;
 pub mod ring_light;

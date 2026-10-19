@@ -83,7 +83,10 @@ do this here?
 - **Least privilege.** A skill may read and use only what its
   `[permissions]` lists, and without the table it may do nothing: the
   runtime refuses one that reads a topic or makes a step it does not give.
-  Give exactly what it uses, and tell the owner what that is.
+  Give exactly what it uses, and tell the owner what that is. A fixed hum
+  still needs speech permission; rest intents need body permission, and
+  private output ceilings need their separate `output_limits` grant. Keep
+  unmeasured routines disabled; installation alone does not qualify them.
 
 ## 3. Write the skill folder
 
