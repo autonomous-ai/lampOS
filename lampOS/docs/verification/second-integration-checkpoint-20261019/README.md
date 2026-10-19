@@ -1,6 +1,6 @@
 # Second integration checkpoint, 2026-10-19
 
-Current status (18:24 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
+Current status (18:42 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
 passed automatic ARM64: **7,684 nextest (1 leaky), 48 skipped**, plus
 **4 doc and 12 separate harness tests**. [Native evidence](caps-foundation-arm64.json)
 records the exact head, base and merge checkout. The [host motion failure](caps-foundation-motion-failure.json)
@@ -31,7 +31,16 @@ passed (1 leaky), 48 skipped**, plus **4 doc and 12 harness tests**.
 The [warm-STT integration review](music-warm-stt-integration-review.json)
 and [conditional peer review](music-conditional-integration-review.json)
 record the next Music regression requirements and the source-verified #2008
-activation P2. A private current-integration rehearsal is underway.
+activation P2. The [warm-listener rehearsal preflight](music-current-integration-preflight.json)
+passed 278 provider, 46 requested-audio, 3 accepted-decline and 1 prior-action
+cases (overlapping), full shared crates **486/0/0**, ring-worker **23/0/0**,
+formatting, strict workspace Clippy and build. All 1,616 source hashes match
+both copies. [Initial sandbox failures](music-current-integration-sandbox-failure.json)
+remain separate. [Source review](music-current-integration-review.json) records
+the next unclear/hum integration boundaries and the newly reported #2003
+stale-provenance P2. The [27-consumer scan](music-current-integration-consumers.json)
+sets the final full gate's scope; the private preflight is not a final gate.
+First's separate warm-STT lamp P1 remains with its owner.
 The [work log](../../work-log.md) carries current integration status.
 
 Historical checkpoint (15:26 UTC): #1732 is published as `22c9c730bd` onto #1712.
