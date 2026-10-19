@@ -1357,9 +1357,19 @@ after a take-over, but now for every turn:
     - its name, its words calling it, a tap, or being said close to it let
       a line out as before.
 
-    In a quiet room it is as on Live. The journal's "no conversation going
-    on" line says when the lamp was "last heard saying words, to their end,"
-    and adds ", in a busy room, where it goes on 15 s".
+    In a quiet room it is as on Live, and one more thing: a conversation is
+    also going on for 20 s after the end of the lamp's words
+    (`AFTER_THE_LAMPS_WORDS`, follows-on's `WITHIN_US`), whenever the answer
+    began (`worker::going_on_from`). The thread's 45 s count from an
+    answer's start, so a story told for 40 s or more used them up while it
+    was told. On lamp-4ace on 20 Oct at 01:47 and 01:49, two hand-overs said
+    as stories ended ("Hey Lamp, ask Claude Code to write a two-line
+    poem…", "… ask Codex to write a haiku…") lost "Hey Lamp" to the lamp's
+    own voice and were held as no conversation, "it was last heard saying
+    words, to their end, 0 s ago" (the first builder at 01:50 and 02:04 on
+    #1712). The journal's "no conversation going on" line says when the
+    lamp was "last heard saying words, to their end," and adds ", in a busy
+    room, where it goes on 15 s".
   - **the journal names the sign that let a line out** (#1712, the first
     builder at 17:49). With `--spoken-to`, the rule's first reason can be
     one that lets nothing out by itself, the session trusted or the room

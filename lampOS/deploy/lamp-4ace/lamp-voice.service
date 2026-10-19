@@ -157,7 +157,7 @@ Environment=LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo
 Environment=LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek
 Environment=LAMP_SECOND_GEMINI_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/google-search/v1beta
 # The words of this lamp's played test lines, heard as written (#1830); not a product setting.
-Environment="LAMP_SECOND_KEY_TERMS=Hanoi,Da Nang,Ho Chi Minh City,desk lamp,two-line poem,haiku,Bitcoin,gold price,Louvre"
+Environment="LAMP_SECOND_KEY_TERMS=Hanoi,Da Nang,Ho Chi Minh City,desk lamp,two-line poem,haiku,Bitcoin,gold price,Louvre,Claude Code,Codex"
 # Whom it answered: one line per first output the rule judged, private to root on the lamp, never published
 # (lampOS/docs/attention.md, "The record of whom it answered"). Take this line out and nothing is written.
 Environment=LAMP_FIRST_OUTPUT=/var/lib/lampOS/voice/first-output
