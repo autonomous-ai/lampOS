@@ -3834,3 +3834,54 @@ async fn a_chat_begun_on_a_cut_ins_early_words_carries_its_note() {
         assert!(chats.iter().all(|chat| chat.contains(&cut_in)), "{chats:?}");
     }
 }
+
+/// #1712, item 4 (`LAMP_GOING_ON_ASKS`, #1522): a line the rule says waits
+/// for the Policy is asked once the Policy's hook decides it is played, and
+/// not at all when held; a hook that never decides lets it be played after
+/// the bound, as with no decision.
+#[tokio::test(start_paused = true)]
+async fn a_line_that_waits_for_the_policy_goes_as_it_decides() {
+    for (decides_after, says, asked) in [
+        (Some(3), None, 1),
+        (Some(3), Some("held"), 0),
+        (None, None, 1),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("And what about tomorrow".to_owned())].into()),
+            chats: Mutex::new([vec![text("Rain."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let polled = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = polled.clone();
+        let mut engine = engine
+            .heeding(Arc::new(|_, _, _, _| Some(super::WAITS_FOR_POLICY)))
+            .asking_the_policy(Arc::new(move |request| {
+                assert_eq!(request, 1);
+                let polls = counted.fetch_add(1, Ordering::SeqCst) + 1;
+                decides_after.filter(|after| polls >= *after).map(|_| says)
+            }));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(10), engine.next())
+                .await
+                .expect("the turn ends");
+            if matches!(event, ProviderOutput::TurnComplete { .. }) {
+                break;
+            }
+        }
+        assert_eq!(
+            script.asked.lock().unwrap().len(),
+            asked,
+            "decides after {decides_after:?}, says {says:?}"
+        );
+        let polls = polled.load(Ordering::SeqCst);
+        match decides_after {
+            Some(after) => assert_eq!(polls, after),
+            // Up to the bound, `policy_holds::WAIT` and four polls more.
+            None => assert!((40..=46).contains(&polls), "{polls} polls"),
+        }
+    }
+}
