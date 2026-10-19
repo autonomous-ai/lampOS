@@ -1598,6 +1598,8 @@ pub(crate) mod tests {
                     PartResult::new("camera", Verdict::NotChecked, "HomeWiFi-5G"),
                 ],
                 build: Some("deadbeefcafe-Alice".into()),
+                // The report's summary leaves the lamp's own name out.
+                lamp: Some("lamp-Alice".into()),
             }),
             restarts: restarts(
                 "Id=lamp-voice.service\nNRestarts=0\n\nId=Alice.service\nNRestarts=4\n\nId=lamp-eyes.service\nNRestarts=1\n",

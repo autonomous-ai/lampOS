@@ -15,6 +15,15 @@ the lamp.
   run's verdict, and its `build`: the program's folder under
   `/opt/lampOS/selftest/` as installed (`build_of`), absent when run from
   anywhere else, so `lamp-health` can tell an older rule's fail (#1399).
+  And its `lamp`: the lamp that ran it, by its host name as the kernel has
+  it (`/proc/sys/kernel/hostname`, `lamp_selftest::lamp_of`), the name
+  `lamp-cloud`'s `info` answers as `hostname`: `lamp-` and the last four of
+  its serial or Ethernet address, which the image's hotspot script gives it
+  at the first boot. A test station refuses a report naming another lamp
+  than the one it identified ([production-testing.md](production-testing.md)).
+  Absent where the name cannot be read or is not a host name (1 to 64
+  letters, digits, `-`, `.`, `_`), and from runs before it: those still read
+  (`#[serde(default)]`), with no lamp.
 - `/var/lib/lamp-selftest/<started>.json` (`--dir`, both units) for each run, the newest 20
   kept, with `latest.json` and `latest.txt` (one line a part) beside them.
   Each file is written whole and renamed, so a power cut leaves no half
