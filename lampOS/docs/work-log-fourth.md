@@ -4675,6 +4675,21 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#1701 merged** (09:01). Its P3, Monday's A/B written into `same-voice.md` and the `LAMP_SAME_VOICE_MODEL` row, is next: a docs follow-up after the current gate, since the `switches` test reads that table.
 - **#1673's piece 3, a fault of mine caught by the gate before any push:** `lamp-cloud`'s texts tick was a `select!` beside the MQTT client's `poll`, and it dropped that `poll` every 50 ms, even with `LAMP_MESSAGES` off. `poll` makes the connection itself, so a broker slower than 50 ms to answer would never be joined. The gate's reconnect test failed, and a new test shows it: a broker answering CONNECT after 300 ms got 17 connects in 5 s and no subscription. Now one `poll` is kept until it ends, and the tick runs beside it only while texts are taken. The new test and all 7 of `online`'s pass, and the two connection tests passed 10 of 10. The gate is running again; then the PR replaces #1697.
 
+## 2026-10-19, 10:50 ICT: #1713 and #1714 merged; #1713's review fixed for a follow-up; Lamp 2 stays a `lamp` on the backend
+
+- **#1713 merged** (10:21, texts from the app, off unless `LAMP_MESSAGES=on`). The reviewer's 10:09 findings came in before it, and the merge went over them (the reviewer, 10:38): a text's answer was told the room's spoken thread (P1), and face and memory calls in a text acted on the person in view (P2). No unit sets `LAMP_MESSAGES`. **The fix is one commit on `fourth/messages-review`, gating now:**
+  - a text's own system message, with no thread and no history;
+  - face calls refused for every unheard request;
+  - a text's memory is the room's;
+  - a reply cut to one message;
+  - `chat/in` lasting the run's minute, so a stale text is passed over;
+  - the 10:21 review's two doc P3s.
+
+  Each new test fails with its fix undone.
+- **#1714 merged:** Monday's same-voice A/B in `same-voice.md` and the switches row (#1701's P3).
+- **#1396 changed** (the first builder, 10:1x, on the backend's question): a Lamp 2 stays a `lamp` on the backend, with no new type. The lamp tells the generations apart with `"generation": "lamp-v2"`, now also on every `lamp-cloud` reply (asked by the backend at 10:32 and agreed at 10:34). That's my next PR. The backend PR that added the type is closed, and the app PR is reworked to pick the Lamp 2 page by the generation.
+- **#1673's piece 4:** as agreed, the news wouldn't reach the phone unasked (the reason is in the app repository, so only a pointer on #1673). On the lamp's side, news not told aloud is to be given with the answer to the person's next text; it's built locally, after the follow-up.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
