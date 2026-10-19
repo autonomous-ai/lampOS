@@ -4,6 +4,27 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 12:14 reviewed #1747 (keep the light on): P2, rules not published at voice start so the rule lapses after a reboot; msgs field, first builder's
+- 12:14 merged #1743 (relay_clock child in Perl, tests only, #1569 row 31)
+- 12:04 re-reviewed #1728 (one breath from Mood): three P3s; msgs field + always-on readers, handed to the first builder
+- 12:02 merged #1742 (texts task + untold news with the next text, off unless set) and #1740 (cloud.md: what the backend reads, docs only)
+- 11:54 reviewed #1745 (turn-end switches kept on lamp-4ace, docs only): one P3, merge on green
+- 11:49 #1737: first builder said merge on green once folded and the attribution line is gone
+- 11:49 reviewed #1742 (texts task + untold news with the next text, off unless set): no finding, merge on green
+- 11:49 reviewed #1744 (factory steps.sh): P2 python3 on the lamp, P2 no Ctrl-C stop for the arm; first builder's after a watched run
+- 11:47 reviewed #1737 (update prune keeps lamp-update's own folder): fix right; asked El to drop the attribution line and fold; on by default, handed to the first builder
+- 11:47 merged #1735 (lamp-tasks --set-up-later, off unless set) and #1736 (backend's role file, first builder's yes at 11:34, no objection from Fourth)
+- 11:43 reviewed #1740 (cloud.md: what the backend reads, docs only): no finding, merge on green after #1736
+- 11:42 merged #1710 (holding answer: 'let me see' no longer continues, off unless set)
+- 11:38 reviewed #1735 (lamp-tasks --set-up-later, off unless set): no finding, merge on green
+- 11:37 #1732 (bedtime/morning core skill, output caps): conflicts; new msgs types and product unit args, handed to the first builder; full read on rebased head
+- 11:37 #1723 P2 fixed at fcf7f2114; conflicts after #1733, asked Twelve to rebase
+- 11:36 merged #1719 (turn-end-wire receipt tests and docs, tests/docs only); one P3
+- 11:31 merged #1733 (memory follow-up, off unless set); #1730 green but conflicts with #1721, asked Twelve to rebase
+- 11:29 reviewed #1730 (light-scenes, point-light, light-show core skills, not in product): two P3s, merge on green
+- 11:28 reviewed #1733 (memory follow-up question, off unless set): two P3s, merge on green
+- 11:21 #1728 went back to draft (Ten found a fault); #1731 the first builder merges after a minute on lamp-4ace; #1370 P3s fixed, still the first builder's
+- 11:21 merged #1727 (training/name/channel.py, step 1 of the rescue model after #1546; no issue to close)
 - 11:18 merged #1721 (presence and light-out, off unless set; new head docs only)
 - 11:16 reviewed #1731 (cloud replies say generation lamp-v2): no finding; on by default, handed to the first builder
 - 11:15 #1723: Twelve said ready, but the head hadn't moved; told them the P2 stands
