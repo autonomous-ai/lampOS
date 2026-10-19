@@ -358,3 +358,14 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   Live for scenes 4 and 6). twelve-P2 on #1722: memory's forget-all and
   threads switches reach only the Live worker, not the DeepSeek route. A yes
   to Tests on #1806.
+- #1815 taken (the first builder, 19:05). It's #1909: `lamp-cloud` on in the
+  product unit. The reviewer's P2 was that `Conflicts=` stops os-server even
+  when lamp-cloud is skipped by its conditions; I showed both forms on c0a4
+  with stand-in units, then fixed it with `ExecStartPre=-+systemctl stop`.
+  Folded with the P3 line and rebased (`11f86c666`). `lamp-voice`'s head has a
+  `lamp-cloud` compile error from #1728 (`UNITS` length), reported on #1722.
+  One read-only ssh to c0a4 was made before the lock: logged, and Thirteen
+  told.
+- The owner's rule (19:38): voice tests on the second route. twelve-P2 is
+  #1930 into #1712's head: forget-all and threads reach the second worker.
+  #1693 (4)'s run sheet is rewritten for the second route.
