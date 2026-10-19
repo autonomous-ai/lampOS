@@ -537,6 +537,23 @@ impl Cli {
         parse_ps(&reply.stdout).map_err(str::to_string)
     }
 
+    /// Whether Harness is signed in to the person's account (`harness auth
+    /// status --json`, `serve --set-up-later`). A read only: it signs
+    /// nothing in or out.
+    pub fn signed_in(&self) -> Result<SignIn, String> {
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run(
+                &["auth".into(), "status".into(), "--json".into()],
+                self.config.read_timeout,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("auth_status_failed".into());
+        }
+        parse_auth_status(&reply.stdout).map_err(str::to_string)
+    }
+
     /// A second adapter on the same CLI and settings, for `wait`
     /// (`serve --push-wait`): held for minutes, it must never take the one
     /// operation lane launches and reads share.
@@ -1054,6 +1071,46 @@ pub fn closed(code: Option<i32>) -> Result<Closed, String> {
         Some(_) => Err("close_failed".into()),
         None => Err("close_killed".into()),
     }
+}
+
+/// Whether Harness is signed in to the person's account.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SignIn {
+    In,
+    /// Signed in, and its sign-in could not be renewed just now: no
+    /// network, or the sign-in service is down.
+    Offline,
+    Out,
+}
+
+impl SignIn {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::In => "yes",
+            Self::Offline => "offline",
+            Self::Out => "no",
+        }
+    }
+}
+
+/// What `harness auth status --json` says (openharness `cli.ts`
+/// `authStatusCommand`): one line, exit 0 signed in or not, with
+/// `loggedIn`, and `offline` when signed in but unrenewable just now.
+/// Other fields are passed over.
+pub fn parse_auth_status(bytes: &[u8]) -> Result<SignIn, &'static str> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Status {
+        logged_in: bool,
+        #[serde(default)]
+        offline: bool,
+    }
+    let status: Status = serde_json::from_slice(bytes).map_err(|_| "auth_status_invalid_reply")?;
+    Ok(match (status.logged_in, status.offline) {
+        (false, _) => SignIn::Out,
+        (true, true) => SignIn::Offline,
+        (true, false) => SignIn::In,
+    })
 }
 
 /// What `harness ps --json` says (Harness 0.4.2): an object whose

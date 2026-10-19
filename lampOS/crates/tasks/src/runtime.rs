@@ -6,7 +6,7 @@ use crate::{
     },
     harness::{
         Cli, CliConfig, Closed, Ended, Launch, LaunchOutcome, Listed, MOST_WAITED, Observation,
-        Target,
+        SignIn, Target,
     },
     progress::{Reads, Tracker},
     protocol::{MAX_LINE_BYTES, MAX_REPLY_BYTES, Request},
@@ -137,10 +137,28 @@ pub struct Config {
     /// `version` ([`read_targets_or_newer`]): the part runs with hand-overs
     /// off and says so, rather than stopping and saying nothing (#1505).
     pub targets_newer: Option<u32>,
+    /// `serve --set-up-later`: the part runs before the lamp is set up for
+    /// hand-overs, and says why they are off (#1676). Off unless set.
+    pub set_up_later: Option<SetUpLater>,
 }
 
+/// What `serve --set-up-later` looks at again, and how often.
+#[derive(Clone, Debug)]
+pub struct SetUpLater {
+    /// The targets file, read again whenever it changes: a computer added
+    /// after sign-in is used without a restart, and a file that is gone
+    /// leaves no target.
+    pub targets: PathBuf,
+    /// How often the file and Harness's sign-in are looked at again.
+    pub every: Duration,
+}
+
+/// How often `serve --set-up-later` looks at the targets and the sign-in.
+pub const SET_UP_LOOK_EVERY: Duration = Duration::from_secs(60);
+
 /// An operator-owned file selects targets; a model supplies only an alias.
-/// Configuration is read once. Existing tasks retain their original target.
+/// Read once as the part starts, and again when it changes with `serve
+/// --set-up-later`. Existing tasks retain their original target.
 pub fn read_targets(path: &Path) -> io::Result<BTreeMap<String, Target>> {
     read_targets_or_newer(path)?.map_err(|version| {
         io::Error::new(
@@ -305,6 +323,16 @@ pub trait Adapter: Send + 'static {
         let _ = (machine_id, agent_id);
         Err("unsupported".into())
     }
+    /// Whether Harness is signed in to the person's account (`serve
+    /// --set-up-later`). An adapter without it says so.
+    fn signed_in(&self) -> Result<SignIn, String> {
+        Err("unsupported".into())
+    }
+    /// There is no Harness program behind this adapter (`serve
+    /// --set-up-later`): every hand-over is refused, with why.
+    fn absent(&self) -> bool {
+        false
+    }
 }
 impl Adapter for Cli {
     fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
@@ -327,6 +355,60 @@ impl Adapter for Cli {
     }
     fn close(&self, machine_id: &str, agent_id: &str) -> Result<Closed, String> {
         Cli::close(self, machine_id, agent_id)
+    }
+    fn signed_in(&self) -> Result<SignIn, String> {
+        Cli::signed_in(self)
+    }
+}
+
+/// The production adapter: Harness's CLI, or, with `serve --set-up-later`
+/// and no program at `--harness`, nothing to hand over with. Harness put on
+/// later is used once the part starts again.
+enum Production {
+    Cli(Cli),
+    Absent,
+}
+impl Adapter for Production {
+    fn wait_lane(&self) -> Option<Arc<dyn WaitLane>> {
+        match self {
+            Self::Cli(cli) => Adapter::wait_lane(cli),
+            Self::Absent => None,
+        }
+    }
+    fn launch(&self, launch: &Launch) -> LaunchOutcome {
+        match self {
+            Self::Cli(cli) => cli.launch(launch),
+            Self::Absent => LaunchOutcome::NotSent {
+                code: "no_harness".into(),
+            },
+        }
+    }
+    fn observe(&self, machine_id: &str, agent_id: &str) -> Result<Observation, String> {
+        match self {
+            Self::Cli(cli) => cli.observe(machine_id, agent_id),
+            Self::Absent => Err("no_harness".into()),
+        }
+    }
+    fn status(&self, machine_id: &str) -> Result<Vec<Listed>, String> {
+        match self {
+            Self::Cli(cli) => cli.status(machine_id),
+            Self::Absent => Err("no_harness".into()),
+        }
+    }
+    fn close(&self, machine_id: &str, agent_id: &str) -> Result<Closed, String> {
+        match self {
+            Self::Cli(cli) => cli.close(machine_id, agent_id),
+            Self::Absent => Err("no_harness".into()),
+        }
+    }
+    fn signed_in(&self) -> Result<SignIn, String> {
+        match self {
+            Self::Cli(cli) => cli.signed_in(),
+            Self::Absent => Err("no_harness".into()),
+        }
+    }
+    fn absent(&self) -> bool {
+        matches!(self, Self::Absent)
     }
 }
 
@@ -361,18 +443,31 @@ struct Report {
     /// once, and how the reads have gone.
     status: Option<(u64, Arc<TaskStatus>)>,
     reads: Option<Reads>,
+    /// With `serve --set-up-later`: what was last found.
+    set_up: Option<SetUp>,
+}
+/// What `serve --set-up-later` last found.
+#[derive(Clone, Copy, Default)]
+struct SetUp {
+    /// The targets file changed and is not valid: the targets before it
+    /// are kept.
+    targets_invalid: bool,
+    /// Harness's sign-in, once read.
+    sign_in: Option<SignIn>,
 }
 enum Job {
     Launch(LaunchJob),
     Observe(ObservationJob),
     Status(String),
     Close(CloseJob),
+    SignIn,
 }
 enum Outcome {
     Launch(u64, LaunchOutcome),
     Observe(ObservationJob, Result<Observation, String>),
     Status(String, Result<Vec<Listed>, String>),
     Close(CloseJob, Result<Closed, String>),
+    SignIn(Result<SignIn, String>),
 }
 struct Binding {
     path: PathBuf,
@@ -496,7 +591,13 @@ fn owner<C: Clock>(
     (jobs, outcomes): (SyncSender<Job>, Receiver<Outcome>),
     current: Arc<Mutex<Report>>,
     stop: Arc<AtomicBool>,
-    (watch, progress, lane, close_told): (bool, bool, Option<Arc<dyn WaitLane>>, bool),
+    (watch, progress, lane, close_told, set_up_later): (
+        bool,
+        bool,
+        Option<Arc<dyn WaitLane>>,
+        bool,
+        Option<SetUpLater>,
+    ),
 ) -> io::Result<()> {
     let mut requests = 0u64;
     let mut busy = false;
@@ -509,10 +610,22 @@ fn owner<C: Clock>(
     let mut status_began = Instant::now();
     // A store kept aside is looked for again once a minute (#1505).
     let mut looked_aside = Instant::now();
+    // `serve --set-up-later`: the targets file as last read, and when the
+    // file and the sign-in are next looked at. The first look is at once.
+    let mut set_up = set_up_later.as_ref().map(|_| SetUp::default());
+    let mut targets_seen = None;
+    let mut targets_due = Instant::now();
+    let mut sign_in_due = Instant::now();
     while !stop.load(Ordering::Acquire) {
         if looked_aside.elapsed() >= LOOK_ASIDE_EVERY {
             engine.look_aside();
             looked_aside = Instant::now();
+        }
+        if let (Some(later), Some(found)) = (set_up_later.as_ref(), set_up.as_mut())
+            && Instant::now() >= targets_due
+        {
+            targets_due = Instant::now() + later.every;
+            look_at_targets(&mut engine, &later.targets, &mut targets_seen, found);
         }
         // Something that may have changed which tasks are watched.
         let mut moved = false;
@@ -532,6 +645,22 @@ fn owner<C: Clock>(
                     // the lamp closed and how it went.
                     eprintln!("tasks: closing task {}'s harness: {result:?}", job.task_id);
                     engine.finish_close(&job, result, &now)
+                }
+                Outcome::SignIn(read) => {
+                    if let Some(found) = set_up.as_mut() {
+                        match read {
+                            Ok(sign_in) => {
+                                if found.sign_in != Some(sign_in) {
+                                    eprintln!("tasks: Harness signed in: {}", sign_in.name());
+                                }
+                                found.sign_in = Some(sign_in);
+                            }
+                            // Kept as it was: one failed read says nothing
+                            // about the account.
+                            Err(code) => eprintln!("tasks: Harness's sign-in not read: {code}"),
+                        }
+                    }
+                    Ok(())
                 }
                 Outcome::Status(machine, listed) => {
                     if let Some(tracker) = tracker.as_mut() {
@@ -623,14 +752,27 @@ fn owner<C: Clock>(
                     };
                     // One `ps` a machine, after launches and reads: it is a
                     // read only and takes nothing from them.
-                    observe.or_else(|| {
-                        let tracker = tracker.as_mut()?;
-                        let watched = engine.watched(&now);
-                        let machine = tracker.due(&watched, now.monotonic_ms)?;
-                        tracker.asked(&machine, &watched, now.monotonic_ms);
-                        status_began = Instant::now();
-                        Some(Job::Status(machine))
-                    })
+                    observe
+                        .or_else(|| {
+                            let tracker = tracker.as_mut()?;
+                            let watched = engine.watched(&now);
+                            let machine = tracker.due(&watched, now.monotonic_ms)?;
+                            tracker.asked(&machine, &watched, now.monotonic_ms);
+                            status_began = Instant::now();
+                            Some(Job::Status(machine))
+                        })
+                        // The sign-in last of all, once a while, and never
+                        // with no Harness to ask (`serve --set-up-later`).
+                        .or_else(|| {
+                            let later = set_up_later.as_ref()?;
+                            if engine.summary()["no_harness"] == true
+                                || Instant::now() < sign_in_due
+                            {
+                                return None;
+                            }
+                            sign_in_due = Instant::now() + later.every;
+                            Some(Job::SignIn)
+                        })
                 }
             };
             if let Some(job) = next {
@@ -668,9 +810,82 @@ fn owner<C: Clock>(
             cli_busy: busy,
             status: status.clone(),
             reads: tracker.as_ref().map(Tracker::reads),
+            set_up,
         };
     }
     Ok(())
+}
+
+/// What makes a targets file another one: written again in place, or
+/// replaced by a rename.
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct FileIdentity {
+    dev: u64,
+    ino: u64,
+    len: u64,
+    modified: i64,
+    nanos: i64,
+}
+
+/// Read the targets again when the file changed (`serve --set-up-later`).
+/// The same strictness as at start ([`read_targets_or_newer`]): valid ones
+/// are used from now on; ones for a newer build turn hand-overs off; a
+/// file that is gone leaves no target; and one that is not valid keeps the
+/// targets before it, and says so. `seen` is the file as last read: `None`
+/// before the first look, `Some(None)` while there is no file.
+fn look_at_targets(
+    engine: &mut Engine<Store>,
+    path: &Path,
+    seen: &mut Option<Option<FileIdentity>>,
+    found: &mut SetUp,
+) {
+    let identity = fs::symlink_metadata(path)
+        .ok()
+        .map(|metadata| FileIdentity {
+            dev: metadata.dev(),
+            ino: metadata.ino(),
+            len: metadata.len(),
+            modified: metadata.mtime(),
+            nanos: metadata.mtime_nsec(),
+        });
+    if *seen == Some(identity) {
+        return;
+    }
+    let first = seen.is_none();
+    *seen = Some(identity);
+    let read = match read_targets_or_newer(path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(Ok(BTreeMap::new())),
+        read => read,
+    };
+    // One line a change, with how many and never their names: a target's
+    // alias may be a computer's name.
+    let said = match read {
+        Ok(Ok(targets)) => {
+            let count = targets.len();
+            match engine.set_targets(targets) {
+                Ok(()) => {
+                    found.targets_invalid = false;
+                    format!("{count} task targets")
+                }
+                Err(_) => {
+                    found.targets_invalid = true;
+                    "task targets not valid; the ones before are kept".into()
+                }
+            }
+        }
+        Ok(Err(version)) => {
+            found.targets_invalid = false;
+            engine.targets_newer(version);
+            format!("task targets for a newer build (version {version}); hand-overs are off")
+        }
+        Err(error) => {
+            found.targets_invalid = true;
+            format!("task targets not valid ({error}); the ones before are kept")
+        }
+    };
+    if !first {
+        eprintln!("tasks: the targets file changed: {said}");
+    }
 }
 
 /// The `wait`s held, one a machine, and the agents' ends they brought that
@@ -1051,11 +1266,25 @@ pub fn serve<C: Clock>(
     stop: Arc<AtomicBool>,
 ) -> io::Result<()> {
     let cancelled = stop.clone();
+    // Only a program that is not there at all: one there and not fit to
+    // run is refused as before.
+    let absent = config.set_up_later.is_some()
+        && fs::symlink_metadata(&executable)
+            .is_err_and(|error| error.kind() == io::ErrorKind::NotFound);
+    if absent {
+        eprintln!(
+            "tasks: no Harness program at {}; hand-overs are off",
+            executable.display()
+        );
+    }
     serve_with_adapter(config, clock, stop, move |session| {
+        if absent {
+            return Ok(Production::Absent);
+        }
         let mut cli = CliConfig::new(executable);
         cli.cancel = Some(cancelled);
         cli.as_person = as_person;
-        Cli::new(cli, session.into())
+        Cli::new(cli, session.into()).map(Production::Cli)
     })
 }
 
@@ -1088,6 +1317,9 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         engine.targets_newer(version);
     }
     let adapter = make_adapter(engine.store_id())?;
+    if adapter.absent() {
+        engine.no_harness();
+    }
     let lane = if config.push_wait {
         let lane = adapter.wait_lane();
         if lane.is_none() {
@@ -1106,6 +1338,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         cli_busy: false,
         status: None,
         reads: None,
+        set_up: None,
     }));
     let (public, _public_binding) = bind(&config.socket)?;
     let (trusted, _trusted_binding) = bind(&config.voice_socket)?;
@@ -1145,6 +1378,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                                 let result = close_told(&adapter, &job);
                                 Outcome::Close(job, result)
                             }
+                            Job::SignIn => Outcome::SignIn(adapter.signed_in()),
                         };
                         if outcomes_tx.try_send(result).is_err() {
                             break;
@@ -1158,6 +1392,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
     let (owner_tx, owner_rx) = mpsc::sync_channel(REQUEST_QUEUE);
     let owner_stop = stop.clone();
     let switches = (config.watch, config.progress, config.close_told);
+    let set_up_later = config.set_up_later.clone();
     let report = current.clone();
     let owner = thread::Builder::new()
         .name("tasks-store".into())
@@ -1169,7 +1404,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 (jobs_tx, outcomes_rx),
                 report,
                 owner_stop,
-                (switches.0, switches.1, lane, switches.2),
+                (switches.0, switches.1, lane, switches.2, set_up_later),
             )
         })?;
     let (clients_tx, clients_rx) = mpsc::sync_channel::<(UnixStream, Instant, bool)>(CLIENT_QUEUE);
@@ -1245,10 +1480,30 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 // part runs, and says so until someone looks (#1505).
                 let targets_newer = report.summary["targets_newer"].as_u64();
                 let set_aside = report.summary["set_aside"].as_str().map(str::to_owned);
+                // With `--set-up-later`: why hand-overs are off, or will
+                // fail, while the lamp is not yet set up for them (#1676).
+                // Not set up is not unwell; a targets file that is not
+                // valid is.
+                let set_up = report.set_up;
+                let targets_invalid = set_up.is_some_and(|found| found.targets_invalid);
+                let off = set_up.and_then(|found| {
+                    if report.summary["no_harness"] == true {
+                        Some(("no_harness", "Harness is not installed on this lamp; hand-overs are off until it is"))
+                    } else if targets_newer.is_some() {
+                        None
+                    } else if report.summary["targets"] == 0 {
+                        Some(("no_computer", "No computer to hand tasks to yet: the task targets are missing or empty"))
+                    } else if found.sign_in == Some(SignIn::Out) {
+                        Some(("not_signed_in", "Harness is not signed in to the person's account; hand-overs fail until it is"))
+                    } else {
+                        None
+                    }
+                });
                 let level = if !ready {
                     Level::Error
                 } else if errors > 0
                     || targets_newer.is_some()
+                    || targets_invalid
                     || set_aside.is_some()
                     || handover_failed
                 {
@@ -1268,6 +1523,10 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                     "Tasks has bus publication failures"
                 } else if let Some(message) = newer_message.as_deref() {
                     message
+                } else if let Some((_, message)) = off {
+                    message
+                } else if targets_invalid {
+                    "The task targets file changed and is not valid; the targets before it are kept"
                 } else if set_aside.is_some() {
                     "Tasks set aside a store from a newer build; its tasks are not followed"
                 } else if handover_failed {
@@ -1302,6 +1561,17 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 }
                 if let Some(name) = set_aside.as_deref() {
                     value = value.with("set_aside", name);
+                }
+                if let Some(found) = set_up {
+                    if let Some((reason, _)) = off {
+                        value = value.with("handovers_off", reason);
+                    }
+                    if let Some(sign_in) = found.sign_in {
+                        value = value.with("signed_in", sign_in.name());
+                    }
+                    if found.targets_invalid {
+                        value = value.with("targets_invalid", true);
+                    }
                 }
                 // Only with `--progress`: without it the report is as it was.
                 if let Some(reads) = report.reads {
@@ -1706,6 +1976,7 @@ mod tests {
             push_wait: false,
             close_told: false,
             targets_newer: None,
+            set_up_later: None,
         };
         serve_with_adapter::<_, Never>(config, Never, Arc::new(AtomicBool::new(false)), |_| {
             panic!("adapter configured while disabled")
