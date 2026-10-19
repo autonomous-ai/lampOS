@@ -234,9 +234,10 @@ the task was started on. The `@<id>` form before it is refused ("Name the
 machine with --machine <id>."), so a `lamp-tasks` build from before that
 change fails every launch with `new_failed`.
 
-The engine allowlist is `codex`, `claude` or `opencode` (OpenCode since task
-41: Harness 0.4.2's `harness new --help` names it, and its ask mode passes
-OpenCode no flag; see "Who gets the work"). A project is an explicit name
+The engine allowlist is `codex`, `claude`, `opencode` or `devin` (OpenCode
+since task 41: Harness 0.4.2's `harness new --help` names it, and its ask
+mode passes OpenCode no flag; see "Who gets the work"; Devin since #1854,
+see "Devin" below). A project is an explicit name
 (at most 128 UTF-8 bytes) or an absolute/`~/` folder (at most 512 bytes).
 Leading option/target syntax, ambiguous relative folders, control characters
 and whitespace around a project are refused. Text is at most 1,000 UTF-8
@@ -517,11 +518,11 @@ now reads the state of the release after it:
   requests, `conflict` for the rest).
 - **A newer `schema`** is a change no older build may read (the rule
   below says which changes those are). A build
-  that finds a `schema` above its own (1) keeps the store as it is,
+  that finds a `schema` above its own (2) keeps the store as it is,
   renamed `tasks.sqlite3.newer-<schema>-<unix seconds>` in the same folder
   (Harness's `HOME` beside it is not touched), and starts with an empty
   store and a new store id, with one line: `tasks: storage was written by a
-  newer build (schema N, this build reads 1); it is set aside as …, and
+  newer build (schema N, this build reads 2); it is set aside as …, and
   this build starts with an empty store`. The tasks it was following are
   forgotten by the lamp; their harnesses go on in Harness. The kept file is
   whole, so the newer build can be put back on it by hand.
@@ -749,6 +750,49 @@ Tests: `engine::tests::targets_read_again_are_used_from_then_on_and_a_task_keeps
 (writing over a file without the part's mark fails it),
 `tests/runtime.rs`: `targets_from_machines_are_written_and_used_while_signed_in`
 (asking while signed out fails it), `targets_from_machines_needs_an_engine_and_set_up_later`.
+
+## Devin (#1854)
+
+`devin` is Devin's own terminal program on the person's computer, which
+Harness starts in a pane like Claude Code and Codex, with its hooks and its
+transcript readers (openharness `cli/src/engines/devin/`). So `ps`, `show` and
+`wait` read it as they read the others. Devin Cloud (`devin-cloud`, Devin's
+REST API on a GitHub repository, billed in ACUs) is a separate agent the
+CLI's `new` doesn't start, and isn't one of the lamp's.
+
+- **No `--mode`.** Devin has no permission modes in Harness: its `new`
+  leaves the mode out for it and refuses one it is sent
+  (`INVALID_PERMISSION_MODE`, `cli/src/lib/newCommand.ts`). So `lamp-tasks`
+  sends none for `devin` (`EngineKind::has_modes`), and takes a receipt that
+  claims no mode that approves on its own (`auto`, `full`) and no bypass. A
+  missing or `null` mode, or another, is taken; Devin's real receipt hasn't
+  been seen. The other engines still need `auto` with a bypass that is
+  there.
+- **It may ask before it writes.** With no auto mode, Devin works in its own
+  default. An agent waiting for the person is told as now: "Devin is
+  waiting for you on your computer".
+- **The store's `schema` is 2 only while it holds a Devin task:** a
+  target's engine may be `devin`, a new value in a stored enum. A store
+  with only Codex, Claude or OpenCode work stays schema 1 and is written as
+  1, so a rollback to a build from before keeps the person's hand-overs. A
+  store that holds a Devin task is written as 2, which a build from before
+  sets aside (above). A schema-2 store whose Devin work is gone is written
+  as 1 again, and a schema-1 store that names Devin is refused (the first
+  builder on #1872).
+- **The voice** knows Devin as one of the staff (`agent_tasks::KINDS`). It's
+  heard as "Devin" or "Devon", and the model is told it can sound like
+  "Kevin", which is never taken as Devin's own name, since it is a
+  person's. News of its work names it (`task_news::who`). With all four
+  agents the start description gives examples for two of them, since all
+  four are named in its list and the description must stay inside the
+  service's 1,024 bytes.
+- **Tests:**
+  - `tests/harness.rs` `devin_is_asked_for_by_name_with_no_mode_and_its_receipt_claims_none` (sending `--mode` to Devin fails it);
+  - `engine::tests::a_store_with_no_devin_task_is_written_as_schema_one` (writing 2 always fails it) and `a_store_with_a_devin_task_is_written_as_schema_two`;
+  - `runtime::tests::targets_for_a_newer_build_are_told_apart_and_never_read` (Devin read as this build's);
+  - the voice's `agent_tasks::tests::the_person_may_hand_work_to_devin_by_name`, `every_description_fits_the_service_whatever_the_switches` (now with four), and `task_news::tests::news_names_the_agent_each_engine_is`.
+- **Not yet shown:** a real hand-over to Devin. It needs a computer with
+  Devin signed in and the lamp on the same Harness account (#1854, step 3).
 
 ## Host qualification and first lamp check
 

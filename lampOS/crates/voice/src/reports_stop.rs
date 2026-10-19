@@ -65,6 +65,23 @@ pub trait Reports {
 /// The lamp's bus.
 pub struct Bus(pub Option<lamp_bus::Bus>);
 
+/// A bus of a test's own, in place of the lamp's, for the worker's tests
+/// that run the call through its loop.
+#[cfg(test)]
+pub(crate) static TEST_ROOT: std::sync::Mutex<Option<std::path::PathBuf>> =
+    std::sync::Mutex::new(None);
+
+impl Bus {
+    /// The lamp's bus (`LAMP_BUS_ROOT`, or its default), the call's own.
+    pub fn of_the_lamp() -> Self {
+        #[cfg(test)]
+        if let Some(root) = TEST_ROOT.lock().ok().and_then(|root| root.clone()) {
+            return Self(lamp_bus::Bus::new(root).ok());
+        }
+        Self(lamp_bus::Bus::from_environment().ok())
+    }
+}
+
 impl Reports for Bus {
     fn ask(&mut self) -> Option<usize> {
         let bus = self.0.as_ref()?;

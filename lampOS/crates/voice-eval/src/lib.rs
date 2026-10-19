@@ -27,6 +27,7 @@ pub mod runner;
 pub mod stats;
 pub mod stimulus;
 pub mod target_audio;
+pub mod waiting_cuts;
 
 use std::{error::Error, io};
 

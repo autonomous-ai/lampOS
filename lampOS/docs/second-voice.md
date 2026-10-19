@@ -146,7 +146,7 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   keeps the name alone. **With `LAMP_SECOND_KNOWN_NAMES=on`** (#753), the
   names the lamp knows follow the unit's words, each its own `keyterm`:
   - the name typed at setup (`LAMP_PERSON_NAME`);
-  - the agents it hands work to, "Claude Code", "Codex" and "OpenCode",
+  - the agents it hands work to, "Claude Code", "Codex", "OpenCode" and "Devin",
     when it has a tasks part (on lamp-4ace on 19 Oct "ask Codex" came back
     "Next to write").
 

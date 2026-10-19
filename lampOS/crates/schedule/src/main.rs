@@ -8,7 +8,7 @@ use std::{
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     if args.next().as_deref() != Some("serve") {
-        return Err("usage: lamp-schedule serve --dir ABS --socket ABS --zone IANA [--bus-root ABS] [--boot-id ID] [--trust-clock] [--kernel-clock] [--run-for-ms N] [--enable]".into());
+        return Err("usage: lamp-schedule serve --dir ABS --socket ABS --zone IANA|system [--bus-root ABS] [--boot-id ID] [--trust-clock] [--kernel-clock] [--run-for-ms N] [--enable]".into());
     }
     let mut dir = None;
     let mut socket = None;
@@ -59,6 +59,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         bus_root,
         zone: zone.ok_or("--zone is required")?,
         run_for,
+        report_every: lamp_schedule::runtime::REPORT_EVERY,
     };
     let clock = SystemClock::new(boot_id.as_deref(), trust_clock)?.with_kernel_clock(kernel_clock);
     let stop = Arc::new(AtomicBool::new(false));

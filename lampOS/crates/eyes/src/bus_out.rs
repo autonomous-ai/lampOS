@@ -15,10 +15,15 @@
 //! With `LAMP_PRESENCE=on` as well (#1677), whether anyone is at the lamp,
 //! on `room/presence` ([`crate::away`]): the faces of each look and the
 //! voice's lines on `voice/heard`, said once a second while the eyes look.
-use crate::{away::Away, faces, facing, speaking};
+use crate::{
+    activity::{Judge, Look},
+    away::Away,
+    faces, facing, speaking,
+};
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_msgs::{
-    Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, Level, RoomPresence, Speech,
+    Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, HumanSeems, Level, RoomActivity,
+    RoomPresence, Speech, StoodUp, TurnVerdict, VoiceTurn,
 };
 use std::{io, time::Duration};
 
@@ -27,7 +32,14 @@ pub const ENVIRONMENT: &str = "LAMP_BUS";
 /// Where the eyes read whether to say if anyone is at the lamp, with the
 /// bus on. `on` only.
 pub const PRESENCE_ENVIRONMENT: &str = "LAMP_PRESENCE";
+/// Where the eyes read which voice counts as someone (#1677's part 2):
+/// `addressed`, only a turn the voice answered as said to the lamp
+/// (`voice/turn`); otherwise every line heard (`voice/heard`).
+pub const PRESENCE_VOICE_ENVIRONMENT: &str = "LAMP_PRESENCE_VOICE";
 
+/// Where the eyes read whether to say what the person at the desk is doing
+/// (#1678), with the bus on. `on` only.
+pub const ACTIVITY_ENVIRONMENT: &str = "LAMP_ACTIVITY";
 /// The name the eyes publish under.
 pub const SOURCE: &str = "eyes";
 /// How long a list of faces means anything.
@@ -209,12 +221,27 @@ pub struct BusOut {
     /// With `lamp-eyes --visits on`: how familiar the remembered person at
     /// the lamp is (#1670).
     familiar: Option<Publisher>,
+    /// With `lamp-eyes --seems`: how the person at the lamp seems from
+    /// their face (#1671).
+    seems: Option<Publisher>,
+    /// With `LAMP_ACTIVITY=on`: what the person at the desk is doing.
+    activity: Option<ActivityOut>,
+}
+
+/// `room/activity` and `room/stood_up`, and what they are judged from.
+struct ActivityOut {
+    out: Publisher,
+    stood: Publisher,
+    judge: Judge,
 }
 
 /// `room/presence`, what it is judged from, and the voice's lines.
 struct Presence {
     out: Publisher,
+    /// The voice's lines on `voice/heard`, or with `addressed` its answered
+    /// turns on `voice/turn`.
     heard: Subscriber,
+    addressed: bool,
     away: Away,
     /// Whether the last value said someone, for the journal's line.
     said_someone: bool,
@@ -224,8 +251,9 @@ impl BusOut {
     /// The publisher, if the environment says `on` and the bus can be used.
     /// A bus that cannot is said once and the eyes go on without. With
     /// `familiar` (`--visits on`), how familiar the remembered person at the
-    /// lamp is is said too (#1670).
-    pub fn from_environment(familiar: bool) -> Option<Self> {
+    /// lamp is is said too (#1670), and with `seems` (`--seems`), how the
+    /// person at the lamp seems from their face (#1671).
+    pub fn from_environment(familiar: bool, seems: bool) -> Option<Self> {
         if std::env::var(ENVIRONMENT).ok().as_deref() != Some("on") {
             return None;
         }
@@ -249,6 +277,14 @@ impl BusOut {
         if familiar && let Err(error) = out.say_familiar(&bus) {
             eprintln!("lamp-eyes: how familiar the person at the lamp is is not said: {error}");
         }
+        if std::env::var(ACTIVITY_ENVIRONMENT).ok().as_deref() == Some("on")
+            && let Err(error) = out.say_activity(&bus)
+        {
+            eprintln!("lamp-eyes: what the person at the desk is doing is not said: {error}");
+        }
+        if seems && let Err(error) = out.say_seems(&bus) {
+            eprintln!("lamp-eyes: how the person at the lamp seems is not said: {error}");
+        }
         Some(out)
     }
 
@@ -268,19 +304,80 @@ impl BusOut {
             reported_at_us: None,
             presence: None,
             familiar: None,
+            activity: None,
+            seems: None,
         })
     }
 
+    /// Also say what the person at the desk is doing, on `room/activity`,
+    /// and when they stand up and leave, on `room/stood_up` (#1678).
+    pub fn say_activity(&mut self, bus: &Bus) -> io::Result<()> {
+        let mut out =
+            bus.publisher_declared(RoomActivity::TOPIC, &RoomActivity::declaration(), SOURCE)?;
+        out.expires_after(Some(RoomActivity::LASTS));
+        let stood = bus.publisher_declared(StoodUp::TOPIC, &StoodUp::declaration(), SOURCE)?;
+        self.activity = Some(ActivityOut {
+            out,
+            stood,
+            judge: Judge::default(),
+        });
+        Ok(())
+    }
+
+    /// With activity on, tell the sitter from others by face: the eyes'
+    /// recogniser gives the prints the judge asks for (#1678's (d)).
+    pub fn activity_by_face(&mut self) {
+        if let Some(activity) = self.activity.as_mut() {
+            activity.judge = Judge::with_prints();
+        }
+    }
+
+    /// The camera closed (not permitted, failed, or reopening): the
+    /// sitter's prints go with it.
+    pub fn activity_forget_prints(&mut self) {
+        if let Some(activity) = self.activity.as_mut() {
+            activity.judge.forget_prints();
+        }
+    }
+
+    /// Which face of the last look the judge wants printed, if any.
+    pub fn activity_wants_print(&mut self, now_us: u64) -> Option<usize> {
+        self.activity.as_mut()?.judge.wants_print(now_us)
+    }
+
+    /// The print asked for, or none if it could not be taken: in memory
+    /// only, and the journal says what it decided, a number only.
+    pub fn activity_printed(&mut self, now_us: u64, print: Option<&[f32]>) {
+        if let Some(activity) = self.activity.as_mut()
+            && let Some(line) = activity.judge.printed(now_us, print)
+        {
+            eprintln!("lamp-eyes: {line}");
+        }
+    }
+
     /// Also say whether anyone is at the lamp, on `room/presence`, from the
-    /// faces of each look and the voice's lines on `voice/heard` (#1677).
+    /// faces of each look and the voice's lines on `voice/heard` (#1677), or
+    /// with `LAMP_PRESENCE_VOICE=addressed` only its answered turns.
     pub fn say_presence(&mut self, bus: &Bus) -> io::Result<()> {
+        let addressed =
+            std::env::var(PRESENCE_VOICE_ENVIRONMENT).ok().as_deref() == Some("addressed");
+        self.say_presence_by(bus, addressed)
+    }
+
+    /// As [`BusOut::say_presence`], with which voice counts given.
+    pub fn say_presence_by(&mut self, bus: &Bus, addressed: bool) -> io::Result<()> {
         let mut out =
             bus.publisher_declared(RoomPresence::TOPIC, &RoomPresence::declaration(), SOURCE)?;
         out.expires_after(Some(RoomPresence::LASTS));
-        let heard = bus.subscribe_typed(Speech::TOPICS[0], "eyes_presence", Speech::TYPE)?;
+        let heard = if addressed {
+            bus.subscribe_typed(VoiceTurn::TOPIC, "eyes_presence", VoiceTurn::TYPE)?
+        } else {
+            bus.subscribe_typed(Speech::TOPICS[0], "eyes_presence", Speech::TYPE)?
+        };
         self.presence = Some(Presence {
             out,
             heard,
+            addressed,
             away: Away::default(),
             said_someone: false,
         });
@@ -306,6 +403,24 @@ impl BusOut {
         }
     }
 
+    /// Also say how the person at the lamp seems from their face, on
+    /// `humans/seems` (#1671).
+    pub fn say_seems(&mut self, bus: &Bus) -> io::Result<()> {
+        let mut out =
+            bus.publisher_declared(HumanSeems::TOPIC, &HumanSeems::declaration(), SOURCE)?;
+        out.expires_after(Some(HumanSeems::LASTS));
+        self.seems = Some(out);
+        Ok(())
+    }
+
+    /// At each read of the near face: how it seems, as a kind and a
+    /// confidence only. Nothing without [`Self::say_seems`].
+    pub fn seems(&mut self, read: HumanSeems, now_us: u64) {
+        if let Some(out) = self.seems.as_mut() {
+            let _ = out.publish_json(now_us, &read);
+        }
+    }
+
     /// One look: what the detector found in it.
     pub fn saw(
         &mut self,
@@ -327,6 +442,9 @@ impl BusOut {
                 .reduce(f32::max);
             presence.away.looked(now_us, tall);
         }
+        if let Some(activity) = self.activity.as_mut() {
+            activity.judge.looked(now_us, &Look::all(found, filled));
+        }
     }
 
     /// Call from the loop whether or not the camera is open: with it closed
@@ -341,8 +459,16 @@ impl BusOut {
         if let Some(presence) = self.presence.as_mut() {
             // When the voice heard the words, by the host's monotonic clock,
             // never later than now: lines that waited are as old as they are.
+            // With `addressed`, only a turn answered as said to the lamp, at
+            // its verdict: chatter it held back is nobody.
             while let Ok(Some(line)) = presence.heard.recv(Duration::ZERO) {
-                presence.away.heard(line.header.at_us.min(now_us));
+                let counts = !presence.addressed
+                    || line
+                        .parse::<VoiceTurn>()
+                        .is_ok_and(|turn| turn.verdict == TurnVerdict::Answered);
+                if counts {
+                    presence.away.heard(line.header.at_us.min(now_us));
+                }
             }
             let before = presence.said_someone;
             if let Some(now) = presence.away.say(now_us) {
@@ -351,6 +477,18 @@ impl BusOut {
                 }
                 presence.said_someone = now.someone;
                 let _ = presence.out.publish_json(now_us, &now);
+            }
+        }
+        if let Some(activity) = self.activity.as_mut() {
+            if let Some(now) = activity.judge.say(now_us) {
+                let _ = activity.out.publish_json(now_us, &now);
+            }
+            if let Some(up) = activity.judge.stood_up(now_us) {
+                let _ = activity.stood.publish_json(now_us, &up);
+            }
+            // Numbers only, so a scripted sitting can set the lines (#1678).
+            if let Some(line) = activity.judge.journal(now_us) {
+                eprintln!("lamp-eyes: {line}");
             }
         }
     }
@@ -373,6 +511,7 @@ impl BusOut {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lamp_msgs::SeemsKind;
 
     /// A face of this box in a 640 by 480 picture, its nose `nose` eye
     /// distances to the right of the point between its eyes.
@@ -701,12 +840,75 @@ mod tests {
         std::fs::remove_dir_all(&root).unwrap();
     }
 
+    /// #1677's part 2: with `LAMP_PRESENCE_VOICE=addressed`, a voice is
+    /// someone only on a turn answered as said to the lamp; a turn held back
+    /// and a line merely heard are nobody.
+    #[test]
+    fn with_addressed_only_an_answered_turn_is_someone() {
+        let root = std::path::PathBuf::from(format!("/tmp/lpa-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(RoomPresence::TOPIC, "test", RoomPresence::TYPE)
+            .unwrap();
+        let mut turns = bus
+            .publisher_declared(VoiceTurn::TOPIC, &VoiceTurn::declaration(), "voice")
+            .unwrap();
+        let mut heard = bus
+            .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        out.say_presence_by(&bus, true).unwrap();
+        let s = 1_000_000u64;
+        let mut last = None;
+        let mut look = |out: &mut BusOut, at: u64, last: &mut Option<RoomPresence>| {
+            out.saw(&[], &[], PICTURE, at);
+            out.tick(at);
+            while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+                *last = Some(message.parse::<RoomPresence>().unwrap());
+            }
+        };
+        look(&mut out, s, &mut last);
+        // Chatter: a line heard, and a turn held back as not said to it.
+        let line = Speech {
+            text: "did you see the match".into(),
+            finished: true,
+            locale: None,
+            request: None,
+        };
+        heard.publish_json(2 * s, &line).unwrap();
+        let held = VoiceTurn {
+            request: 7,
+            verdict: TurnVerdict::HeldBack,
+        };
+        turns.publish_json(3 * s, &held).unwrap();
+        look(&mut out, 4 * s, &mut last);
+        assert_eq!(last.map(|now| now.someone), Some(false), "{last:?}");
+        // Said to the lamp: someone, by voice.
+        let answered = VoiceTurn {
+            request: 8,
+            verdict: TurnVerdict::Answered,
+        };
+        turns.publish_json(5 * s, &answered).unwrap();
+        look(&mut out, 6 * s, &mut last);
+        assert_eq!(
+            last,
+            Some(RoomPresence {
+                someone: true,
+                nobody_s: 0,
+                by: Some(lamp_msgs::SeenBy::Voice),
+            })
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
     /// The journal's height is the published face's: a face cut by the
     /// picture's edge counts only what is in the picture, and a box with no
     /// size once clamped counts for nothing.
     #[test]
     fn the_journals_height_is_the_published_faces() {
-        let root = std::path::PathBuf::from(format!("/tmp/leh-{}", std::process::id()));
+        let root = std::path::PathBuf::from(format!("/tmp/lej-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         let bus = Bus::new(&root).unwrap();
@@ -733,6 +935,60 @@ mod tests {
         );
         let away = &out.presence.as_ref().unwrap().away;
         assert_eq!(away.cause(), "face, 0.20 of the picture tall");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// #1678: with activity on, each look's largest face makes
+    /// `room/activity`, at the desk while the baseline comes in, said once a
+    /// second and good for three; someone rising out of the chair and gone
+    /// makes one `room/stood_up`.
+    #[test]
+    fn what_the_person_at_the_desk_does_is_said_from_the_looks() {
+        let root = std::path::PathBuf::from(format!("/tmp/lea-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(RoomActivity::TOPIC, "test", RoomActivity::TYPE)
+            .unwrap();
+        let mut stood = bus
+            .subscribe_typed(StoodUp::TOPIC, "test", StoodUp::TYPE)
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        out.say_activity(&bus).unwrap();
+        let s = 1_000_000u64;
+        let mut said = Vec::new();
+        // Seated 30 s, a face 120 of 480 tall, a look every 500 ms.
+        for look in 0..60u64 {
+            let at = look * s / 2;
+            out.saw(&[face(260.0, 180.0, 96.0, 120.0, 0.0)], &[], PICTURE, at);
+            out.tick(at);
+            while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+                assert_eq!(message.header.expires_ms, Some(3_000));
+                said.push(message.parse::<RoomActivity>().unwrap());
+            }
+        }
+        assert!(said.len() >= 29, "{said:?}");
+        assert!(
+            said.iter()
+                .all(|now| now.state == lamp_msgs::Activity::AtDesk && !now.baseline)
+        );
+        assert_eq!(said.last().unwrap().sitting_s, 29);
+        // Rising out of the chair over a second, then gone.
+        for (k, top) in [180.0, 140.0, 100.0, 60.0].into_iter().enumerate() {
+            let at = 30 * s + k as u64 * s / 4;
+            let tall = 120.0 * (1.0 - 0.06 * k as f32);
+            out.saw(&[face(260.0, top, tall * 0.8, tall, 0.0)], &[], PICTURE, at);
+            out.tick(at);
+        }
+        for look in 0..8u64 {
+            let at = 31 * s + look * s / 2;
+            out.saw(&[], &[], PICTURE, at);
+            out.tick(at);
+        }
+        let up = stood.recv(Duration::ZERO).unwrap().expect("stood up");
+        assert_eq!(up.parse::<StoodUp>().unwrap().sitting_s, 30);
+        assert!(stood.recv(Duration::ZERO).unwrap().is_none(), "once");
         std::fs::remove_dir_all(&root).unwrap();
     }
 
@@ -789,6 +1045,40 @@ mod tests {
             said.push(message.parse::<HumanFamiliar>().unwrap().level);
         }
         assert_eq!(said, [Some(FamiliarLevel::Regular), None]);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// #1671: with the face read on, each read says a kind and a
+    /// confidence, from the eyes, good for five seconds; without it,
+    /// nothing is said.
+    #[test]
+    fn how_the_person_at_the_lamp_seems_is_said_only_when_switched_on() {
+        let root = std::path::PathBuf::from(format!("/tmp/les-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(HumanSeems::TOPIC, "test", HumanSeems::TYPE)
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        let read = |kind, confidence| HumanSeems { kind, confidence };
+        out.seems(read(SeemsKind::Positive, 0.9), 1_000_000);
+        assert!(hears.recv(Duration::ZERO).unwrap().is_none());
+        out.say_seems(&bus).unwrap();
+        out.seems(read(SeemsKind::Negative, 0.7), 2_000_000);
+        out.seems(read(SeemsKind::Unsure, 0.3), 4_000_000);
+        let mut said = Vec::new();
+        while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+            assert_eq!(message.header.source, "eyes");
+            assert_eq!(message.header.expires_ms, Some(5_000));
+            let text = String::from_utf8_lossy(&message.payload).into_owned();
+            assert_eq!(text.matches(':').count(), 2, "{text}");
+            said.push(message.parse::<HumanSeems>().unwrap());
+        }
+        assert_eq!(
+            said,
+            [read(SeemsKind::Negative, 0.7), read(SeemsKind::Unsure, 0.3)]
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 }

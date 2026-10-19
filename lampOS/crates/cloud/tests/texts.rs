@@ -31,6 +31,7 @@ fn lamp(name: &str, texting: bool) -> (Real, PathBuf) {
         ring: Ring::default(),
         texts: Texts::on(texting),
         reports: None,
+        skills: None,
     };
     (lamp, bus_root)
 }

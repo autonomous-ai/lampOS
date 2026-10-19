@@ -59,7 +59,7 @@ The agent then, in this order:
    fills what it knows (the person is whoever started the session; no lamp
    unless told; branches `lamp-<name>` and `<name>/*`; it owns nothing
    yet), shows it to its person, pushes it as its first commit on
-   `lamp-<name>`, and comments on the Queue issue (#705): "new builder
+   `lamp-<name>`, and comments on the Queue issue (#1722, continued from #705): "new builder
    <name>, role file at <link>, no tasks yet". It takes no task until the
    first builder has taken the file onto `lamp-voice`, corrected where it
    must be, and labelled issues `builder:<name>`.
@@ -70,8 +70,8 @@ The agent then, in this order:
 5. Reads its own log on its own branch, newest first.
 6. If it has a lamp: that lamp's `deploy/<lamp>/LAMP.md` and `README.md`.
 7. Finds its next task: the first issue in its own list in the pinned
-   [Queue issue](https://github.com/autonomous-ai/lampOS/issues/705) that
-   is open and not `status:taken` (`gh issue view 705`;
+   [Queue issue](https://github.com/autonomous-ai/lampOS/issues/1722) that
+   is open and not `status:taken` (`gh issue view 1722`;
    `gh issue list --label builder:<name> --state open` shows them all),
    claimed as "Claiming an issue" says. It reads the comments on its
    issues: answers come there.
@@ -218,8 +218,8 @@ building all the time. never sit idle!"):
 - "Waiting on others" is not a state. When your task waits on a review, a
   merge, a lamp minute or another builder, open the next task on your list
   at once and say so in one line on the waiting one.
-- Your list in Queue #705 is kept at least three deep by the first builder.
-  If it ever has nothing you can do now, say so on #705 with your name, and
+- Your list in Queue #1722 is kept at least three deep by the first builder.
+  If it ever has nothing you can do now, say so on #1722 with your name, and
   meanwhile take an unowned open issue in your parts (a flaky test, a doc
   that lies, a missing test) rather than wait.
 - Post or push at least every 20 minutes while you work. The idle watch
@@ -402,7 +402,7 @@ builder has to read, place or close before anyone may do it.
   to: the task you are on, or the issue of the part where it showed (for
   example a flaky test of another part's: a comment on that part's open
   issue). Only when no issue fits, it is one comment on the Queue issue
-  ([#705](https://github.com/autonomous-ai/lampOS/issues/705)). Head it
+  ([#1722](https://github.com/autonomous-ai/lampOS/issues/1722)). Head it
   `<name>-P<n>` for a proposal or `Found by <name>` for a fault, with what
   was seen, how to see it, and what it would cost (and still a line in
   your log). The first builder answers there: it widens an issue, opens a
@@ -472,6 +472,21 @@ was busy. Since then:
    listed in `.github/workflows/lampos-arm64.yml`, and every skill's
    `SKILL.md` still run, and every push to `lamp-voice` still builds the
    binaries lamps install.
+7. **A long issue is cut and continued** (the project lead, 19 Oct 2026).
+   Issues had reached 219 comments with no clear end, and a builder
+   joining one had to read all of it. When an issue other than a queue
+   passes **30 comments or 3 days open**:
+   - its builder posts one **checkpoint** comment: what is delivered
+     (merged PRs), what is not, and what "done" means for the rest;
+   - the first builder closes it on what was delivered, with that
+     comment as the record;
+   - the first builder opens a **new issue for the rest**. It starts
+     with the checkpoint's summary and a link to the old issue, so nobody
+     needs to read the old thread. **Its title says what it blocks**
+     ("a short Stop is heard 7 of 7 times before it is on for a
+     customer's lamp"), not "continue #828";
+   - a rest that needs a scope or priority call (narrow it, park it or
+     drop it) goes to the lead on #1711 with the checkpoint.
 
 **Moved on 2026-10-14.** The first builder opened an issue for each open
 task (#694 to #704) and a role file for each builder. work-split.md keeps
@@ -547,6 +562,24 @@ the lamp.
   ten). Do what they agree to and write the difference in the log.
 - **Photographs only of the lamp**, with no person, face or screen.
 
+## The voice to build and test with (the owner, 19 Oct 2026)
+
+Every builder builds and tests the voice on the second route
+(`LAMP_VOICE_ROUTE=second`, [second-voice.md](second-voice.md)): Deepgram
+for speech to text, DeepSeek for chat and search, and ElevenLabs
+(`eleven_v4_turbo`) as the lamp's one voice. Gemini Live costs too much for a
+lamp people talk to all day.
+
+- **Played tests, scenes and checks of the voice run on the second route.**
+  A voice feature is done when it works there. One that works only on Live
+  is not done.
+- **No Live sessions on a lamp,** except a comparison the first builder names
+  on #1712, the issue where the flow is built.
+- **A suite, tool or script that starts a Live session** is named on the
+  Queue (#1722), and it is moved to the second route.
+- **Live stays a setting** (`LAMP_VOICE_ROUTE=gemini`) for a lamp that is
+  set up with it, not the lamp to build against.
+
 ## Facts every lamp builder needs
 
 Measured on lamp-52e6 on 2026-10-14 ([body.md](body.md), the
@@ -605,6 +638,9 @@ kept by `hw-first` ([builders/hw-first.md](../builders/hw-first.md)).
 - **The hardware lead** (a person) approves the suite's limits, durations,
   fixtures and stop conditions, and the shipment gate. A changed limit is a
   versioned decision.
+- **The suite and the record:** the coverage matrix, its file
+  (`production/matrix-v<N>.toml`), the station tool `lamp-station` and the
+  record each run leaves are in [production-testing.md](production-testing.md).
 
 ## What was not shown, and open questions
 

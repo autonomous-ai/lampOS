@@ -72,6 +72,32 @@ profile's exclusion:
   (`lamp-actions::server`'s light test and `lamp-memory::health`'s
   `the_environment_alone_does_not_enable_reporting_or_create_bus_data` left
   on 2026-10-17, below);
+- two tests of `lamp-skills::skills`, named exactly, that run the real
+  program on the host's clock by design (#1806, Seventh's choice on
+  2026-10-19): `asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait`
+  (the production 2.5 s give-up, and the late answer after it passed over)
+  and `a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go`
+  (a real one-second re-publication during a 1.5 s hold). They took 4.5 s
+  and 3.6 s on ARM64. The reading pose's checks of a skill's definition,
+  which need no clock, are a test of their own outside the group,
+  `a_reading_pose_needs_a_known_mood_and_a_for_of_at_most_two_minutes`;
+- one more of `lamp-skills::skills`, named exactly,
+  `asking_the_policy_a_hello_made_and_not_noticed_rests` (#1829, the
+  reviewer's P3 on 2026-10-19): it skips the program's clock for the run
+  itself, but waits up to 20 s of real time for the program to start and
+  subscribe, and once missed that under a load of about 30;
+- two tests of `lamp-voice`'s `hand_controls`, named exactly, that count
+  the input pump's real wakes for a second by design (#1806, #1569 row 35,
+  2026-10-19): `with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once`
+  (at most 10 passes waiting, 100 or more ticking, and a stop within 100 ms)
+  and `with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump`. They
+  took 2.6 s and 1.3 s on ARM64; beside 8 busy cores and four SQLite stores
+  syncing on a Mac, the first's stop took 103 ms to 1.09 s in 18 of 20 runs;
+- two more of `lamp-skills::skills`, named exactly, that start the real
+  program twice on the host's clock, a restart between, and wait 800 ms of
+  real time for a nudge that must not come (#1837):
+  `the_program_keeps_a_skill_off_across_a_restart` and
+  `the_program_forgets_a_snooze_at_a_restart`;
 - tests with a real-clock bound that a loaded runner misses: none now. A
   test goes here only until it gets its own time; the bound the lamp runs
   with is never raised for it. `lamp-voice`'s `coordinator::motor::tests::native_head`

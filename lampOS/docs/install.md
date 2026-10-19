@@ -246,7 +246,9 @@ Memory, Expression and skills take `--zone system`, which follows that file,
 across daylight saving and without a restart (skills since #1384). Schedule
 takes `--zone ${LAMP_ZONE}` from `zone.env`, which install writes from the
 image's zone and setup writes again with the person's. The voice
-tells the time from `/etc/localtime` itself. The policy keeps none: only its
+reads `/etc/localtime` through the same crate, `lamp-local-time` (#820):
+the time it tells, night, and the days of what is remembered and marked,
+each moment with its own offset, a new zone taken up without a restart. The policy keeps none: only its
 hello and progress news would use one, and the product doesn't pass them.
 `install`'s `the_parts_that_keep_local_time_read_the_zone_setup_saves` holds
 the units to this.
@@ -416,15 +418,55 @@ units stopped:
    rest). `--gaze` is not in it: it is measured with a face and the camera
    ([body.md](body.md)), and the body runs without it until then. Without
    `--write` it only prints, so a lamp can be read first and written later.
-2. **The touch calibration**, `/etc/lampOS/controls/controls-pins.json`,
-   with a person at the lamp: `lamp-controls calibrate-touch` (controls.md, "Run without a lamp,
-   then qualify on one": First's on-lamp sequence), its output installed there. `install`
-   keeps a pins file changed on the lamp.
+2. **The touch pads**, `/etc/lampOS/controls/controls-pins.json`, with a
+   person at the lamp. GPIO head pads differ by unit: the hardware team's test
+   reads four candidate lines (37, 96, 97, 98), and lamp-52e6's pads were on
+   97 and 98, driven high while touched (#1362). So `lamp-controls
+   discover-head --seconds 30`, with each pad touched twice, finds this unit's
+   pair and polarity, and they go into `head_pads`; the product's 37 and 96,
+   active-high, are only a default. On an MPR121 strip it is
+   `lamp-controls calibrate-touch` (controls.md, "Run without a lamp, then
+   qualify on one": First's on-lamp sequence), its output installed there,
+   but **that half is skipped while the base strip is off**: V2 doesn't use
+   the strip, at the project lead's decision (19 Oct), and `lamp-controls`
+   reads it only with `LAMP_CONTROLS_STRIP=on` ([controls.md](controls.md),
+   "The base strip is off"); `deploy/factory/steps.sh` then skips it, reading
+   the switch from `lamp-controls`' own environment, and finds the head pads
+   as on any lamp. `install` keeps a pins file changed on the lamp.
 3. **The update key**, `/etc/lampOS/update/key.pub`: the public half of the
    owner's signing key ([updates.md](updates.md)). `install` refuses to run
    without it (step 1 below), and setup never writes it.
 
 Then `lamp-selftest --occasion factory` ([selftest.md](selftest.md)).
+
+`deploy/factory/steps.sh --unit-id <this lamp> --update-key <key.pub>` runs
+the four in this order, as root on the lamp. Without `--write` every step is
+dry: it reads the body at rest into `/tmp`, says what it would write, and
+writes nothing to `/etc`. With `--write`, step 1 also takes this arm's own
+`--stand`: with a person's yes at the console and a hand by the arm, it runs
+the body by hand on a private mood socket (no voice, idle, wake or glances),
+tells it `listening` with `lamp-body-mood`, and asks it to stand at 30%,
+then at 100%, and writes where the arm stopped at 100% in place of
+lamp-4ace's. An arm that does not reach its full stand writes nothing.
+Ctrl-C during a stand sends the body SIGTERM, which eases the arm back, and
+stops the steps. Every body run passes `--let-go-at-stop on` (#1776), so the
+lamp is let go once it is down and step 1 can be done again: a lamp that has
+run `lamp-body` since power-on is otherwise held, torque on, and the rest
+read refuses it. Found held, a written step 1 asks, lets it go with a body
+run that only starts and stops, and reads it then; dry, it says so. Written, steps 2 and 4 also ask first; each is refused
+without a console. On GPIO head pads the touch step runs `discover-head`
+with `lamp-controls` stopped, and writes the two lines that each gave two
+touches, with their polarity (pull-up for active-low, pull-down for
+active-high, so a line with nothing on it reads as not touched), the rest of
+the pins file kept; anything but two such lines writes nothing. On an MPR121
+it calibrates. Either way `lamp-controls` is started again however the step
+ends, and dry it only says what it would run, without stopping
+`lamp-controls`. A key already in place is kept
+when it is the same and fails the step when it is not. A failed step stops
+the rest and says which; `--from N` goes on from it. It runs nothing but
+the lamp's own binaries and the shell. `deploy/factory/steps-test.sh` tests
+it with no lamp; run it by hand after a change (the ARM64 workflow does not
+run it).
 
 ## Setup at first boot, without the keeper
 
@@ -437,9 +479,10 @@ product does it with systemd alone (#811):
 | `lamp-setup.service` | at boot, `WantedBy=multi-user.target`, only while `/var/lib/lampos-setup/done` is missing and setup's two settings exist | the hotspot and V1's setup page until the home's Wi-Fi and the person's settings are saved; then writes the marker |
 | `lampos-setup-done.path` | at boot, `WantedBy=multi-user.target` | starts `lampos.target` once the marker exists: the moment setup writes it, and at every later boot |
 | `lamp-setup-reset.service` | in the target, after setup | the reset button held 5 s: stops the lamp, wipes, removes the marker, reboots into setup |
+| `lamp-waking.service` | early at boot, `WantedBy=sysinit.target`, only once the marker exists | the waking face until the voice asks for the ring (#1681, [ring-choreography.md](ring-choreography.md), "The waking face"); off unless `LAMP_WAKING_FACE=on`, and then it exits at once |
 
-Setup and its reset start the same binary, `/opt/lampOS/setup/current/lamp-setup`.
-`install` writes and enables all three and starts none.
+Setup, its reset and the waking face start the same binary, `/opt/lampOS/setup/current/lamp-setup`.
+`install` writes and enables all four and starts none.
 
 ## The install command
 
@@ -559,10 +602,29 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    written only after `harness service install` succeeded; the CLI's own
    files are no proof, since it writes its unit before registering it and
    keeps it when a later step fails, the reviewer on #934): makes `/var/lib/lampos-tasks` `lampos`'s own (0700, the
-   tasks unit's state folder), runs `loginctl enable-linger lampos` (a user
-   manager for `lampos` from boot, with no login), then the Harness CLI's
-   own `harness service install` as `lampos` with
-   `HOME=/var/lib/lampos-tasks` and its `XDG_RUNTIME_DIR`. No unit of
+   tasks unit's state folder); gives `lampos`'s own user manager that folder
+   as its `HOME`, with a drop-in
+   `/etc/systemd/system/user@<uid>.service.d/lamp-home.conf`
+   (`Environment=HOME=/var/lib/lampos-tasks`), `systemctl daemon-reload`
+   and `systemctl try-restart user@<uid>.service` (a manager already
+   running takes it; one not running is left alone); runs `loginctl
+   enable-linger lampos` (a user manager for `lampos` from boot, with no
+   login, started with that `HOME`); then the Harness CLI's own `harness
+   service install` as `lampos` with `HOME=/var/lib/lampos-tasks` and its
+   `XDG_RUNTIME_DIR`.
+   - **Why the drop-in** (#1676): `lampos` is created with no home
+     (`/nonexistent`), and a user manager looks for user units under its
+     `HOME`. Without the drop-in, Harness wrote its unit under
+     `/var/lib/lampos-tasks/.config/systemd/user` and the manager answered
+     "Unit file harnessd.service does not exist" (lamp-75c9, 19 Oct 14:52).
+     With it, on lamp-75c9 at 15:13, the manager's `HOME` was the folder
+     (PAM didn't set it back), and Harness's service installed and ran
+     (`installed`, `registered`, `running`).
+   - **Only that manager:** it runs nothing but Harness. The 13 other
+     product units that run as `lampos` keep the `HOME` systemd gives them
+     from the user database. Changing `lampos`'s passwd home would have
+     moved all of them into the tasks part's folder (the first builder,
+     14:58). No unit of
    install's own: the daemon's runtime, entry point and platform variable
    are the Harness team's (docs/harness.md). A refusal stops the install,
    records nothing, so the next install asks again, and is said; it is taken to the Harness team, not worked around. How a
@@ -616,7 +678,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    uninstall`, then `harness stop`, since the uninstall starts the daemon
    again the usual way (`cli/src/lib/serviceCommand.ts`; the verbs read from
    Harness 0.4.17 on lamp-75c9, Nine on #705); then `harness service status
-   --json` and `loginctl disable-linger lampos`; then the record goes, last,
+   --json` and `loginctl disable-linger lampos`; then the manager's `HOME`
+   drop-in removed and `systemctl daemon-reload`; then the record goes, last,
    so a failure keeps it and a later run tries again. Without the record it
    changes nothing; without Harness at `/usr/local/bin/harness` it refuses
    and keeps the record. Harness itself, the sign-in under

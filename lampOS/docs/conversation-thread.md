@@ -341,8 +341,10 @@ does not erase that talk when it comes back, and is told it:
   lamp and whom the session was opened for are each process's own and are
   not taken from the file. The second route opens the thread for the person
   at the lamp before each turn (`Thread::at_lamp`, `Thread::opening`),
-  counted from the eyes' known file as the Live worker counts it, and asks
-  the memory for that person's kept things.
+  counted from the eyes' known file as the Live worker counts it. With
+  `LAMP_SECOND_SCOPED_CONTEXT=on` and a memory scope bound at admission, the turn's recall, history, kept things
+  and answer are that request's scope alone, not the person opened for
+  ([memory.md](memory.md#second-route-context-scope), #1675).
 
 Shown by `a_thread_another_route_wrote_while_this_one_was_away_is_told_again`
 and `an_exchange_on_the_second_route_comes_back_to_the_live_route_as_the_same_persons`.

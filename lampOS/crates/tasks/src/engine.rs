@@ -1,7 +1,7 @@
 //! Durable task policy. A launch intent is committed before it can leave this
 //! module. Transcript observations and qualified speech receipts are separate.
 use crate::{
-    harness::{Closed, Launch, LaunchOutcome, Observation, Target},
+    harness::{Closed, EngineKind, Launch, LaunchOutcome, Observation, Target},
     protocol::{MAX_PAGE_SIZE, MAX_REPLY_BYTES, Request},
     store::{MAX_STATE_BYTES, Store},
 };
@@ -64,7 +64,15 @@ fn persistence_kept<P: Persistence>(persistence: &P) -> Option<String> {
 /// build launch, close or speak more than the newer one would. Any other new
 /// optional field needs no bump: this build reads past it (#1505, Jarvis on
 /// #1512).
-const SCHEMA: u32 = 1;
+///
+/// 2: a target's engine may be `devin` (#1854). Only a state that holds a
+/// Devin task is written as 2 ([`State::schema_needed`]): one with only
+/// other engines' work stays 1, so a build before Devin still reads it after
+/// a rollback, and the person's hand-overs stay (the first builder on #1872).
+const SCHEMA: u32 = 2;
+/// The oldest `schema` this build reads and writes: a state with no Devin
+/// task.
+const OLDEST_SCHEMA: u32 = 1;
 
 pub trait Persistence {
     fn load(&self) -> io::Result<Option<Vec<u8>>>;
@@ -565,9 +573,25 @@ fn task_label(store_id: &str, id: u64) -> String {
 }
 
 impl State {
+    /// The `schema` this state is written with: [`SCHEMA`] only when a task
+    /// in it is Devin's, else [`OLDEST_SCHEMA`].
+    fn schema_needed(&self) -> u32 {
+        if self
+            .tasks
+            .iter()
+            .any(|task| task.launch.target.engine == EngineKind::Devin)
+        {
+            SCHEMA
+        } else {
+            OLDEST_SCHEMA
+        }
+    }
+    /// A state read may carry a `schema` above the one it needs (its Devin
+    /// tasks since dropped), never one below: a schema-1 state naming Devin
+    /// is refused.
     fn check(&self) -> Result<(), Error> {
         let fail = storage;
-        if self.schema != SCHEMA
+        if !(self.schema_needed()..=SCHEMA).contains(&self.schema)
             || !hex(&self.store_id, 32)
             || !hex(&self.session_id, 32)
             || self.tasks.len() > MAX_TASKS
@@ -1012,7 +1036,7 @@ impl<P: Persistence> Engine<P> {
                 ));
             }
             State {
-                schema: SCHEMA,
+                schema: OLDEST_SCHEMA,
                 store_id: new_store_id.into(),
                 session_id: session_id.into(),
                 revision: 0,
@@ -1108,6 +1132,7 @@ impl<P: Persistence> Engine<P> {
                 }
             }
         }
+        state.schema = state.schema_needed();
         state.check()?;
         let bytes = serde_json::to_vec(&state).map_err(|_| storage())?;
         if bytes.len() > MAX_STATE_BYTES {
@@ -1206,7 +1231,8 @@ impl<P: Persistence> Engine<P> {
         self.last_clock = now.clone();
         Ok(())
     }
-    fn save(&mut self, next: State) -> Result<(), Error> {
+    fn save(&mut self, mut next: State) -> Result<(), Error> {
+        next.schema = next.schema_needed();
         next.check()?;
         let bytes = serde_json::to_vec(&next).map_err(|_| storage())?;
         if bytes.len() > MAX_STATE_BYTES {
@@ -2406,7 +2432,7 @@ fn receipt_body(state: &State, request: &Request) -> Result<Value, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{harness::EngineKind, protocol::Guard};
+    use crate::protocol::Guard;
     use std::{cell::RefCell, rc::Rc};
 
     const STORE: &str = "11111111111111111111111111111111";
@@ -3963,7 +3989,7 @@ mod tests {
         assert!(engine.summary()["set_aside"].is_null());
         let mut newer: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        newer["schema"] = json!(2);
+        newer["schema"] = json!(3);
         let memory = Memory::default();
         memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&newer).unwrap());
         let engine = Engine::open(
@@ -3975,7 +4001,7 @@ mod tests {
         )
         .unwrap();
         let kept = engine.summary()["set_aside"].as_str().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-2-"), "{kept}");
+        assert!(kept.starts_with("tasks.sqlite3.newer-3-"), "{kept}");
         drop(engine);
         let mut engine = Engine::open(
             memory.clone(),
@@ -4155,6 +4181,61 @@ mod tests {
         assert_eq!(receipt_op(&json!({})), "unknown");
     }
 
+    fn written(memory: &Memory) -> Value {
+        serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap()
+    }
+
+    /// #1854, the first builder on #1872: a store with no Devin task stays
+    /// schema 1, so a rollback to a build before Devin keeps the person's
+    /// hand-overs; one written as 2 whose Devin work is gone goes back to 1.
+    #[test]
+    fn a_store_with_no_devin_task_is_written_as_schema_one() {
+        let (mut engine, memory) = opened();
+        accepted(&mut engine, 0);
+        assert_eq!(written(&memory)["schema"], 1);
+        let mut later = written(&memory);
+        later["schema"] = json!(2);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&later).unwrap());
+        let mut engine = Engine::open(memory.clone(), targets(), STORE, RESTART, &clock(1))
+            .expect("a schema-2 store opens");
+        assert!(engine.set_aside().is_none());
+        assert_eq!(engine.state.tasks.len(), 1);
+        assert_eq!(written(&memory)["schema"], 1);
+        prepare(&mut engine, 2);
+        assert_eq!(written(&memory)["schema"], 1);
+    }
+
+    /// #1854: a store that holds a Devin task is written as 2, which a build
+    /// before Devin sets aside; one that names Devin under schema 1 is
+    /// refused, never read.
+    #[test]
+    fn a_store_with_a_devin_task_is_written_as_schema_two() {
+        let devin = || {
+            let mut staff = targets();
+            staff.get_mut("desk").unwrap().engine = EngineKind::Devin;
+            staff
+        };
+        let memory = Memory::default();
+        let mut engine = Engine::open(memory.clone(), devin(), STORE, SESSION, &clock(0)).unwrap();
+        assert_eq!(written(&memory)["schema"], 1);
+        prepare(&mut engine, 0);
+        let stored = written(&memory);
+        assert_eq!(stored["schema"], 2);
+        assert_eq!(stored["tasks"][0]["launch"]["target"]["engine"], "devin");
+        drop(engine);
+        let engine = Engine::open(memory.clone(), devin(), STORE, RESTART, &clock(1))
+            .expect("a schema-2 store opens");
+        assert_eq!(engine.state.tasks.len(), 1);
+        assert_eq!(written(&memory)["schema"], 2);
+        drop(engine);
+        let mut wrong = written(&memory);
+        wrong["schema"] = json!(1);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&wrong).unwrap());
+        assert!(Engine::open(memory, devin(), STORE, RESTART, &clock(2)).is_err());
+    }
+
     /// A store from a newer `schema` is set aside whole and this build
     /// starts with an empty one, never destroying it (#1505).
     #[test]
@@ -4163,7 +4244,7 @@ mod tests {
         accepted(&mut engine, 0);
         let mut newer: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        newer["schema"] = json!(2);
+        newer["schema"] = json!(3);
         newer["tasks"][0]["dispatch"]["state"] = json!("a_state_from_later");
         let bytes = serde_json::to_vec(&newer).unwrap();
         let memory = Memory::default();
@@ -4177,7 +4258,7 @@ mod tests {
         )
         .expect("a newer store is set aside, not refused");
         let kept = engine.set_aside().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-2-"), "{kept}");
+        assert!(kept.starts_with("tasks.sqlite3.newer-3-"), "{kept}");
         assert_eq!(
             memory.0.borrow().kept,
             [(kept, bytes)],
@@ -4185,7 +4266,7 @@ mod tests {
         );
         assert!(engine.state.tasks.is_empty());
         assert_eq!(engine.store_id(), "f".repeat(32), "a new store, its own id");
-        assert_eq!(engine.state.schema, SCHEMA);
+        assert_eq!(engine.state.schema, OLDEST_SCHEMA);
     }
 
     /// Requests stay strict: a request this build has no `op` for is

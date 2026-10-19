@@ -5,6 +5,7 @@ use crate::{
     store::{MAX_STATE_BYTES, Store},
     time::{self, ClockSample, Deadline, When},
 };
+use lamp_local_time::LocalTime;
 use lamp_msgs::{ClockStamp, ScheduleDue, ScheduleNotice};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -276,7 +277,13 @@ pub struct Engine<P: Persistence> {
     persistence: P,
     set_aside: Option<String>,
     state: State,
+    /// The zone a new reminder is set in, by name: `--zone`'s, or with
+    /// `--zone system` the system's as setup last pointed it ([`Self::system`]).
     zone: String,
+    /// `--zone system` (#820): the system's zone, named again at each request,
+    /// so a re-setup is followed without a restart. A reminder already set
+    /// keeps the zone it was set in.
+    system: Option<LocalTime>,
     last_clock: ClockSample,
     recovered: BTreeSet<u64>,
     failed: bool,
@@ -286,8 +293,41 @@ impl<P: Persistence> Engine<P> {
     /// `new_store_id` is fresh random data in serve, and injectable in tests.
     /// Existing stores retain their identity and monotonically rising IDs.
     pub fn open(
+        persistence: P,
+        zone: &str,
+        now: &ClockSample,
+        new_store_id: &str,
+    ) -> Result<Self, Error> {
+        if zone == "system" {
+            let system = LocalTime::zone("system").map_err(|error| {
+                eprintln!("schedule: the system's time zone cannot be read: {error}");
+                bad_time(error)
+            })?;
+            return Self::open_following(persistence, system, now, new_store_id);
+        }
+        Self::open_in(persistence, zone, None, now, new_store_id)
+    }
+
+    /// [`Self::open`] following `system`, the system's zone (`--zone system`):
+    /// one whose name is not a zone the bundled zones know is refused, as a
+    /// named one is.
+    pub fn open_following(
+        persistence: P,
+        system: LocalTime,
+        now: &ClockSample,
+        new_store_id: &str,
+    ) -> Result<Self, Error> {
+        let zone = system.name().ok_or_else(|| {
+            eprintln!("schedule: the system's time zone names no zone this build knows");
+            bad_time("no zone name")
+        })?;
+        Self::open_in(persistence, &zone, Some(system), now, new_store_id)
+    }
+
+    fn open_in(
         mut persistence: P,
         zone: &str,
+        system: Option<LocalTime>,
         now: &ClockSample,
         new_store_id: &str,
     ) -> Result<Self, Error> {
@@ -386,6 +426,7 @@ impl<P: Persistence> Engine<P> {
             set_aside: set_aside.map(|(_, name)| name),
             state,
             zone: zone.into(),
+            system,
             last_clock: now.clone(),
             recovered,
             failed: false,
@@ -589,6 +630,7 @@ impl<P: Persistence> Engine<P> {
     }
 
     pub fn answer(&mut self, request: Request, now: &ClockSample) -> Result<Value, Error> {
+        self.follow_zone();
         self.tick(now)?;
         match &request {
             Request::Status {} => {
@@ -749,6 +791,21 @@ impl<P: Persistence> Engine<P> {
         });
         self.save(next)?;
         Ok(response)
+    }
+
+    /// With `--zone system`, the system's zone as it is now; one that names
+    /// no zone this build knows keeps the last that did.
+    fn follow_zone(&mut self) {
+        if let Some(name) = self.system.as_ref().and_then(LocalTime::name)
+            && name != self.zone
+            && time::validate_zone(&name).is_ok()
+        {
+            eprintln!(
+                "schedule: the system's zone is now {name} (was {})",
+                self.zone
+            );
+            self.zone = name;
+        }
     }
 
     fn guard(&self, guard: &Guard) -> Result<(), Error> {

@@ -136,6 +136,29 @@ pub fn hello_for(known: Option<&str>, typed: Option<&str>) -> String {
     }
 }
 
+/// The hello's words for someone who comes by often (#1670, Mood's
+/// `familiar`): the same hello, one beat warmer.
+pub const OFTEN: &str = "They come by often: greet them as you would someone you see most days, warmly and without fuss.";
+
+/// [`hello_for`], and for a remembered person who comes by often
+/// (`regular` or `close`), [`OFTEN`] inside its note.
+pub fn hello_for_familiar(
+    known: Option<&str>,
+    typed: Option<&str>,
+    familiar: Option<lamp_msgs::FamiliarLevel>,
+) -> String {
+    let hello = hello_for(known, typed);
+    match familiar {
+        Some(lamp_msgs::FamiliarLevel::Regular | lamp_msgs::FamiliarLevel::Close) => {
+            match hello.strip_suffix(')') {
+                Some(note) => format!("{note} {OFTEN})"),
+                None => format!("{hello} ({OFTEN})"),
+            }
+        }
+        _ => hello,
+    }
+}
+
 /// The voice's own hello when no face is known, in place of
 /// `speak_up::NOTE`: by the typed name.
 pub fn hello(name: &str) -> String {
@@ -149,6 +172,26 @@ pub fn hello(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #1670: someone who comes by often gets the same hello with one more
+    /// sentence; someone new, or nobody known, gets it as before.
+    #[test]
+    fn someone_who_comes_by_often_is_greeted_one_beat_warmer() {
+        use lamp_msgs::FamiliarLevel;
+        let plain = hello_for(Some("Minh"), None);
+        assert_eq!(hello_for_familiar(Some("Minh"), None, None), plain);
+        assert_eq!(
+            hello_for_familiar(Some("Minh"), None, Some(FamiliarLevel::New)),
+            plain
+        );
+        for level in [FamiliarLevel::Regular, FamiliarLevel::Close] {
+            let warmer = hello_for_familiar(Some("Minh"), None, Some(level));
+            assert_eq!(
+                warmer,
+                format!("{} {OFTEN})", plain.strip_suffix(')').unwrap())
+            );
+        }
+    }
 
     fn file(name: &str, text: &[u8]) -> std::path::PathBuf {
         let path = std::env::temp_dir().join(format!("lamp-person-{name}-{}", std::process::id()));

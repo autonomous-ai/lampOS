@@ -47,6 +47,9 @@ fn config(root: &Path) -> Config {
         bus_root: root.join("b"),
         zone: "Etc/UTC".into(),
         run_for: Some(Duration::from_secs(15)),
+        // A report every 50 ms, not the lamp's second, so a test that reads
+        // it waits a fraction of a second (#1806).
+        report_every: Duration::from_millis(50),
     }
 }
 

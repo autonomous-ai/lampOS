@@ -135,6 +135,10 @@ pub struct Thread {
     named: Option<String>,
     /// Whom the newest session was opened for: the only exchanges it is told.
     opened_for: Option<String>,
+    /// With `LAMP_LIVE_SCOPED_SESSION`, each known person a spoken line was
+    /// admitted for in the last two minutes, with their newest such line
+    /// ([`Self::admitted`]).
+    admitted: Vec<(String, Instant)>,
     /// A written request not yet answered ([`Self::written`]).
     note: Option<Pending>,
     /// How new a thread file this holds: the modification time of the file
@@ -229,6 +233,7 @@ impl Thread {
             whose: None,
             named: None,
             opened_for: None,
+            admitted: Vec::new(),
             note: None,
             held: None,
         }
@@ -268,6 +273,20 @@ impl Thread {
     /// who keeps talking while turned away from the eyes is not recognised
     /// and must not lose their conversation; the room's after that.
     fn session_person(&self, now: Instant) -> Option<String> {
+        // Lines admitted for someone known, lately ([`Self::admitted`]):
+        // one person's, then theirs, before the count of who is at the lamp
+        // catches up. Two or more known people taking turns: the room's, so
+        // neither is told the other's things and no line is dropped at each
+        // change of speaker (the reviewer's P2 on #1865).
+        let mut lately = self
+            .admitted
+            .iter()
+            .filter(|(_, at)| now.saturating_duration_since(*at) < QUIET_BEFORE_ROOM);
+        match (lately.next(), lately.next()) {
+            (Some((person, _)), None) => return Some(person.clone()),
+            (Some(_), Some(_)) => return None,
+            _ => {}
+        }
         if self.whose.is_some() || self.opened_for.is_none() {
             return self.whose.clone();
         }
@@ -305,6 +324,26 @@ impl Thread {
         changed
     }
 
+    /// A spoken line was admitted for `person`, a memory id
+    /// (`LAMP_LIVE_SCOPED_SESSION`, [`crate::scoped_session`]): for the next
+    /// two minutes the session is theirs, or the room's while someone else
+    /// known has spoken too, and a session opened otherwise is opened again
+    /// between turns. Returns whether the session now open is someone
+    /// else's, so the line must not go into it.
+    pub fn admitted(&mut self, person: &str, now: Instant) -> bool {
+        self.admitted.retain(|(other, at)| {
+            other != person && now.saturating_duration_since(*at) < QUIET_BEFORE_ROOM
+        });
+        self.admitted.push((person.to_owned(), now));
+        crate::scoped_session::refuses(Some(person), self.opened_for.as_deref())
+    }
+
+    /// The camera was closed or changed: who a line was admitted for is
+    /// no longer known.
+    pub fn admitted_unknown(&mut self) {
+        self.admitted.clear();
+    }
+
     /// Whom the session being opened is for.
     pub fn opened_for(&self) -> Option<&str> {
         self.opened_for.as_deref()
@@ -335,16 +374,18 @@ impl Thread {
         };
         // Who is at the lamp and whom the session was opened for are this
         // process's own; each exchange keeps its `whose` through the file.
-        let (whose, named, opened_for, note) = (
+        let (whose, named, opened_for, admitted, note) = (
             self.whose.take(),
             self.named.take(),
             self.opened_for.take(),
+            std::mem::take(&mut self.admitted),
             self.note.take(),
         );
         *self = read;
         self.whose = whose;
         self.named = named;
         self.opened_for = opened_for;
+        self.admitted = admitted;
         self.note = note;
         self.held = Some(at);
         took
@@ -473,11 +514,17 @@ impl Thread {
     /// anyone said. An answer to any later request drops it unused (the
     /// request was retired or failed), and so does a forgetting.
     pub fn written(&mut self, request: u64, text: &str) {
+        let scope = self.whose.clone().or_else(|| self.opened_for.clone());
+        self.written_for(request, text, scope.as_deref());
+    }
+
+    /// Keep a written note under its admitted scope, including explicit room scope.
+    pub fn written_for(&mut self, request: u64, text: &str, scope: Option<&str>) {
         let mut note = String::new();
         add(&mut note, text, PERSON_BYTES);
         self.note = Some(Pending {
             request,
-            whose: self.whose.clone().or_else(|| self.opened_for.clone()),
+            whose: scope.map(str::to_owned),
             note,
         });
     }
@@ -499,6 +546,16 @@ impl Thread {
 
     /// A piece of what the lamp said in answer `request`.
     pub fn lamp(&mut self, request: u64, text: &str, now: Instant) {
+        let scope = self
+            .named
+            .clone()
+            .or_else(|| self.whose.clone())
+            .or_else(|| self.opened_for.clone());
+        self.lamp_for(request, text, now, scope.as_deref());
+    }
+
+    /// Attribute an answer to its admitted scope rather than a later face observation.
+    pub fn lamp_for(&mut self, request: u64, text: &str, now: Instant, scope: Option<&str>) {
         // The name of a function said where it should have been called is
         // not something the lamp said: neither that piece nor what follows
         // it in the same answer is kept, told again or taken for a
@@ -532,11 +589,7 @@ impl Thread {
             // eight are all there is. The person the eyes name now; nobody
             // named, the one counted; nobody known while a person's session
             // goes on: theirs.
-            let whose = self
-                .named
-                .clone()
-                .or_else(|| self.whose.clone())
-                .or_else(|| self.opened_for.clone());
+            let whose = scope.map(str::to_owned);
             let theirs = self.exchanges.iter().filter(|e| e.whose == whose);
             if theirs.count() == EXCHANGES {
                 if let Some(oldest) = self.exchanges.iter().position(|e| e.whose == whose) {
@@ -720,12 +773,24 @@ impl Thread {
     /// at most `most`, oldest first, as (what they said, what the lamp said):
     /// for a route that gives a model the conversation as messages.
     pub fn recent(&self, now: Instant, within: Duration, most: usize) -> Vec<Recent> {
+        self.recent_for(self.opened_for.as_deref(), now, within, most)
+    }
+
+    /// Read an explicit admitted scope without changing session ownership.
+    /// None selects only the room, never the person currently in view.
+    pub fn recent_for(
+        &self,
+        scope: Option<&str>,
+        now: Instant,
+        within: Duration,
+        most: usize,
+    ) -> Vec<Recent> {
         let mut recent: Vec<Recent> = self
             .exchanges
             .iter()
             .rev()
             .filter(|exchange| {
-                exchange.whose == self.opened_for
+                exchange.whose.as_deref() == scope
                     && now.saturating_duration_since(exchange.at) <= within
                     && exchange.lamp.chars().any(char::is_alphanumeric)
             })
@@ -744,10 +809,16 @@ impl Thread {
     /// `room` bytes: the latest exchanges that fit, in the order they went,
     /// of the person the session is opened for ([`Self::opening`]) only.
     pub fn recall(&self, now: Instant, room: usize) -> Option<String> {
+        self.recall_for(self.opened_for.as_deref(), now, room)
+    }
+
+    /// Read an explicit admitted scope without changing session ownership.
+    /// None selects only the room, never the person currently in view.
+    pub fn recall_for(&self, scope: Option<&str>, now: Instant, room: usize) -> Option<String> {
         // An answer with no word in it ("...") is the model keeping quiet
         // aloud. Told back to it, it is what it does next.
         let told = |exchange: &&Exchange| {
-            exchange.whose == self.opened_for
+            exchange.whose.as_deref() == scope
                 && now.saturating_duration_since(exchange.at) <= REMEMBERED_FOR
                 && exchange.lamp.chars().any(char::is_alphanumeric)
         };
@@ -2260,6 +2331,130 @@ mod tests {
         thread.lamp(3, "Okay, A.", now);
         assert_eq!(thread.names_window(2), window(&before));
         assert_eq!(thread.names_window(1), window(&before[1..]));
+    }
+
+    /// `LAMP_LIVE_SCOPED_SESSION`: a line admitted for someone known makes
+    /// the session theirs before the count catches up, refuses only another
+    /// known person's session, and stops counting two minutes on or once
+    /// the camera closes.
+    #[test]
+    fn an_admitted_person_owns_the_next_session_for_two_minutes() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        thread.at_lamp(Some(a.clone()));
+        thread.opening(now);
+        assert!(thread.admitted(&b, now), "B in A's session");
+        assert!(thread.switch_due(now), "the count still says A");
+        assert!(thread.opening(now));
+        assert_eq!(thread.opened_for(), Some(b.as_str()));
+        assert!(!thread.admitted(&b, now));
+        assert!(
+            thread.switch_due(now + QUIET_BEFORE_ROOM),
+            "back to the count"
+        );
+        thread.admitted_unknown();
+        assert!(thread.switch_due(now));
+        let mut room = Thread::new();
+        room.opening(now);
+        assert!(!room.admitted(&a, now), "a room session is never refused");
+        assert!(room.switch_due(now), "but is opened again for them");
+    }
+
+    /// The reviewer's P2 on #1865: two known people taking turns lose one
+    /// line, when the second first speaks, and then talk on in a room
+    /// session, told neither's things; none of their later lines is
+    /// refused or opens a session. Once one has been quiet two minutes, the
+    /// session is the other's again, opened between turns.
+    #[test]
+    fn two_known_people_taking_turns_share_a_room_session() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        thread.at_lamp(Some(a.clone()));
+        thread.opening(now);
+        assert!(!thread.admitted(&a, now), "A in A's session");
+        assert!(!thread.switch_due(now));
+        assert!(thread.admitted(&b, now), "B's first line, in A's session");
+        assert!(thread.switch_due(now));
+        thread.opening(now);
+        assert_eq!(thread.opened_for(), None, "the room's");
+        let second = Duration::from_secs(1);
+        for turn in 1..=20u32 {
+            let at = now + second * turn;
+            let person = if turn % 2 == 0 { &a } else { &b };
+            assert!(!thread.admitted(person, at), "turn {turn} refused");
+            assert!(!thread.switch_due(at), "turn {turn} reopened");
+        }
+        let later = now + second * 20 + QUIET_BEFORE_ROOM;
+        assert!(
+            !thread.admitted(&a, later),
+            "a room session is never refused"
+        );
+        assert!(thread.switch_due(later), "B quiet two minutes: A's again");
+        thread.opening(later);
+        assert_eq!(thread.opened_for(), Some(a.as_str()));
+    }
+
+    #[test]
+    fn scoped_answer_keeps_its_admitted_person_after_the_face_changes() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        thread.at_lamp(Some(a.clone()));
+        thread.opening(now);
+        thread.person("A question", true, now);
+        thread.at_lamp(Some(b.clone()));
+        thread.lamp_for(1, "A private answer", now, Some(&a));
+        assert_eq!(thread.recent_for(Some(&a), now, REMEMBERED_FOR, 6).len(), 1);
+        assert!(
+            thread
+                .recent_for(Some(&b), now, REMEMBERED_FOR, 6)
+                .is_empty()
+        );
+        thread.written_for(2, "room note", None);
+        thread.lamp_for(2, "room answer", now, None);
+        let room = thread.recent_for(None, now, REMEMBERED_FOR, 6);
+        assert_eq!(room.len(), 1);
+        assert_eq!(room[0].written.as_deref(), Some("room note"));
+        assert!(
+            thread
+                .recent_for(Some(&b), now, REMEMBERED_FOR, 6)
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn explicit_history_scope_never_uses_the_sticky_session_owner() {
+        let now = Instant::now();
+        let a = crate::remember::person_id("A");
+        let b = crate::remember::person_id("B");
+        let mut thread = Thread::new();
+        thread.at_lamp(Some(a.clone()));
+        thread.opening(now);
+        thread.person("private marker A", true, now);
+        thread.lamp(1, "private reply A", now);
+        for scope in [Some(b.as_str()), None] {
+            assert!(thread.recent_for(scope, now, REMEMBERED_FOR, 6).is_empty());
+            assert!(thread.recall_for(scope, now, 4096).is_none());
+        }
+        assert!(
+            thread
+                .recall_for(Some(&a), now, 4096)
+                .unwrap()
+                .contains("private marker A")
+        );
+        assert_eq!(thread.opened_for(), Some(a.as_str()));
+        thread.forget();
+        assert!(
+            thread
+                .recent_for(Some(&a), now, REMEMBERED_FOR, 6)
+                .is_empty()
+        );
+        assert!(thread.recall_for(Some(&a), now, 4096).is_none());
     }
 
     /// The exchanges a route gives a model as messages: the person's only,

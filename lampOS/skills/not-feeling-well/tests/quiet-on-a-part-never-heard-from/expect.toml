@@ -1,0 +1,5 @@
+# From 10:00, the eyes expected and never heard from (missing; the lamp
+# stale for 10 minutes): no quiet_ms, nothing. A part that never came up
+# is the self-test's and the waking face's, not this trigger's.
+clock = "10:00"
+none = true

@@ -68,6 +68,13 @@ lamp-schedule serve --enable \
   --zone Asia/Ho_Chi_Minh
 ```
 
+`--zone` takes an IANA name or `system` (#820): the zone the lamp's setup
+last pointed `/etc/localtime` at, read through `lamp-local-time` as the other
+parts read it, and named again at each request, so a re-setup to another zone
+is followed without a restart (one line says the change). A system zone that
+names no zone in the bundled database is refused at start, as an unknown name
+is; a later one that names none keeps the last that did.
+
 `--dir`, `--socket`, and `--zone` are required when enabled. `--bus-root` defaults
 to `/run/lampos-bus` if omitted; supplying it explicitly
 makes the intended bus clear. The store and socket each need an existing parent;
@@ -244,8 +251,10 @@ Times are exact ASCII `HH:MM` on a 24-hour clock. `9:00`, `09:0`, AM/PM strings,
 seconds, unknown fields, and invented relative-day words are refused. Dates are
 exact `YYYY-MM-DD`. A zone is a name in the bundled IANA database, such as
 `Asia/Ho_Chi_Minh`, `America/New_York`, or `UTC`; a numeric offset is not a zone.
-Omitting the zone selects the configured zone for that new request. Changing
-the service's default later does not move existing reminders.
+Omitting the zone selects the configured zone for that new request, with
+`--zone system` the system's at that moment. Changing the service's default
+later, or the system's zone under `--zone system`, does not move existing
+reminders: each keeps the zone it was set in.
 
 Every new timer, reminder, and snooze requires trusted wall time, including an
 elapsed timer: it needs a durable wall deadline for a later boot. On the same
@@ -470,7 +479,9 @@ end-to-end audio, or a person hearing the reminder.
 
 `schedule/due` is `lamp_msgs/ScheduleDue` version 1, **Latest**, with a 1-second
 period and a 3-second lifespan. The owner also publishes on revision and
-readiness changes. Its fields are `stamp`, `store_id`, `revision`, `enabled`,
+readiness changes. The period is `runtime::REPORT_EVERY`, given as
+`Config::report_every`; tests give 50 ms, so a test that reads the report
+does not wait a second for it (#1806). Its fields are `stamp`, `store_id`, `revision`, `enabled`,
 `ready`, pending count, waiting-for-clock count, and optional `oldest` metadata:
 `id`, `delivery`, `due_unix_ms`, `late`, and optional `late_by_ms`. There is no
 reminder text in this topic. It is a hint to inspect durable work, not a queue

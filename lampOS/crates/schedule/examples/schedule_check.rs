@@ -709,6 +709,7 @@ fn ipc_checks(root: &Path, warm: usize, cleanup_safe: Arc<AtomicBool>) -> io::Re
         bus_root: root.join("b"),
         zone: "Etc/UTC".into(),
         run_for: None,
+        report_every: lamp_schedule::runtime::REPORT_EVERY,
     };
     let mut running = Running::start(config, clock.clone(), cleanup_safe)
         .map_err(|error| context("runtime startup", error))?;

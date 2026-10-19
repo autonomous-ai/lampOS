@@ -1743,6 +1743,11 @@ own measurement. It writes the file only with `--write`, never over one
 already there, and refuses a read taken with torque on (install.md, "At the
 factory, once per lamp").
 
+**`lamp-body-mood`** (#1682) tells a body one mood on its `--mood-socket`,
+as the voice does: one `{"mood":WORD,"level":LEVEL}` datagram (level 128
+unless given). The factory's steps use it to stand a body run by hand on a
+private socket. It never opens the servo port.
+
 ### Reading a run without stopping it
 
 Two lines let a run be read from the journal while it goes on (#705), since

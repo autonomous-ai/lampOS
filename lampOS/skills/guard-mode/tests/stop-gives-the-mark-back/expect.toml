@@ -1,0 +1,21 @@
+# On, then "stop" at the lamp at 300 s: the mark is given back, and the
+# visit after is not texted.
+clock = "14:20"
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }
+
+[[call_tool]]
+name = "keep_watch"
+at = "300s"
+args = { turn = "off" }
+
+[[expect]]
+at = "4s"
+call = "light"
+
+[[expect]]
+at = "300s"
+call = "ends"

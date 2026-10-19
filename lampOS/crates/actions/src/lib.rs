@@ -105,11 +105,11 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
         functions.extend([
             plain(
                 "volume_up",
-                "Make your own speaker louder by one step, when someone asks you to speak up, to turn yourself up, or says you are too quiet.",
+                "Make your own voice louder by one step, when someone asks you to speak up, be louder or turn yourself up, or says you are too quiet. \"Turn yourself up\" and \"louder\" are your voice; \"turn the light up\" is your light (light_brighter).",
             ),
             plain(
                 "volume_down",
-                "Make your own speaker quieter, when someone asks you to keep it down, speak more quietly or turn yourself down, or says you are too loud. Not for \"softer\" alone: that is your light (light_dimmer), unless they say it of your voice or sound.",
+                "Make your own voice quieter by one step, when someone asks you to keep it down, be quieter, speak more quietly or turn yourself down, or says you are too loud. \"Turn yourself down\" and \"quieter\" are your voice; \"turn the light down\" is your light (light_dimmer). Not for \"softer\" alone: that is your light too, unless they say it of your voice or sound.",
             ),
             plain(
                 "volume_mute",
@@ -137,11 +137,11 @@ pub fn catalog(sound: bool, light: bool) -> Vec<Function> {
             },
             plain(
                 "light_brighter",
-                "Make your own light a step brighter, keeping its colour. Not for white or whiter: white is a colour (light_colour, or light_cooler for a step). Not for \"turn yourself up\": that is your voice (volume_up).",
+                "Make your own light a step brighter, keeping its colour, when someone asks for more light or to turn the light up. Not for white or whiter: white is a colour (light_colour, or light_cooler for a step). Not for \"turn yourself up\": that is your voice (volume_up).",
             ),
             plain(
                 "light_dimmer",
-                "Make your own light a step dimmer, keeping its colour, when someone says it is too bright or harsh, or asks for it softer, a touch softer, gentler or lower. \"Softer\" with nothing said of your voice or sound is your light. Not for \"turn yourself down\": that is your voice (volume_down).",
+                "Make your own light a step dimmer, keeping its colour, when someone says it is too bright or harsh, or asks for it softer, a touch softer, gentler or lower, or to turn the light down. \"Softer\" with nothing said of your voice or sound is your light. Not for \"turn yourself down\": that is your voice (volume_down).",
             ),
             plain(
                 "light_warmer",
@@ -399,6 +399,56 @@ mod tests {
         );
         assert!(
             said("light_brighter").contains("Not for \"turn yourself up\": that is your voice")
+        );
+    }
+
+    /// lamp-4ace, 19 Oct (the batteries at 11:10 and 13:03, #1712): the
+    /// DeepSeek route took "turn yourself down a bit" and "turn yourself
+    /// back up" for the light both times, where Gemini Live turned the
+    /// voice. "Turn yourself", louder and quieter are the voice; the light
+    /// turned up or down is the light. The names stay as every route knows
+    /// them.
+    #[test]
+    fn turning_yourself_up_or_down_is_the_voice_and_the_light_turned_is_the_light() {
+        let all = catalog(true, true);
+        let said = |name: &str| all.iter().find(|f| f.name == name).unwrap().description;
+        for (voice, words) in [
+            ("volume_up", ["turn yourself up", "louder", "too quiet"]),
+            ("volume_down", ["turn yourself down", "quieter", "too loud"]),
+        ] {
+            for word in words {
+                assert!(said(voice).contains(word), "{voice}: {word}");
+            }
+        }
+        assert!(said("volume_up").contains("\"turn the light up\" is your light (light_brighter)"));
+        assert!(
+            said("volume_down").contains("\"turn the light down\" is your light (light_dimmer)")
+        );
+        assert!(said("light_brighter").contains("turn the light up"));
+        assert!(
+            said("light_brighter")
+                .contains("Not for \"turn yourself up\": that is your voice (volume_up)")
+        );
+        assert!(said("light_dimmer").contains("turn the light down"));
+        assert!(
+            said("light_dimmer")
+                .contains("Not for \"turn yourself down\": that is your voice (volume_down)")
+        );
+        assert_eq!(
+            all.iter().map(|f| f.name).collect::<Vec<_>>(),
+            [
+                "volume_up",
+                "volume_down",
+                "volume_mute",
+                "volume_unmute",
+                "light_on",
+                "light_off",
+                "light_colour",
+                "light_brighter",
+                "light_dimmer",
+                "light_warmer",
+                "light_cooler"
+            ]
         );
     }
 

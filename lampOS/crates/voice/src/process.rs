@@ -891,6 +891,10 @@ fn worker_command(
             role,
             var(crate::local_time::KERNEL_CLOCK_ENVIRONMENT).as_deref(),
         ))
+        .envs(near_calibrated_worker_environment(
+            role,
+            var(crate::attention::NEAR_CALIBRATED_ENVIRONMENT).as_deref(),
+        ))
         .envs(quiet_evidence_worker_environment(
             role,
             var(crate::quiet_pace::EVIDENCE_ENVIRONMENT).as_deref(),
@@ -920,6 +924,10 @@ fn worker_command(
             var(crate::second_config::CREDENTIALS_ENV).as_deref(),
         ))
         .envs(second_route_worker_environment(role, &var))
+        .envs(second_scoped_context_worker_environment(
+            role,
+            var(crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -935,6 +943,18 @@ fn memory_days_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some(("LAMP_MEMORY_DAYS", "on"))
+}
+
+// The second route's scoped context (#1675, #1839), passed the same narrow
+// way: the exact `on`, to the second route only, which reads it.
+fn second_scoped_context_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on"))).then_some((
+        crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
+        "on",
+    ))
 }
 
 // The rules' switch (#813), passed the same narrow way: the exact `on`, to
@@ -977,6 +997,16 @@ fn kernel_clock_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::local_time::KERNEL_CLOCK_ENVIRONMENT, "on"))
+}
+
+// This home's near bar (#753), to the two routes' workers, which judge a
+// call with it: the exact `on`.
+fn near_calibrated_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::attention::NEAR_CALIBRATED_ENVIRONMENT, "on"))
 }
 
 // The echo evidence's skip (#705), to the one worker that runs it: capture.
@@ -1152,6 +1182,30 @@ mod tests {
         }
     }
 
+    /// #753: this home's near bar reaches the two routes' workers, which
+    /// judge a call with it, and only as the exact `on`.
+    #[test]
+    fn the_near_bars_switch_reaches_the_two_routes_only() {
+        let on = Some(std::ffi::OsStr::new("on"));
+        for role in ["provider", "second"] {
+            assert_eq!(
+                near_calibrated_worker_environment(role, on),
+                Some((crate::attention::NEAR_CALIBRATED_ENVIRONMENT, "on")),
+                "{role}"
+            );
+        }
+        for role in ["capture", "speaker"] {
+            assert_eq!(near_calibrated_worker_environment(role, on), None, "{role}");
+        }
+        for off in [
+            None,
+            Some(std::ffi::OsStr::new("ON")),
+            Some(std::ffi::OsStr::new("")),
+        ] {
+            assert_eq!(near_calibrated_worker_environment("provider", off), None);
+        }
+    }
+
     #[test]
     fn cleared_worker_environment_passes_only_the_exact_voice_route_opt_in() {
         use std::{ffi::OsString, os::unix::ffi::OsStringExt};
@@ -1176,6 +1230,12 @@ mod tests {
                         memory_days_worker_environment as fn(_, _) -> _,
                         "LAMP_MEMORY_DAYS",
                         ["provider", "second"].as_slice(),
+                    ),
+                    // The second route's scoped context reaches it alone.
+                    (
+                        second_scoped_context_worker_environment,
+                        "LAMP_SECOND_SCOPED_CONTEXT",
+                        ["second"].as_slice(),
                     ),
                     // Rules reach the Live provider only.
                     (
@@ -1302,7 +1362,8 @@ mod tests {
     /// command it is started with. A script in the worker's place writes
     /// the environment it got: the provider has the memory's two switches,
     /// the clock and the typed name's file, the second route the memory's
-    /// days, the clock and the name's file (#1323), and capture the quiet
+    /// days, the clock, the name's file (#1323) and its scoped context
+    /// (#1839), and capture the quiet
     /// evidence switch (#1285) and the detector's input (#828). With every other variable set to a secret,
     /// nothing else reaches any of them but the shell's own.
     #[test]
@@ -1326,6 +1387,8 @@ mod tests {
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
                     crate::second_provider::net::key_terms::ENVIRONMENT,
                     crate::second_config::FLUX_ENV,
+                    crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
+                    crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                 ]
                 .contains(&name)
                 {
@@ -1391,6 +1454,7 @@ mod tests {
             (
                 "provider",
                 vec![
+                    "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
@@ -1403,6 +1467,7 @@ mod tests {
                 "second",
                 vec![
                     "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
+                    "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
@@ -1414,6 +1479,7 @@ mod tests {
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_KNOWN_NAMES=on",
                     "LAMP_SECOND_PREPARED=on",
+                    "LAMP_SECOND_SCOPED_CONTEXT=on",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
                     "LAMP_SECOND_STEADY_FIRST=on",
                     "LAMP_SECOND_WEATHER=on",

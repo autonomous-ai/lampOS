@@ -1,0 +1,30 @@
+# A, whose face the eyes know, asks and leaves; back at 14:40, known two
+# seconds later: the watch ends and its mark is given back. No text.
+clock = "14:20"
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }
+
+[[known]]
+at = "0s"
+name = "known-a"
+
+[[known]]
+at = "32s"
+
+[[known]]
+at = "1202s"
+name = "known-a"
+
+[[known]]
+at = "1302s"
+
+[[expect]]
+at = "4s"
+call = "light"
+
+[[expect]]
+at = "1202s"
+call = "ends"

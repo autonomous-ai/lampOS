@@ -182,6 +182,9 @@ pub type ScopedToolRunner = Arc<
 
 /// The system message for a turn, built when the turn's chat begins.
 pub type System = Arc<dyn Fn() -> Told + Send + Sync>;
+/// The system message built for the admitted request's immutable scope, never
+/// for whoever is in view when the chat begins.
+pub type ScopedSystem = Arc<dyn Fn(&crate::memory_scope::ScopeLease) -> Told + Send + Sync>;
 
 /// What a turn's chat is told: the system message, and the exchanges just
 /// before it as messages (user, then assistant), oldest first. Both come
@@ -243,6 +246,9 @@ pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
 /// begun just before it, in the same session.
 pub type Heed =
     Arc<dyn Fn(u64, (u64, u64), &str, Option<u64>) -> Option<&'static str> + Send + Sync>;
+/// Where a spoken turn's verdict is said (`voice/turn`, #1155): its
+/// request, and whether it is answered or its answer held back.
+pub type Verdicts = Arc<dyn Fn(u64, lamp_msgs::TurnVerdict) + Send + Sync>;
 /// Whether the lamp's own last line before `request` was a question, in a
 /// conversation going on (`worker::lamp_just_asked`): then a checked sound
 /// with a word in it is the person's answer, as on the Live route.
@@ -302,6 +308,7 @@ struct Shared {
     tools: ToolRunner,
     scoped_tools: Option<ScopedToolRunner>,
     system: System,
+    scoped_system: Option<ScopedSystem>,
     clock: Clock,
     /// When answer audio was last sent.
     answered_at: Mutex<Option<Instant>>,
@@ -311,6 +318,8 @@ struct Shared {
     sequence: AtomicU64,
     out: mpsc::Sender<ProviderOutput>,
     heed: Option<Heed>,
+    /// Where each judged turn's verdict is said, when it is.
+    verdicts: Option<Verdicts>,
     asked: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
@@ -624,12 +633,14 @@ impl Engine {
                 tools,
                 scoped_tools: None,
                 system,
+                scoped_system: None,
                 clock,
                 answered_at: Mutex::new(None),
                 said_until_us: AtomicU64::new(0),
                 sequence: AtomicU64::new(0),
                 out,
                 heed: None,
+                verdicts: None,
                 asked: None,
                 cues: None,
                 down: None,
@@ -675,10 +686,11 @@ impl Engine {
         boot: lamp_turn_owner::BootId,
         cache: Arc<crate::memory_scope::FaceCache>,
         runner: ScopedToolRunner,
+        system: Option<ScopedSystem>,
     ) -> Self {
-        Arc::get_mut(&mut self.shared)
-            .expect("configured before admission")
-            .scoped_tools = Some(runner);
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.scoped_tools = Some(runner);
+        shared.scoped_system = system;
         self.memory = Some((boot, cache));
         self
     }
@@ -706,6 +718,21 @@ impl Engine {
         {
             scope.revoke();
         }
+    }
+
+    /// Whether turns are told and kept for their admitted memory scope
+    /// (a [`ScopedSystem`] given to [`Self::with_memory_scope`]).
+    pub(crate) fn scopes_context(&self) -> bool {
+        self.shared.scoped_system.is_some()
+    }
+
+    /// Authority of the current admitted request, including its immutable scope.
+    pub(crate) fn memory_lease(&self) -> Option<crate::memory_scope::ScopeLease> {
+        self.turn
+            .as_ref()?
+            .memory_scope
+            .as_ref()
+            .map(|scope| scope.lease())
     }
 
     fn memory_scope(
@@ -905,6 +932,15 @@ impl Engine {
     pub fn noting_a_task_waiting(mut self, note: TaskNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.task_waiting = Some(note);
+        }
+        self
+    }
+
+    /// Each judged turn's verdict is said with `told` (#1155): held back,
+    /// or answered when it was judged and let out. Before any turn only.
+    pub fn telling_verdicts(mut self, told: Verdicts) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.verdicts = Some(told);
         }
         self
     }
@@ -1652,6 +1688,15 @@ async fn spoken(
         .ok()
         .and_then(|mut cut| cut.take())
         .filter(|carried| carried.request < request && carried.at.elapsed() <= CARRY_WITHIN);
+    // The turn's verdict, as the journal says it above (#1155): only for a
+    // turn something judged, and never for one with nothing heard.
+    if let Some(told) = shared.verdicts.as_ref().filter(|_| !empty) {
+        if held || heeded.is_some() {
+            told(request, lamp_msgs::TurnVerdict::HeldBack);
+        } else if shared.heed.is_some() || marked {
+            told(request, lamp_msgs::TurnVerdict::Answered);
+        }
+    }
     if empty || held || heeded.is_some() {
         // Left unanswered: a line held by the rule is not talk, nor are no
         // words at all, which are a sound (as a short sound already is).
@@ -1991,12 +2036,13 @@ impl Shared {
 
 /// How an answer stopped short.
 enum Stop {
-    /// `not_for_me`: nothing more is said.
-    Silent,
     /// The first round had not begun within its bound ([`BEGIN_WITHIN`]):
     /// the route gave the turn up, not the model. It ends as a silent turn,
     /// but what was said is no talk the lamp left alone.
     GaveUp,
+    /// `not_for_me`: nothing more is said, and the model judged the line
+    /// not said to the lamp.
+    Declined,
     Failed(Fault),
     /// The engine is gone.
     Gone,
@@ -2049,6 +2095,9 @@ async fn answer(
     let spoke = AtomicBool::new(false);
     // The answer's own first audio went (not the announcement's).
     let answered = AtomicBool::new(false);
+    // Whether a tool ran for this line: one declined after is the lamp's.
+    let ran = AtomicBool::new(false);
+    let acted = &ran;
     let mut queue = Queue {
         shared,
         speech: &mut speech,
@@ -2078,7 +2127,16 @@ async fn answer(
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
         }
-        let mut messages = (shared.system)().messages();
+        let told = match (&shared.scoped_system, &scope) {
+            (Some(system), Some(lease)) => system(lease),
+            _ => (shared.system)(),
+        };
+        // Building it can wait on the memory service: a request revoked
+        // meanwhile is not asked with what was read for it.
+        if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+            return Err(Stop::Gone);
+        }
+        let mut messages = told.messages();
         // A chat begun on the early words stands for round 1 if it fits.
         let mut prepared = prepared_for.and_then(|(prepared, said)| {
             match prepared.misfit(&messages, &notes, &said) {
@@ -2264,7 +2322,7 @@ async fn answer(
                 );
             }
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
-                return Err(Stop::Silent);
+                return Err(Stop::Declined);
             }
             // A look asked by its own call (#1712): the coordinator takes the
             // turn's full look, and the turn ends here; its picture comes in
@@ -2350,6 +2408,7 @@ async fn answer(
                 {
                     did(Did::Worked(monotonic_us()));
                 }
+                acted.store(true, Ordering::Relaxed);
                 let result = match (&shared.scoped_tools, &scope) {
                     (Some(run), Some(scope)) => {
                         run(
@@ -2490,10 +2549,24 @@ async fn answer(
                 idle: true,
             }
         }
-        Err(Stop::Silent | Stop::GaveUp) => ProviderOutput::TurnComplete {
+        Err(Stop::GaveUp) => ProviderOutput::TurnComplete {
             request,
             idle: true,
         },
+        Err(Stop::Declined) => {
+            // A line the model declines is told held back, as a line the
+            // rule holds is, unless a tool ran for it first (#1155, the
+            // first builder on #1817).
+            if let Some(told) = shared.verdicts.as_ref()
+                && !acted.load(Ordering::Relaxed)
+            {
+                told(request, lamp_msgs::TurnVerdict::HeldBack);
+            }
+            ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            }
+        }
         Err(Stop::Failed(reason)) => ProviderOutput::TurnFailed {
             request,
             stage: if spoke.load(Ordering::Relaxed) {
@@ -2590,7 +2663,7 @@ impl Queue<'_> {
         // other is left out, and not run (its arguments are not read).
         if crate::not_speech::bare_call(&text) {
             if text.trim_start().starts_with(NOT_FOR_ME) {
-                return Err(Stop::Silent);
+                return Err(Stop::Declined);
             }
             return Ok(());
         }

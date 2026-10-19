@@ -1175,6 +1175,7 @@ pub(crate) fn who(task: &Value) -> &'static str {
     match task["target"]["engine"].as_str() {
         Some("codex") => "Codex",
         Some("opencode") => "OpenCode",
+        Some("devin") => "Devin",
         _ => "Claude Code",
     }
 }
@@ -3053,5 +3054,20 @@ mod tests {
         assert_eq!(first_told(true, ended, &yes, &lamp), Some(16));
         // Without the switch, 15 s after the last turn either way.
         assert_eq!(first_told(false, ended, &asked, &lamp), Some(150));
+    }
+
+    /// #1854: news of Devin's work names Devin, as each engine's names its
+    /// own agent; an engine the voice doesn't know is Claude Code, as before.
+    #[test]
+    fn news_names_the_agent_each_engine_is() {
+        for (engine, name) in [
+            ("claude", "Claude Code"),
+            ("codex", "Codex"),
+            ("opencode", "OpenCode"),
+            ("devin", "Devin"),
+            ("a_later_engine", "Claude Code"),
+        ] {
+            assert_eq!(who(&json!({"target":{"engine":engine}})), name, "{engine}");
+        }
     }
 }

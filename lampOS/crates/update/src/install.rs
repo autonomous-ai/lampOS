@@ -153,6 +153,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lampos-setup-done.path",
         include_str!("../../../deploy/product/lampos-setup-done.path"),
     ),
+    // The waking face, from power-on until the voice takes the ring
+    // (#1681); off unless `LAMP_WAKING_FACE=on`.
+    (
+        "lamp-waking.service",
+        include_str!("../../../deploy/product/lamp-waking.service"),
+    ),
 ];
 
 /// The skills every lamp runs: each a folder of `lampOS/skills/`, put in
@@ -186,6 +192,12 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "it is called only after Desk tutor's look, and Desk tutor isn't in the product",
     ),
     (
+        "guard-mode",
+        "an installable skill (#1685), not yet tried on a lamp: it needs `room/presence` \
+         (`LAMP_PRESENCE=on`), and its texts reach no phone until `lamp-cloud` and the app's push \
+         relay take `messages/out`",
+    ),
+    (
         "light-out",
         "it reads `room/presence`, which the eyes say only with `LAMP_PRESENCE=on` (#1677), off \
          until the light going out and coming back has been seen on a lamp: someone reading face \
@@ -213,6 +225,14 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "light-show",
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
          32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
+    ),
+    // An installable skill (#1685): its owner puts it on; not in the
+    // product's install until it has been tried on a lamp.
+    (
+        "look-for-things",
+        "an installable skill, not yet tried on a lamp (#1685): its turns need a lamp-body with \
+         `toward` and the lamp's `--gaze`, and its function would put a product session past its \
+         32 without `LAMP_USE_SKILL=on`",
     ),
 ];
 
@@ -432,8 +452,8 @@ pub fn part(text: &str) -> Option<Part> {
     unit::linked(text).map(|(folder, binary)| Part { folder, binary })
 }
 
-/// Every part of the product, in the order of `PRODUCT`, each once: setup
-/// and its reset start the same binary.
+/// Every part of the product, in the order of `PRODUCT`, each once: setup,
+/// its reset and the waking face start the same binary.
 pub fn parts() -> Vec<Part> {
     let mut parts: Vec<Part> = Vec::new();
     for part in PRODUCT.iter().filter_map(|(_, text)| part(text)) {
@@ -501,11 +521,7 @@ impl Host for System {
     }
 
     fn harness_at_boot(&mut self, user: &str, home: &str) -> Result<(), String> {
-        run(Command::new("install").args(["-d", "-o", user, "-g", user, "-m", "0700", home]))?;
-        // A user manager for the user from boot, with no login: the
-        // daemon's user unit needs it, a system user as any other.
-        run(Command::new("loginctl").args(["enable-linger", user]))?;
-        run(harness_as(user, home)?.args(["service", "install"]))
+        harness_at_boot_with(&mut output_of, Path::new("/"), user, home)
     }
 
     fn harness_off(&mut self, user: &str, home: &str) -> Result<Vec<String>, String> {
@@ -555,14 +571,6 @@ fn uid_of(run: &mut Runner, user: &str) -> Result<String, String> {
     Ok(uid)
 }
 
-fn harness_as(user: &str, home: &str) -> Result<Command, String> {
-    let uid = uid_of(&mut output_of, user)?;
-    let argv = harness_argv(user, home, &uid, &[]);
-    let mut command = Command::new(&argv[0]);
-    command.args(&argv[1..]);
-    Ok(command)
-}
-
 /// One program and its arguments, run to its end: what it printed when it
 /// ended with 0, else why not. The real one is [`output_of`]; a test's logs
 /// and fails on demand.
@@ -582,11 +590,64 @@ fn output_of(argv: &[String]) -> Result<String, String> {
     }
 }
 
+/// Where `user`'s own user manager is given `home` as its `HOME` (#1676):
+/// a drop-in for `user@<uid>.service` alone. `lampos` has no home of its
+/// own (`/nonexistent`), so without it the manager looks for user units
+/// under `/nonexistent/.config/systemd/user`, never where Harness writes
+/// its unit under `home` ("Unit file harnessd.service does not exist", on
+/// lamp-75c9 on 19 Oct). The parts that run as `lampos` keep their `HOME`:
+/// only this manager, which runs nothing but Harness, gets it.
+pub fn home_drop_in(uid: &str) -> String {
+    format!("/etc/systemd/system/user@{uid}.service.d/lamp-home.conf")
+}
+
+/// [`Host::harness_at_boot`]'s steps, each through `run`, under `root` (`/`
+/// on the lamp): `id -u`; `home` made `user`'s own (0700); the manager's
+/// `HOME` drop-in ([`home_drop_in`]) written, `systemctl daemon-reload`,
+/// and `systemctl try-restart` of `user@<uid>.service`, so a manager
+/// already running (its linger on before) takes it, and one not running
+/// is left alone; `loginctl enable-linger`, which starts it with that
+/// `HOME`; then the Harness CLI's own `harness service install` as `user`
+/// with that `HOME`. Shown on lamp-75c9 on 19 Oct: the manager keeps the
+/// drop-in's `HOME`, and Harness's service then installs and runs. A
+/// failing step stops it there.
+pub fn harness_at_boot_with(
+    run: &mut Runner,
+    root: &Path,
+    user: &str,
+    home: &str,
+) -> Result<(), String> {
+    let uid = uid_of(run, user)?;
+    run(&["install", "-d", "-o", user, "-g", user, "-m", "0700", home].map(str::to_owned))?;
+    let drop_in = root.join(home_drop_in(&uid).trim_start_matches('/'));
+    let folder = drop_in.parent().expect("the drop-in is in a folder");
+    std::fs::create_dir_all(folder).map_err(|error| format!("{}: {error}", folder.display()))?;
+    write_whole(
+        &drop_in,
+        format!("[Service]\nEnvironment=HOME={home}\n").as_bytes(),
+        0o644,
+    )
+    .map_err(|error| format!("{}: {error}", drop_in.display()))?;
+    run(&["systemctl", "daemon-reload"].map(str::to_owned))?;
+    run(&[
+        "systemctl".to_owned(),
+        "try-restart".to_owned(),
+        format!("user@{uid}.service"),
+    ])?;
+    // A user manager for the user from boot, with no login: the daemon's
+    // user unit needs it, a system user as any other.
+    run(&["loginctl", "enable-linger", user].map(str::to_owned))?;
+    run(&harness_argv(user, home, &uid, &["service", "install"]))?;
+    Ok(())
+}
+
 /// [`Host::harness_off`]'s steps, each through `run`, in this order: `id -u`,
 /// then as `user` `harness service uninstall` and `harness stop` (with no
 /// daemon running it says so and ends with 0), then `harness service status
 /// --json` while the user's manager is still there, then `loginctl
-/// disable-linger`, which ends it, then `pgrep -u <user> -f harnessd`. A
+/// disable-linger`, which ends it, then the manager's `HOME` drop-in
+/// removed ([`home_drop_in`]) and `systemctl daemon-reload`, then `pgrep -u
+/// <user> -f harnessd`. A
 /// failing step stops it there. The status not answering, and what it and
 /// `pgrep` still find, are the lines returned.
 pub fn harness_off_with(run: &mut Runner, user: &str, home: &str) -> Result<Vec<String>, String> {
@@ -603,6 +664,9 @@ pub fn harness_off_with(run: &mut Runner, user: &str, home: &str) -> Result<Vec<
         Err(_) => vec!["`harness service status --json` did not answer".to_owned()],
     };
     run(&["loginctl", "disable-linger", user].map(str::to_owned))?;
+    // The manager's `HOME` goes with it ([`home_drop_in`]).
+    run(&["rm".to_owned(), "-f".to_owned(), home_drop_in(&uid)])?;
+    run(&["systemctl", "daemon-reload"].map(str::to_owned))?;
     // `pgrep` ends with 1 when it finds nothing: then there is no list.
     if let Ok(found) = run(&["pgrep", "-u", user, "-f", "harnessd"].map(str::to_owned)) {
         let pids: Vec<&str> = found.split_whitespace().collect();
@@ -1746,13 +1810,13 @@ mod tests {
         {
             assert!(part(text).is_some(), "{name} starts through a current link");
         }
-        // Setup and its reset share one binary, and so do the air and its
-        // bus clock; every other service is a part.
+        // Setup, its reset and the waking face share one binary, and so do
+        // the air and its bus clock; every other service is a part.
         let services = PRODUCT
             .iter()
             .filter(|(name, _)| name.ends_with(".service"))
             .count();
-        assert_eq!(parts.len(), services - 2, "every product service is a part");
+        assert_eq!(parts.len(), services - 3, "every product service is a part");
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");

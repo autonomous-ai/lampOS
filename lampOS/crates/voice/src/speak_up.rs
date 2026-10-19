@@ -24,8 +24,8 @@
 //! policy's decision about it. `say_now` says it, `wait` keeps it, and a
 //! decision in shadow or none in time leaves it to the rule above
 //! ([`Hello`]). Without it nothing here touches the bus.
-use lamp_bus::{Bus, Publisher, Subscriber};
-use lamp_msgs::{Decision, VoiceArrival};
+use lamp_bus::{Bus, Message, Publisher, Subscriber};
+use lamp_msgs::{Decision, FamiliarLevel, MOOD_STATE_TTL_US, MoodState, VoiceArrival};
 use serde_json::{Value, json};
 use std::{
     io,
@@ -205,6 +205,9 @@ const AWAY_FOR_US: u64 = 300_000_000;
 const LOOKED_AWAY_US: u64 = 20_000_000;
 const QUIET_FOR_US: u64 = 30_000_000;
 const AT_MOST_EVERY_US: u64 = 1_200_000_000;
+/// For someone `close` (#1670), at most one hello an hour: a friend
+/// wouldn't greet you twice (the first builder on #1670, 12:19).
+const CLOSE_AT_MOST_EVERY_US: u64 = 3_600_000_000;
 /// The file is read this often, and counts while it is this fresh.
 const READ_EVERY_US: u64 = 250_000;
 const FRESH: Duration = Duration::from_millis(1_500);
@@ -227,8 +230,26 @@ pub struct Arrival {
     gone_since: Option<u64>,
     /// How long nobody had been there when the person now there arrived.
     away_us: u64,
+    /// When the person now there arrived: a glance away and back is the
+    /// same arrival (Tests on #1775), unlike `there_since`.
+    arrived_us: Option<u64>,
     greeted_us: Option<u64>,
     greeted_this_arrival: bool,
+    /// The bus Mood's state is read from, and how familiar the remembered
+    /// person at the lamp is by it (#1670): none without a fresh level.
+    mood: Option<Bus>,
+    familiar: Option<FamiliarLevel>,
+}
+
+/// How familiar Mood says the remembered person at the lamp is (#1670): only
+/// from source `mood`, unexpired, checked, stamped no later than now on the
+/// voice's monotonic clock and within its 2.5 s; else `None`.
+pub fn familiar_in(message: Option<Message>, now_us: u64) -> Option<FamiliarLevel> {
+    let message = message.filter(|message| !message.expired && message.header.source == "mood")?;
+    let state = message.parse::<MoodState>().ok()?;
+    state.check().ok()?;
+    let since = now_us.checked_sub(state.stamp.at_us)?;
+    (since < MOOD_STATE_TTL_US).then_some(state.familiar)?
 }
 
 impl Arrival {
@@ -241,6 +262,9 @@ impl Arrival {
         }
         let arrival = Self {
             speaks,
+            // How familiar the person at the lamp is, where Mood says it
+            // (#1670); without a bus, nothing changes.
+            mood: Bus::from_environment().ok(),
             ..Self::new(Some(path), now_us)
         };
         if std::env::var(ASK_ENVIRONMENT).as_deref() != Ok("on") {
@@ -363,9 +387,24 @@ impl Arrival {
             // is turns up in the first read and was never away.
             gone_since: Some(now_us),
             away_us: 0,
+            arrived_us: None,
             greeted_us: None,
             greeted_this_arrival: false,
+            mood: None,
+            familiar: None,
         }
+    }
+
+    /// How familiar the remembered person at the lamp is, given directly
+    /// instead of read from Mood: for a test or a measurement.
+    pub fn familiar_seen(&mut self, level: Option<FamiliarLevel>) {
+        self.familiar = level;
+    }
+
+    /// How familiar the remembered person at the lamp is, as Mood last said
+    /// (#1670), for the hello's words.
+    pub fn familiar(&self) -> Option<FamiliarLevel> {
+        self.familiar
     }
 
     /// Whether the eyes have a near face now, from their file.
@@ -374,6 +413,9 @@ impl Arrival {
             return self.near;
         }
         self.read_us = now_us;
+        if let Some(bus) = self.mood.as_ref() {
+            self.familiar = familiar_in(bus.latest(MoodState::TOPIC).ok().flatten(), now_us);
+        }
         self.near = self.path.as_ref().is_some_and(|path| {
             let fresh = std::fs::metadata(path)
                 .and_then(|about| about.modified())
@@ -401,6 +443,7 @@ impl Arrival {
                 // An arrival, unless it is the same person looking back.
                 if let Some(gone) = self.gone_since.take() {
                     self.away_us = now_us.saturating_sub(gone);
+                    self.arrived_us = Some(now_us);
                     self.greeted_this_arrival = false;
                     // What was asked for someone before is not about them.
                     if let Some(asking) = self.asking.as_mut() {
@@ -433,9 +476,21 @@ impl Arrival {
                 .is_some_and(|since| now_us.saturating_sub(since) >= THERE_FOR_US)
             && self.away_us >= AWAY_FOR_US
             && quiet_us >= QUIET_FOR_US
-            && self
-                .greeted_us
-                .is_none_or(|at| now_us.saturating_sub(at) >= AT_MOST_EVERY_US)
+            && self.greeted_us.is_none_or(|at| {
+                if self.familiar == Some(FamiliarLevel::Close) {
+                    // For someone close, an arrival that began within the
+                    // hour is not greeted at all, rather than greeted late
+                    // once the hour is up while they sit there, a glance
+                    // away and back included.
+                    self.arrived_us
+                        .or(self.there_since)
+                        .unwrap_or(now_us)
+                        .saturating_sub(at)
+                        >= CLOSE_AT_MOST_EVERY_US
+                } else {
+                    now_us.saturating_sub(at) >= AT_MOST_EVERY_US
+                }
+            })
     }
 
     /// Whether someone has been at the lamp for a moment now.
@@ -529,6 +584,97 @@ mod tests {
         assert_eq!(pass(&mut arrival, &mut now, 30, true, QUIET), 0);
         assert_eq!(pass(&mut arrival, &mut now, 800, false, QUIET), 0);
         assert_eq!(pass(&mut arrival, &mut now, 10, true, QUIET), 1);
+    }
+
+    /// #1670: someone `close` comes back within the hour: no second hello,
+    /// where anyone else is greeted again after twenty minutes; after the
+    /// hour, `close` is greeted again too.
+    #[test]
+    fn someone_close_is_not_greeted_twice_in_an_hour() {
+        let greetings = |familiar: Option<FamiliarLevel>| {
+            let mut now = 1_000 * S;
+            let mut arrival = Arrival::new(None, now);
+            arrival.familiar_seen(familiar);
+            let mut said = Vec::new();
+            // Away six minutes, then there: greeted. Then away and back
+            // every 26 minutes, three times.
+            for _ in 0..4 {
+                pass(&mut arrival, &mut now, 360, false, QUIET);
+                said.push(
+                    pass(&mut arrival, &mut now, 20, true, QUIET)
+                        + pass(&mut arrival, &mut now, 1_180, true, QUIET),
+                );
+            }
+            said
+        };
+        // 0, 26, 52 and 78 minutes on: anyone is greeted at each.
+        assert_eq!(greetings(None), [1, 1, 1, 1]);
+        assert_eq!(greetings(Some(FamiliarLevel::Regular)), [1, 1, 1, 1]);
+        // Close: not at 26 or 52, again at 78.
+        assert_eq!(greetings(Some(FamiliarLevel::Close)), [1, 0, 0, 1]);
+    }
+
+    /// Peer read (Tests) on #1775: someone close who sat down within the
+    /// hour and glances away for two seconds once it is up is the same
+    /// arrival, and is not greeted mid-sitting.
+    #[test]
+    fn tests_peer_read_someone_close_who_glances_away_after_the_hour_is_not_greeted_mid_sitting() {
+        let mut now = 1_000 * S;
+        let mut arrival = Arrival::new(None, now);
+        arrival.familiar_seen(Some(FamiliarLevel::Close));
+        // Away six minutes, then there: greeted, and there ten minutes.
+        assert_eq!(pass(&mut arrival, &mut now, 360, false, QUIET), 0);
+        assert_eq!(pass(&mut arrival, &mut now, 600, true, QUIET), 1);
+        // Away forty minutes, back fifty minutes after the hello: within
+        // the hour, so none, for the next twelve minutes of sitting.
+        assert_eq!(pass(&mut arrival, &mut now, 2_400, false, QUIET), 0);
+        assert_eq!(pass(&mut arrival, &mut now, 720, true, QUIET), 0);
+        // A glance away of two seconds, an hour and two minutes after the
+        // hello, and back: the same arrival, still sitting there.
+        assert_eq!(pass(&mut arrival, &mut now, 2, false, QUIET), 0);
+        assert_eq!(
+            pass(&mut arrival, &mut now, 60, true, QUIET),
+            0,
+            "greeted mid-sitting, after a glance away"
+        );
+    }
+
+    /// #1670: Mood's familiar level is read from source `mood` only, fresh,
+    /// valid and within its 2.5 s.
+    #[test]
+    fn the_familiar_level_is_read_from_moods_fresh_state_only() {
+        let (bus, root) = bus("familiar");
+        let latest = || bus.latest(MoodState::TOPIC).unwrap();
+        assert_eq!(familiar_in(latest(), 5_000_000), None);
+        let state = |familiar| MoodState {
+            stamp: lamp_msgs::ClockStamp {
+                clock_id: "boot".into(),
+                at_us: 5_000_000,
+                sequence: 1,
+            },
+            session_id: "s".into(),
+            awake: 0.7,
+            energy: 0.3,
+            warmth: 0.6,
+            asleep: false,
+            attention: None,
+            familiarity: lamp_msgs::Familiarity::Unknown,
+            familiar,
+        };
+        let mut mood = bus
+            .publisher_declared(MoodState::TOPIC, &MoodState::declaration(), "mood")
+            .unwrap();
+        mood.publish_json(1, &state(Some(FamiliarLevel::Close)))
+            .unwrap();
+        assert_eq!(familiar_in(latest(), 5_000_000), Some(FamiliarLevel::Close));
+        assert_eq!(familiar_in(latest(), 4_999_999), None);
+        assert_eq!(familiar_in(latest(), 5_000_000 + MOOD_STATE_TTL_US), None);
+        bus.publisher_declared(MoodState::TOPIC, &MoodState::declaration(), "replay")
+            .unwrap()
+            .publish_json(2, &state(Some(FamiliarLevel::Close)))
+            .unwrap();
+        assert_eq!(familiar_in(latest(), 5_000_000), None);
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     /// An arrival after six minutes away, there three seconds: due.

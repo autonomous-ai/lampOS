@@ -4,10 +4,11 @@
 //! actions part and the voice's say service.
 use lamp_bus::{Bus, Declaration, Kind, Publisher, Subscriber};
 use lamp_msgs::{
-    BodyGesture, Decision, GestureState, Hand, Light, LightRequest, Pause, SkillEvent, SkillStage,
-    Speech, Voice, VoiceState,
+    BodyGesture, Decision, GestureState, Hand, Light, LightRequest, MessageOut, Pause, SkillEvent,
+    SkillStage, Speech, Voice, VoiceState,
 };
 use lamp_skills::glow::{GLOW_EVERY, Glow, Glows, REQUESTS_ENVIRONMENT};
+use lamp_skills::watch::{self, Out, Outs, Watches};
 use lamp_skills::{
     Admission, BODY_REQUESTS_ENVIRONMENT, CLIP_GAP_US, Call, Engine, Permissions, Run, body_ask,
     clip_us, clock, duration_us, load_all, package, run_tests, told, tools_file,
@@ -29,7 +30,8 @@ use std::{
 
 const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] \
                      [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] \
-                     [--tools-dir DIR] [--boot-id ID] [--clock-control PATH]\n       \
+                     [--tools-dir DIR] [--state-dir DIR] [--boot-id ID] [--clock-control PATH] \
+                     [--known-file PATH]\n       \
                      [--zone system|NAME | --utc-offset-minutes N]\n       \
                      lamp-skills test SKILL_DIR...\n       \
                      lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar\n       \
@@ -153,8 +155,10 @@ fn main() -> ExitCode {
     let mut dir = PathBuf::from(SKILLS_DIR);
     let mut root = None;
     let mut tools = None;
+    let mut state = None;
     let mut boot_id = None;
     let mut clock_control = None;
+    let mut known_file = None;
     let mut offset = None;
     let mut zone = None;
     let mut sockets = Sockets {
@@ -209,8 +213,10 @@ fn main() -> ExitCode {
             "--actions-socket" => sockets.actions = value,
             "--say-socket" => sockets.say = value,
             "--tools-dir" => tools = Some(value),
+            "--state-dir" => state = Some(value),
             "--boot-id" => boot_id = value.to_str().map(str::to_owned),
             "--clock-control" => clock_control = Some(value),
+            "--known-file" => known_file = Some(value),
             _ => {
                 eprintln!("{USAGE}");
                 return ExitCode::from(2);
@@ -237,12 +243,14 @@ fn main() -> ExitCode {
     let ask = std::env::var("LAMP_SKILLS_ASK").unwrap_or_default();
     let options = Options {
         tools,
+        state,
         ask,
         light_requests: std::env::var(REQUESTS_ENVIRONMENT).is_ok_and(|value| value == "on"),
         body_requests: std::env::var(BODY_REQUESTS_ENVIRONMENT).is_ok_and(|value| value == "on"),
         boot_id,
         clock_control,
         local_time,
+        known_file,
     };
     match serve(&dir, root, &sockets, &options) {
         Ok(()) => ExitCode::SUCCESS,
@@ -396,6 +404,10 @@ fn said_lately<T: serde::de::DeserializeOwned>(bus: &Bus, topic: &str) -> Option
 /// How the program serves, beyond its sockets.
 struct Options {
     tools: Option<PathBuf>,
+    /// `--state-dir`: the part's own folder, where the skills a person
+    /// turned off are kept across a restart (#1685); without it, until the
+    /// program stops.
+    state: Option<PathBuf>,
     /// `LAMP_SKILLS_ASK`: `skip`, `policy`, or anything else for nothing done.
     ask: String,
     /// `LAMP_LIGHT_REQUESTS=on`: a skill's light is asked of the ring.
@@ -412,6 +424,10 @@ struct Options {
     /// `--zone` or `--utc-offset-minutes`: the lamp's local time, for quiet
     /// hours.
     local_time: Option<Arc<lamp_local_time::LocalTime>>,
+    /// `--known-file`: the eyes' file with the name of the known person at
+    /// the lamp (`lamp-eyes --known-file`), for a watch to tell a known face
+    /// from one it does not know, and the person who asked from anyone else.
+    known_file: Option<PathBuf>,
 }
 
 /// A skip of the clock asked on `--clock-control`, and where to say it is
@@ -544,6 +560,15 @@ fn serve(
     };
     let (finished, done) = mpsc::channel::<SkillEvent>();
     let mut engine = Engine::new(Vec::new(), skip_ask);
+    if let Some(state) = &options.state {
+        match engine.keep_off_in(state) {
+            Ok(off) => eprintln!(
+                "lamp-skills: the skills a person turned off kept in {}: {off:?}",
+                state.display()
+            ),
+            Err(error) => eprintln!("lamp-skills: the skills turned off not read: {error}"),
+        }
+    }
     // The Policy's gate (#958): asks out on `skills/ask`, its answers in on
     // `policy/decisions`, by the ask's number. The ask's wire is #958's
     // `lamp_msgs::SkillAsk`, written here as JSON until it is on lamp-voice.
@@ -574,6 +599,13 @@ fn serve(
         ends: RefCell::new(HashMap::new()),
         local_time: options.local_time.clone(),
         permissions: RefCell::new(HashMap::new()),
+        looks: RefCell::new(HashMap::new()),
+        watching: RefCell::new(Watching {
+            watches: Watches::default(),
+            marks: HashMap::new(),
+            texts: None,
+            known_file: options.known_file.clone(),
+        }),
     };
     let (ask, asks) = mpsc::channel::<ToolAsk>();
     if let Some(tools) = tools {
@@ -624,7 +656,7 @@ fn serve(
             answer_asks(
                 answers,
                 &mut asking.waiting,
-                &engine,
+                &mut engine,
                 &mut runs,
                 &mut out,
                 &runner,
@@ -645,6 +677,12 @@ fn serve(
                     .iter()
                     .map(|skill| (skill.name.clone(), skill.permissions.clone()))
                     .collect();
+                // A watch whose skill is gone, or changed, is off.
+                {
+                    let mut watching = runner.watching.borrow_mut();
+                    let outs = watching.watches.replace(&skills);
+                    watched(outs, &mut watching, &mut out, &runner);
+                }
                 // A held dim whose skill or trigger is gone is given back.
                 for run in engine.replace(skills) {
                     handle(run, &mut runs, &mut out, &runner);
@@ -713,7 +751,7 @@ fn serve(
                 answer_asks(
                     answers,
                     &mut asking.waiting,
-                    &engine,
+                    &mut engine,
                     &mut runs,
                     &mut out,
                     &runner,
@@ -740,6 +778,7 @@ fn serve(
         for run in engine.tick(clock::now_us()) {
             handle(run, &mut runs, &mut out, &runner);
         }
+        watch_look(&mut out, &runner);
     }
 }
 
@@ -785,6 +824,16 @@ fn observe(
         &message.payload,
         message.header.expires_ms,
     );
+    {
+        let mut watching = runner.watching.borrow_mut();
+        let outs = watching.watches.observe(
+            &message.header.topic,
+            &message.payload,
+            now_us,
+            local_minute(runner),
+        );
+        watched(outs, &mut watching, out, runner);
+    }
     for mut run in made {
         for event in std::mem::take(&mut run.events) {
             publish(out, event);
@@ -909,6 +958,208 @@ struct Runner {
     /// By skill, what each loaded skill may use, as of the last load: a
     /// skill not loaded may use nothing.
     permissions: RefCell<HashMap<String, Permissions>>,
+    /// By skill, the looks its search under way has taken (#1685).
+    looks: RefCell<HashMap<String, u32>>,
+    /// The watches (guard mode), their marks and their texts.
+    watching: RefCell<Watching>,
+}
+
+/// The watch skills' watches ([`watch`]), the mark each shows while on,
+/// where their texts go, and the eyes' known file.
+struct Watching {
+    watches: Watches,
+    marks: HashMap<String, Glow>,
+    /// `messages/out`, made when the first text goes.
+    texts: Option<Publisher>,
+    known_file: Option<PathBuf>,
+}
+
+/// The eyes renew their known file every 2 s while the known person is at
+/// the lamp and remove it when nobody is near: older than this, it says
+/// nothing.
+const KNOWN_FRESH: Duration = Duration::from_secs(5);
+
+/// The name in the eyes' known file, if it is fresh: kept in the program
+/// only, to tell a known face from one it does not know and the person who
+/// asked from anyone else; never in a text, an event or the journal.
+fn known_now(path: &Path) -> Option<String> {
+    let age = std::fs::metadata(path)
+        .and_then(|meta| meta.modified())
+        .ok()
+        .and_then(|modified| SystemTime::now().duration_since(modified).ok())?;
+    if age > KNOWN_FRESH {
+        return None;
+    }
+    let name = std::fs::read_to_string(path).ok()?;
+    let name = name.trim();
+    (!name.is_empty() && name.len() <= 160 && !name.contains('\n')).then(|| name.to_owned())
+}
+
+/// The lamp's local minute of the day, if its time is known.
+fn local_minute(runner: &Runner) -> Option<u16> {
+    let local = runner.local_time.as_ref()?;
+    let now_ms = unix_ms();
+    Some(watch::minute_of(now_ms, local.offset_minutes_at(now_ms)))
+}
+
+/// Whether a watch's mark can be shown: the ring takes `light/request`.
+fn can_mark(runner: &Runner) -> bool {
+    runner.glows.as_ref().is_some_and(|glows| {
+        glows
+            .bus
+            .subscribers(LightRequest::TOPIC)
+            .is_ok_and(|subscribers| !subscribers.is_empty())
+    })
+}
+
+/// What the watches do: each mark shown or given back, each text sent on
+/// `messages/out`, each held to its skill's permissions where it leaves the
+/// program, and said on `skills/events`.
+fn watched(outs: Outs, watching: &mut Watching, out: &mut Publisher, runner: &Runner) {
+    for (skill, did) in outs {
+        let may = runner
+            .permissions
+            .borrow()
+            .get(&skill)
+            .cloned()
+            .unwrap_or_default();
+        let said = |out: &mut Publisher, why: String| {
+            publish(
+                out,
+                SkillEvent {
+                    skill: skill.clone(),
+                    stage: SkillStage::Done,
+                    why,
+                    allowed: None,
+                },
+            );
+        };
+        match did {
+            Out::Mark(call) => {
+                if let Some(why) = may.refuses(&call) {
+                    eprintln!("lamp-skills: skill:{skill}: refused its mark: {why}");
+                    continue;
+                }
+                let Some(glows) = &runner.glows else {
+                    said(
+                        out,
+                        format!("mark: not shown: the ring needs {REQUESTS_ENVIRONMENT}=on"),
+                    );
+                    continue;
+                };
+                if let Some(old) = watching.marks.remove(&skill) {
+                    old.give_back();
+                }
+                let mut glow = Glow::new(glows, &skill, light_now(&runner.bus));
+                let how = glow.ask(&call);
+                watching.marks.insert(skill.clone(), glow);
+                said(out, format!("mark: {how}"));
+            }
+            Out::Unmark => {
+                if let Some(back) = watching.marks.remove(&skill).and_then(Glow::give_back) {
+                    said(out, format!("mark: {back}"));
+                }
+            }
+            Out::Text(text) => {
+                if let Some(why) = may.refuses(&Call::Text(text.clone())) {
+                    eprintln!("lamp-skills: skill:{skill}: refused its text: {why}");
+                    continue;
+                }
+                let message = MessageOut {
+                    from: format!("skill:{skill}").chars().take(64).collect(),
+                    text,
+                };
+                if let Err(why) = message.check() {
+                    said(out, format!("text: not sent: {why}"));
+                    continue;
+                }
+                if watching.texts.is_none() {
+                    match runner.bus.publisher_declared(
+                        MessageOut::TOPIC,
+                        &MessageOut::declaration(),
+                        "skills",
+                    ) {
+                        Ok(texts) => watching.texts = Some(texts),
+                        Err(error) => {
+                            said(
+                                out,
+                                format!("text: not sent: {} ({error})", MessageOut::TOPIC),
+                            );
+                            continue;
+                        }
+                    }
+                }
+                let sent = watching
+                    .texts
+                    .as_mut()
+                    .map(|texts| texts.publish_json(lamp_ipc::monotonic_us(), &message));
+                match sent {
+                    Some(Ok(_)) => said(
+                        out,
+                        format!("text: sent on {}: {}", MessageOut::TOPIC, message.text),
+                    ),
+                    Some(Err(error)) => said(out, format!("text: not sent: {error}")),
+                    None => {}
+                }
+            }
+            Out::Said(why) => said(out, why),
+        }
+    }
+}
+
+/// A watch's tool called: committed first, so a caller that gave up turns
+/// nothing; then turned on or off, the model told what to say, and what the
+/// watch does done.
+fn watch_call((name, args, reply, admission): ToolAsk, out: &mut Publisher, runner: &Runner) {
+    if !admission.commit() {
+        eprintln!("lamp-skills: {name} with {args} not run: the caller gave up");
+        return;
+    }
+    let mut watching = runner.watching.borrow_mut();
+    let asker = watching.known_file.as_deref().and_then(known_now);
+    let marks = can_mark(runner);
+    match watching
+        .watches
+        .tool(&name, &args, clock::now_us(), asker.as_deref(), marks)
+    {
+        Some(Ok((skill, answer, outs))) => {
+            let _ = reply.send(answer);
+            publish(
+                out,
+                SkillEvent {
+                    skill: skill.clone(),
+                    stage: SkillStage::Triggered,
+                    why: format!("the model called {name} with {args}"),
+                    allowed: None,
+                },
+            );
+            let outs = outs.into_iter().map(|did| (skill.clone(), did)).collect();
+            watched(outs, &mut watching, out, runner);
+        }
+        Some(Err(why)) => {
+            eprintln!("lamp-skills: {name} with {args} not run: {why}");
+            let _ = reply.send(json!({ "error": why }));
+        }
+        None => {
+            let _ = reply.send(json!({ "error": "No skill of mine does that just now." }));
+        }
+    }
+}
+
+/// While a watch is on: the known face at the lamp and the privacy switch,
+/// looked at.
+fn watch_look(out: &mut Publisher, runner: &Runner) {
+    let mut watching = runner.watching.borrow_mut();
+    if !watching.watches.any_on() {
+        return;
+    }
+    let (now_us, minute) = (clock::now_us(), local_minute(runner));
+    let known = watching.known_file.as_deref().and_then(known_now);
+    let mut outs = watching.watches.known(known.as_deref(), now_us, minute);
+    let closed = said_lately::<serde_json::Value>(&runner.bus, watch::PRIVACY)
+        .is_some_and(|privacy| privacy["physical_muted"] == json!(true));
+    outs.extend(watching.watches.privacy(closed));
+    watched(outs, &mut watching, out, runner);
 }
 
 impl Runner {
@@ -1048,7 +1299,7 @@ fn ask_policy_for(
 fn answer_asks(
     answers: &mut Subscriber,
     waiting: &mut HashMap<u64, (lamp_skills::Run, Instant)>,
-    engine: &Engine,
+    engine: &mut Engine,
     runs: &mut Runs,
     out: &mut Publisher,
     runner: &Runner,
@@ -1090,6 +1341,8 @@ fn answer_asks(
             },
         );
         if let Some(calls) = calls.filter(|calls| !calls.is_empty()) {
+            // A `[rest]` watches from here whether it is noticed (#1685).
+            engine.made(&run.skill, clock::now_us());
             start_or_queue(run, calls, runs, out, runner);
         }
     }
@@ -1139,6 +1392,11 @@ fn tool_call(
     out: &mut Publisher,
     runner: &Runner,
 ) {
+    // A watch's tool turns its watch, with no steps (guard mode, #1685).
+    let watched_tool = runner.watching.borrow().watches.owner(&name).is_some();
+    if watched_tool {
+        return watch_call((name, args, reply, admission), out, runner);
+    }
     let refuse = |why: &str| {
         if admission.commit() {
             let _ = reply.send(json!({ "error": why }));
@@ -1153,6 +1411,34 @@ fn tool_call(
         eprintln!("lamp-skills: {name} with {args} not run: its run is under way");
         return refuse(still);
     }
+    // A search's look (#1685): its first at the desk, its looks counted,
+    // none past the last, the model told to give up kindly instead.
+    let searching = engine
+        .skills()
+        .iter()
+        .find(|skill| skill.tool.as_deref() == Some(name.as_str()))
+        .filter(|skill| skill.search.is_some())
+        .map(|skill| {
+            let looked = if busy.contains(&skill.name) {
+                runner.looks.borrow().get(&skill.name).copied().unwrap_or(0)
+            } else {
+                0
+            };
+            (skill.name.clone(), looked, skill.search_look(&args, looked))
+        });
+    let counted = searching
+        .as_ref()
+        .map(|(skill, looked, _)| (skill.clone(), *looked));
+    let args = match searching {
+        Some((_, looked, Err(give_up))) => {
+            eprintln!(
+                "lamp-skills: {name} with {args} not run: its search took its {looked} looks"
+            );
+            return refuse(&give_up);
+        }
+        Some((_, _, Ok(look))) => look,
+        None => args,
+    };
     let mut run = match engine.tool(&name, &args, clock::now_us()) {
         Ok(run) => run,
         Err(why) => {
@@ -1189,6 +1475,9 @@ fn tool_call(
     // The caller told it timed out: nothing is done.
     if !admission.commit() {
         return;
+    }
+    if let Some((skill, looked)) = counted {
+        runner.looks.borrow_mut().insert(skill, looked + 1);
     }
     // A call with a look is answered only once its body and light are made:
     // the voice asks the eyes as the answer's first audio plays, and by
@@ -1370,6 +1659,10 @@ struct Changed {
     coloured: bool,
     dimmed: u8,
     lasting_us: u64,
+    /// The light as the run's steps left it, from the light shown before
+    /// it: a light held until its trigger ends is given back only if it is
+    /// still this.
+    left: Option<Light>,
 }
 
 /// What the body was told in this run: until when its last clip plays, and
@@ -1544,7 +1837,10 @@ fn perform(
         said.push(refused);
         return said.join("; ");
     }
-    let mut changed = Changed::default();
+    let mut changed = Changed {
+        left: before.clone(),
+        ..Changed::default()
+    };
     let mut played = Played::default();
     match asking {
         Some((what, asking)) => {
@@ -1614,7 +1910,7 @@ fn perform(
                     );
                 }
             }
-            clock::sleep(Duration::from_micros(changed.lasting_us));
+            wait_out(skill, calls, bus, changed.lasting_us, &mut said);
         }
     }
     if let Some(last) = played.last.as_mut() {
@@ -1639,9 +1935,12 @@ fn perform(
             }
         }
     }
-    // A dim held until its trigger ends waits for that end, however long,
-    // the ring's request renewed meanwhile when it is asked of the ring.
-    let held = end.filter(|_| changed.dimmed > 0 && (glow.is_some() || before.is_some()));
+    // A light held until its trigger ends (a dim, or a colour such as a
+    // pale breath, #1681) waits for that end, however long, the ring's
+    // request renewed meanwhile when it is asked of the ring.
+    let held = end.filter(|_| {
+        (changed.dimmed > 0 || changed.coloured) && (glow.is_some() || before.is_some())
+    });
     let held_until_ends = held.is_some();
     if let Some(end) = held {
         let _ = end.recv();
@@ -1665,9 +1964,9 @@ fn perform(
                     light_now(bus)
                 };
                 let left = |now: &Light| {
-                    now.on
-                        && now.colour == before.colour
-                        && now.level == before.level.saturating_sub(changed.dimmed).max(1)
+                    changed.left.as_ref().is_some_and(|left| {
+                        now.on && now.colour == left.colour && now.level == left.level
+                    })
                 };
                 if held_until_ends && !now.as_ref().is_some_and(left) {
                     said.push("light: changed meanwhile or not known, so left as it is".into());
@@ -1711,6 +2010,7 @@ fn act(
                 continue;
             }
             Call::Light { lasting, .. } => {
+                changed.left = lamp_skills::glow::asked(call, changed.left.as_ref());
                 changed.coloured = true;
                 changed.lasting_us = changed.lasting_us.max(
                     lasting
@@ -1719,7 +2019,12 @@ fn act(
                         .unwrap_or(0),
                 );
             }
-            Call::Dim { steps, .. } => changed.dimmed += steps,
+            Call::Dim { steps, .. } => {
+                if let Some(dimmed) = lamp_skills::glow::asked(call, changed.left.as_ref()) {
+                    changed.left = Some(dimmed);
+                }
+                changed.dimmed += steps;
+            }
             // Only the ring puts the light out (#1677): what it holds is
             // given back by asking again, as any light of the ring's.
             Call::Out { .. } if glow.is_some() => changed.dimmed += 1,
@@ -1802,6 +2107,7 @@ fn show(
             lasting: None,
             pattern: frame.pattern,
             keep: false,
+            until_ends: false,
         };
         let made = match glow {
             Some(glow) => glow.ask(&light),
@@ -1830,8 +2136,39 @@ fn show(
     format!("show {name}: {shown} frames shown")
 }
 
-/// How often a show looks whether it should stop.
+/// How often a show looks whether it should stop, and a search's pose
+/// whether someone speaks.
 const SHOW_LOOKS: Duration = Duration::from_millis(200);
+
+/// The run's while, slept out. A search's (its pose held until someone
+/// speaks, #1685) ends within a fifth of a second of the voice listening to
+/// someone: its pose is let go, and the light then given back.
+fn wait_out(skill: &str, calls: &[Call], bus: &Bus, lasting_us: u64, said: &mut Vec<String>) {
+    let until_spoken = calls.iter().any(|call| {
+        matches!(
+            call,
+            Call::Mood {
+                until_spoken: true,
+                ..
+            }
+        )
+    });
+    if !until_spoken {
+        clock::sleep(Duration::from_micros(lasting_us));
+        return;
+    }
+    let until = clock::now() + Duration::from_micros(lasting_us);
+    while clock::now() < until {
+        // Someone speaking, the lamp paused or the body pushed ends it, as
+        // a show's frames end (the peer read on #1766).
+        if let Some(why) = show_stopped(bus) {
+            end_hold(skill);
+            said.push(format!("{why}: the search ended"));
+            return;
+        }
+        clock::sleep(SHOW_LOOKS.min(until.saturating_duration_since(clock::now())));
+    }
+}
 
 /// Why a show goes no further, if it should not: the body pushed, the lamp
 /// paused, or the voice listening to someone.
@@ -1849,9 +2186,12 @@ fn show_stopped(bus: &Bus) -> Option<String> {
     {
         return Some("the lamp was paused".into());
     }
-    (said_lately::<VoiceState>(bus, VoiceState::TOPIC).map(|now| now.state)
-        == Some(Voice::Listening))
-    .then(|| "the voice is listening to someone".into())
+    voice_listening(bus).then(|| "the voice is listening to someone".into())
+}
+
+/// Whether the voice is listening to someone now: a person speaks.
+fn voice_listening(bus: &Bus) -> bool {
+    said_lately::<VoiceState>(bus, VoiceState::TOPIC).map(|now| now.state) == Some(Voice::Listening)
 }
 
 /// Waits while the clip `sent` plays, until the body says on `body/gesture`
@@ -2158,6 +2498,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             mood,
             lasting_us,
             toward,
+            until_spoken,
         } => {
             // Said again every second, as the body needs it at least every
             // 1.5 s (#1011); when it stops being said, the body comes back.
@@ -2175,14 +2516,27 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             };
             let first = tell(&what, text.clone(), &path);
             let until = clock::now() + Duration::from_micros(*lasting_us);
+            // A search's pose looks every fifth of a second and is let go
+            // once someone speaks, the lamp is paused or the body pushed
+            // (#1685); any other, each second.
+            let (until_spoken, bus) = (*until_spoken, bus.clone());
+            let looks = if until_spoken { SHOW_LOOKS } else { MOOD_EVERY };
             std::thread::spawn(move || {
-                while clock::now() + MOOD_EVERY < until {
-                    clock::sleep(MOOD_EVERY);
+                let mut next = clock::now() + MOOD_EVERY;
+                while next < until {
+                    clock::sleep(looks.min(next.saturating_duration_since(clock::now())));
                     if !holding(&skill, number) {
                         break;
                     }
-                    let _ = UnixDatagram::unbound()
-                        .and_then(|body| body.send_to(text.as_bytes(), &path));
+                    if until_spoken && show_stopped(&bus).is_some() {
+                        end_hold(&skill);
+                        break;
+                    }
+                    if clock::now() >= next {
+                        let _ = UnixDatagram::unbound()
+                            .and_then(|body| body.send_to(text.as_bytes(), &path));
+                        next += MOOD_EVERY;
+                    }
                 }
             });
             format!("{first}, held {} s", lasting_us / 1_000_000)
@@ -2192,6 +2546,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Sound { .. } => "sound: made by its own step".into(),
         Call::Look => "look: the voice's, asked in the call's answer".into(),
         Call::AfterSay => "after the say".into(),
+        Call::Text(_) => "text: a watch's, sent by the watch".into(),
         Call::Ends => "its trigger ended".into(),
     }
 }
@@ -2245,6 +2600,7 @@ mod tests {
             lasting: Some("4s".into()),
             pattern: None,
             keep: false,
+            until_ends: false,
         }
     }
 
@@ -2289,6 +2645,7 @@ mod tests {
                 mood: "reading".into(),
                 lasting_us: 3_000_000,
                 toward: None,
+                until_spoken: false,
             },
         ];
         let (mut changed, mut played, mut glow, mut said) =
@@ -2386,6 +2743,13 @@ mod tests {
                     ..Permissions::default()
                 },
             )])),
+            looks: RefCell::default(),
+            watching: RefCell::new(Watching {
+                watches: Watches::default(),
+                marks: HashMap::new(),
+                texts: None,
+                known_file: None,
+            }),
         };
         let dance = runner.sockets_for("dance");
         assert_eq!(dance.may.skill, "dance");

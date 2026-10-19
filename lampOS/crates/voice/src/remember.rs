@@ -38,6 +38,7 @@
 //! No word of what was said, kept or asked for is ever logged.
 use crate::thread::FinishedExchange;
 use lamp_gemini::{Tool, ToolCall};
+use lamp_local_time::LocalTime;
 use serde_json::{Value, json};
 use std::{
     collections::VecDeque,
@@ -309,8 +310,8 @@ fn run_for_guarded(
         return result;
     }
     let now = unix_ms();
-    let offset = crate::local_time::offset_here().unwrap_or(0);
-    let Some(mut request) = request(call, now, offset) else {
+    let zone = crate::local_time::system();
+    let Some(mut request) = request(call, now, zone) else {
         return (
             json!({"error": "There was nothing in that for me to keep."}),
             true,
@@ -332,7 +333,7 @@ fn run_for_guarded(
     let Some(answer) = answer else {
         return (gone(), false);
     };
-    let told = answer_for(&call.name, &answer, now, offset);
+    let told = answer_for(&call.name, &answer, now, zone);
     if matches!(call.name.as_str(), REMEMBER | FORGET) && answer["ok"] == true {
         // The note a new session is told has changed.
         if let Some(jobs) = JOBS.get() {
@@ -357,7 +358,7 @@ fn run_for_guarded(
 }
 
 /// The memory's request for a call, or nothing when it asks to keep nothing.
-fn request(call: &ToolCall, now_unix_ms: u64, offset_seconds: i32) -> Option<Value> {
+fn request(call: &ToolCall, now_unix_ms: u64, zone: Option<&LocalTime>) -> Option<Value> {
     Some(match call.name.as_str() {
         REMEMBER => {
             let text = call.args.get("text").and_then(Value::as_str)?.trim();
@@ -379,7 +380,7 @@ fn request(call: &ToolCall, now_unix_ms: u64, offset_seconds: i32) -> Option<Val
                 .get("days_ago")
                 .and_then(Value::as_u64)
                 .filter(|days| *days <= 3_650)
-                .map(|days| day_name(local_day(now_unix_ms, offset_seconds) - days as i64));
+                .map(|days| day_name(local_day(now_unix_ms, zone) - days as i64));
             json!({"op":"recall","query":about,"day":day,"limit":RECALL_ENTRIES,"max_bytes":RECALL_BYTES})
         }
     })
@@ -448,7 +449,12 @@ fn marked(mut answer: Value) -> Value {
 
 /// What to tell the model for the memory's answer. `None` for one that is
 /// not the answer to that request.
-fn answer_for(name: &str, answer: &Value, now_unix_ms: u64, offset_seconds: i32) -> Option<Value> {
+fn answer_for(
+    name: &str,
+    answer: &Value,
+    now_unix_ms: u64,
+    zone: Option<&LocalTime>,
+) -> Option<Value> {
     if answer.get("ok").and_then(Value::as_bool)? {
         return Some(match name {
             REMEMBER => {
@@ -470,14 +476,14 @@ fn answer_for(name: &str, answer: &Value, now_unix_ms: u64, offset_seconds: i32)
                 _ => json!({"forgotten": true, "everything": true}),
             },
             _ => {
-                let today = local_day(now_unix_ms, offset_seconds);
+                let today = local_day(now_unix_ms, zone);
                 let found: Vec<Value> = answer
                     .get("entries")?
                     .as_array()?
                     .iter()
                     .filter_map(|entry| {
                         let when = when(
-                            today - local_day(entry.get("at_unix_ms")?.as_u64()?, offset_seconds),
+                            today - local_day(entry.get("at_unix_ms")?.as_u64()?, zone),
                         );
                         let mut item = match entry.get("kind")?.as_str()? {
                             "kept" => json!({"when": when, "asked_to_remember": entry.get("text")?}),
@@ -503,9 +509,12 @@ fn answer_for(name: &str, answer: &Value, now_unix_ms: u64, offset_seconds: i32)
     }
 }
 
-/// The local day a moment falls on, as days since 1970-01-01.
-fn local_day(unix_ms: u64, offset_seconds: i32) -> i64 {
-    ((unix_ms / 1_000) as i64 + i64::from(offset_seconds)).div_euclid(86_400)
+/// The local day a moment falls on, as days since 1970-01-01: each moment
+/// with the zone's offset at it, so a day before a daylight-saving change
+/// is counted as it was then (#820). UTC only while the lamp's zone cannot
+/// be read at all ([`crate::local_time::system`]).
+fn local_day(unix_ms: u64, zone: Option<&LocalTime>) -> i64 {
+    zone.map_or((unix_ms / 86_400_000) as i64, |zone| zone.day(unix_ms))
 }
 
 /// `YYYY-MM-DD`, as the memory names a day.
@@ -920,9 +929,6 @@ const ANSWER_BYTES: usize = 8_192;
 pub struct DaysClient {
     socket: PathBuf,
     prefix: String,
-    // Read once before readiness. Tool deadlines contain no filesystem I/O
-    // for timezone lookup; offset_at still follows listed DST transitions.
-    zone: Vec<u8>,
     context: Mutex<DaysContext>,
     /// Held while a rule is counted and kept ([`crate::rules::admit`]).
     keeping: Mutex<()>,
@@ -1045,12 +1051,10 @@ impl DaysClient {
     }
 
     fn with_idle(socket: PathBuf, idle: Duration) -> io::Result<Self> {
-        let mut zone = Vec::new();
-        let loaded = std::fs::File::open("/etc/localtime")
-            .and_then(|file| file.take(65_537).read_to_end(&mut zone));
-        if loaded.is_err() || zone.len() > 65_536 {
-            zone.clear();
-        }
+        // The zone is opened before readiness; at each call after, it is
+        // looked at (three `stat` calls and a `readlink`) and read again only
+        // when setup changed it (`lamp-local-time`, #820).
+        let _ = crate::local_time::system();
         let prefix = format!(
             "voice-{}",
             crate::process::boot_text(crate::process::new_boot()?)
@@ -1066,7 +1070,6 @@ impl DaysClient {
         Ok(Self {
             socket,
             prefix,
-            zone,
             context: Mutex::new(DaysContext::default()),
             keeping: Mutex::new(()),
             jobs,
@@ -1243,13 +1246,13 @@ impl DaysClient {
         let started = Instant::now();
         let deadline = deadline.min(crate::tools::ASK_DEADLINE);
         let now = unix_ms();
-        let offset = crate::local_time::offset_at(&self.zone, (now / 1000) as i64).unwrap_or(0);
+        let zone = crate::local_time::system();
         let Some(left) = deadline.checked_sub(started.elapsed()) else {
             return (gone(), false);
         };
         match lease {
-            Some(_) => self.run_at_guarded(call, left, (now, offset), person, lease),
-            None => self.run_at(call, left, now, offset, person),
+            Some(_) => self.run_at_guarded(call, left, (now, zone), person, lease),
+            None => self.run_at(call, left, now, zone, person),
         }
     }
 
@@ -1258,21 +1261,21 @@ impl DaysClient {
         call: &ToolCall,
         deadline: Duration,
         now: u64,
-        offset: i32,
+        zone: Option<&LocalTime>,
         person: Option<&str>,
     ) -> (Value, bool) {
-        self.run_at_guarded(call, deadline, (now, offset), person, None)
+        self.run_at_guarded(call, deadline, (now, zone), person, None)
     }
 
     fn run_at_guarded(
         &self,
         call: &ToolCall,
         deadline: Duration,
-        time: (u64, i32),
+        time: (u64, Option<&LocalTime>),
         person: Option<&str>,
         lease: Option<&crate::memory_scope::ScopeLease>,
     ) -> (Value, bool) {
-        let (now, offset) = time;
+        let (now, zone) = time;
         if !scope_current(lease) {
             return (gone(), false);
         }
@@ -1317,7 +1320,7 @@ impl DaysClient {
             FORGET_EVERYTHING => return (gone(), false),
             _ => None,
         };
-        let Some(mut request) = days_request.or_else(|| request(call, now, offset)) else {
+        let Some(mut request) = days_request.or_else(|| request(call, now, zone)) else {
             return (
                 json!({"error":"There was nothing in that for me to keep."}),
                 true,
@@ -1336,7 +1339,7 @@ impl DaysClient {
         let (told, ids) = if call.name == RECALL {
             let Some(result) = deadline
                 .checked_sub(started.elapsed())
-                .and_then(|left| self.recall(&request, person, left, now, offset, lease))
+                .and_then(|left| self.recall(&request, person, left, now, zone, lease))
             else {
                 return (gone(), false);
             };
@@ -1348,7 +1351,7 @@ impl DaysClient {
             let Some(answer) = answer else {
                 return (gone(), false);
             };
-            let Some(told) = answer_for(&call.name, &answer, now, offset) else {
+            let Some(told) = answer_for(&call.name, &answer, now, zone) else {
                 return (gone(), false);
             };
             // Everything includes the rules they gave, kept beside their
@@ -1406,18 +1409,18 @@ impl DaysClient {
         person: Option<&str>,
         deadline: Duration,
         now: u64,
-        offset: i32,
+        zone: Option<&LocalTime>,
         lease: Option<&crate::memory_scope::ScopeLease>,
     ) -> Option<(Value, Vec<(Option<String>, u64)>)> {
         let Some(person) = person else {
             let answer = bounded_exchange_scoped(&self.socket, request, deadline, lease)?;
-            let (told, ids) = days_answer(&answer, now, offset)?;
+            let (told, ids) = days_answer(&answer, now, zone)?;
             return Some((told, ids.into_iter().map(|id| (None, id)).collect()));
         };
         let (theirs, room) = recall_both(request, person, deadline, |line, left| {
             bounded_exchange_scoped(&self.socket, line, left, lease)
         })?;
-        let (theirs, their_ids) = days_answer(&theirs, now, offset)?;
+        let (theirs, their_ids) = days_answer(&theirs, now, zone)?;
         let mut found = theirs["found"].as_array()?.clone();
         for item in &mut found {
             item["theirs"] = json!(true);
@@ -1427,7 +1430,7 @@ impl DaysClient {
             .map(|id| (Some(person.to_owned()), id))
             .collect();
         if let Some(room) = room {
-            let (room, room_ids) = days_answer(&room, now, offset)?;
+            let (room, room_ids) = days_answer(&room, now, zone)?;
             found.extend(room["found"].as_array()?.iter().cloned());
             ids.extend(room_ids.into_iter().map(|id| (None, id)));
         }
@@ -1562,7 +1565,7 @@ impl DaysClient {
         } else {
             None
         };
-        let offset = crate::local_time::offset_at(&self.zone, (now / 1000) as i64).unwrap_or(0);
+        let zone = crate::local_time::system();
         // A write whose acknowledgement is lost may still have committed: a
         // rule kept without its ID here would let what is said under it be
         // journalled unlinked. As for `remember` and `forget`, journalling
@@ -1586,7 +1589,7 @@ impl DaysClient {
             return (gone(), false);
         }
         let told = crate::rules::answer_for(&call.name, &answer, |at| {
-            when(local_day(now, offset) - local_day(at, offset))
+            when(local_day(now, zone) - local_day(at, zone))
         });
         let Some((told, changed)) = told.filter(|(told, _)| crate::tools::sendable(told)) else {
             return (gone(), false);
@@ -1784,7 +1787,7 @@ fn snapshot_ids(snapshot: &Value, session: &str, scope: &str) -> Option<Vec<u64>
     (found.len() == source_ids.len()).then_some(source_ids)
 }
 
-fn days_answer(answer: &Value, now: u64, offset: i32) -> Option<(Value, Vec<u64>)> {
+fn days_answer(answer: &Value, now: u64, zone: Option<&LocalTime>) -> Option<(Value, Vec<u64>)> {
     if answer["ok"] != true {
         return None;
     }
@@ -1803,8 +1806,7 @@ fn days_answer(answer: &Value, now: u64, offset: i32) -> Option<(Value, Vec<u64>
             return None;
         }
         sources.push(id);
-        let when =
-            when(local_day(now, offset) - local_day(entry.get("at_unix_ms")?.as_u64()?, offset));
+        let when = when(local_day(now, zone) - local_day(entry.get("at_unix_ms")?.as_u64()?, zone));
         let item = match entry.get("kind")?.as_str()? {
             "kept" => {
                 json!({"source_id":id,"when":when,"asked_to_remember":entry.get("text")?.as_str()?})
@@ -2382,7 +2384,29 @@ mod tests {
 
     // 2026-10-13 22:30 in Ho Chi Minh City, seven hours east of UTC.
     const NOW: u64 = 1_791_905_400_000;
-    const EAST: i32 = 25_200;
+    /// Ho Chi Minh City's offset, the same all year.
+    const EAST: LocalTime = LocalTime::Offset(420);
+
+    /// #820: how many days ago something was kept, counted where the lamp
+    /// stands, in two zones. In New York, kept at 23:30 on Saturday 7 March
+    /// 2026 and asked about at 23:30 the next day, after the clocks went
+    /// forward: one day, each moment with its own offset. One offset for
+    /// both, summer's, as the voice had it, put both on the Sunday.
+    #[test]
+    fn days_ago_are_counted_where_the_lamp_stands_across_a_change_of_its_clocks() {
+        let new_york = LocalTime::zone("America/New_York").unwrap();
+        let saigon = LocalTime::zone("Asia/Ho_Chi_Minh").unwrap();
+        let kept = 1_772_944_200_000; // 2026-03-08 04:30 UTC
+        let asked = 1_773_027_000_000; // 2026-03-09 03:30 UTC
+        let ago = |zone: &LocalTime| local_day(asked, Some(zone)) - local_day(kept, Some(zone));
+        assert_eq!(ago(&new_york), 1);
+        assert_eq!(ago(&LocalTime::Offset(-240)), 0);
+        // 11:30 on Sunday and 10:30 on Monday in Ho Chi Minh City.
+        assert_eq!(ago(&saigon), 1);
+        assert_eq!(ago(&EAST), 1);
+        // Without a zone at all, UTC's days.
+        assert_eq!(local_day(kept, None), 20_520);
+    }
     const DAY: u64 = 86_400_000;
 
     /// #1693, `LAMP_MEMORY_FORGET_ALL`: something recall gave is forgotten
@@ -2401,7 +2425,7 @@ mod tests {
         });
         let client = DaysClient::new(socket.clone()).unwrap();
         client.forget_all.store(true, Ordering::Release);
-        let run = |name, args| client.run_at(&call(name, args), FIRST_READ, NOW, EAST, None);
+        let run = |name, args| client.run_at(&call(name, args), FIRST_READ, NOW, Some(&EAST), None);
         assert!(run(RECALL, json!({"about":"wedding"})).1);
         // Not shown this session: refused here, nothing sent.
         let (told, answered) = run(FORGET, json!({"source_id":99}));
@@ -2444,7 +2468,7 @@ mod tests {
             &call(FORGET, json!({"source_id":8})),
             FIRST_READ,
             NOW,
-            EAST,
+            Some(&EAST),
             Some(MINH),
         );
         assert_eq!(told["forgotten"], false, "{told}");
@@ -2452,7 +2476,7 @@ mod tests {
             &call(FORGET_EVERYTHING, json!({})),
             FIRST_READ,
             NOW,
-            EAST,
+            Some(&EAST),
             Some(MINH),
         );
         assert_eq!(told["forgotten"], false, "{told}");
@@ -2470,7 +2494,7 @@ mod tests {
             &call(FORGET, json!({"source_id":8})),
             FIRST_READ,
             NOW,
-            EAST,
+            Some(&EAST),
             None,
         );
         assert_eq!(
@@ -2495,7 +2519,7 @@ mod tests {
             &call(RECALL, json!({"about":"coffee", "days_ago":1})),
             FIRST_READ,
             NOW,
-            EAST,
+            Some(&EAST),
             None,
         );
         assert!(answered, "{told}");
@@ -2506,7 +2530,7 @@ mod tests {
         assert_eq!(client.context.lock().unwrap().of(None), [8, 2]);
         assert!(
             client
-                .run_at(&call(RECALL, json!({})), FIRST_READ, NOW, EAST, None)
+                .run_at(&call(RECALL, json!({})), FIRST_READ, NOW, Some(&EAST), None)
                 .1
         );
         let read = served.join().unwrap();
@@ -2620,16 +2644,16 @@ mod tests {
             json!({"id":1,"kind":"exchange","at_unix_ms":NOW,"heard":"x"}),
         ] {
             assert_eq!(
-                days_answer(&json!({"ok":true,"entries":[entry]}), NOW, EAST),
+                days_answer(&json!({"ok":true,"entries":[entry]}), NOW, Some(&EAST)),
                 None
             );
         }
         assert_eq!(
-            days_answer(&json!({"ok":false,"entries":[]}), NOW, EAST),
+            days_answer(&json!({"ok":false,"entries":[]}), NOW, Some(&EAST)),
             None
         );
         assert_eq!(
-            days_answer(&json!({"ok":true,"entries":[]}), NOW, EAST)
+            days_answer(&json!({"ok":true,"entries":[]}), NOW, Some(&EAST))
                 .unwrap()
                 .0["found"],
             json!([])
@@ -2707,7 +2731,7 @@ mod tests {
                 &call(RECALL, json!({"about":"coffee"})),
                 Duration::from_millis(50),
                 NOW,
-                EAST,
+                Some(&EAST),
                 None
             ),
             (gone(), false)
@@ -3562,15 +3586,15 @@ mod tests {
             request(
                 &call(REMEMBER, json!({"text":"  takes coffee black "})),
                 NOW,
-                EAST
+                Some(&EAST)
             ),
             Some(json!({"op":"remember","at_unix_ms":NOW,"text":"takes coffee black"}))
         );
         for nothing in [json!({}), json!({"text":" ... "}), json!({"text":7})] {
-            assert_eq!(request(&call(REMEMBER, nothing), NOW, EAST), None);
+            assert_eq!(request(&call(REMEMBER, nothing), NOW, Some(&EAST)), None);
         }
         assert_eq!(
-            request(&call(FORGET, json!({})), NOW, EAST),
+            request(&call(FORGET, json!({})), NOW, Some(&EAST)),
             Some(json!({"op":"forget_last","kind":"kept"}))
         );
         // Yesterday is the local day before, not UTC's: 22:30 here is
@@ -3579,7 +3603,7 @@ mod tests {
             request(
                 &call(RECALL, json!({"about":" coffee ","days_ago":1})),
                 NOW,
-                EAST
+                Some(&EAST)
             ),
             Some(
                 json!({"op":"recall","query":"coffee","day":"2026-10-12","limit":6,"max_bytes":2400})
@@ -3587,14 +3611,14 @@ mod tests {
         );
         let early = NOW + 4 * 3_600_000;
         assert_eq!(
-            request(&call(RECALL, json!({"days_ago":0})), early, EAST).unwrap()["day"],
+            request(&call(RECALL, json!({"days_ago":0})), early, Some(&EAST)).unwrap()["day"],
             "2026-10-14"
         );
         assert_eq!(
             request(
                 &call(RECALL, json!({"about":"","days_ago":99_999})),
                 NOW,
-                EAST
+                Some(&EAST)
             ),
             Some(json!({"op":"recall","query":null,"day":null,"limit":6,"max_bytes":2400}))
         );
@@ -3608,7 +3632,7 @@ mod tests {
             {"kind":"exchange","id":3,"at_unix_ms":NOW - 3_600_000,"heard":"And tea?","said":"No idea."}
         ]});
         assert_eq!(
-            answer_for(RECALL, &answer, NOW, EAST),
+            answer_for(RECALL, &answer, NOW, Some(&EAST)),
             Some(json!({"found":[
                 {"when":"2 weeks ago","heard":"How do I take my coffee?","you_said":"Black."},
                 {"when":"yesterday","asked_to_remember":"takes coffee black"},
@@ -3616,7 +3640,7 @@ mod tests {
             ]}))
         );
         assert_eq!(
-            answer_for(RECALL, &json!({"ok":true,"entries":[]}), NOW, EAST),
+            answer_for(RECALL, &json!({"ok":true,"entries":[]}), NOW, Some(&EAST)),
             Some(json!({"found":[],"note":"Nothing about that in what I remember."}))
         );
         assert_eq!(
@@ -3635,7 +3659,7 @@ mod tests {
     #[test]
     fn keeping_and_forgetting_are_told_as_what_the_memory_established() {
         assert_eq!(
-            answer_for(REMEMBER, &json!({"ok":true,"id":4}), NOW, EAST),
+            answer_for(REMEMBER, &json!({"ok":true,"id":4}), NOW, Some(&EAST)),
             Some(json!({"remembered":true}))
         );
         assert_eq!(
@@ -3643,12 +3667,12 @@ mod tests {
                 FORGET,
                 &json!({"ok":true,"removed":{"kind":"kept","id":4,"at_unix_ms":1}}),
                 NOW,
-                EAST
+                Some(&EAST)
             ),
             Some(json!({"forgotten":true}))
         );
         assert_eq!(
-            answer_for(FORGET, &json!({"ok":true,"removed":null}), NOW, EAST).unwrap()["forgotten"],
+            answer_for(FORGET, &json!({"ok":true,"removed":null}), NOW, Some(&EAST)).unwrap()["forgotten"],
             false
         );
         assert_eq!(
@@ -3656,7 +3680,7 @@ mod tests {
                 REMEMBER,
                 &json!({"ok":false,"error":"empty","message":"m"}),
                 NOW,
-                EAST
+                Some(&EAST)
             ),
             Some(json!({"error":"There was nothing in that for me to keep."}))
         );
@@ -3668,7 +3692,11 @@ mod tests {
             json!({"entries":[]}),
             json!("ok"),
         ] {
-            assert_eq!(answer_for(REMEMBER, &other, NOW, EAST), None, "{other}");
+            assert_eq!(
+                answer_for(REMEMBER, &other, NOW, Some(&EAST)),
+                None,
+                "{other}"
+            );
         }
     }
 
@@ -3762,7 +3790,6 @@ mod tests {
         let client = DaysClient {
             socket: PathBuf::from("/unused-no-io"),
             prefix: "test".into(),
-            zone: Vec::new(),
             context: Mutex::new(context),
             keeping: Mutex::new(()),
             jobs,

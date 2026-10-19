@@ -191,8 +191,9 @@ product's is `/run/lampos-skills`), and the voice reads and calls them the
 same way, at the same session open and within the same deadline:
 
     <skills>/tools.json   each skill's tool, described with its SKILL.md description,
-                          with the parameters of its choice and flag, if it has them,
-                          and beside the tools, "body": the tools whose skill asks
+                          with the parameters of its choice and flag, if it has them;
+                          a skill's [stop] function (#1685), its "how" one of snooze,
+                          off or on; and beside the tools, "body": the tools whose skill asks
                           for the body (a text never runs one, #1673)
     <skills>/call.sock    {"op":"call","name":"dance","args":{"style":"calm"}} -> {"ok":true,"result":{"next":"..."}}
                           arguments that are not the tool's -> {"ok":false,"error":"..."}
@@ -410,6 +411,10 @@ a skill cut for it is named on the setup line (#1706). The voice puts
 reports."}`, or "I'm not sending any reports." when they were off. With
 nobody taking the ask (`lamp-cloud` not running), or no answer in time, it
 says so and never claims a stop. Only a request a person said runs it.
+It runs in a request whose answer the attention rule holds too, its
+answer still held: the one call that does (`DONE_THOUGH_HELD`,
+[attention.md](attention.md), "What happens to an answer that is held
+back").
 There is no function to turn reports on: that is the person's own screen.
 
 ## `the_time`, the voice's own
@@ -448,12 +453,13 @@ time, from its opening note, and nothing said whose it was.
   taken only there or as `UTC`: the folder's top-level `EST`, `MST` and
   `HST` have no summer time, so "EST" for the East Coast would be an hour
   off New York's half the year (the reviewer on #1552). The zone file is read from
-  `/usr/share/zoneinfo` with the voice's own reader (`local_time.rs`). Only
+  `/usr/share/zoneinfo` and read by `lamp-local-time`, as every part
+  reads the lamp's own zone (#820). Only
   `[A-Za-z0-9_+/-]` is taken, with no `..`, no `//` and no leading or
   trailing `/`, and the file must be a zone file. A slim zone file, which
   lists no changes past its last rule change, has its closing rule worked
-  out (`Mm.w.d` dates; a `Jn` or `n` rule gives nothing). The lamp's own
-  time is read exactly as before.
+  out, and since #820 so has the lamp's own: before, past the changes its
+  file listed, its time was not told.
 - **The answer names the place, and the lamp's own beside it:**
   `{"now":"In London it is 10:40 in the morning, Sunday 18 October 2026.
   Said aloud: twenty to eleven in the morning. Here in Ho Chi Minh it is

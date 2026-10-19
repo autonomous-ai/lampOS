@@ -225,6 +225,7 @@ impl Schedule {
             bus_root: root.path().join("b"),
             zone: "Etc/UTC".into(),
             run_for: None,
+            report_every: lamp_schedule::runtime::REPORT_EVERY,
         };
         let worker = {
             let (clock, stop) = (clock.clone(), stop.clone());

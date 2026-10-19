@@ -75,6 +75,12 @@ pub trait Lamp {
     fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
         None
     }
+    /// Where the skills are read for the app's skills page (#1722,
+    /// `crate::skills`): there only with `LAMP_CLOUD=on` and
+    /// `LAMP_SKILLS_PAGE=on`.
+    fn skills(&self) -> Option<crate::skills::Places> {
+        None
+    }
 }
 
 /// How long a preview is shown after the last one, as V1's: an abandoned
@@ -154,6 +160,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             }
             some(shared.with(|reports| reports.answer()))
         }
+        // The app's skills page (#1722): every skill on the lamp, its group,
+        // whether it can be removed or turned off and what it may use. Read
+        // only.
+        "skills.list" if lamp.skills().is_some() => {
+            let places = lamp.skills().ok_or_else(|| not_here(kind))?;
+            crate::skills::list(&places).map(Some)
+        }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -182,6 +195,8 @@ pub mod tests {
         pub to_give: Vec<Value>,
         /// Reports (#1683), with their switch.
         pub reports: Option<std::sync::Arc<crate::reports::Shared>>,
+        /// The skills page (#1722), with its switch.
+        pub skills: Option<crate::skills::Places>,
     }
 
     impl Lamp for Fake {
@@ -235,6 +250,9 @@ pub mod tests {
         }
         fn reports(&self) -> Option<std::sync::Arc<crate::reports::Shared>> {
             self.reports.clone()
+        }
+        fn skills(&self) -> Option<crate::skills::Places> {
+            self.skills.clone()
         }
         fn send_text(&mut self, text: &lamp_msgs::ChatIn, _now_ms: u64) -> Result<(), String> {
             self.texts.push(text.clone());
@@ -391,6 +409,39 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!((&off["share"], &off["queued"]), (&json!(false), &json!(1)));
+    }
+
+    /// #1722: the skills page is answered only with its switch, and
+    /// without it refused as every kind this lamp lacks.
+    #[test]
+    fn the_skills_are_listed_for_the_app_only_with_their_switch() {
+        let mut lamp = lamp();
+        assert_eq!(
+            answer(&mut lamp, "skills.list", &Value::Null),
+            Err("not on this lamp: skills.list".to_owned())
+        );
+        let places = crate::skills::tests::places("answer");
+        crate::skills::tests::skill(
+            &places,
+            "dance",
+            "Dance",
+            "",
+            "kind = \"core\"\n[permissions]\nbody = true",
+        );
+        lamp.skills = Some(places);
+        let listed = answer(&mut lamp, "skills.list", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(listed["version"], 1);
+        assert_eq!(listed["skills"][0]["name"], "dance");
+        assert_eq!(listed["skills"][0]["can_remove"], false);
+        // The other skills kinds are not built: refused as before.
+        for kind in ["skills.remove", "skills.catalog", "skills.install"] {
+            assert_eq!(
+                answer(&mut lamp, kind, &json!({"name": "dance"})),
+                Err(not_here(kind))
+            );
+        }
     }
 
     #[test]

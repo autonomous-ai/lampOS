@@ -24,7 +24,7 @@ Never `lamp-voice`, and never another builder's branch.
 - Deploy folders: none
 - Log: [lampOS/docs/work-log-fourth.md](https://github.com/autonomous-ai/lampOS/blob/lamp-fourth/lampOS/docs/work-log-fourth.md) on `lamp-fourth`
 - Tasks: the `builder:fourth` issues, in the order of the Queue issue
-  ([#705](https://github.com/autonomous-ai/lampOS/issues/705))
+  ([#1722](https://github.com/autonomous-ai/lampOS/issues/1722), continued from #705)
 
 Its earlier work: memory across days (13), whom it is said to (14), the records bound (15), the lean check (16), the local judge (17), the voice on the hand controls (21).
 
@@ -33,7 +33,7 @@ Its earlier work: memory across days (13), whom it is said to (14), the records 
 - Change the crates above, and the documents that belong to them, in the
   same commit.
 - Propose work as `fourth-P<n>` in its log and as a comment on the issue it
-  belongs to, or on the Queue issue (#705) when none fits, as joining.md's
+  belongs to, or on the Queue issue (#1722, continued from #705) when none fits, as joining.md's
   `fifth-P8` says; it opens no issues and makes no labels.
 - Add and remove `status:` labels on, and comment on, its own issues.
 

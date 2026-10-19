@@ -799,11 +799,62 @@ returned after revocation. A write already accepted by Memory cannot be undone
 by canceling its caller. Typed conversations continue to use the room scope.
 
 This boundary fixes tool attribution and cancellation only. A visible face is
-not proof of the speaker. Provider context, snapshots and history still require
-their own session isolation; this change does not establish that a session
-already containing one person's private context is safe for another person.
-Voice matching remains diagnostic until that isolation and real-person
-qualification are complete (#1675).
+not proof of the speaker. On a route whose switch is off
+(`LAMP_SECOND_SCOPED_CONTEXT` for the Second route, `LAMP_LIVE_SCOPED_SESSION`
+for Live), provider context, snapshots and history still require their own
+session isolation: this does not establish that a session already containing
+one person's private context is safe for another person. With Live's switch on,
+a line nobody known is named for still goes into the open session. Voice
+matching remains diagnostic until that isolation and real-person qualification
+are complete (#1675).
+
+### Second route context scope
+
+With `LAMP_SECOND_SCOPED_CONTEXT=on` (off unless set), on the Second route the
+same admitted scope also decides what a turn's chat is told. Its system message, recalled thread and history messages are read for the
+request's scope alone (`Thread::recall_for`/`recent_for`): a person's
+exchanges for that person, the room's for a room request, never the sticky
+session owner's or those of whoever is in view when the chat begins. The Days
+note is asked for that scope and asked again when the scope differs from the
+previous turn's. A request revoked while its context was built is not asked.
+The lamp's answer is kept under the same scope (`Thread::lamp_for`), and a
+written request's note is kept as the room's, as it is admitted. The context is
+still built on the turn's task, so a slow memory service delays that turn's
+first round as before; nothing new is read on the input path.
+
+Off, a turn is told and kept as before, for the person the session was opened
+for. ### Live route session scope
+
+With `LAMP_LIVE_SCOPED_SESSION=on` (off unless set), a spoken line on the Live
+route goes only into a session opened for the person it was admitted for
+(`crate::scoped_session`). Whose a Live session is otherwise follows the
+counted person, who changes only after someone else known has been named for
+10 s; a line admitted meanwhile for B went into A's session, which already holds
+A's kept things, thread and conversation.
+
+- **Someone known in another known person's session:** the line is not sent.
+  It fails as not delivered (the same report as a line refused for a lost
+  connection), and the session is opened again, fresh, for B between turns.
+  B's next line is answered in B's own session. The cost is that first line.
+- **For two minutes after a line admitted for someone known**, the session is
+  theirs, ahead of the count of who is at the lamp (`Thread::admitted`), so
+  the count catching up later does not open it again for A. Closing or
+  changing the camera forgets it.
+- **Two or more known people taking turns** within two minutes share a room
+  session, told neither's kept things or thread: one line is lost when the
+  second first speaks, and none after, however often they alternate (the
+  reviewer's P2 on #1865). Once only one of them has spoken in the last two
+  minutes, the session is theirs again, opened between turns without
+  refusing a line.
+- **Not refused:** a line admitted for the room, any line in a room session
+  (it holds nobody's private context; the session is still opened again for a
+  known person between turns), and written requests and reminders. A known
+  person who keeps talking turned away from the eyes keeps their session, as
+  before.
+- **Latency:** the check is a mutex and a comparison before the line is sent;
+  the new session costs one session open between turns, as any renewal. Not
+  measured on a lamp, and no lamp run yet.
+
 
 The added admission work targets less than 100 microseconds: no filesystem or
 network I/O and no waiting for the cache mutex. Privacy invalidation is atomic

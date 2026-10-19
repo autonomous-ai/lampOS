@@ -9,7 +9,12 @@
 # and held their bounds beside a full core load in five runs (#1292), so
 # every run now runs them: one at a time (the group) and started first (its
 # priority), beside the rest. Run them alone with profile `realtime`. See
-# docs/realtime-tests.md.
+# docs/realtime-tests.md. Two of `lamp-skills`' tests joined on 2026-10-19:
+# they run the real program on the host's clock by design (#1806). A third
+# the same day waits for the real program to start under load (#1829),
+# and two more start it twice on the host's clock, a restart between
+# (#1837). Two of `lamp-voice`'s hand-controls tests joined the same day
+# too: they count the input pump's real wakes for a second by design (#1806).
 #
 # The same filterset appears twice below (the group override and
 # `realtime`'s selection). Keep both identical.
@@ -27,6 +32,8 @@ filter = '''
     binary_id(lamp-voice::capture_hold_worker)
   | (binary_id(lamp-voice) & test(=coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff))
   | (binary_id(lamp-health::program) & test(=between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone))
+  | (binary_id(lamp-skills::skills) & (test(=asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait) | test(=a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go) | test(=asking_the_policy_a_hello_made_and_not_noticed_rests) | test(=the_program_keeps_a_skill_off_across_a_restart) | test(=the_program_forgets_a_snooze_at_a_restart)))
+  | (binary_id(lamp-voice) & (test(=hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once) | test(=hand_controls::tests::with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump)))
 '''
 test-group = 'realtime'
 # Started first, so that its one-at-a-time chain runs beside the rest rather
@@ -50,4 +57,6 @@ default-filter = '''
     binary_id(lamp-voice::capture_hold_worker)
   | (binary_id(lamp-voice) & test(=coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff))
   | (binary_id(lamp-health::program) & test(=between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone))
+  | (binary_id(lamp-skills::skills) & (test(=asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait) | test(=a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go) | test(=asking_the_policy_a_hello_made_and_not_noticed_rests) | test(=the_program_keeps_a_skill_off_across_a_restart) | test(=the_program_forgets_a_snooze_at_a_restart)))
+  | (binary_id(lamp-voice) & (test(=hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once) | test(=hand_controls::tests::with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump)))
 '''

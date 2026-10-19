@@ -619,7 +619,10 @@ this room" until someone asks to be recognised.
 - **Kept.** `--people FILE` (on lamp-4ace `/var/lib/lampos-eyes/people.json`,
   in a directory of mode 0700 and a file of mode 0600). Per person: the
   name, up to five prints and when they were added. At most 20 people. No
-  picture is kept, and no print leaves the lamp. **Read one release
+  picture is kept, and no print leaves the lamp. With `LAMP_ACTIVITY=on`
+  the sitter's prints (up to six, for telling the sitter from others) are
+  held in memory for the sitting only, never in this file
+  ([below](#what-the-person-at-the-desk-is-doing-lamp_activityon-1678)). **Read one release
   forward** (#1505, harm 3): a field a later build added, on the file or on
   a person, is read past, and the next save writes this build's fields.
   What this build cannot read is **set aside, never dropped or guessed
@@ -958,6 +961,49 @@ seen; and forgetting takes the number and an unwritten count
 name (`bus_out.rs`). The voice's line comes only with `visits: true`. Not
 run on a lamp.
 
+### How the person at the lamp seems (`--seems`, #1671, step 1)
+
+Off unless `lamp-eyes --seems /opt/lampOS/eyes/models/emotion-ferplus-8.onnx`
+is given. It doesn't need the recogniser, and it never asks who anyone is. It's a
+read for **measuring how often it is wrong**: nothing acts on it yet, and
+the lamp never says how anyone looks (#1671; the first builder's 14:04).
+
+- **The model:** FER+ (`emotion-ferplus-8.onnx`, the ONNX model zoo's,
+  MIT), 35,040,571 bytes, pinned by SHA-256 in `seems.rs`, run under
+  tract. No build or release carries it yet. It is placed by hand on a test lamp.
+- **The read:** at most every 2 s, the nearest face at or over
+  `NEAR_ENOUGH` of the picture's height is cut out upright as for
+  recognition (`who::align`, 112 by 112), made grey and 64 by 64
+  (`seems::grey`), and scored on eight expressions. These are reduced, as V1
+  did: `positive` when happiness holds 0.6 or more of the eight, `negative`
+  when sadness, anger, disgust, fear and contempt together do, else
+  `unsure` (`seems::judge`, `NAMED_FROM`, authored, to be set from the
+  measure).
+- **Said:** with `LAMP_BUS=on`, each read on `humans/seems`
+  (`lamp_msgs::HumanSeems`, good for 5 s): a kind and a confidence only.
+  No name, print or picture is kept or said. With no face near, nothing is
+  said, and a reader treats no fresh value as not known.
+- **The journal** says only how many reads there were in the last minute,
+  how long one took on average and the longest, for the cost on a lamp.
+  A read runs in the look loop, so it delays the look it comes with (one in
+  about eight), and that is the look the body follows a face by. If a read
+  on the lamp takes over about 100 ms, it moves to its own thread before
+  anything turns `--seems` on (the reviewer on #1859).
+
+Next (#1671): a week's log of time, kind, confidence and whether the
+person's own words or laughter agreed, with no identity, picture or audio,
+deleted after the measure; then a labelled session at a lamp. Only then
+may a core skill tell the conversation "they seem low".
+
+Tests: a face made grey and 64 by 64; the eight scores made shares;
+`positive`, `negative` and `unsure` at the line and just under it; a file
+that isn't the pinned model refused; with the model present
+(`LAMP_SEEMS_MODEL`), a read in eight shares (`seems.rs`). The read is said
+only with the switch, from the eyes, as a kind and a confidence
+(`bus_out.rs`); `--seems` is a short absolute path, given once (`main.rs`).
+One read takes about 45 ms on an x86 laptop's release build. **The cost on a
+lamp is not measured yet**, and it is the first thing to measure.
+
 ### Whether anyone is at the lamp (`LAMP_PRESENCE=on`, #1677)
 
 With `LAMP_PRESENCE=on` beside `LAMP_BUS=on`, the eyes also say on
@@ -978,6 +1024,67 @@ going out and Messages read ([presence.md](presence.md)). A presence switch
 whose subscription fails is said once in the journal, and the faces are
 published as before. Not run on a lamp: its cost there is part of
 presence.md's lamp check.
+
+### What the person at the desk is doing (`LAMP_ACTIVITY=on`, #1678)
+
+With `LAMP_ACTIVITY=on` beside `LAMP_BUS=on`, the eyes also say on
+`room/activity` (`lamp_msgs::RoomActivity`) what the face at the desk shows,
+and on `room/stood_up` (`lamp_msgs::StoodUp`, an event) when someone rose
+out of the chair and left (`crates/eyes/src/activity.rs`, from
+`bus_out.rs`). The eyes see a face, not a body, so each state is read from
+the sitter's face against this person's own sitting: the median of its
+first two minutes of looks at the desk (a face at least 0.14 of the picture
+tall, Stretch break's `near`). The sitter is the largest near face when a
+sitting starts, and from then on the near face nearest their last place,
+within a face's height of it or of where they sat, whoever is larger: in an
+office a colleague near the desk is often the largest face. Head down is
+the nose lower between the eyes and mouth by 0.12 than it sat, held 20 s
+(reading, writing or a phone held low, not told apart), whatever the face's
+size, since a head bowed over the desk comes closer too; leaning in is the
+face 1.25 times as tall, held 10 s. No sitter for 20 s is away; a sitting
+goes on through a gap under two minutes.
+
+At lamp-75c9 (19 Oct, one person, an open office, the lamp beside the
+laptop at about face height) leaning in was seen (1.52 times as tall). Head
+down, as first written (the centre a quarter of the face lower), was not:
+the face came closer (1.21 times) and only 0.06 of its height lower, so it
+is the pitch alone now, and 0.12 is the design's line until a run sets it.
+Leaning back (0.99 times) and sitting low (0.15 of the face lower against
+half) could not be seen from that place and were dropped; they come back
+only if a lamp in front of a person shows them. While a sitting with its
+baseline is followed the journal says every 2 s `lamp-eyes: sitter 1.04 as
+tall as sat, 0.03 of its height lower, pitch 0.52 (sat 0.50), AtDesk`, numbers
+only, for the next run. By place alone, someone else in the sitter's own
+place, at their distance, is taken for them (the run's leave step: faces
+side-on at 0.40 to 0.53 across, where the sitter had sat at 0.44).
+
+**Told by face, with the recogniser** (#1678's (d); the owner's yes, 19 Oct
+15:57, recorded on #1827; switched on on a lamp only after Third's privacy
+read, lamp-4ace first).
+When the eyes also have `--recogniser` (the pinned SFace), the sitter is
+told from others by face. In the sitting's first minutes one print of the
+sitter is taken every 20 s, up to six (about a second of SFace), and their
+mean is the sitter's. After that a print is taken only of a face back at
+the sitter's place after 2 s or more without them, at most one every 2 s:
+alike enough (`who::SAME_PERSON`, 0.363) it is the sitter, the same
+sitting; less, or a face that can't be printed (side-on), it is not, and
+`away` and `room/stood_up` go on as if nobody were there. Followed without
+such a gap the sitter is never printed again, so turning their head does
+not lose them. The sitter's prints are held in the eyes' memory for that
+sitting only and dropped when it ends (no sitter for two minutes, whether
+or not the eyes are looking) or when the camera closes (not permitted, a
+failure, or a reopen at the full size): never
+written, never published, never compared with `people.json` and never
+named. The journal says only what was decided, with a number: `lamp-eyes: a
+face at the sitter's place, likeness 0.21: not the sitter`. Without the
+recogniser it is by place alone, as above. Standing up is
+the face rising by half its height and shrinking to 0.85 of it within 2 s,
+then not seen for 2 s, said once. Nothing is said with no look for 5 s.
+States and counts only on the bus: no box, no picture, nobody's identity.
+Arithmetic on the looks the eyes already make, and with the recogniser the
+few prints above, on frames the eyes already have: no model or frame is
+added. Its cost on a lamp is #1678's CPU run; how well the states are told
+apart is its scripted sitting.
 
 ### Whether a face is speaking (`LAMP_EYES_SPEAKING=on`, #720)
 
