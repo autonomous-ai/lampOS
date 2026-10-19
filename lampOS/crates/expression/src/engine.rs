@@ -1288,6 +1288,20 @@ impl Engine {
         };
         let body_playing = body_level.is_some() && !self.retired_turn;
         let body_level = body_level.unwrap_or(0.0);
+        // The level the speaking motion meets (#933): the body's lag, when
+        // the voice has said that far; otherwise the farthest piece it has
+        // said that is still to end. The voice says its sound 200 ms ahead
+        // (`FORETELL_US`) and the catalogues' lag is 300 ms, so no piece was
+        // ever at the lag, and the head never nodded or swayed on a lamp
+        // (#1759, 20 Oct). The move then lands at most the difference early.
+        let speech_level = body_playout
+            .or_else(|| {
+                self.playout
+                    .iter()
+                    .filter(|f| f.start_us <= body_at && f.end_us > now_us)
+                    .max_by_key(|f| f.start_us)
+            })
+            .map_or(0.0, |frame| frame.level);
         let mode = if playing {
             Voice::Speaking
         } else {
@@ -1510,7 +1524,7 @@ impl Engine {
             let mut names = Vec::new();
             let motion = self
                 .speech
-                .step(rules, speaking, body_level, still, now_us, &mut names);
+                .step(rules, speaking, speech_level, still, now_us, &mut names);
             offsets = add(offsets, motion, 1.0);
             state
                 .behaviours
