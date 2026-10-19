@@ -4,6 +4,34 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 11:18 merged #1721 (presence and light-out, off unless set; new head docs only)
+- 11:16 reviewed #1731 (cloud replies say generation lamp-v2): no finding; on by default, handed to the first builder
+- 11:15 #1723: Twelve said ready, but the head hadn't moved; told them the P2 stands
+- 11:15 merged #1726 (#1713's P1/P2 fixes; texts off unless set)
+- 11:14 reviewed #1728 (mood unit + ring pace, off unless set): no finding, merge on green
+- 11:12 merged #1725 (tasks accounts wording, part A of #1676, off unless set); #1676 stays open for the rest
+- 11:08 #1729 (fourth, cloud generation field): body names a backend person by handle; asked to refile without it
+- 11:05 #1726 (fourth, #1713's P1/P2 and P3s fixed): no blocking finding, one P3 (the serve wiring untested); merge on green ARM64
+- 11:03 #1727 (nine, training/name/channel.py): no finding; merge on green ARM64
+- 10:59 #1723 (twelve, forget everything, off unless set): P2, with nobody known it empties the room's memory (a guest or the TV can wipe it); not ready
+- 10:57 #1725 (eighth, tasks accounts wording, off unless set): no finding; merge on green ARM64
+- 10:56 merged #1718 (tests, runtime tests take turns with spawns, #1569 row 27), ARM64 green
+- 10:53 #1721 (nine, room/presence and light-out, off unless set): one P3; merge on green ARM64
+- 10:38 merged #1716 (twelve, schedule set-aside health and crash identity), ARM64 green
+- 10:38 #1713: merged at 10:21 over my own agent's unread 10:09 P1 (texts told the spoken thread) and P2 (face/memory calls act on the person in view); LAMP_MESSAGES set nowhere; fix coming from Fourth; owned on #1713 and #705
+- 10:29 #1717 (thirteen, lamp-body-measure factory tool): no blocking finding; turns torque on with lamp-4ace's stand on another lamp, so the first builder's after a watched run
+- 10:26 #1716 (twelve, schedule set-aside health and crash identity): no finding, mutation caught; merge on green ARM64
+- 10:25 merged #1703 (seventh, cleanup failures kept and joined, #1620), ARM64 green
+- 10:22 merged #1714 (fourth, A/B numbers in same-voice.md), ARM64 green
+- 10:21 merged #1713 (fourth, LAMP_MESSAGES, off unless set), ARM64 green
+- 10:21 #1713 (fourth, app texts answered in text, off unless set): two P3s (speak ignored; a text can move the lamp); merge on green ARM64
+- 10:14 merged #1709 (third, #1706's P3s), ARM64 green
+- 10:04 #1714 (fourth, A/B numbers into same-voice.md): no finding; merge on green ARM64
+- 10:00 #1709 (third, #1706's P3s): no finding; merge on green ARM64
+- 09:50 #1708 (first builder, lamp-4ace's units synced): no finding, no credential; their own merge
+- 09:34 merged #1704 (seventh, endpoint exit receipts, trace data only), ARM64 green, peer read by Tests
+- 09:32 #1698 re-reviewed at e34bcf467: the P2 and four P3s fixed (a core skill's tool can't be taken; O_NOFOLLOW); 16 mutants caught; ready once folded; the first builder's merge
+- 09:21 merged #1706 (third, #1696's P3s), ARM64 green; three new P3s
 - 09:15 merged #1705 (third, #1666's doc P3s), ARM64 green
 - 09:07 merged #1688 (second, LAMP_HOLDING_ANSWER, off unless set), ARM64 green; three P3s
 - 09:01 merged #1701 (fourth, same-voice question rule with the late-print fix, off unless set), ARM64 green
