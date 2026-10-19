@@ -366,7 +366,9 @@ pub fn serve(
         .as_deref()
         .filter(|_| files.room_facts)
         .and_then(|root| lamp_bus::Bus::new(root).ok());
-    let (texts_system, texts_runner) = texts_ends(character.clone(), tools.clone());
+    // What the texts' task is built from, kept before the spoken turns take
+    // their own (`texts_task`).
+    let texts_from = (character.clone(), tools.clone());
     let sessions = std::sync::Mutex::new(Sessions::default());
     let system = move || {
         let now = Instant::now();
@@ -471,12 +473,8 @@ pub fn serve(
         .enable_all()
         .build()?;
     if let Some((chat, root)) = texts {
-        runtime.spawn(crate::messages::serve(
-            chat,
-            texts_system,
-            texts_runner,
-            root,
-        ));
+        let (character, tools) = texts_from;
+        runtime.spawn(texts_task(chat, character, tools, root));
     }
     runtime.block_on(run(channels, boot, engine, thread))
 }
@@ -890,6 +888,20 @@ pub(crate) fn texts_ends(
         })
     });
     (system, runner)
+}
+
+/// The worker's texts (#1673) as [`serve`] runs them: `messages::serve` with
+/// a text's own system message and functions ([`texts_ends`]). Built here
+/// from the character and the settings alone, so the spoken turn's `system`
+/// can never be handed to it (the reviewer on #1726).
+pub(crate) fn texts_task(
+    model: impl crate::messages::Model + Send + Sync + 'static,
+    character: String,
+    tools: crate::tools::Settings,
+    bus_root: PathBuf,
+) -> impl std::future::Future<Output = ()> {
+    let (system, runner) = texts_ends(character, tools);
+    crate::messages::serve(model, system, runner, bus_root)
 }
 
 /// The system message for a text's answer (#1673): the character, the time
@@ -1650,6 +1662,104 @@ mod tests {
         assert!(told.text.starts_with("You are a lamp."), "{}", told.text);
         assert!(told.history.is_empty());
         *crate::thread::THREAD.lock().unwrap() = kept;
+    }
+
+    /// What the texts' model was sent, round by round; it answers "Done."
+    #[derive(Clone, Default)]
+    struct Recording(Arc<std::sync::Mutex<Vec<Vec<net::Message>>>>);
+
+    impl crate::messages::Model for Recording {
+        fn round<'a>(
+            &'a self,
+            messages: &'a [net::Message],
+            text: &'a mut (dyn FnMut(&str) + Send),
+        ) -> futures_util::future::BoxFuture<'a, Result<Vec<net::ToolCall>, String>> {
+            Box::pin(async move {
+                self.0.lock().unwrap().push(messages.to_vec());
+                text("Done.");
+                Ok(Vec::new())
+            })
+        }
+    }
+
+    /// The reviewer on #1726: through a bus, as the worker runs its texts
+    /// ([`texts_task`]), the model a text reaches is never sent a line said
+    /// at the lamp, though the room's thread holds one.
+    #[tokio::test]
+    async fn the_worker_answers_a_text_without_the_rooms_spoken_conversation() {
+        use lamp_msgs::{ChatIn, ChatOut, ChatPart};
+        let kept = std::mem::take(&mut *crate::thread::THREAD.lock().unwrap());
+        let request = 43;
+        for event in [
+            ProviderOutput::Transcript {
+                request: None,
+                text: "Where did I put the spare key?".into(),
+                finished: true,
+            },
+            ProviderOutput::Transcript {
+                request: Some(request),
+                text: "Under the blue mat.".into(),
+                finished: true,
+            },
+            ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            },
+        ] {
+            keep(&event, None);
+        }
+        let root = PathBuf::from(format!("/tmp/lvw-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut replies = bus
+            .subscribe_typed(ChatOut::TOPIC, "test", ChatOut::TYPE)
+            .unwrap();
+        let model = Recording::default();
+        let worker = tokio::spawn(texts_task(
+            model.clone(),
+            "You are a lamp.".into(),
+            crate::tools::Settings::default(),
+            root.clone(),
+        ));
+        let mut sends = bus
+            .publisher_declared(ChatIn::TOPIC, &ChatIn::declaration(), "cloud")
+            .unwrap();
+        let text = ChatIn {
+            run_id: "run-1".into(),
+            session_id: Some("s1".into()),
+            text: "What did they just ask you?".into(),
+            speak: false,
+        };
+        let until = Instant::now() + Duration::from_secs(10);
+        while sends
+            .publish_json(lamp_ipc::monotonic_us(), &text)
+            .unwrap()
+            .delivered
+            == 0
+        {
+            assert!(Instant::now() < until, "the worker never listened");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        loop {
+            assert!(Instant::now() < until, "no answer");
+            match replies.recv(Duration::ZERO).unwrap() {
+                Some(message) if message.parse::<ChatOut>().unwrap().part == ChatPart::Final => {
+                    break;
+                }
+                Some(_) => {}
+                None => tokio::time::sleep(Duration::from_millis(10)).await,
+            }
+        }
+        worker.abort();
+        let _ = std::fs::remove_dir_all(&root);
+        *crate::thread::THREAD.lock().unwrap() = kept;
+        let sent = model.0.lock().unwrap();
+        let all = serde_json::to_string(&sent[0]).unwrap();
+        assert!(all.contains("You are a lamp."), "{all}");
+        assert!(all.contains("What did they just ask you?"), "{all}");
+        assert!(!all.contains("Under the blue mat."), "{all}");
+        assert!(!all.contains("spare key"), "{all}");
     }
 
     /// The reviewer on #1100: this route reads the eyes' file only as a

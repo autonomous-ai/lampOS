@@ -164,6 +164,10 @@ shows it (#1673's app and backend half, after #1396).
 - `second_provider::worker::tests::a_texts_system_message_never_has_the_rooms_spoken_conversation`:
   with a spoken exchange in the thread, the spoken turn's system message
   has it, and a text's (`texts_ends`) has neither it nor any history.
+- `second_provider::worker::tests::the_worker_answers_a_text_without_the_rooms_spoken_conversation`:
+  through a bus, as the worker runs its texts (`texts_task`, built from the
+  character and settings alone, so the spoken `system` can't reach it), the
+  model is never sent a line said at the lamp.
 - `tools::tests::a_face_is_kept_or_forgotten_only_on_words_heard_at_the_lamp`:
   an unheard face call never reaches the eyes; a heard one does.
 - `crates/voice/tests/typed_memory.rs`: with Sam in view, a spoken
