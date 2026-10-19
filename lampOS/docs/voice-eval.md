@@ -638,8 +638,11 @@ owners are active, and such an attempt is retained as failed.
 ```
 
    Use `provider_config` (a private provider JSON on the Lamp) instead of the
-   fixture pair for Gemini, or `serve_config` for one long-lived serve runtime
-   per attempt (see [serve-session runner](voice-eval-serve.md)). For a direct-human cohort set `"stimulus_source":
+   fixture pair for a provider, or `serve_config` for one long-lived serve runtime
+   per attempt (see [serve-session runner](voice-eval-serve.md)). Either runs on
+   the second route unless the config names `"voice_route": "live"`, with the
+   second route's settings in `runtime_env` (the owner's 19 Oct 19:3x rule; the
+   serve page says how). For a direct-human cohort set `"stimulus_source":
    "direct_human"` and `"human_speaker": "person-1"` (a label, not a name); the
    console then shows each line to say at its trigger and nothing is played.
    Prompt-only timed attempts stay unscored until reviewed attribution is supplied.
