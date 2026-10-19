@@ -795,6 +795,7 @@ async fn with_follows_run_a_reply_to_the_lamp_turns_the_volume_back_up() {
         (true, true, 0.89, "volume_mute", false),
         (true, true, 0.89, "check_my_work", false),
         (true, true, 0.89, "dance", false),
+        (true, true, 0.89, "use_skill", false),
         (true, false, 0.89, "volume_up", false),
         (true, true, 0.5, "volume_up", false),
     ]
@@ -815,10 +816,13 @@ async fn with_follows_run_a_reply_to_the_lamp_turns_the_volume_back_up() {
         .unwrap();
         let mut options = desk.options(true);
         options.follows_run = follows_run;
+        // A skill reached through `use_skill` is held as a skill is (#1668).
+        options.tools.use_skill = name == crate::use_skill::NAME;
         let route = crate::tools::route(&options.tools, name);
         assert_eq!(
-            matches!(&route, crate::tools::Route::Executive(dir) if dir.ends_with(crate::tools::SKILLS_DIR)),
-            ["check_my_work", "dance"].contains(&name),
+            matches!(&route, crate::tools::Route::Executive(dir) if dir.ends_with(crate::tools::SKILLS_DIR))
+                || matches!(&route, crate::tools::Route::UseSkill(_)),
+            ["check_my_work", "dance", "use_skill"].contains(&name),
             "row {row}: {name} routes to {route:?}"
         );
         let mut rig = LiveRig::start_with(quick_policy(), options);

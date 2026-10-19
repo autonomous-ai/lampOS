@@ -308,6 +308,9 @@ pub fn serve(
         );
     }
     let declared = tools.clone();
+    // With `use_skill` the skills' lines are told after the character, as
+    // the Live route tells them (#1668).
+    let skills_told = tools.clone();
     let net = Net::new(config, Arc::new(move || crate::tools::declared(&declared)))
         .map_err(io::Error::other)?;
     let thread = files.thread;
@@ -353,11 +356,16 @@ pub fn serve(
         let going_on = crate::thread::current(file.as_deref(), |thread| thread.going_on(now))
             .unwrap_or_default();
         let room = room_bus.as_ref().map(crate::bus_out::room_now);
+        let skills = if skills_told.use_skill {
+            crate::use_skill::section(&crate::tools::skill_tools(&skills_told))
+        } else {
+            String::new()
+        };
         system_message(
             &character,
             crate::agent_tasks::noted(crate::local_time::told_here(clock, places), tasks.as_ref())
                 .as_deref(),
-            &(memory + &facts(session_fact && !going_on, room)),
+            &(memory + &facts(session_fact && !going_on, room) + &skills),
             file.as_deref(),
         )
     };

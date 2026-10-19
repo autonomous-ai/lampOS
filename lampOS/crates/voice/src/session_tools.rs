@@ -101,8 +101,14 @@ impl Given {
     }
 }
 
+/// The functions' names, and for `use_skill` a name for each skill it
+/// reaches, so a skill installed or removed behind it is a change too
+/// (#1668).
 pub fn names(tools: &[Tool]) -> BTreeSet<String> {
-    tools.iter().map(|tool| tool.name.clone()).collect()
+    tools
+        .iter()
+        .flat_map(|tool| std::iter::once(tool.name.clone()).chain(crate::use_skill::reached(tool)))
+        .collect()
 }
 
 /// What would be declared now and a session was not given, and the other
@@ -368,6 +374,19 @@ pub fn not_ready(tools: &[Tool], settings: &Settings) -> Option<String> {
     }
 }
 
+/// What a session is told after its instruction: what it can't do right
+/// now ([`not_ready`]), and with `use_skill` its skills' lines
+/// ([`crate::use_skill::section`], #1668). None when there is neither.
+pub fn told_after(tools: &[Tool], settings: &Settings) -> Option<String> {
+    let mut told = not_ready(tools, settings).unwrap_or_default();
+    if tools.iter().any(|tool| tool.name == crate::use_skill::NAME) {
+        told.push_str(&crate::use_skill::section(&crate::tools::skill_tools(
+            settings,
+        )));
+    }
+    (!told.is_empty()).then_some(told)
+}
+
 /// What the character says the lamp can do for people, each by functions
 /// of its own.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -461,6 +480,15 @@ pub fn setup_line(tools: &[Tool], settings: &Settings) -> String {
     ));
     if light == 0 {
         line.push_str("; no light functions: the ring is not up");
+    }
+    if let Some(reach) = tools
+        .iter()
+        .find(|tool| tool.name == crate::use_skill::NAME)
+    {
+        line.push_str(&format!(
+            "; {} skills through use_skill",
+            crate::use_skill::reached(reach).len()
+        ));
     }
     line
 }
@@ -1007,6 +1035,43 @@ mod tests {
         ] {
             assert!(!moment.due());
         }
+    }
+
+    /// #1668: with `use_skill` the session is given one function for every
+    /// skill, so a skill installed behind it changes no function's name; it
+    /// is a change all the same, named `use_skill:<skill>`, and the session
+    /// is renewed for it as for any change.
+    #[test]
+    fn a_skill_installed_behind_use_skill_is_a_change() {
+        let folder = Folder::new("use-skill");
+        let mut settings = settings(&folder);
+        settings.use_skill = true;
+        write(&folder, &SOUND, 0);
+        std::fs::create_dir(folder.0.join(crate::tools::SKILLS_DIR)).unwrap();
+        let skills = |names: &[&str], seconds: u64| {
+            let path = folder.0.join(crate::tools::SKILLS_DIR).join(CATALOG_FILE);
+            let tools: Vec<_> = names.iter().map(|name| tool(name)).collect();
+            std::fs::write(&path, json!({"tools": tools}).to_string()).unwrap();
+            std::fs::File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_modified(SystemTime::UNIX_EPOCH + Duration::from_secs(1_800_000_000 + seconds))
+                .unwrap();
+        };
+        skills(&["dance"], 0);
+        let given = Given::default();
+        given.record(&declared(&settings));
+        assert!(given.now().unwrap().contains("use_skill:dance"));
+        let mut watch = Watch::new(&settings, LOOK_EVERY).unwrap();
+        let start = Instant::now();
+        assert_eq!(watch.changed(&settings, &given, start), None);
+        skills(&["dance", "check_my_work"], 1);
+        let change = watch
+            .changed(&settings, &given, start + LOOK_EVERY)
+            .unwrap();
+        assert_eq!(change.added, ["use_skill:check_my_work"]);
+        assert!(change.removed.is_empty());
     }
 
     /// El's peer read of #1588 (the first builder's 21:09 step: three
