@@ -287,6 +287,13 @@ pub async fn run(provider_config: &Path, second_config: &Path, runs: u32) -> io:
     for line in memory_verdict(&ask_memory(&today, &character, runs).await) {
         println!("{line}");
     }
+    println!(
+        "tools: the sayings' {} lines, {runs} runs each",
+        SAYING_LINES.len()
+    );
+    for line in sayings_verdict(&ask_sayings(&today, &character, runs).await) {
+        println!("{line}");
+    }
     Ok(())
 }
 
@@ -521,6 +528,199 @@ pub fn memory_verdict(counts: &MemoryCounts) -> Vec<String> {
         format!(
             "tools memory verdict: right every time on the judged lines: {}",
             whole.join(", ")
+        )
+    });
+    lines
+}
+
+/// The voice's own sayings on the second route (the first builder's 01:04
+/// and 02:44 on #1722): the three lines of `second-trio.sh`'s lamp check
+/// (#2001's run sheet) that rest on what the model says, each asked as the
+/// route asks it, so a model or wording change that breaks one fails here
+/// without the lamp.
+///
+/// - `asked-again` (#1967): the coordinator's written ask-again turn
+///   (`speak_up::ASK_AGAIN_NOTE`) after a line held as unclear, mid-story:
+///   right is a short question ("Sorry?"), no call, nothing of the story.
+/// - `after-the-hum` (#1967, `LAMP_MISHEARD_HUM`): the next line after a
+///   misheard cut-in, with `misheard_hum::NOTE` beside it as the route puts
+///   a note: right is the line's answer (56), not the story taken up again.
+/// - `go-on` (#1986, `LAMP_HOLDING_ANSWER`): after "One moment.", the
+///   coordinator's written turn (`holding_answer::NOTE`): right is the
+///   promised answer (391), not another holding phrase.
+///
+/// The lost line asked again (#2001) asks the same chat as before, so it
+/// has no line here: its check is the engine's own tests.
+pub const SAYING_LINES: [SayingLine; 3] = [
+    SayingLine {
+        name: "asked-again",
+        before: (STORY_ASKED, STORY_BEGUN),
+        note: None,
+        said: crate::speak_up::ASK_AGAIN_NOTE,
+        right: asked_again,
+    },
+    SayingLine {
+        name: "after-the-hum",
+        before: (STORY_ASKED, STORY_BEGUN),
+        note: Some(crate::misheard_hum::NOTE),
+        said: "What's seven times eight?",
+        right: answered_after_the_hum,
+    },
+    SayingLine {
+        name: "go-on",
+        before: (
+            "Hey Lamp, what's seventeen times twenty-three?",
+            "One moment.",
+        ),
+        note: None,
+        said: crate::holding_answer::NOTE,
+        right: went_on,
+    },
+];
+
+/// The story the first two lines cut in on, and how far the lamp got.
+const STORY_ASKED: &str = "Hey Lamp, tell me a long story about a lighthouse keeper.";
+const STORY_BEGUN: &str = "On a rocky island far from shore, an old lighthouse keeper named Ada lit the great lamp every night.";
+
+/// One of the sayings' lines: the exchange before it, a note beside it,
+/// what is said (a written turn's words, or the person's), and whether an
+/// answer (its words, and whether anything was called) is right.
+pub struct SayingLine {
+    pub name: &'static str,
+    pub before: (&'static str, &'static str),
+    pub note: Option<&'static str>,
+    pub said: &'static str,
+    pub right: fn(&str, bool) -> bool,
+}
+
+impl SayingLine {
+    /// The request: the spoken character and the turn's changing part, the
+    /// exchange before, the note as a system message beside the line (as
+    /// the route's notes go), then the line.
+    pub fn messages(&self, character: &str) -> Vec<Message> {
+        let spoken = super::super::worker::spoken_character(character, false, false);
+        let mut messages = vec![
+            Message::system(format!("{spoken}\n\n{}", super::cache::changing(0))),
+            Message::user(self.before.0),
+            Message::assistant(self.before.1),
+        ];
+        messages.extend(self.note.map(Message::system));
+        messages.push(Message::user(self.said));
+        messages
+    }
+}
+
+fn words(text: &str) -> usize {
+    text.split_whitespace().count()
+}
+
+/// Whether `text` says any of `phrases` as whole words (lowercase, a hyphen
+/// kept within a word): "56" is not in "156", nor "ada" in "Canada" (the
+/// peer read's P3 on #2035).
+fn says(text: &str, phrases: &[&str]) -> bool {
+    let plain = |text: &str| {
+        let kept: String = text
+            .to_lowercase()
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    ' '
+                }
+            })
+            .collect();
+        format!(
+            " {} ",
+            kept.split_whitespace().collect::<Vec<_>>().join(" ")
+        )
+    };
+    let text = plain(text);
+    phrases.iter().any(|phrase| text.contains(&plain(phrase)))
+}
+
+/// "Sorry?": a short question, nothing called, nothing of the story.
+pub fn asked_again(text: &str, called: bool) -> bool {
+    !called && text.contains('?') && words(text) <= 3 && !says(text, &["ada"])
+}
+
+/// The line answered in words (56), nothing called, the story not taken up
+/// again.
+pub fn answered_after_the_hum(text: &str, called: bool) -> bool {
+    !called && says(text, &["56", "fifty-six", "fifty six"]) && !says(text, &["lighthouse", "ada"])
+}
+
+/// The promised answer in words (391), nothing called, never another
+/// holding phrase.
+pub fn went_on(text: &str, called: bool) -> bool {
+    !called
+        && !crate::holding_answer::holding_only(text)
+        && says(
+            text,
+            &[
+                "391",
+                "three hundred ninety-one",
+                "three hundred and ninety-one",
+            ],
+        )
+}
+
+/// What a request answered: its words, and whether it called anything.
+async fn said(chat: &Chat, messages: &[Message]) -> net::Result<(String, bool)> {
+    let mut stream = chat.send(messages).await?;
+    let (mut text, mut called) = (String::new(), false);
+    while let Some(event) = stream.next().await? {
+        match event {
+            ChatEvent::Text(piece) => text.push_str(&piece),
+            ChatEvent::ToolCalls(calls) => called |= !calls.is_empty(),
+            _ => {}
+        }
+    }
+    Ok((text, called))
+}
+
+/// For each sayings line, how many answers were right, of how many.
+pub type SayingCounts = BTreeMap<usize, (u32, u32)>;
+
+/// Each sayings line asked `runs` times, with every function.
+pub async fn ask_sayings(chat: &Chat, character: &str, runs: u32) -> SayingCounts {
+    let mut counts = SayingCounts::new();
+    for _ in 0..runs {
+        for (at, line) in SAYING_LINES.iter().enumerate() {
+            match said(chat, &line.messages(character)).await {
+                Ok((text, called)) => {
+                    let count = counts.entry(at).or_default();
+                    count.0 += u32::from((line.right)(&text, called));
+                    count.1 += 1;
+                }
+                Err(error) => println!("tools sayings line={} failed: {error}", line.name),
+            }
+        }
+    }
+    counts
+}
+
+/// One line per sayings line, right of asked, then the verdict: right every
+/// time on every line, or which weren't. Counts only, never the words.
+pub fn sayings_verdict(counts: &SayingCounts) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut short = Vec::new();
+    for (at, line) in SAYING_LINES.iter().enumerate() {
+        let (right, asked) = counts.get(&at).copied().unwrap_or_default();
+        if asked == 0 || right < asked {
+            short.push(line.name);
+        }
+        lines.push(format!(
+            "tools sayings line={} right={right}/{asked}",
+            line.name
+        ));
+    }
+    lines.push(if short.is_empty() {
+        "tools sayings verdict: right every time on every line".to_owned()
+    } else {
+        format!(
+            "tools sayings verdict: not every time: {}",
+            short.join(", ")
         )
     });
     lines
@@ -850,6 +1050,151 @@ mod tests {
         assert_eq!(
             lines.last().unwrap(),
             "tools verdict: right every time on every line: note"
+        );
+    }
+
+    /// The sayings' bar (the first builder's 02:44 on #1722): what each line
+    /// takes as right, and the answers that would break each on the lamp.
+    #[test]
+    fn the_sayings_take_a_short_sorry_the_lines_answer_and_the_promised_answer() {
+        assert!(asked_again("Sorry?", false));
+        assert!(asked_again("Sorry, what?", false));
+        assert!(!asked_again("Sorry?", true), "a call is no ask again");
+        assert!(!asked_again("Sorry, I missed that. Where was I?", false));
+        assert!(!asked_again("Ada lit the lamp.", false));
+        assert!(answered_after_the_hum("It's 56.", false));
+        assert!(answered_after_the_hum(
+            "Seven times eight is fifty-six.",
+            false
+        ));
+        assert!(!answered_after_the_hum(
+            "Fifty-six. Now, back to Ada and her lighthouse.",
+            false
+        ));
+        assert!(!answered_after_the_hum("Sorry?", false));
+        // Whole words, and answered in words (the peer read's P3s).
+        assert!(!answered_after_the_hum("It's 156.", false));
+        assert!(answered_after_the_hum("56, like Canada's 56 lakes.", false));
+        assert!(
+            !answered_after_the_hum("It's 56.", true),
+            "a call is no answer"
+        );
+        assert!(!went_on("It's 3910.", false));
+        assert!(!went_on("It's 391.", true), "a call is no answer");
+        assert!(went_on("Seventeen times twenty-three is 391.", false));
+        assert!(went_on("It's three hundred and ninety-one.", false));
+        assert!(!went_on("One moment.", false));
+        assert!(!went_on("Just a second.", false));
+    }
+
+    /// Each sayings line is asked as the route asks it: the spoken
+    /// character, the exchange before, a note as a system message just
+    /// before the line, then the line (a written turn's words, or said).
+    #[test]
+    fn each_saying_is_asked_with_its_note_beside_the_line() {
+        let after_the_hum = SAYING_LINES[1].messages("CHARACTER");
+        assert_eq!(after_the_hum.len(), 5);
+        assert!(text(&after_the_hum[0]).starts_with("CHARACTER"));
+        assert_eq!(
+            (
+                text(&after_the_hum[1]).as_str(),
+                text(&after_the_hum[2]).as_str()
+            ),
+            (STORY_ASKED, STORY_BEGUN)
+        );
+        assert_eq!(after_the_hum[3].role, "system");
+        assert_eq!(text(&after_the_hum[3]), crate::misheard_hum::NOTE);
+        assert_eq!(text(&after_the_hum[4]), "What's seven times eight?");
+        let asked_again = SAYING_LINES[0].messages("CHARACTER");
+        assert_eq!(asked_again.len(), 4, "no note");
+        assert_eq!(
+            text(asked_again.last().unwrap()),
+            crate::speak_up::ASK_AGAIN_NOTE
+        );
+        let go_on = SAYING_LINES[2].messages("CHARACTER");
+        assert_eq!(text(&go_on[2]), "One moment.");
+        assert_eq!(text(go_on.last().unwrap()), crate::holding_answer::NOTE);
+    }
+
+    /// Through a chat: each line asked `runs` times, judged on its words, and
+    /// the verdict names the line that wasn't right every time. A model that
+    /// takes the story up again after the hum fails `after-the-hum`.
+    #[tokio::test]
+    async fn each_saying_is_asked_and_the_verdict_names_a_line_not_right_every_time() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let total = 2 * SAYING_LINES.len();
+        let server = tokio::spawn(async move {
+            let mut asked = 0;
+            while asked < total {
+                let Ok((mut socket, _)) = listener.accept().await else {
+                    break;
+                };
+                let mut request = Vec::new();
+                let mut buffer = [0; 65_536];
+                let body = loop {
+                    let n = socket.read(&mut buffer).await.unwrap();
+                    if n == 0 {
+                        break None;
+                    }
+                    request.extend_from_slice(&buffer[..n]);
+                    let text = String::from_utf8_lossy(&request).to_string();
+                    let Some((head, body)) = text.split_once("\r\n\r\n") else {
+                        continue;
+                    };
+                    let length: usize = head
+                        .lines()
+                        .find_map(|line| {
+                            line.to_lowercase()
+                                .strip_prefix("content-length: ")
+                                .map(|n| n.trim().parse().unwrap())
+                        })
+                        .unwrap();
+                    if body.len() >= length {
+                        break Some(serde_json::from_str::<serde_json::Value>(body).unwrap());
+                    }
+                };
+                let Some(body) = body else { continue };
+                asked += 1;
+                let last = body["messages"].as_array().unwrap().last().unwrap()["content"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned();
+                let answer = if last == crate::speak_up::ASK_AGAIN_NOTE {
+                    "Sorry?"
+                } else if last == crate::holding_answer::NOTE {
+                    "It's 391."
+                } else {
+                    "Fifty-six. And Ada climbed the lighthouse stairs again."
+                };
+                let event = json!({"choices":[{"delta":{"content":answer}}]});
+                socket
+                    .write_all(
+                        format!(
+                            "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\ndata: {event}\n\ndata: {}\n\ndata: [DONE]\n\n",
+                            json!({"choices":[{"delta":{},"finish_reason":"stop"}]})
+                        )
+                        .as_bytes(),
+                    )
+                    .await
+                    .unwrap();
+            }
+            asked
+        });
+        let declared = functions_here();
+        let declare: net::Declare = Arc::new(move || declared.clone());
+        let base = format!("http://{address}/v1");
+        let chat = Chat::deepseek_at(&base, "m", "k", declare, false).unwrap();
+        let counts = ask_sayings(&chat, "CHARACTER", 2).await;
+        assert_eq!(server.await.unwrap(), total);
+        assert_eq!(
+            sayings_verdict(&counts),
+            [
+                "tools sayings line=asked-again right=2/2",
+                "tools sayings line=after-the-hum right=0/2",
+                "tools sayings line=go-on right=2/2",
+                "tools sayings verdict: not every time: after-the-hum",
+            ]
         );
     }
 }

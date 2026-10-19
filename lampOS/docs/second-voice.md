@@ -1927,8 +1927,30 @@ two arms:
 - `memory-note`: the same with `worker::MEMORY_CALLS_NOTE`, which names
   `remember`, `forget` and `recall`.
 
-Its verdict names the arms right every time on the judged lines. Run it like
-`probe-cache`, where lamp-actions runs:
+Its verdict names the arms right every time on the judged lines.
+
+**Then the sayings' three lines** (`SAYING_LINES`, the first builder's
+01:04 and 02:44 on #1722): the lines of #2001's lamp check
+(`second-trio.sh`) that rest on what the model says, each judged on its
+words, so a model or wording change that breaks one shows here without the
+lamp:
+- `asked-again` (#1967): mid-story, the coordinator's written ask-again turn
+  (`speak_up::ASK_AGAIN_NOTE`): right is a short question ("Sorry?", at
+  most three words), nothing called, nothing of the story;
+- `after-the-hum` (#1967, `LAMP_MISHEARD_HUM`): "What's seven times
+  eight?" with `misheard_hum::NOTE` beside it, as the route puts a note:
+  right is 56 in words, nothing called, the story not taken up again;
+- `go-on` (#1986, `LAMP_HOLDING_ANSWER`): after "One moment.", the
+  coordinator's written turn (`holding_answer::NOTE`): right is 391 in
+  words, nothing called, never another holding phrase. Each number and
+  name is matched as a whole word ("56" isn't in "156").
+
+Each is asked with the spoken character and the turn's changing part, with
+every function. It prints `right=N/M` per line and a verdict naming any line
+not right every time; counts only, never the words. The lost line asked
+again (#2001) asks the same chat again, so its check is the engine's tests.
+
+Run it like `probe-cache`, where lamp-actions runs:
 
 ```sh
 systemd-run --pty --wait \
