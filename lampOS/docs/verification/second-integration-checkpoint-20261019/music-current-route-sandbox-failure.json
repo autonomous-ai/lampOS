@@ -1,0 +1,72 @@
+{
+  "head": "6d57d9c131d1ca0ded0e0f18661c4b22be8259a7",
+  "integration_base": "b48f7660c7b82e5dd4a162dc616d512fb93415b5",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "source_only": true,
+  "source_file_count": 1609,
+  "source_tree_sha256": "a482c604f3946907e0255f959f12df80efa7835b426c75145e449a8df399a3cf",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.86,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 59.05,
+      "log_sha256": "b6bd77904ecdebc1e4c5eea39cf83bc1455b4cab3412c852cb61aaf28fef3d1a",
+      "summaries": []
+    },
+    {
+      "stage": "second_provider",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "seconds": 41.62,
+      "log_sha256": "2e40c3361d69f8e3bdf8fdd6eee595e660b71da17b30d0b38fd887e07d60ea62",
+      "summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2327 filtered out; finished in 0.00s",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2327 filtered out; finished in 0.00s",
+        "test result: FAILED. 224 passed; 29 failed; 0 ignored; 0 measured; 2075 filtered out; finished in 1.81s"
+      ]
+    }
+  ],
+  "scope": "Failed sandboxed preflight on unchanged source: local Unix and loopback socket binds were denied. The outer second-provider summary is 224 passed, 29 failed, 0 ignored; child-process summaries are not added to that count. Replacement qualification requires local fake-peer sockets.",
+  "source_hash_manifest_sha256": "a482c604f3946907e0255f959f12df80efa7835b426c75145e449a8df399a3cf",
+  "new_cross_case_lines": [
+    "test second_provider::tests::called_fallback_does_not_supply_words_for_a_music_identity ... ok",
+    "test second_provider::tests::prepared_music_calls_wait_for_final_admission_and_survive_only_matching_words ... ok",
+    "test second_provider::tests::carried_words_answered_for_a_held_request_have_no_new_music_identity ... ok"
+  ]
+}
