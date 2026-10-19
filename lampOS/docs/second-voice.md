@@ -473,9 +473,13 @@ order is kept. A written turn is the same from the chat on.
     - the decline (`not_for_me`), which a busy room needs at every turn;
     - `use_skill`, which the skills' lines in the instruction name;
     - setup's walk (`setup_step`, `redo_setup`), which a setup talk calls at
-      every turn.
-  - **Behind `more_functions`:** the memory's (`remember`, `recall`,
-    `forget`, `forget_everything`), the faces', the time elsewhere
+      every turn;
+    - the memory's `remember`, `recall` and `forget`, asked of a lamp all
+      day. Behind `more_functions`, on lamp-4ace at 00:29 on 20 Oct,
+      "remember my violet umbrella is in the car" and "forget that" were
+      answered in words, nothing kept or forgotten, while `recall`, which
+      the memory note names, was called (the first builder on #1722, 00:34).
+  - **Behind `more_functions`:** `forget_everything`, the faces', the time elsewhere
     (`the_time`), a mark for review, the stop of reports, and any skill
     function given on its own.
   - **Once the model calls it in a turn**, the route answers it itself, with
@@ -518,6 +522,29 @@ order is kept. A written turn is the same from the chat on.
   clause went to ElevenLabs 2.8 s after the words), and 6 with Gemini's
   (`FIRST_WORDS`). `LAMP_SECOND_FIRST_WORDS=N` sets it, from 0 (whole
   clauses only) to 20, for an A/B.
+- **Each line's speech-to-text socket is journaled as it is taken:**
+  `request N: speech to text opened in C ms, A ms of the line's sound
+  waiting` (or `kept ready`). The line's sound comes in 10 ms blocks from
+  its start and waits until the socket is open, then goes at once (#1712,
+  the first builder at 00:25: on lamp-4ace 8 of 12 lines' words came 0.9
+  to 2.3 s after the line, `Finalize`'s answer reaching only 0.3 to 1.2 s
+  of the 1.1 to 2.8 s sent; Deepgram was still hearing the burst).
+- **With `LAMP_SECOND_STT_WARM=on`, the next line's socket is kept open**
+  (off unless set; `Engine::keeping_a_listener_ready`). As a line takes its
+  socket, the next is opened in the background and kept with `KeepAlive`
+  (every 5 s, `KEEP_ALIVE`). The next line takes it at once, so its sound
+  goes live from its first block. Its bounds (the first builder at 00:31):
+  - **at most 3 minutes** (`KEPT_FOR`), then it is closed, so a lamp
+    nobody talks to keeps nothing open; a line after that opens its own;
+  - **closed at once when listening stops** (the privacy switch, a mute)
+    or the microphone's privacy generation changes (`Engine::listening`,
+    from each authority the worker installs), and never used for a line of
+    another generation; no audio is sent on it before a line takes it;
+  - **one found closed** (`Listener::open`, `SttStream::still_open`) is
+    dropped without a word, and the line opens its own as before.
+
+  The cost is one idle socket to the relay's proxy during a conversation:
+  Deepgram bills the audio sent, and `KeepAlive` sends none.
 - **With `LAMP_SECOND_PREPARED=on` the chat is begun on the line's early
   words** (off unless set; #1712, the first builder at 17:02: the route's
   first word came about 3.4 s after a line, Live's 2.4 s, and the bar is
@@ -759,7 +786,10 @@ When the coordinator switches (below):
   (`attention::DONE_THOUGH_HELD`, today `reports_stop`), with a note that
   nothing said now is heard (`HELD_NOTE`), as the Live route's model hears
   every line and its `reports_stop` is done though held (the first builder
-  on #1722, 16:44). Only those calls are run, with no round after; any
+  on #1722, 16:44). With `LAMP_SECOND_SCOPED_CONTEXT=on` that round is
+  told for the line's admitted person or room alone, as every other turn
+  is, never for the session's sticky person
+  ([memory.md](memory.md#second-route-context-scope)). Only those calls are run, with no round after; any
   words are dropped and nothing is played. The turn ends when that round
   does, given up after `HELD_WITHIN` (6 s); a line begun meanwhile replaces
   it, and words carried from a line it cut short are answered beside it.
@@ -1064,6 +1094,42 @@ lamp's voice (`coordinator/second.rs`, `routes`):
   A value is taken exactly: `Second` or ` second` is refused. A bounded run
   (`lamp-voice directed`) has no second route, and refuses `second`.
 
+**The lamps' voice since 19 October** (the owner, #1712). The product unit
+(`deploy/product/lamp-voice.service`), lamp-52e6's, the repo's lamp-4ace
+unit and the attended pilot set `LAMP_VOICE_ROUTE=second`, as lamp-4ace runs
+it: `LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json`,
+`LAMP_SECOND_CHAT=deepseek`, `LAMP_SECOND_SEARCH=deepseek`,
+`LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo`, the down-line and the wait cue.
+Live stays a per-lamp setting: a drop-in with `LAMP_VOICE_ROUTE=gemini`.
+
+**A product lamp needs nothing a person adds** (the first builder at 21:08
+and 21:14). Every service goes through the Autonomous relay with the one key
+the lamp already has:
+- DeepSeek's chat and search go through the relay
+  (`LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek`,
+  #1939), with second.json's `llm_credential_file`, so the unit loads no
+  credential.
+- Speech to text and the voice fall back to the text model's base and key,
+  as on V1.
+
+It needs two files in `/etc/lampOS/voice`, root's and 0600:
+
+| File | Placed by | What reads it |
+|---|---|---|
+| `second.json` | install, and an update round before it writes a voice unit that names it, from `deploy/product/settings/second.json` (the relay's `…/api/v1/ai`, `gpt-4.1-mini`, ElevenLabs), kept up to date while it is install's own; a lamp's own is kept. On a lamp whose updater predates the round's step, the voice places the same bytes as it starts when the file is missing (`second_config::place_product_if_missing`; updates.md) | `LAMP_VOICE_SECOND_CONFIG` |
+| `credential` | setup (the user's key), or install from V1's config; the same file `provider.json` names | second.json's `llm_credential_file`, for every service |
+
+Without either, the voice does not start, and the route never falls back to
+Live. `lamp-selftest`'s `voice_route` part names what is missing (`selftest.md`).
+
+lamp-4ace's repo unit takes DeepSeek through the relay too (the owner,
+21:3x: "instead of using their direct deepseek key"), and loads only
+Gemini's key (`LoadCredential=gemini.key:/etc/lampOS/voice/second-llm.key`).
+The A/B of DeepSeek direct against the relay takes `deepseek.key` in
+`probe-cascade`'s own transient unit, never in the voice's. Its own
+second.json names `second-llm.key`, `second-stt.key` and `second-tts.key`,
+which hold the relay key.
+
 With `second`, the journal says once at start:
 `lamp-voice: the voice route is second only (LAMP_VOICE_ROUTE=second): speech to text, a text model and speech answer every turn; Gemini Live is not used`.
 
@@ -1174,6 +1240,59 @@ record is written.
   (the loop, both routes), and `second_provider`'s
   `news_asked_about_rides_on_its_turn_and_its_key_is_never_the_models` and
   `news_asked_by_voice_through_this_route_is_put_on_the_turn`.
+- **The hums, as on Live** (the first builder's 21:51 on #1722). With
+  `LAMP_OTHER_LANGUAGE=sorry` (`--ask-unclear`) the route's rule
+  (`worker::Heeding`, the Live rule's own `crate::attention`) holds a line
+  of a conversation heard mostly in another script, as a number alone, or
+  as a cut-in over the lamp's answer with no English word
+  (`End { cut_in }`, told to the rule before it judges). The turn then sends
+  `ProviderOutput::Unclear` before its `TurnComplete`, with no chat asked
+  (`Engine::asking_again`). So the coordinator asks "Sorry?" in writing, and
+  hums for an empty one with `LAMP_UNCLEAR_HUM=on`, as for Live. With
+  `LAMP_MISHEARD_HUM=on` a misheard cut-in is sent with `cut_in: true`: the
+  lamp hums its "hm?" with no model turn, and the first request asked within
+  10 s is told it wasn't caught (`misheard_hum::NOTE`), once. Journal:
+  `lamp-voice second: request N was held as unclear (why): …`. Tests:
+  `worker::tests::a_line_heard_as_nothing_the_conversation_means_is_held_as_unclear`,
+  `second_provider`'s
+  `a_line_held_as_unclear_is_told_and_a_misheard_cut_in_is_noted_next`, and
+  the loop's
+  `an_empty_sorry_in_the_loop_hums_with_the_switch_and_only_then` and
+  `with_the_switch_a_misheard_cut_in_hums_and_sends_no_model_turn`, each run
+  on Live and on the second route alone.
+- **A holding-only answer is asked to go on**, as on Live
+  (`LAMP_HOLDING_ANSWER=on`; the first builder's 22:54 on #1722). A spoken
+  turn whose whole answer only asks the person to wait ("One moment."),
+  with nothing called, sends `HoldingAnswer` before it completes, and the
+  coordinator asks the route once to go on
+  ([holding-answer.md](holding-answer.md), "On the second route").
+- **A line lost on the network is asked once more** (`LAMP_RESEND_LOST_LINE=on`,
+  as on Live; the first builder's 00:02 on #1722), as the lamp's only voice.
+  - **When:** a spoken line whose round-1 chat failed before its first
+    event (no word said, nothing called), with a fault `link::lost` counts:
+    `Transport` or `ConnectTimeout`, the faults the link's own check runs
+    for, less `ResponseTimeout`, which Live's `resend::mendable` holds
+    would only stay silent again.
+  - **How:** the turn waits for the link, asking every 250 ms whether any
+    service host takes a bare connection, as the link's check does
+    (`link::any_answers`). If one does within `resend::RESEND_WITHIN_US`
+    (5 s) of the failure, the same messages are asked once more, round 1's
+    bounds running from then.
+  - **Otherwise** it fails as before, and the link's check and down line
+    follow. The turn's `TurnFailed`, which starts that check, waits only
+    those 5 s, so the two never act on one failure at once.
+  - **Never:** twice, after a word or a call, for a status (a refusal is no
+    network loss), for the lamp's own written turn, or once a newer line has
+    begun. That line replaces the turn (`Engine::begin`).
+  - **No second "sorry":** the down line is said only for a refusal or a chat
+    not begun in time, never for these.
+  - Journal: `lamp-voice second: request N lost on the network (…): the link
+    is back, asked once more`, or why it is not asked again.
+  - Tests: `second_provider`'s
+    `a_line_lost_on_the_network_is_asked_once_more_when_the_link_is_back`
+    and `a_line_is_not_asked_again_after_words_a_call_a_refusal_or_a_newer_line`
+    (paused clock), and `link`'s
+    `a_line_is_lost_only_on_the_network_and_never_for_a_silent_answer`.
 - **Its input is taken late**, in order and from the parent's boot, as the
   Live worker's is since 40de19327 (`WorkerChannels::taking_late_input`): its
   input is checked against fresh authority when used, and its end would end
@@ -1251,9 +1370,19 @@ after a take-over, but now for every turn:
     - its name, its words calling it, a tap, or being said close to it let
       a line out as before.
 
-    In a quiet room it is as on Live. The journal's "no conversation going
-    on" line says when the lamp was "last heard saying words, to their end,"
-    and adds ", in a busy room, where it goes on 15 s".
+    In a quiet room it is as on Live, and one more thing: a conversation is
+    also going on for 20 s after the end of the lamp's words
+    (`AFTER_THE_LAMPS_WORDS`, follows-on's `WITHIN_US`), whenever the answer
+    began (`worker::going_on_from`). The thread's 45 s count from an
+    answer's start, so a story told for 40 s or more used them up while it
+    was told. On lamp-4ace on 20 Oct at 01:47 and 01:49, two hand-overs said
+    as stories ended ("Hey Lamp, ask Claude Code to write a two-line
+    poem…", "… ask Codex to write a haiku…") lost "Hey Lamp" to the lamp's
+    own voice and were held as no conversation, "it was last heard saying
+    words, to their end, 0 s ago" (the first builder at 01:50 and 02:04 on
+    #1712). The journal's "no conversation going on" line says when the
+    lamp was "last heard saying words, to their end," and adds ", in a busy
+    room, where it goes on 15 s".
   - **the journal names the sign that let a line out** (#1712, the first
     builder at 17:49). With `--spoken-to`, the rule's first reason can be
     one that lets nothing out by itself, the session trusted or the room
@@ -1279,7 +1408,19 @@ after a take-over, but now for every turn:
   the first builder's scoring of 19 Oct: "what is the weather like in
   Hanoi" was answered "You asking what the weather's like here today?",
   "Night!" came at 1 pm (the character's example), and a poem had two
-  lines. A text is typed, not heard, and is not told it.
+  lines. A text is typed, not heard, and is not told it. With a memory
+  (`LAMP_MEMORY_SOCKET`), `worker::MEMORY_CALLS_NOTE` follows: to remember
+  call `remember` ("saying you will is not keeping it"), to forget
+  something they told it call `forget`, with both sides as examples in one
+  line: "please forget that" or "forget what I just told you" is a forget,
+  "forget it, it doesn't matter" or "never mind" about the conversation is
+  not (the reviewer and the first builder on #2007, 01:17 and 01:18: a
+  wrong forget deletes what they asked the lamp to keep). Worded only
+  against "forget it", the note left "Hey Lamp, please forget that." in
+  words on lamp-4ace, nothing forgotten (the first builder at 02:05). For
+  an earlier conversation, call `recall`. The memory note
+  itself names only `recall`, and on lamp-4ace on 20 Oct DeepSeek answered
+  "remember …" and "forget that" in words (#1722, 00:34).
 - **The time, as it is asked** (`local_time::told_asked_here`, spoken
   turns and texts): each request is built as it is asked, so it is told
   the time then, exactly and with the words a person says it in, "It is
@@ -1352,9 +1493,19 @@ after a take-over, but now for every turn:
   16:37 to 16:45: four such pieces around lamp-name's hits, `results 0
   with words`). The engine keeps the last line's sound, its last 1.5 s
   (`KEPT_SAMPLES`): carried whole, 2 to 4 s of it held each line's words
-  back 1 to 2.5 s while Deepgram worked through it (18:56). Only a piece
-  that came back with no words carries it, the name cut off on its own; one
-  whose words came back carries nothing. A line in the same session that
+  back 1 to 2.5 s while Deepgram worked through it (18:56). Only the name
+  cut off on its own carries: a piece that came back with no words, or with
+  the lamp's name alone (`attention::only_the_name`: "Lamp.", "Hey Lamp,",
+  a word written for the name, greetings at most). One whose other words
+  came back carries nothing. With `LAMP_SECOND_STT_WARM=on` the name's
+  piece comes back as "Lamp", where a socket opened for it heard nothing.
+  On lamp-4ace on 20 Oct, "Lamp" alone was held as a short sound and the
+  rest for no name: 4 of 6 held, twice (#2002's P1, the first builder at
+  01:23). The name's words then begin the next
+  line's, so it is judged and asked whole ("Lamp. what time is it?"), and
+  its sound is not sent again: `request N goes on from request M: its 1
+  words, the lamp's name alone, begin it; its sound is not sent again`. A
+  line in the same session that
   the coordinator says continues it, or that begins within 1.5 s of its end
   when it was not answered (`CARRY_AFTER_END`), takes that piece's time,
   so a name lamp-name heard in it counts for the line. Its sound is sent
@@ -1764,7 +1915,33 @@ lamp ended 20 steps louder. Live calls `volume_down`, then `volume_up`.
 It prints, for each arm and line, how many requests called each function
 first (`none` for an answer in words) and how many were right. Then it names
 the arms that were right every time on every line. Counts only, no words.
-Run it like `probe-cache`, where lamp-actions runs:
+
+**Then the memory's nine lines** (`MEMORY_LINES`: `trials.sh forget`'s
+four, the first builder on #1722, 00:34: on lamp-4ace "remember my violet
+umbrella is in the car" and "forget that" were answered in words, with
+every function given, while Live called `remember` and `forget`). In order:
+- "Hey Lamp, remember my violet umbrella is in the car." (`remember`);
+- "What was the name of that café I mentioned last week?" (counted);
+- "Oh, forget it, never mind." and "Never mind, forget I asked.",
+  each right when it does **not** call `forget`, asked while the umbrella is
+  kept (the reviewer and the first builder on #2007);
+- "What do you remember about my umbrella?" (`recall`);
+- "Hey Lamp, please forget that." (`forget`), the trial's own line;
+- "What about my umbrella?" (counted);
+- "Remember my keys are on the hook by the door." (`remember`);
+- "Actually, forget what I just told you." (`forget`), straight after it.
+
+The counted lines are right in words or a `recall` that finds nothing. Each
+is asked with the ones before as right history, with every function, in
+two arms:
+- `memory-today`: the spoken character (`SPOKEN_NOTE`), the changing part
+  and the memory note as `LAMP_MEMORY_DAYS` tells it (`DAYS_NOTE`, which
+  names only `recall`);
+- `memory-note`: the same with `worker::MEMORY_CALLS_NOTE`, which names
+  `remember`, `forget` and `recall`.
+
+Its verdict names the arms right every time on the judged lines. Run it like
+`probe-cache`, where lamp-actions runs:
 
 ```sh
 systemd-run --pty --wait \

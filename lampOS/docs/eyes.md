@@ -691,6 +691,15 @@ this room" until someone asks to be recognised.
   beside the socket), the name of the known person at the lamp is kept
   there and renewed every two seconds while they are there. The file is
   removed when nobody is near.
+- **Their face.** With `LAMP_EYES_SPEAKING=on` and `LAMP_BUS=on` too,
+  `known-face` beside the known file (mode 0600) holds the passing id
+  their face has on `humans/faces/tracked` (`f3`), written just after the
+  name and removed with it (`who::keep_known`). Only that id: no picture,
+  print or name. It is what lets the voice tell whether the face seen
+  speaking is the known person's ([memory.md](memory.md#how-the-voice-uses-it)).
+  The voice reads it as it reads `known`, so whatever access a deploy gives
+  the voice to `known` it needs to `known-face` too (the voice runs as root
+  on lamp-4ace and in the product unit).
 - **The voice** (`crates/voice/src/known_faces.rs`, when
   `LAMP_EYES_WHO_SOCKET` names the socket):
   - The model has two functions, `remember_my_face` and `forget_my_face`,
@@ -990,7 +999,10 @@ landmarks YuNet already gives: a few additions a face a look, no new model,
 and no picture is kept or leaves the lamp. `from` says what judged it, and
 the score is on that one's scale: the corners' in eye distances a look
 (`yes` from 0.02), the mesh's in inner-lip gap over face height (`yes` from
-0.012, below). Nothing reads it yet.
+0.012, below). The second route reads it with
+`LAMP_SECOND_SPEAKING_FACE=on` ([memory.md](memory.md#how-the-voice-uses-it)),
+with the known face's id the eyes keep beside the known file
+([Who is there](#who-is-there)).
 
 - **The shape:** the mouth's width over the distance between the eyes.
   Moving, coming closer, turning and tilting scale both alike. A nod

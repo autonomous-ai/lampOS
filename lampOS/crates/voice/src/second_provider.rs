@@ -257,6 +257,16 @@ pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
 /// begun just before it, in the same session.
 pub type Heed =
     Arc<dyn Fn(u64, (u64, u64), &str, Option<u64>) -> Option<&'static str> + Send + Sync>;
+/// Told that `request` ended as a cut-in over the lamp's answer
+/// (`ProviderInput::End { cut_in: true }`), before the rule judges it.
+pub type CutIn = Arc<dyn Fn(u64) + Send + Sync>;
+/// After the rule held `request`: why it was held as unclear, if it was, and
+/// whether the lamp hums for it (a misheard cut-in, `LAMP_MISHEARD_HUM`), as
+/// the Live worker tells the coordinator (`ProviderOutput::Unclear`, #926).
+pub type AskAgain = Arc<dyn Fn(u64) -> Option<(&'static str, bool)> + Send + Sync>;
+/// Whether the link is back: any service host takes a bare connection
+/// (`link::any_answers`), for a line lost on the network ([`Engine::resending`]).
+pub type LinkBack = Arc<dyn Fn() -> BoxFuture<'static, bool> + Send + Sync>;
 /// Whether the lamp's own last line before `request` was a question, in a
 /// conversation going on (`worker::lamp_just_asked`): then a checked sound
 /// with a word in it is the person's answer, as on the Live route.
@@ -326,6 +336,18 @@ struct Shared {
     sequence: AtomicU64,
     out: mpsc::Sender<ProviderOutput>,
     heed: Option<Heed>,
+    /// [`Engine::asking_again`]: told of cut-ins, and asked after a hold.
+    ask_again: Option<(CutIn, AskAgain)>,
+    /// When a cut-in was last held as misheard with the lamp's hum: the
+    /// first request asked within `misheard_hum::NOTE_WITHIN_US` of it is
+    /// told so ([`crate::misheard_hum::NOTE`]), once.
+    misheard_at_us: Mutex<Option<u64>>,
+    /// [`Engine::holding_answers`]: a spoken turn answered only with a
+    /// holding phrase sends `HoldingAnswer`.
+    holding_answer: bool,
+    /// [`Engine::resending`]: a spoken line whose chat was lost on the
+    /// network is asked once more when the link is back.
+    resend: Option<LinkBack>,
     asked: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
@@ -371,6 +393,12 @@ struct Shared {
     /// A spoken turn's chat begins on the line's early words
     /// ([`Engine::preparing`]).
     prepare: bool,
+    /// A listener is kept connected for the next line
+    /// ([`Engine::keeping_a_listener_ready`]): the one kept, and how many
+    /// have been opened, so an expiry takes only its own.
+    keep_listener: bool,
+    spare: Mutex<Option<Kept>>,
+    spares: AtomicU64,
     /// The request begun last, with its session, for a look asked by a call.
     begun: Mutex<Option<(u64, u64)>>,
     /// The spoken request being answered and its words, until any of its
@@ -385,6 +413,12 @@ struct Shared {
     /// The answer's first piece goes once this many words have come
     /// ([`Engine::cutting_first_words`]).
     first_words: Option<usize>,
+    /// Seeing someone speak (`LAMP_SECOND_SPEAKING_FACE=on`,
+    /// [`crate::speaking_faces`]): the eyes' looks and their known file.
+    speaking: Option<(
+        Arc<crate::speaking_faces::SpeakingFaces>,
+        std::path::PathBuf,
+    )>,
 }
 
 /// The last spoken line's sound, at most [`KEPT_SAMPLES`], for a line that
@@ -602,6 +636,9 @@ const POLICY_POLL: Duration = Duration::from_millis(50);
 /// these). A written or reminded turn has none.
 #[derive(Default)]
 struct Marks {
+    /// The privacy generation the line began under: a listener kept for it
+    /// must be of the same one ([`Kept`]).
+    privacy: u64,
     /// Begun over the lamp's audible answer, and not the first after a
     /// stop, which is told that instead, with `--cut-in-told`
     /// (`LAMP_CUT_IN_TOLD`, [`crate::cut_in_told::NOTE`]).
@@ -716,6 +753,10 @@ impl Engine {
                 sequence: AtomicU64::new(0),
                 out,
                 heed: None,
+                ask_again: None,
+                misheard_at_us: Mutex::new(None),
+                holding_answer: false,
+                resend: None,
                 asked: None,
                 cues: None,
                 down: None,
@@ -736,11 +777,15 @@ impl Engine {
                 words_heard: None,
                 look_by_call: false,
                 prepare: false,
+                keep_listener: false,
+                spare: Mutex::new(None),
+                spares: AtomicU64::new(0),
                 begun: Mutex::new(None),
                 in_flight: Mutex::new(None),
                 answered_request: Mutex::new(None),
                 cut: Mutex::new(None),
                 first_words: None,
+                speaking: None,
             }),
             output,
             urgent: VecDeque::new(),
@@ -837,6 +882,30 @@ impl Engine {
         })
     }
 
+    /// A line any face other than the known person's was seen speaking
+    /// through is told and kept as the room's (`LAMP_SECOND_SPEAKING_FACE=on`,
+    /// [`crate::speaking_faces`]): `known` is the eyes' known file, with its
+    /// face beside it. Only after [`Self::with_memory_scope`] with a scoped
+    /// builder (`LAMP_SECOND_SCOPED_CONTEXT=on`); refused otherwise.
+    pub fn seeing_who_speaks(
+        mut self,
+        eyes: Arc<crate::speaking_faces::SpeakingFaces>,
+        known: std::path::PathBuf,
+    ) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        // Without a scoped builder a turn is told and filed for the sticky
+        // person, whatever its lease says, so a narrowed line would still
+        // carry their memory and history (Second on #2008): refused.
+        if shared.scoped_system.is_none() {
+            eprintln!(
+                "lamp-voice second: seeing who speaks is not on: it needs LAMP_SECOND_SCOPED_CONTEXT=on"
+            );
+            return self;
+        }
+        shared.speaking = Some((eyes, known));
+        self
+    }
+
     /// Short sounds let through are checked (`--sounds-checked`, #800).
     pub fn checking_sounds(mut self, on: bool) -> Self {
         self.sounds_checked = on;
@@ -881,6 +950,37 @@ impl Engine {
         self
     }
 
+    /// Whether the microphone may be listened to, and under which privacy
+    /// generation, from each authority the worker installs: a kept listener
+    /// goes at once when listening stops (the privacy switch, a mute) or
+    /// the generation changes, before any line's sound could reach it
+    /// (#1712, the first builder at 00:31).
+    pub fn listening(&self, allowed: bool, generation: u64) {
+        if let Ok(mut spare) = self.shared.spare.lock()
+            && spare
+                .as_ref()
+                .is_some_and(|kept| !allowed || kept.generation != generation)
+            && let Some(kept) = spare.take()
+        {
+            kept.opening.abort();
+        }
+    }
+
+    /// Speech to text's socket for the next line is opened while this one
+    /// is heard and kept with `KeepAlive`, so the next line's sound goes to
+    /// it from its first block (`LAMP_SECOND_STT_WARM=on`, #1712, the first
+    /// builder at 00:25). Each line opened its own socket as it began, and
+    /// its sound waited until the socket was open, then went at once: on
+    /// lamp-4ace 8 of 12 lines' words waited 0.9 to 2.3 s for Deepgram to
+    /// hear the burst. A kept socket found closed is not used, and the line
+    /// opens its own as before. Before any turn only.
+    pub fn keeping_a_listener_ready(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.keep_listener = on;
+        }
+        self
+    }
+
     /// A spoken turn's chat begins on the words its speech to text has
     /// before they are final (`LAMP_SECOND_PREPARED=on`, [`Prepared`]).
     /// Before any turn only.
@@ -891,11 +991,52 @@ impl Engine {
         self
     }
 
+    /// `LAMP_HOLDING_ANSWER=on` (`--holding-answer`), as on Live: a spoken
+    /// turn whose whole answer only asks the person to wait ("One moment.",
+    /// `holding_answer::holding_only`), with nothing called in any round,
+    /// sends `ProviderOutput::HoldingAnswer` before its idle `TurnComplete`,
+    /// and the coordinator asks the route once to go on
+    /// (`holding_answer::NOTE`). Before any turn only.
+    pub fn holding_answers(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.holding_answer = on;
+        }
+        self
+    }
+
+    /// `LAMP_RESEND_LOST_LINE=on`, as on Live (the first builder's 00:02 on
+    /// #1722): a spoken line whose chat was lost on the network
+    /// ([`link::lost`]) before any word was said or anything called is asked
+    /// once more, if `back` finds the link back within
+    /// `resend::RESEND_WITHIN_US` of the failure and no newer line has begun
+    /// meanwhile; otherwise the turn fails as before, and the link's own
+    /// check and down line follow. Never twice. Before any turn only.
+    pub fn resending(mut self, back: LinkBack) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.resend = Some(back);
+        }
+        self
+    }
+
     /// A spoken turn's words are judged with `heed` before they are answered.
     /// Before any turn only: the turns share it.
     pub fn heeding(mut self, heed: Heed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.heed = Some(heed);
+        }
+        self
+    }
+
+    /// A line the rule held as unclear (another script, a number alone, a
+    /// cut-in with no English word) is told to the coordinator as
+    /// `ProviderOutput::Unclear`, before its `TurnComplete`, as the Live
+    /// worker tells it (#926, `LAMP_OTHER_LANGUAGE=sorry`): the coordinator
+    /// asks again, or hums (`LAMP_UNCLEAR_HUM`, `LAMP_MISHEARD_HUM`). A
+    /// misheard cut-in hummed for has the next request told so
+    /// ([`crate::misheard_hum::NOTE`]). Before any turn only.
+    pub fn asking_again(mut self, cut_in: CutIn, ask: AskAgain) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.ask_again = Some((cut_in, ask));
         }
         self
     }
@@ -1112,6 +1253,7 @@ impl Engine {
             ProviderInput::Start {
                 request,
                 session,
+                privacy_generation,
                 continues,
                 continues_cut_off,
                 after_stop,
@@ -1160,28 +1302,49 @@ impl Engine {
                     .lock()
                     .ok()
                     .and_then(|last| *last);
+                // The piece's words, when they came back before this line
+                // began.
+                let words_back = |kept: &KeptSound| {
+                    last.as_ref()
+                        .filter(|(of, _)| *of == kept.request)
+                        .map(|(_, words)| words.trim())
+                };
                 let carried = self.kept.take().filter(|kept| {
                     let since = kept.ended.map(|end| now.saturating_duration_since(end));
-                    // Only the piece that came back with no words, the name
-                    // cut off on its own: one whose words came back carries
-                    // nothing (#1712, 18:56).
-                    let words_back = last
-                        .as_ref()
-                        .filter(|(of, _)| *of == kept.request)
-                        .map(|(_, words)| !words.trim().is_empty());
+                    // Only the name cut off on its own: a piece that came
+                    // back with no words, or with the lamp's name alone. One
+                    // whose other words came back carries nothing (#1712,
+                    // 18:56). With the next line's socket kept ready
+                    // (`LAMP_SECOND_STT_WARM`) the name's piece comes back as
+                    // "Lamp", where a socket opened for it heard nothing
+                    // (#2002's P1, the first builder at 01:23).
+                    let carries = words_back(kept).is_none_or(|words| {
+                        words.is_empty() || crate::attention::only_the_name(words)
+                    });
                     kept.session == session
                         && kept.request < request
                         && !kept.samples.is_empty()
-                        && words_back != Some(true)
+                        && carries
                         && since.is_none_or(|since| since <= KEEP_AFTER_END)
                         && (continues
                             || since.is_some_and(|since| since <= CARRY_AFTER_END)
                                 && answered != Some(kept.request))
                 });
-                let before = last
-                    .filter(|_| carried.is_none())
-                    .filter(|(of, _)| continues_cut_off && previous == Some((*of, session)))
-                    .map(|(_, words)| words);
+                // The name's words, when they came back: they begin this
+                // line's, so it is heard and judged whole, and its sound
+                // need not go again.
+                let name_words = carried
+                    .as_ref()
+                    .and_then(words_back)
+                    .filter(|words| !words.is_empty())
+                    .map(str::to_owned);
+                let before = match &name_words {
+                    Some(words) => Some(words.clone()),
+                    None => last
+                        .filter(|_| carried.is_none())
+                        .filter(|(of, _)| continues_cut_off && previous == Some((*of, session)))
+                        .map(|(_, words)| words),
+                };
                 // A stop to tell: this request's own, or one left by the
                 // request begun just before it in this session. Left when that
                 // one was never asked (heard nothing, held, or replaced before
@@ -1219,6 +1382,7 @@ impl Engine {
                     follows_on,
                     sound: sound.clone(),
                     called: AtomicBool::new(false),
+                    privacy: privacy_generation,
                 });
                 let said = Arc::new(Mutex::new((0, 0)));
                 self.kept = Some(match carried {
@@ -1231,7 +1395,13 @@ impl Engine {
                             .name_sounded
                             .as_ref()
                             .is_some_and(|heard| heard(kept.said_from));
-                        if name_heard {
+                        if let Some(words) = &name_words {
+                            eprintln!(
+                                "lamp-voice second: request {request} goes on from request {}: its {} words, the lamp's name alone, begin it; its sound is not sent again",
+                                kept.request,
+                                words.split_whitespace().count()
+                            );
+                        } else if name_heard {
                             eprintln!(
                                 "lamp-voice second: request {request} goes on from request {}: the name heard in it counts; its sound is not sent again",
                                 kept.request
@@ -1337,7 +1507,17 @@ impl Engine {
                     turn.marks.called.store(true, Ordering::Release);
                 }
             }
-            ProviderInput::End { request, sound, .. } => {
+            ProviderInput::End {
+                request,
+                sound,
+                cut_in,
+                ..
+            } => {
+                // Before the rule judges the line: a cut-in over the lamp's
+                // answer is judged as one (#828).
+                if cut_in && let Some((told, _)) = &self.shared.ask_again {
+                    told(request);
+                }
                 if let Some(kept) = self.kept.as_mut().filter(|kept| kept.request == request) {
                     kept.ended = Some((self.shared.clock)());
                 }
@@ -1640,6 +1820,44 @@ async fn say_down(shared: &Shared, request: u64, heard: bool) -> Result<(), Stop
     Ok(())
 }
 
+/// How often a lost line's wait asks whether the link is back.
+const LINK_BACK_EVERY: Duration = Duration::from_millis(250);
+
+/// Whether the link is back (`back`) within `resend::RESEND_WITHIN_US` of
+/// now, with no newer line begun meanwhile (`begun` no longer `request`):
+/// asked every [`LINK_BACK_EVERY`], each ask bounded by what is left.
+async fn link_back_in_time(shared: &Shared, request: u64, back: &LinkBack) -> bool {
+    let until =
+        tokio::time::Instant::now() + Duration::from_micros(crate::resend::RESEND_WITHIN_US);
+    let newer = || {
+        shared
+            .begun
+            .lock()
+            .ok()
+            .and_then(|begun| *begun)
+            .is_some_and(|(of, _)| of != request)
+    };
+    loop {
+        if newer() {
+            eprintln!(
+                "lamp-voice second: request {request} lost on the network: a newer line has begun, so it is not asked again"
+            );
+            return false;
+        }
+        if tokio::time::timeout_at(until, back()).await == Ok(true) {
+            return !newer();
+        }
+        if tokio::time::Instant::now() + LINK_BACK_EVERY >= until {
+            eprintln!(
+                "lamp-voice second: request {request} lost on the network: the link was not back within {} s, so it is not asked again",
+                crate::resend::RESEND_WITHIN_US / 1_000_000
+            );
+            return false;
+        }
+        tokio::time::sleep(LINK_BACK_EVERY).await;
+    }
+}
+
 pub fn fault(error: &net::Error) -> Fault {
     match error {
         net::Error::Url => Fault::Local,
@@ -1715,13 +1933,68 @@ async fn spoken(
         .into_iter()
         .collect();
     let begun = Instant::now();
-    let mut listener = match shared.services.listen().await {
+    // The listener kept ready for this line, if one is, of this privacy
+    // generation, and still open; otherwise its own, opened now. One found
+    // closed is dropped without a word.
+    let kept = shared.spare.lock().ok().and_then(|mut spare| spare.take());
+    let kept = match kept {
+        Some(kept) if kept.generation == marks.privacy => match kept.opening.await {
+            Ok(Ok(listener)) if listener.open() => Some(listener),
+            _ => None,
+        },
+        Some(kept) => {
+            kept.opening.abort();
+            None
+        }
+        None => None,
+    };
+    let from = if kept.is_some() {
+        "kept ready"
+    } else {
+        "opened"
+    };
+    let connected = match kept {
+        Some(listener) => Ok(listener),
+        None => shared.services.listen().await,
+    };
+    let mut listener = match connected {
         Ok(listener) => listener,
         Err(error) => {
             shared.stages(request, &Times::new(begun)).await;
             return shared.fail(request, FailedStage::InputOpen, &error).await;
         }
     };
+    // How long the line's sound waited for it, in its 10 ms blocks.
+    eprintln!(
+        "lamp-voice second: request {request}: speech to text {from} in {} ms, {} ms of the line's sound waiting",
+        begun.elapsed().as_millis(),
+        heard.len() * 10
+    );
+    // And the next line's, opened while this one is heard, kept at most
+    // [`KEPT_FOR`]: a lamp nobody talks to keeps nothing open.
+    if shared.keep_listener {
+        let number = shared.spares.fetch_add(1, Ordering::Relaxed) + 1;
+        if let Ok(mut spare) = shared.spare.lock()
+            && let Some(old) = spare.replace(Kept {
+                number,
+                generation: marks.privacy,
+                opening: tokio::spawn(shared.services.listen()),
+            })
+        {
+            old.opening.abort();
+        }
+        let expiring = Arc::downgrade(&shared);
+        tokio::spawn(async move {
+            tokio::time::sleep(KEPT_FOR).await;
+            if let Some(shared) = expiring.upgrade()
+                && let Ok(mut spare) = shared.spare.lock()
+                && spare.as_ref().is_some_and(|kept| kept.number == number)
+                && let Some(kept) = spare.take()
+            {
+                kept.opening.abort();
+            }
+        });
+    }
     // The words before they are final, for a chat begun on them.
     let mut early = if shared.prepare {
         listener.early()
@@ -1778,6 +2051,34 @@ async fn spoken(
                 .await;
         }
     };
+    // Seeing someone speak: a line admitted as the known person's that any
+    // other face spoke is the room's, before anything is told or filed with
+    // it. Only ever narrowed (the first builder, #1722 00:23).
+    if let (Some((eyes, known)), Some(scope)) = (&shared.speaking, scope.as_ref())
+        && let Some(person) = scope
+            .scope()
+            .and_then(|scope| scope.person())
+            .map(str::to_owned)
+    {
+        let speakers = eyes.speakers(begun, finishing);
+        let known = known.clone();
+        let pair =
+            tokio::task::spawn_blocking(move || crate::speaking_faces::known_with_face(&known))
+                .await
+                .ok()
+                .flatten();
+        if crate::speaking_faces::someone_elses(&speakers, &person, pair) {
+            scope.narrow_to_room();
+            eprintln!(
+                "lamp-voice second: request {request}: a face not the known person's was seen speaking it: told and kept as the room's"
+            );
+            if prepared.take().is_some() {
+                eprintln!(
+                    "lamp-voice second: request {request}: the chat begun on its early words is dropped: it was told as the person's"
+                );
+            }
+        }
+    }
     if let Ok(mut last) = shared.heard_last.lock() {
         *last = Some((request, text.clone()));
     }
@@ -1918,6 +2219,32 @@ async fn spoken(
             return;
         }
         though_held.await;
+        // Held as unclear: the coordinator asks again, or hums, as for the
+        // Live route (#926, #828). Told once, before the turn completes.
+        if heeded.is_some()
+            && let Some((_, ask)) = &shared.ask_again
+            && let Some((why, cut_in)) = ask(request)
+        {
+            eprintln!(
+                "lamp-voice second: request {request} was held as unclear ({why}): {}",
+                if cut_in {
+                    "the lamp hums, and the next request is told it was not caught"
+                } else {
+                    "the coordinator asks again"
+                }
+            );
+            if cut_in && let Ok(mut at) = shared.misheard_at_us.lock() {
+                *at = Some(monotonic_us());
+            }
+            let unclear = ProviderOutput::Unclear {
+                request,
+                why: why.to_owned(),
+                cut_in,
+            };
+            if !shared.emit(unclear).await {
+                return;
+            }
+        }
         if shared.stages(request, &times).await {
             shared
                 .emit(ProviderOutput::TurnComplete {
@@ -1928,6 +2255,16 @@ async fn spoken(
         }
         return;
     }
+    // The first request answered after a misheard cut-in was hummed for,
+    // within `NOTE_WITHIN_US`: the model is told it did not catch it, as the
+    // Live worker tells it (`LAMP_MISHEARD_HUM`, #828). Once.
+    let misheard = shared
+        .misheard_at_us
+        .lock()
+        .ok()
+        .and_then(|mut at| at.take())
+        .filter(|held| crate::misheard_hum::answers_the_hum(*held, monotonic_us()))
+        .map(|_| crate::misheard_hum::NOTE.to_owned());
     // The first request asked after a hand or the head stopped the lamp: the
     // model is told so, as Gemini is (`STOPPED_NOTE`, #1148), so the story
     // that was stopped is not begun again.
@@ -2001,6 +2338,7 @@ async fn spoken(
     let notes = stopped
         .into_iter()
         .chain(cut_in)
+        .chain(misheard)
         .chain(staff)
         .chain(named)
         .chain(call)
@@ -2036,6 +2374,24 @@ async fn spoken(
         prepared,
     )
     .await;
+}
+
+/// Where the worker reads [`Engine::keeping_a_listener_ready`]: `on`, and
+/// nothing else.
+pub const STT_WARM_ENVIRONMENT: &str = "LAMP_SECOND_STT_WARM";
+
+/// How long a listener kept for the next line is kept: a conversation's
+/// lines come seconds apart, and after this the lamp keeps nothing open
+/// (#1712, the first builder at 00:31: "at most a few minutes").
+pub const KEPT_FOR: Duration = Duration::from_secs(180);
+
+/// A listener opening, or open, for the next line
+/// ([`Engine::keeping_a_listener_ready`]): which one it is, the privacy
+/// generation it was opened under, and its connection.
+struct Kept {
+    number: u64,
+    generation: u64,
+    opening: JoinHandle<net::Result<Box<dyn Listener>>>,
 }
 
 /// Where the worker reads [`Engine::preparing`]: `on`, and nothing else.
@@ -2297,7 +2653,7 @@ async fn done_though_held(
         if gone() {
             return None;
         }
-        let mut messages = (shared.system)().messages();
+        let mut messages = told(shared, scope).messages();
         if gone() {
             return None;
         }
@@ -2472,6 +2828,9 @@ async fn answer(
         None => Message::user(said),
     };
     let writing_times = times.clone();
+    // Whether the model called anything in the turn, any round.
+    let called_any = AtomicBool::new(false);
+    let called = &called_any;
     let writing = async move {
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
@@ -2510,6 +2869,10 @@ async fn answer(
             messages.clone_from(&prepared.messages);
         }
         let asked_at = messages.len() - 1;
+        // Round 1's bounds run from here, or from its one ask again after a
+        // line lost on the network (`LAMP_RESEND_LOST_LINE`).
+        let mut from = begun;
+        let mut resent = false;
         let mut round = 0;
         while round < MAX_ROUNDS {
             if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -2528,7 +2891,7 @@ async fn answer(
             let mut reasoning = None;
             loop {
                 let next = if first && round == 1 {
-                    let at = |after: Duration| begun + after;
+                    let at = |after: Duration| from + after;
                     let cues = shared.cues.as_ref().filter(|_| heard);
                     let first_wait = if cues.is_some() {
                         CUE_AFTER
@@ -2599,6 +2962,28 @@ async fn answer(
                             "lamp-voice second: request {request} chat round {round} failed after {} ms: {error}",
                             began.elapsed().as_millis()
                         );
+                        // Lost on the network before any word or call: asked
+                        // once more if the link is back in time (#1722).
+                        if first
+                            && round == 1
+                            && !resent
+                            && heard
+                            && let Some(back) = &shared.resend
+                            && link::lost(&fault(&error))
+                        {
+                            resent = true;
+                            if link_back_in_time(shared, request, back).await {
+                                if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                                    return Err(Stop::Gone);
+                                }
+                                eprintln!(
+                                    "lamp-voice second: request {request} lost on the network ({error}): the link is back, asked once more"
+                                );
+                                from = tokio::time::Instant::now();
+                                stream = shared.services.chat(messages.clone());
+                                continue;
+                            }
+                        }
                         // A chat that answers with a refusal before any word
                         // (401, 429, a 5xx) is as down as one that never
                         // begins: the line, not silence (#1844's B).
@@ -2660,6 +3045,11 @@ async fn answer(
                     "lamp-voice second: request {request} chat round {round} called {}",
                     names.join(", ")
                 );
+            }
+            // A turn that called anything, a look by its call included, is no
+            // holding answer (#1712; the peer read on #1986).
+            if !calls.is_empty() {
+                called.store(true, Ordering::Relaxed);
             }
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
                 return Err(Stop::Silent);
@@ -2778,6 +3168,8 @@ async fn answer(
     };
     let saying = async {
         let mut after = false;
+        // The answer's words, for a holding answer's check.
+        let mut whole = String::new();
         while let Some((text, mut packets)) = queued.recv().await {
             // The announcement is heard, not written: the coordinator reads
             // an answer's opening words for its look ("Let me look.") and
@@ -2787,6 +3179,8 @@ async fn answer(
             // space, so the lamp's words read "just now. Hmm," (#1014).
             let answering = text != ANNOUNCEMENT;
             if answering {
+                whole.push(' ');
+                whole.push_str(&text);
                 let words = ProviderOutput::Transcript {
                     request: Some(request),
                     text: if std::mem::replace(&mut after, true) {
@@ -2873,9 +3267,17 @@ async fn answer(
                 return Err(Stop::Gone);
             }
         }
-        Ok(())
+        Ok(whole)
     };
     let ended = tokio::try_join!(writing, saying);
+    // Only asking the person to wait ("One moment."), with nothing called:
+    // the coordinator asks this route to go on, as it asks Gemini
+    // (`LAMP_HOLDING_ANSWER`, `crate::holding_answer`; the first builder's
+    // 22:54 on #1722). Only for someone who spoke.
+    let holding = shared.holding_answer
+        && asked == Asker::Spoken
+        && !called.load(Ordering::Relaxed)
+        && matches!(&ended, Ok((_, whole)) if crate::holding_answer::holding_only(whole));
     // The voice's line on the turn's pieces (#1712).
     shared.services.spoken(request);
     let gave_up = matches!(ended, Err(Stop::GaveUp));
@@ -2930,6 +3332,28 @@ async fn answer(
     }
     if !shared.stages(request, &times).await {
         return;
+    }
+    // Before its idle `TurnComplete`, as the Live worker sends it, for the
+    // session the turn was begun in.
+    if holding
+        && matches!(last, ProviderOutput::TurnComplete { idle: true, .. })
+        && let Some(session) = shared
+            .begun
+            .lock()
+            .ok()
+            .and_then(|begun| *begun)
+            .filter(|(of, _)| *of == request)
+            .map(|(_, session)| session)
+    {
+        eprintln!(
+            "lamp-voice second: request {request} was answered only with a holding phrase: the coordinator may ask it to go on"
+        );
+        if !shared
+            .emit(ProviderOutput::HoldingAnswer { request, session })
+            .await
+        {
+            return;
+        }
     }
     shared.emit(last).await;
     // Rendered after a turn is out, never beside its chat and speech on a

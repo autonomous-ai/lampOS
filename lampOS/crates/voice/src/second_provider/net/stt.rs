@@ -558,6 +558,12 @@ impl SttStream {
         Arc::clone(&self.words_at)
     }
 
+    /// Whether its socket is still there to take audio: not once its task
+    /// has ended (the service or the relay closed it).
+    pub fn still_open(&self) -> bool {
+        self.audio.as_ref().is_some_and(|audio| !audio.is_closed()) && !self.task.is_finished()
+    }
+
     /// Queue 16 kHz mono samples. Fails when the socket has gone or the
     /// queue is full (the service stopped reading); nothing waits.
     pub fn send(&self, samples: &[i16]) -> Result<()> {
@@ -1304,6 +1310,32 @@ mod tests {
         assert!(!loud(&block(100)));
         assert!(!loud(&block(0)));
         assert!(!loud(&[]));
+    }
+
+    /// #1712 (`LAMP_SECOND_STT_WARM`): a stream kept ready says it is still
+    /// open while its socket is, and not once the service has closed it.
+    #[tokio::test]
+    async fn a_kept_stream_says_whether_its_socket_is_still_open() {
+        use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
+        let (near, far) = tokio::io::duplex(1 << 16);
+        let (close, closing) = tokio::sync::oneshot::channel::<()>();
+        let server = tokio::spawn(async move {
+            let mut socket = WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+            let _ = closing.await;
+            let _ = socket.close(None).await;
+        });
+        let stream =
+            SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
+        assert!(stream.still_open());
+        let _ = close.send(());
+        for _ in 0..200 {
+            if !stream.still_open() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert!(!stream.still_open());
+        server.abort();
     }
 
     /// #1712, request 329 on lamp-4ace: finals with words covering most of

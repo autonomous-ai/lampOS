@@ -192,6 +192,12 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          down at the desk must never lose their light",
     ),
     (
+        "laugh-glance",
+        "it reads `ears/classes`, which lamp-ears says only with `LAMP_EARS_CLASSES=on` (#1669), off \
+         until its scores are measured in an empty room and a busy one: a glance at every loud \
+         voice would read as a machine",
+    ),
+    (
         "not-feeling-well",
         "not yet tried on a lamp (#1681): whether its droop and dim on `lamp/health`'s `error` \
          read as a lamp a little unwell, not a status light, is for the lamp check",
@@ -330,6 +336,15 @@ pub const ZONE_PATH: &str = "/etc/lampOS/zone.env";
 /// 0600), kept up to date while it is install's own.
 pub const PROVIDER_PATH: &str = "/etc/lampOS/voice/provider.json";
 pub const PROVIDER: &str = include_str!("../../../deploy/product/settings/voice-provider.json");
+/// The second route's services, the lamps' voice since 19 Oct (#1712): the
+/// relay, every service on the same key as `provider.json`'s
+/// ([`CREDENTIAL_PATH`]). Private and kept as `provider.json` is: up to date
+/// while it is install's own, and a lamp's own (lamp-4ace's) kept.
+pub const SECOND_PATH: &str = "/etc/lampOS/voice/second.json";
+/// Where the voice's unit names it: the round places it when the build's
+/// voice unit does (`round::Round::place_second`).
+pub const SECOND_CONFIG_ENV: &str = "LAMP_VOICE_SECOND_CONFIG";
+pub const SECOND: &str = include_str!("../../../deploy/product/settings/second.json");
 /// The voice's key, as `provider.json` names it. It is the user's (the owner on
 /// #806, 2026-10-16 16:13): setup takes it from the account page or the app,
 /// and a reset wipes it. On a lamp that ran V1, install copies V1's
@@ -855,7 +870,7 @@ pub fn install(
     // removed on purpose (a reset wipes it with the person's data), and V1's
     // config, which may still hold the previous owner's, never puts it back.
     let key = device_key(config);
-    let mut private: Vec<(&str, &str)> = vec![(PROVIDER_PATH, PROVIDER)];
+    let mut private: Vec<(&str, &str)> = vec![(PROVIDER_PATH, PROVIDER), (SECOND_PATH, SECOND)];
     let mut marked = false;
     for (path, part) in [(CREDENTIAL_PATH, "the voice"), (JEV_KEY_PATH, "the Policy")] {
         let there = config.on(path).exists();

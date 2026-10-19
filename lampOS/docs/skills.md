@@ -148,7 +148,7 @@ must not leave a step silently undone)*.
 | `[again]` | no | When the tool runs again soon after it ran: `within` (a duration) and `if_heard` (at least one entry, each one or more whole words; any case). Within `within` of the tool's last run, counted from when that run began, a call runs only if the newest thing heard on `voice/heard`, finished or not, its pieces joined as the voice joins them, began after that run began and has one of the entries among its whole words (an entry of two words, as "one more", in a row); otherwise nothing is done and the model is answered with the error `told` (at most 256 bytes; a general "you just did this" without it). A word is what is between characters that are not letters or digits, so "dance" is not in "guidance" nor "again" in "against". Nothing heard since counts as not asked. A refused call does not count as a run. With it, `lamp-skills` subscribes to `voice/heard`. Only with a `tool` |
 | `still` | no | What the model is told, as an error, of a call while the tool's last run is under way, in a skill with no pose (`do.body.mood`) and no `do.look`: nothing is done, and it does not count as a run (at most 256 bytes; "I'm still doing that." without it). Only with a `tool` |
 | `trigger.topic` | yes | The topic it listens to |
-| `trigger.field` with one of `equals`, `above`, `below` | yes, except on `humans/faces/tracked` | What a message must show for the trigger to hold. A number is compared as a number, anything else exactly. On `humans/faces/tracked` without them, it holds while a face is in view |
+| `trigger.field` with one of `equals`, `above`, `below` | yes, except on `humans/faces/tracked` | What a message must show for the trigger to hold. A number is compared as a number, anything else exactly. A dot steps into an object: `scores.music` is the `music` of `scores` (#1669, `ears/classes`); an empty step (`scores.`, `.music`) is refused. A field that is not there is null: it never holds for `equals`, `above` or `below`, and holds for `not_equals`. The same goes for `each`, `key`, `rise` and a `[[while]]` field. On `humans/faces/tracked` without them, it holds while a face is in view |
 | `trigger.when` | no | `present` (the default): it holds, and has held for `for`. `appears`: it holds where it did not just before, once each time. `leaves` and `changes` are refused for now |
 | `trigger.near` | no | On `humans/faces/tracked` alone: only a face at least this share of the picture's height counts (Welcome back: 0.14, the voice's Arrival's line for someone at the desk) |
 | `trigger.for` | no | It has held this long |
@@ -948,6 +948,75 @@ build in Claude Code or Codex on their own computer; a change reloads live
 on the lamp. A "My skills" page in the lamp's app (on or off, what each did
 and when) comes once there are more than a handful. The store comes after
 launch.
+
+#### Made by voice (#1685, off unless `LAMP_MAKE_SKILL=on`)
+
+"Lamp, make me a skill that dims the light at 10 pm." With the switch, the
+model is given `make_skill(request)` (`crates/voice/src/made_skill.rs`). What
+happens:
+
+1. **Handed over as any work.** The voice prepares a hand-over with the
+   tasks part ([tasks.md](tasks.md#a-skill-made-by-voice-1685-off-unless-lamp_make_skillon)).
+   Its text is the brief, then the person's request:
+   - The brief is fixed words: the skill format and what a made skill may
+     use. So the computer's agent needs no skill creator of its own.
+   - The request is at most 180 bytes, refused if longer, never cut.
+   - Nothing else of the conversation goes with it.
+   - The model says back only the request, never the brief, and hands it
+     over (`confirm_agent_task`) only on the person's yes. The agent is
+     whichever the hand-over uses.
+2. **Back as two files.** When the work comes back done, its answer must be
+   exactly two fenced blocks, `skill.toml` and `SKILL.md`, at most 8 KiB
+   each. The files come back on the hand-over's own channel (Harness's
+   answer); there is no other transport.
+3. **Held to what a made skill may use** (the coordinator's cap, 19 Oct):
+   - `kind` installable, with a version;
+   - `[permissions]` with only `light`, `body`, and `topics` among
+     `voice/state` and `room/presence`;
+   - no function for the model (`tool`);
+   - `[ask] policy` only `nudge`, never a hello, news or a reminder;
+   - speaking, messages, the look and any other topic are refused.
+   Widening this is the lead's call.
+4. **Checked.** The card is marked `made: here` (`lamp-cloud`'s "Made on
+   this lamp" group). Then `lamp-skills pack` (#1698) checks the folder:
+   every check a load makes, its permissions among them, and the package
+   read back as an install reads one. A skill that does more than it
+   declares is refused there.
+5. **Kept, not installed.** The package goes in the voice's own folder,
+   `/var/lib/lampOS/voice/made-skills` (0700, the voice's user):
+   - at most 5 are kept, and the oldest is let go with its package;
+   - each is kept with its SHA-256 and what it asks to use (`made.json`);
+   - the same hand-over read again gives back the kept one, not checked
+     again.
+6. **Told.** The lamp says what it would do (the card's description), what
+   it would use ("its light and whether it is talking"), and, word for
+   word: "I've made it; putting it on needs a yes from the team first."
+   - The files are never read out.
+   - A skill not kept is told plainly why ("it asks to use more than the
+     light and the head, which a made skill can't").
+
+**Open, for the lead:**
+- **Putting a made skill on the lamp.** An unsigned package made by an
+  agent goes against the 18:33 ruling, "only signed packages from the
+  update channel". The SHA-256 kept is what such a yes would be bound to,
+  so what the person heard is what would go on, and nothing can widen
+  after it.
+- Whether the spoken yes is enough, or the app confirms too.
+- Harness sign-in on home lamps.
+
+Removing a made skill by voice comes with putting one on.
+
+Tests:
+- `made_skill::tests`:
+  - the brief within the hand-over's 1,000 bytes;
+  - exactly two files;
+  - the cap, each wider use refused;
+  - the card marked;
+  - the note's words;
+  - nothing kept without the checker.
+- `agent_tasks::tests::a_skill_to_make_is_handed_over_as_its_brief_and_said_back_as_its_request`.
+- `task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out`.
+- `crates/skills/tests/made.rs`, with the real `lamp-skills`: checked, packed and kept 0700 by its SHA-256; a step it doesn't declare refused; at most five kept.
 
 ## V1's moves and emotions: what we take
 

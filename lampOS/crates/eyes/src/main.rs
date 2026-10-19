@@ -422,26 +422,6 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             lamp_eyes::who::Familiar::Close => lamp_msgs::FamiliarLevel::Close,
         })
     }
-    /// The name of the one known at the lamp, replaced whole, or no file.
-    fn keep_known(path: &std::path::Path, name: Option<&str>) {
-        use std::os::unix::fs::OpenOptionsExt;
-        let Some(name) = name else {
-            let _ = std::fs::remove_file(path);
-            return;
-        };
-        let mut temporary = path.as_os_str().to_owned();
-        temporary.push(".new");
-        let written = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&temporary)
-            .and_then(|mut file| writeln!(file, "{name}"));
-        if written.is_ok() {
-            let _ = std::fs::rename(&temporary, path);
-        }
-    }
     fn answer(stream: &mut UnixStream, value: serde_json::Value) {
         // A caller that is gone or slow changes nothing here.
         let _ = writeln!(stream, "{value}");
@@ -1174,12 +1154,19 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             let tall = picture.filled.1.max(1) as f32;
                             let heights: Vec<f32> =
                                 faces.iter().map(|face| face.height / tall).collect();
-                            let print = faces
+                            let near = faces
                                 .iter()
                                 .zip(&heights)
-                                .filter(|(_, height)| **height >= NEAR_ENOUGH)
-                                .max_by(|a, b| a.1.total_cmp(b.1))
-                                .and_then(|(face, _)| align(&picture, &face.marks))
+                                .enumerate()
+                                .filter(|(_, (_, height))| **height >= NEAR_ENOUGH)
+                                .max_by(|a, b| a.1.1.total_cmp(b.1.1));
+                            // That face's passing id, while speaking is
+                            // judged: whose mouth the known name goes with.
+                            let near_id = near.and_then(|(index, _)| {
+                                bus_out.as_ref().and_then(|bus| bus.speaking_id(index))
+                            });
+                            let print = near
+                                .and_then(|(_, (face, _))| align(&picture, &face.marks))
                                 .and_then(|aligned| who.recogniser.print(&aligned).ok());
                             if let Some((taking, _)) = who.taking.as_mut() {
                                 taking.look(&heights, print);
@@ -1195,15 +1182,16 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     }
                                 }
                                 if let Some(path) = &arguments.known_file {
-                                    keep_known(
+                                    lamp_eyes::who::keep_known(
                                         path,
                                         who.known.as_ref().map(|known| known.0.as_str()),
+                                        near_id.as_deref(),
                                     );
                                 }
                             } else {
                                 // Nobody near: nobody known at the lamp.
                                 if let Some(path) = &arguments.known_file {
-                                    keep_known(path, None);
+                                    lamp_eyes::who::keep_known(path, None, None);
                                 }
                                 if who.visits
                                     && let Some(bus) = bus_out.as_mut()
