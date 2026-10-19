@@ -919,6 +919,10 @@ fn worker_command(
             role,
             var(crate::person::ENVIRONMENT).as_deref(),
         ))
+        .envs(second_scoped_context_worker_environment(
+            role,
+            var(crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -934,6 +938,18 @@ fn memory_days_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some(("LAMP_MEMORY_DAYS", "on"))
+}
+
+// The second route's scoped context (#1675, #1839), passed the same narrow
+// way: the exact `on`, to the second route only, which reads it.
+fn second_scoped_context_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on"))).then_some((
+        crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
+        "on",
+    ))
 }
 
 // The rules' switch (#813), passed the same narrow way: the exact `on`, to
@@ -1103,6 +1119,12 @@ mod tests {
                         "LAMP_MEMORY_DAYS",
                         ["provider", "second"].as_slice(),
                     ),
+                    // The second route's scoped context reaches it alone.
+                    (
+                        second_scoped_context_worker_environment,
+                        "LAMP_SECOND_SCOPED_CONTEXT",
+                        ["second"].as_slice(),
+                    ),
                     // Rules reach the Live provider only.
                     (
                         memory_rules_worker_environment,
@@ -1228,7 +1250,8 @@ mod tests {
     /// command it is started with. A script in the worker's place writes
     /// the environment it got: the provider has the memory's two switches,
     /// the clock and the typed name's file, the second route the memory's
-    /// days, the clock and the name's file (#1323), and capture the quiet
+    /// days, the clock, the name's file (#1323) and its scoped context
+    /// (#1839), and capture the quiet
     /// evidence switch (#1285) and the detector's input (#828). With every other variable set to a secret,
     /// nothing else reaches any of them but the shell's own.
     #[test]
@@ -1251,6 +1274,7 @@ mod tests {
                     crate::local_time::KERNEL_CLOCK_ENVIRONMENT,
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
                     crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
+                    crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                 ]
                 .contains(&name)
                 {
@@ -1314,6 +1338,7 @@ mod tests {
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
+                    "LAMP_SECOND_SCOPED_CONTEXT=on",
                 ],
             ),
             (
