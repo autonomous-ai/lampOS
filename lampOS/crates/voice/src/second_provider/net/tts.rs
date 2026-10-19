@@ -139,7 +139,7 @@ pub(crate) fn request(
     Ok(Some(request))
 }
 
-fn without_tags(text: &str) -> String {
+pub(super) fn without_tags(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut depth = 0usize;
     for c in text.chars() {
@@ -163,12 +163,26 @@ pub struct Tts {
 
 impl Tts {
     pub fn new(config: &SecondConfig) -> Result<Self> {
+        Self::with(
+            config.tts_provider,
+            &config.tts_base_url,
+            config.tts_key.expose(),
+            config.tts_voice.as_deref(),
+        )
+    }
+
+    pub(crate) fn with(
+        provider: TtsProvider,
+        base_url: &str,
+        key: &str,
+        voice: Option<&str>,
+    ) -> Result<Self> {
         Ok(Self {
             client: http_client()?,
-            provider: config.tts_provider,
-            base_url: config.tts_base_url.clone(),
-            key: config.tts_key.expose().to_owned(),
-            voice: config.tts_voice.clone(),
+            provider,
+            base_url: base_url.to_owned(),
+            key: key.to_owned(),
+            voice: voice.map(str::to_owned),
         })
     }
 

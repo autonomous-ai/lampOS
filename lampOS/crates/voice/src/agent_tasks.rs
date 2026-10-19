@@ -1746,7 +1746,10 @@ pub(crate) mod tests {
 
     /// A tasks part of one socket pair, answering each line with what the
     /// test gives it, and passing on what it was sent.
-    fn tasks_part(directory: &Path, answers: Vec<(&'static str, Value)>) -> mpsc::Receiver<Value> {
+    pub(crate) fn tasks_part(
+        directory: &Path,
+        answers: Vec<(&'static str, Value)>,
+    ) -> mpsc::Receiver<Value> {
         let (sent, seen) = mpsc::channel();
         for name in ["request.sock", "voice.sock"] {
             let listener = UnixListener::bind(directory.join(name)).unwrap();
@@ -1771,7 +1774,7 @@ pub(crate) mod tests {
     }
 
     /// Held by each test that prepares and confirms: they share [`PENDING`].
-    static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
+    pub(crate) static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
     /// Held by each test that writes or reads the shared [`STAFF`].
     static STAFF_HELD: Mutex<()> = Mutex::new(());

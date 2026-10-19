@@ -130,6 +130,23 @@ of Gemini conversational memory across physical mute is claimed. There is no
 periodic context reset or timer-based reopen. A later stable unmute must satisfy
 the new runtime's ordinary readiness checks again.
 
+**Which service hears a line.** By default each admitted line's audio goes
+to Gemini Live (through the company relay on the lamps); with
+`LAMP_VOICE_SECOND_CONFIG` the second route hears a line only when it takes
+one over ([second-voice.md](second-voice.md)). With `LAMP_VOICE_ROUTE=second`
+it hears every one: on every turn, each admitted line's audio goes to speech
+to text (the relay's `/ws/audio/transcriptions`, or Deepgram directly with
+`deepgram_credential_file`), its words to the text model (the relay's chat,
+or with `LAMP_SECOND_CHAT` Google's Gemini API, OpenRouter, and the provider
+it routes to, or DeepSeek's own API, whose data is processed in China), a
+look's picture with them unless the model takes none, and the answer's text
+to speech (ElevenLabs or OpenAI's voice, or Google's with
+`LAMP_SECOND_SPEECH=gemini`); with `LAMP_SECOND_SEARCH` the model's queries
+go to DeepSeek's search, OpenRouter's (Exa), or the service `search_url`
+names, and a page it asks to read to DeepSeek's fetch. A mute or a privacy change ends a line there
+too: an authority with no owner retires the request, which closes its
+speech-to-text socket (the reviewer on #1686).
+
 One service invocation owns one signal registration and one bounded rotating
 metadata writer. Each GPIO-only/full runtime uses a fresh private IPC directory;
 a successful cycle explicitly removes the now-empty directory after all workers

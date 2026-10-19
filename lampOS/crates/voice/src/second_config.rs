@@ -30,7 +30,94 @@ struct Raw {
     tts_provider: Option<String>,
     #[serde(default)]
     tts_voice: Option<String>,
+    /// Fields the configured chat request also carries, for an
+    /// OpenAI-compatible endpoint that needs its own (a model's reasoning
+    /// setting, say). The request's own fields cannot be replaced.
+    #[serde(default)]
+    llm_extra: Option<serde_json::Map<String, serde_json::Value>>,
+    /// Google's Gemini API, for `LAMP_SECOND_CHAT=gemini` and
+    /// `LAMP_SECOND_SPEECH=gemini`: its base URL (absent: Google's own)
+    /// and the models (absent: [`GEMINI_CHAT_MODEL`],
+    /// [`GEMINI_SPEECH_MODEL`]). Its key is the voice unit's credential
+    /// [`GEMINI_CREDENTIAL`], never a field here.
+    #[serde(default)]
+    gemini_base_url: Option<String>,
+    #[serde(default)]
+    gemini_chat_model: Option<String>,
+    #[serde(default)]
+    gemini_speech_model: Option<String>,
+    /// A web search the model may call (`web_search`): its URL and key file
+    /// together, and fields of its own for the request. Absent: no search.
+    #[serde(default)]
+    search_url: Option<String>,
+    #[serde(default)]
+    search_credential_file: Option<String>,
+    #[serde(default)]
+    search_extra: Option<serde_json::Map<String, serde_json::Value>>,
+    /// The model `LAMP_SECOND_CHAT=openrouter` asks through OpenRouter, a
+    /// slug from its public model list; absent: [`OPENROUTER_MODEL`].
+    #[serde(default)]
+    openrouter_model: Option<String>,
+    /// OpenRouter's `reasoning.effort` for it; absent: `minimal` for a
+    /// Google model (Gemini 3 cannot think less), `none` for any other.
+    #[serde(default)]
+    openrouter_reasoning_effort: Option<String>,
+    /// The model `LAMP_SECOND_CHAT=deepseek` asks of DeepSeek's own API;
+    /// absent: [`DEEPSEEK_MODEL`].
+    #[serde(default)]
+    deepseek_model: Option<String>,
 }
+
+/// OpenRouter's OpenAI-compatible API.
+pub const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
+/// The owner's pick (19 Oct): DeepSeek V4.1 Flash, its dated 17 October
+/// snapshot, pinned by OpenRouter's own slug for it, read from
+/// `GET https://openrouter.ai/api/v1/models` on 19 Oct (text and image in,
+/// tools); never the moving alias `~deepseek/deepseek-flash-latest`.
+pub const OPENROUTER_MODEL: &str = "deepseek/deepseek-v4.1-flash-1017";
+/// The second candidate through OpenRouter (`openrouter_model`), from the
+/// same list.
+pub const OPENROUTER_SECOND_MODEL: &str = "google/gemini-3.6-flash";
+/// DeepSeek's own OpenAI-compatible API (`/chat/completions`, `/models`,
+/// `/v1/tools/search`, `/v1/tools/fetch`). Its peak hours, 01:00 to 04:00
+/// and 06:00 to 10:00 UTC on weekdays, cost double (DeepSeek's pricing page,
+/// 19 Oct); there is no switch for them.
+pub const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com";
+/// DeepSeek's name for DeepSeek-V4.1-Flash-1017 (images and tools in;
+/// DeepSeek's docs, 19 Oct: the dated name is not given as a model name).
+/// Asked with thinking off.
+pub const DEEPSEEK_MODEL: &str = "deepseek-flash";
+/// DeepSeek's models that take no picture: a look never goes to one.
+pub const DEEPSEEK_TEXT_ONLY: [&str; 1] = ["deepseek-v4-pro"];
+
+/// The OpenRouter and DeepSeek chats as `second.json` sets them, the
+/// defaults applied.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Hosted {
+    pub openrouter_model: String,
+    pub openrouter_effort: String,
+    pub deepseek_model: String,
+}
+
+/// A web search service the model may call, as `second.json` names it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchService {
+    pub url: String,
+    pub key: Key,
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Google's Gemini API, called directly.
+pub const GEMINI_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta";
+/// The text model `LAMP_SECOND_CHAT=gemini` asks, with thinking at its
+/// floor (the research of 19 Oct: the fastest first token among the
+/// sub-second models with the higher score).
+pub const GEMINI_CHAT_MODEL: &str = "gemini-3.6-flash";
+/// The voice `LAMP_SECOND_SPEECH=gemini` asks: half ElevenLabs Flash's
+/// price a minute of speech, rated above it (the research of 19 Oct).
+pub const GEMINI_SPEECH_MODEL: &str = "gemini-3.8-flash-lite-tts";
+/// Fields of the chat request that `llm_extra` may not replace.
+const OWN_FIELDS: [&str; 5] = ["model", "messages", "stream", "tools", "tool_choice"];
 
 /// A key read from a credential file. Never shown by Debug.
 #[derive(Clone, PartialEq, Eq)]
@@ -60,6 +147,16 @@ pub enum TtsProvider {
     ElevenLabs,
 }
 
+impl TtsProvider {
+    /// The voice's name in a journal line.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::OpenAi => "OpenAI's voice",
+            Self::ElevenLabs => "ElevenLabs",
+        }
+    }
+}
+
 /// The route with V1's fallbacks applied: an empty or absent STT or TTS
 /// URL or credential file is the LLM's.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -73,6 +170,20 @@ pub struct SecondConfig {
     pub tts_key: Key,
     pub tts_provider: TtsProvider,
     pub tts_voice: Option<String>,
+    /// `llm_extra`; empty when absent.
+    pub llm_extra: serde_json::Map<String, serde_json::Value>,
+    pub gemini: Gemini,
+    /// `search_url` with `search_credential_file`; `None`: no web search.
+    pub search: Option<SearchService>,
+    pub hosted: Hosted,
+}
+
+/// Google's Gemini API as `second.json` sets it, the defaults applied.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Gemini {
+    pub base_url: String,
+    pub chat_model: String,
+    pub speech_model: String,
 }
 
 /// `None` when the variable is unset or empty: the second route is off.
@@ -89,6 +200,19 @@ fn from_setting(value: Option<OsString>) -> io::Result<Option<SecondConfig>> {
 
 pub fn load_from_path(path: &Path) -> io::Result<SecondConfig> {
     let data = read_private(path, 16_384)?;
+    // Gemini's key moved to the voice unit's credential: a file that still
+    // names the old field is refused by name, so the person setting the lamp
+    // up is told where the key goes now, and the key is never read here.
+    if serde_json::from_slice::<serde_json::Value>(&data)
+        .ok()
+        .and_then(|value| value.get("gemini_credential_file").cloned())
+        .is_some()
+    {
+        return Err(invalid(
+            io::ErrorKind::InvalidInput,
+            "gemini_credential_file is no longer read: Gemini's key is the voice unit's credential gemini.key (LoadCredential=gemini.key:<file>)",
+        ));
+    }
     let raw: Raw = serde_json::from_slice(&data).map_err(|_| {
         invalid(
             io::ErrorKind::InvalidData,
@@ -126,7 +250,86 @@ pub fn load_from_path(path: &Path) -> io::Result<SecondConfig> {
             key: key(&stt_file)?,
         },
     };
+    let llm_extra = raw.llm_extra.unwrap_or_default();
+    if llm_extra.len() > 16 || OWN_FIELDS.iter().any(|own| llm_extra.contains_key(*own)) {
+        return Err(invalid(
+            io::ErrorKind::InvalidInput,
+            "llm_extra may add at most 16 fields, none of the request's own",
+        ));
+    }
+    let model = |name: Option<String>, default: &str| -> io::Result<String> {
+        let name = given(name).unwrap_or_else(|| default.to_owned());
+        // A path segment of the request's URL.
+        if name.len() > 128
+            || !name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_'))
+        {
+            return Err(invalid(
+                io::ErrorKind::InvalidInput,
+                "a Gemini model name is letters, digits, '-', '.' and '_'",
+            ));
+        }
+        Ok(name)
+    };
+    let gemini = Gemini {
+        base_url: checked_url(
+            given(raw.gemini_base_url).unwrap_or_else(|| GEMINI_BASE_URL.to_owned()),
+        )?,
+        chat_model: model(raw.gemini_chat_model, GEMINI_CHAT_MODEL)?,
+        speech_model: model(raw.gemini_speech_model, GEMINI_SPEECH_MODEL)?,
+    };
+    let search = match (given(raw.search_url), given(raw.search_credential_file)) {
+        (None, None) => None,
+        (Some(url), Some(file)) => Some(SearchService {
+            url: checked_url(url)?,
+            key: key(&file)?,
+            extra: raw.search_extra.unwrap_or_default(),
+        }),
+        _ => {
+            return Err(invalid(
+                io::ErrorKind::InvalidInput,
+                "search_url and search_credential_file go together",
+            ));
+        }
+    };
+    // A model's slug goes in the request's body: letters, digits and the
+    // marks OpenRouter's slugs use.
+    let slug = |name: Option<String>, default: &str| -> io::Result<String> {
+        let name = given(name).unwrap_or_else(|| default.to_owned());
+        if name.len() > 128
+            || !name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '.' | '_' | '/' | ':'))
+        {
+            return Err(invalid(
+                io::ErrorKind::InvalidInput,
+                "a model name is letters, digits, '-', '.', '_', '/' and ':'",
+            ));
+        }
+        Ok(name)
+    };
+    let openrouter_model = slug(raw.openrouter_model, OPENROUTER_MODEL)?;
+    let openrouter_effort = match given(raw.openrouter_reasoning_effort) {
+        Some(effort) => match effort.as_str() {
+            "none" | "minimal" | "low" | "medium" | "high" => effort,
+            _ => {
+                return Err(invalid(
+                    io::ErrorKind::InvalidInput,
+                    "openrouter_reasoning_effort is none, minimal, low, medium or high",
+                ));
+            }
+        },
+        None => least_effort(&openrouter_model).to_owned(),
+    };
+    let hosted = Hosted {
+        openrouter_model,
+        openrouter_effort,
+        deepseek_model: slug(raw.deepseek_model, DEEPSEEK_MODEL)?,
+    };
     Ok(SecondConfig {
+        search,
+        hosted,
         llm_key: key(&raw.llm_credential_file)?,
         llm_base_url,
         llm_model: raw.llm_model,
@@ -136,7 +339,62 @@ pub fn load_from_path(path: &Path) -> io::Result<SecondConfig> {
         tts_key: key(&tts_file)?,
         tts_provider,
         tts_voice: given(raw.tts_voice),
+        llm_extra,
+        gemini,
     })
+}
+
+/// Where systemd gives a unit its credentials (`LoadCredential=`).
+pub const CREDENTIALS_ENV: &str = "CREDENTIALS_DIRECTORY";
+/// The voice unit's credential for OpenRouter
+/// (`LoadCredential=openrouter.key:/etc/lampOS/policy/jev.key`, the key the
+/// Policy already uses).
+pub const OPENROUTER_CREDENTIAL: &str = "openrouter.key";
+/// The voice unit's credential for DeepSeek's own API
+/// (`LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key`).
+pub const DEEPSEEK_CREDENTIAL: &str = "deepseek.key";
+/// The voice unit's credential for Google's Gemini API, for
+/// `LAMP_SECOND_CHAT=gemini` and `LAMP_SECOND_SPEECH=gemini`
+/// (`LoadCredential=gemini.key:/etc/lampOS/voice/gemini.key`).
+pub const GEMINI_CREDENTIAL: &str = "gemini.key";
+
+/// The key in the unit's credential `name`, in `directory` (the unit's
+/// `CREDENTIALS_DIRECTORY`), read as the other keys are; why not, naming the
+/// credential and never its contents.
+pub fn unit_credential(directory: Option<&std::ffi::OsStr>, name: &str) -> io::Result<Key> {
+    let directory = directory
+        .filter(|directory| Path::new(directory).is_absolute())
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                format!(
+                    "the voice unit has no credentials ({CREDENTIALS_ENV} is not set): {name} is given by LoadCredential={name}:<file>"
+                ),
+            )
+        })?;
+    credential(&Path::new(directory).join(name)).map_err(|error| {
+        io::Error::new(
+            error.kind(),
+            format!("the voice unit's credential {name}: {error}"),
+        )
+    })
+}
+
+/// The least OpenRouter's `reasoning.effort` may be for `model`: Gemini 3
+/// cannot stop thinking, so `minimal`; any other is asked not to think.
+pub fn least_effort(model: &str) -> &'static str {
+    if model.starts_with("google/") {
+        "minimal"
+    } else {
+        "none"
+    }
+}
+
+/// A key from a private credential file, read as `second.json`'s are.
+pub(crate) fn credential(file: &Path) -> io::Result<Key> {
+    key(file
+        .to_str()
+        .ok_or_else(|| invalid(io::ErrorKind::InvalidInput, "credential path must be UTF-8"))?)
 }
 
 fn invalid(kind: io::ErrorKind, message: &'static str) -> io::Error {
@@ -284,5 +542,161 @@ mod tests {
     fn a_plain_http_url_is_refused() {
         let (_, config) = written("http", r#","tts_base_url":"http://tts.example.invalid""#);
         assert!(load_from_path(&config).is_err());
+    }
+
+    /// Without its fields, Gemini is Google's own API, its key left to the
+    /// Live route's, and the research's two models; nothing extra is sent.
+    #[test]
+    fn gemini_defaults_to_googles_api_and_the_researched_models() {
+        let (_, config) = written("gemini-defaults", "");
+        let route = load_from_path(&config).unwrap();
+        assert_eq!(
+            route.gemini,
+            Gemini {
+                base_url: GEMINI_BASE_URL.into(),
+                chat_model: GEMINI_CHAT_MODEL.into(),
+                speech_model: GEMINI_SPEECH_MODEL.into(),
+            }
+        );
+        assert!(route.llm_extra.is_empty());
+    }
+
+    /// Gemini's key is the voice unit's credential `gemini.key`, never a
+    /// field of this file: a file that still names one is refused, so a key
+    /// put there is never passed over in silence.
+    #[test]
+    fn gemini_and_the_extra_chat_fields_are_taken_as_written() {
+        let directory = directory("gemini-set");
+        let google = directory.join("google.key");
+        private(&google, "g-secret\n");
+        let (_, config) = written(
+            "gemini-key-field",
+            &format!(r#","gemini_credential_file":"{}""#, google.display()),
+        );
+        let refused = load_from_path(&config).unwrap_err().to_string();
+        assert!(refused.contains("gemini_credential_file"), "{refused}");
+        assert!(!refused.contains("g-secret"));
+        let (_, config) = written(
+            "gemini-set",
+            r#","gemini_base_url":"https://gemini.example.invalid/v1beta","gemini_chat_model":"gemini-3.5-flash-lite","gemini_speech_model":"gemini-3.8-flash-tts","llm_extra":{"thinking":{"type":"disabled"}}"#,
+        );
+        let route = load_from_path(&config).unwrap();
+        assert_eq!(
+            route.gemini.base_url,
+            "https://gemini.example.invalid/v1beta"
+        );
+        assert_eq!(route.gemini.chat_model, "gemini-3.5-flash-lite");
+        assert_eq!(route.gemini.speech_model, "gemini-3.8-flash-tts");
+        assert_eq!(
+            serde_json::Value::Object(route.llm_extra.clone()),
+            serde_json::json!({"thinking": {"type": "disabled"}})
+        );
+    }
+
+    /// OpenRouter's pinned DeepSeek snapshot and DeepSeek's own Flash by
+    /// default, each asked to think as little as it can; a model set is
+    /// taken, a strange name or effort refused.
+    #[test]
+    fn the_hosted_chats_default_to_the_owners_picks_and_think_least() {
+        let (_, config) = written("hosted-defaults", "");
+        assert_eq!(
+            load_from_path(&config).unwrap().hosted,
+            Hosted {
+                openrouter_model: "deepseek/deepseek-v4.1-flash-1017".into(),
+                openrouter_effort: "none".into(),
+                deepseek_model: "deepseek-flash".into(),
+            }
+        );
+        let (_, config) = written(
+            "hosted-set",
+            r#","openrouter_model":"google/gemini-3.6-flash","deepseek_model":"deepseek-v4-pro""#,
+        );
+        let hosted = load_from_path(&config).unwrap().hosted;
+        assert_eq!(hosted.openrouter_model, "google/gemini-3.6-flash");
+        assert_eq!(hosted.openrouter_effort, "minimal");
+        assert_eq!(hosted.deepseek_model, "deepseek-v4-pro");
+        let (_, config) = written("hosted-effort", r#","openrouter_reasoning_effort":"low""#);
+        assert_eq!(
+            load_from_path(&config).unwrap().hosted.openrouter_effort,
+            "low"
+        );
+        for extra in [
+            r#","openrouter_reasoning_effort":"max""#,
+            r#","openrouter_model":"deepseek flash""#,
+            r#","deepseek_model":"x\"y""#,
+        ] {
+            let (_, config) = written("hosted-refused", extra);
+            assert!(load_from_path(&config).is_err(), "{extra}");
+        }
+    }
+
+    /// A unit's credential is read from its `CREDENTIALS_DIRECTORY`, as the
+    /// other keys are; without one, or without the file, the error names the
+    /// credential and nothing of a key.
+    #[test]
+    fn a_units_credential_is_read_from_its_directory_and_never_shown() {
+        let directory = directory("unit-credentials");
+        private(&directory.join("openrouter.key"), "or-secret\n");
+        let key = unit_credential(Some(directory.as_os_str()), OPENROUTER_CREDENTIAL).unwrap();
+        assert_eq!(key.expose(), "or-secret");
+        assert_eq!(format!("{key:?}"), "Key([REDACTED])");
+        let missing = unit_credential(Some(directory.as_os_str()), DEEPSEEK_CREDENTIAL)
+            .unwrap_err()
+            .to_string();
+        assert!(missing.contains("deepseek.key"), "{missing}");
+        let unset = unit_credential(None, DEEPSEEK_CREDENTIAL)
+            .unwrap_err()
+            .to_string();
+        assert!(unset.contains("CREDENTIALS_DIRECTORY"), "{unset}");
+        assert!(
+            unit_credential(
+                Some(std::ffi::OsStr::new("relative")),
+                OPENROUTER_CREDENTIAL
+            )
+            .is_err()
+        );
+    }
+
+    /// A web search is named by its URL and key file together, or not at all.
+    #[test]
+    fn a_search_service_needs_its_url_and_key_together() {
+        let (_, config) = written("search-none", "");
+        assert_eq!(load_from_path(&config).unwrap().search, None);
+        let directory = directory("search-set");
+        let search = directory.join("search.key");
+        private(&search, "s-secret");
+        let (_, config) = written(
+            "search-set",
+            &format!(
+                r#","search_url":"https://search.example.invalid/search","search_credential_file":"{}","search_extra":{{"type":"instant"}}"#,
+                search.display()
+            ),
+        );
+        let route = load_from_path(&config).unwrap();
+        let service = route.search.unwrap();
+        assert_eq!(service.url, "https://search.example.invalid/search");
+        assert_eq!(service.key, Key("s-secret".into()));
+        assert_eq!(service.extra["type"], "instant");
+        let (_, config) = written(
+            "search-half",
+            r#","search_url":"https://search.example.invalid/search""#,
+        );
+        assert!(load_from_path(&config).is_err());
+    }
+
+    /// A model name goes into the request's URL: only a plain name; and
+    /// `llm_extra` cannot replace what the request itself says.
+    #[test]
+    fn a_strange_model_name_or_extra_field_is_refused() {
+        for extra in [
+            r#","gemini_chat_model":"../models/x""#,
+            r#","gemini_speech_model":"tts?key=1""#,
+            r#","llm_extra":{"model":"other"}"#,
+            r#","llm_extra":{"messages":[]}"#,
+            r#","gemini_base_url":"http://gemini.example.invalid""#,
+        ] {
+            let (_, config) = written("gemini-refused", extra);
+            assert!(load_from_path(&config).is_err(), "{extra}");
+        }
     }
 }

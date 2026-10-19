@@ -6,11 +6,14 @@
 use std::{fmt, sync::Arc, time::Duration};
 
 mod chat;
+mod gemini_tts;
+pub mod search;
 mod sentences;
 mod stt;
 mod tts;
 
-pub use chat::{Chat, ChatEvent, ChatStream, Declare, Message, ToolCall};
+pub use chat::{Chat, ChatEvent, ChatStream, Declare, GEMINI_REASONING, Message, ToolCall};
+pub use gemini_tts::{GeminiSpeech, GeminiTts};
 pub use sentences::Sentences;
 pub use stt::{Replies, SttStream, check as stt_check};
 pub use tts::{PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream};
@@ -115,6 +118,28 @@ async fn post(
         return Err(Error::Status(response.status().as_u16()));
     }
     Ok(response)
+}
+
+/// A JSON `GET` with the key in `authorization` (a service's model list),
+/// bounded as a request and at 1 MiB.
+pub async fn get_json(url: &str, authorization: &str) -> Result<serde_json::Value> {
+    let client = http_client()?;
+    let request = client.get(url).header("authorization", authorization);
+    let mut response = tokio::time::timeout(CONNECT + STALL, request.send())
+        .await
+        .map_err(|_| Error::Timeout("request"))?
+        .map_err(|_| Error::Transport("request"))?;
+    if !response.status().is_success() {
+        return Err(Error::Status(response.status().as_u16()));
+    }
+    let mut bytes = Vec::new();
+    while let Some(piece) = chunk(&mut response).await? {
+        bytes.extend(piece);
+        if bytes.len() > 1 << 20 {
+            return Err(Error::Protocol("answer length"));
+        }
+    }
+    serde_json::from_slice(&bytes).map_err(|_| Error::Protocol("answer"))
 }
 
 /// The next piece of a streamed body; `None` at its end.

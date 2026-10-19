@@ -29,6 +29,9 @@
 //! closed is published (mute, privacy, cancellation). Without a configured
 //! route `Rig::second` is `None` and every function here is the old call.
 use super::*;
+pub(super) use crate::second_provider::worker::RouteFlags;
+#[cfg(test)]
+use crate::second_provider::worker::{ChatRoute, SearchRoute};
 use std::ffi::OsString;
 
 /// 30 s of 16 kHz mono microphone audio.
@@ -184,25 +187,34 @@ impl Routes {
         matches!(self, Self::Live { standby: Some(_) } | Self::SecondOnly(_))
     }
 
-    /// The workers, from the Live worker's arguments (`provider_arguments`).
-    pub(super) fn workers(
-        &self,
-        provider: Vec<String>,
-        wait_cue: bool,
-        down_line: bool,
-    ) -> io::Result<Workers> {
+    /// The workers, from the Live worker's arguments (`provider_arguments`)
+    /// and the second route's switches; `only_voice` is set here, by route.
+    pub(super) fn workers(&self, provider: Vec<String>, flags: RouteFlags) -> io::Result<Workers> {
         Ok(match self {
             Self::Live { standby } => Workers {
                 role: "provider",
                 standby: standby
                     .as_deref()
-                    .map(|config| arguments(&provider, config, wait_cue, down_line, false))
+                    .map(|config| {
+                        let flags = RouteFlags {
+                            only_voice: false,
+                            ..flags
+                        };
+                        arguments(&provider, config, &flags)
+                    })
                     .transpose()?,
                 arguments: provider,
             },
             Self::SecondOnly(config) => Workers {
                 role: "second",
-                arguments: arguments(&provider, config, wait_cue, down_line, true)?,
+                arguments: arguments(
+                    &provider,
+                    config,
+                    &RouteFlags {
+                        only_voice: true,
+                        ..flags
+                    },
+                )?,
                 standby: None,
             },
         })
@@ -243,28 +255,64 @@ pub(super) fn routes(
 /// [`routes`], from this process's environment.
 pub(super) fn routes_from_environment(serving: bool) -> io::Result<Routes> {
     routes(
-        std::env::var_os(ROUTE_ENV),
-        std::env::var_os(crate::second_config::SECOND_CONFIG_ENV),
+        var_os(ROUTE_ENV),
+        var_os(crate::second_config::SECOND_CONFIG_ENV),
         serving,
     )
     .map_err(|why| io::Error::new(io::ErrorKind::InvalidInput, why))
+}
+
+/// The second route's own switches (`LAMP_SECOND_*`), from this process's
+/// environment; a wrong value refused.
+pub(super) fn route_flags_from_environment() -> io::Result<RouteFlags> {
+    RouteFlags::from_values(var_os).map_err(|why| io::Error::new(io::ErrorKind::InvalidInput, why))
+}
+
+#[cfg(test)]
+thread_local! {
+    /// The routes' variables as a test sets them, in place of the
+    /// process's own; `None`: the process's.
+    pub(super) static TEST_ENVIRONMENT: std::cell::RefCell<Option<Vec<(&'static str, OsString)>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// One of the routes' variables.
+fn var_os(name: &str) -> Option<OsString> {
+    #[cfg(test)]
+    if let Some(set) = TEST_ENVIRONMENT.with(|set| set.borrow().clone()) {
+        return set
+            .into_iter()
+            .find(|(key, _)| *key == name)
+            .map(|(_, value)| value);
+    }
+    std::env::var_os(name)
+}
+
+impl Routes {
+    /// `run_start` says which route answers when it is the second alone
+    /// (`"voice_route":"second"`), so a session folder of the A/B tells the
+    /// two apart (the reviewer on #1686); otherwise it is as before.
+    pub(super) fn mark(&self, run_start: &mut Value) {
+        if let Self::SecondOnly(_) = self {
+            run_start["voice_route"] = json!("second");
+        }
+    }
 }
 
 /// What the journal says at the service's start, for the second route alone.
 pub(super) const SECOND_ONLY_LINE: &str = "lamp-voice: the voice route is second only (LAMP_VOICE_ROUTE=second): speech to text, a text model and speech answer every turn; Gemini Live is not used";
 
 /// The `worker second` arguments: the Live worker's, its configuration
-/// first, then the second route's, `--wait-cue` with `wait_cue`
-/// (`LAMP_SECOND_WAIT_CUE=on`), `--down-line` with `down_line`
-/// (`LAMP_SECOND_DOWN_LINE=on`), `--only-voice` with `only_voice`
-/// (`LAMP_VOICE_ROUTE=second`), then its flags but `--keep-link` and
-/// `--wait-for-room`, which are for Gemini's link.
+/// first, then the second route's, then the route's own flags (`--wait-cue`
+/// with `LAMP_SECOND_WAIT_CUE=on`, `--down-line` with
+/// `LAMP_SECOND_DOWN_LINE=on`, `--only-voice` with `LAMP_VOICE_ROUTE=second`,
+/// `--gemini-chat` and `--gemini-speech` with `LAMP_SECOND_CHAT=gemini` and
+/// `LAMP_SECOND_SPEECH=gemini`, `RouteFlags`), then its flags but
+/// `--keep-link` and `--wait-for-room`, which are for Gemini's link.
 pub(super) fn arguments(
     provider: &[String],
     second_config: &Path,
-    wait_cue: bool,
-    down_line: bool,
-    only_voice: bool,
+    route: &RouteFlags,
 ) -> io::Result<Vec<String>> {
     let (config, flags) = provider
         .split_first()
@@ -273,15 +321,7 @@ pub(super) fn arguments(
         .to_str()
         .ok_or_else(|| io::Error::other("second route configuration path must be UTF-8"))?;
     let mut arguments = vec![config.clone(), second_config.to_owned()];
-    if wait_cue {
-        arguments.push(crate::second_provider::worker::WAIT_CUE_FLAG.to_owned());
-    }
-    if down_line {
-        arguments.push(crate::second_provider::worker::DOWN_LINE_FLAG.to_owned());
-    }
-    if only_voice {
-        arguments.push(crate::second_provider::worker::ONLY_VOICE_FLAG.to_owned());
-    }
+    arguments.extend(route.flags().into_iter().map(str::to_owned));
     arguments.extend(
         flags
             .iter()
@@ -981,15 +1021,9 @@ mod tests {
         ]
         .map(String::from)
         .to_vec();
+        let second = Path::new("/etc/second.json");
         assert_eq!(
-            arguments(
-                &provider,
-                Path::new("/etc/second.json"),
-                false,
-                false,
-                false
-            )
-            .unwrap(),
+            arguments(&provider, second, &RouteFlags::default()).unwrap(),
             [
                 "/etc/provider.json",
                 "/etc/second.json",
@@ -998,29 +1032,65 @@ mod tests {
                 "--tools"
             ]
         );
+        let all = RouteFlags {
+            wait_cue: true,
+            down_line: true,
+            only_voice: true,
+            chat: Some(ChatRoute::Gemini),
+            gemini_speech: true,
+            search: Some(SearchRoute::DeepSeek),
+        };
+        let given = arguments(&provider, second, &all).unwrap();
         assert_eq!(
-            arguments(&provider, Path::new("/etc/second.json"), true, true, true).unwrap()[..5],
+            given[..9],
             [
                 "/etc/provider.json",
                 "/etc/second.json",
                 "--wait-cue",
                 "--down-line",
-                "--only-voice"
-            ]
-        );
-        assert_eq!(
-            arguments(&provider, Path::new("/etc/second.json"), false, true, false).unwrap()[..3],
-            ["/etc/provider.json", "/etc/second.json", "--down-line"]
-        );
-        assert_eq!(
-            arguments(&provider, Path::new("/etc/second.json"), false, false, true).unwrap()[..4],
-            [
-                "/etc/provider.json",
-                "/etc/second.json",
                 "--only-voice",
+                "--gemini-chat",
+                "--gemini-speech",
+                "--deepseek-search",
                 "--thread-file"
             ]
         );
+        // The worker takes back exactly what was given, the rest left as
+        // the Live worker's flags.
+        let (taken, rest) = RouteFlags::take(&given[2..]);
+        assert_eq!(taken, all);
+        assert_eq!(rest, ["--thread-file", "/t", "--tools"]);
+        // Every chat and search choice goes and comes back as itself.
+        for chat in [
+            ChatRoute::Gemini,
+            ChatRoute::OpenRouter,
+            ChatRoute::DeepSeek,
+        ] {
+            for search in [
+                None,
+                Some(SearchRoute::DeepSeek),
+                Some(SearchRoute::OpenRouter),
+                Some(SearchRoute::Exa),
+            ] {
+                let route = RouteFlags {
+                    chat: Some(chat),
+                    search,
+                    ..RouteFlags::default()
+                };
+                let given = arguments(&provider, second, &route).unwrap();
+                assert_eq!(RouteFlags::take(&given[2..]).0, route);
+            }
+        }
+        let speech_only = RouteFlags {
+            gemini_speech: true,
+            ..RouteFlags::default()
+        };
+        let given = arguments(&provider, second, &speech_only).unwrap();
+        assert_eq!(
+            given[..3],
+            ["/etc/provider.json", "/etc/second.json", "--gemini-speech"]
+        );
+        assert_eq!(RouteFlags::take(&given[2..]).0, speech_only);
         assert!(configured(None).is_none());
         assert!(configured(Some(OsString::new())).is_none());
         assert_eq!(
@@ -1051,6 +1121,26 @@ mod tests {
         }
         assert!(standby.standing_by());
         assert!(!alone.standing_by());
+    }
+
+    /// The reviewer on #1686: `run_start` says `"voice_route":"second"` with
+    /// the second route alone, and nothing new otherwise.
+    #[test]
+    fn run_start_names_the_second_route_alone_and_nothing_else() {
+        let plain = json!({"kind": "run_start", "provider_kind": "gemini"});
+        let mut alone = plain.clone();
+        Routes::SecondOnly(PathBuf::from("/etc/second.json")).mark(&mut alone);
+        assert_eq!(alone["voice_route"], "second");
+        for routes in [
+            Routes::Live { standby: None },
+            Routes::Live {
+                standby: Some(PathBuf::from("/etc/second.json")),
+            },
+        ] {
+            let mut run_start = plain.clone();
+            routes.mark(&mut run_start);
+            assert_eq!(run_start, plain);
+        }
     }
 
     /// `second` with its configuration is the second route alone.
@@ -1104,9 +1194,15 @@ mod tests {
             .map(String::from)
             .to_vec();
         let config = PathBuf::from("/etc/second.json");
+        let flags = |wait_cue, down_line| RouteFlags {
+            wait_cue,
+            down_line,
+            gemini_speech: true,
+            ..RouteFlags::default()
+        };
         assert_eq!(
             Routes::Live { standby: None }
-                .workers(provider.clone(), true, true)
+                .workers(provider.clone(), flags(true, true))
                 .unwrap(),
             Workers {
                 role: "provider",
@@ -1114,26 +1210,42 @@ mod tests {
                 standby: None,
             }
         );
+        // Standing by, the second route is never told it is the only voice,
+        // whatever it is given.
         assert_eq!(
             Routes::Live {
                 standby: Some(config.clone())
             }
-            .workers(provider.clone(), false, true)
+            .workers(
+                provider.clone(),
+                RouteFlags {
+                    only_voice: true,
+                    ..flags(false, true)
+                }
+            )
             .unwrap(),
             Workers {
                 role: "provider",
                 arguments: provider.clone(),
-                standby: Some(arguments(&provider, &config, false, true, false).unwrap()),
+                standby: Some(arguments(&provider, &config, &flags(false, true)).unwrap()),
             }
         );
         let alone = Routes::SecondOnly(config.clone())
-            .workers(provider.clone(), true, false)
+            .workers(provider.clone(), flags(true, false))
             .unwrap();
         assert_eq!(
             alone,
             Workers {
                 role: "second",
-                arguments: arguments(&provider, &config, true, false, true).unwrap(),
+                arguments: arguments(
+                    &provider,
+                    &config,
+                    &RouteFlags {
+                        only_voice: true,
+                        ..flags(true, false)
+                    }
+                )
+                .unwrap(),
                 standby: None,
             }
         );
@@ -1144,9 +1256,94 @@ mod tests {
                 "/etc/second.json",
                 "--wait-cue",
                 "--only-voice",
+                "--gemini-speech",
                 "--tools"
             ]
         );
+    }
+
+    /// The Gemini switches are on with `gemini` and off unset or empty;
+    /// anything else is refused at start. The two older ones keep `on`.
+    #[test]
+    fn the_second_routes_switches_are_read_and_a_wrong_one_refused() {
+        let flags = |pairs: &'static [(&'static str, &'static str)]| {
+            RouteFlags::from_values(|name| {
+                pairs
+                    .iter()
+                    .find(|(key, _)| *key == name)
+                    .map(|(_, value)| OsString::from(*value))
+            })
+        };
+        assert_eq!(flags(&[]), Ok(RouteFlags::default()));
+        assert_eq!(
+            flags(&[
+                ("LAMP_SECOND_CHAT", "gemini"),
+                ("LAMP_SECOND_SPEECH", ""),
+                ("LAMP_SECOND_WAIT_CUE", "on"),
+                ("LAMP_SECOND_DOWN_LINE", "yes"),
+            ]),
+            Ok(RouteFlags {
+                wait_cue: true,
+                chat: Some(ChatRoute::Gemini),
+                ..RouteFlags::default()
+            })
+        );
+        assert_eq!(
+            flags(&[("LAMP_SECOND_SPEECH", "gemini")]).map(|f| f.gemini_speech),
+            Ok(true)
+        );
+        assert_eq!(
+            flags(&[
+                ("LAMP_SECOND_CHAT", "openrouter"),
+                ("LAMP_SECOND_SEARCH", "openrouter"),
+            ]),
+            Ok(RouteFlags {
+                chat: Some(ChatRoute::OpenRouter),
+                search: Some(SearchRoute::OpenRouter),
+                ..RouteFlags::default()
+            })
+        );
+        assert_eq!(
+            flags(&[
+                ("LAMP_SECOND_CHAT", "deepseek"),
+                ("LAMP_SECOND_SEARCH", "deepseek"),
+            ]),
+            Ok(RouteFlags {
+                chat: Some(ChatRoute::DeepSeek),
+                search: Some(SearchRoute::DeepSeek),
+                ..RouteFlags::default()
+            })
+        );
+        assert_eq!(
+            flags(&[("LAMP_SECOND_SEARCH", "exa")]).map(|f| f.search),
+            Ok(Some(SearchRoute::Exa))
+        );
+        for (name, value, words) in [
+            ("LAMP_SECOND_CHAT", "on", "gemini, openrouter, deepseek"),
+            (
+                "LAMP_SECOND_CHAT",
+                "DeepSeek",
+                "gemini, openrouter, deepseek",
+            ),
+            ("LAMP_SECOND_SPEECH", "Gemini", "gemini"),
+            ("LAMP_SECOND_SPEECH", "elevenlabs", "gemini"),
+            ("LAMP_SECOND_SEARCH", "google", "deepseek, openrouter, exa"),
+        ] {
+            let why =
+                RouteFlags::from_values(|asked| (asked == name).then(|| OsString::from(value)))
+                    .unwrap_err();
+            assert_eq!(
+                why,
+                format!("{name} is {words} or nothing, not {value:?}: the voice does not start")
+            );
+        }
+        // OpenRouter's web plugin rides on OpenRouter's chat alone.
+        let why = flags(&[
+            ("LAMP_SECOND_CHAT", "deepseek"),
+            ("LAMP_SECOND_SEARCH", "openrouter"),
+        ])
+        .unwrap_err();
+        assert!(why.contains("needs LAMP_SECOND_CHAT=openrouter"), "{why}");
     }
 
     /// Mute, privacy and cancellation all publish an authority without

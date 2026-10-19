@@ -46,6 +46,27 @@ fn stt_check_options(rest: &[String]) -> Result<(u32, u32)> {
     Ok((rounds, held))
 }
 
+/// `probe-cascade`'s `[RUNS] [--look JPEG]`, in that order: five runs and
+/// no look unless said; at most 50 runs.
+fn probe_options(rest: &[String]) -> Result<(u32, Option<std::path::PathBuf>)> {
+    let usage = || {
+        io::Error::other("usage: probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG]")
+    };
+    let (runs, rest) = match rest {
+        [runs, rest @ ..] if !runs.starts_with("--") => (runs.parse().map_err(|_| usage())?, rest),
+        _ => (5, rest),
+    };
+    let look = match rest {
+        [] => None,
+        [flag, jpeg] if flag == "--look" => Some(std::path::PathBuf::from(jpeg)),
+        _ => return Err(usage().into()),
+    };
+    if !(1..=50).contains(&runs) {
+        return Err(usage().into());
+    }
+    Ok((runs, look))
+}
+
 fn run() -> Result<()> {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     // The voice runs only as a command on its list, and a worker only in a
@@ -622,17 +643,26 @@ fn run() -> Result<()> {
                 _ => return Err(io::Error::other("unknown worker role").into()),
             }
         }
-        // worker second DIR PARENT WORKER PROVIDER_CONFIG SECOND_CONFIG [--wait-cue] [--down-line] [--only-voice] [the provider worker's flags but --keep-link]
+        // worker second DIR PARENT WORKER PROVIDER_CONFIG SECOND_CONFIG [--wait-cue] [--down-line] [--only-voice] [--gemini-chat] [--gemini-speech] [the provider worker's flags but --keep-link]
         [command, role, dir, parent, worker, provider_config, second_config, flags @ ..] if command == "worker" && role == "second" => {
-            let (wait_cue, flags) = lamp_voice::second_provider::worker::take_wait_cue(flags);
-            let (down_line, flags) = lamp_voice::second_provider::worker::take_down_line(flags);
-            let (only_voice, flags) = lamp_voice::second_provider::worker::take_only_voice(flags);
+            let (route, flags) = lamp_voice::second_provider::worker::RouteFlags::take(flags);
             let (_, _, files, _) = lamp_voice::second_provider::worker::parse_flags(Path::new(dir), flags)?;
             let parent = parse_boot(parent)?;
             let worker = parse_boot(worker)?;
             let mut channels = WorkerChannels::bind(Path::new(dir), role, parent, worker, true)?;
+            // The only voice takes its input late, as the Live worker does.
+            if route.only_voice {
+                channels = channels.taking_late_input();
+            }
             channels.connect(Path::new(dir), role, true)?;
-            lamp_voice::second_provider::worker::serve(channels, parent, Path::new(provider_config), Path::new(second_config), files, wait_cue, down_line, only_voice)?;
+            lamp_voice::second_provider::worker::serve(channels, parent, Path::new(provider_config), Path::new(second_config), files, route)?;
+        }
+        // probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG]
+        [command, provider_config, second_config, rest @ ..] if command == "probe-cascade" => {
+            let (runs, look) = probe_options(rest)?;
+            tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                lamp_voice::second_provider::probe::run(Path::new(provider_config), Path::new(second_config), runs, look.as_deref()),
+            )?;
         }
         // worker ring DIR PARENT WORKER --continuous [--resting CEILING] [--bus-root DIR] [--eye] [--head-touch] [--light-requests]
         #[cfg(target_os = "linux")]

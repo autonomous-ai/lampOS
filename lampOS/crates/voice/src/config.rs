@@ -153,6 +153,20 @@ pub fn take_patience(flags: &[String]) -> (bool, &[String]) {
 }
 
 impl ProviderConfig {
+    /// The Live route's voice, by its name (Kore on the lamps).
+    pub fn voice(&self) -> &str {
+        &self.voice
+    }
+
+    /// The Live route's key file, when it is a Google API key: its endpoint
+    /// is Google's own, not a relay's, and it is sent as an API key. A
+    /// relay's key is never given to Google.
+    pub fn google_credential_file(&self) -> Option<&Path> {
+        (self.endpoint == lamp_gemini::GOOGLE_ENDPOINT
+            && matches!(self.authentication, Authentication::ApiKey))
+        .then(|| Path::new(&self.credential_file))
+    }
+
     pub fn load(path: &Path) -> io::Result<Self> {
         let data = read_private(path, 16_384)?;
         let config: Self = serde_json::from_slice(&data).map_err(|_| {
@@ -479,6 +493,34 @@ pub fn patient_writes(session: SessionConfig) -> io::Result<SessionConfig> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The second route's Gemini calls may use the Live route's key only when
+    /// it is Google's own API key: never a relay's, nor a bearer token.
+    #[test]
+    fn the_live_key_is_googles_only_with_googles_endpoint_and_an_api_key() {
+        let config = |endpoint: &str, extra: &str| -> ProviderConfig {
+            serde_json::from_str(&format!(
+                r#"{{"endpoint":"{endpoint}","model":"m","voice":"Kore","credential_file":"/run/credential"{extra}}}"#
+            ))
+            .unwrap()
+        };
+        let google = config(lamp_gemini::GOOGLE_ENDPOINT, "");
+        assert_eq!(google.voice(), "Kore");
+        assert_eq!(
+            google.google_credential_file(),
+            Some(Path::new("/run/credential"))
+        );
+        let relay = "wss://campaign-api.autonomous.ai/api/v1/ai/v1/ws/gemini/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent";
+        assert_eq!(config(relay, "").google_credential_file(), None);
+        assert_eq!(
+            config(
+                lamp_gemini::GOOGLE_ENDPOINT,
+                r#","authentication":"bearer""#
+            )
+            .google_credential_file(),
+            None
+        );
+    }
 
     fn parsed(extra: &str) -> Result<ProviderConfig, serde_json::Error> {
         serde_json::from_str(&format!(

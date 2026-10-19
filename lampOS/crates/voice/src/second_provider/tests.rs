@@ -113,6 +113,7 @@ fn text(piece: &str) -> net::Result<ChatEvent> {
 
 fn call(id: &str, name: &str, args: Value) -> ToolCall {
     ToolCall {
+        extra: None,
         id: id.into(),
         name: name.into(),
         args,
@@ -201,6 +202,14 @@ async fn turn(engine: &mut Engine) -> Vec<String> {
                 assert!(finished);
                 (format!("heard:{text}"), false)
             }
+            // The words' end (`finished`) and the request's times, each
+            // checked by its own test.
+            ProviderOutput::Transcript {
+                request: Some(_),
+                text,
+                finished: true,
+            } if text.is_empty() => continue,
+            ProviderOutput::Stages { .. } => continue,
             ProviderOutput::Transcript {
                 request: Some(_),
                 text,
@@ -349,6 +358,131 @@ async fn a_tool_call_is_run_and_its_result_answered() {
     );
 }
 
+/// The route A/B of 19 Oct: three hand-overs asked of the second route
+/// alone, none handed over. A spoken request naming Claude Code is asked
+/// with the Live route's staff note beside its words (`LAMP_STAFF_NOTE=on`,
+/// `worker::staff_noting`), `start_agent_task` is among the functions this
+/// route declares, and the call the model makes is run through this
+/// route's own runner (`worker::tool_runner`, as `serve` builds it) to the
+/// tasks part, which prepares the work; the model is told so and asks, and
+/// the lamp says it.
+#[test]
+fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
+    let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let directory = std::env::temp_dir().join(format!("second-tasks-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&directory);
+    std::fs::create_dir_all(&directory).unwrap();
+    let seen = crate::agent_tasks::tests::tasks_part(
+        &directory,
+        vec![
+            (
+                "request.sock",
+                json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}}),
+            ),
+            (
+                "request.sock",
+                json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+            ),
+        ],
+    );
+    let place = crate::agent_tasks::Place {
+        directory: directory.clone(),
+        target: crate::agent_tasks::DEFAULT_TARGET.into(),
+        who: false,
+        lead_in: false,
+        asked: false,
+        needs: None,
+        staff_note: true,
+        accounts: false,
+    };
+    let settings = crate::tools::Settings {
+        tasks: Some(place.clone()),
+        ..crate::tools::Settings::default()
+    };
+    assert!(
+        crate::tools::declared(&settings)
+            .iter()
+            .any(|tool| tool.name == crate::agent_tasks::START)
+    );
+    let task = "Write a two-line poem about the rain";
+    let asked = call("c1", crate::agent_tasks::START, json!({ "task": task }));
+    let heard = "Hey Lamp, ask Claude Code to write a two-line poem about the rain.";
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(heard.to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![asked.clone()])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Shall I start it?"), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        worker::tool_runner(settings, None),
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .noting_staff(worker::staff_noting(place));
+    let labels = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            turn(&mut engine).await
+        });
+    let _ = std::fs::remove_dir_all(&directory);
+    assert_eq!(
+        labels[labels.len() - 4..],
+        [
+            "said:Shall I start it?",
+            "audio:17",
+            "generated",
+            "complete"
+        ]
+    );
+    let asked_of = script.asked.lock().unwrap();
+    assert_eq!(
+        asked_of[0],
+        [
+            Message::system("SYSTEM"),
+            Message::system(crate::staff_note::note(&["Claude Code"])),
+            Message::user(heard),
+        ]
+    );
+    let ops: Vec<Value> = seen.try_iter().collect();
+    assert_eq!(ops.len(), 2, "{ops:?}");
+    assert_eq!(ops[0]["op"], "status");
+    assert_eq!(
+        (&ops[1]["op"], &ops[1]["text"], &ops[1]["target"]),
+        (
+            &json!("prepare"),
+            &json!(task),
+            &json!(crate::agent_tasks::DEFAULT_TARGET)
+        )
+    );
+    let told = asked_of[1]
+        .iter()
+        .find(|message| message.role == "tool")
+        .and_then(|message| message.content.as_ref()?.as_str())
+        .and_then(|content| serde_json::from_str::<Value>(content).ok())
+        .expect("the model is told what the call did");
+    assert_eq!(
+        (&told["prepared"], &told["task"]),
+        (&json!(true), &json!(task))
+    );
+}
+
 #[tokio::test]
 async fn not_for_me_ends_the_turn_in_silence() {
     let script = Arc::new(Script {
@@ -437,6 +571,12 @@ async fn a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered() {
     loop {
         match engine.next().await {
             ProviderOutput::Started { .. } => seen.push("started"),
+            // Its times: nothing reached.
+            ProviderOutput::Stages {
+                chat_ms: None,
+                audio_ms: None,
+                ..
+            } => seen.push("stages"),
             ProviderOutput::TurnComplete { .. } => {
                 seen.push("complete");
                 break;
@@ -444,7 +584,7 @@ async fn a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered() {
             other => panic!("{other:?}"),
         }
     }
-    assert_eq!(seen, ["started", "complete"]);
+    assert_eq!(seen, ["started", "stages", "complete"]);
     assert!(begun.elapsed() >= BEGIN_WITHIN, "{:?}", begun.elapsed());
     assert!(calls.lock().unwrap().is_empty());
 }
@@ -579,6 +719,62 @@ async fn a_slow_first_round_makes_one_soft_sound_and_waits_longer() {
 
 fn written_turn(request: u64, words: &str) -> ProviderInput {
     written(request, words)
+}
+
+/// The first builder, 19 Oct: an A/B is scored on each request's first
+/// answer audio, never its wait cue. Every request sends its times before
+/// its end: one that waited with a sound has its words, its cue, its chat's
+/// first event and its answer's first audio; one whose chat never began
+/// has its words and its cue and nothing after; a written one no words.
+#[tokio::test(start_paused = true)]
+async fn each_request_sends_its_times_before_its_end() {
+    async fn times_of(engine: &mut Engine) -> (Option<[bool; 4]>, bool) {
+        let mut times = None;
+        loop {
+            match tokio::time::timeout(Duration::from_secs(30), engine.next())
+                .await
+                .expect("the turn ends")
+            {
+                ProviderOutput::Stages {
+                    words_ms,
+                    cue_ms,
+                    chat_ms,
+                    audio_ms,
+                    ..
+                } => {
+                    times = Some([
+                        words_ms.is_some(),
+                        cue_ms.is_some(),
+                        chat_ms.is_some(),
+                        audio_ms.is_some(),
+                    ])
+                }
+                ProviderOutput::TurnComplete { .. } | ProviderOutput::TurnFailed { .. } => {
+                    return (times, true);
+                }
+                _ => {}
+            }
+        }
+    }
+    let answer = || vec![vec![text("It is noon."), Ok(ChatEvent::Done)]];
+    let mut slow = waiting(Some(Duration::from_millis(2_000)), answer());
+    spoken_turn(&mut slow);
+    assert_eq!(
+        times_of(&mut slow).await,
+        (Some([true, true, true, true]), true)
+    );
+    let mut never = waiting(None, vec![vec![]]);
+    spoken_turn(&mut never);
+    assert_eq!(
+        times_of(&mut never).await,
+        (Some([true, true, false, false]), true)
+    );
+    let mut written = waiting(Some(Duration::from_millis(100)), answer());
+    written.submit(written_turn(2, "What time is it?"));
+    assert_eq!(
+        times_of(&mut written).await,
+        (Some([false, false, true, true]), true)
+    );
 }
 
 /// The next sound is never the one played last.
@@ -822,6 +1018,80 @@ async fn the_announcement_is_said_once_per_quiet_spell() {
     assert!(announced(&turn(&mut engine).await));
 }
 
+/// The lamp's words end as the Live route's do: after the last sentence's
+/// audio, one empty piece, finished; a turn that said nothing has none.
+#[tokio::test]
+async fn the_lamps_words_end_with_a_finished_piece_as_the_live_routes_do() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [
+                vec![text("It is noon. Enjoy lunch!"), Ok(ChatEvent::Done)],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        NOT_FOR_ME,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.announcing(false);
+    let pieces = |events: &[ProviderOutput]| -> Vec<(String, bool)> {
+        events
+            .iter()
+            .filter_map(|event| match event {
+                ProviderOutput::Transcript {
+                    request: Some(_),
+                    text,
+                    finished,
+                } => Some((text.clone(), *finished)),
+                _ => None,
+            })
+            .collect()
+    };
+    async fn turn_of(engine: &mut Engine) -> Vec<ProviderOutput> {
+        let mut events = Vec::new();
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+                .await
+                .expect("the turn ends");
+            let done = matches!(event, ProviderOutput::TurnComplete { .. });
+            events.push(event);
+            if done {
+                return events;
+            }
+        }
+    }
+    engine.submit(written(1, "Time?"));
+    let events = turn_of(&mut engine).await;
+    assert_eq!(
+        pieces(&events),
+        [
+            ("It is noon.".to_owned(), false),
+            (" Enjoy lunch!".to_owned(), false),
+            (String::new(), true),
+        ]
+    );
+    // After every packet of audio, before the turn's end.
+    let finished_at = events
+        .iter()
+        .position(|event| matches!(event, ProviderOutput::Transcript { finished: true, .. }))
+        .unwrap();
+    assert!(
+        events[finished_at..]
+            .iter()
+            .all(|event| !matches!(event, ProviderOutput::Audio { .. }))
+    );
+    engine.submit(written(2, "Not you."));
+    let events = turn_of(&mut engine).await;
+    assert!(pieces(&events).is_empty(), "{:?}", pieces(&events));
+}
+
 /// The lamp's only voice (`LAMP_VOICE_ROUTE=second`, `--only-voice`) never
 /// says its voice sounds different: the first answer after a quiet spell
 /// is the model's own first words.
@@ -948,6 +1218,78 @@ async fn a_reminder_is_deferred_as_the_fixture_does() {
         late_by_ms: None,
     });
     assert_eq!(turn(&mut engine).await, ["deferred:Disabled"]);
+}
+
+fn reminder(request: u64, text: &str) -> ProviderInput {
+    ProviderInput::Reminder {
+        request,
+        session: 1,
+        privacy_generation: 1,
+        text: text.into(),
+        late: false,
+        late_by_ms: None,
+    }
+}
+
+/// The only voice (`LAMP_VOICE_ROUTE=second`, with the lamp saying its
+/// reminders) says a due reminder as the Live route does: the chat is
+/// given the Live route's own note for it, the item's words as data, and
+/// what it says is said. A call it makes is not run: a reminder is only
+/// said. An item the Live route would refuse is refused the same way.
+#[tokio::test]
+async fn the_only_voice_says_a_due_reminder_with_the_live_routes_note_and_no_tools() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            [
+                vec![text("Time to stretch."), Ok(ChatEvent::Done)],
+                vec![
+                    text("Stretch now."),
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "set_timer",
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, calls, _) = scripted(script.clone());
+    let mut engine = engine.announcing(false).saying_reminders(true);
+    engine.submit(reminder(1, "stretch"));
+    assert_eq!(
+        turn(&mut engine).await,
+        [
+            "started:1".to_owned(),
+            "said:Time to stretch.".into(),
+            "audio:16".into(),
+            "generated".into(),
+            "complete".into(),
+        ]
+    );
+    let note = crate::provider_worker::reminder_note("stretch", false, None).unwrap();
+    assert_eq!(script.asked.lock().unwrap()[0][1], Message::user(note));
+    engine.submit(reminder(2, "stretch"));
+    assert_eq!(
+        turn(&mut engine).await,
+        [
+            "started:2".to_owned(),
+            "said:Stretch now.".into(),
+            "audio:12".into(),
+            "generated".into(),
+            "complete".into(),
+        ]
+    );
+    assert!(calls.lock().unwrap().is_empty(), "no tool ran");
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        2,
+        "no round after the call"
+    );
+    engine.submit(reminder(3, "  "));
+    assert_eq!(turn(&mut engine).await, ["deferred:Invalid"]);
 }
 
 #[tokio::test]
@@ -1134,11 +1476,12 @@ async fn a_look_waits_five_seconds_and_then_says_it_could_not_look() {
         let mut said = Vec::new();
         loop {
             match engine.next().await {
+                // The words' end (`finished`) adds none.
                 ProviderOutput::Transcript {
                     request: Some(_),
                     text,
                     ..
-                } => said.push(text),
+                } if !text.is_empty() => said.push(text),
                 ProviderOutput::TurnComplete { .. } => return (said, begun.elapsed()),
                 ProviderOutput::TurnFailed { .. } => panic!("failed"),
                 _ => {}
@@ -1183,11 +1526,12 @@ async fn a_full_look_without_its_still_still_says_it_could_not_look() {
     let mut said = Vec::new();
     loop {
         match engine.next().await {
+            // The words' end (`finished`) adds none.
             ProviderOutput::Transcript {
                 request: Some(_),
                 text,
                 ..
-            } => said.push(text),
+            } if !text.is_empty() => said.push(text),
             ProviderOutput::TurnComplete { .. } => break,
             ProviderOutput::TurnFailed { .. } => panic!("failed"),
             _ => {}
@@ -1569,4 +1913,121 @@ async fn a_request_going_on_names_the_one_begun_before_it_in_its_session() {
         turn(&mut engine).await;
     }
     assert_eq!(*froms.lock().unwrap(), [None, Some(1), None]);
+}
+
+/// #1712: with the second route as the lamp's only voice, nothing publishes
+/// `room/state`, so it keeps the room itself, as the Live worker does. Three
+/// spoken lines the model leaves alone within a minute make the room busy;
+/// the lamp answering a line counts as speaking, not as talk.
+#[tokio::test]
+async fn lines_left_unanswered_make_the_routes_room_busy_and_an_answer_is_speaking() {
+    let silent = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                NOT_FOR_ME,
+                json!({}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Did you see the game?".to_owned()),
+                Ok("Yes, last night.".to_owned()),
+                Ok("What a finish.".to_owned()),
+                Ok("Lamp, what time is it?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                silent(),
+                silent(),
+                silent(),
+                vec![text("It's noon."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (mut engine, _, _) = scripted(script);
+    let room_now = || {
+        crate::room_told::room()
+            .lock()
+            .unwrap()
+            .at(lamp_ipc::monotonic_us())
+    };
+    assert_eq!(room_now(), crate::room_told::Room::Unknown);
+    for request in 1..=3 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    }
+    assert_eq!(room_now(), crate::room_told::Room::Busy);
+    engine.submit(start(4));
+    engine.submit(audio(4, 1));
+    engine.submit(end(4));
+    assert!(
+        turn(&mut engine)
+            .await
+            .contains(&"said:It's noon.".to_owned())
+    );
+    // The answer cleared the run of lines left alone: two more are no busy
+    // room's run of three.
+    assert!(
+        !crate::room_told::room()
+            .lock()
+            .unwrap()
+            .talked_past_the_lamp()
+    );
+}
+
+/// #1712: a spoken line the lamp's name began is asked with the Live route's
+/// note beside the words (`LAMP_NAME_NOTE=on`, `worker::Heeding`); a line
+/// without it, with none.
+#[tokio::test]
+async fn a_line_the_name_began_is_asked_with_the_name_note() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Lamp, what time is it?".to_owned()),
+                Ok("What time is it?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("It's noon."), Ok(ChatEvent::Done)],
+                vec![text("Noon."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.noting_the_name(Arc::new(|request| {
+        (request == 1).then_some(crate::called::note(false))
+    }));
+    for request in 1..=2 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    }
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(
+        asked[0],
+        [
+            Message::system("SYSTEM"),
+            Message::system(crate::called::note(false)),
+            Message::user("Lamp, what time is it?"),
+        ]
+    );
+    assert_eq!(
+        asked[1],
+        [Message::system("SYSTEM"), Message::user("What time is it?")]
+    );
 }

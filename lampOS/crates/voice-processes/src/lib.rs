@@ -30,10 +30,13 @@ pub enum Command {
     TurnTimes,
     /// The stall lines of tonight (`lamp-voice stalls`, #1178): read only.
     Stalls,
+    /// The second route's candidate services timed from the lamp
+    /// (`lamp-voice probe-cascade`): times only, run by hand.
+    ProbeCascade,
 }
 
 impl Command {
-    pub const ALL: [Command; 12] = [
+    pub const ALL: [Command; 13] = [
         Command::Serve,
         Command::Directed,
         Command::DirectedFixture,
@@ -46,6 +49,7 @@ impl Command {
         Command::Marked,
         Command::TurnTimes,
         Command::Stalls,
+        Command::ProbeCascade,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -62,6 +66,7 @@ impl Command {
             Command::Marked => "marked",
             Command::TurnTimes => "turn-times",
             Command::Stalls => "stalls",
+            Command::ProbeCascade => "probe-cascade",
         }
     }
 

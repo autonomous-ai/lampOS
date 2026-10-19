@@ -7,7 +7,11 @@
 //! conversation thread as a Live session is, with the same tools, and each
 //! turn kept in that thread and the memory's journal as the Live route
 //! keeps its own.
-use super::{Engine, Net, Told, ToolRunner, net::Message, output_request};
+use super::{
+    Engine, Net, Told, ToolRunner,
+    net::{Message, search::Search},
+    output_request,
+};
 use crate::{
     provider_flow::OutputSender,
     provider_link::{LinkContext, ProviderLink, ProviderLinkState},
@@ -232,48 +236,195 @@ pub const WAIT_CUE_ENVIRONMENT: &str = "LAMP_SECOND_WAIT_CUE";
 /// The worker's flag for it, right after the second route's configuration.
 pub const WAIT_CUE_FLAG: &str = "--wait-cue";
 
-/// Whether the service's environment says `LAMP_SECOND_WAIT_CUE=on`.
-pub fn wait_cue_from_environment() -> bool {
-    std::env::var(WAIT_CUE_ENVIRONMENT).ok().as_deref() == Some("on")
-}
-
-/// Take a leading `--wait-cue` off the worker's flags.
-pub fn take_wait_cue(flags: &[String]) -> (bool, &[String]) {
-    match flags {
-        [flag, rest @ ..] if flag == WAIT_CUE_FLAG => (true, rest),
-        _ => (false, flags),
-    }
-}
-
 /// Where the coordinator reads whether a turn the chat never began says
 /// [`super::DOWN_LINE`]. `on` only.
 pub const DOWN_LINE_ENVIRONMENT: &str = "LAMP_SECOND_DOWN_LINE";
-/// The worker's flag for it, after `--wait-cue` if that is given.
+/// The worker's flag for it.
 pub const DOWN_LINE_FLAG: &str = "--down-line";
 
-/// Whether the service's environment says `LAMP_SECOND_DOWN_LINE=on`.
-pub fn down_line_from_environment() -> bool {
-    std::env::var(DOWN_LINE_ENVIRONMENT).ok().as_deref() == Some("on")
-}
-
-/// Take a leading `--down-line` off the worker's flags.
-pub fn take_down_line(flags: &[String]) -> (bool, &[String]) {
-    match flags {
-        [flag, rest @ ..] if flag == DOWN_LINE_FLAG => (true, rest),
-        _ => (false, flags),
-    }
-}
-
 /// The worker's flag when this route is the lamp's only voice
-/// (`LAMP_VOICE_ROUTE=second`), after `--down-line` if that is given: it
-/// says no [`super::ANNOUNCEMENT`], as there is no other voice to differ from.
+/// (`LAMP_VOICE_ROUTE=second`): it says no [`super::ANNOUNCEMENT`], as there
+/// is no other voice to differ from, says due reminders, and takes its
+/// input late as the Live worker does.
 pub const ONLY_VOICE_FLAG: &str = "--only-voice";
 
-/// Take a leading `--only-voice` off the worker's flags.
-pub fn take_only_voice(flags: &[String]) -> (bool, &[String]) {
-    match flags {
-        [flag, rest @ ..] if flag == ONLY_VOICE_FLAG => (true, rest),
-        _ => (false, flags),
+/// Where the coordinator reads which text model this route asks in place of
+/// the configured chat: `gemini` (Google's API, directly), `openrouter`
+/// (OpenRouter) or `deepseek` (DeepSeek's own API). Off unset or empty; any
+/// other value is refused at start.
+pub const CHAT_ENVIRONMENT: &str = "LAMP_SECOND_CHAT";
+/// Where the coordinator reads whether this route's speech is Gemini's own
+/// speech model (`gemini`), the configured voice when it fails. As
+/// [`CHAT_ENVIRONMENT`].
+pub const SPEECH_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH";
+pub const GEMINI_SPEECH_FLAG: &str = "--gemini-speech";
+/// Where the coordinator reads which web search the model may use:
+/// `deepseek` (DeepSeek's Search & Fetch, as functions), `openrouter`
+/// (OpenRouter's web plugin, with `LAMP_SECOND_CHAT=openrouter` only) or
+/// `exa` (`second.json`'s `search_url`). As [`CHAT_ENVIRONMENT`].
+pub const SEARCH_ENVIRONMENT: &str = "LAMP_SECOND_SEARCH";
+
+/// The text model in place of the configured chat (`LAMP_SECOND_CHAT`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ChatRoute {
+    Gemini,
+    OpenRouter,
+    DeepSeek,
+}
+
+/// The web search the model may use (`LAMP_SECOND_SEARCH`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SearchRoute {
+    DeepSeek,
+    OpenRouter,
+    Exa,
+}
+
+/// The second route's own flags, given right after its configuration, each
+/// only when on, in the order of the fields.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RouteFlags {
+    /// `LAMP_SECOND_WAIT_CUE=on`.
+    pub wait_cue: bool,
+    /// `LAMP_SECOND_DOWN_LINE=on`.
+    pub down_line: bool,
+    /// `LAMP_VOICE_ROUTE=second`, set by the coordinator's routes.
+    pub only_voice: bool,
+    /// `LAMP_SECOND_CHAT`.
+    pub chat: Option<ChatRoute>,
+    /// `LAMP_SECOND_SPEECH=gemini`.
+    pub gemini_speech: bool,
+    /// `LAMP_SECOND_SEARCH`.
+    pub search: Option<SearchRoute>,
+}
+
+/// Each choice's word in the environment, and its worker flag.
+const CHATS: [(ChatRoute, &str, &str); 3] = [
+    (ChatRoute::Gemini, "gemini", "--gemini-chat"),
+    (ChatRoute::OpenRouter, "openrouter", "--openrouter-chat"),
+    (ChatRoute::DeepSeek, "deepseek", "--deepseek-chat"),
+];
+const SEARCHES: [(SearchRoute, &str, &str); 3] = [
+    (SearchRoute::DeepSeek, "deepseek", "--deepseek-search"),
+    (SearchRoute::OpenRouter, "openrouter", "--openrouter-search"),
+    (SearchRoute::Exa, "exa", "--exa-search"),
+];
+
+/// One of `table`'s words for `value`; nothing unset or empty; why not.
+fn choice<T: Copy>(
+    name: &str,
+    value: Option<std::ffi::OsString>,
+    table: &[(T, &str, &str)],
+) -> Result<Option<T>, String> {
+    let Some(value) = value.filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    table
+        .iter()
+        .find(|(_, word, _)| value == *word)
+        .map(|(route, ..)| Some(*route))
+        .ok_or_else(|| {
+            let words: Vec<&str> = table.iter().map(|(_, word, _)| *word).collect();
+            format!(
+                "{name} is {} or nothing, not {value:?}: the voice does not start",
+                words.join(", ")
+            )
+        })
+}
+
+impl RouteFlags {
+    /// The switches (all but `only_voice`) as `var` gives them from the
+    /// service's environment (`coordinator::second`). The two `on` switches
+    /// are on with `on` only, as before; the others with one of their words,
+    /// off unset or empty, and refused with anything else, as is OpenRouter's
+    /// search without OpenRouter's chat, which it rides on.
+    pub fn from_values(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Result<Self, String> {
+        let on = |name| var(name).is_some_and(|value| value == "on");
+        let route = Self {
+            wait_cue: on(WAIT_CUE_ENVIRONMENT),
+            down_line: on(DOWN_LINE_ENVIRONMENT),
+            only_voice: false,
+            chat: choice(CHAT_ENVIRONMENT, var(CHAT_ENVIRONMENT), &CHATS)?,
+            gemini_speech: choice(
+                SPEECH_ENVIRONMENT,
+                var(SPEECH_ENVIRONMENT),
+                &[((), "gemini", GEMINI_SPEECH_FLAG)],
+            )?
+            .is_some(),
+            search: choice(SEARCH_ENVIRONMENT, var(SEARCH_ENVIRONMENT), &SEARCHES)?,
+        };
+        if route.search == Some(SearchRoute::OpenRouter)
+            && route.chat != Some(ChatRoute::OpenRouter)
+        {
+            return Err(format!(
+                "{SEARCH_ENVIRONMENT}=openrouter is OpenRouter's web plugin and needs {CHAT_ENVIRONMENT}=openrouter: the voice does not start"
+            ));
+        }
+        Ok(route)
+    }
+
+    /// The worker's flags for these switches, in order.
+    pub fn flags(&self) -> Vec<&'static str> {
+        let mut flags = Vec::new();
+        for (on, flag) in [
+            (self.wait_cue, WAIT_CUE_FLAG),
+            (self.down_line, DOWN_LINE_FLAG),
+            (self.only_voice, ONLY_VOICE_FLAG),
+        ] {
+            if on {
+                flags.push(flag);
+            }
+        }
+        flags.extend(
+            CHATS
+                .iter()
+                .filter(|(route, ..)| self.chat == Some(*route))
+                .map(|(.., flag)| *flag),
+        );
+        if self.gemini_speech {
+            flags.push(GEMINI_SPEECH_FLAG);
+        }
+        flags.extend(
+            SEARCHES
+                .iter()
+                .filter(|(route, ..)| self.search == Some(*route))
+                .map(|(.., flag)| *flag),
+        );
+        flags
+    }
+
+    /// Take the leading flags off the worker's, in order.
+    pub fn take(mut flags: &[String]) -> (Self, &[String]) {
+        let mut next = |flag: &str| match flags {
+            [first, rest @ ..] if first == flag => {
+                flags = rest;
+                true
+            }
+            _ => false,
+        };
+        let wait_cue = next(WAIT_CUE_FLAG);
+        let down_line = next(DOWN_LINE_FLAG);
+        let only_voice = next(ONLY_VOICE_FLAG);
+        let chat = CHATS
+            .iter()
+            .find(|(.., flag)| next(flag))
+            .map(|(chat, ..)| *chat);
+        let gemini_speech = next(GEMINI_SPEECH_FLAG);
+        let search = SEARCHES
+            .iter()
+            .find(|(.., flag)| next(flag))
+            .map(|(search, ..)| *search);
+        (
+            Self {
+                wait_cue,
+                down_line,
+                only_voice,
+                chat,
+                gemini_speech,
+                search,
+            },
+            flags,
+        )
     }
 }
 
@@ -297,25 +448,193 @@ pub fn parse_flags(dir: &Path, flags: &[String]) -> io::Result<crate::provider_w
     Ok(parsed)
 }
 
+/// The key for Gemini's API: the voice unit's credential `gemini.key`
+/// (`LoadCredential=gemini.key:<file>`, in `credentials`, its
+/// `CREDENTIALS_DIRECTORY`), as OpenRouter's and DeepSeek's are; without
+/// it, the Live route's own when that is a Google API key. A credential
+/// there but unreadable (not private, a link) is refused, never passed
+/// over. A relay's key is never sent to Google: without a Google key the
+/// worker does not start.
+pub fn gemini_key(
+    provider: &crate::config::ProviderConfig,
+    credentials: Option<&std::ffi::OsStr>,
+) -> io::Result<crate::second_config::Key> {
+    use crate::second_config::{GEMINI_CREDENTIAL, unit_credential};
+    match unit_credential(credentials, GEMINI_CREDENTIAL) {
+        Ok(key) => return Ok(key),
+        Err(error) if error.kind() != io::ErrorKind::NotFound => return Err(error),
+        Err(_) => {}
+    }
+    match provider.google_credential_file() {
+        Some(file) => crate::second_config::credential(file),
+        None => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "LAMP_SECOND_CHAT=gemini and LAMP_SECOND_SPEECH=gemini call Google directly and need a Google API key: the voice unit's credential gemini.key (LoadCredential=gemini.key:<file>); the Live route's key goes to a relay and is not given to Google",
+        )),
+    }
+}
+
+/// The real services as `route` sets them: the configured chat and voice,
+/// or Gemini's, OpenRouter's or DeepSeek's in their place, each saying so in
+/// the journal once. OpenRouter's and DeepSeek's keys are the voice unit's
+/// credentials, in `credentials` (its `CREDENTIALS_DIRECTORY`).
+pub fn services(
+    config: crate::second_config::SecondConfig,
+    provider: &crate::config::ProviderConfig,
+    route: RouteFlags,
+    credentials: Option<&std::ffi::OsStr>,
+    declare: super::net::Declare,
+) -> io::Result<Net> {
+    use crate::second_config::{DEEPSEEK_CREDENTIAL, OPENROUTER_CREDENTIAL, unit_credential};
+    let gemini = config.gemini.clone();
+    let hosted = config.hosted.clone();
+    let fallback = config.tts_provider.name();
+    let key = (route.chat == Some(ChatRoute::Gemini) || route.gemini_speech)
+        .then(|| gemini_key(provider, credentials))
+        .transpose()?;
+    let mut net = Net::new(config, declare).map_err(io::Error::other)?;
+    let call = |model| {
+        key.as_ref().map(|key| super::services::GeminiCall {
+            base_url: &gemini.base_url,
+            key: key.expose(),
+            model,
+        })
+    };
+    match route.chat {
+        None => {}
+        Some(ChatRoute::Gemini) => {
+            if let Some(call) = call(&gemini.chat_model) {
+                net = net.chatting_with_gemini(&call).map_err(io::Error::other)?;
+            }
+            eprintln!(
+                "lamp-voice second: the text model is Gemini ({}, thinking {}), called directly (LAMP_SECOND_CHAT=gemini)",
+                gemini.chat_model,
+                super::net::GEMINI_REASONING
+            );
+        }
+        Some(ChatRoute::OpenRouter) => {
+            let key = unit_credential(credentials, OPENROUTER_CREDENTIAL)?;
+            let search = route.search == Some(SearchRoute::OpenRouter);
+            net = net
+                .chatting_with_openrouter(key.expose(), search)
+                .map_err(io::Error::other)?;
+            eprintln!(
+                "lamp-voice second: the text model is {} through OpenRouter, the fastest provider first, reasoning {}{} (LAMP_SECOND_CHAT=openrouter)",
+                hosted.openrouter_model,
+                hosted.openrouter_effort,
+                if search {
+                    ", searching the web on Exa before every answer (LAMP_SECOND_SEARCH=openrouter)"
+                } else {
+                    ""
+                }
+            );
+        }
+        Some(ChatRoute::DeepSeek) => {
+            let key = unit_credential(credentials, DEEPSEEK_CREDENTIAL)?;
+            net = net
+                .chatting_with_deepseek(key.expose())
+                .map_err(io::Error::other)?;
+            eprintln!(
+                "lamp-voice second: the text model is DeepSeek's {} on DeepSeek's own API, thinking off (LAMP_SECOND_CHAT=deepseek)",
+                hosted.deepseek_model
+            );
+        }
+    }
+    if route.gemini_speech
+        && let Some(call) = call(&gemini.speech_model)
+    {
+        net = net
+            .speaking_with_gemini(&call, provider.voice())
+            .map_err(io::Error::other)?;
+        eprintln!(
+            "lamp-voice second: speech is Gemini's ({}, voice {}), {fallback} for a sentence it cannot start (LAMP_SECOND_SPEECH=gemini)",
+            gemini.speech_model,
+            provider.voice()
+        );
+    }
+    Ok(net)
+}
+
+/// The web search the model may call as its own functions, as `route` sets
+/// it: DeepSeek's Search & Fetch (its key the unit's `deepseek.key`), or the
+/// search service `second.json` names. OpenRouter's rides on its chat.
+pub fn search_for(
+    config: &crate::second_config::SecondConfig,
+    route: RouteFlags,
+    credentials: Option<&std::ffi::OsStr>,
+) -> io::Result<Option<Search>> {
+    use crate::second_config::{DEEPSEEK_CREDENTIAL, unit_credential};
+    let search = match route.search {
+        None | Some(SearchRoute::OpenRouter) => return Ok(None),
+        Some(SearchRoute::DeepSeek) => {
+            let key = unit_credential(credentials, DEEPSEEK_CREDENTIAL)?;
+            Search::deepseek(key.expose())
+        }
+        Some(SearchRoute::Exa) => {
+            let service = config.search.as_ref().ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "LAMP_SECOND_SEARCH=exa needs search_url and search_credential_file in the second route's configuration",
+                )
+            })?;
+            Search::exa(&service.url, service.key.expose(), service.extra.clone())
+        }
+    }
+    .map_err(io::Error::other)?;
+    let names: Vec<String> = search
+        .declarations()
+        .into_iter()
+        .map(|tool| tool.name)
+        .collect();
+    eprintln!(
+        "lamp-voice second: the model may search the web ({}; LAMP_SECOND_SEARCH)",
+        names.join(", ")
+    );
+    Ok(Some(search))
+}
+
+/// The lamp's functions, then the search's, within Live's bound of
+/// [`lamp_gemini::MAX_TOOLS`]: the search is given room before a skill's
+/// function, and the fetch only when room is left.
+pub fn with_search(
+    mut tools: Vec<lamp_gemini::Tool>,
+    search: &[lamp_gemini::Tool],
+) -> Vec<lamp_gemini::Tool> {
+    let Some((first, rest)) = search.split_first() else {
+        return tools;
+    };
+    tools.truncate(lamp_gemini::MAX_TOOLS - 1);
+    tools.push(first.clone());
+    for tool in rest {
+        if tools.len() < lamp_gemini::MAX_TOOLS {
+            tools.push(tool.clone());
+        }
+    }
+    tools
+}
+
 /// The second route's worker process until Stop. `files` are the Live
 /// provider worker's flags; this route uses the thread's file and the
 /// tools (the memory among them), and has no use yet for the rest. With
-/// `only_voice` (`--only-voice`) it is the lamp's only voice.
-#[allow(clippy::too_many_arguments)]
+/// `route.only_voice` (`--only-voice`) it is the lamp's only voice.
 pub fn serve(
     channels: WorkerChannels,
     boot: BootId,
     provider_config: &Path,
     second_config: &Path,
     files: crate::provider_worker::Files,
-    wait_cue: bool,
-    down_line: bool,
-    only_voice: bool,
+    route: RouteFlags,
 ) -> io::Result<()> {
-    let character = crate::config::ProviderConfig::load(provider_config)?.instruction(false)?;
+    let provider = crate::config::ProviderConfig::load(provider_config)?;
+    let character = provider.instruction(false)?;
     let config = crate::second_config::load_from_path(second_config)?;
     let checked = checks_sounds(&files);
     let tools = files.tools;
+    // As the Live route says them, when this route is the only voice.
+    let reminders = route.only_voice && tools.schedule_speak;
+    if reminders {
+        eprintln!("lamp-voice second: due reminders are said on this route, the lamp's only voice");
+    }
     if let Some(socket) = &tools.memory {
         // As the Live route starts it: each known person's memory apart.
         crate::remember::start(
@@ -323,12 +642,22 @@ pub fn serve(
             tools.who.as_deref().map(crate::known_faces::known_file_of),
         );
     }
+    // The voice unit's credentials (`LoadCredential=`), passed to this
+    // worker alone (`process.rs`).
+    let credentials = std::env::var_os(crate::second_config::CREDENTIALS_ENV);
+    // A web search as functions of its own, with LAMP_SECOND_SEARCH:
+    // declared beside the lamp's tools and answered here.
+    let search = search_for(&config, route, credentials.as_deref())?.map(Arc::new);
+    let searched = search
+        .as_ref()
+        .map(|search| search.declarations())
+        .unwrap_or_default();
     let declared = tools.clone();
     // With `use_skill` the skills' lines are told after the character, as
     // the Live route tells them (#1668).
     let skills_told = tools.clone();
     let declare: crate::second_provider::net::Declare =
-        Arc::new(move || crate::tools::declared(&declared));
+        Arc::new(move || with_search(crate::tools::declared(&declared), &searched));
     // Texts from the Autonomous app (#1673): a client of their own, on the
     // same model, beside the spoken turns.
     let texts = match (&files.bus_root, files.messages) {
@@ -339,7 +668,7 @@ pub fn serve(
         )),
         _ => None,
     };
-    let net = Net::new(config, declare).map_err(io::Error::other)?;
+    let net = services(config, &provider, route, credentials.as_deref(), declare)?;
     let thread = files.thread;
     let file = thread.clone();
     let clock = tools.clock;
@@ -401,21 +730,12 @@ pub fn serve(
             file.as_deref(),
         )
     };
-    let runner: ToolRunner = Arc::new(move |request, heard, name, args| {
-        let settings = tools.clone();
-        Box::pin(async move {
-            let call = lamp_gemini::ToolCall {
-                id: String::new(),
-                name,
-                args,
-            };
-            tokio::task::spawn_blocking(move || {
-                crate::tools::answer(&settings, &call, request, heard)
-            })
-            .await
-            .unwrap_or_else(|_| crate::tools::unavailable())
-        })
-    });
+    let staff = tools
+        .tasks
+        .clone()
+        .filter(|_| files.staff_note)
+        .map(staff_noting);
+    let runner = tool_runner(tools, search);
     let system: crate::second_provider::System = Arc::new(system);
     let mut engine = Engine::new(
         Arc::new(net),
@@ -426,9 +746,13 @@ pub fn serve(
         runner.clone(),
     )
     .checking_sounds(checked)
-    .waiting_with_a_sound(wait_cue)
-    .saying_when_down(down_line)
-    .announcing(!only_voice);
+    .waiting_with_a_sound(route.wait_cue)
+    .saying_when_down(route.down_line)
+    .announcing(!route.only_voice)
+    .saying_reminders(reminders);
+    if let Some(staff) = staff {
+        engine = engine.noting_staff(staff);
+    }
     // A look reads the eyes' look file with the Live route's bounds: a full
     // look's still may be older and larger (#836, #941).
     if let Some(path) = files.look.clone() {
@@ -441,17 +765,50 @@ pub fn serve(
             crate::sight::fresh_up_to(&path, SystemTime::now(), within, most).map(|(jpeg, _)| jpeg)
         }));
     }
+    // As the lamp's only voice this route keeps the room itself (#1712).
+    if route.only_voice {
+        engine = engine.keeping_room(keeping_room(
+            files.attention && files.spoken_to,
+            files.cut_ins_not_talk,
+            files.room_file.as_deref(),
+            files.bus_root.as_deref(),
+        ));
+    }
     if files.attention {
-        let heeding = Mutex::new(Heeding::new(
+        let heeding = Arc::new(Mutex::new(Heeding::new(
             files.attention_busy,
             files.name_in_passing_ignored,
             files.bus_root.as_deref(),
             thread.clone(),
-        ));
+        )));
+        // The name note, as the Live route gives it (`LAMP_NAME_NOTE=on`).
+        if files.name_note
+            && let Ok(mut heeding) = heeding.lock()
+        {
+            heeding.telling_the_name(
+                files.name_note_busy_face,
+                files.name_note && files.name_note_heard_as,
+            );
+        }
+        if files.name_note {
+            let heeding = heeding.clone();
+            engine = engine.noting_the_name(Arc::new(move |request| {
+                heeding.lock().ok()?.name_note_for(request)
+            }));
+        }
         if files.attention_near
             && let (Ok(mut heeding), Some(root)) = (heeding.lock(), files.bus_root.as_deref())
         {
             heeding.hear_levels(root);
+        }
+        if route.only_voice
+            && let Ok(mut heeding) = heeding.lock()
+        {
+            heeding.as_the_only_voice(
+                files.remarks,
+                files.attention && files.spoken_to,
+                files.spoken_to_by_day,
+            );
         }
         engine = engine.heeding(Arc::new(move |request, said, heard, from| {
             heeding
@@ -477,6 +834,158 @@ pub fn serve(
         runtime.spawn(texts_task(chat, character, tools, root));
     }
     runtime.block_on(run(channels, boot, engine, thread))
+}
+
+/// The second route's tool calls: a web search's functions answered by the
+/// search, every other call run as the Live route runs it
+/// (`crate::tools::answer`: the lamp's light and volume, its memory, the
+/// schedule, the tasks part's `start_agent_task` and the rest), whose
+/// journal line for each run is worded as the Live route's.
+pub(crate) fn tool_runner(
+    tools: crate::tools::Settings,
+    search: Option<Arc<Search>>,
+) -> ToolRunner {
+    Arc::new(move |request, heard, name, args| {
+        let settings = tools.clone();
+        let search = search.clone();
+        Box::pin(async move {
+            if let Some(search) = search.filter(|search| search.answers(&name)) {
+                return search.answer(&name, &args).await;
+            }
+            let call = lamp_gemini::ToolCall {
+                id: String::new(),
+                name,
+                args,
+            };
+            tokio::task::spawn_blocking(move || {
+                use crate::tools::Route;
+                let route = crate::tools::route(&settings, &call.name);
+                // The Live route's line for a call the Policy held and then
+                // let run, which the battery counts (`followups.sh`'s "; run
+                // after N ms"): said for each call that route would hold, at
+                // 0 ms, since this route holds none (#1712: 0 tool calls were
+                // counted on it at 09:00).
+                if let Some(line) = run_after(&route, &call.name, request) {
+                    eprintln!("{line}");
+                }
+                // Something done is the lamp answering, words or none, as the
+                // Live worker counts it for the room (#829): not a lookup, and
+                // only for a line heard in the room, never a text from the
+                // app or the lamp's own turn.
+                if heard
+                    && matches!(
+                        route,
+                        Route::Executive(_)
+                            | Route::UseSkill(_)
+                            | Route::Schedule(_)
+                            | Route::Tasks(_)
+                            | Route::Faces(..)
+                            | Route::Mark(_)
+                    )
+                    && let Ok(mut room) = crate::room_told::room().lock()
+                {
+                    room.answered_by_a_call(request, monotonic_us());
+                }
+                crate::tools::answer(&settings, &call, request, heard)
+            })
+            .await
+            .unwrap_or_else(|_| crate::tools::unavailable())
+        })
+    })
+}
+
+/// The journal's line for a call the Live route would hold for the Policy
+/// (`policy_holds::holds`), as that route says it once it lets one run,
+/// for the battery's counters: at 0 ms, since this route holds none.
+pub(crate) fn run_after(route: &crate::tools::Route, name: &str, request: u64) -> Option<String> {
+    crate::policy_holds::holds(route, name).then(|| {
+        format!(
+            "lamp-voice second: request {request} asked for {name}; run after 0 ms: this route holds no call for the Policy"
+        )
+    })
+}
+
+/// The room this route keeps as the lamp's only voice, as the Live worker
+/// keeps its own: taken back from its file at the start, told on the bus
+/// (`room/state`) at each tick, and kept in its file about once a second.
+/// With `spoken_to` (`--spoken-to` and `--attention`) only talk between
+/// people counts, and with `cut_ins_not_talk` a line said over the lamp is
+/// left out, as on the Live worker.
+pub(crate) fn keeping_room(
+    spoken_to: bool,
+    cut_ins_not_talk: bool,
+    room_file: Option<&Path>,
+    bus_root: Option<&Path>,
+) -> Box<dyn FnMut(u64) + Send> {
+    let mut kept_boot = None;
+    if let Ok(mut room) = crate::room_told::room().lock() {
+        room.leave_cut_ins_out(cut_ins_not_talk);
+        room.count_only_talk(spoken_to);
+        if let Some(path) = room_file {
+            let (line, boot) = crate::room_told::start_from(
+                path,
+                Path::new(crate::room_told::MACHINE_BOOT_FILE),
+                &mut room,
+                monotonic_us(),
+            );
+            if let Some(line) = line {
+                eprintln!("lamp-voice second: {line}");
+            }
+            kept_boot = boot.map(|boot| (path.to_path_buf(), boot));
+        }
+    }
+    let mut out = bus_root.and_then(|root| {
+        crate::bus_out::RoomOut::on(root)
+            .inspect_err(|error| {
+                eprintln!("lamp-voice second: the room is not published on the bus: {error}");
+            })
+            .ok()
+    });
+    let mut kept = None;
+    let mut saved_at_us = 0;
+    let mut unwritten_told = false;
+    Box::new(move |now_us| {
+        let Ok(mut room) = crate::room_told::room().lock() else {
+            return;
+        };
+        let now = room.at(now_us);
+        if let Some(out) = out.as_mut() {
+            out.tell(now, now_us);
+        }
+        if let Some((path, boot)) = &kept_boot
+            && now_us.saturating_sub(saved_at_us) >= 1_000_000
+        {
+            saved_at_us = now_us;
+            if let Err(error) = crate::room_told::keep_in(path, &room, boot, now_us, &mut kept)
+                && !unwritten_told
+            {
+                unwritten_told = true;
+                eprintln!(
+                    "lamp-voice second: the room's file could not be written ({error}): a restart will not know the room"
+                );
+            }
+        }
+    })
+}
+
+/// With `LAMP_STAFF_NOTE=on` (`--staff-note`) and the tasks part: the note
+/// the Live route gives beside a request whose words name one of the staff
+/// (`crate::staff_note`), for this route to give beside the words. Here the
+/// words are whole before the chat is asked, so it is never late. On
+/// lamp-4ace on 16 Oct the Live route's model did the work itself until
+/// that note named who the work was for.
+pub(crate) fn staff_noting(place: crate::agent_tasks::Place) -> super::StaffNote {
+    Arc::new(move |request, words| {
+        let who = crate::agent_tasks::named_in_words(&place, words);
+        if who.is_empty() {
+            return None;
+        }
+        eprintln!(
+            "lamp-voice second: request {request}: named {}; the model is told",
+            who.join(" and ")
+        );
+        Some(crate::staff_note::note(&who))
+    })
 }
 
 /// Whether a checked sound heard for `request` may be the person's answer
@@ -534,6 +1043,15 @@ pub(crate) struct Heeding {
     /// a request going on from it keeps, and the words it was judged with,
     /// which are stripped from the front of that request's.
     judged: Option<(u64, u64, String)>,
+    /// This route is the lamp's only voice ([`Self::as_the_only_voice`]):
+    /// the room is the one it keeps itself, not Gemini's worker's.
+    keeps_room: bool,
+    /// The name note (`LAMP_NAME_NOTE=on`, [`Self::telling_the_name`]):
+    /// whether a busy room waits for someone turned to the lamp, and
+    /// whether the note says the name may have sounded like another word.
+    name_note: Option<(bool, bool)>,
+    /// The request judged last, and the note it earned, if any.
+    noted: Option<(u64, Option<&'static str>)>,
 }
 
 /// The room microphone's rise over its quiet, dB, by when it was sampled.
@@ -597,7 +1115,79 @@ impl Heeding {
             thread,
             levels: None,
             judged: None,
+            keeps_room: false,
+            name_note: None,
+            noted: None,
         }
+    }
+
+    /// The model is told beside a line that the lamp's name was heard as it
+    /// began, as the Live route tells it (`crate::called`, `LAMP_NAME_NOTE`):
+    /// with `needs_face` (`LAMP_NAME_NOTE_BUSY=face`) in a busy room only
+    /// with someone turned to the lamp or the name heard surely, and with
+    /// `heard_as` saying it may have sounded like another word.
+    pub(crate) fn telling_the_name(&mut self, needs_face: bool, heard_as: bool) {
+        self.name_note = Some((needs_face, heard_as));
+    }
+
+    /// The note `request` earned when it was judged, if any.
+    pub(crate) fn name_note_for(&self, request: u64) -> Option<&'static str> {
+        self.noted
+            .filter(|(judged, _)| *judged == request)
+            .and_then(|(_, note)| note)
+    }
+
+    /// Whether the name was heard as the line began (or since, until it
+    /// ended), as the Live route's `called::Called::due` counts it: a
+    /// hearing of [`crate::called::LEAST_SCORE`] or more that began no more
+    /// than [`crate::called::BEFORE_US`] before the line. The note, or why
+    /// none, said in the journal as the Live route says it.
+    fn note_the_name(&mut self, request: u64, (began_us, ended_us): (u64, u64), signs: &Signs) {
+        let Some((needs_face, heard_as)) = self.name_note else {
+            return;
+        };
+        let heard = signs.names.iter().any(|(at, score)| {
+            *score >= crate::called::LEAST_SCORE
+                && at.saturating_add(crate::called::BEFORE_US) >= began_us
+                && *at <= ended_us
+        });
+        let note = heard.then(|| {
+            let busy = needs_face && signs.room == crate::room_told::Room::Busy;
+            let sure = signs
+                .names
+                .iter()
+                .any(|(_, score)| *score >= crate::attention::SURE_SCORE);
+            let turned = if busy && sure { Some(true) } else { signs.turned };
+            match crate::called::busy_gate(needs_face, busy, turned) {
+                Ok(()) => {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the model is told the lamp's name was heard"
+                    );
+                    Some(crate::called::note(heard_as))
+                }
+                Err(why) => {
+                    eprintln!(
+                        "lamp-voice second: request {request}: the lamp's name was heard in a busy room and {why}; the model is not told"
+                    );
+                    None
+                }
+            }
+        });
+        self.noted = Some((request, note.flatten()));
+    }
+
+    /// As the lamp's only voice (`LAMP_VOICE_ROUTE=second`), whom this
+    /// route answers is judged as the Live worker judges it: the room it
+    /// keeps itself (nothing else publishes `room/state` then), a
+    /// conversation over once people have talked past the lamp, remarks
+    /// held, and with `--spoken-to` only talk between people counted, by
+    /// day too (#1712: this morning the route missed two calls and answered
+    /// a bystander, every line judged in an unknown room).
+    pub(crate) fn as_the_only_voice(&mut self, remarks: bool, spoken_to: bool, by_day: bool) {
+        self.keeps_room = true;
+        self.attention.hold_remarks(remarks);
+        self.attention.speak_when_spoken_to(spoken_to);
+        self.attention.judge_by_day(by_day);
     }
 
     /// Sample the room microphone's rise over its quiet from now on, on a
@@ -658,6 +1248,7 @@ impl Heeding {
             continues_from,
             ..self.signs(request, said)
         };
+        self.note_the_name(request, said, &signs);
         self.judge(request, said, heard, signs)
     }
 
@@ -684,10 +1275,21 @@ impl Heeding {
                 }),
             continues_from: None,
         };
+        // The route's own room as the only voice, as the Live worker reads
+        // its own (`attention_now`): with people talking past the lamp since
+        // it last spoke, no conversation is going on.
+        if self.keeps_room
+            && let Ok(mut room) = crate::room_told::room().lock()
+        {
+            signs.room = room.at(monotonic_us());
+            signs.going_on &= !room.talked_past_the_lamp();
+        }
         let Some((bus, names)) = &mut self.bus else {
             return signs;
         };
-        signs.room = crate::bus_out::room_now(bus);
+        if !self.keeps_room {
+            signs.room = crate::bus_out::room_now(bus);
+        }
         signs.turned = crate::bus_out::someone_turned_to_lamp(bus);
         let now_us = monotonic_us();
         let now_ms = unix_ms(SystemTime::now());
@@ -755,8 +1357,13 @@ impl Heeding {
         attention.lamp_asked(signs.lamp_asked);
         attention.set_near(signs.near);
         let turned = signs.turned.filter(|_| self.strict);
-        match attention.first_output_busy(request, signs.room, signs.going_on, self.strict, turned)
-        {
+        let verdict =
+            attention.first_output_busy(request, signs.room, signs.going_on, self.strict, turned);
+        // The verdict for the room this route keeps (`super::room`).
+        if let Ok(mut room) = crate::room_told::room().lock() {
+            room.judged(request, verdict, false);
+        }
+        match verdict {
             Some(crate::attention::Verdict::Hold(why)) => Some(why),
             // Said, as each hold is by the route (#829, 17:21).
             Some(crate::attention::Verdict::Play(why)) => {
@@ -967,8 +1574,11 @@ pub(crate) fn keep(event: &ProviderOutput, file: Option<&Path>) {
             ..
         } => {
             // Sentences come trimmed, those after the first with a space
-            // before; the thread joins its pieces as given.
-            if let Ok(mut thread) = crate::thread::THREAD.lock() {
+            // before; the thread joins its pieces as given. The empty last
+            // piece says the words are over and adds none.
+            if !text.is_empty()
+                && let Ok(mut thread) = crate::thread::THREAD.lock()
+            {
                 thread.lamp(*request, &format!("{} ", text.trim_start()), now);
             }
         }
@@ -1037,6 +1647,7 @@ pub async fn run(
     'tick: loop {
         // The turn tasks run while this waits.
         ticker.tick().await;
+        engine.tick_room(monotonic_us());
         match gate.drain(&mut channels.control, &mut engine)? {
             Drain::Stopped => return Ok(()),
             Drain::Deferred => continue,
@@ -1809,5 +2420,336 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
         let a = Some(crate::remember::person_id("A"));
         assert_eq!(opened, [a.clone(), a]);
+    }
+
+    /// #1712: as the lamp's only voice, the rule judges in the room this
+    /// route keeps (`room_told::room`), not in an unknown one; without the
+    /// switch, and with no bus, the room stays unknown.
+    #[test]
+    fn as_the_only_voice_the_rule_judges_in_the_room_the_route_keeps() {
+        {
+            let mut room = crate::room_told::room().lock().unwrap();
+            let now = monotonic_us();
+            for request in 1..=3 {
+                room.heard(request, now);
+                room.ended(request, now);
+                room.unanswered(request, now);
+            }
+            assert_eq!(room.at(now), crate::room_told::Room::Busy);
+        }
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        assert_eq!(
+            heeding.signs(9, (0, 0)).room,
+            crate::room_told::Room::Unknown
+        );
+        heeding.as_the_only_voice(false, false, false);
+        assert_eq!(heeding.signs(9, (0, 0)).room, crate::room_told::Room::Busy);
+    }
+
+    /// #1712: the name note, as the Live route gives it: the model is told
+    /// when the lamp's name was heard as the line began or during it, not
+    /// for a hearing long before; in a busy room, with `needs_face`, only
+    /// with someone turned to the lamp or a sure hearing.
+    #[test]
+    fn the_name_heard_as_a_line_began_earns_the_live_routes_note() {
+        use crate::room_told::Room;
+        let signs = |room: Room, names: Vec<(u64, f32)>, turned: Option<bool>| super::Signs {
+            room,
+            going_on: false,
+            lamp_asked: false,
+            turned,
+            names,
+            near: false,
+            continues_from: None,
+        };
+        let line = (10_000_000, 12_000_000);
+        let heard = crate::called::LEAST_SCORE;
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.note_the_name(
+            1,
+            line,
+            &signs(Room::Quiet, vec![(10_200_000, heard)], None),
+        );
+        assert_eq!(heeding.name_note_for(1), None, "not switched on");
+        heeding.telling_the_name(true, false);
+        heeding.note_the_name(
+            2,
+            line,
+            &signs(Room::Quiet, vec![(10_200_000, heard)], None),
+        );
+        assert_eq!(heeding.name_note_for(2), Some(crate::called::note(false)));
+        assert_eq!(heeding.name_note_for(1), None, "only the request judged");
+        heeding.note_the_name(3, line, &signs(Room::Quiet, vec![(1_000_000, heard)], None));
+        assert_eq!(heeding.name_note_for(3), None, "heard long before the line");
+        heeding.note_the_name(
+            4,
+            line,
+            &signs(Room::Busy, vec![(10_200_000, heard)], Some(false)),
+        );
+        assert_eq!(heeding.name_note_for(4), None, "busy, nobody turned");
+        heeding.note_the_name(
+            5,
+            line,
+            &signs(Room::Busy, vec![(10_200_000, heard)], Some(true)),
+        );
+        assert!(heeding.name_note_for(5).is_some(), "busy, someone turned");
+        let sure = crate::attention::SURE_SCORE;
+        heeding.note_the_name(6, line, &signs(Room::Busy, vec![(10_200_000, sure)], None));
+        assert!(heeding.name_note_for(6).is_some(), "busy, a sure hearing");
+        heeding.telling_the_name(false, true);
+        heeding.note_the_name(
+            7,
+            line,
+            &signs(Room::Busy, vec![(10_200_000, heard)], Some(false)),
+        );
+        assert_eq!(heeding.name_note_for(7), Some(crate::called::note(true)));
+    }
+
+    /// #1712: a call the Live route would hold for the Policy is said as
+    /// that route says one it lets run ("; run after N ms"), which the
+    /// battery counts; a lookup, which no route holds, is not.
+    #[test]
+    fn a_call_the_live_route_would_hold_is_said_as_run_for_the_battery() {
+        let exec = crate::tools::Route::Executive("/run/lampos-actions".into());
+        let line = super::run_after(&exec, "light_on", 7).unwrap();
+        assert_eq!(
+            line,
+            "lamp-voice second: request 7 asked for light_on; run after 0 ms: this route holds no call for the Policy"
+        );
+        let counted = line
+            .split("; run after ")
+            .nth(1)
+            .and_then(|rest| rest.split(" ms").next())
+            .and_then(|ms| ms.parse::<u64>().ok());
+        assert_eq!(counted, Some(0), "the battery's pattern reads it");
+        assert!(super::run_after(&crate::tools::Route::Clock, "the_time", 7).is_none());
+    }
+
+    /// #1712: the room this route keeps is told on the bus (`room/state`)
+    /// at the worker's tick, as the Live worker tells its own.
+    #[test]
+    fn the_room_the_route_keeps_is_told_on_the_bus() {
+        let root = std::env::temp_dir().join(format!("lamp-second-room-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let mut tick = super::keeping_room(false, false, None, Some(&root));
+        tick(monotonic_us());
+        let told = lamp_bus::Bus::new(&root)
+            .unwrap()
+            .latest(lamp_msgs::RoomState::TOPIC)
+            .unwrap()
+            .expect("the room is told");
+        assert!(told.parse::<lamp_msgs::RoomState>().is_ok());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Gemini's key: the voice unit's credential `gemini.key`, as
+    /// OpenRouter's and DeepSeek's are, else the Live route's when that is a
+    /// Google API key. A `gemini.key` there but not private is refused, not
+    /// passed over for the Live key. With the Live route through a relay and
+    /// no credential, a Gemini switch keeps the worker from starting: the
+    /// relay's key is never sent to Google, and without a Gemini switch
+    /// nothing is asked for.
+    #[test]
+    fn gemini_is_called_with_the_units_key_or_the_live_routes_google_key_never_a_relays() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-second-gemini-key-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let credentials = dir.join("credentials");
+        let empty = dir.join("no-credentials");
+        let open = dir.join("open-credentials");
+        for directory in [&credentials, &empty, &open] {
+            std::fs::create_dir_all(directory).unwrap();
+        }
+        let private = |path: std::path::PathBuf, text: &str, mode: u32| {
+            std::fs::write(&path, text).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
+            path
+        };
+        let llm = private(dir.join("llm.key"), "relay-key", 0o600);
+        let live = private(dir.join("live.key"), "live-google-key\n", 0o600);
+        private(credentials.join("gemini.key"), "unit-google-key", 0o600);
+        private(open.join("gemini.key"), "open-google-key", 0o644);
+        let config = private(
+            dir.join("second.json"),
+            &format!(
+                r#"{{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"{}"}}"#,
+                llm.display()
+            ),
+            0o600,
+        );
+        let second = || crate::second_config::load_from_path(&config).unwrap();
+        let provider = |endpoint: &str| -> crate::config::ProviderConfig {
+            serde_json::from_str(&format!(
+                r#"{{"endpoint":"{endpoint}","model":"m","voice":"Kore","credential_file":"{}"}}"#,
+                live.display()
+            ))
+            .unwrap()
+        };
+        let direct = provider(lamp_gemini::GOOGLE_ENDPOINT);
+        let relay = provider("wss://relay.example.invalid/ws/gemini");
+        let unit = Some(credentials.as_os_str());
+        for live_route in [&relay, &direct] {
+            assert_eq!(
+                super::gemini_key(live_route, unit).unwrap().expose(),
+                "unit-google-key"
+            );
+        }
+        for none in [None, Some(empty.as_os_str())] {
+            assert_eq!(
+                super::gemini_key(&direct, none).unwrap().expose(),
+                "live-google-key"
+            );
+        }
+        let not_private = super::gemini_key(&direct, Some(open.as_os_str()))
+            .unwrap_err()
+            .to_string();
+        assert!(not_private.contains("gemini.key"), "{not_private}");
+        assert!(!not_private.contains("open-google-key"));
+        let refused = super::gemini_key(&relay, None).unwrap_err().to_string();
+        assert!(refused.contains("gemini.key"), "{refused}");
+        assert!(!refused.contains("relay-key") && !refused.contains("live-google-key"));
+        let none: super::super::net::Declare = std::sync::Arc::new(Vec::new);
+        let speech = super::RouteFlags {
+            gemini_speech: true,
+            ..super::RouteFlags::default()
+        };
+        assert!(super::services(second(), &relay, speech, None, none.clone()).is_err());
+        assert!(super::services(second(), &relay, speech, unit, none.clone()).is_ok());
+        assert!(
+            super::services(
+                second(),
+                &relay,
+                super::RouteFlags::default(),
+                None,
+                none.clone()
+            )
+            .is_ok()
+        );
+        assert!(super::services(second(), &direct, speech, None, none).is_ok());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// OpenRouter's and DeepSeek's keys are the voice unit's credentials:
+    /// with them the chat starts, without them the worker does not, saying
+    /// which credential it lacks and nothing of a key; DeepSeek's search the
+    /// same; the Exa search needs its service named.
+    #[test]
+    fn the_hosted_chats_and_searches_take_the_units_credentials() {
+        use super::{ChatRoute, RouteFlags, SearchRoute};
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-second-hosted-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        let credentials = dir.join("credentials");
+        std::fs::create_dir_all(&credentials).unwrap();
+        let private = |path: std::path::PathBuf, text: &str| {
+            std::fs::write(&path, text).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            path
+        };
+        let llm = private(dir.join("llm.key"), "relay-key");
+        let second = private(
+            dir.join("second.json"),
+            &format!(
+                r#"{{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"{}"}}"#,
+                llm.display()
+            ),
+        );
+        let config = || crate::second_config::load_from_path(&second).unwrap();
+        let provider: crate::config::ProviderConfig = serde_json::from_str(&format!(
+            r#"{{"endpoint":"wss://relay.example.invalid/ws","model":"m","voice":"Kore","credential_file":"{}"}}"#,
+            llm.display()
+        ))
+        .unwrap();
+        let none: super::super::net::Declare = std::sync::Arc::new(Vec::new);
+        let chat = |chat| RouteFlags {
+            chat: Some(chat),
+            ..RouteFlags::default()
+        };
+        let search = |search| RouteFlags {
+            search: Some(search),
+            ..RouteFlags::default()
+        };
+        let dirs = Some(credentials.as_os_str());
+        for (route, name) in [
+            (chat(ChatRoute::OpenRouter), "openrouter.key"),
+            (chat(ChatRoute::DeepSeek), "deepseek.key"),
+        ] {
+            let error = super::services(config(), &provider, route, dirs, none.clone())
+                .err()
+                .unwrap()
+                .to_string();
+            assert!(error.contains(name), "{error}");
+        }
+        let error = super::search_for(&config(), search(SearchRoute::DeepSeek), dirs)
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(error.contains("deepseek.key"), "{error}");
+        private(credentials.join("openrouter.key"), "or-secret\n");
+        private(credentials.join("deepseek.key"), "ds-secret\n");
+        for route in [chat(ChatRoute::OpenRouter), chat(ChatRoute::DeepSeek)] {
+            assert!(super::services(config(), &provider, route, dirs, none.clone()).is_ok());
+            // Without the unit's credentials at all.
+            let error = super::services(config(), &provider, route, None, none.clone())
+                .err()
+                .unwrap()
+                .to_string();
+            assert!(error.contains("CREDENTIALS_DIRECTORY"), "{error}");
+            assert!(!error.contains("secret"), "{error}");
+        }
+        let found = super::search_for(&config(), search(SearchRoute::DeepSeek), dirs)
+            .unwrap()
+            .unwrap();
+        assert!(found.answers(super::super::net::search::FETCH));
+        assert!(
+            super::search_for(&config(), search(SearchRoute::OpenRouter), dirs)
+                .unwrap()
+                .is_none()
+        );
+        assert!(super::search_for(&config(), search(SearchRoute::Exa), dirs).is_err());
+        assert!(
+            super::search_for(&config(), RouteFlags::default(), dirs)
+                .unwrap()
+                .is_none()
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The search's functions go beside the lamp's within Live's bound of
+    /// 32: the search before a skill's last function, the fetch only with
+    /// room left.
+    #[test]
+    fn the_search_is_given_room_before_a_skill_and_the_fetch_only_with_room() {
+        let tool = |name: String| lamp_gemini::Tool {
+            name,
+            description: "A function.".into(),
+            parameters: None,
+            silent: false,
+        };
+        let lamp = |count: usize| -> Vec<lamp_gemini::Tool> {
+            (0..count).map(|i| tool(format!("tool_{i}"))).collect()
+        };
+        let search = [tool("web_search".into()), tool("fetch_page".into())];
+        let names = |tools: Vec<lamp_gemini::Tool>| -> Vec<String> {
+            tools.into_iter().map(|tool| tool.name).collect()
+        };
+        let roomy = names(super::with_search(lamp(10), &search));
+        assert_eq!(roomy.len(), 12);
+        assert_eq!(roomy[10..], ["web_search", "fetch_page"]);
+        let full = names(super::with_search(lamp(32), &search));
+        assert_eq!(full.len(), 32);
+        assert_eq!(full[31], "web_search");
+        assert!(!full.contains(&"tool_31".to_owned()));
+        assert!(!full.contains(&"fetch_page".to_owned()));
+        assert_eq!(names(super::with_search(lamp(5), &[])).len(), 5);
     }
 }
