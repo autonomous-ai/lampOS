@@ -313,8 +313,10 @@ and the job fails without moving the head.
     be asked; a round that switches asks nothing.
 11. **After.** Switched or put back, the folders this program made that no
     unit or link names now, nor any unit or link as it was before the last
-    switch, are removed: the lamp keeps its build and the one before. A folder it did
-    not make (every one installed by hand) is never removed.
+    switch, are removed: the lamp keeps its build and the one before. The
+    folder `lamp-update.service` starts this program from (install's
+    `update/current`) is kept too, since no round switches it (#1680). A
+    folder it did not make (every one installed by hand) is never removed.
 
 ### The commands
 
@@ -430,6 +432,10 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   keeping its build and the one before, the one two builds ago removed and
   the one installed by hand kept. With the link never moved on purpose,
   those four fail and the other fifteen pass.
+- After install (#1680, `a_round_after_install_keeps_lamp_updates_own_folder`):
+  a blank lamp given build 1 by `lamp-update install`, then a round that
+  switches to build 2, keeps `update/current` naming a folder that is there.
+  Without the fix the round removes that folder and the test fails.
 - The real HTTPS path, once, by hand (the ignored test
   `a_release_file_from_github`): 646 bytes of this repository's
   `models/ambernet` release, through GitHub's redirect to

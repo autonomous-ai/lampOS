@@ -1427,3 +1427,127 @@ fn a_linked_part_keeps_its_build_and_the_one_before() {
     // Installed by hand: never removed.
     assert!(lamp.exists(&folder("eyes 1")));
 }
+
+/// The machine as `lamp-update install` asks it, for a lamp made of files:
+/// users go into the root's /etc/passwd, and nothing else is done.
+struct InstallHost(PathBuf);
+
+impl lamp_update::install::Host for InstallHost {
+    fn add_user(&mut self, name: &str, _: &[String]) -> Result<(), String> {
+        let passwd = self.0.join("etc/passwd");
+        let mut text = fs::read_to_string(&passwd).unwrap_or_default();
+        text.push_str(&format!(
+            "{name}:x:999:999::/nonexistent:/usr/sbin/nologin\n"
+        ));
+        fs::write(passwd, text).unwrap();
+        Ok(())
+    }
+
+    fn enable(&mut self, _: &[String]) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn tmpfiles(&mut self, _: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn utc_offset_minutes(&mut self, _: &str) -> Result<i32, String> {
+        Ok(420)
+    }
+
+    fn harness_at_boot(&mut self, _: &str, _: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn harness_off(&mut self, _: &str, _: &str) -> Result<Vec<String>, String> {
+        Ok(Vec::new())
+    }
+}
+
+/// Every binary the product starts, and the voice's worker, each the line
+/// `<name> <sequence>`.
+fn product_build(lamp: &mut Lamp, sequence: u64) -> Manifest {
+    let texts: Vec<(String, String)> = lamp_update::install::parts()
+        .into_iter()
+        .map(|part| part.binary)
+        .chain(["lamp-turn-end".to_owned()])
+        .map(|name| {
+            let text = format!("{name} {sequence}");
+            (name, text)
+        })
+        .collect();
+    let binaries: Vec<(&str, &str)> = texts
+        .iter()
+        .map(|(name, text)| (name.as_str(), text.as_str()))
+        .collect();
+    lamp.publish(sequence, &binaries, &[])
+}
+
+impl Lamp {
+    /// A blank lamp given build 1 by `lamp-update install`, every part
+    /// running through its `current` link.
+    fn installed() -> Self {
+        let mut lamp = Lamp::new();
+        for folder in ["etc", "opt"] {
+            fs::remove_dir_all(lamp.root.join(folder)).unwrap();
+        }
+        fs::create_dir_all(lamp.root.join("etc")).unwrap();
+        fs::write(lamp.root.join("etc/hostname"), "lamp-4ace\n").unwrap();
+        fs::write(
+            lamp.root.join("etc/passwd"),
+            "root:x:0:0::/root:/bin/bash\n",
+        )
+        .unwrap();
+        fs::write(
+            lamp.root.join("etc/group"),
+            "root:x:0:\naudio:x:29:\nvideo:x:44:\ndialout:x:20:\n",
+        )
+        .unwrap();
+        fs::write(lamp.root.join("etc/timezone"), "Asia/Ho_Chi_Minh\n").unwrap();
+        product_build(&mut lamp, 1);
+        let config = lamp_update::install::Install {
+            root: lamp.root.clone(),
+            channel: "lamp-voice".into(),
+            channel_url: CHANNEL.into(),
+            key: lamp.config.key,
+            records: lamp.config.records.clone(),
+            setup: false,
+            models: Vec::new(),
+        };
+        let mut host = InstallHost(lamp.root.clone());
+        lamp_update::install::install(&config, &mut lamp.channel, &mut host, &mut |_| {}).unwrap();
+        lamp.systemd.units.clear();
+        for entry in fs::read_dir(lamp.root.join("etc/systemd/system")).unwrap() {
+            let entry = entry.unwrap();
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let text = fs::read_to_string(entry.path()).unwrap_or_default();
+            if name.ends_with(".service") && unit::linked_program(&text, &lamp.root).is_some() {
+                lamp.systemd.start(&name);
+            }
+        }
+        lamp
+    }
+}
+
+/// #1680: install records lamp-update's own folder as made, and its unit
+/// starts through `update/current`. A round never switches lamp-update, so
+/// its first switch must not remove that folder: the lamp would not start
+/// lamp-update again after the next boot.
+#[test]
+fn a_round_after_install_keeps_lamp_updates_own_folder() {
+    let mut lamp = Lamp::installed();
+    let link = lamp.root.join("opt/lampOS/update/current");
+    let own = fs::read_link(&link).unwrap();
+    product_build(&mut lamp, 2);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(fs::read_link(&link).unwrap(), own);
+    assert!(
+        lamp.exists("/opt/lampOS/update/current/lamp-update"),
+        "update/current names a folder that is gone: {:?}",
+        lamp.said
+    );
+    assert_eq!(
+        lamp.read("/opt/lampOS/update/current/lamp-update"),
+        "lamp-update 1"
+    );
+}
