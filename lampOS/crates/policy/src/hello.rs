@@ -1566,6 +1566,25 @@ mod tests {
         }
     }
 
+    /// The first builder on #1817: a line the rule let out and the model
+    /// then declined (`not_for_me`) is told answered, then held back. The
+    /// held back takes the turn back from the quiet.
+    #[test]
+    fn a_turn_the_model_declines_after_the_rule_let_it_out_is_taken_back() {
+        let (mut hello, started) = to_the_lamp(true);
+        let quiet = hello.options.quiet_for;
+        let second = Duration::from_secs(1);
+        let begun = started + quiet + second;
+        hello.voice(Voice::Listening, begun);
+        hello.heard(begun + second / 2, Some(5));
+        hello.voice(Voice::Thinking, begun + second);
+        hello.verdict(5, TurnVerdict::Answered);
+        hello.verdict(5, TurnVerdict::HeldBack);
+        let rested = begun + 2 * second;
+        hello.voice(Voice::Resting, rested);
+        assert_eq!(hello.hold(&arrived(), rested, 0, Room::Busy), None);
+    }
+
     /// Second on #1782: the second route says its verdict before the words
     /// it judged go out, so the policy can take the verdict first. It is
     /// kept for its words, whether they come while the voice still thinks

@@ -456,6 +456,89 @@ async fn a_turn_the_heed_holds_is_told_held_back() {
     );
 }
 
+/// The first builder on #1817: a line the model itself declines
+/// (`not_for_me`, called or written as words) is told held back, with no
+/// heed too, as a line the rule holds is.
+#[tokio::test]
+async fn a_line_the_model_declines_is_told_held_back() {
+    for declined in [
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            NOT_FOR_ME,
+            json!({}),
+        )])),
+        text("not_for_me{}"),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("No, the other one".to_owned())].into()),
+            chats: Mutex::new([vec![declined, Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let (mut engine, told) = telling(engine);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        assert_eq!(
+            labels.last().map(String::as_str),
+            Some("complete"),
+            "{labels:?}"
+        );
+        assert_eq!(
+            *told.lock().unwrap(),
+            [(1, lamp_msgs::TurnVerdict::HeldBack)]
+        );
+    }
+}
+
+/// A line declined after a tool ran for it is the lamp's: nothing is told.
+#[tokio::test]
+async fn a_line_declined_after_a_tool_ran_is_not_told_held_back() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Set a timer for five minutes.".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "set_timer",
+                        json!({"minutes": 5}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        NOT_FOR_ME,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, calls, _) = scripted(script);
+    let (mut engine, told) = telling(engine);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let labels = turn(&mut engine).await;
+    assert_eq!(
+        labels.last().map(String::as_str),
+        Some("complete"),
+        "{labels:?}"
+    );
+    assert_eq!(calls.lock().unwrap().len(), 1);
+    assert!(
+        told.lock().unwrap().is_empty(),
+        "{:?}",
+        told.lock().unwrap()
+    );
+}
+
 /// Second on #1782: the verdict is told before the turn's words leave the
 /// engine. When it is told, the turn's start, its words and its end are all
 /// still waiting to be taken, so the policy can hear the verdict before the

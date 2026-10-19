@@ -438,13 +438,13 @@ fn turns(root: &Root) -> lamp_bus::Subscriber {
         .unwrap()
 }
 
-/// Waits up to two seconds on the host for `request` to be told `verdict`.
+/// Waits up to `within` on the host for `request` to be told `verdict`.
 /// Other tests' workers that apply the rule say theirs on the same bus,
 /// numbered by their own rigs, so a verdict for another request, or for
 /// this number with the other verdict, is passed over until this one
 /// comes.
-fn told(turns: &mut lamp_bus::Subscriber, request: u64, verdict: TurnVerdict) {
-    let until = std::time::Instant::now() + Duration::from_secs(2);
+fn told(turns: &mut lamp_bus::Subscriber, request: u64, verdict: TurnVerdict, within: Duration) {
+    let until = std::time::Instant::now() + within;
     let mut heard = Vec::new();
     while let Some(left) = until.checked_duration_since(std::time::Instant::now()) {
         let Some(message) = turns.recv(left).unwrap() else {
@@ -484,7 +484,12 @@ async fn an_answer_the_rule_holds_is_told_held_back() {
         "{}",
         what(&first)
     );
-    told(&mut turns, request, TurnVerdict::HeldBack);
+    told(
+        &mut turns,
+        request,
+        TurnVerdict::HeldBack,
+        Duration::from_secs(2),
+    );
     rig.stop().await;
 }
 
@@ -517,6 +522,57 @@ async fn an_answer_the_rule_lets_out_is_told_answered() {
         rig.output().await,
         ProviderOutput::TurnComplete { .. }
     ));
-    told(&mut turns, request, TurnVerdict::Answered);
+    told(
+        &mut turns,
+        request,
+        TurnVerdict::Answered,
+        Duration::from_secs(2),
+    );
+    rig.stop().await;
+}
+
+/// The first builder on #1817: a line the model itself declines
+/// (`not_for_me`) is told held back on the bus, as a line the rule holds
+/// is: here with no rule at all.
+#[tokio::test(start_paused = true)]
+async fn a_line_the_model_declines_is_told_held_back() {
+    let _clock = logical_clock();
+    let _turn = one_at_a_time().await;
+    let root = Root::new();
+    let mut turns = turns(&root);
+    let mut options = in_a_busy_room();
+    options.attention = None;
+    options.tools = crate::tools::Settings {
+        decline: true,
+        exec: None,
+        memory: None,
+        clock: false,
+        ..Default::default()
+    };
+    let mut rig = LiveRig::start_with(quick_policy(), options);
+    let mut dial = rig.ready().await;
+    let request = rig.speak(&mut dial, false, true).await;
+    // With no rule here, a verdict for this request can only be the
+    // decline's: what other tests' workers said before it is let go, and
+    // the decline's is looked for in the half second after it.
+    while turns.recv(Duration::ZERO).unwrap().is_some() {}
+    dial.service
+        .send(function_call("c1", crate::tools::NOT_FOR_ME))
+        .await;
+    let answered = rig.service_message(&mut dial).await;
+    assert!(answered.get("toolResponse").is_some(), "{answered}");
+    dial.service.send(idle_complete()).await;
+    let first = rig.output().await;
+    assert!(
+        matches!(first, ProviderOutput::TurnComplete { request: done, .. } if done == request),
+        "{}",
+        what(&first)
+    );
+    told(
+        &mut turns,
+        request,
+        TurnVerdict::HeldBack,
+        Duration::from_millis(500),
+    );
     rig.stop().await;
 }
