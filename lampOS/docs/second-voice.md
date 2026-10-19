@@ -1358,10 +1358,14 @@ after a take-over, but now for every turn:
   lines. A text is typed, not heard, and is not told it. With a memory
   (`LAMP_MEMORY_SOCKET`), `worker::MEMORY_CALLS_NOTE` follows: to remember
   call `remember` ("saying you will is not keeping it"), to forget
-  something remembered for them call `forget` ("'Forget it' or 'never mind'
-  about the conversation is not that": it would delete what they asked the
-  lamp to keep; the reviewer and the first builder on #2007, 01:17 and
-  01:18), and for an earlier conversation call `recall`. The memory note
+  something they told it call `forget`, with both sides as examples in one
+  line: "please forget that" or "forget what I just told you" is a forget,
+  "forget it, it doesn't matter" or "never mind" about the conversation is
+  not (the reviewer and the first builder on #2007, 01:17 and 01:18: a
+  wrong forget deletes what they asked the lamp to keep). Worded only
+  against "forget it", the note left "Hey Lamp, please forget that." in
+  words on lamp-4ace, nothing forgotten (the first builder at 02:05). For
+  an earlier conversation, call `recall`. The memory note
   itself names only `recall`, and on lamp-4ace on 20 Oct DeepSeek answered
   "remember …" and "forget that" in words (#1722, 00:34).
 - **The time, as it is asked** (`local_time::told_asked_here`, spoken
@@ -1849,18 +1853,20 @@ It prints, for each arm and line, how many requests called each function
 first (`none` for an answer in words) and how many were right. Then it names
 the arms that were right every time on every line. Counts only, no words.
 
-**Then the memory's seven lines** (`MEMORY_LINES`: `trials.sh forget`'s
+**Then the memory's nine lines** (`MEMORY_LINES`: `trials.sh forget`'s
 four, the first builder on #1722, 00:34: on lamp-4ace "remember my violet
 umbrella is in the car" and "forget that" were answered in words, with
 every function given, while Live called `remember` and `forget`). In order:
 - "Hey Lamp, remember my violet umbrella is in the car." (`remember`);
 - "What was the name of that café I mentioned last week?" (counted);
-- "Oh, forget it, it doesn't matter." and "Never mind, forget I asked.",
+- "Oh, forget it, never mind." and "Never mind, forget I asked.",
   each right when it does **not** call `forget`, asked while the umbrella is
   kept (the reviewer and the first builder on #2007);
 - "What do you remember about my umbrella?" (`recall`);
-- "Lamp, forget that." (`forget`);
-- "What about my umbrella?" (counted).
+- "Hey Lamp, please forget that." (`forget`), the trial's own line;
+- "What about my umbrella?" (counted);
+- "Remember my keys are on the hook by the door." (`remember`);
+- "Actually, forget what I just told you." (`forget`), straight after it.
 
 The counted lines are right in words or a `recall` that finds nothing. Each
 is asked with the ones before as right history, with every function, in

@@ -878,8 +878,11 @@ pub(crate) const LOOK_CALL_NOTE: &str = " When you would look, call take_a_look:
 /// forgotten; the memory note names only recall). Live called both.
 /// "Forget it" about the talk itself is not a forget: it would delete what
 /// they asked the lamp to keep (the reviewer and the first builder on
-/// #2007, 01:17 and 01:18).
-pub(crate) const MEMORY_CALLS_NOTE: &str = " When someone asks you to remember something, call remember: saying you will is not keeping it. When they ask you to forget something you remembered for them, call forget. 'Forget it' or 'never mind' about the conversation is not that. For something from an earlier conversation, call recall.";
+/// #2007, 01:17 and 01:18). But "please forget that" about something kept
+/// is: worded only against "forget it", it was answered in words on
+/// lamp-4ace, nothing forgotten (the first builder at 02:05 on #2007). So
+/// both, as examples, in one line.
+pub(crate) const MEMORY_CALLS_NOTE: &str = " When someone asks you to remember something, call remember: saying you will is not keeping it. When they ask you to forget something they told you, such as \"please forget that\" or \"forget what I just told you\", call forget; \"forget it, it doesn't matter\" or \"never mind\" about the conversation is not that. For something from an earlier conversation, call recall.";
 
 /// Whether a hearing of the name at `at_us` with `score` is one since
 /// `from_us`, as the rule takes a hearing for a line.
@@ -5214,7 +5217,8 @@ mod tests {
             "call remember",
             "call forget",
             "call recall",
-            "'Forget it' or 'never mind' about the conversation is not that",
+            "\"please forget that\" or \"forget what I just told you\", call forget",
+            "\"forget it, it doesn't matter\" or \"never mind\" about the conversation is not that",
         ] {
             assert!(remembers.contains(call), "{call}");
         }
