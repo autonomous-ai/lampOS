@@ -259,6 +259,21 @@ and the job fails without moving the head.
    installed. The folders made are recorded. With `--apply off` the round
    stops before this step, and prints the plan with each unit's changed
    lines.
+   **The skills still load** (the first builder on #1722). A round places
+   no skill: `/var/lib/lampOS/skills/` stays as it was, and a lamp gets the
+   build's skills only from `lamp-update install`. So when the skills part
+   changes folder, the build's `lamp-skills list --dir DIR` (the unit's
+   `--dir`, else `/var/lib/lampOS/skills`) and the running one's are read
+   on that folder, each killed after 30 s. A skill that loads now and that
+   the build would not load (folders from before #1698's `[permissions]`
+   under a lamp-skills with its checks) refuses the build before the quiet
+   moment, nothing switched: `build N's lamp-skills would not load these
+   skills of DIR, which load now: dance (voice/heard is not in [permissions]
+   topics); ...`. Every round tries again, and switches once they load
+   (after `lamp-update install`). A skill both refuse holds nothing back. A
+   running lamp-skills older than `list` (status 2: `list` and the checks
+   came together) loaded every folder; a build's that cannot list the
+   folder fails the round, nothing switched. Not run with `--apply off`.
 7. **The quiet moment.** Before anything is switched: the voice says on
    the bus that it is resting (`voice/state`, said once a second, at most
    3 s old), nothing was heard or said (`voice/heard`, `voice/said`) and the
