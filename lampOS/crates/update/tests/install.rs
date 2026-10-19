@@ -567,6 +567,11 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
         } else if *name == "lamp-setup.service" {
             // Setup is the one that runs while the marker is missing.
             assert!(unit.contains(&format!("ConditionPathExists=!{SETUP_DONE}").as_str()));
+        } else if *name == "lamp-waking.service" {
+            // The waking face is before the lamp, on a set-up lamp only:
+            // before the marker the ring is the setup light's (#1681).
+            assert!(unit.contains(&condition.as_str()), "{name}");
+            assert!(section(text, "Install").contains(&"WantedBy=sysinit.target"));
         } else if *name == "lampos-setup-done.path" {
             // And this starts the lamp once it is there.
             let path = section(text, "Path");

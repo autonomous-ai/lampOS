@@ -153,6 +153,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lampos-setup-done.path",
         include_str!("../../../deploy/product/lampos-setup-done.path"),
     ),
+    // The waking face, from power-on until the voice takes the ring
+    // (#1681); off unless `LAMP_WAKING_FACE=on`.
+    (
+        "lamp-waking.service",
+        include_str!("../../../deploy/product/lamp-waking.service"),
+    ),
 ];
 
 /// The skills every lamp runs: each a folder of `lampOS/skills/`, put in
@@ -432,8 +438,8 @@ pub fn part(text: &str) -> Option<Part> {
     unit::linked(text).map(|(folder, binary)| Part { folder, binary })
 }
 
-/// Every part of the product, in the order of `PRODUCT`, each once: setup
-/// and its reset start the same binary.
+/// Every part of the product, in the order of `PRODUCT`, each once: setup,
+/// its reset and the waking face start the same binary.
 pub fn parts() -> Vec<Part> {
     let mut parts: Vec<Part> = Vec::new();
     for part in PRODUCT.iter().filter_map(|(_, text)| part(text)) {
@@ -1746,13 +1752,13 @@ mod tests {
         {
             assert!(part(text).is_some(), "{name} starts through a current link");
         }
-        // Setup and its reset share one binary, and so do the air and its
-        // bus clock; every other service is a part.
+        // Setup, its reset and the waking face share one binary, and so do
+        // the air and its bus clock; every other service is a part.
         let services = PRODUCT
             .iter()
             .filter(|(name, _)| name.ends_with(".service"))
             .count();
-        assert_eq!(parts.len(), services - 2, "every product service is a part");
+        assert_eq!(parts.len(), services - 3, "every product service is a part");
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");
