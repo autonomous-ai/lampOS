@@ -103,10 +103,33 @@ pub struct Suite {
     pub approved: bool,
 }
 
+/// What a run whose self-test report does not name its lamp is: the report
+/// is from a build before reports named their lamp, and cannot be matched to
+/// the station's `--device`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WithoutLamp {
+    /// The run is recorded, `incomplete` at best.
+    #[default]
+    Incomplete,
+    /// No record is made.
+    Refused,
+}
+
+/// The suite's rules that are the hardware lead's to set.
+#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Rules {
+    #[serde(default)]
+    pub selftest_without_lamp: WithoutLamp,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct File {
     suite: Suite,
+    #[serde(default)]
+    rules: Rules,
     revision: Vec<Revision>,
     check: Vec<Check>,
 }
@@ -115,6 +138,7 @@ struct File {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Matrix {
     pub suite: Suite,
+    pub rules: Rules,
     pub revisions: Vec<Revision>,
     pub checks: Vec<Check>,
     /// SHA-256 of the file's bytes, in hex.
@@ -202,6 +226,7 @@ impl Matrix {
         }
         Ok(Self {
             suite: file.suite,
+            rules: file.rules,
             revisions: file.revision,
             checks: file.check,
             sha256: hex(&Sha256::digest(text.as_bytes())),
@@ -444,5 +469,36 @@ what = "temperature after moves"
         let b = Matrix::parse(&SMALL.replace("max = 85.0", "max = 95.0")).unwrap();
         assert_eq!(a.suite.version, b.suite.version);
         assert_ne!(a.sha256, b.sha256);
+    }
+
+    /// A report without its lamp is `incomplete` unless the matrix says
+    /// `refused`: the hardware lead's to set, and version 0 says so.
+    #[test]
+    fn the_rule_for_a_report_without_its_lamp_is_the_matrixs() {
+        assert_eq!(
+            Matrix::parse(SMALL).unwrap().rules.selftest_without_lamp,
+            WithoutLamp::Incomplete
+        );
+        assert_eq!(
+            Matrix::parse(V0).unwrap().rules.selftest_without_lamp,
+            WithoutLamp::Incomplete
+        );
+        let with =
+            |rules: &str| SMALL.replacen("[[revision]]", &format!("{rules}\n[[revision]]"), 1);
+        let refused = Matrix::parse(&with("[rules]\nselftest_without_lamp = \"refused\"\n"));
+        assert_eq!(
+            refused.unwrap().rules.selftest_without_lamp,
+            WithoutLamp::Refused
+        );
+        let incomplete = with("[rules]\nselftest_without_lamp = \"incomplete\"\n");
+        assert_eq!(
+            Matrix::parse(&incomplete)
+                .unwrap()
+                .rules
+                .selftest_without_lamp,
+            WithoutLamp::Incomplete
+        );
+        assert!(Matrix::parse(&with("[rules]\nselftest_without_lamp = \"pass\"\n")).is_err());
+        assert!(Matrix::parse(&with("[rules]\nlamp_names = \"any\"\n")).is_err());
     }
 }
