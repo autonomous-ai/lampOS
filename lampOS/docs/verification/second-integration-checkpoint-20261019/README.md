@@ -1,15 +1,35 @@
 # Second integration checkpoint, 2026-10-19
 
-Current status (19:31 UTC): the clean output-caps rebase `3ad17c000` passed
+Current status: the clean output-caps rebase `3ad17c000` passed
 the [complete host gate](caps-rebased-host.json): **6,768/0/30**, none
 filtered, with formatting, strict workspace Clippy and build green. All
 1,589 hashes match both copies; [27 consumers](caps-rebased-consumers.json)
 are covered. Publication and the new automatic ARM64 run remain pending.
-Rest/Say's fresh consumer gate is running. [Peer re-read](peer-fixes-reread.json)
+
+Rest/Say `f0fbb20e7` on `3ad17c000` also passed its new
+[complete host gate](rest-rebased-host.json): **6,818 passed, 0 failed,
+30 ignored**, none filtered. Non-Update passed **6,686/0/29** in
+**1,138.56 s**; complete Update passed **132/0/1** in **99.50 s**.
+Formatting **3.55 s**, strict workspace Clippy **127.35 s**, and workspace
+build **24.45 s** passed. All **1,591** frozen source hashes match both
+copies; the [changed-name scan](rest-rebased-consumers.json) covers four
+changed crates and **27 consumers**. The explicit zero-listeners Say
+assertion belongs to this foundation.
+
+First's **19:36 UTC** request is to publish Rest/Say (B), scheduled Skills
+(C), and authored Bedtime (D) as stacked PRs now, without waiting for each
+predecessor to merge. C has completed its host gate; D is still running.
+The C result will be recorded separately.
+Publication and new automatic ARM64 runs remain pending.
+[Peer re-read](peer-fixes-reread.json)
 closes the speaking-face configuration P2 in actual merge `d99eee947` and
 records #2020's fix and its already-known queued-writer limit. GitHub reads
 are available through the connector; writes and Git transport remain blocked
 by connectivity or connector permissions. No remote update is claimed.
+
+Cleanup removed **21 completed target directories**, measured by `du` at
+**69,904,036 KiB**; `df` then reported **138 GiB free**. Sources, logs and
+evidence were retained, and active target directories were kept.
 
 Earlier checkpoint (18:56 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
 passed automatic ARM64: **7,684 nextest (1 leaky), 48 skipped**, plus
@@ -57,9 +77,9 @@ passed: 283 provider and 34 second-route coordinator tests, complete Memory
 **218/0/5**, formatting, strict workspace Clippy and build. All 1,616 hashes
 match both copies. [Review](music-unclear-integration-review.json) records
 the new prepared-call, note-invalidation and carried-answer regressions.
-Memory's uncovered after-forget P2 remains assigned to its owner. A new
-switch-table conflict in #1996 needs a clean rebase; old ARM64 counts do not
-qualify a future head. GitHub connection failures currently prevent confirming
+Memory's uncovered after-forget P2 remains assigned to its owner. The
+switch-table conflict in #1996 prompted the clean rebase recorded above;
+old ARM64 counts do not qualify its new head. GitHub connection failures prevent confirming
 remote publication and review state.
 The [work log](../../work-log.md) carries current integration status.
 
