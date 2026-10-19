@@ -1055,8 +1055,8 @@ fn credentials_worker_environment(
 }
 
 // The second route's Gemini endpoint and voice, its key terms and the
-// lamp's place (#1712), to its worker only, as set: the worker checks them,
-// and says so.
+// lamp's place (#1712), and whether it listens for the names the lamp knows
+// (#753), to its worker only, as set: the worker checks them, and says so.
 fn second_route_worker_environment(
     role: &str,
     var: impl Fn(&str) -> Option<std::ffi::OsString>,
@@ -1067,6 +1067,7 @@ fn second_route_worker_environment(
         crate::second_config::KEY_TERMS_ENV,
         crate::local_time::PLACE_ENVIRONMENT,
         crate::second_provider::net::weather::ENVIRONMENT,
+        crate::second_provider::net::key_terms::ENVIRONMENT,
     ]
     .into_iter()
     .filter(|_| role == "second")
@@ -1095,6 +1096,24 @@ mod tests {
         );
         assert!(second_route_worker_environment("provider", var).is_empty());
         assert!(second_route_worker_environment("second", |_| None).is_empty());
+    }
+
+    /// #753: whether the second route listens for the names the lamp knows
+    /// goes to its worker only.
+    #[test]
+    fn the_known_names_switch_reaches_only_the_second_route() {
+        let name = crate::second_provider::net::key_terms::ENVIRONMENT;
+        let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
+        assert_eq!(
+            second_route_worker_environment("second", var),
+            [(name, std::ffi::OsString::from("on"))]
+        );
+        for role in ["provider", "capture", "speaker"] {
+            assert!(
+                second_route_worker_environment(role, var).is_empty(),
+                "{role}"
+            );
+        }
     }
 
     /// The voice unit's credentials' directory goes to the second route's
@@ -1294,6 +1313,7 @@ mod tests {
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::local_time::KERNEL_CLOCK_ENVIRONMENT,
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
+                    crate::second_provider::net::key_terms::ENVIRONMENT,
                 ]
                 .contains(&name)
                 {
@@ -1371,6 +1391,7 @@ mod tests {
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_SECOND_GEMINI_BASE_URL=https://relay.example.invalid/v1beta",
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
+                    "LAMP_SECOND_KNOWN_NAMES=on",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
                     "LAMP_SECOND_WEATHER=on",
                 ],

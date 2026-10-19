@@ -356,7 +356,11 @@ impl SttStream {
             Stt::Autonomous { base_url, key } => (Some(base_url.as_str()), key),
         };
         Self::open(
-            url(proxy, config.stt_language.as_deref(), &config.stt_key_terms)?,
+            url(
+                proxy,
+                config.stt_language.as_deref(),
+                &super::key_terms::listening(&config.stt_key_terms),
+            )?,
             key.expose(),
         )
         .await
@@ -528,7 +532,11 @@ pub async fn check(config: &SecondConfig, samples: &[i16]) -> Result<()> {
         Stt::Autonomous { base_url, key } => (Some(base_url.as_str()), key),
     };
     let asked = Instant::now();
-    let address = url(proxy, config.stt_language.as_deref(), &config.stt_key_terms)?;
+    let address = url(
+        proxy,
+        config.stt_language.as_deref(),
+        &super::key_terms::listening(&config.stt_key_terms),
+    )?;
     let (mut write, mut read) = socket(address, key.expose()).await?.split();
     println!(
         "connected in {} ms; sending {:.2} s of audio",
