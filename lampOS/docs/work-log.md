@@ -15,7 +15,7 @@ log and nothing a lamp runs ([joining.md](joining.md),
 
 ## Current checkpoint: 2026-10-19
 
-Ready for integration: yes (#1996 output caps passed automatic ARM64; inherited host motion failure remains disclosed; reviewer merge pending)
+Ready for integration: no (#1996 passed automatic ARM64; newer switch documentation conflicts and needs a clean rebase; inherited host motion failure remains disclosed)
 
 Ready for integration: no (#1732 ARM64 is green; the authored skill is being split from shared foundations)
 
@@ -363,9 +363,19 @@ is preserved, and formatting/Clippy were not repeated.
 First subsequently reported #2002's warm-STT pause/split P1 on the lamp:
 a name-only fragment followed by a pause could leave both fragments held.
 Its owner is fixing it and the switch remains off on lamps. The above Engine
-and local IPC checks do not qualify live STT or acoustic behavior. A further
-private composition on `175e411c17` is preparing #1967 unclear/hum regression
-coverage; it has no runtime result yet. Final Music publication follows the
+and local IPC checks do not qualify live STT or acoustic behavior. The further private composition on `175e411c17` is
+`b59fc17757b6f6dc8f0138c8ac1da077fff06726`. Its [source review](verification/second-integration-checkpoint-20261019/music-unclear-integration-review.json)
+retains both parents' production deltas and test helpers. Three new cases
+prove an unclear final line cannot dispatch a prepared Music call, the hum
+note invalidates an otherwise identical prepared prompt, and a held successor
+cancels pending Music while its carried answer receives no recording grant.
+The real Written retry instruction cannot authorize a recording either.
+[Its focused gate](verification/second-integration-checkpoint-20261019/music-unclear-integration-preflight.json)
+passed formatting **3.61 s**, strict workspace/all-target Clippy **118.51 s**,
+all **283 provider** and **34 second-route coordinator** cases, complete
+Memory **218/0/5**, none filtered, **83.83 s**, and workspace build **78.15 s**.
+All **1,616** frozen source hashes match both copies. These checks do not
+replace the final 27-consumer/native gate or clear the uncovered Memory P2. Final Music publication follows the
 actual Bedtime landing and preserves the separately owned held-report and
 speaking-face fixes when they land.
 
@@ -375,6 +385,19 @@ source ID on the next remember call in the same conversation, causing the new
 fact to be refused. The existing real-client/store test ends after deletion;
 the owner has the requested follow-on-write regression. No runtime or lamp
 reproduction, peer source edit, or fix ownership is claimed here.
+First assigned that repair to the Memory owner at 18:40 UTC, with both real
+client/store follow-on-write regressions.
+
+GitHub reads and the own-log push began failing with TLS timeouts/connection
+reset around 18:43 UTC. Local work and bounded read-only retries continue;
+no remote publication or latest review state is assumed from those failures.
+A local merge check also found #1996 now conflicts only in the switch table,
+beside #1967's updated unclear-line description. A documentation-only attempt
+did not remove the conflict under Git's actual merge algorithm and is not
+published. A clean rebase will preserve both rows, verify its actual current
+base and receive the applicable gates before publication. The later foundation
+PRs still follow actual predecessor landing, in order.
+
 
 Bedtime and Tasks have only their original automatic PR ARM64 run,
 following First's no-duplicate-dispatch direction. GitHub's [Actions incident](https://www.githubstatus.com/incidents/8tzbpcnl75jp)

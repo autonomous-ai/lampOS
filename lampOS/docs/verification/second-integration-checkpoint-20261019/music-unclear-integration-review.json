@@ -1,0 +1,54 @@
+{
+  "head": "b59fc17757b6f6dc8f0138c8ac1da077fff06726",
+  "foundation_parent": "573b7dfaf540110ab4f8437c299887da03ca6f68",
+  "integration_base": "175e411c17b061137a5fa94deda21d243e228c21",
+  "previous_music": "90faee56fa4464f270b9ac12d40fca0ee8c0d307",
+  "source_sha256": {
+    "lampOS/crates/voice/src/second_provider.rs": "57fedb3298c89adccaf6b2ac6c0f76c7d35f05695fdaa66362d08dde8eb259f6",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "35b6192cc6760c147762cba6b9c16cedb6a17f2afbb551ea3b1ea779814dac7d",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "338c15c531a0cbb1e9c0ca3d06ae4f2bcee6974a97b1cb3603f6ac00f6de0fd7"
+  },
+  "function_union": [
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "from": "upstream",
+      "revision": "573b7dfaf540110ab4f8437c299887da03ca6f68",
+      "functions_retained": 97,
+      "missing": []
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "from": "incoming_music",
+      "revision": "90faee56fa4464f270b9ac12d40fca0ee8c0d307",
+      "functions_retained": 108,
+      "missing": []
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "from": "upstream",
+      "revision": "573b7dfaf540110ab4f8437c299887da03ca6f68",
+      "functions_retained": 110,
+      "missing": []
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "from": "incoming_music",
+      "revision": "90faee56fa4464f270b9ac12d40fca0ee8c0d307",
+      "functions_retained": 134,
+      "missing": []
+    }
+  ],
+  "production_review": "The complete Engine and worker edits retain both parents. Raw current words and fresh PCM determine SpokenTurn; held carried answers use spoken=None and return before Unclear. The misheard note participates in Prepared::misfit. Scope, offer identity, expiry, private news, IPC retry guards and shutdown remain intact.",
+  "memory_path": "The installed requested_audio_runner reaches the shared Memory runner. DaysClient adds the same-person conversation source_ids and days_protocol forwards them to remember_from; no Music context is sent to Memory. All changed Memory runtime files match the integration parent.",
+  "new_tests": [
+    "prepared_music_held_as_unclear_cannot_offer_and_written_sorry_has_no_grant",
+    "misheard_hum_note_replaces_same_words_prepared_music_with_fresh_context",
+    "carried_music_after_unclear_handoff_cancels_pending_call_without_another_unclear"
+  ],
+  "limits": [
+    "Private composition; final publication follows actual Bedtime landing.",
+    "Engine simulation covers authorization and event ordering, not live STT, physical hums, acoustic onset, or device playback.",
+    "The upstream stale-source-after-forget P2 is assigned to the Memory owner and is not fixed here.",
+    "Warm-STT pause/split, held-report scoped context, and speaking-face findings remain separately owned; unmerged fixes are not imported."
+  ]
+}
