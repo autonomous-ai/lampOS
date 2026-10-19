@@ -52,6 +52,19 @@ are not kept as something the lamp said. The request ends when the service
 completes it. The service still believes it answered; whether that
 changes what it does next has not been looked at.
 
+On the second route, with `LAMP_REPORTS=on`, a held line is asked one
+round for a `reports_stop` (`attention::DONE_THOUGH_HELD`,
+[second-voice.md](second-voice.md)) only when its heard words name
+reports, sharing or sending: one of `report`, `reports`, `sharing`,
+`sending` or `data` as a whole word, in any case
+(`attention::HELD_ASKED_WORDS`, #1925). That is checked on the heard words
+before anything leaves the lamp, and the model decides on the line asked.
+Every other held line is sent nowhere, as without the switch: a held line
+is people in the room talking to each other (37 in 44 minutes on the first
+arm of 19 October), and asking each one would send it all out and pay a
+chat round for each. The journal says `a held line names reports: asked
+once`, with no words.
+
 ## Where it gives way
 
 The rule fails open. The answer is played when no text of what was heard

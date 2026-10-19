@@ -410,6 +410,11 @@ a skill cut for it is named on the setup line (#1706). The voice puts
 reports."}`, or "I'm not sending any reports." when they were off. With
 nobody taking the ask (`lamp-cloud` not running), or no answer in time, it
 says so and never claims a stop. Only a request a person said runs it.
+On the second route a line whose answer is held is asked about
+`reports_stop` only when its heard words name `report`, `reports`,
+`sharing`, `sending` or `data` (whole words, any case;
+`attention::HELD_ASKED_WORDS`, #1925, [attention.md](attention.md)); any
+other held line is sent nowhere.
 There is no function to turn reports on: that is the person's own screen.
 
 ## `the_time`, the voice's own

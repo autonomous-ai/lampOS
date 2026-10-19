@@ -1,5 +1,7 @@
 //! The engine against scripted services: no network.
 use super::*;
+
+mod held_consent;
 use futures_util::stream::{self, BoxStream};
 use net::ToolCall;
 use serde_json::json;
@@ -32,6 +34,8 @@ struct Script {
     /// The final words come this long after the line's end, as `Finalize`'s
     /// answer does.
     finish_after: Option<Duration>,
+    /// The functions each chat told only some was told ([`Services::chat_only`]).
+    told_only: Mutex<Vec<&'static [&'static str]>>,
 }
 
 struct ScriptListener {
@@ -98,6 +102,15 @@ impl Services for Script {
         } else {
             scripted.boxed()
         }
+    }
+
+    fn chat_only(
+        &self,
+        messages: Vec<Message>,
+        only: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.told_only.lock().unwrap().push(only);
+        self.chat(messages)
     }
 
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {

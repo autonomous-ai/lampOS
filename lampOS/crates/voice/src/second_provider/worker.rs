@@ -1387,6 +1387,9 @@ pub fn serve(
     // its search from the words heard, while the model's first round runs
     // (#1712).
     let early = search.as_ref().map(|_| Arc::new(Early::default()));
+    // A held line's `reports_stop` is done, its answer kept held, as on the
+    // Live route (`crate::attention::DONE_THOUGH_HELD`), with LAMP_REPORTS=on.
+    let though_held = tools.reports_stop;
     let runner = tool_runner(tools, search.clone(), early.clone());
     // The same calls with the admitted request's memory authority (#1794).
     let scoped_runner = scoped_tool_runner(scoped_settings, search.clone(), early.clone());
@@ -1404,6 +1407,7 @@ pub fn serve(
     .telling_cut_ins(files.cut_in_told)
     .waiting_with_a_sound(route.wait_cue)
     .saying_when_down(route.down_line)
+    .doing_though_held(though_held)
     .announcing(!route.only_voice)
     .saying_reminders(reminders);
     if let Some(staff) = staff {
