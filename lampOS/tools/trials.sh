@@ -829,7 +829,10 @@ trial() { # ROW [--dry]
 
   ASIDE=$($SUDO mktemp -d "$ASIDE_DIR/lampos-trial-$row.XXXXXX") || { say "no set-aside folder in $ASIDE_DIR"; exit 3; }
   $SUDO chmod 0700 "$ASIDE"
-  trap 'put_back; $SUDO rm -rf "$ASIDE"' EXIT
+  # The put-back is never cut short: a second INT, TERM or HUP while it runs
+  # is ignored (the first builder, #2034, 20 Oct 03:40: a second TERM ended
+  # it half done).
+  trap 'trap "" INT TERM HUP; put_back; $SUDO rm -rf "$ASIDE"' EXIT
   trap 'exit 130' INT TERM
   [[ -z $NOTE ]] || say "needs: $NOTE"
   local unit
