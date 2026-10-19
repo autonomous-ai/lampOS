@@ -62,6 +62,24 @@ pub const DAYS_ENVIRONMENT: &str = "LAMP_MEMORY_DAYS";
 pub const REMEMBER: &str = "remember";
 pub const RECALL: &str = "recall";
 pub const FORGET: &str = "forget";
+/// Forgetting everything kept of whoever is at the lamp (#1693).
+pub const FORGET_EVERYTHING: &str = "forget_everything";
+/// Only the exact value `on`, with the Days client: `forget` takes the id of
+/// something recalled, and `forget_everything` is offered (#1693). Off, the
+/// functions are as before.
+pub const FORGET_ALL_ENVIRONMENT: &str = "LAMP_MEMORY_FORGET_ALL";
+static FORGET_ALL: OnceLock<bool> = OnceLock::new();
+
+/// Whether `forget` takes an id and `forget_everything` is offered.
+pub fn forget_all_on() -> bool {
+    FORGET_ALL.get() == Some(&true)
+}
+
+/// Set it once for this process, as [`start`] does from the environment;
+/// the first setting stands. For a caller that runs the Days client itself.
+pub fn switch_forget_all(on: bool) -> bool {
+    *FORGET_ALL.get_or_init(|| on)
+}
 /// Only the exact value `on`, with the Days client: a session opened for
 /// someone known may be told one open thread of theirs to ask about, once
 /// (#1693 (3)). Off, the session is told what it was.
@@ -129,15 +147,46 @@ pub fn tools_with(rules: bool) -> Vec<Tool> {
             })),
             silent: false,
         },
-        Tool {
-            name: FORGET.into(),
-            description: "Call this when someone asks you to forget the last thing they asked you to remember. \
-                          Then tell them briefly that it is off your list, and do not use it again."
+        if forget_all_on() {
+            Tool {
+                name: FORGET.into(),
+                description: "Call this when someone asks you to forget something. For the last thing they asked you \
+                              to remember, call it with nothing. For something recall just gave you, give its source_id; \
+                              never guess one. Then tell them plainly that it is gone, with where it came up, \
+                              and do not use it again."
+                    .into(),
+                parameters: Some(json!({
+                    "type": "object",
+                    "properties": {
+                        "source_id": {"type": "integer", "description": "The source_id of what recall gave you, when that is what they want forgotten."}
+                    }
+                })),
+                silent: false,
+            }
+        } else {
+            Tool {
+                name: FORGET.into(),
+                description: "Call this when someone asks you to forget the last thing they asked you to remember. \
+                              Then tell them briefly that it is off your list, and do not use it again."
+                    .into(),
+                parameters: None,
+                silent: false,
+            }
+        },
+    ];
+    if forget_all_on() {
+        tools.push(Tool {
+            name: FORGET_EVERYTHING.into(),
+            description: "Call this only when the person asks you to forget everything about them, and only after \
+                          you have asked once whether they really mean everything and they have said yes. It forgets \
+                          all you keep of them: what they asked you to remember, your conversations and what you \
+                          noticed. It works only for someone you know by face; otherwise say what it tells you. \
+                          Then tell them plainly that it is all gone."
                 .into(),
             parameters: None,
             silent: false,
-        },
-    ];
+        });
+    }
     if rules {
         tools.extend(crate::rules::tools());
     }
@@ -151,7 +200,14 @@ pub fn is_tool(name: &str) -> bool {
 
 /// [`is_tool`] with the rules switched on or off.
 pub fn is_tool_with(name: &str, rules: bool) -> bool {
-    matches!(name, REMEMBER | RECALL | FORGET) || (rules && crate::rules::is_tool(name))
+    matches!(name, REMEMBER | RECALL | FORGET)
+        || (name == FORGET_EVERYTHING && forget_all_on())
+        || (rules && crate::rules::is_tool(name))
+}
+
+/// What the model is told for a `source_id` this session was not shown.
+fn not_shown() -> Value {
+    json!({"forgotten": false, "note": "That is not something recall gave me just now. Call recall, then forget it by its source_id."})
 }
 
 /// What the model is told when the memory did not answer: words it can say.
@@ -191,7 +247,8 @@ pub fn run_for(
                     |client| client.rule_for(call, deadline, person),
                 );
         }
-        if call.name == FORGET {
+        let forgets = matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING);
+        if forgets {
             // A timed-out removal can still commit. Invalidate the local
             // recap without waiting on its mutex in this tool's deadline.
             FORGET_THREAD.store(true, Ordering::Release);
@@ -204,7 +261,7 @@ pub fn run_for(
                 || (gone(), false),
                 |client| client.run_for(call, deadline, person),
             );
-        if call.name == FORGET {
+        if forgets {
             FORGET_THREAD.store(true, Ordering::Release);
             if let Ok(mut thread) = crate::thread::THREAD.try_lock() {
                 clear_forgotten_thread(&mut thread);
@@ -363,7 +420,15 @@ fn answer_for(name: &str, answer: &Value, now_unix_ms: u64, offset_seconds: i32)
                 Value::Null => {
                     json!({"forgotten": false, "note": "There was nothing I had been asked to remember."})
                 }
+                // `forget {id}` answers a count: none means it was not there.
+                Value::Number(count) if count.as_u64() == Some(0) => {
+                    json!({"forgotten": false, "note": "That was not in what I keep any more."})
+                }
                 _ => json!({"forgotten": true}),
+            },
+            FORGET_EVERYTHING => match answer.get("removed")?.as_u64()? {
+                0 => json!({"forgotten": false, "note": "I was keeping nothing of them."}),
+                _ => json!({"forgotten": true, "everything": true}),
             },
             _ => {
                 let today = local_day(now_unix_ms, offset_seconds);
@@ -477,6 +542,8 @@ pub fn start(socket: PathBuf, known: Option<PathBuf>) {
     let days = *DAYS_MODE.get_or_init(days_from_environment);
     // Rules live only in the Days memory: with the legacy one they stay off.
     crate::rules::switch(days && crate::rules::from_environment());
+    // Forgetting that reaches everything lives only in the Days memory.
+    switch_forget_all(days && std::env::var(FORGET_ALL_ENVIRONMENT).ok().as_deref() == Some("on"));
     if days {
         DAYS.get_or_init(|| {
             // The optional thread file contains no source IDs. A new Days
@@ -786,6 +853,8 @@ pub struct DaysClient {
     lost: Arc<AtomicU64>,
     /// [`THREADS_ENVIRONMENT`], read when the client is made.
     threads: AtomicBool,
+    /// [`forget_all_on`], read when the client is made (#1693).
+    forget_all: AtomicBool,
 }
 
 #[derive(Default)]
@@ -928,6 +997,7 @@ impl DaysClient {
             threads: AtomicBool::new(
                 std::env::var(THREADS_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
+            forget_all: AtomicBool::new(forget_all_on()),
         })
     }
 
@@ -1100,7 +1170,46 @@ impl DaysClient {
     ) -> (Value, bool) {
         let started = Instant::now();
         let deadline = deadline.min(crate::tools::ASK_DEADLINE);
-        let Some(mut request) = request(call, now, offset) else {
+        // #1693: something recall gave, by its id, in the scope it was
+        // shown from; and everything of whoever is at the lamp.
+        let days_request = match call.name.as_str() {
+            FORGET
+                if self.forget_all.load(Ordering::Acquire)
+                    && call.args.get("source_id").is_some() =>
+            {
+                let Some(id) = call.args["source_id"]
+                    .as_u64()
+                    .filter(|id| *id > 0 && *id <= i64::MAX as u64)
+                else {
+                    return (not_shown(), true);
+                };
+                let Ok(context) = self.context.try_lock() else {
+                    return (gone(), false);
+                };
+                // Only what this session was shown, of the person's own
+                // memory when someone known is at the lamp, else the room's:
+                // nobody forgets another's, nor the room's for everyone.
+                if !context.of(person).contains(&id) {
+                    return (not_shown(), true);
+                }
+                Some(json!({"op":"forget","id":id}))
+            }
+            // Only for someone known, their own scope: with nobody known
+            // the room's memory is everyone's in the house, and a guest, a
+            // child or the TV must never empty it (the reviewer on #1723).
+            FORGET_EVERYTHING if self.forget_all.load(Ordering::Acquire) && person.is_some() => {
+                Some(json!({"op":"forget_all"}))
+            }
+            FORGET_EVERYTHING if self.forget_all.load(Ordering::Acquire) => {
+                return (
+                    json!({"forgotten": false, "note": "I can forget everything only for someone I know by face, and I don't know who this is. I can forget one thing at a time instead."}),
+                    true,
+                );
+            }
+            FORGET_EVERYTHING => return (gone(), false),
+            _ => None,
+        };
+        let Some(mut request) = days_request.or_else(|| request(call, now, offset)) else {
             return (
                 json!({"error":"There was nothing in that for me to keep."}),
                 true,
@@ -1109,7 +1218,7 @@ impl DaysClient {
         if call.name == RECALL && request["query"].is_string() {
             request["op"] = json!("search");
         }
-        let writes = matches!(call.name.as_str(), REMEMBER | FORGET);
+        let writes = matches!(call.name.as_str(), REMEMBER | FORGET | FORGET_EVERYTHING);
         if writes {
             let Ok(mut context) = self.context.try_lock() else {
                 return (gone(), false);
@@ -1134,6 +1243,18 @@ impl DaysClient {
             let Some(told) = answer_for(&call.name, &answer, now, offset) else {
                 return (gone(), false);
             };
+            // Everything includes the rules they gave, kept beside their
+            // memory in a scope of their own (#813).
+            if call.name == FORGET_EVERYTHING && crate::rules::on() {
+                let rules = json!({"op":"forget_all","person":crate::rules::scope(person)});
+                if deadline
+                    .checked_sub(started.elapsed())
+                    .and_then(|left| bounded_exchange(&self.socket, &rules, left))
+                    .is_none_or(|answer| answer["ok"] != true)
+                {
+                    return (gone(), false);
+                }
+            }
             let ids = if call.name == REMEMBER && told["remembered"] == true {
                 let Some(id) = answer["id"]
                     .as_u64()
@@ -1153,7 +1274,7 @@ impl DaysClient {
         let Ok(mut context) = self.context.try_lock() else {
             return (gone(), false);
         };
-        if call.name == FORGET && told["forgotten"] == true {
+        if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) && told["forgotten"] == true {
             // Already-delivered provider context cannot be retracted here.
             // Do not let later prose recreate forgotten material unlinked.
             context.journal_inhibited = true;
@@ -1868,6 +1989,103 @@ mod tests {
     const NOW: u64 = 1_791_905_400_000;
     const EAST: i32 = 25_200;
     const DAY: u64 = 86_400_000;
+
+    /// #1693, `LAMP_MEMORY_FORGET_ALL`: something recall gave is forgotten
+    /// by its id, only if this session was shown it in that scope, and
+    /// "forget everything" empties the scope of whoever is at the lamp
+    /// (the room's here, never everyone's). Off, `forget` is as before.
+    #[test]
+    fn with_the_switch_what_recall_gave_and_everything_can_be_forgotten() {
+        let (socket, served) = memory("forget-all", 2, |request| match request["op"].as_str() {
+            Some("search") => json!({"ok":true,"entries":[
+                {"kind":"kept","id":8,"at_unix_ms":NOW-DAY,"text":"my sister's wedding is Saturday"}
+            ]}),
+            Some("forget") => json!({"ok":true,"removed":3}),
+            Some("forget_all") => json!({"ok":true,"removed":5}),
+            _ => json!({"ok":false}),
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        let run = |name, args| client.run_at(&call(name, args), FIRST_READ, NOW, EAST, None);
+        assert!(run(RECALL, json!({"about":"wedding"})).1);
+        // Not shown this session: refused here, nothing sent.
+        let (told, answered) = run(FORGET, json!({"source_id":99}));
+        assert!(answered);
+        assert_eq!(told["forgotten"], false, "{told}");
+        let (told, _) = run(FORGET, json!({"source_id":8}));
+        assert_eq!(told, json!({"forgotten": true}));
+        assert!(client.context.lock().unwrap().journal_inhibited);
+        // With nobody known, everything is refused here: the room's memory
+        // is the household's (the reviewer on #1723), and nothing is sent.
+        let (told, answered) = run(FORGET_EVERYTHING, json!({}));
+        assert!(answered);
+        assert_eq!(told["forgotten"], false, "{told}");
+        assert!(
+            told["note"]
+                .as_str()
+                .unwrap()
+                .contains("only for someone I know")
+        );
+        let read = served.join().unwrap();
+        assert_eq!(read.len(), 2, "{read:?}");
+        assert_eq!(read[0]["op"], "search");
+        assert_eq!(read[1], json!({"op":"forget","id":8}));
+        assert!(read.iter().all(|line| line["op"] != "forget_all"));
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+
+        // Someone known: their own scope, and the room's id isn't theirs.
+        const MINH: &str = "p-be9688998f085098";
+        let (socket, served) = memory("forget-all-minh", 1, |request| {
+            match request["op"].as_str() {
+                Some("forget_all") => json!({"ok":true,"removed":0}),
+                _ => json!({"ok":true,"entries":[]}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        client.context.lock().unwrap().include(None, &[8]);
+        let (told, _) = client.run_at(
+            &call(FORGET, json!({"source_id":8})),
+            FIRST_READ,
+            NOW,
+            EAST,
+            Some(MINH),
+        );
+        assert_eq!(told["forgotten"], false, "{told}");
+        let (told, _) = client.run_at(
+            &call(FORGET_EVERYTHING, json!({})),
+            FIRST_READ,
+            NOW,
+            EAST,
+            Some(MINH),
+        );
+        assert_eq!(told["forgotten"], false, "{told}");
+        let read = served.join().unwrap();
+        assert_eq!(read, [json!({"op":"forget_all","person":MINH})]);
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+
+        // Off: an id is passed over and the last kept thing goes, as before;
+        // forget_everything isn't the memory's.
+        let (socket, served) = memory("forget-all-off", 1, |_| json!({"ok":true,"removed":null}));
+        let client = DaysClient::new(socket.clone()).unwrap();
+        assert!(!client.forget_all.load(Ordering::Acquire));
+        client.run_at(
+            &call(FORGET, json!({"source_id":8})),
+            FIRST_READ,
+            NOW,
+            EAST,
+            None,
+        );
+        assert_eq!(
+            served.join().unwrap()[0],
+            json!({"op":"forget_last","kind":"kept"})
+        );
+        assert!(!is_tool(FORGET_EVERYTHING));
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
 
     #[test]
     fn days_search_preserves_rank_and_observations_and_uses_the_named_local_day() {

@@ -864,6 +864,10 @@ fn worker_command(
             role,
             var(crate::remember::THREADS_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_forget_all_worker_environment(
+            role,
+            var(crate::remember::FORGET_ALL_ENVIRONMENT).as_deref(),
+        ))
         .envs(kernel_clock_worker_environment(
             role,
             var(crate::local_time::KERNEL_CLOCK_ENVIRONMENT).as_deref(),
@@ -917,6 +921,16 @@ fn memory_rules_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "provider" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::rules::ENVIRONMENT, "on"))
+}
+
+// Forgetting that reaches everything (#1693), passed the same narrow way:
+// the exact `on`, to the provider only, which offers the memory's functions.
+fn memory_forget_all_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "provider" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::FORGET_ALL_ENVIRONMENT, "on"))
 }
 
 // The open threads' switch (#1693 (3)), passed the same narrow way: the
@@ -1044,6 +1058,12 @@ mod tests {
                         "LAMP_MEMORY_THREADS",
                         ["provider"].as_slice(),
                     ),
+                    // So does forgetting everything (#1693).
+                    (
+                        memory_forget_all_worker_environment,
+                        "LAMP_MEMORY_FORGET_ALL",
+                        ["provider"].as_slice(),
+                    ),
                     // The clock's switch, the two that tell the time.
                     (
                         kernel_clock_worker_environment,
@@ -1169,6 +1189,7 @@ mod tests {
                 if [
                     "LAMP_MEMORY_DAYS",
                     crate::rules::ENVIRONMENT,
+                    crate::remember::FORGET_ALL_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::local_time::KERNEL_CLOCK_ENVIRONMENT,
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
@@ -1221,6 +1242,7 @@ mod tests {
                 vec![
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
+                    "LAMP_MEMORY_FORGET_ALL=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
