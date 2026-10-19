@@ -12,6 +12,9 @@ Group=orangepi
 SupplementaryGroups=audio
 RuntimeDirectory=lampos-actions
 RuntimeDirectoryMode=0755
+# Kept across a restart (a crash's, an update's): its catalog stays in place, so the voice sees
+# no functions gone and back, and renews no session for a restart (#1588, El's P3).
+RuntimeDirectoryPreserve=restart
 # Reminders and timers by voice (#709, #747).
 Environment=LAMP_SCHEDULE_TOOLS=on
 Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock

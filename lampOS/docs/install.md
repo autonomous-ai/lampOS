@@ -80,7 +80,7 @@ differs. Folders are what the unit makes or names.
 | eyes | `lamp-eyes` | orangepi, `video` | `/var/lib/lampos-eyes/` (0700, `people.json`); `/run/lampos-eyes/` (0755); the camera lock folder | two models, `/opt/lampOS/eyes/*.onnx`, outside the build's folder | `permit.sock`, `who.sock`, `present`, `known`, `sight.jpg` |
 | name | `lamp-name` | orangepi | none | models, `/opt/lampOS/name/models`, outside the build's folder | the bus |
 | expression | `lamp-expression serve` | orangepi | none | a catalogue, `/opt/lampOS/expression/catalogues/*.json` | the bus |
-| actions | `lamp-actions` | orangepi, `audio` (product: lampos, `audio`) | `/run/lampos-actions/` (0755); product: `/var/lib/lampos-output-caps/` (0700) | none | its folder; the bus |
+| actions | `lamp-actions` | orangepi, `audio` (product: lampos, `audio`) | `/run/lampos-actions/` (0755, kept across restarts); product: `/var/lib/lampos-output-caps/` (0700) | none | its folder; the bus |
 | memory | `lamp-memory` | orangepi (`@MEMORY_USER@`: its own) | `/var/lib/lampos-memory/` (0700); `/run/lampos-memory/` | none | `memory.sock` |
 | policy | `lamp-policy` | orangepi (template: `DynamicUser=yes`) | `/var/lib/lampos-policy/` (0700) | the judge's key, `/etc/lampOS/policy/jev.key`, as a systemd credential | the bus |
 | health | `lamp-health serve` | orangepi | none | none: what it expects is options | the bus |

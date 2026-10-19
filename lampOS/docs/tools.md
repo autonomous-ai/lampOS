@@ -147,8 +147,9 @@ conversation for the same kind at most once a minute (`BACK_AT_MOST_EVERY`),
 so a light that comes and goes (#1514) does not renew it over and over. In a
 quiet room a return renews on the 30 s bound, as any change does under
 #1484. It need not wait out the 30 s after
-a renewal that brought nothing back: lamp-actions restarting in a quiet room
-renews for the light gone, and the light back seconds later renews at the
+a renewal that brought nothing back: lamp-actions stopped and started in a
+quiet room renews for the light gone (a restart keeps its folder and its
+catalog, so it renews nothing: El on #1588, [actions.md](actions.md)), and the light back seconds later renews at the
 next gap rather than the lamp refusing for half a minute (Jarvis on #1588).
 Two returns in a row still wait for it, so a catalog that comes and goes
 renews at most twice in 30 s. The cost is one reconnect landing just after

@@ -12,6 +12,9 @@ Group=orangepi
 SupplementaryGroups=audio
 RuntimeDirectory=lampos-actions
 RuntimeDirectoryMode=0755
+# Kept across a restart (a crash's, an update's): its catalog stays in place, so the voice sees
+# no functions gone and back, and renews no session for a restart (#1588, El's P3).
+RuntimeDirectoryPreserve=restart
 ExecStart=/opt/lampOS/actions/a90e423ad71302d363489763f01fa5050284dc558c0f33ad607a1c4501bec279/lamp-actions --dir /run/lampos-actions --mixer-card allwinnerhdmi --mixer-control Speaker --volume-ceiling 100 --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=2s
