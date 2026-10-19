@@ -20,6 +20,7 @@ use std::{
 
 pub mod clock;
 pub mod glow;
+pub mod known;
 pub mod package;
 pub mod visits;
 pub mod watch;
@@ -2949,6 +2950,9 @@ pub struct Engine {
     off_file: Option<PathBuf>,
     /// Who was at the lamp, from `room/presence`, for a `[history]` (#1685).
     visits: visits::Visits,
+    /// With `LAMP_WHO_WAS_HERE_KNOWN=on`: the eyes' known file, for the
+    /// mark of someone the lamp knows ([`known`]), never a name.
+    known_file: Option<PathBuf>,
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
@@ -3060,6 +3064,14 @@ fn event(skill: &str, stage: SkillStage, why: String, allowed: Option<bool>) -> 
 }
 
 impl Engine {
+    /// Who was here's mark of someone the lamp knows, from the eyes' known
+    /// file at `path` (`LAMP_WHO_WAS_HERE_KNOWN=on`, [`known`]): off unless
+    /// given, and told only to a skill with `known_faces = true`.
+    pub fn marking_known(mut self, path: PathBuf) -> Self {
+        self.known_file = Some(path);
+        self
+    }
+
     /// `skip_ask`: act without asking the Policy (`LAMP_SKILLS_ASK=skip`).
     /// Without it, or `asking_the_policy`, nothing a skill starts is done.
     pub fn new(skills: Vec<Skill>, skip_ask: bool) -> Self {
@@ -3082,6 +3094,7 @@ impl Engine {
             off: BTreeSet::new(),
             off_file: None,
             visits: visits::Visits::default(),
+            known_file: None,
         }
     }
 
@@ -3418,12 +3431,18 @@ impl Engine {
             return calls;
         };
         let ago = visits::ago(now_us);
-        let record = self
-            .visits
-            .told(now_us, within_us, |at_us| match self.local_minute(at_us) {
+        // The mark of someone the lamp knows only for a skill that may know
+        // a known face (`known_faces`); any other is told "someone".
+        let marked = self.known_file.is_some() && skill.permissions.known_faces;
+        let record = self.visits.told_marking(
+            now_us,
+            within_us,
+            |at_us| match self.local_minute(at_us) {
                 Some(minute) => format!("at {:02}:{:02}, {}", minute / 60, minute % 60, ago(at_us)),
                 None => ago(at_us),
-            });
+            },
+            marked,
+        );
         calls
             .into_iter()
             .map(|call| match call {
@@ -3703,6 +3722,17 @@ impl Engine {
         {
             self.visits
                 .seen(presence.someone, presence.nobody_s, presence.by, now_us);
+            // Someone the lamp knows at it, with the mark on: only someone
+            // who asked to be remembered, as the eyes write them. The name
+            // is let go here, unread past whether there is one.
+            if presence.someone
+                && self
+                    .known_file
+                    .as_deref()
+                    .is_some_and(|path| known::name_in(path, known::MARK_FRESH).is_some())
+            {
+                self.visits.known_here();
+            }
         }
         // Words still coming count too: the model may call before the end.
         if topic == Speech::TOPICS[0]

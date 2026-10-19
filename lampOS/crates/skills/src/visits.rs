@@ -27,6 +27,10 @@ pub struct Visits {
     unseen: VecDeque<(u64, u64)>,
     /// The newest value: when, and whether someone was there.
     last: Option<(u64, bool)>,
+    /// With `LAMP_WHO_WAS_HERE_KNOWN=on` (`crate::known`): the spells, by
+    /// their start, in which the eyes knew the face at the lamp. A mark
+    /// only: no name, nothing of whom.
+    known: Vec<u64>,
 }
 
 impl Visits {
@@ -77,6 +81,8 @@ impl Visits {
         {
             self.spells.pop_front();
         }
+        let oldest = self.spells.front().map_or(u64::MAX, |(from, _, _)| *from);
+        self.known.retain(|from| *from >= oldest);
         while self.unseen.len() > MOST
             || self.unseen.front().is_some_and(|(_, until)| *until < since)
         {
@@ -84,10 +90,32 @@ impl Visits {
         }
     }
 
+    /// The eyes knew the face at the lamp during the spell going on, if one
+    /// is.
+    pub fn known_here(&mut self) {
+        if let Some((from, None, _)) = self.spells.back()
+            && !self.known.contains(from)
+        {
+            self.known.push(*from);
+        }
+    }
+
     /// What the record says of the last `within_us` before `now_us`, in
     /// words for the model, with each time as `when` says it (a local time
     /// of day, or how long ago).
     pub fn told(&self, now_us: u64, within_us: u64, when: impl Fn(u64) -> String) -> String {
+        self.told_marking(now_us, within_us, when, false)
+    }
+
+    /// [`Visits::told`], with `marked` each spell the eyes knew the face in
+    /// said as "someone the lamp knows", never who.
+    pub fn told_marking(
+        &self,
+        now_us: u64,
+        within_us: u64,
+        when: impl Fn(u64) -> String,
+        marked: bool,
+    ) -> String {
         let Some((last_us, someone)) = self.last else {
             return "The lamp has no record of who was at it: its eyes have said nothing about \
                     the room since it started (presence is off, or they could not see). Say you \
@@ -99,6 +127,11 @@ impl Visits {
         let mut lines: Vec<(u64, String)> = Vec::new();
         for (from, until, face) in &self.spells {
             // A voice with no face: someone passing or out of view.
+            let who = if marked && self.known.contains(from) {
+                "someone the lamp knows"
+            } else {
+                "someone"
+            };
             let (was, has_been) = if *face {
                 ("was at the lamp", "has been at the lamp")
             } else {
@@ -111,7 +144,7 @@ impl Visits {
                 Some(until) if *until >= since => lines.push((
                     *from,
                     format!(
-                        "- someone {was} for {}, {}",
+                        "- {who} {was} for {}, {}",
                         length(until - from),
                         when(*from)
                     ),
@@ -120,7 +153,7 @@ impl Visits {
                 None if seeing && someone => lines.push((
                     *from,
                     format!(
-                        "- someone {has_been} for {}, since {}, and still is",
+                        "- {who} {has_been} for {}, since {}, and still is",
                         length(now_us.saturating_sub(*from)),
                         when(*from)
                     ),
@@ -155,11 +188,20 @@ impl Visits {
             .iter()
             .filter(|(_, until, _)| until.is_some_and(|until| until >= since))
             .count();
-        let mut told = format!(
-            "The lamp's record of the room over the last {}, times only, from its eyes and ears: it \
-             never knows who anyone was, and keeps no picture.",
-            length(within_us)
-        );
+        let mut told = if marked {
+            format!(
+                "The lamp's record of the room over the last {}, times only, from its eyes and \
+                 ears: it never knows who anyone was, only whether its eyes knew a face, someone \
+                 who asked it to remember them, and keeps no picture.",
+                length(within_us)
+            )
+        } else {
+            format!(
+                "The lamp's record of the room over the last {}, times only, from its eyes and \
+                 ears: it never knows who anyone was, and keeps no picture.",
+                length(within_us)
+            )
+        };
         for (_, line) in lines {
             told.push('\n');
             told.push_str(&line);
@@ -355,6 +397,48 @@ mod tests {
                 && told.contains("\n- someone has been at the lamp for under a minute, since under a minute ago, and still is"),
             "{told}"
         );
+    }
+
+    /// #1685's mark (`LAMP_WHO_WAS_HERE_KNOWN`, the first builder's (a)): a
+    /// spell the eyes knew the face in is said as "someone the lamp knows",
+    /// never who, and only when marked; without it the words are as before.
+    #[test]
+    fn a_spell_the_eyes_knew_is_someone_the_lamp_knows_and_never_who() {
+        let mut visits = Visits::default();
+        visits.known_here();
+        assert!(visits.known.is_empty(), "no spell going on: nothing kept");
+        visits.seen(true, 0, Some(SeenBy::Face), 10 * M);
+        visits.known_here();
+        visits.known_here();
+        assert_eq!(visits.known, [10 * M], "once a spell");
+        visits.seen(false, 20, None, 20 * M);
+        visits.seen(true, 0, Some(SeenBy::Face), 30 * M);
+        visits.seen(false, 20, None, 40 * M);
+        let when = ago(41 * M);
+        let told = visits.told_marking(41 * M, 60 * M, &when, true);
+        assert!(
+            told.contains("- someone the lamp knows was at the lamp for "),
+            "{told}"
+        );
+        assert_eq!(
+            told.matches("- someone was at the lamp for ").count(),
+            1,
+            "the second spell: {told}"
+        );
+        assert!(told.contains("only whether its eyes knew a face"), "{told}");
+        // Unmarked (no switch, or a skill without known_faces): as before.
+        let plain = visits.told_marking(41 * M, 60 * M, &when, false);
+        assert_eq!(plain, visits.told(41 * M, 60 * M, &when));
+        assert!(
+            !plain.contains("the lamp knows") && plain.contains("never knows who"),
+            "{plain}"
+        );
+        // A day on, the marked spell is pruned with the spells, and its mark
+        // with it (the reviewer's P3 on #1997).
+        let day = KEPT_US + 41 * M;
+        visits.seen(true, 0, Some(SeenBy::Face), day);
+        visits.known_here();
+        assert_eq!(visits.known, [day], "only the new spell's mark is kept");
     }
 
     #[test]
