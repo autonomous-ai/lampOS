@@ -4722,6 +4722,22 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#1823, `lamp-near-call` for Seventh's setup step (#753):** one try, the loop, the bar and the file, 7 tests. The reviewer found nothing (15:22), and it merges once ARM64 is green.
 - **Step 2, the Flux trial (`LAMP_SECOND_FLUX`):** committed on #1818's branch, 13 tests of its own. Gating now. It hasn't been run against Deepgram.
 
+## 2026-10-19, 16:35 ICT: the owner tests the DeepSeek route; item 3 is mine (#1855); the key terms ready to merge (#1840); Flux kept as a trial (#1841)
+
+- **The DeepSeek route didn't hear the owner at 15:2x** (the first builder, 15:26). Asked of me: does a person at the desk get words, as the route sends the audio?
+  - **What I found from the code:** the route gets the same audio as Live, mic2 after the canceller at 16 kHz. The key terms on `57b545850` were "Lamp" alone. A person at the desk on today's path isn't recorded on this Mac.
+  - **For the first builder to run on the lamp:** the owner's 12 Oct session in gain-stepped slices, and `gain.py`.
+  - **The first builder's own runs on the lamp:** the owner's ten desk lines were heard 10 of 10. Gain made things worse. Flux was no better overall on the owner's voice (6 of 7 names against 5, 6 lines fully right against 7).
+  - So the gain and source switches stay unbuilt, and Flux stays a trial.
+- **#1840 (the key terms) and #1841 (Flux through the Autonomous proxy's own path):**
+  - Replaced #1818, #1830 and #1831 as #1712 was rebased. The known faces are left out by the first builder's ruling, after the reviewer's P2. The reviewer found nothing (16:12).
+  - #1840 has #1712's tip merged in, with no force-push, and is ready for the first builder to merge.
+- **Item 3, the conversation carrying the owner's lines without the name, mine since 16:11.**
+  - **The verdict lines** (the first builder, 16:16) showed 209, 210, 214 and 216 held with no conversation counted. The main cause is Third's, in the turn code: the next line ends a turn whose search is still running, so 208's weather and 213's F1 answers were never said (the first builder, 16:23).
+  - **Mine, #1855:** a line whose chat the route gave up at 3 s is no talk the lamp left alone. The journal now names when the room's count ends a conversation. Gating now.
+- **Checkpoints:** #828 and #829 were closed on mine at 14:51, and #1808 and #1809 carry their rest.
+- **#753:** #1823 (`lamp-near-call`) merged at 15:36. The consumer (`LAMP_ATTENTION_NEAR_CALIBRATED`) is written, with Seventh's two points: a kept try's score is checked, and the reset wipes the file. It goes up after #1855's gate.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
