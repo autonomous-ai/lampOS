@@ -147,7 +147,17 @@ fn the_sample_pilot_config_forwards_the_installed_pilot_settings() {
             "--playout-start-ms",
             "200",
             "--provider-continuation",
-            "kept-start"
+            "kept-start",
+            "--voice-route",
+            "second",
+            "--runtime-env",
+            "LAMP_SECOND_CHAT=deepseek",
+            "--runtime-env",
+            "LAMP_SECOND_SEARCH=deepseek",
+            "--runtime-env",
+            "LAMP_SECOND_SPEECH=elevenlabs",
+            "--runtime-env",
+            "LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json"
         ])
     );
     assert_eq!(report["backend"]["noise_suppression"], "off");
@@ -188,9 +198,53 @@ fn the_endpoint_trial_config_adds_only_the_endpoint_flag() {
             "--provider-continuation",
             "kept-start",
             "--endpoint",
-            "smart-turn"
+            "smart-turn",
+            "--voice-route",
+            "second",
+            "--runtime-env",
+            "LAMP_SECOND_CHAT=deepseek",
+            "--runtime-env",
+            "LAMP_SECOND_SEARCH=deepseek",
+            "--runtime-env",
+            "LAMP_SECOND_SPEECH=elevenlabs",
+            "--runtime-env",
+            "LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json"
         ])
     );
+}
+
+/// The owner, 19 Oct 19:3x: a run is on the second route unless it names
+/// live. One without the second route's configuration is refused on the Mac,
+/// before anything starts on the lamp; one that names live (a comparison the
+/// first builder names on #1712) runs, and its record says live.
+#[test]
+fn a_run_is_on_the_second_route_unless_it_names_live() {
+    let dir = common::Private::new("cfg");
+    let mut config: Value =
+        serde_json::from_str(&std::fs::read_to_string(sample()).unwrap()).unwrap();
+    let settings = config.as_object_mut().unwrap();
+    settings.remove("voice_route");
+    settings.remove("runtime_env");
+    let path = dir.join("config.json");
+    std::fs::write(&path, config.to_string()).unwrap();
+    let output = dry_run(&dir, &path);
+    assert!(!output.status.success());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        error.contains("second route needs its configuration"),
+        "{error}"
+    );
+    config["voice_route"] = "live".into();
+    std::fs::write(&path, config.to_string()).unwrap();
+    let output = dry_run(&dir, &path);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let flags = report["backend"]["runtime_flags"].as_array().unwrap();
+    assert_eq!(flags[flags.len() - 2..], ["--voice-route", "live"]);
 }
 
 #[test]

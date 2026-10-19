@@ -1703,10 +1703,9 @@ async fn run_call(
         {
             room.answered_by_a_call(request, monotonic_us());
         }
-        match &scope {
-            Some(scope) => crate::tools::answer_scoped(&settings, &call, request, heard, scope),
-            None => crate::tools::answer(&settings, &call, request, heard),
-        }
+        // A news key stays in the answer: the turn takes it out before
+        // its model reads it, and tells the coordinator (#1390).
+        crate::tools::answer_keeping_news(&settings, &call, request, heard, scope.as_ref())
     })
     .await
     .unwrap_or_else(|_| crate::tools::unavailable())
@@ -4083,6 +4082,107 @@ mod tests {
             .and_then(|ms| ms.parse::<u64>().ok());
         assert_eq!(counted, Some(0), "the battery's pattern reads it");
         assert!(super::run_after(&crate::tools::Route::Clock, "the_time", 7).is_none());
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_REMARKS` on the second
+    /// route as the lamp's only voice. In a busy room a remark to the room,
+    /// let out only as the conversation going on, is held as on Live (#829,
+    /// the umbrella and the car); what calls the lamp plays; without the
+    /// switch the remark plays. With `--attention` busy or not, and with
+    /// `--spoken-to` or not.
+    #[test]
+    fn as_the_only_voice_a_remark_to_the_room_is_held_with_the_switch() {
+        use crate::room_told::Room;
+        let signs = || super::Signs {
+            room: Room::Busy,
+            going_on: true,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let remarks = [
+            "I should bring an umbrella then.",
+            "Okay, I will book the car for eight.",
+        ];
+        for strict in [false, true] {
+            for spoken_to in [false, true] {
+                let judged = |held_back: bool, heard: &str| {
+                    let mut heeding = super::Heeding::new(strict, false, None, None);
+                    heeding.as_the_only_voice(held_back, spoken_to, false);
+                    heeding.judge(9, line, heard, signs())
+                };
+                for remark in remarks {
+                    assert_eq!(
+                        judged(true, remark),
+                        Some(crate::remarks::REMARK),
+                        "{remark}, strict {strict}, spoken_to {spoken_to}"
+                    );
+                    assert_eq!(judged(false, remark), None, "{remark} without the switch");
+                }
+                assert_eq!(judged(true, "Lamp, and tomorrow?"), None, "called");
+            }
+        }
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_CUT_INS_NOT_TALK` on the second
+    /// route as the only voice. The room this route keeps (`keeping_room`)
+    /// leaves lines said over the lamp's own answer out of its talk, as the
+    /// Live worker's room does: three such lines left alone do not make it
+    /// busy; without the switch they do. The engine marks such a line at its
+    /// Start (`over_the_lamps_voice`, `second_provider.rs`). In tests the room
+    /// is the thread's own, so each case runs on a thread of its own.
+    #[test]
+    fn as_the_only_voice_lines_said_over_the_lamp_are_not_talk_with_the_switch() {
+        let busy_after_three = |cut_ins_not_talk: bool| {
+            std::thread::spawn(move || {
+                let _tick = super::keeping_room(false, cut_ins_not_talk, None, None);
+                let mut room = crate::room_told::room().lock().unwrap();
+                let now = monotonic_us();
+                for request in 1..=3 {
+                    room.heard(request, now);
+                    room.began_over_the_lamp(request);
+                    room.ended(request, now);
+                    room.unanswered(request, now);
+                }
+                room.at(now) == crate::room_told::Room::Busy
+            })
+            .join()
+            .unwrap()
+        };
+        assert!(!busy_after_three(true), "with the switch: not talk");
+        assert!(busy_after_three(false), "without it: talk, and busy");
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_SPOKEN_TO=day-and-night` on
+    /// the second route as the only voice. By day, with the day's own bars,
+    /// a name heard close to the lamp at 0.95 in a busy room, nobody turned
+    /// to it and no words calling it, is held, as on Live (#829, the eye
+    /// drops); with `on` alone it plays. The night's bars are not read here:
+    /// this route never tells its rule the night (Live does, from
+    /// `local_time::night_here`), so it judges every hour as day.
+    #[test]
+    fn as_the_only_voice_the_days_bars_hold_a_name_heard_close_by_day() {
+        use crate::room_told::Room;
+        let signs = || super::Signs {
+            room: Room::Busy,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(false),
+            names: vec![(1_000_100_000, 0.95)],
+            near: true,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let judged = |by_day: bool| {
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, by_day);
+            heeding.judge(9, line, "What time is it?", signs())
+        };
+        assert!(judged(true).is_some(), "by day, held");
+        assert_eq!(judged(false), None, "with on alone, played");
     }
 
     /// #1712, lamp-4ace's A/B: after a hand-over and 104 s, every line

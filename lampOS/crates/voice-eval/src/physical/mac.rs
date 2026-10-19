@@ -2570,7 +2570,7 @@ impl Backend for PhysicalBackend<'_> {
             },
             "stimulus_source": self.config.stimulus_source,
             "noise_suppression": self.config.noise_suppression,
-            "runtime_flags": self.config.runtime_flags.argv(),
+            "runtime_flags": self.config.runtime_flags.relay_argv(),
             "lamp_diagnostics": self.config.diagnostics,
             "player": self.player.describe(),
             "room_recorder": self.config.room_recorder.as_ref().map(|argv| argv.first().cloned()),
@@ -2736,8 +2736,9 @@ impl Backend for PhysicalBackend<'_> {
         if let Some(ceiling) = self.config.ring_channel_ceiling {
             argv.extend(["--ring-channel-ceiling".into(), ceiling.to_string()]);
         }
-        // The relay validates these again before it starts lamp-voice.
-        argv.extend(self.config.runtime_flags.argv());
+        // The relay validates these again before it starts lamp-voice, and
+        // gives lamp-voice the route and settings in its environment.
+        argv.extend(self.config.runtime_flags.relay_argv());
         let mut child = Command::new(&argv[0])
             .args(&argv[1..])
             .stdin(Stdio::piped())

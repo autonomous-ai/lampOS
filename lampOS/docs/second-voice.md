@@ -1002,6 +1002,19 @@ record is written.
   (`ReminderDeferral::Disabled`), for Gemini to say once it is back. The
   journal: `lamp-voice second: due reminders are said on this route, the
   lamp's only voice`.
+- **The voice's own sayings are said**, as on Live (the first builder's
+  20:15 on #1722): task news told unasked and progress news (each a
+  written turn of the news's note, at the same quiet moment), a skill's say
+  (`LAMP_SAY`, answered `spoken` on the same proof), and news asked about
+  (`check_agent_task`), whose key the turn takes out of the answer before
+  its model reads it and sends as `NewsAnswered` (`docs/tasks.md`). So the
+  tasks part is told a finished task was heard once its turn is heard
+  whole, and closes its harness, as on Live. Tests:
+  `coordinator::tests::second_route::news_is_told_once_at_the_next_quiet_moment_on_the_second_route_as_on_live`
+  and `a_skills_say_is_said_and_answered_spoken_on_the_second_route_as_on_live`
+  (the loop, both routes), and `second_provider`'s
+  `news_asked_about_rides_on_its_turn_and_its_key_is_never_the_models` and
+  `news_asked_by_voice_through_this_route_is_put_on_the_turn`.
 - **Its input is taken late**, in order and from the parent's boot, as the
   Live worker's is since 40de19327 (`WorkerChannels::taking_late_input`): its
   input is checked against fresh authority when used, and its end would end
@@ -1550,6 +1563,46 @@ systemd-run --pty --wait \
   -p LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key \
   /opt/lampOS/voice/current/lamp-voice probe-cache \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 3
+```
+
+### Which function each follow-up line calls (`probe-tools`)
+
+`lamp-voice probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS]` (1 to 20, 3 by
+default; `second_provider/probe/tools.rs`). It was built for one fault the
+four-arm test found (the first builder on #1722, 20:22). On lamp-4ace at
+20:08 and 09:12, after "make your light a little dimmer" and "a little
+dimmer still", DeepSeek answered "Hey Lamp, turn yourself down a bit." with
+`light_dimmer`, then "turn yourself back up a little" with `volume_up`: the
+lamp ended 20 steps louder. Live calls `volume_down`, then `volume_up`.
+
+- **The conversation:** the character and a turn's changing part, then five
+  lines (`LINES`): the four above and "That's better, thanks." (no call).
+  Each line is asked with the lines before it as right history: the right
+  call, the actions part's short answer to it (`LAMP_SHORT_DONE=on`, as on
+  the lamps), and a word or two. So each line is judged on its own.
+- **The functions:** the voice's own, as `probe-cache` declares them, and
+  the actions part's from its catalog in `LAMP_ACTIONS_DIR`
+  (`/run/lampos-actions`), the way the voice reads them. On a lamp that's
+  the light and volume with their installed descriptions. Without them it
+  refuses to run.
+- **The arms**, on DeepSeek's own API (`hosted.deepseek_model`, thinking
+  off, the unit's `deepseek.key`):
+  - `today`: every function;
+  - `few`: narrowed as `LAMP_SECOND_FEW_TOOLS=on` narrows a spoken turn's;
+  - `note`: today's, with one sentence after the changing part (`NOTE`):
+    "'Turn yourself up' or 'turn yourself down' always means your voice
+    (volume_up, volume_down), whatever was said about your light before."
+
+It prints, for each arm and line, how many requests called each function
+first (`none` for an answer in words) and how many were right. Then it names
+the arms that were right every time on every line. Counts only, no words.
+Run it like `probe-cache`, where lamp-actions runs:
+
+```sh
+systemd-run --pty --wait \
+  -p LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key \
+  /opt/lampOS/voice/current/lamp-voice probe-tools \
+  /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 20
 ```
 
 ## Not done

@@ -2607,8 +2607,9 @@ pub(crate) mod tests {
 
     /// Seventh's peer review on #1427: through the real routes. The Live worker's
     /// asking thread (`provider_worker::answered_scoped`) takes the key out of what
-    /// its model is told and keeps it; the second voice (`tools::answer`)
-    /// takes it out too, and keeps nothing.
+    /// its model is told and keeps it; `tools::answer` takes it out too, and
+    /// keeps nothing; the second voice's spoken turn
+    /// (`tools::answer_keeping_news`) gets it, to take out itself.
     #[test]
     fn the_key_is_never_the_models_on_either_voice() {
         let directory =
@@ -2645,6 +2646,17 @@ pub(crate) mod tests {
         let told = crate::tools::answer(&settings, &call, 2, true);
         assert!(told.get(NEWS_KEY).is_none(), "{told}");
         assert_eq!(told["answer"], "Lumi, Sunny and Archie.");
+
+        // The second voice's spoken turn keeps it for its own turn to take
+        // out (`second_provider`'s `news_asked_about_rides_on_its_turn…`).
+        let (place, _seen) = serving(&directory, "idle", "Lumi, Sunny and Archie.", false);
+        let settings = crate::tools::Settings {
+            tasks: Some(place),
+            ..crate::tools::Settings::default()
+        };
+        let mut kept = crate::tools::answer_keeping_news(&settings, &call, 3, true, None);
+        assert_eq!(take_news_key(&mut kept).as_deref(), Some("s1:2:4"));
+        assert_eq!(kept["answer"], "Lumi, Sunny and Archie.");
         let _ = std::fs::remove_dir_all(&directory);
     }
 

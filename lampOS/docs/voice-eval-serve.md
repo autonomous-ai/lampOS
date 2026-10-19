@@ -34,8 +34,42 @@ Runtime policy is forwarded typed and validated. The fields are
 - An omitted field passes nothing, so the default child argv is unchanged.
   Fixture runs refuse these fields.
 
+**The voice route.** A `serve` or `directed` run starts the voice on the
+second route (Deepgram, DeepSeek, ElevenLabs) unless it names Gemini Live:
+the owner, 19 Oct 19:3x, every voice test runs on the second route, and Live
+only for a comparison the first builder names on #1712.
+
+- `voice_route` is `"second"` (the default) or `"live"` (`--voice-route` to
+  `lamp-session`). The relay sets `LAMP_VOICE_ROUTE` (`second`, or `gemini`
+  for live) in the runtime's environment, not its argv.
+- `runtime_env` holds the `LAMP_*` settings the voice reads, copied from the
+  lamp's voice unit (`--runtime-env NAME=VALUE`, each name once). The second
+  route needs `LAMP_VOICE_SECOND_CONFIG`, and takes its switches
+  (`LAMP_SECOND_CHAT`, `LAMP_SECOND_SEARCH`, `LAMP_SECOND_SPEECH`, ...) from
+  here. `LAMP_VOICE_ROUTE` itself is set only by `voice_route`. The values
+  travel on the relay's command line, which a process list shows, so a name
+  ending in `_KEY`, `_TOKEN`, `_SECRET` or `_PASSWORD` is refused (the first
+  builder on #1916); keys come by `LoadCredential`, below.
+- A run on the second route without `LAMP_VOICE_SECOND_CONFIG` is refused on
+  the Mac before anything starts on the lamp. lamp-voice would refuse it at
+  start too. A fixture run refuses both fields.
+- **Keys** (the first builder, #1722, 20:08): the second route reads its keys
+  from the voice unit's systemd credentials (`CREDENTIALS_DIRECTORY`), so a
+  `lamp-session` started over plain SSH has none.
+  - Once the attended pilot unit (`lamp-voice-pilot@.service`) is on the second
+    route (step 2 on #1712), a run uses that unit: it carries the voice unit's
+    `LoadCredential` lines, and that's the way to keep.
+  - Until then, the `lamp_command` starts `lamp-session` in a transient unit
+    with the same lines, as the first builder's probes run:
+    `systemd-run --wait --pipe --collect -p LoadCredential=gemini.key:/etc/lampOS/voice/second-llm.key -p LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key … lamp-session …`.
+  - Never copy a key, pass one in the environment or on the command line, or
+    read one into a file the run keeps.
+
+  No physical run on the second route has been made yet.
+
 `fixtures/voice-eval-serve-pilot-config.example.json` holds the installed
-pilot's settings, the kept-start candidate and an external room recorder:
+pilot's settings, the kept-start candidate, the second route's settings and
+an external room recorder:
 
 - noise suppression off;
 - `duplex`; the installed template uses `v1-baseline`;

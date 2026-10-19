@@ -13,7 +13,7 @@ use lamp_voice_eval::{
             FakePlayerFault, FakePreparedRoomPlayer, HumanPrompter, LampMode, ObserverPlayer,
             PhysicalBackend, PhysicalConfig, Player,
         },
-        session::{self, RuntimeFlags, SessionOptions},
+        session::{self, RuntimeFlags, SessionOptions, VoiceRoute},
     },
     plan::{LoadedPlan, SERVE_PLAN},
     record::{AttemptRecord, StimulusSource},
@@ -772,6 +772,16 @@ struct PhysicalFile {
     /// Opt-in end-of-turn experiment (`smart-turn`); absent is the default.
     #[serde(default)]
     endpoint: Option<String>,
+    /// The voice route of a `directed` or `serve` run: "second" (the
+    /// default, the owner's 19 Oct 19:3x rule) or "live", only for a
+    /// comparison the first builder names on #1712.
+    #[serde(default)]
+    voice_route: Option<String>,
+    /// `LAMP_*` settings for the runtime's environment, copied from the
+    /// lamp's voice unit: the second route needs `LAMP_VOICE_SECOND_CONFIG`
+    /// and takes its `LAMP_SECOND_` switches from here.
+    #[serde(default)]
+    runtime_env: std::collections::BTreeMap<String, String>,
 }
 fn default_source() -> StimulusSource {
     StimulusSource::LoudspeakerSynthetic
@@ -811,6 +821,25 @@ impl PhysicalFile {
                 self.diagnostics && self.serve_config.is_none(),
             )?;
         }
+        if self.fixture_reply.is_some() {
+            if self.voice_route.is_some() || !self.runtime_env.is_empty() {
+                return Err(invalid(
+                    "voice_route and runtime_env need provider_config or serve_config",
+                ));
+            }
+            return Ok(flags);
+        }
+        // Named in every directed or serve run, so its record says which.
+        flags.take(
+            VoiceRoute::FLAG,
+            self.voice_route
+                .as_deref()
+                .unwrap_or(VoiceRoute::Second.as_str()),
+        )?;
+        for (name, value) in &self.runtime_env {
+            flags.take("--runtime-env", &format!("{name}={value}"))?;
+        }
+        flags.validate_route()?;
         Ok(flags)
     }
     fn into_config(self) -> Result<(PhysicalConfig, Box<dyn Player>)> {
