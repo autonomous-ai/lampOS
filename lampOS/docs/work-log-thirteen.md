@@ -100,3 +100,10 @@ list".
 - #1744 on c0a4, with the person at the arm: dry run passed; the dry run found that step 1 must refuse an `activating` lamp-body (fixed). Step 1 wrote `lamp.env` (this arm's stand 2626/2602; both stands let go at the stop, #1776's first lamp run). Head pads refused (three driven lines, idle level changes; Found by thirteen on #1764). Folded to `db05c999a`.
 - #933 A/B: `tools/speaking-ab.sh` on #1759's branch (10/10 tests; staging moved to `/var/lib`, since `/run` is noexec). Not run: c0a4's voice holds answers back (no name models).
 - **thirteen-P1** (on #1722): the product lamp-body unit can't start on a factory `lamp.env` (`--gaze-socket` without `--gaze`).
+- #933 A/B on c0a4 (person at the arm, `LAMP_SPOKEN_TO=off` and the body without gaze, both Twelve's yes, restored and logged):
+  - The token limit was lifted by the person.
+  - Run A (off): 11 speaking steps, the base still.
+  - Run B (on): first held back by the busy-room gate; with the person facing the camera it played, 45 steps. **The person: B more alive.**
+  - Only 3 settles fired, 0 nods and 0 sways. Expression was "still for work" in 372 of 796 samples.
+  - **thirteen-P3** (concentration shouldn't zero the lamp's own speaking moves). P2 withdrawn: resumable voice takes `voice/sound` by design.
+- `speaking-ab.sh`: `--arms`, staging in `/var/lib`, and it now counts voice levels and Expression's offsets (13/13 tests).
