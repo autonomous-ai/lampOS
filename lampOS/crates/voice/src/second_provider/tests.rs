@@ -36,6 +36,10 @@ struct Script {
     finish_after: Option<Duration>,
     /// The functions each chat told only some was told ([`Services::chat_only`]).
     told_only: Mutex<Vec<&'static [&'static str]>>,
+    /// How many listeners were asked for, and whether those made say their
+    /// socket has closed ([`Listener::open`]).
+    listened: AtomicUsize,
+    closed: Arc<AtomicBool>,
 }
 
 struct ScriptListener {
@@ -43,8 +47,12 @@ struct ScriptListener {
     samples: Arc<AtomicUsize>,
     early: Vec<net::Early>,
     finish_after: Option<Duration>,
+    closed: Arc<AtomicBool>,
 }
 impl Listener for ScriptListener {
+    fn open(&self) -> bool {
+        !self.closed.load(Ordering::Relaxed)
+    }
     fn send(&self, samples: &[i16]) -> net::Result<()> {
         self.samples.fetch_add(samples.len(), Ordering::Relaxed);
         Ok(())
@@ -68,13 +76,21 @@ impl Listener for ScriptListener {
 
 impl Services for Script {
     fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+        self.listened.fetch_add(1, Ordering::Relaxed);
         let result = match &self.listen_error {
             Some(error) => Err(error.clone()),
+            // A listener kept for a line the script never plays hears none.
             None => Ok(Box::new(ScriptListener {
-                heard: self.heard.lock().unwrap().pop_front().unwrap(),
+                heard: self
+                    .heard
+                    .lock()
+                    .unwrap()
+                    .pop_front()
+                    .unwrap_or_else(|| Ok(String::new())),
                 samples: self.samples_heard.clone(),
                 early: self.early.lock().unwrap().pop_front().unwrap_or_default(),
                 finish_after: self.finish_after,
+                closed: self.closed.clone(),
             }) as Box<dyn Listener>),
         };
         Box::pin(async move { result })
@@ -4313,5 +4329,117 @@ async fn a_line_that_waits_for_the_policy_goes_as_it_decides() {
             // Up to the bound, `policy_holds::WAIT` and four polls more.
             None => assert!((40..=46).contains(&polls), "{polls} polls"),
         }
+    }
+}
+
+/// #1712 (`LAMP_SECOND_STT_WARM`, the first builder at 00:25): with the
+/// switch, each line's listener opens the next line's, so a line's sound
+/// goes to a socket already open; one found closed since is not used, and
+/// the line opens its own. Without it, one listener a line, as before.
+#[tokio::test]
+async fn the_next_lines_listener_is_kept_ready_and_one_closed_since_is_not_used() {
+    let script = |lines: &[&str]| {
+        Arc::new(Script {
+            heard: Mutex::new(lines.iter().map(|line| Ok((*line).to_owned())).collect()),
+            chats: Mutex::new(
+                lines
+                    .iter()
+                    .map(|_| vec![text("Sure."), Ok(ChatEvent::Done)])
+                    .collect(),
+            ),
+            ..Script::default()
+        })
+    };
+    let lines = ["What time is it?", "And tomorrow?", "Thanks."];
+    let kept = script(&lines);
+    let (engine, _, _) = scripted(kept.clone());
+    let mut engine = engine.keeping_a_listener_ready(true);
+    let listened = |script: &Script| script.listened.load(Ordering::Relaxed);
+    for (request, expected) in [(1, 2), (2, 3)] {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        assert_eq!(listened(&kept), expected, "request {request}");
+    }
+    // The kept listener's socket closed since: the line opens its own, and
+    // the next line's is opened after it.
+    kept.closed.store(true, Ordering::Relaxed);
+    engine.submit(start(3));
+    engine.submit(audio(3, 1));
+    engine.submit(end(3));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(listened(&kept), 5);
+    // Each line was heard as its own words, in order.
+    let firsts: Vec<Option<Message>> = kept
+        .asked
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|asked| asked.last().cloned())
+        .collect();
+    assert_eq!(firsts[0], Some(Message::user("What time is it?")));
+    assert_eq!(firsts[1], Some(Message::user("And tomorrow?")));
+    // Off: one listener a line.
+    let plain = script(&lines[..2]);
+    let (mut engine, _, _) = scripted(plain.clone());
+    for request in 1..=2 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    }
+    assert_eq!(listened(&plain), 2);
+}
+
+/// #1712, the first builder at 00:31: a kept listener lasts at most
+/// [`KEPT_FOR`], so a lamp nobody talks to keeps nothing open; and it goes
+/// at once when listening stops (the privacy switch, a mute) or the privacy
+/// generation changes. Either way the next line opens its own.
+#[tokio::test(start_paused = true)]
+async fn a_kept_listener_goes_after_its_time_or_when_listening_stops() {
+    let script = || {
+        Arc::new(Script {
+            heard: Mutex::new([Ok("Hi.".to_owned()), Ok("Hello.".to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![text("Hi."), Ok(ChatEvent::Done)],
+                    vec![text("Hello."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        })
+    };
+    let listened = |script: &Script| script.listened.load(Ordering::Relaxed);
+    // Each way the kept one goes, then the next line: 4 listeners (line
+    // 1's, its kept one, line 2's own, and line 2's kept one), not 3.
+    for gone in [
+        "its time",
+        "listening stopped",
+        "another generation",
+        "kept",
+    ] {
+        let played = script();
+        let (engine, _, _) = scripted(played.clone());
+        let mut engine = engine.keeping_a_listener_ready(true);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        assert_eq!(listened(&played), 2);
+        match gone {
+            "its time" => tokio::time::sleep(KEPT_FOR + Duration::from_secs(1)).await,
+            "listening stopped" => engine.listening(false, 1),
+            "another generation" => engine.listening(true, 2),
+            _ => engine.listening(true, 1),
+        }
+        tokio::task::yield_now().await;
+        engine.submit(start(2));
+        engine.submit(audio(2, 1));
+        engine.submit(end(2));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let expected = if gone == "kept" { 3 } else { 4 };
+        assert_eq!(listened(&played), expected, "{gone}");
     }
 }

@@ -114,6 +114,14 @@ impl Gate {
             self.retired_through = self.retired_through.max(self.highest_seen);
         }
         engine.retire_through(self.retired_through);
+        // A listener kept for the next line goes when listening stops (the
+        // privacy switch, a mute) or its generation changes (#1712).
+        if let Some(state) = self.guard.state() {
+            engine.listening(
+                state.listening_ready(MonoTime::from_micros(now_us)),
+                state.microphone_generation(),
+            );
+        }
         Ok(())
     }
 
@@ -1457,6 +1465,17 @@ pub fn serve(
     }
     if look_by_call {
         engine = engine.looking_by_call();
+    }
+    // The next line's speech to text kept connected (#1712).
+    if std::env::var(crate::second_provider::STT_WARM_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+    {
+        eprintln!(
+            "lamp-voice second: speech to text's socket for the next line is kept open (LAMP_SECOND_STT_WARM)"
+        );
+        engine = engine.keeping_a_listener_ready(true);
     }
     // A spoken turn's chat begun on the line's early words (#1712).
     if std::env::var(crate::second_provider::PREPARED_ENVIRONMENT)

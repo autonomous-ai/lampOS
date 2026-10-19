@@ -73,9 +73,17 @@ pub trait Listener: Send {
     fn early(&mut self) -> Option<mpsc::UnboundedReceiver<net::Early>> {
         None
     }
+    /// Whether it can still take a line: one kept ready whose socket has
+    /// closed since cannot ([`crate::second_provider::Engine::keeping_a_listener_ready`]).
+    fn open(&self) -> bool {
+        true
+    }
 }
 
 impl Listener for SttStream {
+    fn open(&self) -> bool {
+        SttStream::still_open(self)
+    }
     fn send(&self, samples: &[i16]) -> net::Result<()> {
         SttStream::send(self, samples)
     }
