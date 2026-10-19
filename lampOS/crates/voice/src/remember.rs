@@ -593,6 +593,21 @@ pub fn told() -> String {
     NOTE.lock().map(|note| note.clone()).unwrap_or_default()
 }
 
+/// What a typed conversation, a text from the Autonomous app (#1673), is
+/// told of the memory: the room's, never the person's at the lamp, since
+/// the lamp can't tell who is texting (the reviewer on #1713). With the
+/// Days memory no session is opened for it, which would close or change
+/// the spoken one's, so it is told only how to recall, which reads the
+/// room's too (`crate::tools::answer_typed`).
+pub fn told_for_texts() -> String {
+    if DAYS_MODE.get() == Some(&true) {
+        return TEXTS_DAYS.into();
+    }
+    told()
+}
+
+const TEXTS_DAYS: &str = "\n\nYour memory\nFor questions about earlier conversations, call recall. If it returns nothing, say you do not remember. The person texting is not known: never say 'you told me'. Never invent a memory.\n";
+
 /// Called only while opening a provider session, for the person it is
 /// opened for ([`person_id`], `None` for the room): the one its thread is
 /// told of too ([`crate::thread::Thread::opening`]). The legacy path uses

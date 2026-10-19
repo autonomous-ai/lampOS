@@ -226,11 +226,22 @@ pub async fn answer(
     messages.extend(chats.kept(&session, Instant::now()));
     messages.push(Message::user(&text.text));
     let mut reply = String::new();
+    // Words go to the app only while they fit in one message, as the whole
+    // reply is cut to ([`fitted`]): past that, a `final` `lamp-cloud` can't
+    // carry would leave the app with words and no end (the reviewer on
+    // #1713).
+    let mut sent = 0;
+    let mut full = false;
     for round in 0..ROUNDS {
         let mut said = String::new();
         let calls = {
             let mut text = |words: &str| {
                 said.push_str(words);
+                if full || sent + words.len() > lamp_msgs::CHAT_TEXT_BYTES {
+                    full = true;
+                    return;
+                }
+                sent += words.len();
                 say(piece(ChatPart::Delta, words));
             };
             model.round(&messages, &mut text).await
@@ -255,13 +266,26 @@ pub async fn answer(
             messages.push(Message::tool(call.id, result.to_string()));
         }
     }
-    let reply = reply.trim().to_owned();
+    let reply = fitted(reply.trim());
     if reply.is_empty() {
         say(piece(ChatPart::Error, NOT_NOW));
         return;
     }
     say(piece(ChatPart::Final, &reply));
     chats.remember(&session, &text.text, &reply, Instant::now());
+}
+
+/// `reply` as one message carries it ([`lamp_msgs::CHAT_TEXT_BYTES`]):
+/// cut at a character's edge, with "…" to say so, when it is longer.
+pub fn fitted(reply: &str) -> String {
+    if reply.len() <= lamp_msgs::CHAT_TEXT_BYTES {
+        return reply.to_owned();
+    }
+    let mut end = lamp_msgs::CHAT_TEXT_BYTES - '…'.len_utf8();
+    while !reply.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}…", &reply[..end])
 }
 
 #[cfg(test)]
@@ -390,6 +414,39 @@ mod tests {
         );
         let last = serde_json::to_value(sent[0].last().unwrap()).unwrap();
         assert_eq!(last["content"], "What time is it?");
+    }
+
+    /// The reviewer on #1713: a reply longer than a message carries is cut
+    /// to fit, with "…", and the words sent before it never pass that
+    /// either, so every piece is one `lamp-cloud` can carry.
+    #[tokio::test]
+    async fn a_reply_longer_than_a_message_is_cut_to_fit() {
+        // Two-byte characters, 7,000 bytes a piece: 21,000 in all.
+        let piece: &'static str = Box::leak("é".repeat(3_500).into_boxed_str());
+        let model = scripted(vec![(vec![piece, piece, piece], Vec::new())]);
+        let out = pieces(
+            &model,
+            &mut Chats::default(),
+            &no_tools(),
+            &text("Tell me a long story.", None),
+        )
+        .await;
+        assert!(out.iter().all(|o| o.check().is_ok()));
+        let words: usize = out
+            .iter()
+            .filter(|o| o.part == ChatPart::Delta)
+            .map(|o| o.text.len())
+            .sum();
+        assert_eq!(words, 14_000);
+        let last = out.last().unwrap();
+        assert_eq!(last.part, ChatPart::Final);
+        assert!(last.text.len() <= lamp_msgs::CHAT_TEXT_BYTES);
+        assert!(
+            last.text.ends_with("é…"),
+            "{}",
+            &last.text[last.text.len() - 8..]
+        );
+        assert_eq!(fitted("short"), "short");
     }
 
     #[tokio::test]
@@ -526,6 +583,86 @@ mod tests {
             ]
         );
         assert!(got.iter().all(|o| o.run_id.as_deref() == Some("run-1")));
+    }
+
+    /// A model that takes `wait` over each answer, and answers "Done."
+    struct Slow {
+        wait: Duration,
+    }
+
+    impl Model for Slow {
+        fn round<'a>(
+            &'a self,
+            _: &'a [Message],
+            text: &'a mut (dyn FnMut(&str) + Send),
+        ) -> BoxFuture<'a, Result<Vec<ToolCall>, String>> {
+            Box::pin(async move {
+                tokio::time::sleep(self.wait).await;
+                text("Done.");
+                Ok(Vec::new())
+            })
+        }
+    }
+
+    /// The reviewer on #1713: a text still waiting on `chat/in` when its
+    /// time is up, here behind a slow answer, is passed over: never
+    /// answered, its functions never run. The next text is answered.
+    #[tokio::test]
+    async fn a_text_whose_time_is_up_behind_a_slow_one_is_passed_over() {
+        let root = std::path::PathBuf::from(format!("/tmp/lvs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut replies = bus
+            .subscribe_typed(ChatOut::TOPIC, "test", ChatOut::TYPE)
+            .unwrap();
+        let model = Slow {
+            wait: Duration::from_millis(400),
+        };
+        let worker = tokio::spawn(serve(model, system(), no_tools(), root.clone()));
+        let mut sends = bus
+            .publisher_declared(ChatIn::TOPIC, &ChatIn::declaration(), "cloud")
+            .unwrap();
+        let run = |id: &str| ChatIn {
+            run_id: id.into(),
+            ..text("Hi lamp", Some("s1"))
+        };
+        let until = Instant::now() + Duration::from_secs(10);
+        while sends
+            .publish_json(lamp_ipc::monotonic_us(), &run("run-1"))
+            .unwrap()
+            .delivered
+            == 0
+        {
+            assert!(Instant::now() < until, "the worker never listened");
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        // While the first is answered: one that lasts 50 ms, then one as
+        // the app sends them.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        sends.expires_after(Some(Duration::from_millis(50)));
+        sends
+            .publish_json(lamp_ipc::monotonic_us(), &run("run-2"))
+            .unwrap();
+        sends.expires_after(ChatIn::declaration().lifespan());
+        sends
+            .publish_json(lamp_ipc::monotonic_us(), &run("run-3"))
+            .unwrap();
+        let mut finals = Vec::new();
+        while finals.len() < 2 {
+            assert!(Instant::now() < until, "{finals:?}");
+            if let Some(message) = replies.recv(Duration::ZERO).unwrap() {
+                let out = message.parse::<ChatOut>().unwrap();
+                if out.part == ChatPart::Final {
+                    finals.push(out.run_id.unwrap_or_default());
+                }
+            } else {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        }
+        worker.abort();
+        let _ = std::fs::remove_dir_all(&root);
+        assert_eq!(finals, ["run-1", "run-3"]);
     }
 
     #[test]

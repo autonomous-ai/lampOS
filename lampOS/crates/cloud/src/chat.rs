@@ -22,8 +22,10 @@ use std::time::{Duration, UNIX_EPOCH};
 pub const ENVIRONMENT: &str = "LAMP_MESSAGES";
 /// How long the reply's words are gathered before they go, as V1's.
 pub const GATHER: Duration = Duration::from_millis(250);
-/// How long a run waits for its answer before it ends as a fault.
-pub const ANSWER_WITHIN: Duration = Duration::from_secs(60);
+/// How long a run waits for its answer before it ends as a fault: the
+/// texts' own lifespan on `chat/in`, so a text the app has given up on is
+/// never answered after.
+pub const ANSWER_WITHIN: Duration = lamp_msgs::CHAT_ANSWER_WITHIN;
 /// How much of the reply a `chat_response`'s `summary` shows, as V1's.
 pub const SUMMARY_CHARS: usize = 200;
 /// What the app is told when nothing answered in time.
