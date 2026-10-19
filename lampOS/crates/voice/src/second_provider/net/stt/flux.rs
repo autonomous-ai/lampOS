@@ -428,7 +428,8 @@ where
                         },
                     ));
                     return if force_by.is_some() {
-                        Ok((turns.text(), told(&at_end, None, "close_stream")))
+                        let from = closed_by_service(&mut at_end, &turns, sent, closing, force_went);
+                        Ok((turns.text(), told(&at_end, None, from)))
                     } else {
                         Err(Error::Transport("speech-to-text stream"))
                     };
@@ -436,7 +437,8 @@ where
                 None => {
                     replies.end("ended with no close".to_owned());
                     return if force_by.is_some() {
-                        Ok((turns.text(), told(&at_end, None, "close_stream")))
+                        let from = closed_by_service(&mut at_end, &turns, sent, closing, force_went);
+                        Ok((turns.text(), told(&at_end, None, from)))
                     } else {
                         Err(Error::Transport("speech-to-text stream"))
                     };
@@ -450,6 +452,30 @@ where
             }
         }
     }
+}
+
+/// Where a line's words came from when the service ended the stream after
+/// `ForceEndTurn`: `close_stream` when the lamp had asked it to close;
+/// otherwise `closed_early`, with when, how far it heard and how many
+/// words, never the words, as the Nova route tells it (`stt.rs`
+/// `closed_by_service`; the first builder's agent on #2055).
+fn closed_by_service(
+    at_end: &mut String,
+    turns: &Turns,
+    sent: f64,
+    closing: bool,
+    force_went: Option<Instant>,
+) -> &'static str {
+    if closing {
+        return "close_stream";
+    }
+    let after = force_went.map_or(0, |went| went.elapsed().as_millis());
+    let words = turns.text().split_whitespace().count();
+    at_end.push_str(&format!(
+        "; closed by the service {after} ms after force_end, before its answer: {}, {words} words",
+        turns.at_end(sent, Instant::now())
+    ));
+    "closed_early"
 }
 
 #[cfg(test)]
@@ -784,6 +810,57 @@ mod tests {
             at_end.ends_with(", force_end unanswered, words from=close_stream"),
             "{at_end}"
         );
+    }
+
+    /// The first builder's agent on #2055: Flux closing the stream just
+    /// after `ForceEndTurn`, before its answer and with no `CloseStream`
+    /// asked, keeps the words so far, told as closed early with a count,
+    /// never the words, as on the Nova route.
+    #[tokio::test(start_paused = true)]
+    async fn a_close_before_force_end_turns_answer_is_told_as_closed_early() {
+        let (near, far) = tokio::io::duplex(1 << 16);
+        let server = tokio::spawn(async move {
+            let mut socket = WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+            let mut told = false;
+            while let Some(Ok(message)) = socket.next().await {
+                match message {
+                    Message::Binary(_) if !told => {
+                        told = true;
+                        socket.send(Message::text(HELLO)).await.unwrap();
+                    }
+                    Message::Text(text) if text.contains("ForceEndTurn") => {
+                        tokio::time::sleep(Duration::from_millis(40)).await;
+                        let _ = socket.close(None).await;
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+        });
+        let stream = super::super::SttStream::start_flux(
+            WebSocketStream::from_raw_socket(near, Role::Client, None).await,
+        );
+        for _ in 0..50 {
+            stream.send(&[0; 320]).unwrap();
+        }
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let (words, at_end) = stream.finish_told(true).await.unwrap();
+        server.abort();
+        let at_end = at_end.unwrap();
+        assert_eq!(words, "hello");
+        assert!(
+            at_end.ends_with(", force_end unanswered, words from=closed_early"),
+            "{at_end}"
+        );
+        assert!(
+            at_end.contains("; closed by the service 40 ms after force_end, before its answer: flux: turns=1, the latest turn open"),
+            "{at_end}"
+        );
+        assert!(
+            at_end.contains("heard to 600 of 1000 ms sent, 1 words"),
+            "{at_end}"
+        );
+        assert!(!at_end.contains("ello"), "{at_end}");
     }
 
     /// A flush's `ForceEndTurn` still unanswered at the end of the line:
