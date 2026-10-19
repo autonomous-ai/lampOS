@@ -67,14 +67,16 @@ pub fn offline_in(message: Option<lamp_bus::Message>) -> bool {
 /// Only never said counts as open, so a lamp without the route looks up as
 /// before. Read at each request from the head and at each step of a look
 /// up, never subscribed: the lease is said every 10 ms (#711). Only the
-/// Controls privacy route (`LAMP_PRIVACY_CONTROLS=on`) says it at all.
+/// Controls privacy route (`LAMP_PRIVACY_CONTROLS=on` or `no-slide`) says it
+/// at all. A valid lease of a lamp with no slide (`no_slide`) is open: it
+/// has no switch to close, as a lamp without the route.
 pub fn privacy_muted_in(message: Option<lamp_bus::Message>) -> bool {
     message.is_some_and(|message| {
         message
             .parse::<lamp_msgs::MicrophonePrivacy>()
             .ok()
             .filter(|lease| lease.check().is_ok())
-            .is_none_or(|lease| lease.physical_muted != Some(false))
+            .is_none_or(|lease| lease.physical_muted != Some(false) && !lease.no_slide)
     })
 }
 

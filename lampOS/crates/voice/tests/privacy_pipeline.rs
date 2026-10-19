@@ -12,12 +12,11 @@ use lamp_ears::{
     BLOCK, Settings,
     privacy::{Capture, CaptureOwner, Emission},
 };
-use lamp_msgs::{ClockStamp, ControlsState, MicrophonePrivacy, PrivacySwitch};
+use lamp_msgs::{ClockStamp, ControlsState, MicrophonePrivacy};
 use lamp_turn_owner::{BootId, BoundaryGuard, Controller, MonoTime, Permission, Snapshot};
 use lamp_voice::{
     privacy::{PrivacyGate, PrivacyState},
-    privacy_bus::{CaptureLeaseGate, SwitchFence},
-    process::boot_text,
+    privacy_bus::{CaptureLeaseGate, Observation, SwitchFence, fresh, grants, lease},
 };
 use std::{
     cell::{Cell, RefCell},
@@ -84,6 +83,8 @@ struct Controls {
     monitor: Monitor,
     engine: Engine,
     sequence: u64,
+    /// `no-slide`: no line is read, and each state says so.
+    no_slide: bool,
 }
 
 impl Controls {
@@ -95,6 +96,14 @@ impl Controls {
             monitor: Monitor::new(CLOCK),
             engine: Engine::new(Config::default(), CLOCK, CONTROLS).unwrap(),
             sequence: 0,
+            no_slide: false,
+        }
+    }
+
+    fn no_slide() -> Self {
+        Self {
+            no_slide: true,
+            ..Self::new()
         }
     }
 
@@ -111,7 +120,11 @@ impl Controls {
         // The production Controls runtime attaches this independent monitor to
         // its gesture state. An unavailable gesture source cannot invent HIGH.
         let mut state = self.engine.tick(published_us).state;
-        state.privacy = Some(self.monitor.snapshot(published_us));
+        if self.no_slide {
+            state.no_privacy_slide = true;
+        } else {
+            state.privacy = Some(self.monitor.snapshot(published_us));
+        }
         state.check().unwrap();
         self.sequence += 1;
         envelope(
@@ -137,15 +150,23 @@ struct Worker {
     fence: SwitchFence,
     gate: CaptureLeaseGate,
     authority: BoundaryGuard,
-    last: Option<PrivacySwitch>,
+    last: Option<Observation>,
     sequence: u64,
 }
 
 impl Worker {
     fn new(session: &'static str) -> Self {
+        Self::with_fence(session, SwitchFence::new(CLOCK.into()))
+    }
+
+    fn no_slide(session: &'static str) -> Self {
+        Self::with_fence(session, SwitchFence::no_slide(CLOCK.into()))
+    }
+
+    fn with_fence(session: &'static str, fence: SwitchFence) -> Self {
         Self {
             session,
-            fence: SwitchFence::new(CLOCK.into()),
+            fence,
             gate: CaptureLeaseGate::default(),
             authority: BoundaryGuard::new(boot(), clock()),
             last: None,
@@ -154,14 +175,11 @@ impl Worker {
     }
 
     fn accept(&mut self, message: &Message) -> io::Result<()> {
-        if let Some(sample) = self.fence.accept(message, now(), wall(now()))? {
-            self.gate.observe(
-                sample.stamp.sequence,
-                sample.stamp.at_us,
-                now(),
-                sample.muted.unwrap(),
-            );
-            self.last = Some(sample);
+        if let Some(observed) = self.fence.observe(message, now(), wall(now()))? {
+            let stamp = observed.stamp();
+            self.gate
+                .observe(stamp.sequence, stamp.at_us, now(), observed.muted()?);
+            self.last = Some(observed);
         }
         Ok(())
     }
@@ -169,33 +187,23 @@ impl Worker {
     fn message(&mut self, snapshot: Snapshot) -> Result<Message, lamp_turn_owner::Error> {
         self.authority.install(clock(), snapshot)?;
         let state = self.authority.state().unwrap();
-        let physical = self
-            .last
-            .as_ref()
-            .filter(|sample| sample.fresh_at(CLOCK, now()));
-        let observed_us = physical.map_or(0, |sample| sample.stamp.at_us);
-        let mut expires_at_us = state.expires_at().as_micros().min(now() + FRESH_US);
-        if physical.is_some() {
-            expires_at_us = expires_at_us.min(observed_us + FRESH_US);
-        }
+        let physical = fresh(self.last.as_ref(), now());
         self.sequence += 1;
-        // Only transport field assembly is local to the fixture. Permission,
-        // switch ordering, authority admission and lease validation use the
-        // production components exercised by this test.
-        let lease = MicrophonePrivacy {
-            stamp: ClockStamp {
+        // Only transport is local to the fixture. Permission, switch
+        // ordering, authority admission, freshness, the grant, the lease's
+        // fields and its validation use the production components.
+        let lease = lease(
+            ClockStamp {
                 clock_id: CLOCK.into(),
                 at_us: now(),
                 sequence: self.sequence,
             },
-            session_id: self.session.into(),
-            controller_boot: boot_text(state.boot()),
-            microphone_generation: state.microphone_generation(),
-            observed_us,
-            expires_at_us,
-            permitted: physical.is_some() && self.gate.permitted(state, now()),
-            physical_muted: physical.and_then(|sample| sample.muted),
-        };
+            self.session,
+            state.boot(),
+            state,
+            physical,
+            grants(&self.gate, state, physical, true, now()),
+        );
         lease.check().unwrap();
         Ok(envelope(
             Header {
@@ -334,6 +342,23 @@ impl Pipeline {
                 false,
             )
             .unwrap()
+    }
+
+    /// A lamp with no slide: Controls says so, and nothing is read.
+    fn no_slide(permission: Permission) -> Self {
+        let mut pipeline = Self::new(permission);
+        pipeline.controls = Controls::no_slide();
+        pipeline.worker = Worker::no_slide(VOICE);
+        pipeline
+    }
+
+    /// One `controls/state` from a lamp with no slide, published at
+    /// `published_us` and received 2 ms later.
+    fn marker(&mut self, published_us: u64) -> io::Result<(Snapshot, MicrophonePrivacy)> {
+        let message = self.controls.message(published_us);
+        advance(published_us + 2_000);
+        self.worker.accept(&message)?;
+        Ok(self.forward())
     }
 
     fn stable_high(&mut self) -> (Snapshot, MicrophonePrivacy) {
@@ -523,13 +548,13 @@ impl Mic2 {
     }
 
     fn feed(&mut self, worker: &Worker) {
-        let sample = worker.last.as_ref().unwrap();
+        let observed = worker.last.as_ref().unwrap();
         self.sequence += 1;
         self.gate.observe(
             self.sequence,
-            MonoTime::from_micros(sample.stamp.at_us),
+            MonoTime::from_micros(observed.stamp().at_us),
             clock(),
-            sample.muted.unwrap(),
+            observed.muted().unwrap(),
         );
     }
 
@@ -655,4 +680,137 @@ fn a_different_controller_cannot_replace_the_workers_private_authority() {
     );
     assert!(pipeline.tick(BLOCK).is_none());
     assert!(pipeline.audio.borrow().events.is_empty());
+}
+
+/// A lamp with no slide (`no-slide`): steady fresh markers open MIC1 for an
+/// Allowed controller after the usual 60 ms, each lease bound to its Controls
+/// publication with no physical level; the software mute (a Denied
+/// controller) closes it at once and never grants while it stays.
+#[test]
+fn with_no_slide_steady_markers_open_capture_and_the_software_mute_closes_it() {
+    let mut pipeline = Pipeline::no_slide(Permission::Allowed);
+    for offset in [0, 20_000, 40_000] {
+        let (_, lease) = pipeline.marker(START + offset).unwrap();
+        assert!(!lease.permitted, "{offset}");
+        assert!(lease.no_slide);
+        assert_eq!(lease.physical_muted, None);
+        assert_eq!(lease.observed_us, START + offset);
+        assert!(pipeline.tick(BLOCK).is_none());
+    }
+    let (_, open) = pipeline.marker(START + 60_000).unwrap();
+    assert!(open.permitted);
+    assert!(open.no_slide);
+    assert_eq!(open.physical_muted, None);
+    assert_eq!(open.observed_us, START + 60_000);
+    assert_eq!(open.expires_at_us, START + 60_000 + FRESH_US);
+    assert!(pipeline.tick(127).is_none());
+    assert!(pipeline.ears.is_open());
+
+    advance(START + 65_000);
+    pipeline
+        .controller
+        .set_microphone_permission(clock(), Permission::Denied)
+        .unwrap();
+    let (_, muted) = pipeline.forward();
+    assert!(!muted.permitted);
+    assert!(muted.microphone_generation > open.microphone_generation);
+    assert!(!pipeline.ears.is_open());
+    for offset in [80_000, 100_000, 120_000, 140_000] {
+        let (_, lease) = pipeline.marker(START + offset).unwrap();
+        assert!(!lease.permitted, "a fresh marker cannot clear the mute");
+        assert!(pipeline.tick(BLOCK).is_none());
+    }
+    let audio = pipeline.audio.borrow();
+    assert_eq!(
+        audio.events,
+        [
+            (START + 62_000, CaptureEvent::Open),
+            (START + 62_000, CaptureEvent::Read(127)),
+            (START + 65_000, CaptureEvent::Discard),
+            (START + 65_000, CaptureEvent::Drop),
+        ]
+    );
+}
+
+/// Controls stops with no slide: renewed leases keep their publication, so
+/// MIC1 closes no later than 50 ms after it, whatever the controller says.
+#[test]
+fn with_no_slide_capture_ends_fifty_ms_after_the_last_marker() {
+    let mut pipeline = Pipeline::no_slide(Permission::Allowed);
+    for offset in [0, 20_000, 40_000, 60_000] {
+        pipeline.marker(START + offset).unwrap();
+    }
+    assert!(pipeline.tick(127).is_none());
+    assert!(pipeline.ears.is_open());
+    let last = START + 60_000;
+    advance(last + FRESH_US - 1);
+    let (_, renewed) = pipeline.forward();
+    assert!(renewed.permitted);
+    assert_eq!(renewed.observed_us, last);
+    assert_eq!(renewed.expires_at_us, last + FRESH_US);
+    advance(last + FRESH_US);
+    assert!(pipeline.ears.maintain(now()).unwrap().is_none());
+    assert!(!pipeline.ears.is_open());
+    let (_, lease) = pipeline.forward();
+    assert!(!lease.permitted);
+    assert!(!lease.no_slide, "nothing fresh is observed: unknown");
+    assert_eq!((lease.physical_muted, lease.observed_us), (None, 0));
+}
+
+/// Before any marker the lease is unknown and grants nothing; a publisher
+/// restart, a changed session, slide evidence or a state with no marker
+/// ends the worker, and MIC1 closes at the old lease's expiry by itself.
+#[test]
+fn with_no_slide_missing_restarted_or_unmarked_controls_never_keep_capture() {
+    let mut pipeline = Pipeline::no_slide(Permission::Allowed);
+    let (_, unknown) = pipeline.forward();
+    assert!(!unknown.permitted && !unknown.no_slide);
+    assert_eq!((unknown.physical_muted, unknown.observed_us), (None, 0));
+    assert!(pipeline.tick(BLOCK).is_none());
+    assert!(pipeline.audio.borrow().events.is_empty());
+    for failure in 0..4 {
+        let mut pipeline = Pipeline::no_slide(Permission::Allowed);
+        for offset in [0, 20_000, 40_000, 60_000] {
+            pipeline.marker(START + offset).unwrap();
+        }
+        let (_, permitted) = pipeline.forward();
+        assert!(permitted.permitted);
+        assert!(pipeline.tick(127).is_none());
+        let published = START + 80_000;
+        let mut message = pipeline.controls.message(published);
+        advance(published + 2_000);
+        let mut state = message.parse::<ControlsState>().unwrap();
+        match failure {
+            0 => message.publisher_restarted = true,
+            1 => {
+                state.session_id = "fedcba9876543210".into();
+                message.header.boot = state.session_id.clone();
+            }
+            2 => {
+                state.no_privacy_slide = false;
+                let mut slide = Controls::new();
+                slide.acquire(published, Some(true));
+                state.privacy = slide
+                    .message(published)
+                    .parse::<ControlsState>()
+                    .unwrap()
+                    .privacy;
+            }
+            _ => state.no_privacy_slide = false,
+        }
+        if failure != 0 {
+            message.payload = serde_json::to_vec(&state).unwrap();
+        }
+        assert!(
+            pipeline.worker.accept(&message).is_err(),
+            "failure {failure}"
+        );
+        advance(permitted.expires_at_us);
+        assert!(pipeline.ears.maintain(now()).unwrap().is_none());
+        assert!(!pipeline.ears.is_open());
+        assert_eq!(
+            pipeline.audio.borrow().events.last().unwrap().1,
+            CaptureEvent::Drop
+        );
+    }
 }

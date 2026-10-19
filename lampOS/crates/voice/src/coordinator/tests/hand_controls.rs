@@ -736,6 +736,7 @@ fn conversation_sends_hand_stop_before_a_provider_fault_queued_in_the_same_tick(
         event_sequence: 1,
         rejected_inputs: 0,
         privacy: None,
+        no_privacy_slide: false,
     };
     state.check().unwrap();
     let mut controls =

@@ -72,6 +72,7 @@ fn state() -> ControlsState {
         latest_mute: None,
         event_sequence: 0,
         rejected_inputs: 0,
+        no_privacy_slide: false,
     }
 }
 

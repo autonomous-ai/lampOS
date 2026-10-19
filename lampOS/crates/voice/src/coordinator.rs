@@ -824,9 +824,10 @@ struct Rig {
     capture: Worker,
     speaker: Worker,
     privacy: Worker,
-    /// The privacy worker reads Controls' switch (`LAMP_PRIVACY_CONTROLS=on`):
-    /// a switch it cannot read closes the cycle as a mute does, for the
-    /// service to wait and read again, never ending it (#795).
+    /// The privacy worker reads Controls' switch (`LAMP_PRIVACY_CONTROLS=on`),
+    /// or Controls' word that there is none (`no-slide`): a switch it cannot
+    /// read closes the cycle as a mute does, for the service to wait and read
+    /// again, never ending it (#795).
     privacy_controls: bool,
     ring: OptionalRing,
     camera: Option<OptionalCamera>,
@@ -895,18 +896,28 @@ fn unasked_session(cloud: &CloudAvailability, paused: bool) -> Option<u64> {
     cloud.ready_session().filter(|_| !paused)
 }
 
+/// Whether the Controls privacy route's wait owns the ring: with a slide
+/// (`on`), whose wait paints the physical-mute indication. A lamp with no
+/// slide (`no-slide`) has no LOW to paint, so its ring is as with the route
+/// off: the asleep and tap faces, and no indicator worker (#795).
+fn privacy_ring(route: Option<crate::privacy_bus::Route>) -> bool {
+    route == Some(crate::privacy_bus::Route::Slide)
+}
+
 /// Whether the asleep face (#712) may show while the service waits: with its
-/// switch on, and never with the Controls privacy route, whose wait paints
-/// the physical-mute indication; the ring has one writer (#795).
+/// switch on, and never while the Controls privacy route's wait has the ring
+/// ([`privacy_ring`]), whose wait paints the physical-mute indication; the
+/// ring has one writer (#795).
 fn asleep_face_allowed(switch_on: bool, privacy_controls: bool) -> bool {
     switch_on && !privacy_controls
 }
 
 /// Whether a tap on the head while the lamp waits out a mute shows the
 /// asleep face for about a second (#711, First on #711, 17 Oct 10:18):
-/// with head touch, where the asleep face is the muted look (not the
-/// Controls privacy route, whose ring is the switch's own indication and
-/// has one writer, #755), and not already shown all the time by
+/// with head touch, where the asleep face is the muted look (not while the
+/// Controls privacy route's wait has the ring, [`privacy_ring`], whose ring
+/// is the switch's own indication and has one writer, #755), and not
+/// already shown all the time by
 /// `LAMP_RING_ASLEEP=on`.
 fn tap_face_allowed(head_touch: bool, asleep_on: bool, privacy_controls: bool) -> bool {
     head_touch && !asleep_on && !privacy_controls
@@ -1919,6 +1930,12 @@ fn run_source(
     mut cues: Option<CueSink>,
     termination: &Termination,
 ) -> Result<()> {
+    // With no slide the software mute alone closes the microphones: refused
+    // before anything starts when it has no persisted record.
+    crate::privacy_bus::refuse_no_slide_without_mute(
+        crate::privacy_bus::from_environment()?.map(|(_, route)| route),
+        controls_options.mute_record.is_some(),
+    )?;
     lifetime.validate()?;
     // Restore the software latch before any worker, including metadata/GPIO.
     let controls = RefCell::new(HandControls::restore(controls_options)?);
@@ -2008,10 +2025,15 @@ fn run_source(
             let executable = std::env::current_exe()?;
             // While it waits out a mute or a closed privacy switch, a lamp
             // with a ring shows the asleep face (#712, `LAMP_RING_ASLEEP=on`).
-            // Not with the Controls privacy route: its wait paints the
+            // Not with the Controls privacy route's slide: its wait paints the
             // physical-mute indication, and the ring has one writer (#795).
-            let privacy_controls =
-                matches!(crate::privacy_bus::root_from_environment(), Ok(Some(_)));
+            // With no slide there is no indication, and the faces stay.
+            let privacy_controls = privacy_ring(
+                crate::privacy_bus::from_environment()
+                    .ok()
+                    .flatten()
+                    .map(|(_, route)| route),
+            );
             let asleep_ceiling = options.ring_channel_ceiling.filter(|_| {
                 asleep_face_allowed(
                     crate::ring_asleep::enabled_from_environment(),
@@ -3208,8 +3230,12 @@ fn spawn_rig(
     } else {
         None
     };
-    let privacy_root = crate::privacy_bus::root_from_environment()?;
-    let privacy_arguments = crate::privacy_bus::worker_arguments(privacy_root.as_deref())?;
+    let privacy_route = crate::privacy_bus::from_environment()?;
+    let privacy_arguments = crate::privacy_bus::worker_arguments(
+        privacy_route
+            .as_ref()
+            .map(|(root, route)| (root.as_path(), *route)),
+    )?;
     let privacy_arguments: Vec<&str> = privacy_arguments.iter().map(String::as_str).collect();
     let mut later_tick = |second: Option<&mut second::Route>| -> io::Result<()> {
         controls_startup(controls)?;
@@ -3282,7 +3308,7 @@ fn spawn_rig(
         capture,
         speaker,
         privacy,
-        privacy_controls: privacy_root.is_some(),
+        privacy_controls: privacy_route.is_some(),
         ring,
         camera,
         motor: None,
