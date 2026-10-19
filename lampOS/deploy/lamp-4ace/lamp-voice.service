@@ -21,7 +21,7 @@ Group=root
 Slice=system.slice
 WorkingDirectory=/
 UMask=0077
-ExecStart=/opt/lampOS/releases/1cc25cbb5ad0139efb84eba47e8a1d73da66f5d9f9c947e2d2b8f14cb1fbcdd4/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery bounded --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast --call-wait-ms 2000 --controls-mute /var/lib/lampOS/voice/controls/mute.json
+ExecStart=/opt/lampOS/releases/f70b4961c757c107c44713b11a59c4cffc2b67444fba907a5840086063f9f2ce/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery bounded --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast --call-wait-ms 2000 --controls-mute /var/lib/lampOS/voice/controls/mute.json
 # The microphone and speaker workers may not wait behind other work on the lamp: a read held up
 # for 10 ms, or a reference 20 ms late, ends the service (by design: the echo canceller's timing
 # is then unknown). With every core busy for 40 s (2026-10-13, twelve busy loops) the service
@@ -81,6 +81,7 @@ Environment=LAMP_STOP_WORDS_COUNTS=/run/lampos-voice/stop-words-counts.json
 # The stop-word stream hears mic2 before the canceller (#1047, 17 Oct 00:02): the canceller removes a person's
 # word said over the lamp along with the echo (crates/audio/src/duplex.rs).
 Environment=LAMP_STOP_WORDS_SOURCE=raw
+Environment=LAMP_SKILLS_DIR=/run/lampos-skills
 Environment=LAMP_TURN_END_PRIORITY=10
 Environment=LAMP_TURN_END_NO_SPIN=on
 Environment=LAMP_CUT_IN_TOLD=on
