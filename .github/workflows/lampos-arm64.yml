@@ -39,9 +39,27 @@ on:
   push:
     branches: ['lamp-voice']
     paths: ['lampOS/**', '.github/workflows/lampos-arm64.yml']
+  # A pull request that changes only docs a build never reads skips this run (the
+  # project lead, 19 Oct 2026, #1711): the docs' and the role files' Markdown. The
+  # docs that code or tests read are named again below, so a change to one still
+  # runs. Find them with `git grep -o 'docs/[a-z0-9_-]*\.md' lampOS/crates`. A
+  # skill's SKILL.md is part of the skill, so lampOS/skills/** always runs. The
+  # push to lamp-voice keeps every run: its artifact is what lamps install.
+  # Such a PR merges without ARM64 once the reviewer has read it
+  # (builders/reviewer.md).
   pull_request:
     branches: ['lamp-voice']
-    paths: ['lampOS/**', '.github/workflows/lampos-arm64.yml']
+    paths:
+      - 'lampOS/**'
+      - '!lampOS/docs/**/*.md'
+      - '!lampOS/builders/**'
+      - 'lampOS/docs/brain-build.md'
+      - 'lampOS/docs/endpoint-detection.md'
+      - 'lampOS/docs/endpoint-pilot.md'
+      - 'lampOS/docs/install.md'
+      - 'lampOS/docs/memory.md'
+      - 'lampOS/docs/switches.md'
+      - '.github/workflows/lampos-arm64.yml'
   workflow_dispatch:
     inputs:
       full:
