@@ -1530,6 +1530,7 @@ mod tests {
             rules: 1,
             hello: lamp_msgs::Unprompted::default(),
             news: lamp_msgs::Unprompted::default(),
+            keep_light_on: false,
         };
         let forgotten = Rules {
             quiet: false,

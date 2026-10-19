@@ -277,6 +277,10 @@ struct TestFile {
     /// It has held this long.
     #[serde(rename = "for")]
     lasting: Option<String>,
+    /// `"holds"`: it holds while its topic has said nothing yet (#1677: a
+    /// rule's topic on a lamp without the rules); a value that has run out
+    /// still does not hold. Left out, a silent topic never holds.
+    unknown: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -877,6 +881,8 @@ struct Condition {
     topic: String,
     test: Test,
     for_us: u64,
+    /// It holds while its topic has said nothing yet (`unknown = "holds"`).
+    unknown_holds: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1618,10 +1624,27 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 ));
             }
         };
+        let unknown_holds = match condition.unknown.as_deref() {
+            None => false,
+            Some("holds") if condition.lasting.is_none() && condition.present.is_none() => true,
+            Some("holds") => {
+                return Err(format!(
+                    "on {}: unknown = \"holds\" goes with a field's test, without for or present",
+                    condition.topic
+                ));
+            }
+            Some(other) => {
+                return Err(format!(
+                    "on {}: unknown is \"holds\" or left out, not {other:?}",
+                    condition.topic
+                ));
+            }
+        };
         conditions.push(Condition {
             topic: condition.topic,
             test,
             for_us: condition.lasting.as_deref().map_or(Ok(0), duration_us)?,
+            unknown_holds,
         });
     }
     let quiet = match file.quiet {
@@ -2643,6 +2666,10 @@ impl Engine {
         since_us: Option<&u64>,
         now_us: u64,
     ) -> bool {
+        // A topic that has said nothing yet: held only when asked to be.
+        if condition.unknown_holds && !latest.contains_key(&condition.topic) {
+            return true;
+        }
         Self::fresh(latest, &condition.topic, now_us)
             .is_some_and(|value| condition.test.holds(value))
             && since_us.is_some_and(|since| now_us - since >= condition.for_us)

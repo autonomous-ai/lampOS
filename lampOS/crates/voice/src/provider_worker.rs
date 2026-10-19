@@ -1191,7 +1191,8 @@ pub async fn run_with_continuation(
         );
         // The rules' typed fact for the policy, when rules are on.
         if let Some(root) = files.bus_root.as_deref().filter(|_| crate::rules::on()) {
-            crate::rules::bus_on(root);
+            // The room's rules hold from the start, before anyone speaks.
+            crate::rules::bus_on(root, socket);
         }
     }
     // Who work can go to, if the person may name them.

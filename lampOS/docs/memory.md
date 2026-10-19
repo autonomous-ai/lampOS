@@ -559,9 +559,14 @@ facts stay `remember`.
   about the greeting or the news said unprompted by a typed mark after it,
   `[unprompted <greeting|news|both> never not_before=<minute>
   not_from=<minute> not_while_talking] ` with only the limits asked; the
-  marks are taken off before anything is told to the model.
+  marks are taken off before anything is told to the model. A rule to keep
+  the light on (#1677) is `[unprompted light never] `, and is the room's:
+  kept in `r-everyone` whoever says it, and taken back with `forget_rule`
+  and `about = "light"`, no number, which forgets every such rule of the
+  room's ([presence.md](presence.md)).
 - **Typed when kept (#813).** `keep_rule` takes, beside `rule`, the
-  optional `about` (`greeting`, `news` or `both`) with `never`,
+  optional `about` (`greeting`, `news`, `both`, or `light` with `never`
+  only) with `never`,
   `not_before` / `not_from` (`HH:MM`, 24 hours, local) and
   `not_while_talking`, filled by the model. A limit without `about`, a time
   that is not `HH:MM`, or `not_before` equal to `not_from` is refused with

@@ -1,0 +1,6 @@
+# From 10:00, someone at the desk until 30 s, then nobody, as in
+# goes-out-after-ten-minutes: but the room asked to keep the light on
+# ("keep the light on", memory/rules keep_light_on true at 0.25 s). Ten
+# minutes of nobody come at 630 s, and the light is left as it is.
+clock = "10:00"
+none = true
