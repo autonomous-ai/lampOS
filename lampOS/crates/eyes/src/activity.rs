@@ -9,6 +9,7 @@
 //! desk is often the largest (lamp-75c9's scripted sitting, 19 Oct). Pure
 //! arithmetic on the looks it is given: the bus is `bus_out`'s.
 use crate::faces;
+use crate::who::{SAME_PERSON, likeness};
 use lamp_msgs::{Activity, RoomActivity, StoodUp};
 use std::collections::VecDeque;
 
@@ -44,6 +45,19 @@ const HOLD_US: [(Activity, u64); 3] = [
 const REACH: f32 = 1.0;
 /// How often the journal says the sitter's look against the baseline.
 pub const JOURNAL_US: u64 = 2_000_000;
+/// With the eyes' recogniser (#1678's (d); the owner's yes, 19 Oct 15:57,
+/// recorded on #1827; on a lamp only after Third's privacy read), the sitter
+/// is told from others by face: a print of the sitter this often while the
+/// sitting has fewer than [`MOST_PRINTS`], their mean the sitter's, held in
+/// memory for that sitting only, never written, published or named.
+const PRINT_EVERY_US: u64 = 20_000_000;
+const MOST_PRINTS: usize = 6;
+/// A face at the sitter's place after this long without them is the sitter
+/// only once its print says so; one is taken at most every
+/// [`CHECK_EVERY_US`]. Followed without such a gap, the sitter is never
+/// printed again, so turning their head does not lose them.
+const CHECK_AFTER_US: u64 = 2_000_000;
+const CHECK_EVERY_US: u64 = 2_000_000;
 /// Standing up: within this long before the face was lost, it rose by
 /// [`STOOD_RISE`] of its height and shrank to [`STOOD_SHRINK`] of it.
 const STOOD_WITHIN_US: u64 = 2_000_000;
@@ -102,6 +116,21 @@ fn hold_of(state: Activity) -> u64 {
         .map_or(0, |(_, us)| *us)
 }
 
+/// The mean of unit prints, itself of unit length.
+fn mean(prints: &[Vec<f32>]) -> Vec<f32> {
+    let mut sum = vec![0.0f32; prints.first().map_or(0, Vec::len)];
+    for print in prints {
+        for (total, value) in sum.iter_mut().zip(print) {
+            *total += value;
+        }
+    }
+    let length = sum.iter().map(|value| value * value).sum::<f32>().sqrt();
+    if length > f32::EPSILON {
+        sum.iter_mut().for_each(|value| *value /= length);
+    }
+    sum
+}
+
 fn median(mut values: Vec<f32>) -> f32 {
     values.sort_by(f32::total_cmp);
     values[values.len() / 2]
@@ -129,16 +158,135 @@ pub struct Judge {
     leaving: Option<(u64, u32)>,
     said: Option<(Activity, u64)>,
     journaled_at: Option<u64>,
+    /// With the recogniser: the sitter's prints, and what is asked for.
+    prints: Option<Prints>,
+}
+
+/// The sitter's prints, for this sitting only, and the print asked for.
+#[derive(Default)]
+struct Prints {
+    taken: Vec<Vec<f32>>,
+    asked_at: Option<u64>,
+    asking: Option<Ask>,
+}
+
+/// Never the prints themselves, so no debug line can show one.
+impl std::fmt::Debug for Prints {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Prints")
+            .field("taken", &self.taken.len())
+            .field("asked_at", &self.asked_at)
+            .field("asking", &self.asking)
+            .finish()
+    }
+}
+
+/// A print asked of a face in the last look, by its place in that look.
+#[derive(Clone, Copy, Debug)]
+enum Ask {
+    /// The sitter's own, for their print.
+    Sitter(usize),
+    /// A face at the sitter's place after a gap, to tell whether it is them.
+    Check(usize, Look),
 }
 
 impl Judge {
+    /// A judge that tells the sitter from others by face: the caller gives
+    /// the prints it asks for ([`Judge::wants_print`], [`Judge::printed`]).
+    pub fn with_prints() -> Self {
+        Self {
+            prints: Some(Prints::default()),
+            ..Self::default()
+        }
+    }
+
     /// A look at `now_us`, with every face found in it.
     pub fn looked(&mut self, now_us: u64, faces: &[Look]) {
         self.looked_at = Some(now_us);
-        let Some(face) = self.sitter_in(now_us, faces) else {
+        let Some((index, face)) = self.sitter_in(now_us, faces) else {
+            if let Some(prints) = self.prints.as_mut() {
+                prints.asking = None;
+            }
             self.lost(now_us);
             return;
         };
+        let gap = |last: u64| now_us.saturating_sub(last);
+        let after_gap = self.last_face.is_some_and(|last| {
+            gap(last) >= CHECK_AFTER_US
+                && gap(last) <= u64::from(RoomActivity::SITTING_GAP_S) * 1_000_000
+        });
+        if let Some(prints) = self.prints.as_mut() {
+            prints.asking = None;
+            if after_gap && self.sitter.is_some() && !prints.taken.is_empty() {
+                prints.asking = Some(Ask::Check(index, face));
+                self.lost(now_us);
+                return;
+            }
+        }
+        self.accept(now_us, face);
+        if let Some(prints) = self.prints.as_mut()
+            && prints.taken.len() < MOST_PRINTS
+            && prints
+                .asked_at
+                .is_none_or(|at| now_us.saturating_sub(at) >= PRINT_EVERY_US)
+        {
+            prints.asking = Some(Ask::Sitter(index));
+        }
+    }
+
+    /// Which face of the last look to print, if a print is wanted now: the
+    /// caller prints it (or can't, a face side-on) and gives it to
+    /// [`Judge::printed`].
+    pub fn wants_print(&mut self, now_us: u64) -> Option<usize> {
+        let prints = self.prints.as_mut()?;
+        let index = match prints.asking? {
+            Ask::Sitter(index) => index,
+            Ask::Check(index, _)
+                if prints
+                    .asked_at
+                    .is_none_or(|at| now_us.saturating_sub(at) >= CHECK_EVERY_US) =>
+            {
+                index
+            }
+            Ask::Check(..) => return None,
+        };
+        prints.asked_at = Some(now_us);
+        Some(index)
+    }
+
+    /// The print asked for, or none if it could not be taken. A face checked
+    /// at the sitter's place is the sitter only if it is alike enough
+    /// (`who::SAME_PERSON`); what was decided is the journal's line, a
+    /// number only.
+    pub fn printed(&mut self, now_us: u64, print: Option<&[f32]>) -> Option<String> {
+        let prints = self.prints.as_mut()?;
+        match prints.asking.take()? {
+            Ask::Sitter(_) => {
+                prints.taken.extend(print.map(<[f32]>::to_vec));
+                None
+            }
+            Ask::Check(_, face) => {
+                let Some(print) = print else {
+                    return Some(
+                        "a face at the sitter's place could not be printed: not the sitter yet"
+                            .into(),
+                    );
+                };
+                let alike = likeness(print, &mean(&prints.taken));
+                let same = alike >= SAME_PERSON;
+                if same {
+                    self.accept(now_us, face);
+                }
+                Some(format!(
+                    "a face at the sitter's place, likeness {alike:.2}: {}",
+                    if same { "the sitter" } else { "not the sitter" }
+                ))
+            }
+        }
+    }
+
+    /// The sitter's face in a look: follow them, start a sitting if none.
+    fn accept(&mut self, now_us: u64, face: Look) {
         self.leaving = None;
         let new_sitting = self.last_face.is_none_or(|last| {
             now_us.saturating_sub(last) > u64::from(RoomActivity::SITTING_GAP_S) * 1_000_000
@@ -148,6 +296,7 @@ impl Judge {
             self.samples.clear();
             self.baseline = None;
             self.recent.clear();
+            self.forget_prints();
         }
         self.sitter = Some(face);
         self.last_face = Some(now_us);
@@ -194,8 +343,12 @@ impl Judge {
     /// last place, within [`REACH`] of it or of where they sat (the
     /// baseline), whoever is larger; outside one, the largest near face, who
     /// starts it.
-    fn sitter_in(&self, now_us: u64, faces: &[Look]) -> Option<Look> {
-        let near = faces.iter().filter(|face| face.height >= NEAR);
+    fn sitter_in(&self, now_us: u64, faces: &[Look]) -> Option<(usize, Look)> {
+        let near = faces
+            .iter()
+            .copied()
+            .enumerate()
+            .filter(|(_, face)| face.height >= NEAR);
         let sitting = self.last_face.is_some_and(|last| {
             now_us.saturating_sub(last) <= u64::from(RoomActivity::SITTING_GAP_S) * 1_000_000
         });
@@ -206,11 +359,17 @@ impl Judge {
         };
         match self.sitter.filter(|_| sitting) {
             Some(last) => near
-                .filter(|face| within(face, &last))
-                .min_by(|a, b| a.from(&last).total_cmp(&b.from(&last))),
-            None => near.max_by(|a, b| a.height.total_cmp(&b.height)),
+                .filter(|(_, face)| within(face, &last))
+                .min_by(|(_, a), (_, b)| a.from(&last).total_cmp(&b.from(&last))),
+            None => near.max_by(|(_, a), (_, b)| a.height.total_cmp(&b.height)),
         }
-        .copied()
+    }
+
+    /// The sitting is over, or the camera closed: the prints go.
+    pub fn forget_prints(&mut self) {
+        if let Some(prints) = self.prints.as_mut() {
+            *prints = Prints::default();
+        }
     }
 
     /// The journal's line, every [`JOURNAL_US`] while a sitting with its
@@ -267,6 +426,13 @@ impl Judge {
 
     /// What the face at the desk shows at `now_us`, while the eyes look.
     pub fn now(&mut self, now_us: u64) -> Option<RoomActivity> {
+        // Before anything else, so the prints go with the sitting whether or
+        // not the eyes are looking (Third's read of #1827).
+        if self.last_face.is_some_and(|last| {
+            now_us.saturating_sub(last) > u64::from(RoomActivity::SITTING_GAP_S) * 1_000_000
+        }) {
+            self.forget_prints();
+        }
         let looked = self.looked_at?;
         if now_us.saturating_sub(looked) >= BLIND_AFTER_US {
             return None;
@@ -506,6 +672,131 @@ mod tests {
         let mut judge = Judge::default();
         judge.looked(0, &[SEATED, colleague]);
         assert_eq!(judge.sitter, Some(colleague));
+    }
+
+    const THEM: [f32; 4] = [1.0, 0.0, 0.0, 0.0];
+    const SOMEONE_ELSE: [f32; 4] = [0.0, 1.0, 0.0, 0.0];
+
+    /// Looks every 500 ms from `from` to `to` s, each `faces`, every print
+    /// asked for answered with `print`; the journal's lines.
+    fn printed_looks(
+        judge: &mut Judge,
+        from: u64,
+        to: u64,
+        faces: &[Look],
+        print: Option<&[f32]>,
+    ) -> Vec<String> {
+        let mut lines = Vec::new();
+        let mut at = from * S;
+        while at < to * S {
+            judge.looked(at, faces);
+            if judge.wants_print(at).is_some() {
+                lines.extend(judge.printed(at, print));
+            }
+            judge.now(at);
+            at += S / 2;
+        }
+        lines
+    }
+
+    /// Sat 2 minutes, by face, as `SEATED`.
+    fn seated_by_face() -> Judge {
+        let mut judge = Judge::with_prints();
+        printed_looks(&mut judge, 0, 125, &[SEATED], Some(&THEM));
+        judge
+    }
+
+    /// #1678's (d): someone else in the sitter's own place
+    /// is not the sitter, told by face; the sitter back is.
+    #[test]
+    fn someone_else_in_the_sitters_place_is_told_by_face() {
+        let mut judge = seated_by_face();
+        assert_eq!(judge.prints.as_ref().unwrap().taken.len(), MOST_PRINTS);
+        // The sitter leaves; a colleague sits where they sat.
+        printed_looks(&mut judge, 125, 130, &[], None);
+        let lines = printed_looks(&mut judge, 130, 160, &[SEATED], Some(&SOMEONE_ELSE));
+        assert_eq!(state(&mut judge, 160), Some(Activity::Away));
+        assert!(
+            lines.iter().all(|line| line.ends_with("not the sitter")),
+            "{lines:?}"
+        );
+        assert_eq!(lines.len(), 15, "one check every 2 s: {lines:?}");
+        // The sitter comes back: the same sitting, its baseline kept.
+        let lines = printed_looks(&mut judge, 160, 170, &[SEATED], Some(&THEM));
+        assert_eq!(
+            lines.first().map(String::as_str),
+            Some("a face at the sitter's place, likeness 1.00: the sitter")
+        );
+        let back = judge.now(170 * S).unwrap();
+        assert_eq!(
+            (back.state, back.sitting_s, back.baseline),
+            (Activity::AtDesk, 170, true)
+        );
+        // A face that can't be printed (side-on) is not the sitter yet.
+        let mut judge = seated_by_face();
+        printed_looks(&mut judge, 125, 130, &[], None);
+        let lines = printed_looks(&mut judge, 130, 160, &[SEATED], None);
+        assert_eq!(state(&mut judge, 160), Some(Activity::Away));
+        assert!(
+            lines
+                .iter()
+                .all(|line| line.ends_with("not the sitter yet"))
+        );
+    }
+
+    #[test]
+    fn the_sitter_followed_without_a_gap_is_never_printed_and_the_prints_go_with_the_sitting() {
+        let mut judge = seated_by_face();
+        // Followed, with a gap under 2 s: no print asked for.
+        let mut at = 125 * S;
+        while at < 200 * S {
+            let faces: &[Look] = if (150 * S..151 * S).contains(&at) {
+                &[]
+            } else {
+                &[SEATED]
+            };
+            judge.looked(at, faces);
+            assert_eq!(judge.wants_print(at), None, "at {at}");
+            at += S / 2;
+        }
+        assert_eq!(state(&mut judge, 200), Some(Activity::AtDesk));
+        // The sitting ends: its prints go, and whoever sits next starts a
+        // new sitting without being checked against them.
+        printed_looks(&mut judge, 200, 330, &[], None);
+        assert!(judge.prints.as_ref().unwrap().taken.is_empty());
+        let lines = printed_looks(&mut judge, 330, 340, &[SEATED], Some(&SOMEONE_ELSE));
+        assert!(lines.is_empty(), "{lines:?}");
+        let new = judge.now(340 * S).unwrap();
+        assert_eq!((new.state, new.sitting_s), (Activity::AtDesk, 10));
+        // Without the recogniser nothing is asked for.
+        let mut judge = seated();
+        assert_eq!(judge.wants_print(125 * S), None);
+    }
+
+    /// Third's read of #1827: the prints go when the sitting ends even with
+    /// the eyes not looking (the camera muted), and when the camera closes;
+    /// and no debug line shows one.
+    #[test]
+    fn the_prints_go_while_the_eyes_are_blind_and_when_the_camera_closes() {
+        let taken = |judge: &Judge| judge.prints.as_ref().unwrap().taken.len();
+        // Muted after sitting: no look at all, then past the sitting's gap.
+        let mut judge = seated_by_face();
+        assert_eq!(taken(&judge), MOST_PRINTS);
+        // The last look was at 124.5 s.
+        assert_eq!(judge.now(124 * S + 2 * 60 * S), None, "not looking");
+        assert_eq!(taken(&judge), MOST_PRINTS, "within the sitting's gap");
+        assert_eq!(judge.now(125 * S + 2 * 60 * S + S), None);
+        assert_eq!(taken(&judge), 0);
+        // The camera closed: gone at once.
+        let mut judge = seated_by_face();
+        judge.forget_prints();
+        assert_eq!(taken(&judge), 0);
+        // A print never shows in a debug line: only how many there are.
+        let mut judge = Judge::with_prints();
+        printed_looks(&mut judge, 0, 30, &[SEATED], Some(&[0.6, 0.8, 0.0, 0.0]));
+        let shown = format!("{judge:?}");
+        assert!(shown.contains("taken: 2"), "{shown}");
+        assert!(!shown.contains("0.8"), "{shown}");
     }
 
     #[test]

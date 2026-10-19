@@ -565,6 +565,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     let mut presence = arguments.presence_file.clone().map(Presence::new);
     // The faces in view, for whoever listens on the lamp's bus.
     let mut bus_out = lamp_eyes::bus_out::BusOut::from_environment(arguments.visits);
+    if who.is_some()
+        && let Some(bus) = bus_out.as_mut()
+    {
+        bus.activity_by_face();
+    }
     // Faces that never move, left out when asked.
     let mut still = arguments.leave_still.then(lamp_eyes::still::Still::default);
     let mut epoch = 0u64;
@@ -818,6 +823,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             }
             camera = lamp_eyes::bus_out::Camera::Closed;
             lamp_eyes::kept::forget_all(&mut kept, &mut still_kept);
+            if let Some(bus) = bus_out.as_mut() {
+                bus.activity_forget_prints();
+            }
             still_at = None;
             wanted = None;
             if let Some(presence) = presence.as_mut() {
@@ -941,6 +949,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             }
             tell(Seen { face: None });
             lamp_eyes::kept::forget_all(&mut kept, &mut still_kept);
+            if let Some(bus) = bus_out.as_mut() {
+                bus.activity_forget_prints();
+            }
             still_at = None;
             if let Some(presence) = presence.as_mut() {
                 presence.gone();
@@ -1027,6 +1038,9 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             let _ = open.stop(budget(STOP));
             camera = lamp_eyes::bus_out::Camera::Closed;
             lamp_eyes::kept::forget_all(&mut kept, &mut still_kept);
+            if let Some(bus) = bus_out.as_mut() {
+                bus.activity_forget_prints();
+            }
             still_at = None;
             wanted = None;
             latest = None;
@@ -1160,7 +1174,19 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             }
                         }
                         if let Some(bus) = bus_out.as_mut() {
-                            bus.saw(&faces, &opens, picture.filled, lamp_ipc::monotonic_us());
+                            let now = lamp_ipc::monotonic_us();
+                            bus.saw(&faces, &opens, picture.filled, now);
+                            // The sitter told from others by face (#1678's
+                            // (d)): a print held in memory only.
+                            if let Some(who) = who.as_ref()
+                                && let Some(index) = bus.activity_wants_print(now)
+                            {
+                                let print = faces
+                                    .get(index)
+                                    .and_then(|face| align(&picture, &face.marks))
+                                    .and_then(|aligned| who.recogniser.print(&aligned).ok());
+                                bus.activity_printed(now, print.as_deref());
+                            }
                         }
                         // Whose the near face is, when it is time to ask or
                         // someone is being remembered.
