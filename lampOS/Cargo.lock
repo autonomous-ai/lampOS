@@ -2163,6 +2163,7 @@ dependencies = [
  "lamp-voice",
  "libc",
  "ring",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",
