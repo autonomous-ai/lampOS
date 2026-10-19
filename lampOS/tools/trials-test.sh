@@ -99,6 +99,9 @@ touch "$FAKE/journal"
 if [[ -n $show_cursor ]]; then
   tail -1 "$FAKE/journal" | cut -f2-
   echo "-- cursor: $(wc -l <"$FAKE/journal" | tr -d ' ')"
+  # The trial's mark, after its set-aside and set-up, once it is counted:
+  # after_mark waits for it.
+  touch "$FAKE/marked"
   exit 0
 fi
 tail -n +"$((${after:-0} + 1))" "$FAKE/journal" | while IFS=$'\t' read -r unit line; do
@@ -203,7 +206,7 @@ no_dropin() { if ls "$T/units"/*.d/zz-trial.conf >/dev/null 2>&1; then bad "$1: 
 reset() {
   rm -rf "$T/units"/* "$T/calls" "$T/journal" "$T/answer" "$T/env-ignored" "$T/restarts" \
     "$T/restarts-before-failing" "$T/bus" "$T/state"/* "$T/pub-fails" "$T/skills"/* "$T/answer2" \
-    "$T/memory-sent" "$T/eyes" "$T/answer-all" "$T"/bus-[0-9]* \
+    "$T/memory-sent" "$T/eyes" "$T/answer-all" "$T"/bus-[0-9]* "$T/marked" \
     "$T/send-refused" "$T/units"/lamp-setup-change* "$T/out"
   mkdir -p "$T/bus"
   # Mood isn't running on the stand-in lamp unless a test says so.
@@ -224,8 +227,12 @@ field() { dry "$1" | sed -n "s/^  $2: //p"; }
 in_of() { dry "$1" | sed -n 's/^  proof in \([^,]*\),.*/\1/p'; }
 proofs_of() { dry "$1" | sed -n 's/^  proof in .*: \/\(.*\)\/$/\1/p'; }
 absents_of() { dry "$1" | sed -n 's/^  absent in [^:]*: \/\(.*\)\/$/\1/p'; }
+# Waits until the trial has taken its mark, however long its set-up ran: a
+# line timed from the start lands before the mark when a set-up runs past it
+# (the reviewer, 05:22 on #1722).
+after_mark() { for _ in $(seq 1 400); do [[ -e $T/marked ]] && break; sleep 0.05; done; }
 # Makes the row's proof come: its line in the journal at its pub or call, or a
-# second after the trial begins; or its message on the bus.
+# second after the trial takes its mark; or its message on the bus.
 answer() { # ROW
   local in example
   if [[ $(in_of "$1" | wc -l) -gt 1 ]]; then
@@ -242,12 +249,9 @@ answer() { # ROW
         printf '%s\t%s\n' "${ins[$n]}" "${examples[$n]}" >>"$T/answer-all"
       fi
     done
-    # Once the trial has taken its mark: when its cause begins.
+    # Once the trial has taken its mark.
     if [[ -s $T/answer-all ]]; then
-      (
-        for _ in $(seq 100); do grep -qE '(cause|PLAY):' "$T/out" 2>/dev/null && break; sleep 0.1; done
-        cat "$T/answer-all" >>"$T/journal"
-      ) &
+      (after_mark; cat "$T/answer-all" >>"$T/journal") &
     fi
     return
   fi
@@ -264,7 +268,7 @@ answer() { # ROW
   else
     printf '%s\t%s\n' "$in" "$example" >"$T/answer"
     if ! dry "$1" | grep -qE '^  cause: (pub|keep|call) '; then
-      (sleep 1; cat "$T/answer" >>"$T/journal") &
+      (after_mark; sleep 1; cat "$T/answer" >>"$T/journal") &
     fi
   fi
 }
@@ -481,7 +485,8 @@ has "scenes: the answer printed" "$T/out" 'answered: {"ok":true}'
 # exactly, whatever the trial did to it.
 reset
 echo "kept" >"$T/memory/days.json"
-(sleep 1; echo "changed" >"$T/memory/days.json"; echo "new" >"$T/memory/new.json") &
+# Changed once set aside: after the mark (Tests' P3 on #2074).
+(after_mark; sleep 1; echo "changed" >"$T/memory/days.json"; echo "new" >"$T/memory/new.json") &
 TRIALS_WAIT=2 "$SCRIPT" forget >"$T/out" 2>&1; check "forget without its line" 1 $?
 wait
 [[ $(cat "$T/memory/days.json") == kept && ! -e $T/memory/new.json ]] && ok || bad "forget: the memory store not put back"
