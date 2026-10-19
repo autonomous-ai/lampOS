@@ -26,6 +26,8 @@ pub(super) fn supervise(
             .join("privacy-pending.json"),
         mailbox: crate::onboarding::mailbox_of(&progress),
         progress,
+        // Fourth's consumer reads this fixed path (#753); only setup writes it.
+        near_call: PathBuf::from(lamp_near_call::FILE),
     });
     supervise_with_checkpoint(trace, cues, termination, paths.as_ref(), wait, active)
 }
@@ -258,6 +260,7 @@ mod tests {
         crate::onboarding::storage::Paths {
             progress: checkpoint.with_file_name("progress.json"),
             mailbox: checkpoint.with_file_name("progress.told"),
+            near_call: checkpoint.with_file_name("near-call.json"),
             checkpoint: checkpoint.to_path_buf(),
         }
     }

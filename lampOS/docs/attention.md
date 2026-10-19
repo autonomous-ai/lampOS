@@ -713,7 +713,9 @@ Only numbers are kept, never sound: `/var/lib/lampOS/voice/near-call.json`
 "at_unix_s"}`. A file whose bar its own tries don't make is not used, nor
 one with a try no step could have accepted (a score outside 0.95 to 1, or
 not a number).
-Setup's step (Seventh) takes the tries.
+Setup's `how_you_sound` step (#1803, [onboarding.md](onboarding.md)) takes
+the tries, with the prompt's end read from the Unix clock when its playback is
+whole, and writes the file on onboarding's storage worker.
 
 **The rule reads it with `LAMP_ATTENTION_NEAR_CALIBRATED=on`** (off unless
 set), on both routes: the Live worker's busy-near rule and `--addressed`
