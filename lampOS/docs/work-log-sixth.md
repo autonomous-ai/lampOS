@@ -1,10 +1,34 @@
 # Sixth builder's work log
 
 Sixth works on `lamp-sixth`, with one `sixth/<task>` branch per task. The
-list and the answers belong to the first builder (Queue #705). Sixth has no
-lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
-every result on a lamp below names it. Newest first.
+list and the answers belong to the first builder (Queue #1722, continued from
+#705). Sixth shares lamp-52e6 through Fifth, with a scoped loan and exact
+restoration; every hardware result below names its lamp. Newest first.
 
+## 2026-10-19 — opt-in mic1 export, PR #1748
+
+Ready for lamp-voice: no. Draft #1748 at `d68cab679`, stacked on #1707.
+
+- First chose Ears as the sole mic1 owner after shared ALSA access returned
+  busy on lamp-4ace. `LAMP_BUS_AUDIO=on` requires privacy controls and stays
+  off otherwise. A single nonblocking slot retains original authority,
+  capture time and sequence; short mutes/read failures reserve a sequence gap.
+- Added an Event-only guarded Bus path: maintenance before borrowing PCM,
+  checks at encoding/send/retry boundaries, bounded retries, no raw reuse of
+  the ordinary publisher buffer. Authority is withdrawn before driver discard.
+  Kernel/receiver copies are not retractable; retention remains a review item.
+- Local fmt and strict all-target clippy pass. Full bus+ears tests outside the
+  sandbox: 159 passed, 1 ignored. Independent source cross-review found no
+  concrete additional Ears fault; it is not a live qualification.
+- ARM64 run `39203751159` has built release binaries; tests remain running at
+  this checkpoint. Third has agreed to review capture/publication/retention.
+- Replaced the scratch `capture.py` with a mic1 bus decoder that rejects gaps
+  instead of filling scored silence. Prior ALSA helper is parked as text.
+  Decoder/playback/scorer: 33 tests pass. Updated source and read-only CPU
+  sampler delivered on #1669 comment `6260144582`; operator comparison helper
+  is being prepared. No real audio, deployment or device access in this work.
+- Added and verified `builder:sixth` on 46 historical PRs; #1748 has it too.
+  Report to First: Queue #1722 comment `6260126281`.
 
 ## 2026-10-19 — room sound contract and offline scorer (#1669)
 
