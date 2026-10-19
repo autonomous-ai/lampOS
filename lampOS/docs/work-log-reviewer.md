@@ -4,6 +4,28 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 18:29 merged #1882 (Jarvis's cloud skills.list) as 5689de7d9; #1722 is the Queue, not closed
+- 18:27 read #1846 (first builder's scoped ARM64 runs): no blocking finding; DevOps's workflow and the first builder's merge; Python under .github/ is outside the rule's letter
+- 18:26 first read of #1876 (first builder's wellbeing nudges): product skills unchanged; three P2s if installed (stop functions past the 32, eyes and stretch 5 min apart, off not kept); needs a rebase
+- 18:25 merged #1880 (Jarvis's held reports_stop) as 90c66e1bf; #1683 left open
+- 18:22 merged #1877 (El's health facts) as 32fae8b60; #1681 left open
+- 18:20 read #1783 (first builder's volume/light wording and character lines): no finding; theirs to merge (on by default)
+- 18:17 first read of #1790 (first builder's who was here): no blocking finding; conflicts with lamp-voice and carries a merge commit, needs a rebase
+- 18:16 #1865's P2 fixed at d6c63f37a (two known people share a room session); first builder's merge
+- 18:16 merged #1825 (Twelve's schedule --zone system, folded) as a8b1f3474; #820 already closed
+- 18:15 read #1879's top commit (El's models in the manifest): off unchanged; three P2s (a failed model put-back, recovery not restarting a model-only change, prune trusting state.json) and a self-update dead end; first builder's merge
+- 18:14 re-read #1732 at 805f56961: all four P2s and the docs gap fixed, three new P3s; conflicts with lamp-voice again; first builder's merge
+- 18:14 read #1884 (Seventh's wait-cut-counts): P2, Python under lampOS/tools/ (Rust only outside training); for the first builder if an exception
+- 18:13 read #1882 (Jarvis's cloud skills.list): no blocking finding, one P3 (the off-file folder isn't made by any unit); merge on green ARM64
+- 18:11 read #1880 (Jarvis's held reports_stop done): no blocking finding, one P3 (a full desk drops it silently); merge on green ARM64
+- 18:10 merged #1873 (Tests' serve fixture polls at the tick when idle, tests only, #1806) as d982e5b9a
+- 18:07 read #1877 (El's health facts): no blocking finding, one P3 (a lamp-wide quiet test names every old stale part); merge on green ARM64
+- 18:04 #1872's new head 9ec713c35 (schema 2 only while Devin work): reads right, gate green; first builder's merge
+- 17:57 gate of #1874 (first builder's skill snooze/off, #1837 folded): green; first builder's merge
+- 17:54 read #1865 (Sixth's Live scoped session): switch off unchanged; one P2 when on (two known people alternating lose every other line); first builder's merge
+- 17:43 gate of #1871 (first builder's look for things, #1766 folded): green; first builder's merge
+- 17:43 read #1872 (Eighth's Devin in lamp-tasks): no blocking finding; for the first builder (store schema 2 on every lamp, a rollback sets it aside)
+- 17:37 merged #1863 (Tests' client deadline tests at 800 ms, tests only, #1806) as 179016adc
 - 17:33 merged #1864 (Seventh's refused-session tests, tests and docs) as b45aaf45a; #1567 stays open
 - 17:31 regates of #1811 (1963849d4) and #1827 (4f7afb94a) after the rebase: green; first builder's merges
 - 17:30 merged #1862 (Tests' pump-wake tests into the realtime group, config and docs) as 9867cc4dc
