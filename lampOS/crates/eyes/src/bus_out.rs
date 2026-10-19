@@ -15,10 +15,15 @@
 //! With `LAMP_PRESENCE=on` as well (#1677), whether anyone is at the lamp,
 //! on `room/presence` ([`crate::away`]): the faces of each look and the
 //! voice's lines on `voice/heard`, said once a second while the eyes look.
-use crate::{away::Away, faces, facing, speaking};
+use crate::{
+    activity::{Judge, Look},
+    away::Away,
+    faces, facing, speaking,
+};
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_msgs::{
-    Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, Level, RoomPresence, Speech,
+    Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, Level, RoomActivity, RoomPresence,
+    Speech, StoodUp,
 };
 use std::{io, time::Duration};
 
@@ -28,6 +33,9 @@ pub const ENVIRONMENT: &str = "LAMP_BUS";
 /// bus on. `on` only.
 pub const PRESENCE_ENVIRONMENT: &str = "LAMP_PRESENCE";
 
+/// Where the eyes read whether to say what the person at the desk is doing
+/// (#1678), with the bus on. `on` only.
+pub const ACTIVITY_ENVIRONMENT: &str = "LAMP_ACTIVITY";
 /// The name the eyes publish under.
 pub const SOURCE: &str = "eyes";
 /// How long a list of faces means anything.
@@ -209,6 +217,15 @@ pub struct BusOut {
     /// With `lamp-eyes --visits on`: how familiar the remembered person at
     /// the lamp is (#1670).
     familiar: Option<Publisher>,
+    /// With `LAMP_ACTIVITY=on`: what the person at the desk is doing.
+    activity: Option<ActivityOut>,
+}
+
+/// `room/activity` and `room/stood_up`, and what they are judged from.
+struct ActivityOut {
+    out: Publisher,
+    stood: Publisher,
+    judge: Judge,
 }
 
 /// `room/presence`, what it is judged from, and the voice's lines.
@@ -249,6 +266,11 @@ impl BusOut {
         if familiar && let Err(error) = out.say_familiar(&bus) {
             eprintln!("lamp-eyes: how familiar the person at the lamp is is not said: {error}");
         }
+        if std::env::var(ACTIVITY_ENVIRONMENT).ok().as_deref() == Some("on")
+            && let Err(error) = out.say_activity(&bus)
+        {
+            eprintln!("lamp-eyes: what the person at the desk is doing is not said: {error}");
+        }
         Some(out)
     }
 
@@ -268,7 +290,23 @@ impl BusOut {
             reported_at_us: None,
             presence: None,
             familiar: None,
+            activity: None,
         })
+    }
+
+    /// Also say what the person at the desk is doing, on `room/activity`,
+    /// and when they stand up and leave, on `room/stood_up` (#1678).
+    pub fn say_activity(&mut self, bus: &Bus) -> io::Result<()> {
+        let mut out =
+            bus.publisher_declared(RoomActivity::TOPIC, &RoomActivity::declaration(), SOURCE)?;
+        out.expires_after(Some(RoomActivity::LASTS));
+        let stood = bus.publisher_declared(StoodUp::TOPIC, &StoodUp::declaration(), SOURCE)?;
+        self.activity = Some(ActivityOut {
+            out,
+            stood,
+            judge: Judge::default(),
+        });
+        Ok(())
     }
 
     /// Also say whether anyone is at the lamp, on `room/presence`, from the
@@ -327,6 +365,9 @@ impl BusOut {
                 .reduce(f32::max);
             presence.away.looked(now_us, tall);
         }
+        if let Some(activity) = self.activity.as_mut() {
+            activity.judge.looked(now_us, Look::largest(found, filled));
+        }
     }
 
     /// Call from the loop whether or not the camera is open: with it closed
@@ -351,6 +392,14 @@ impl BusOut {
                 }
                 presence.said_someone = now.someone;
                 let _ = presence.out.publish_json(now_us, &now);
+            }
+        }
+        if let Some(activity) = self.activity.as_mut() {
+            if let Some(now) = activity.judge.say(now_us) {
+                let _ = activity.out.publish_json(now_us, &now);
+            }
+            if let Some(up) = activity.judge.stood_up(now_us) {
+                let _ = activity.stood.publish_json(now_us, &up);
             }
         }
     }
@@ -733,6 +782,60 @@ mod tests {
         );
         let away = &out.presence.as_ref().unwrap().away;
         assert_eq!(away.cause(), "face, 0.20 of the picture tall");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// #1678: with activity on, each look's largest face makes
+    /// `room/activity`, at the desk while the baseline comes in, said once a
+    /// second and good for three; someone rising out of the chair and gone
+    /// makes one `room/stood_up`.
+    #[test]
+    fn what_the_person_at_the_desk_does_is_said_from_the_looks() {
+        let root = std::path::PathBuf::from(format!("/tmp/lea-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(RoomActivity::TOPIC, "test", RoomActivity::TYPE)
+            .unwrap();
+        let mut stood = bus
+            .subscribe_typed(StoodUp::TOPIC, "test", StoodUp::TYPE)
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        out.say_activity(&bus).unwrap();
+        let s = 1_000_000u64;
+        let mut said = Vec::new();
+        // Seated 30 s, a face 120 of 480 tall, a look every 500 ms.
+        for look in 0..60u64 {
+            let at = look * s / 2;
+            out.saw(&[face(260.0, 180.0, 96.0, 120.0, 0.0)], &[], PICTURE, at);
+            out.tick(at);
+            while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+                assert_eq!(message.header.expires_ms, Some(3_000));
+                said.push(message.parse::<RoomActivity>().unwrap());
+            }
+        }
+        assert!(said.len() >= 29, "{said:?}");
+        assert!(
+            said.iter()
+                .all(|now| now.state == lamp_msgs::Activity::AtDesk && !now.baseline)
+        );
+        assert_eq!(said.last().unwrap().sitting_s, 29);
+        // Rising out of the chair over a second, then gone.
+        for (k, top) in [180.0, 140.0, 100.0, 60.0].into_iter().enumerate() {
+            let at = 30 * s + k as u64 * s / 4;
+            let tall = 120.0 * (1.0 - 0.06 * k as f32);
+            out.saw(&[face(260.0, top, tall * 0.8, tall, 0.0)], &[], PICTURE, at);
+            out.tick(at);
+        }
+        for look in 0..8u64 {
+            let at = 31 * s + look * s / 2;
+            out.saw(&[], &[], PICTURE, at);
+            out.tick(at);
+        }
+        let up = stood.recv(Duration::ZERO).unwrap().expect("stood up");
+        assert_eq!(up.parse::<StoodUp>().unwrap().sitting_s, 30);
+        assert!(stood.recv(Duration::ZERO).unwrap().is_none(), "once");
         std::fs::remove_dir_all(&root).unwrap();
     }
 

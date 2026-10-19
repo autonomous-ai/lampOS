@@ -363,6 +363,8 @@ of each, and its kind and period as a declaration, are in
 | `lamp/online` | Whether the lamp can reach the internet, worked out from the parts' links | latched | Health, with `--online on` (#830) | Once a second |
 | `room/state` | Quiet or busy | latched | Voice, later the situation | When it changes, and once a second |
 | `room/presence` | Whether anyone is at the lamp: someone (a face or a voice within 20 s), or nobody for how long (#1677, [presence.md](presence.md)) | latched | Eyes, with `LAMP_PRESENCE=on` | Once a second while they look, and when someone comes or goes; each good for 3 s |
+| `room/activity` | What the face at the desk shows: at the desk, leaning in or back, head down, sitting low, or away, with how long and the sitting's length (#1678, [eyes.md](eyes.md)) | latched | Eyes, with `LAMP_ACTIVITY=on` | Once a second while they look, and on a change; each good for 3 s |
+| `room/stood_up` | Someone at the desk stood up and left, and the sitting's length (#1678) | event | Eyes, with `LAMP_ACTIVITY=on` | Once each time |
 | `light/command`, `light/state` | The light asked for, and the light shown | latched | The executive and `lamp-cloud` (the app's Light row); the ring's owner | When it changes, and once a second |
 | `light/test`, `light/drawn` | A self-test's colour, shown for 2 s at most; the light the ring actually drew | latched | The self-test; the ring's owner | Asked once a colour; drawn when it changes, and once a second |
 | `light/request` | A light asked for that lapses, with its asker, priority and time, how it moves (`pattern`: breathe, candle or one pulse, #940), and how slowly it is faded into (`fade_ms`, #1677) | event | Skills and other parts (`lamp-cloud`'s preview, [cloud.md](cloud.md)) | Asked, and asked again to keep it, at most 30 s ahead |
@@ -418,6 +420,7 @@ that owns it:
 |---|---|---|
 | `room/state` | the voice's provider worker, on each change and once a second | the policy, and Expression |
 | `room/presence` | the eyes, with `LAMP_PRESENCE=on`, from their looks and `voice/heard` ([presence.md](presence.md)) | `lamp-skills` (Light out when you leave); Messages (#1673) |
+| `room/activity`, `room/stood_up` | the eyes, with `LAMP_ACTIVITY=on`, from their looks ([eyes.md](eyes.md)) | `lamp-skills` (Stretch break waits for a look up); "watches you leave" (#1669) |
 | `voice/timing`, `voice/activity`, `voice/playout` | the voice, with `LAMP_EXPRESSION_OUT=on` ([expression.md](expression.md), "What the voice says, as built") | Expression |
 | `policy/decisions` | the policy ([policy.md](policy.md)) | nothing yet |
 | `body/joint_states` | the body ([body.md](body.md), "On the bus") | nothing yet; recorded to measure how the lamp moves |

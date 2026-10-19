@@ -979,6 +979,28 @@ whose subscription fails is said once in the journal, and the faces are
 published as before. Not run on a lamp: its cost there is part of
 presence.md's lamp check.
 
+### What the person at the desk is doing (`LAMP_ACTIVITY=on`, #1678)
+
+With `LAMP_ACTIVITY=on` beside `LAMP_BUS=on`, the eyes also say on
+`room/activity` (`lamp_msgs::RoomActivity`) what the face at the desk shows,
+and on `room/stood_up` (`lamp_msgs::StoodUp`, an event) when someone rose
+out of the chair and left (`crates/eyes/src/activity.rs`, from
+`bus_out.rs`). The eyes see a face, not a body, so each state is read from
+each look's largest face against this person's own sitting: the median of
+its first two minutes of looks at the desk (a face at least 0.14 of the
+picture tall, Stretch break's `near`). Leaning in is the face 1.25 times as
+tall, held 10 s; leaning back 0.8 times, 10 s; head down its centre lower
+by a quarter of its height and the nose lower between the eyes and mouth by
+0.12, 20 s (reading, writing or a phone held low, not told apart); sitting
+low the centre lower by half its height, two minutes. No near face for 20 s
+is away; a sitting goes on through a gap under two minutes. Standing up is
+the face rising by half its height and shrinking to 0.85 of it within 2 s,
+then not seen for 2 s, said once. Nothing is said with no look for 5 s.
+States and counts only: no box, no picture, nobody's identity. Arithmetic on
+the looks the eyes already make: no model and no frame read is added. Its
+cost on a lamp is #1678's CPU run; how well the states are told apart is its
+scripted sitting.
+
 ### Whether a face is speaking (`LAMP_EYES_SPEAKING=on`, #720)
 
 Off unless `LAMP_EYES_SPEAKING=on` is in the eyes' unit beside `LAMP_BUS=on`.

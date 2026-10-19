@@ -1,0 +1,5 @@
+# The quiet-until-they-leave recording to minute 70, with room/activity
+# saying head_down from minute 45 to 65 (#1678): the chance at 50 minutes
+# waits its ten minutes, they are still head down, and this sitting's
+# stretch is let go; it re-arms only when they leave, so nothing after.
+none = true
