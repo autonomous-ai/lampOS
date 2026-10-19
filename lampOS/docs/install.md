@@ -194,6 +194,13 @@ voice's own hello is off, as lamp-4ace now has it too.
 **19 October: every behaviour that has a skill runs as the skill** (the
 owner: "everything is a skill"). Install puts every product skill in
 `/var/lib/lampOS/skills/` (`install::PRODUCT_SKILLS` in `crates/update`):
+
+The core `onboarding` folder is installed too. It contributes no model tool;
+its privacy invitation bridge remains inactive without the voice's explicit
+onboarding switch, valid hardware profile and pending invitation. Private
+progress lives under `/var/lib/lampOS/voice/onboarding/`; factory reset wipes
+that state, not the skill package.
+
 Welcome back, Reminders, Task news, Stretch break, Stuffy air and Dance,
 each folder whole but for its `tests/`. The voice's own paths for them give
 way in the product's `lamp-voice.service`: its hello stays off

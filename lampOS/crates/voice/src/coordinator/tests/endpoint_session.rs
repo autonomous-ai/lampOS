@@ -535,6 +535,7 @@ fn privacy_peer(
             channels.control.send(WorkerEvent::Privacy {
                 acquired_at_us,
                 muted,
+                receipt: None,
             })?;
             let after_send_at_us = monotonic_us();
             seen.lock()
@@ -1721,6 +1722,7 @@ fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
                         channels
                             .control
                             .send(WorkerEvent::Privacy {
+                                receipt: None,
                                 acquired_at_us: monotonic_us(),
                                 muted: true,
                             })

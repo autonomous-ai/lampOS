@@ -897,6 +897,7 @@ impl PrivacyPeer {
         }
         if !self.peer.stopped && crate::scenario_clock::instant() >= self.next {
             let _ = self.peer.channels.control.send(WorkerEvent::Privacy {
+                receipt: None,
                 acquired_at_us: monotonic_us(),
                 muted: self.muted.load(Ordering::SeqCst),
             });

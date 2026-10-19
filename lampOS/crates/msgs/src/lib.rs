@@ -74,6 +74,8 @@ mod selftest;
 pub use selftest::*;
 mod skills;
 pub use skills::*;
+mod onboarding;
+pub use onboarding::*;
 mod online;
 pub use online::*;
 mod arrival;
@@ -1385,6 +1387,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(logging_topics())
         .chain(memory_topics())
         .chain(skills_topics())
+        .chain(onboarding_topics())
         .chain(online_topics())
         .chain(arrival_topics())
         .chain(turn_topics())

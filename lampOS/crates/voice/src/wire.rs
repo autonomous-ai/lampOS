@@ -84,6 +84,52 @@ impl MicWaited {
     }
 }
 
+/// Physical source evidence already accepted by the Controls switch fence.
+/// This is metadata, never a microphone permission or software-mute report.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct PrivacyReceipt {
+    pub controls_session: String,
+    pub physical: lamp_msgs::PrivacySwitch,
+}
+
+impl PrivacyReceipt {
+    pub fn check(&self) -> io::Result<()> {
+        if self.controls_session.len() != 16
+            || !self
+                .controls_session
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit())
+            || self.physical.check().is_err()
+            || self.physical.muted.is_none()
+            || self.physical.fault.is_some()
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "invalid physical privacy receipt",
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl<'de> Deserialize<'de> for PrivacyReceipt {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Fields {
+            controls_session: String,
+            physical: lamp_msgs::PrivacySwitch,
+        }
+        let fields = Fields::deserialize(deserializer)?;
+        let value = Self {
+            controls_session: fields.controls_session,
+            physical: fields.physical,
+        };
+        value.check().map_err(serde::de::Error::custom)?;
+        Ok(value)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum WorkerEvent {
@@ -108,6 +154,9 @@ pub enum WorkerEvent {
     Privacy {
         acquired_at_us: u64,
         muted: bool,
+        /// Legacy direct GPIO has no Controls source identity.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        receipt: Option<PrivacyReceipt>,
     },
     CapturePrepared {
         epoch: u64,
@@ -708,5 +757,88 @@ impl ReceiveOrder {
         self.sequence = packet.sequence;
         self.sent_at_us = packet.sent_at_us;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod privacy_receipt_tests {
+    use super::*;
+    use lamp_msgs::{ClockStamp, PrivacySwitch};
+
+    fn receipt() -> PrivacyReceipt {
+        PrivacyReceipt {
+            controls_session: "0123456789abcdef".into(),
+            physical: PrivacySwitch {
+                stamp: ClockStamp {
+                    clock_id: "test-clock".into(),
+                    at_us: 100,
+                    sequence: 7,
+                },
+                reader_session_id: "reader".into(),
+                muted: Some(true),
+                fault: None,
+            },
+        }
+    }
+
+    #[test]
+    fn legacy_privacy_event_remains_receipt_free() {
+        let value: WorkerEvent =
+            serde_json::from_str(r#"{"kind":"privacy","acquired_at_us":100,"muted":true}"#)
+                .unwrap();
+        assert!(matches!(value, WorkerEvent::Privacy { receipt: None, .. }));
+        assert!(
+            !serde_json::to_value(value)
+                .unwrap()
+                .as_object()
+                .unwrap()
+                .contains_key("receipt")
+        );
+    }
+
+    #[test]
+    fn controls_receipt_retains_original_source_and_acquisition() {
+        let original = receipt();
+        let event = WorkerEvent::Privacy {
+            acquired_at_us: 100,
+            muted: true,
+            receipt: Some(original.clone()),
+        };
+        let decoded: WorkerEvent =
+            serde_json::from_slice(&serde_json::to_vec(&event).unwrap()).unwrap();
+        let WorkerEvent::Privacy {
+            acquired_at_us,
+            muted,
+            receipt: Some(decoded),
+        } = decoded
+        else {
+            panic!("missing source evidence")
+        };
+        assert_eq!(decoded, original);
+        assert_eq!(decoded.physical.stamp.at_us, acquired_at_us);
+        assert_eq!(decoded.physical.muted, Some(muted));
+    }
+
+    #[test]
+    fn receipt_decode_rejects_unbounded_identity_and_unknown_physical_state() {
+        let mut invalid = receipt();
+        invalid.controls_session = "x".repeat(129);
+        assert!(
+            serde_json::from_value::<PrivacyReceipt>(serde_json::to_value(invalid).unwrap())
+                .is_err()
+        );
+        let mut invalid = receipt();
+        invalid.physical.reader_session_id = "x".repeat(129);
+        assert!(
+            serde_json::from_value::<PrivacyReceipt>(serde_json::to_value(invalid).unwrap())
+                .is_err()
+        );
+        let mut invalid = receipt();
+        invalid.physical.muted = None;
+        invalid.physical.fault = Some(lamp_msgs::ControlFault::Missing);
+        assert!(
+            serde_json::from_value::<PrivacyReceipt>(serde_json::to_value(invalid).unwrap())
+                .is_err()
+        );
     }
 }

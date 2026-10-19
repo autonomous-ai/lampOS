@@ -9,6 +9,7 @@ pub(crate) type Result<T> = std::result::Result<T, Box<dyn std::error::Error + S
 #[derive(Debug)]
 pub(crate) struct PhysicalMute {
     pub(crate) observed_at_us: u64,
+    pub(crate) onboarding: Option<crate::onboarding::privacy::Checkpoint>,
 }
 impl fmt::Display for PhysicalMute {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -257,6 +258,7 @@ fn wait_loop_with_gate(
         for _ in 0..16 {
             match worker.channels.control.receive::<WorkerEvent>()? {
                 Some(WorkerEvent::Privacy {
+                    receipt: _,
                     acquired_at_us,
                     muted,
                 }) => {
@@ -390,14 +392,17 @@ pub(crate) mod tests {
                     let event = match script {
                         Script::Missing => None,
                         Script::Gap if ticks == 0 => Some(WorkerEvent::Privacy {
+                            receipt: None,
                             acquired_at_us: at,
                             muted: true,
                         }),
                         Script::Stale if ticks == 0 => Some(WorkerEvent::Privacy {
+                            receipt: None,
                             acquired_at_us: at - PRIVACY_FRESH_US,
                             muted: true,
                         }),
                         Script::LateThenUnmute => Some(WorkerEvent::Privacy {
+                            receipt: None,
                             acquired_at_us: if ticks == 0 {
                                 at - PRIVACY_FRESH_US
                             } else {
@@ -418,6 +423,7 @@ pub(crate) mod tests {
                                 muted_seen.store(true, Ordering::SeqCst);
                             }
                             Some(WorkerEvent::Privacy {
+                                receipt: None,
                                 acquired_at_us: at,
                                 muted,
                             })
@@ -738,6 +744,7 @@ pub(crate) mod tests {
                 }
                 peer.control
                     .send(WorkerEvent::Privacy {
+                        receipt: None,
                         acquired_at_us: monotonic_us(),
                         muted: false,
                     })

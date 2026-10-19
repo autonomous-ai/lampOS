@@ -1332,6 +1332,7 @@ impl PrivacyPeer {
                 seen.last_privacy_us = Some(at);
             }
             let _ = self.peer.channels.control.send(WorkerEvent::Privacy {
+                receipt: None,
                 acquired_at_us: if stale {
                     at - 60_000
                 } else if backwards {
@@ -1353,6 +1354,7 @@ impl PrivacyPeer {
         self.muted.store(true, Ordering::SeqCst);
         let at = monotonic_us();
         self.peer.channels.control.send(WorkerEvent::Privacy {
+            receipt: None,
             acquired_at_us: at,
             muted: true,
         })?;
@@ -2462,7 +2464,10 @@ fn rapid_mute_and_reopen_never_overlaps_workers_or_carries_speech_across() {
                 );
             }
             let result = match mute {
-                Some(observed_at_us) => Err(Box::new(PhysicalMute { observed_at_us }) as _),
+                Some(observed_at_us) => Err(Box::new(PhysicalMute {
+                    onboarding: None,
+                    observed_at_us,
+                }) as _),
                 None => std::mem::replace(&mut run.result, Ok(())),
             };
             runs.borrow_mut().push(run);
@@ -2863,4 +2868,180 @@ fn resumed_the_lamp_answers_again() {
         .map(|event| event["paused"].clone())
         .collect();
     assert_eq!(pause, [true, false]);
+}
+
+/// Release the worker even if a conversation assertion unwinds. The worker's
+/// own timeout also bounds a regression that blocks the coordinator itself.
+struct HeldOnboardingStorage {
+    release: std::sync::mpsc::Sender<()>,
+    timed_out: Arc<AtomicBool>,
+    accepted: Arc<std::sync::atomic::AtomicU64>,
+    polls: Arc<std::sync::atomic::AtomicU64>,
+    directory: PathBuf,
+}
+
+impl Drop for HeldOnboardingStorage {
+    fn drop(&mut self) {
+        let _ = self.release.send(());
+    }
+}
+
+fn held_onboarding_storage() -> (SessionState, HeldOnboardingStorage) {
+    use crate::onboarding::storage::{Paths, ServiceStorage, Submit};
+    let directory = std::env::temp_dir().join(format!(
+        "lamp-held-onboarding-{}-{}",
+        std::process::id(),
+        monotonic_us()
+    ));
+    fs::create_dir(&directory).unwrap();
+    let file = directory.join("progress.json");
+    let (release, released) = std::sync::mpsc::channel();
+    let (entered, entering) = std::sync::mpsc::channel();
+    let timed_out = Arc::new(AtomicBool::new(false));
+    let failed = timed_out.clone();
+    let storage = ServiceStorage::start_with_hook(
+        Paths {
+            progress: file.clone(),
+            checkpoint: directory.join("privacy.json"),
+            mailbox: directory.join("mailbox"),
+        },
+        Box::new(move |tag| {
+            if tag.revision == 2 {
+                entered.send(()).unwrap();
+                if released.recv_timeout(SCENARIO_LIMIT).is_err() {
+                    failed.store(true, Ordering::SeqCst);
+                    return Err(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        "test storage gate expired",
+                    ));
+                }
+            }
+            Ok(())
+        }),
+    )
+    .unwrap();
+    let client = storage.client();
+    let deadline = Instant::now() + SCENARIO_LIMIT;
+    loop {
+        if client.snapshot().unwrap().ready {
+            break;
+        }
+        assert!(Instant::now() < deadline, "storage initialization stalled");
+        std::thread::yield_now();
+    }
+    assert!(
+        matches!(client.commit(crate::onboarding::Progress::default(), false).unwrap(),
+        Submit::Queued(tag) if tag.revision == 2)
+    );
+    entering
+        .recv_timeout(SCENARIO_LIMIT)
+        .expect("commit reached the held worker");
+    let accepted = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let mut trace = SessionState::default();
+    trace.onboarding_storage = Some(storage);
+    trace.onboarding_test_file = Some(file);
+    trace.onboarding_test_capture_accepted = Some(accepted.clone());
+    let polls = Arc::new(std::sync::atomic::AtomicU64::new(0));
+    trace.onboarding_test_polls = Some(polls.clone());
+    (
+        trace,
+        HeldOnboardingStorage {
+            release,
+            timed_out,
+            accepted,
+            polls,
+            directory,
+        },
+    )
+}
+
+fn assert_held_storage_progress(run: &Run, trace: &SessionState, held: &HeldOnboardingStorage) {
+    run.assert_invariants();
+    assert!(
+        held.polls.load(Ordering::SeqCst) > 1,
+        "the real onboarding owner must poll held storage during conversation"
+    );
+    assert!(
+        !held.timed_out.load(Ordering::SeqCst),
+        "storage released only by watchdog"
+    );
+    assert!(
+        trace
+            .onboarding_storage
+            .as_ref()
+            .unwrap()
+            .client()
+            .snapshot()
+            .unwrap()
+            .busy,
+        "the real conversation ran with commit still pending"
+    );
+    // The capture fixture generates contiguous 10 ms blocks; these are counted
+    // only after the real coordinator validates/consumes them, not when sent.
+    assert!(
+        held.accepted.load(Ordering::SeqCst) >= 30,
+        "less than 300 ms of capture accepted while storage was held"
+    );
+    assert!(!run.events("listening_ready").is_empty());
+    assert!(run.events("capture_gap").is_empty());
+    assert!(
+        run.exits.iter().all(|(_, reaped)| *reaped),
+        "audio reaped before storage release"
+    );
+    for role in ["speaker", "capture", "provider", "privacy"] {
+        assert!(
+            run.seen.stopped.contains(&role),
+            "{role} did not receive Stop"
+        );
+    }
+}
+
+fn release_onboarding_storage(trace: &mut SessionState, held: &HeldOnboardingStorage) {
+    held.release.send(()).unwrap();
+    assert_eq!(
+        trace
+            .onboarding_storage
+            .as_mut()
+            .unwrap()
+            .finish(SCENARIO_LIMIT)
+            .unwrap(),
+        crate::onboarding::storage::StorageShutdown::Finished
+    );
+    fs::remove_dir_all(&held.directory).unwrap();
+}
+
+#[test]
+fn onboarding_storage_held_does_not_interrupt_capture_or_privacy() {
+    let _one = one_session();
+    let (mut trace, held) = held_onboarding_storage();
+    let run = run_in(Script::question(Answer::Complete(12)), &mut trace);
+    assert_held_storage_progress(&run, &trace, &held);
+    assert!(is_mute(&run.result), "{:?}", run.result);
+    assert_eq!(run.outcomes()[&first(&run)], ["audio_written_unscored"]);
+    release_onboarding_storage(&mut trace, &held);
+}
+
+#[test]
+fn stop_and_physical_mute_do_not_wait_for_onboarding_storage() {
+    let _one = one_session();
+    for action in [Act::Sigterm, Act::Mute] {
+        let (mut trace, held) = held_onboarding_storage();
+        let run = run_in(
+            Script {
+                actions: vec![(When::Block(40), action)],
+                signals: action == Act::Sigterm,
+                ..Script::question(Answer::Hold(12))
+            },
+            &mut trace,
+        );
+        assert_held_storage_progress(&run, &trace, &held);
+        if action == Act::Sigterm {
+            assert!(run.result.is_ok(), "{:?}", run.result);
+            assert_eq!(run.events("service_stop_requested").len(), 1);
+        } else {
+            assert!(is_mute(&run.result), "{:?}", run.result);
+            assert_eq!(run.events("physical_mute").len(), 1);
+        }
+        release_onboarding_storage(&mut trace, &held);
+    }
 }

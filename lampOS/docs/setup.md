@@ -124,6 +124,16 @@ Harness service `install` set up, #934; Nine on #1016), the user's key
 software, its releases, the update key, the touch calibration and other
 per-lamp facts, and physical privacy.
 
+Onboarding uses `/var/lib/lampOS/voice/onboarding/progress.json`; the privacy
+checkpoint and transient handoff files share its root-owned 0700 directory.
+The product unit names that canonical file without enabling `LAMP_ONBOARDING`.
+Both reset plans wipe the entire directory's contents, including pending writes,
+temporary files and mailbox descendants, retaining the empty private container.
+The installed core skill in `/var/lib/lampOS/skills/onboarding` is kept.
+A known older deployment using another progress path requires an explicit
+migration; arbitrary legacy environment paths are not imported, and old progress
+alone is not proof that the privacy exercise was completed.
+
 ## The reset (built, off unless set)
 
 `crates/setup` builds `lamp-setup`. Its first slice is the reset:
