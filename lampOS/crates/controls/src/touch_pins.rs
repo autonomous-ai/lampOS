@@ -17,6 +17,30 @@ use std::{
 
 pub const HEAD_CANDIDATES: [u32; 4] = [37, 96, 97, 98];
 
+/// The switch that turns the base strip (MPR121) back on: `on`. Without it
+/// the strip is off: V2 doesn't use it (the project lead's decision, 19 Oct;
+/// V1 had it off too). Its code and tuning are kept: a pins file's `base`
+/// section and the config's `base_selected_mask` stay as written, unread.
+pub const STRIP_ENV: &str = "LAMP_CONTROLS_STRIP";
+
+/// What `lamp-controls serve` serves with: the strip set aside unless
+/// `switch`, the value of [`STRIP_ENV`], is `on`, so no strip worker starts
+/// and the touch state has no strip source; the head pads, the button and
+/// the reset are as before. The pins, the config, and whether a configured
+/// strip was set aside.
+pub fn serving(
+    mut wiring: TouchPinsConfig,
+    mut config: Config,
+    switch: Option<&str>,
+) -> (TouchPinsConfig, Config, bool) {
+    if switch == Some("on") {
+        return (wiring, config, false);
+    }
+    let set_aside = wiring.base.take().is_some();
+    config.base_selected_mask = None;
+    (wiring, config, set_aside)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TouchPinsConfig {

@@ -34,6 +34,7 @@ sets touch at 40% and release at 20% of the way from each pad's noise to its own
 --pins with those thresholds, only if every working pad gave a clear swipe. It serves nothing. --record keeps the\n\
 readings; --replay works from kept readings instead of the chip.\n\
 --touch selects the new independent head/strip path and its pins schema. It configures the selected I2C chip even in shadow.\n\
+The base strip (MPR121) is off unless LAMP_CONTROLS_STRIP=on: serve keeps a pins file's base section unread and starts no strip worker; the head pads, button and reset are served as before.\n\
 Without --touch, no new reader, touch topic or gesture interpretation is selected.\n\
 Only LAMP_PRIVACY_CONTROLS=on selects an explicit privacy section in --pins; absent/off never opens chip 1.\n\
 Replay never opens a bus or hardware. Times are CLOCK_MONOTONIC microseconds.\n\
@@ -569,8 +570,25 @@ fn touch_reader(
 }
 
 fn run_touch(args: Args, config: Config, clock: &str) -> Result<(), Box<dyn std::error::Error>> {
-    use lamp_controls::{strip_worker::Worker, touch_pins::TouchPinsConfig, touch_runtime};
+    use lamp_controls::{
+        strip_worker::Worker, touch_pins, touch_pins::TouchPinsConfig, touch_runtime,
+    };
     let wiring = TouchPinsConfig::load(args.pins.as_ref().expect("validated pins argument"))?;
+    // The base strip is off unless switched on; a replay reads what it was
+    // recorded with.
+    let (wiring, config) = if args.command == "replay" {
+        (wiring, config)
+    } else {
+        let switch = std::env::var(touch_pins::STRIP_ENV).ok();
+        let (wiring, config, set_aside) = touch_pins::serving(wiring, config, switch.as_deref());
+        if set_aside {
+            eprintln!(
+                "lamp-controls: the base strip is off: V2 doesn't use it; its pins section is kept, unread; {}=on turns it back on",
+                touch_pins::STRIP_ENV
+            );
+        }
+        (wiring, config)
+    };
     if wiring.privacy.is_some() && !privacy_selected() {
         return Err(UNSELECTED_PRIVACY.into());
     }

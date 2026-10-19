@@ -426,8 +426,11 @@ units stopped:
    pair and polarity, and they go into `head_pads`; the product's 37 and 96,
    active-high, are only a default. On an MPR121 strip it is
    `lamp-controls calibrate-touch` (controls.md, "Run without a lamp, then
-   qualify on one": First's on-lamp sequence), its output installed there.
-   `install` keeps a pins file changed on the lamp.
+   qualify on one": First's on-lamp sequence), its output installed there,
+   but **that half is skipped while the base strip is off**: V2 doesn't use
+   the strip, at the project lead's decision (19 Oct), and `lamp-controls`
+   reads it only with `LAMP_CONTROLS_STRIP=on` ([controls.md](controls.md),
+   "The base strip is off"). `install` keeps a pins file changed on the lamp.
 3. **The update key**, `/etc/lampOS/update/key.pub`: the public half of the
    owner's signing key ([updates.md](updates.md)). `install` refuses to run
    without it (step 1 below), and setup never writes it.

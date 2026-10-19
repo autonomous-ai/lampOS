@@ -31,6 +31,34 @@ enabled, overriding a configuration file's `enabled` field. Neither switch
 wires Voice, Expression, lights or motors to the requests. This task installs
 no unit and changes no per-lamp deployment file.
 
+### The base strip is off (19 Oct 2026)
+
+The base's touch strip (the MPR121) isn't used in V2: it's not used, at the
+project lead's decision (19 Oct), and V1 had it off too. The head's two pads,
+the button and the reset are unchanged.
+
+- **Off unless `LAMP_CONTROLS_STRIP=on`.** Without the switch, `serve`
+  sets the strip aside (`touch_pins::serving`): a pins file's `base` section
+  and the config's `base_selected_mask` are kept as written and not read, no
+  strip worker starts, and `controls/touch_state` has no strip source. The
+  journal says so once at the start when a pins file had a strip. Any other
+  value is off. `replay` reads what a recording was made with.
+- **What still reads the strip's absence:** the self-test's touch by hand
+  judges the sources `controls/touch_state` lists, so with the strip off it
+  judges the head and the button ([selftest.md](selftest.md)).
+- **Kept:** the strip's code, its tests, `calibrate-touch` and every tuning
+  value below, so it can come back.
+- **To turn it back on** for one lamp: a drop-in,
+  `/etc/systemd/system/lamp-controls.service.d/strip.conf`, with
+  `[Service]` and `Environment=LAMP_CONTROLS_STRIP=on`; a pins file with
+  its `base` section (from `calibrate-touch`, below); and the config's
+  `base_selected_mask` matching its working pads.
+- **The units:** the product's (`deploy/product/lamp-controls.service`) and
+  lamp-4ace's run `serve --touch` with pins files that have no `base`
+  section, so neither started the strip before this either. Only a pins file
+  written by `calibrate-touch` would have, and the switch now keeps it off.
+  lamp-52e6's runs without `--touch`. No unit changed.
+
 ### What a hand requests
 
 `TouchEvent` on `controls/touch` and `TouchState` on `controls/touch_state`
