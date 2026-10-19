@@ -8363,3 +8363,55 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
         "{off}"
     );
 }
+
+/// The eyes' `room/activity`, as they say it while someone sits at the desk.
+fn activity(engine: &mut Engine, at_ms: u64, state: &str) {
+    engine.observe(
+        "room/activity",
+        at_ms * 1_000,
+        format!(r#"{{"state":"{state}","for_s":0,"sitting_s":600,"baseline":true}}"#).as_bytes(),
+        Some(3_000),
+    );
+}
+
+/// #1685, the eyes' word (#1678): a run is noticed by the person standing up
+/// and leaving (`room/stood_up`), or by any change in what `room/activity`
+/// says they are doing from what it said as the run began (looking up from
+/// the page, leaning in), and `away` is gone; the same activity all through,
+/// someone still and turned away, is not noticed, and a skill resting after
+/// one rests. These topics are the program's own reading for a `[rest]`.
+#[test]
+fn a_run_is_noticed_by_the_eyes_activity_changing_or_a_stand_up() {
+    let dir = tempfile::tempdir().unwrap();
+    let topics = Engine::new(vec![resting_skill(dir.path(), 1)], true).topics();
+    assert!(topics.contains(&"room/activity".to_owned()), "{topics:?}");
+    assert!(topics.contains(&"room/stood_up".to_owned()), "{topics:?}");
+    for (how, after, noticed) in [
+        ("the same", None, false),
+        ("looked up", Some("at_desk"), true),
+        ("leaned in", Some("leaning_in"), true),
+        ("away", Some("away"), true),
+        ("stood up", None, true),
+    ] {
+        let mut engine = Engine::new(vec![resting_skill(dir.path(), 1)], true);
+        faces(&mut engine, 0, &seated(false));
+        activity(&mut engine, 0, "head_down");
+        assert_eq!(stuffy(&mut engine, 0).len(), 1, "{how}");
+        activity(&mut engine, 3_000, "head_down");
+        match (how, after) {
+            ("stood up", _) => {
+                engine.observe("room/stood_up", 5_000_000, br#"{"sitting_s":600}"#, None);
+            }
+            (_, Some(state)) => activity(&mut engine, 5_000, state),
+            _ => activity(&mut engine, 5_000, "head_down"),
+        }
+        // After its while, nothing counts: looking up then.
+        engine.tick(10_001_000);
+        activity(&mut engine, 10_500, "at_desk");
+        assert_eq!(
+            engine.resting_until("sip", 11_000_000).is_none(),
+            noticed,
+            "{how}"
+        );
+    }
+}
