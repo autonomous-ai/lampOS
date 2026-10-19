@@ -8384,11 +8384,11 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
 }
 
 /// The peer read's P2 on #1807, the program: guard mode counts only while
-/// the ring shows its mark. Told the mark is outranked (the person asked
-/// for their own light), the program gives the mark back and asks for it
-/// again with a new claim, which the ring hears over the person's light;
-/// until the ring says it is shown again (`light/reached`), a visit is not
-/// counted and nothing is texted; shown, the next visit is.
+/// the ring shows its mark. Told the mark is outranked by another program's
+/// light (Light out's, as the desk empties), the program gives the mark back
+/// and asks for it again with a new claim; until the ring says it is shown
+/// again (`light/reached`), a visit is not counted and nothing is texted;
+/// shown, the next visit is.
 #[test]
 fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
     use lamp_msgs::{LightOutranked, LightReached, MessageOut, RoomPresence};
@@ -8508,13 +8508,13 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
         .unwrap();
     let source = mark.claim.source.clone();
     assert_eq!(source, "skill:guard-mode");
-    // The person's light over it: given back, and asked for again anew.
+    // Another program's light over it: given back, and asked for anew.
     outranked
         .publish_json(
             1,
             &LightOutranked {
                 source: source.clone(),
-                by: LightOutranked::PERSON.into(),
+                by: "skill:light-out".into(),
             },
         )
         .unwrap();
@@ -8548,6 +8548,216 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
     visit(&mut presence);
     let text: MessageOut = next(&mut texts, Duration::from_secs(5))
         .expect("a text once the mark shows")
+        .parse()
+        .unwrap();
+    assert!(text.text.ends_with(", for about 2 minutes."), "{text:?}");
+}
+
+/// The first builder's ruling on #1937, the program: the person's own light
+/// over guard mode's mark ("turn the light off" on the way out) is never
+/// asked over. The watch pauses: no new claim, no visit counted, and one
+/// text, "I've paused watching while your light is off." Their light going
+/// on again alone does not resume it. Asked again in words, it goes on: its
+/// mark given back and asked for anew, and counting once the ring shows it.
+#[test]
+fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
+    use lamp_msgs::{LightOutranked, LightReached, MessageOut, RoomPresence};
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("gp")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    copy(
+        &skills_root().join("guard-mode"),
+        &root.join("skills/guard-mode"),
+    );
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut requests = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
+    let mut texts = bus.subscribe(MessageOut::TOPIC, "phone").unwrap();
+    let mut presence = bus
+        .publisher_declared(RoomPresence::TOPIC, &RoomPresence::declaration(), "eyes")
+        .unwrap();
+    let mut heard = bus
+        .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+        .unwrap();
+    let mut outranked = bus
+        .publisher_declared(
+            LightOutranked::TOPIC,
+            &LightOutranked::declaration(),
+            "ring",
+        )
+        .unwrap();
+    let mut reached = bus
+        .publisher_declared(LightReached::TOPIC, &LightReached::declaration(), "ring")
+        .unwrap();
+    let mut state = bus
+        .publisher_declared(Light::TOPICS[1], &Light::declaration(), "actions")
+        .unwrap();
+    let tools = root.join("tools");
+    let clock = Clock::at(root);
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                root.join("skills").as_os_str(),
+                "--bus-root".as_ref(),
+                root.join("bus").as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--boot-id".as_ref(),
+                OsStr::new("boot-test"),
+            ])
+            .args(clock.args())
+            .env("LAMP_LIGHT_REQUESTS", "on")
+            .env_remove("LAMP_SKILLS_ASK")
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !tools.join("call.sock").exists()
+        || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+    {
+        assert!(Instant::now() < deadline, "guard mode was never loaded");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let next = |subscriber: &mut lamp_bus::Subscriber, within: Duration| {
+        let until = Instant::now() + within;
+        loop {
+            if let Some(message) = subscriber.recv(Duration::from_millis(50)).unwrap() {
+                break Some(message);
+            }
+            if Instant::now() >= until {
+                break None;
+            }
+        }
+    };
+    let say = |presence: &mut lamp_bus::Publisher, someone: bool| {
+        presence
+            .publish_json(
+                1,
+                &RoomPresence {
+                    someone,
+                    nobody_s: if someone { 0 } else { 20 },
+                    by: someone.then_some(lamp_msgs::SeenBy::Voice),
+                },
+            )
+            .unwrap();
+        clock.skip(Duration::ZERO);
+    };
+    // A visit: they leave, someone comes for two minutes and goes.
+    let visit = |presence: &mut lamp_bus::Publisher| {
+        say(presence, false);
+        say(presence, true);
+        clock.skip(Duration::from_secs(120));
+        say(presence, true);
+        say(presence, false);
+    };
+    let speak = |heard: &mut lamp_bus::Publisher| {
+        heard
+            .publish_json(
+                1,
+                &Speech {
+                    text: "Lamp, keep an eye on things while I'm out".into(),
+                    finished: true,
+                    locale: None,
+                    request: None,
+                },
+            )
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(300));
+    };
+    let turn_on = || {
+        let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
+        writeln!(
+            &stream,
+            r#"{{"op":"call","name":"keep_watch","args":{{"turn":"on"}}}}"#
+        )
+        .unwrap();
+        let mut line = String::new();
+        BufReader::new(&stream).read_line(&mut line).unwrap();
+        line
+    };
+    speak(&mut heard);
+    assert!(turn_on().contains(r#""ok":true"#));
+    let mark: LightRequest = next(&mut requests, Duration::from_secs(5))
+        .expect("the mark")
+        .parse()
+        .unwrap();
+    let source = mark.claim.source.clone();
+    // The person's own light over it: no new claim, paused, one line.
+    outranked
+        .publish_json(
+            1,
+            &LightOutranked {
+                source: source.clone(),
+                by: LightOutranked::PERSON.into(),
+            },
+        )
+        .unwrap();
+    let paused: MessageOut = next(&mut texts, Duration::from_secs(3))
+        .expect("the pause's line")
+        .parse()
+        .unwrap();
+    assert_eq!(paused.text, "I've paused watching while your light is off.");
+    assert!(
+        next(&mut requests, Duration::from_millis(1_500)).is_none(),
+        "no claim over the person's light"
+    );
+    // Paused: a visit is not counted.
+    visit(&mut presence);
+    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    // Their light on again, unasked: still paused, no claim, no counting.
+    state
+        .publish_json(1, &Light::new(true, "white", 5).unwrap())
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(500));
+    clock.skip(Duration::from_secs(600));
+    visit(&mut presence);
+    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    let since: Vec<LightRequest> = std::iter::from_fn(|| next(&mut requests, Duration::ZERO))
+        .map(|message| message.parse().unwrap())
+        .collect();
+    // Only the old claim's renewals: nothing given back, so no new claim.
+    let now = lamp_ipc::monotonic_us();
+    assert!(
+        since
+            .iter()
+            .all(|asked| asked.claim.holds_at("boot-test", now) && asked.light == mark.light),
+        "no claim over the person's light: {since:?}"
+    );
+    // Asked again in words: the mark asked for anew, counting once shown.
+    speak(&mut heard);
+    let again = turn_on();
+    assert!(again.contains("again"), "{again}");
+    let mut asked = Vec::new();
+    while let Some(message) = next(&mut requests, Duration::from_secs(2)) {
+        asked.push(message.parse::<LightRequest>().unwrap());
+    }
+    let now = lamp_ipc::monotonic_us();
+    assert!(
+        asked
+            .iter()
+            .any(|asked| !asked.claim.holds_at("boot-test", now))
+            && asked
+                .last()
+                .is_some_and(|last| last.claim.holds_at("boot-test", now)),
+        "given back and asked anew: {asked:?}"
+    );
+    reached
+        .publish_json(
+            1,
+            &LightReached {
+                source,
+                light: mark.light.clone(),
+            },
+        )
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    clock.skip(Duration::from_secs(600));
+    visit(&mut presence);
+    let text: MessageOut = next(&mut texts, Duration::from_secs(5))
+        .expect("a text once asked again and shown")
         .parse()
         .unwrap();
     assert!(text.text.ends_with(", for about 2 minutes."), "{text:?}");

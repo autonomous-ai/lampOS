@@ -1193,10 +1193,10 @@ fn watch_look(out: &mut Publisher, runner: &Runner) {
 
 /// What the ring said of the marks since the last look (the peer read on
 /// #1807): shown (`light/reached`), the watch counts; not shown
-/// (`light/outranked`, by the person's own light or another's), it counts
-/// nothing, and its mark is asked for again with a new claim, which the
-/// ring hears over the person's light and over an older one of the same
-/// priority, at most once each `MARK_AGAIN`.
+/// (`light/outranked`), it counts nothing. By another program's light, its
+/// mark is asked for again with a new claim, which the ring hears over an
+/// older one of the same priority, at most once each `MARK_AGAIN`; by the
+/// person's own light, never: the watch pauses until they ask again.
 fn mark_signs(watching: &mut Watching, out: &mut Publisher) -> Outs {
     let mut said: Vec<(String, bool, Option<String>)> = Vec::new();
     if let Some((outranked, reached)) = &mut watching.signs {
@@ -1221,6 +1221,12 @@ fn mark_signs(watching: &mut Watching, out: &mut Publisher) -> Outs {
             continue;
         };
         if !watching.marks.contains_key(&skill) {
+            continue;
+        }
+        // The person's own light is never asked over (the first builder's
+        // ruling on #1937): the watch pauses until they ask again.
+        if by.as_deref() == Some(LightOutranked::PERSON) {
+            outs.extend(watching.watches.paused_by_person(&skill));
             continue;
         }
         outs.extend(watching.watches.mark_shown(&skill, shown, by.as_deref()));

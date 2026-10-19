@@ -34,15 +34,26 @@ relay delivers it (mobile-P1; [messages.md](messages.md), "Unasked texts").
   the ring at skill priority on `light/request` and renewed every 10 s, so
   nobody is watched without a sign. Without the ring's light requests
   (`LAMP_LIGHT_REQUESTS=on`) it refuses to turn on. **While the mark isn't
-  shown, nothing is counted** (the peer read's P2 on #1807). When the ring
-  says the mark is outranked (`light/outranked`, by your own light, as
-  "turn the light off" on the way out, or by Light out's), the program
-  gives the mark back and asks for it again with a new claim, which the
-  ring hears over your light and over any skill's older one. That is done
-  at most once every 30 s, so a light that outranks it again soon after
-  stays on top and the mark stays hidden. Until the ring says the mark is
-  shown again (`light/reached`), no visit begins, ends or is texted, and
-  the journal and `skills/events` say so.
+  shown, nothing is counted** (the peer read's P2 on #1807): until the ring
+  says it is shown (`light/reached`), no visit begins, ends or is texted,
+  and the journal and `skills/events` say so. When the ring says the mark
+  is outranked (`light/outranked`), the first builder's four rules (#1937):
+  1. **Your own light over it pauses it.** Say "turn the light off" on the
+     way out, and the lamp makes no claim over your light and counts
+     nothing. It texts you once: "I've paused watching while your light is
+     off."
+  2. **Another program's light over it** (Light out's, as the desk empties)
+     **is asked over again:** the mark is given back and asked for with a
+     new claim, at most once every 30 s. A light that outranks even that
+     stays on top, and nothing is counted.
+  3. **Paused, it goes on only when you ask again in words** ("keep an eye
+     on things"): asking is your yes to the mark over your light. The mark
+     is asked for anew, and it counts once the ring shows it.
+  4. **Your light going on alone doesn't resume it:** it stays paused until
+     you ask, or until its 12 hours end it.
+
+  So the mark never replaces a light you just chose unasked, and the lamp
+  never watches unseen.
 - **It counts from when you leave.** A visit counts only once the desk has
   been empty since you asked (`room/presence` says nobody). A visit is
   someone at the lamp: from when `room/presence` says someone (or a face at

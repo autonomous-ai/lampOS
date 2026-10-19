@@ -14,11 +14,15 @@
 //!   or a restart leaves it off.
 //! - **A sign while on, or no counting.** Its faint `mark` is asked of the
 //!   ring while it is on. Whenever the ring says the mark is not shown
-//!   (`light/outranked`), the program asks for it again with a new claim,
-//!   which the ring hears over the person's own light and over any skill's
-//!   older one; until the ring says it is shown again (`light/reached`) the
-//!   watch counts no visit and texts nothing. So nobody is watched without a
-//!   sign (the peer read on #1807).
+//!   (`light/outranked`), the watch counts no visit and texts nothing until
+//!   the ring says it is shown again (`light/reached`): nobody is watched
+//!   without a sign (the peer read on #1807). Outranked by another
+//!   program's light, the program asks for the mark again with a new claim.
+//!   Outranked by the person's own light ("turn the light off" on the way
+//!   out), it never does: a person is never overridden. The watch pauses,
+//!   says so once by text, and goes on only when they ask for it again in
+//!   words, which is their yes to the mark over their light (the first
+//!   builder's ruling on #1937).
 //! - **A time limit.** It ends by itself `[watch] most` after it was asked,
 //!   with one text that it has stopped.
 //! - **Visits.** It counts a visit only once the desk has been empty since
@@ -71,10 +75,13 @@ pub const BLIND: &str = "I can't see right now, the privacy switch is closed.";
 pub const BLIND_EVERY_US: u64 = 60_000_000;
 /// The one line said by text when the watch ends by itself, at its `most`.
 pub const STOPPED: &str = "I've stopped keeping an eye on things.";
+/// The one line said by text when the person's own light hides its mark.
+pub const PAUSED: &str = "I've paused watching while your light is off.";
 
 const ON_NOTE: &str = "Say in one short line that you'll keep an eye on things while they're out and text them if someone comes to the desk.";
 const ON_NOTE_UNKNOWN: &str = "Say in one short line that you'll keep an eye on things while they're out and text them if someone comes to the desk. You don't know their face, so ask them to tell you to stop when they're back.";
 const ALREADY_ON: &str = "You're already keeping an eye on things. Say so in one short line.";
+const ON_AGAIN: &str = "Say in one short line that you're keeping an eye on things again.";
 const OFF_NOTE: &str = "Say in one short line that you've stopped keeping an eye on things.";
 const WAS_OFF: &str = "You weren't keeping an eye on things. Say so in one short line.";
 /// Refusals, in words the lamp can say.
@@ -220,6 +227,9 @@ struct On {
     /// The ring says its mark is not shown: nothing about the desk is taken
     /// until it says it is again.
     hidden: bool,
+    /// The person's own light is over its mark: paused until they ask for
+    /// it again in words, never asked for over them.
+    paused: bool,
     /// When the switch's line last went: one a minute at most.
     blind_at_us: Option<u64>,
     /// The known person who asked, if the eyes knew them: their face back
@@ -300,9 +310,6 @@ impl Watch {
                 None => (json!({ "next": WAS_OFF }), Vec::new()),
             });
         }
-        if self.on.is_some() {
-            return Ok((json!({ "next": ALREADY_ON }), Vec::new()));
-        }
         let asked = heard.is_some_and(|(heard_us, text)| {
             let said = words(text);
             heard_us <= now_us
@@ -312,6 +319,24 @@ impl Watch {
                     .iter()
                     .any(|entry| said.windows(entry.len()).any(|run| run == entry.as_slice()))
         });
+        if let Some(on) = &mut self.on {
+            if !on.paused {
+                return Ok((json!({ "next": ALREADY_ON }), Vec::new()));
+            }
+            // Paused by their own light: asked again in words, it goes on,
+            // its mark asked for anew; it counts once the ring shows it.
+            if !asked {
+                return Err(NOT_ASKED.into());
+            }
+            on.paused = false;
+            return Ok((
+                json!({ "next": ON_AGAIN }),
+                vec![
+                    Out::Mark(spec.mark.clone()),
+                    Out::Said("on again, asked at the lamp: its mark asked for anew".into()),
+                ],
+            ));
+        }
         if !asked {
             return Err(NOT_ASKED.into());
         }
@@ -321,6 +346,7 @@ impl Watch {
         self.on = Some(On {
             since_us: now_us,
             hidden: false,
+            paused: false,
             blind_at_us: None,
             asker: asker.map(str::to_owned),
             away: false,
@@ -442,7 +468,8 @@ impl Watch {
         let Some(on) = &mut self.on else {
             return Vec::new();
         };
-        if on.hidden != shown {
+        // Paused by the person's light, only their asking again ends it.
+        if on.paused || on.hidden != shown {
             return Vec::new();
         }
         on.hidden = !shown;
@@ -454,6 +481,27 @@ impl Watch {
                 by.unwrap_or("something")
             )
         })]
+    }
+
+    /// The person's own light is over its mark (`light/outranked` by the
+    /// person): paused, once, its line; nothing about the desk is taken, and
+    /// its mark is not asked for over them.
+    pub fn paused_by_person(&mut self) -> Vec<Out> {
+        let Some(on) = &mut self.on else {
+            return Vec::new();
+        };
+        if on.paused {
+            return Vec::new();
+        }
+        on.paused = true;
+        on.hidden = true;
+        vec![
+            Out::Text(PAUSED.into()),
+            Out::Said(
+                "paused: the person's own light is over its mark; on again only when they ask"
+                    .into(),
+            ),
+        ]
     }
 
     /// Time passes: at its `most` after it was asked, it ends, with one
@@ -680,6 +728,18 @@ impl Watches {
             entry
                 .watch
                 .mark_shown(shown, by)
+                .into_iter()
+                .map(|out| (skill.to_owned(), out))
+                .collect()
+        })
+    }
+
+    /// The person's own light is over `skill`'s mark: its watch pauses.
+    pub fn paused_by_person(&mut self, skill: &str) -> Outs {
+        self.each.get_mut(skill).map_or_else(Vec::new, |entry| {
+            entry
+                .watch
+                .paused_by_person()
                 .into_iter()
                 .map(|out| (skill.to_owned(), out))
                 .collect()
@@ -1008,6 +1068,85 @@ mod tests {
         );
         // Off, nothing.
         assert!(Watch::default().mark_shown(false, None).is_empty());
+    }
+
+    /// The first builder's ruling on #1937: the person's own light over its
+    /// mark pauses it, with one text, and nothing is taken; it is never
+    /// asked for over them, and goes on only when they ask again in words.
+    #[test]
+    fn the_persons_light_pauses_it_until_they_ask_again() {
+        let spec = spec();
+        let mut watch = on(None);
+        watch.presence(false, MINUTE, None, &spec);
+        let paused = watch.paused_by_person();
+        assert_eq!(texts(&paused), [PAUSED]);
+        assert!(watch.paused_by_person().is_empty());
+        // The ring saying the old mark shows does not end a pause.
+        assert!(watch.mark_shown(true, None).is_empty());
+        assert!(
+            watch
+                .presence(true, 2 * MINUTE, Some(600), &spec)
+                .is_empty()
+        );
+        assert!(watch.presence(false, 4 * MINUTE, None, &spec).is_empty());
+        // Asked with no words for it: still paused.
+        let quiet = watch.turn(
+            true,
+            &spec,
+            5 * MINUTE,
+            Some((5 * MINUTE - SECOND, "hello")),
+            None,
+            true,
+        );
+        assert_eq!(quiet.unwrap_err(), NOT_ASKED);
+        // Asked again in words: the mark asked for anew, counted once shown.
+        let (answer, outs) = watch
+            .turn(
+                true,
+                &spec,
+                6 * MINUTE,
+                heard(6 * MINUTE - SECOND),
+                None,
+                true,
+            )
+            .unwrap();
+        assert_eq!(answer["next"], ON_AGAIN);
+        assert_eq!(outs[0], Out::Mark(spec.mark.clone()));
+        assert!(watch.presence(true, 7 * MINUTE, None, &spec).is_empty());
+        watch.mark_shown(true, None);
+        watch.presence(true, 10 * MINUTE, Some(14 * 60 + 31), &spec);
+        watch.presence(true, 12 * MINUTE, None, &spec);
+        assert_eq!(
+            texts(&watch.presence(false, 12 * MINUTE + SECOND, None, &spec)),
+            ["Someone was at your desk at 14:31, for about 2 minutes."]
+        );
+        // Not paused, asked again: already on.
+        let (answer, outs) = watch
+            .turn(
+                true,
+                &spec,
+                13 * MINUTE,
+                heard(13 * MINUTE - SECOND),
+                None,
+                true,
+            )
+            .unwrap();
+        assert_eq!(answer["next"], ALREADY_ON);
+        assert!(outs.is_empty());
+    }
+
+    /// The first builder's ruling on #1937: paused, it stays paused until
+    /// asked again or its `most`, which ends it as it ends any watch.
+    #[test]
+    fn a_pause_lasts_until_asked_or_its_most() {
+        let spec = spec();
+        let mut watch = on(None);
+        watch.paused_by_person();
+        assert!(watch.tick(11 * 60 * MINUTE, &spec).is_empty());
+        assert!(watch.is_on());
+        let ended = watch.tick(12 * 60 * MINUTE + SECOND, &spec);
+        assert_eq!(texts(&ended), [STOPPED]);
+        assert!(!watch.is_on());
     }
 
     /// The peer read's P3 on #1807: it ends by itself at its `most` after it

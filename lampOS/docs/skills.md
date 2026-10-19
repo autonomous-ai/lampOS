@@ -770,10 +770,30 @@ mark = { colour = "blue", level = 1 }   # a faint light while on: level 1 or 2, 
 - **The mark** is asked of the ring while it is on, as any skill's light
   with `LAMP_LIGHT_REQUESTS=on`, and given back when it goes off. **While
   the ring doesn't show it, the watch takes nothing about the desk** (the
-  peer read on #1807). On `light/outranked` for its source, the program
-  gives it back and asks for it again with a new claim, at most once every
-  30 s; until `light/reached` says it is shown, no visit begins, ends or is
-  texted, and `skills/events` says so.
+  peer read on #1807): until `light/reached` says it is shown, no visit
+  begins, ends or is texted, and `skills/events` says so. The first
+  builder's four rules for when the ring says it is outranked
+  (`light/outranked`), each pinned by a test (#1937):
+  1. **The person's own light over it pauses the watch** ("turn the light
+     off" on the way out): no new claim is made over their light, nothing is
+     counted, and one text, "I've paused watching while your light is off."
+     (`the_persons_light_pauses_it_until_they_ask_again`,
+     `guard_mode_pauses_under_the_persons_light_until_they_ask_again`).
+  2. **Another program's light over it is asked over again:** the mark is
+     given back and asked for with a new claim, at most once every 30 s, so
+     a light that outranks even that stays on top and the watch stays paused
+     (`guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again`).
+  3. **Paused, it goes on only when asked again in words** (`if_heard`):
+     asking is the person's yes to the mark over their light. Its mark is
+     then asked for anew, and it counts once the ring shows it (the same two
+     tests).
+  4. **Their light going on alone doesn't resume it:** it stays paused until
+     they ask, or until its `most` ends it
+     (`guard_mode_pauses_under_the_persons_light_until_they_ask_again`,
+     `a_pause_lasts_until_asked_or_its_most`).
+
+  So the mark never replaces a light the person just chose unasked, and the
+  watch never watches unseen.
 - **Its most:** `most` after it was asked it ends by itself, its mark given
   back, with one text, "I've stopped keeping an eye on things."
 - **Visits** count once `room/presence` has said nobody since it was asked.

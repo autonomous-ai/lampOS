@@ -12,8 +12,11 @@ every ten minutes.
 **On and off.** You turn it on by asking out loud, at the lamp: "Lamp, keep
 an eye on things while I'm out." The lamp says in one short line that it's
 on, and the ring keeps a faint blue mark while it is, so nobody is watched
-without a sign: if your own light or another hides the mark, the lamp asks
-for it again, and counts nothing until it shows. It starts counting once
+without a sign. If another program's light hides the mark, the lamp asks
+for it again, and counts nothing until it shows. If you turn your own
+light off, it pauses, texts you that it has, and counts nothing: it never
+puts its mark over a light you chose. It goes on when you ask for it again
+in words, not when your light simply comes back on. It starts counting once
 you've left the desk. It goes off when you say stop, when the lamp sees
 your own face again, if it knows your face, or by itself after twelve
 hours, with a text that it has stopped. It never turns itself on, and a
