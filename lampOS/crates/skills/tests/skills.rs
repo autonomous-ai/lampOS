@@ -2183,6 +2183,14 @@ fn a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go() {
         "{:?}",
         seen.events
     );
+}
+
+/// A reading pose's definition, checked with no program and no clock: the
+/// mood must be one the body knows, with its `for`, of at most 2 minutes.
+/// Apart from the test above, which runs one at a time in the realtime
+/// group (#1806).
+#[test]
+fn a_reading_pose_needs_a_known_mood_and_a_for_of_at_most_two_minutes() {
     let dir = tempfile::tempdir().unwrap();
     for (step, why) in [
         ("body = { mood = \"dance\", for = \"3s\" }", "not one of"),
