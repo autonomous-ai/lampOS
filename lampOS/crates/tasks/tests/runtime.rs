@@ -13,9 +13,9 @@ use std::{
     fs, io,
     io::Write,
     os::unix::{fs::PermissionsExt, net::UnixStream},
-    process::{Command, Stdio},
+    process::{Child, Command, Output, Stdio},
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, PoisonError, RwLock, RwLockReadGuard,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread::{self, JoinHandle},
@@ -23,8 +23,45 @@ use std::{
 };
 
 const AGENT: &str = "11111111-1111-4111-8111-111111111111";
+
 /// The person's own harness on the same machine (#1390).
 const THEIRS: &str = "33333333-3333-4333-8333-333333333333";
+
+/// A spawn and a test letting go of a tasks directory it takes again take
+/// turns (#1569 row 27). A child spawned by one test thread holds a copy of
+/// every descriptor, the directory's lock among them, until its exec closes
+/// the close-on-exec ones, and `spawn` returns only after that; a service
+/// started again on the same directory in that moment finds it `already
+/// owned`. So a spawn takes the turn alone ([`spawned`]), and letting go of
+/// a store shares it ([`Running::stop`], [`released`]): no child spawned
+/// before can still hold what was let go. On this Mac, beside a test
+/// spawning `lamp-tasks` in a loop, 4 of 10 runs of this file found a
+/// folder already owned, and none of 10 with the turns. nextest, a process
+/// for each test, is not affected.
+static SPAWNS: RwLock<()> = RwLock::new(());
+
+fn share() -> RwLockReadGuard<'static, ()> {
+    SPAWNS.read().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// `command` spawned alone in the turn ([`SPAWNS`]).
+fn spawned(command: &mut Command) -> Child {
+    let _turn = SPAWNS.write().unwrap_or_else(PoisonError::into_inner);
+    command.spawn().unwrap()
+}
+
+/// `command`'s output, as `Command::output` gives it, spawned in the turn.
+fn output_of(command: &mut Command) -> Output {
+    spawned(
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )
+    .wait_with_output()
+    .unwrap()
+}
+
 #[derive(Clone)]
 struct Injected(Arc<Mutex<Sample>>);
 impl Clock for Injected {
@@ -265,6 +302,8 @@ impl Running {
         }
     }
     fn stop(&mut self) {
+        // The service lets go of its store in the turn's share.
+        let _share = share();
         self.stop.store(true, Ordering::Release);
         if let Some(handle) = self.handle.take() {
             handle.join().unwrap().unwrap();
@@ -583,27 +622,23 @@ fn expired_and_restarted_preparations_never_reach_harness() {
 
 #[test]
 fn command_line_is_off_without_loading_any_provisioned_paths() {
-    let output = Command::new(env!("CARGO_BIN_EXE_lamp-tasks"))
-        .args([
-            "serve",
-            "--targets",
-            "/does-not-exist",
-            "--harness",
-            "/does-not-exist",
-        ])
-        .output()
-        .unwrap();
+    let output = output_of(Command::new(env!("CARGO_BIN_EXE_lamp-tasks")).args([
+        "serve",
+        "--targets",
+        "/does-not-exist",
+        "--harness",
+        "/does-not-exist",
+    ]));
     assert!(output.status.success());
     assert!(output.stderr.is_empty());
     let value: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(value["enabled"], false);
     assert!(
-        !Command::new(env!("CARGO_BIN_EXE_lamp-tasks"))
-            .args(["serve", "--enable", "--enable"])
-            .output()
-            .unwrap()
-            .status
-            .success()
+        !output_of(
+            Command::new(env!("CARGO_BIN_EXE_lamp-tasks")).args(["serve", "--enable", "--enable"])
+        )
+        .status
+        .success()
     );
 }
 
@@ -648,13 +683,13 @@ fn refuse_duplicate_fields_with(input: &str, slow_writer_ms: Option<&str>) {
     if let Some(ms) = slow_writer_ms {
         command.env("LAMP_TASKS_TEST_SLOW_EXIT_REPORT_MS", ms);
     }
-    let mut child = command
-        .args(["request", "--socket", "/no-tasks-test-socket"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
+    let mut child = spawned(
+        command
+            .args(["request", "--socket", "/no-tasks-test-socket"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    );
     child
         .stdin
         .take()
@@ -1166,15 +1201,21 @@ fn targets_for_a_newer_build_keep_the_part_running_with_hand_overs_off() {
     );
 }
 
-/// The store once the stopped service's owner has let its folder go: its
-/// thread may still hold the lock for a moment after `stop` returns, and a
-/// start then fails with "tasks directory is already owned" (seen once in
-/// twelve full runs of this file).
-fn released(s: &Running) -> Store {
+/// The store once the stopped service's owner has let its folder go. A
+/// start once failed here with "tasks directory is already owned" (once in
+/// twelve full runs of this file): a child another test spawned held a copy
+/// of the lock ([`SPAWNS`]). The store is let go in the turn's share too.
+fn released(s: &Running) -> Released {
+    let share = share();
     let start = Instant::now();
     loop {
         match Store::open(&s.config.dir) {
-            Ok(store) => return store,
+            Ok(store) => {
+                return Released {
+                    store,
+                    _share: share,
+                };
+            }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                 assert!(
                     start.elapsed() < Duration::from_secs(5),
@@ -1184,6 +1225,25 @@ fn released(s: &Running) -> Store {
             }
             Err(error) => panic!("{error}"),
         }
+    }
+}
+
+/// A store the test opened itself, let go before its share of the turn.
+struct Released {
+    store: Store,
+    _share: RwLockReadGuard<'static, ()>,
+}
+
+impl std::ops::Deref for Released {
+    type Target = Store;
+    fn deref(&self) -> &Store {
+        &self.store
+    }
+}
+
+impl std::ops::DerefMut for Released {
+    fn deref_mut(&mut self) -> &mut Store {
+        &mut self.store
     }
 }
 
