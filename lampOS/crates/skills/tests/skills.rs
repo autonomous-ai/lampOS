@@ -6552,6 +6552,11 @@ fn the_loader_holds_kept_lights_shows_turns_and_choices_to_their_rules() {
             "tool = \"t\"\n[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\nfield = \"side\"\n[[do]]\nsay = \"Hi.\"\n".into(),
             "a trigger's",
         ),
+        // With a trigger too: the tool alone refuses it (the reviewer on #2012).
+        (
+            format!("tool = \"t\"\n{TRIGGERED}[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\nfield = \"side\"\n[[do]]\nif_choice = [\"a\"]\nlight = {{ colour = \"warm\" }}\n"),
+            "a trigger's",
+        ),
         (
             format!("{TRIGGERED}[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\nfield = \"side\"\ndefault = \"a\"\n[[do]]\nif_choice = [\"a\"]\nlight = {{ colour = \"warm\" }}\n"),
             "no default",
@@ -8855,4 +8860,43 @@ fn who_was_here_marks_someone_the_lamp_knows_only_with_known_faces_and_never_nam
     );
     // The switch off: the same.
     assert_eq!(note(&marked, false), unpermitted);
+}
+
+/// The peer read on #2022: with the Policy asked, Watch you leave's run is
+/// made only if the trigger's newest message still chooses a side when the
+/// answer comes; one from the middle meanwhile makes nothing.
+#[test]
+fn watch_you_leave_asked_of_the_policy_goes_ahead_only_while_a_side_is_chosen() {
+    let left = br#"{"sitting_s":900,"side":"left"}"#;
+    let middle = br#"{"sitting_s":900}"#;
+    for (between, made) in [(None, true), (Some(middle), false)] {
+        let mut engine = Engine::new(
+            vec![load(&skills_root().join("watch-you-leave")).unwrap()],
+            false,
+        )
+        .asking_the_policy();
+        // 10:00, outside its quiet hours.
+        engine.clock(0, 0, 600 * 60_000);
+        engine.observe("voice/state", 1, br#"{"state":"resting"}"#, None);
+        let asked = engine.observe("room/stood_up", 2, left, Some(5_000));
+        assert_eq!(asked.len(), 1);
+        if let Some(message) = between {
+            engine.observe("room/stood_up", 3, message, Some(5_000));
+        }
+        let moved: Option<Vec<String>> = engine.still(&asked[0], 4).map(|calls| {
+            calls
+                .iter()
+                .map(|call| match call {
+                    Call::Move(clip) => clip.name.clone(),
+                    other => format!("{other:?}"),
+                })
+                .collect()
+        });
+        assert_eq!(
+            moved,
+            made.then(|| vec!["watch-left".to_owned()]),
+            "a middle message in between: {}",
+            between.is_some()
+        );
+    }
 }

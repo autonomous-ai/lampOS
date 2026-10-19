@@ -17,6 +17,7 @@ written one.
 | `watches-them-go-left` | The sitter leaves by the picture's left at 10 s | Pass: one `watch-left` at 10 s |
 | `watches-them-go-right` | The same by the right | Pass: one `watch-right` at 10 s |
 | `from-the-middle-it-does-not-move` | No side | Pass: nothing |
+| `from-the-middle-keeps-its-ten-minutes` | No side at 10 s, then left at 300 s | Pass: one `watch-left` at 300 s; a middle departure starts no cooldown |
 | `once-in-ten-minutes` | Departures at 10 s, 300 s and 700 s | Pass: 10 s and 700 s; 300 s is within the cooldown |
 | `never-while-the-lamp-speaks` | The lamp speaking as they leave | Pass: nothing |
 | `never-with-a-hand-on-it` | A hand on the lamp as they leave | Pass: nothing |
