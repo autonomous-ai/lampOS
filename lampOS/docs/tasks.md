@@ -1120,6 +1120,36 @@ for the link left those sessions without any function).
 What a prepared or handed-over task is, and what reaches the tasks part, is
 unchanged.
 
+### The person's own accounts, asked of their computer (#1676, off unless `LAMP_TASKS_ACCOUNTS=on`)
+
+Only with `LAMP_TASKS_ASKED=on` (the voice's `--tasks-accounts`, right after
+`--tasks-asked`). The lamp keeps no calendar, email or other account of the
+person's: their computer's agent has those connectors, so the lamp hands such
+an ask over (the owner, 19 Oct 07:1x, "via hand-overs").
+
+- **The session note** (`agent_tasks::session_note`) says the person's own
+  calendar, meetings, email and other accounts are on their computer, not
+  with the lamp, and that the lamp's timers and reminders are not their
+  calendar. An ask about them ("what's on my calendar today", "any email
+  from …", "when is my next meeting") is handed over with
+  `start_agent_task`, in the person's words, and its answer told when it
+  comes, never answered from what the model knows or from `list_reminders`.
+- **No office:** the descriptions, the note and the read-back's `where` say
+  "the person's computer", not their office computer, since a home has no
+  office. Nothing else in the descriptions changes, so each fits its 1,024
+  bytes as before (`every_description_fits_the_service_whatever_the_switches`
+  covers the switch).
+- **No new function:** the session's 32 functions are nearly all used, so
+  this is wording only. The read-back and the person's yes come first, as
+  for any hand-over: the ask leaves the lamp for their computer.
+- **Not yet shown:** an ask answered end to end on a lamp. It needs the
+  computer's agent to have calendar and mail connectors in a session Harness
+  starts, which is the owner's to set up (#1676); until then it's shown with
+  an ask that needs none.
+
+Tests: `agent_tasks::tests::with_accounts_the_persons_calendar_and_email_are_handed_over_and_no_office_is_named`,
+`agent_tasks::tests::the_accounts_switch_is_on_only_with_asked_and_taken_after_it`.
+
 ### Asked of the staff, done by the lamp (#854, off unless `LAMP_TASKS_ASKED=on`)
 
 On lamp-4ace on 2026-10-15 at 20:15 and 20:16 (one session, synthetic
