@@ -501,7 +501,7 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
     let mut engine = Engine::with_clock(
         script.clone(),
         Arc::new(|| "SYSTEM".to_owned().into()),
-        worker::tool_runner(settings, None, None),
+        worker::tool_runner(settings, None, None, false),
         Arc::new(Instant::now),
     )
     .announcing(false)
@@ -665,7 +665,7 @@ fn news_asked_by_voice_through_this_route_is_put_on_the_turn() {
     let mut engine = Engine::with_clock(
         script.clone(),
         Arc::new(|| "SYSTEM".to_owned().into()),
-        worker::tool_runner(settings, None, None),
+        worker::tool_runner(settings, None, None, false),
         Arc::new(Instant::now),
     )
     .announcing(false);
@@ -3228,7 +3228,7 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
     let mut engine = Engine::with_clock(
         script.clone(),
         Arc::new(|| "SYSTEM".to_owned().into()),
-        worker::tool_runner(settings, None, None),
+        worker::tool_runner(settings, None, None, false),
         Arc::new(Instant::now),
     )
     .announcing(false)
@@ -4969,6 +4969,9 @@ async fn a_line_that_waits_for_the_policy_goes_as_it_decides() {
         }
     }
 }
+
+/// The Policy holding the lamp's actions on this route (#800, #1712).
+mod policy;
 
 /// #1712 (`LAMP_SECOND_STT_WARM`, the first builder at 00:25): with the
 /// switch, each line's listener opens the next line's, so a line's sound

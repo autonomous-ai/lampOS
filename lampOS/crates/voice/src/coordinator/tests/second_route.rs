@@ -2741,7 +2741,7 @@ fn a_stop_during_a_slow_tool_call_lets_the_second_worker_exit_within_its_deadlin
         drop((call, stream));
     });
     runtime.block_on(async move {
-        let runner = crate::second_provider::worker::tool_runner(settings, None, None);
+        let runner = crate::second_provider::worker::tool_runner(settings, None, None, false);
         tokio::spawn(runner(1, false, "light_on".into(), serde_json::json!({})));
         tokio::spawn(async move {
             use tokio::io::AsyncReadExt;
