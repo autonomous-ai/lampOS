@@ -1299,6 +1299,10 @@ impl Rig {
         ];
         let mut receipts: [Option<DiagnosticFinished>; 2] = [None, None];
         let mut ring_blank_confirmed = self.ring.blank_confirmed();
+        // A ring that ended mid-session was disabled then; its cached exit is
+        // seen again here, at once. Say so, or it reads as the stop ending it
+        // (lamp-52e6, 19 Oct 21:47, #1620). It still fails the stop below.
+        let ring_exited_before_stop = self.ring.exit_observed();
         // On the Controls route the privacy worker ends itself, cleanly, on a
         // switch it cannot read, saying so first: that is why the cycle ended,
         // not a failed shutdown, and its exit status is still checked below
@@ -1452,7 +1456,8 @@ impl Rig {
                                 let _ = record(
                                     trace,
                                     json!({"kind":"worker_exit_failed", "worker":worker.role,
-                                    "at_us":monotonic_us(), "error":error.to_string()}),
+                                    "at_us":monotonic_us(), "error":error.to_string(),
+                                    "exited_before_stop":worker.role == "ring" && ring_exited_before_stop}),
                                 );
                                 failure.push(CleanupStage::WorkerExit, &worker.role, error);
                             }

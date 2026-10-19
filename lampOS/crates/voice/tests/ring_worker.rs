@@ -84,13 +84,23 @@ impl Rig {
         Self::start_with(fail_at, false)
     }
     fn start_with(fail_at: &[usize], late_first: bool) -> Self {
-        Self::start_full(fail_at, late_first, None)
+        Self::start_full(fail_at, late_first, None, None)
     }
     /// With the all-day worker's senses, for the head's requests (#711).
     fn start_with_senses(senses: Senses) -> Self {
-        Self::start_full(&[], false, Some(senses))
+        Self::start_full(&[], false, Some(senses), None)
     }
-    fn start_full(fail_at: &[usize], late_first: bool, senses: Option<Senses>) -> Self {
+    /// As [`Self::start_with_senses`], painting a resting face as the
+    /// all-day service's ring does.
+    fn start_resting(senses: Senses, resting: u16) -> Self {
+        Self::start_full(&[], false, Some(senses), Some(resting))
+    }
+    fn start_full(
+        fail_at: &[usize],
+        late_first: bool,
+        senses: Option<Senses>,
+        resting: Option<u16>,
+    ) -> Self {
         let directory = SessionDirectory::create().unwrap();
         let boot = new_boot().unwrap();
         let child_boot = new_boot().unwrap();
@@ -116,7 +126,7 @@ impl Rig {
         let (tx, completion) = mpsc::channel();
         let worker = thread::spawn(move || {
             let _ = tx.send(match senses {
-                Some(senses) => run_with_sink_senses(link, boot, sink, None, senses),
+                Some(senses) => run_with_sink_senses(link, boot, sink, resting, senses),
                 None => run_with_sink(link, boot, sink),
             });
         });
@@ -1126,4 +1136,78 @@ fn a_flood_of_head_requests_never_holds_back_revocation_or_expiry() {
         stopped_after < Duration::from_millis(50),
         "{stopped_after:?}"
     );
+}
+
+/// #1620: lamp-52e6 (`LAMP_RING_EYE=on`) failed a service stop on "no
+/// verified black-write receipt"; lamp-4ace (`strong`) stopped cleanly. The
+/// eye only draws the face: with no eye, the eye and the strong eye alike, a
+/// ring resting under a listening authority, then given the stop's last
+/// authority (both privacy permissions denied) and Stop, as the service's
+/// stop sends them, writes black for the shutdown, says so, and exits clean.
+#[test]
+fn every_eye_mode_writes_and_says_the_shutdown_black_at_a_service_stop() {
+    for (eye, eye_strong) in [(false, false), (true, false), (true, true)] {
+        let mut rig = Rig::start_resting(
+            Senses {
+                eye,
+                eye_strong,
+                ..Senses::default()
+            },
+            24,
+        );
+        rig.ready();
+        let mut controller = Controller::new(rig.boot, now());
+        controller
+            .set_microphone_permission(now(), Permission::Allowed)
+            .unwrap();
+        let until = now().checked_add(900_000).unwrap();
+        controller
+            .set_capture(now(), CaptureState::RetainingUntil(until))
+            .unwrap();
+        controller
+            .set_admission(now(), AdmissionState::OpenUntil(until))
+            .unwrap();
+        rig.control(Control::Authority {
+            snapshot: controller.snapshot(now()).unwrap(),
+        });
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while rig.colored() == 0 {
+            assert!(
+                Instant::now() < deadline,
+                "no resting face (eye {eye}, strong {eye_strong})"
+            );
+            thread::sleep(Duration::from_millis(2));
+        }
+        controller
+            .set_camera_permission(now(), Permission::Denied)
+            .unwrap();
+        controller
+            .set_microphone_permission(now(), Permission::Denied)
+            .unwrap();
+        rig.control(Control::Authority {
+            snapshot: controller.snapshot(now()).unwrap(),
+        });
+        rig.control(Control::Stop);
+        loop {
+            match rig.event() {
+                WorkerEvent::Ring {
+                    report:
+                        RingFeedback::Blanked {
+                            reason: RingBlankReason::Shutdown,
+                            ..
+                        },
+                } => break,
+                WorkerEvent::Ring {
+                    report: RingFeedback::Blanked { .. },
+                } => {}
+                other => panic!("eye {eye}, strong {eye_strong}: {other:?}"),
+            }
+        }
+        rig.finish()
+            .unwrap_or_else(|error| panic!("eye {eye}, strong {eye_strong}: {error}"));
+        assert_eq!(
+            rig.writes.lock().unwrap().frames.last(),
+            Some(&EncodedFrame::black())
+        );
+    }
 }
