@@ -92,6 +92,16 @@ IDs after the foreground clear. A full queue drops End, and even an accepted End
 a window before it is consumed. This is static evidence; the existing regression does
 not synchronize either interleaving. The prepared follow-up is not posted.
 
+A later [file-level preview](verification/second-integration-checkpoint-20261019/foundation-upstream-preview.json) against
+`db91c05d3` verifies all 11 overlapping upstream blobs: nine files merge
+cleanly, while the reset-store count and coordinator test insertions need
+resolving. Preview resolutions preserve 28 person stores and both test
+blocks. The frozen green heads remain unchanged; actual fetch/rebase and
+applicable gates are still required. [Music integration review](verification/second-integration-checkpoint-20261019/music-later-integration-review.json)
+records the required `make_skill` fixture field and later regression controls.
+GitHub's separate review endpoint also returned permission denied at 20:18 UTC;
+no follow-up review was posted.
+
 Ready for integration: no (#1996 clean rebase passed the complete host gate; publication and automatic ARM64 for the new head are pending)
 
 Ready for integration: no (#1732's four refreshed foundation host gates passed; publication and new automatic ARM64 remain pending)
