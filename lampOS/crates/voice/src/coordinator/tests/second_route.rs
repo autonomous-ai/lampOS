@@ -1050,28 +1050,42 @@ fn run(script: Script) -> Run {
             crate::expression_out::ExpressionOut::on(&bus, EXPRESSION_CLOCK, "voice-route")
                 .unwrap(),
         );
-        let mut progress = bus
+        let progress = bus
             .subscribe_typed(VoiceProgress::TOPIC, "test", VoiceProgress::TYPE)
             .unwrap();
-        let mut sound = bus
+        let sound = bus
             .subscribe_typed(VoiceSound::TOPIC, "test", VoiceSound::TYPE)
             .unwrap();
         let done = Arc::new(AtomicBool::new(false));
-        let stop = done.clone();
+        // One thread for each topic, so that neither waits on the other: a
+        // Linux socket holds about ten datagrams, and the bus drops one sent
+        // to a full queue, so a keeper busy with progress lost sound pieces
+        // (Second's read on #1722, 20 Oct 00:01; Eighth's 4 of 6 on Linux).
+        let keep = |stop: Arc<AtomicBool>,
+                    mut subscriber: lamp_bus::Subscriber,
+                    input: fn(lamp_bus::Message) -> lamp_expression::Input| {
+            std::thread::spawn(move || {
+                let mut kept = Vec::new();
+                loop {
+                    let stopping = stop.load(Ordering::Acquire);
+                    while let Ok(Some(message)) = subscriber.recv(Duration::from_millis(5)) {
+                        kept.push(input(message));
+                    }
+                    if stopping {
+                        return kept;
+                    }
+                }
+            })
+        };
+        let progress = keep(done.clone(), progress, |message| {
+            lamp_expression::Input::Progress(message.parse().unwrap())
+        });
+        let sound = keep(done.clone(), sound, |message| {
+            lamp_expression::Input::Sound(message.parse().unwrap())
+        });
         let keeper = std::thread::spawn(move || {
-            let mut kept = Vec::new();
-            let mut drain = |kept: &mut Vec<lamp_expression::Input>| {
-                while let Ok(Some(message)) = progress.recv(Duration::from_millis(2)) {
-                    kept.push(lamp_expression::Input::Progress(message.parse().unwrap()));
-                }
-                while let Ok(Some(message)) = sound.recv(Duration::from_millis(2)) {
-                    kept.push(lamp_expression::Input::Sound(message.parse().unwrap()));
-                }
-            };
-            while !stop.load(Ordering::Acquire) {
-                drain(&mut kept);
-            }
-            drain(&mut kept);
+            let mut kept = progress.join().unwrap();
+            kept.extend(sound.join().unwrap());
             kept
         });
         (root, done, keeper)
@@ -2270,6 +2284,19 @@ fn the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken() {
         .filter(|input| matches!(input, lamp_expression::Input::Sound(_)))
         .count();
     assert!(sounds > 100, "{sounds} pieces of sound said for Expression");
+    // Pieces lost between the voice and this test, by their stamps'
+    // sequence: said with the counts below, so a loss is told from the
+    // planner.
+    let mut sequences: Vec<u64> = run
+        .expression
+        .iter()
+        .filter_map(|input| match input {
+            lamp_expression::Input::Sound(sound) => Some(sound.playout.stamp.sequence),
+            _ => None,
+        })
+        .collect();
+    sequences.sort_unstable();
+    let lost = sequences.windows(2).map(|w| w[1] - w[0] - 1).sum::<u64>();
     // Through Expression's planner, with the product's speaking section.
     let mut catalogue = lamp_expression::Catalogue::from_json(include_str!(
         "../../../../../deploy/product/settings/expression.json"
@@ -2329,8 +2356,8 @@ fn the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken() {
     // A stressed word about every 1.1 s over 8 s, a nod for most of them:
     // even a start that loses the first sentence nods more than a flat answer
     // (`second_shape: None`), which nods once, at its onset, and never sways.
-    assert!(nods >= 3, "{nods} nods");
-    assert!(sways >= 1, "{sways} sways");
+    assert!(nods >= 3, "{nods} nods ({sounds} pieces, {lost} lost)");
+    assert!(sways >= 1, "{sways} sways ({sounds} pieces, {lost} lost)");
 }
 
 /// #1620 on the second route (`LAMP_VOICE_ROUTE=second`, the owner, 19 Oct:
