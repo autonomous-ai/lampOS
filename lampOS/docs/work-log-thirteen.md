@@ -120,3 +120,15 @@ list".
   - The step writes `head_rest` (`rest`, `reads: level|pulses`). A pulse pad is touched only while it pulses, so a flip is no touch.
   - The reviewer's P2 is fixed (`c1ddc42ca`): `pulses` needs a burst of fast changes, and two quick taps on a level pad give no `reads`, so the step asks again.
   - It's the first builder's merge after the 08:00 arm-hour trial.
+- **#1965 merged** (touch pads: each lamp's head pads read from their own rest; the reviewer's P2 fixed). **#1976 merged** into #1712 (the scaled stress bar stops at 0.9).
+- **#1990 merged** into #1712: the second route's nod test was flaky. Its syllables were past the meter's top, and one keeper thread lost sound pieces on Linux's small socket queue (Second's read). Each topic now has its own thread.
+- **Row "moves with its words":**
+  - `speaking-ab.sh --levels-only` (Expression in shadow, nothing moves). The reviewer's P2 is fixed: lamp-bus tap's header and VoiceSound's flattened `.level`.
+  - `tools/sound-shape.sh` (levels, rises, pauses, how far ahead each piece was said).
+  - `ends=` (how the turn ended). All on #1759.
+- **Why the head never nodded on a lamp:** the voice says its sound 200 ms ahead (`FORETELL_US`), but the catalogues' `body_lag_us` is 300 ms, so the speaking motion always saw level 0. Shown offline: lag 0–200 gives 8 nods, 300 gives 0. The coordinator test's lag of 0 had hidden it.
+- **#2030 merged** into #1712 (option 1, the first builder's choice):
+  - the farthest piece said is used when none is at the lag;
+  - then the rate rule (at most one nod a sentence, a word 0.15 over its sentence, never two within 4 s), as catalogue keys for the arm hour's dense/sparse comparison;
+  - on lamp-4ace: 75 nods to 10–12 a story, one settle each.
+- Row 2's lines are in `arm-hour.sh` (#2034). #1963: Third's P2 open (merge held).
