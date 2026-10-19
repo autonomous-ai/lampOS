@@ -425,11 +425,107 @@ struct Options {
 /// done.
 type Skip = (Duration, mpsc::Sender<Result<(), String>>);
 
+/// The longest the main loop waits for a message, a call, a skip or a run's
+/// end before it looks at the skills folder, the held runs and every topic's
+/// `latest` again. A turn of its old round of the topics took as long.
+const WAIT_AT_MOST: Duration = Duration::from_millis(250);
+
+/// A sender to the main loop that wakes its wait ([`wait_any`]) with each
+/// send, so a tool call, a skip or a run's end is taken at once, not after
+/// the wait runs out. Before #1806 a tool call waited out a topic's turn,
+/// about 50 ms each on a lamp's skills.
+struct Waking<T> {
+    sender: mpsc::Sender<T>,
+    waker: Arc<std::os::fd::OwnedFd>,
+}
+
+impl<T> Clone for Waking<T> {
+    fn clone(&self) -> Self {
+        Self {
+            sender: self.sender.clone(),
+            waker: self.waker.clone(),
+        }
+    }
+}
+
+impl<T> Waking<T> {
+    fn send(&self, value: T) -> Result<(), mpsc::SendError<T>> {
+        self.sender.send(value)?;
+        // A full pipe already wakes the wait; a write that fails leaves it
+        // to its time.
+        let _ = rustix::io::write(&*self.waker, &[1]);
+        Ok(())
+    }
+}
+
+/// A channel whose sends wake the main loop through `waker`.
+fn waking<T>(waker: &Arc<std::os::fd::OwnedFd>) -> (Waking<T>, mpsc::Receiver<T>) {
+    let (sender, receiver) = mpsc::channel();
+    (
+        Waking {
+            sender,
+            waker: waker.clone(),
+        },
+        receiver,
+    )
+}
+
+/// The main loop's wake: read end and write end, neither ever blocking.
+/// Made with `pipe` and `fcntl`, as the voice's controls make theirs, since
+/// `pipe2` is not on macOS.
+fn wake_pipe() -> io::Result<(std::os::fd::OwnedFd, std::os::fd::OwnedFd)> {
+    let (read, write) = rustix::pipe::pipe()?;
+    for end in [&read, &write] {
+        rustix::io::fcntl_setfd(end, rustix::io::FdFlags::CLOEXEC)?;
+        rustix::fs::fcntl_setfl(end, rustix::fs::OFlags::NONBLOCK)?;
+    }
+    Ok((read, write))
+}
+
+/// Until a topic's or the Policy's socket is readable, the wake is written,
+/// or `wait` passes; at once if one already holds a datagram read ahead.
+/// The wake is emptied. A socket that says an error or hang-up with nothing
+/// to read makes it wait out `wait` instead, so the loop cannot spin.
+fn wait_any(
+    subscribers: &[Subscriber],
+    answers: Option<&Subscriber>,
+    woken: &std::os::fd::OwnedFd,
+    wait: Duration,
+) {
+    use rustix::event::{PollFd, PollFlags, Timespec, poll};
+    let mut drained = [0u8; 64];
+    if !subscribers.iter().chain(answers).any(Subscriber::holds) {
+        let mut fds: Vec<PollFd<'_>> = subscribers
+            .iter()
+            .chain(answers)
+            .map(|subscriber| PollFd::new(subscriber, PollFlags::IN))
+            .collect();
+        fds.push(PollFd::new(woken, PollFlags::IN));
+        let timeout = Timespec::try_from(wait).unwrap_or(Timespec {
+            tv_sec: 0,
+            tv_nsec: 250_000_000,
+        });
+        let broken = match poll(&mut fds, Some(&timeout)) {
+            Ok(_) => fds.iter().any(|fd| {
+                let flags = fd.revents();
+                !flags.contains(PollFlags::IN)
+                    && flags.intersects(PollFlags::ERR | PollFlags::HUP | PollFlags::NVAL)
+            }),
+            Err(rustix::io::Errno::INTR) => false,
+            Err(_) => true,
+        };
+        if broken {
+            std::thread::sleep(wait);
+        }
+    }
+    while matches!(rustix::io::read(woken, &mut drained), Ok(read) if read > 0) {}
+}
+
 /// Listens on `path` for a test: each line `{"skip_us": N}` skips the
 /// program's clock N µs, which the main loop does, and is answered with
 /// `{"now_us": ...}` once it is done, or `{"error": ...}`. Production has
 /// no such socket.
-fn clock_control(path: &Path, skips: mpsc::Sender<Skip>) -> io::Result<()> {
+fn clock_control(path: &Path, skips: Waking<Skip>) -> io::Result<()> {
     // An old socket of its own is taken over; anything else at `path` is
     // left, and the bind fails on it.
     if std::fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_socket()) {
@@ -549,7 +645,9 @@ fn serve(
     } else {
         None
     };
-    let (finished, done) = mpsc::channel::<SkillEvent>();
+    let (woken, waker) = wake_pipe()?;
+    let waker = Arc::new(waker);
+    let (finished, done) = waking::<SkillEvent>(&waker);
     let mut engine = Engine::new(Vec::new(), skip_ask);
     if let Some(state) = &options.state {
         match engine.keep_off_in(state) {
@@ -592,11 +690,11 @@ fn serve(
         permissions: RefCell::new(HashMap::new()),
         looks: RefCell::new(HashMap::new()),
     };
-    let (ask, asks) = mpsc::channel::<ToolAsk>();
+    let (ask, asks) = waking::<ToolAsk>(&waker);
     if let Some(tools) = tools {
         listen(tools, ask.clone())?;
     }
-    let (skip, skips) = mpsc::channel::<Skip>();
+    let (skip, skips) = waking::<Skip>(&waker);
     if let Some(path) = &options.clock_control {
         clock_control(path, skip)?;
     }
@@ -689,60 +787,65 @@ fn serve(
             }
             let _ = out.alive();
         }
-        if subscribers.is_empty() {
-            if let Ok(call) = asks.recv_timeout(clock::poll(Duration::from_millis(250))) {
-                tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner);
+        // One wait for any topic's message, the Policy's answer, or a call,
+        // a skip or a run's end (the wake), not each topic in its turn: a
+        // tool call waited out the turn of whichever topic the loop was on
+        // (#1806). While the Policy is asked, its answers are looked for
+        // every 5 ms, so a late one is given up on time.
+        let wait = if asking.waiting.is_empty() {
+            WAIT_AT_MOST
+        } else {
+            Duration::from_millis(5)
+        };
+        wait_any(
+            &subscribers,
+            asking.gate.as_ref().map(|(_, answers)| answers),
+            &woken,
+            clock::poll(wait),
+        );
+        take_skips(
+            &skips,
+            &mut subscribers,
+            &mut engine,
+            &mut runs,
+            &mut out,
+            &runner,
+            &mut asking,
+        );
+        while let Ok(call) = asks.try_recv() {
+            // What was heard before the call, read first: `[again]` asks
+            // whether it asked for the call.
+            for subscriber in subscribers
+                .iter_mut()
+                .filter(|subscriber| subscriber.topic() == Speech::TOPICS[0])
+            {
+                while let Some(message) = receive(subscriber, Duration::ZERO) {
+                    observe(
+                        &message,
+                        &mut engine,
+                        &mut runs,
+                        &mut out,
+                        &runner,
+                        &mut asking,
+                    );
+                }
             }
-            continue;
+            tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner);
         }
-        let count = subscribers.len() as u64;
-        for index in 0..subscribers.len() {
-            take_skips(
-                &skips,
-                &mut subscribers,
+        if let Some((_, answers)) = &mut asking.gate {
+            answer_asks(
+                answers,
+                &mut asking.waiting,
                 &mut engine,
                 &mut runs,
                 &mut out,
                 &runner,
-                &mut asking,
             );
-            while let Ok(call) = asks.try_recv() {
-                // What was heard before the call, read first: `[again]`
-                // asks whether it asked for the call.
-                for subscriber in subscribers
-                    .iter_mut()
-                    .filter(|subscriber| subscriber.topic() == Speech::TOPICS[0])
-                {
-                    while let Some(message) = receive(subscriber, Duration::ZERO) {
-                        observe(
-                            &message,
-                            &mut engine,
-                            &mut runs,
-                            &mut out,
-                            &runner,
-                            &mut asking,
-                        );
-                    }
-                }
-                tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner);
-            }
-            if let Some((_, answers)) = &mut asking.gate {
-                answer_asks(
-                    answers,
-                    &mut asking.waiting,
-                    &mut engine,
-                    &mut runs,
-                    &mut out,
-                    &runner,
-                );
-            }
-            // While the Policy is asked, look for its answer every 5 ms.
-            let wait = if asking.waiting.is_empty() {
-                Duration::from_millis(250 / count).max(Duration::from_millis(10))
-            } else {
-                Duration::from_millis(5)
-            };
-            if let Some(message) = receive(&mut subscribers[index], clock::poll(wait)) {
+        }
+        // A message a topic, as its turn did; one waiting still makes the
+        // next wait end at once.
+        for subscriber in &mut subscribers {
+            if let Some(message) = receive(subscriber, Duration::ZERO) {
                 observe(
                     &message,
                     &mut engine,
@@ -913,7 +1016,7 @@ fn start_or_queue(
 /// What a run needs from the program.
 struct Runner {
     sockets: Sockets,
-    finished: mpsc::Sender<SkillEvent>,
+    finished: Waking<SkillEvent>,
     bus: Bus,
     /// With `LAMP_LIGHT_REQUESTS=on`, how a skill's light is asked of the ring.
     glows: Option<Glows>,
@@ -1338,7 +1441,7 @@ fn write_tools(dir: &Path, engine: &Engine) {
 ///   it again as its user, under a sandbox whose writable bind went with
 ///   the folder (the reviewer on #1656); systemd makes the folder again as
 ///   it starts it once more (`Restart=on-failure`).
-fn keep_tools(dir: &Path, asks: &mpsc::Sender<ToolAsk>, engine: &Engine) -> io::Result<()> {
+fn keep_tools(dir: &Path, asks: &Waking<ToolAsk>, engine: &Engine) -> io::Result<()> {
     if dir.join("call.sock").exists() {
         return Ok(());
     }
@@ -1363,7 +1466,7 @@ fn keep_tools(dir: &Path, asks: &mpsc::Sender<ToolAsk>, engine: &Engine) -> io::
 /// Listens on `dir/call.sock` as the actions part does: one line in
 /// (`{"op":"call","name":...,"args":{...}}`), one line out, the main loop
 /// answering.
-fn listen(dir: &Path, asks: mpsc::Sender<ToolAsk>) -> io::Result<()> {
+fn listen(dir: &Path, asks: Waking<ToolAsk>) -> io::Result<()> {
     std::fs::create_dir_all(dir)?;
     let socket = dir.join("call.sock");
     let _ = std::fs::remove_file(&socket);
@@ -2489,7 +2592,8 @@ mod tests {
     #[test]
     fn a_runs_sockets_carry_its_skills_permissions_and_nothing_for_another() {
         let dir = tempfile::tempdir().unwrap();
-        let (finished, _done) = mpsc::channel();
+        let (_woken, waker) = wake_pipe().unwrap();
+        let (finished, _done) = waking(&Arc::new(waker));
         let runner = Runner {
             sockets: nowhere(dir.path(), Permissions::default()),
             finished,

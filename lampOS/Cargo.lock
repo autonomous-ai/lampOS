@@ -2132,6 +2132,7 @@ dependencies = [
  "lamp-msgs",
  "lamp-voice",
  "libc",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",
