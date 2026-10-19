@@ -56,6 +56,7 @@ use tokio::{
     task::{JoinHandle, JoinSet},
 };
 
+pub mod link;
 pub mod net;
 pub mod probe;
 mod services;

@@ -980,6 +980,29 @@ notes, the tools declared, and the voice state, Expression and the ring on
 the bus. Nothing is held, replayed or switched, and no `voice_route_*`
 record is written.
 
+- **The link, when it is the only voice** (#1844, the first builder's yes,
+  19 Oct; `second_provider/link.rs`). Before, it said Ready once at start
+  and never again, so with the Wi-Fi off every turn failed in silence and
+  `lamp/online` stayed true. Now a turn that fails on the network (a
+  connection refused or reset, a connect that timed out, an answer that
+  never came: `Transport`, `ConnectTimeout`, `ResponseTimeout`, at any of the
+  three services) checks whether the services' hosts answer at all: a bare
+  TCP connection to the chat's, the speech's, speech to text's and Gemini's
+  host at once, nothing sent, any answering within 2 s enough
+  (`PROBE_WITHIN`). One answering: a service was slow or refused, and
+  nothing changes (a status, 401, 429 or 5xx, never checks: the service
+  answered). None: the link is Unavailable with the turn's fault, and the
+  check runs every 30 s (`PROBE_EVERY_US`, as `--reach-probe`) until one
+  answers, when it is Ready again in a new session. The journal says
+  `lamp-voice second: no service host answers after a turn failed on the
+  network: the link is down, checked every 30 s` and `… a service host
+  answers again: the link is back`. So the offline logic follows it as it
+  follows Gemini's ([offline.md](offline.md)): with `LAMP_OFFLINE_VOICE=on`
+  the offline line once and the breath, `lamp/online` false from health and
+  Expression's offline face, and "I'm back online." after; offline speech is
+  a local-only turn that never reaches this worker, which is why the check
+  runs on its own. The first turn of an outage still fails as before (it is
+  what finds it). A standby's link is unchanged.
 - **Its exit ends the voice**, as Gemini's does (`coordinator::mandatory`):
   it is the only voice. A standby's exit is still dropped, and Gemini goes
   on.
@@ -1228,7 +1251,9 @@ after a take-over, but now for every turn:
   and `--addressed` for whom it answers, sight, camera and air facts, and
   `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).
 - **`voice/link`** (`LAMP_VOICE_LINK`) is this route's link, Ready from its
-  start: a relay outage shows only as failed turns.
+  start. As a standby it stays Ready: an outage shows only as failed turns.
+  As the only voice it goes down and back with the network (below, "The
+  link, when it is the only voice").
 - With `--camera-config` the camera worker still starts for Gemini's picture
   context, which nothing reads here. lamp-4ace's unit sets none.
 
