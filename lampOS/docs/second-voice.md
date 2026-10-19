@@ -847,6 +847,16 @@ after a take-over, but now for every turn:
   going on (`LAMP_GOING_ON_ASKS`, which also ends a busy room sooner once
   answered) and another voice's line (the same-voice check). The busy-room
   battery on lamp-4ace is its check.
+- **The lamp's place** (`LAMP_PLACE`, "Hanoi, Vietnam"): told beside the
+  time, "You are in Hanoi, Vietnam. When someone asks about the weather,
+  the news or anything nearby without naming a place, they mean Hanoi,
+  Vietnam.", and with
+  `LAMP_TIME_PLACES` the time is said as that place's ("Here in …"), not
+  the zone's city. A zone names one city for a whole country: lamp-4ace,
+  in Hanoi, keeps `Asia/Ho_Chi_Minh`. Letters in any script, digits,
+  spaces, `,` `-` `.` `'`, at most 60 bytes; anything else is no place. It
+  reaches the second route's worker alone, whose journal says `lamp-voice
+  second: the lamp's place is … (LAMP_PLACE)`.
 - **A line let out only as the conversation going on** (with
   `LAMP_SPOKEN_TO` and `not_for_me` offered, `LAMP_TOOLS=on`): no name,
   nobody turned to the lamp, not said close to it, no answer to its own

@@ -613,6 +613,16 @@ pub fn with_search(
     tools
 }
 
+/// What the model is told of the time, with the lamp's place after it
+/// ([`crate::local_time::place_told`]); the place alone when the time is not
+/// known.
+fn with_place(time: Option<String>, place: Option<String>) -> Option<String> {
+    match (time, place) {
+        (Some(time), Some(place)) => Some(time + &place),
+        (time, place) => time.or_else(|| place.map(|place| place.trim_start().to_owned())),
+    }
+}
+
 /// The second route's worker process until Stop. `files` are the Live
 /// provider worker's flags; this route uses the thread's file and the
 /// tools (the memory among them), and has no use yet for the rest. With
@@ -714,6 +724,10 @@ pub fn serve(
     // their own (`texts_task`).
     let texts_from = (character.clone(), tools.clone());
     let sessions = std::sync::Mutex::new(Sessions::default());
+    let place = crate::local_time::place_here();
+    if let Some(place) = &place {
+        eprintln!("lamp-voice second: the lamp's place is {place} (LAMP_PLACE)");
+    }
     let system = move || {
         let now = Instant::now();
         let Ok(mut sessions) = sessions.lock() else {
@@ -737,10 +751,14 @@ pub fn serve(
         } else {
             String::new()
         };
+        // The lamp's own place, with `LAMP_PLACE`, beside its time (#1712).
+        let time = with_place(
+            crate::local_time::told_here(clock, places),
+            crate::local_time::place_told(place.as_deref()),
+        );
         system_message(
             &character,
-            crate::agent_tasks::noted(crate::local_time::told_here(clock, places), tasks.as_ref())
-                .as_deref(),
+            crate::agent_tasks::noted(time, tasks.as_ref()).as_deref(),
             &(memory + &facts(session_fact && !going_on, room) + &skills),
             file.as_deref(),
         )
@@ -2709,6 +2727,26 @@ mod tests {
         let next = (1_003_000_000, 1_004_000_000);
         assert_eq!(heeding.judge(10, next, talk, signs(true, false)), None);
         assert_eq!(heeding.conversation_note_for(10), None);
+    }
+
+    /// #1712: the lamp's place follows its time, or stands alone.
+    #[test]
+    fn the_lamps_place_follows_its_time() {
+        let place = crate::local_time::place_told(Some("Hanoi"));
+        assert_eq!(
+            super::with_place(Some("It is noon.".into()), place.clone()).unwrap(),
+            format!("It is noon.{}", place.clone().unwrap())
+        );
+        assert!(
+            super::with_place(None, place)
+                .unwrap()
+                .starts_with("You are in Hanoi.")
+        );
+        assert_eq!(
+            super::with_place(Some("It is noon.".into()), None).as_deref(),
+            Some("It is noon.")
+        );
+        assert_eq!(super::with_place(None, None), None);
     }
 
     /// #1712: the room this route keeps is told on the bus (`room/state`)

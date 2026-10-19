@@ -919,7 +919,7 @@ fn worker_command(
             role,
             var(crate::second_config::CREDENTIALS_ENV).as_deref(),
         ))
-        .envs(gemini_worker_environment(role, &var))
+        .envs(second_route_worker_environment(role, &var))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -1054,10 +1054,10 @@ fn credentials_worker_environment(
         .map(|path| (crate::second_config::CREDENTIALS_ENV, path.to_owned()))
 }
 
-// The second route's Gemini endpoint and voice and its key terms (#1712),
-// to its worker only, as set: the worker checks them as `second.json`'s,
+// The second route's Gemini endpoint and voice, its key terms and the
+// lamp's place (#1712), to its worker only, as set: the worker checks them,
 // and says so.
-fn gemini_worker_environment(
+fn second_route_worker_environment(
     role: &str,
     var: impl Fn(&str) -> Option<std::ffi::OsString>,
 ) -> Vec<(&'static str, std::ffi::OsString)> {
@@ -1065,6 +1065,7 @@ fn gemini_worker_environment(
         crate::second_config::GEMINI_BASE_URL_ENV,
         crate::second_config::SPEECH_MODEL_ENV,
         crate::second_config::KEY_TERMS_ENV,
+        crate::local_time::PLACE_ENVIRONMENT,
     ]
     .into_iter()
     .filter(|_| role == "second")
@@ -1079,20 +1080,20 @@ mod tests {
     /// #1712: the Gemini endpoint and voice go to the second route's worker
     /// only.
     #[test]
-    fn the_gemini_overrides_reach_only_the_second_route() {
+    fn the_second_routes_settings_reach_only_its_worker() {
         let var = |name: &str| {
             (name == crate::second_config::SPEECH_MODEL_ENV)
                 .then(|| std::ffi::OsString::from("gemini-3.8-flash-lite-tts"))
         };
         assert_eq!(
-            gemini_worker_environment("second", var),
+            second_route_worker_environment("second", var),
             [(
                 crate::second_config::SPEECH_MODEL_ENV,
                 std::ffi::OsString::from("gemini-3.8-flash-lite-tts")
             )]
         );
-        assert!(gemini_worker_environment("provider", var).is_empty());
-        assert!(gemini_worker_environment("second", |_| None).is_empty());
+        assert!(second_route_worker_environment("provider", var).is_empty());
+        assert!(second_route_worker_environment("second", |_| None).is_empty());
     }
 
     /// The voice unit's credentials' directory goes to the second route's
@@ -1310,6 +1311,8 @@ mod tests {
                     "gemini-3.8-flash-lite-tts"
                 } else if name == crate::second_config::KEY_TERMS_ENV {
                     "Hanoi"
+                } else if name == crate::local_time::PLACE_ENVIRONMENT {
+                    "Hanoi, Vietnam"
                 } else {
                     "a-secret"
                 },
@@ -1362,6 +1365,7 @@ mod tests {
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
+                    "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_SECOND_GEMINI_BASE_URL=https://relay.example.invalid/v1beta",
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",

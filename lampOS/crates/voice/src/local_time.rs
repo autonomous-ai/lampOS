@@ -415,6 +415,43 @@ pub fn zone_file(zones: &std::path::Path, place: &str) -> Option<(String, Vec<u8
     read(&place)
 }
 
+/// The lamp's own place as the unit names it (`LAMP_PLACE`, "Hanoi,
+/// Vietnam"), over its zone's: a zone names one city for a whole country or
+/// region, and lamp-4ace, in Hanoi, keeps `Asia/Ho_Chi_Minh`, so "the
+/// weather" was asked about the wrong city (#1712). Passed to the second
+/// route's worker alone (`process.rs`).
+pub const PLACE_ENVIRONMENT: &str = "LAMP_PLACE";
+/// The most of it taken.
+const PLACE_BYTES: usize = 60;
+
+/// [`PLACE_ENVIRONMENT`] as `value` gives it: trimmed, at most
+/// [`PLACE_BYTES`] of letters (any script), digits, spaces, `,`, `-`, `.`
+/// and `'`; anything else is no place.
+pub fn place_from(value: Option<&str>) -> Option<String> {
+    let place = value?.trim();
+    (!place.is_empty()
+        && place.len() <= PLACE_BYTES
+        && place
+            .chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, ' ' | ',' | '-' | '.' | '\'')))
+    .then(|| place.to_owned())
+}
+
+/// The lamp's own place from its environment ([`place_from`]).
+pub fn place_here() -> Option<String> {
+    place_from(std::env::var(PLACE_ENVIRONMENT).ok().as_deref())
+}
+
+/// Told beside the time when the lamp's place is set ([`place_here`]):
+/// where it is, and that what is asked about without a place is there.
+pub fn place_told(place: Option<&str>) -> Option<String> {
+    place.map(|place| {
+        format!(
+            " You are in {place}. When someone asks about the weather, the news or anything nearby without naming a place, they mean {place}."
+        )
+    })
+}
+
 /// A zone's place as people say it: its last part, underscores as spaces
 /// (`America/New_York` is "New York").
 pub fn place_name(zone: &str) -> String {
@@ -456,9 +493,16 @@ fn own_place(zone: &str) -> Option<String> {
 }
 
 /// How the lamp's own time is led in, from its zone: "Here in Ho Chi
-/// Minh", or "Here" when the zone names no place ([`own_place`]).
+/// Minh", or "Here" when the zone names no place ([`own_place`]). The
+/// unit's own place goes over the zone's ([`place_here`]).
 fn here_in(zone: &str) -> String {
-    own_place(zone).map_or_else(|| "Here".to_owned(), |place| format!("Here in {place}"))
+    here_in_at(place_here().as_deref(), zone)
+}
+
+fn here_in_at(set: Option<&str>, zone: &str) -> String {
+    set.map(str::to_owned)
+        .or_else(|| own_place(zone))
+        .map_or_else(|| "Here".to_owned(), |place| format!("Here in {place}"))
 }
 
 /// The time at `now` in the place of `zone` (its file `there`), for the
@@ -543,10 +587,18 @@ pub fn now_in(place: &str) -> Result<Option<String>, &'static str> {
 /// What the opening note adds with `LAMP_TIME_PLACES`: whose time it gives,
 /// and to ask the function for anywhere else.
 pub fn told_place(home: Option<&str>) -> String {
-    let here = home.and_then(own_place).map_or_else(
-        || "the time where you are".to_owned(),
-        |place| format!("the time where you are, in {place}"),
-    );
+    told_place_at(place_here().as_deref(), home)
+}
+
+/// [`told_place`] with the unit's place `set` over the zone's.
+fn told_place_at(set: Option<&str>, home: Option<&str>) -> String {
+    let here = set
+        .map(str::to_owned)
+        .or_else(|| home.and_then(own_place))
+        .map_or_else(
+            || "the time where you are".to_owned(),
+            |place| format!("the time where you are, in {place}"),
+        );
     format!(
         " This is {here}. For the time anywhere else, call the_time with that place, never this time."
     )
@@ -969,6 +1021,42 @@ mod tests {
 
     /// A place is looked for under the zone folder only, by its zone name
     /// or its name alone in the usual areas, and must be a zone file.
+    /// #1712: the unit's place goes over the zone's in what the model is
+    /// told and in "here"'s time: lamp-4ace in Hanoi keeps
+    /// `Asia/Ho_Chi_Minh`. A strange value is no place.
+    #[test]
+    fn the_units_place_goes_over_the_zones() {
+        assert_eq!(
+            place_from(Some(" Hanoi, Vietnam ")).as_deref(),
+            Some("Hanoi, Vietnam")
+        );
+        assert_eq!(place_from(Some("Đà Nẵng")).as_deref(), Some("Đà Nẵng"));
+        for odd in [
+            None,
+            Some(""),
+            Some("  "),
+            Some("Hanoi; rm -rf"),
+            Some("x\ny"),
+        ] {
+            assert_eq!(place_from(odd), None, "{odd:?}");
+        }
+        assert_eq!(place_from(Some(&"a".repeat(61))), None);
+        let zone = Some("Asia/Ho_Chi_Minh");
+        assert!(told_place_at(None, zone).contains("in Ho Chi Minh."));
+        assert!(told_place_at(Some("Hanoi"), zone).contains("in Hanoi."));
+        assert_eq!(
+            here_in_at(Some("Hanoi"), "Asia/Ho_Chi_Minh"),
+            "Here in Hanoi"
+        );
+        assert_eq!(here_in_at(None, "Asia/Ho_Chi_Minh"), "Here in Ho Chi Minh");
+        assert_eq!(here_in_at(None, "Etc/GMT-7"), "Here");
+        assert_eq!(place_told(None), None);
+        assert_eq!(
+            place_told(Some("Hanoi")).unwrap(),
+            " You are in Hanoi. When someone asks about the weather, the news or anything nearby without naming a place, they mean Hanoi."
+        );
+    }
+
     #[test]
     fn a_place_is_found_by_its_zone_or_its_name_and_never_outside_the_zones() {
         let dir = std::env::temp_dir().join(format!("lamp-zones-{}", std::process::id()));
