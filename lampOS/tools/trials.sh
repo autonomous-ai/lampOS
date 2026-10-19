@@ -78,6 +78,12 @@ DROPIN=zz-trial.conf
 #            call.sock, as the voice calls it), "run COMMAND", or "play LINE"
 #   AFTER    optional: lines as CAUSE's, run at the end before the units are
 #            restarted (a light given back, a presence ended)
+#   FIRST    optional: for a behaviour that is done only when its cause
+#            ends, an extended regex in IN's journal that shows it began, and
+#   THEN     the lines, as CAUSE's, run once FIRST is seen (the keepers are
+#            stopped first); PROOF is then looked for after them. "wait N"
+#            lets N seconds pass, so the behaviour can be seen
+#   FIRSTEX  FIRST's line as the code writes it, as EXAMPLE is PROOF's
 #   PROOF    an extended regex: the line or message that shows the behaviour
 #   EXAMPLE  that line as the code writes it (trials-test.sh checks PROOF
 #            matches it); the comment above the row names where it is written
@@ -98,14 +104,17 @@ mood       Mood on: lampOS/tools/mood-minute.sh --clap (#1956), its own minute w
 updates    the update stack (#1680: #1788 to #1945, open): updates.md's rehearsal, a file channel and a test key, not a switch"
 
 define() {
-  ABOUT= NOTE= SETASIDE= SETUP= SWITCHES= CAUSE= AFTER= PROOF= EXAMPLE= IN= WAIT=
+  ABOUT= NOTE= SETASIDE= SETUP= SWITCHES= CAUSE= AFTER= FIRST= THEN= FIRSTEX= PROOF= EXAMPLE= IN= WAIT=
   case $1 in
     light-out)
       # #1721 and #1747 (on lamp-voice and #1712). The skill's trigger is
       # room/presence's nobody_s above 599, kept up here; its [quiet] hours
       # (23:00 to 06:00) are taken out of the trial's copy, so it can be
-      # tried at night. Its line: lamp-skills main.rs, "lamp-skills: {} {:?}:
-      # {}" (the skill, Triggered or Done, why).
+      # tried at night. Its lines: lamp-skills main.rs, "lamp-skills: {} {:?}:
+      # {}" (the skill, Triggered or Done, why). It holds while nobody is
+      # there and says Done only when its trigger ends (the first builder,
+      # #1722, 20 Oct 00:28): Triggered, the fade watched, someone back,
+      # then Done with the light asked of the ring.
       ABOUT="light out when nobody's there: light-out puts the ring's light out (#1721, #1747)"
       NOTE="a build with #1721 and #1747, the voice resting, and the eyes' presence off or the room empty: the trial says nobody_s 600 itself. The light fades to the ring's ember over 30 s, and comes back when the trial ends"
       SETASIDE="copy @SKILLS_DIR@/light-out"
@@ -115,9 +124,13 @@ chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/light-out"
       SWITCHES="lamp-skills.service|LAMP_LIGHT_REQUESTS=on
 lamp-skills.service|+--zone system"
       CAUSE='keep room/presence latest {"someone":false,"nobody_s":600} lamp_msgs/RoomPresence'
+      FIRST='light-out Triggered'
+      FIRSTEX='lamp-skills: light-out Triggered: room/presence nobody_s 600 is above 599'
+      THEN='wait 35
+pub room/presence latest {"someone":true,"nobody_s":0} lamp_msgs/RoomPresence'
       AFTER='pub room/presence latest {"someone":true,"nobody_s":0} lamp_msgs/RoomPresence'
-      PROOF='light-out Done'
-      EXAMPLE='lamp-skills: light-out Done: light out: asked of the ring, faded into over 30000 ms'
+      PROOF='light-out Done: light out: asked of the ring'
+      EXAMPLE='lamp-skills: light-out Done: light out: asked of the ring, faded into over 30000 ms; held until its trigger ended; light given back: asked again with a time already passed'
       IN="lamp-skills.service"
       WAIT=90 ;;
     scenes)
@@ -386,6 +399,10 @@ act() { # WHEN LINE
     play)
       say "PLAY: \"$rest\""
       ;;
+    wait)
+      say "$when: $rest s to see it"
+      sleep "${TRIALS_THEN_WAIT:-$rest}"
+      ;;
     *) say "unknown $when: $2"; return 1 ;;
   esac
 }
@@ -428,6 +445,9 @@ trial() { # ROW [--dry]
     lines "$CAUSE" | sed 's/^/  cause: /'
     lines "$AFTER" | sed 's/^/  after: /'
     printf '  proof in %s, within %s s: /%s/\n' "$IN" "$WAIT" "$PROOF"
+    [[ -z $FIRST ]] || printf '  first: /%s/, then:\n' "$FIRST"
+    [[ -z $FIRST ]] || printf '  first example: %s\n' "$FIRSTEX"
+    lines "$THEN" | sed 's/^/  then: /'
     printf '  example: %s\n' "$EXAMPLE"
     exit 0
   fi
@@ -494,6 +514,26 @@ trial() { # ROW [--dry]
 
   local deadline found
   deadline=$(($(date +%s) + WAIT))
+  if [[ -n $FIRST ]]; then
+    # shellcheck disable=SC2086 # IN is a list of units
+    until found=$(since_mark "$mark" $IN | grep -E -m1 -- "$FIRST") && [[ -n $found ]]; do
+      if [[ $(date +%s) -ge $deadline ]]; then
+        say "FAIL: $row: no line matching /$FIRST/ in $IN within $WAIT s. Its last lines:"
+        # shellcheck disable=SC2086
+        since_mark "$mark" $IN | tail -15 | sed 's/^/  /'
+        exit 1
+      fi
+      sleep 1
+    done
+    say "began: $found"
+    local pid
+    for pid in $KEEPERS; do kill "$pid" 2>/dev/null || true; done
+    KEEPERS=""
+    while IFS= read -r line; do
+      act then "$line" || exit 1
+    done < <(lines "$THEN")
+    deadline=$(($(date +%s) + WAIT))
+  fi
   # shellcheck disable=SC2086 # IN is a list of units
   while :; do
     if [[ $IN == bus:* ]]; then
