@@ -230,6 +230,9 @@ impl Attempt {
     pub(crate) fn phase(&self) -> Phase {
         self.phase
     }
+    pub(crate) fn delivered_at_us(&self) -> u64 {
+        self.stored.invitation.delivered_at_us
+    }
 
     /// Persisted acquisition watermark for recovery. The runner tracks any
     /// subsequent open observations it feeds while waiting for readiness.
@@ -446,6 +449,28 @@ pub(crate) fn discard_checkpoint(path: &Path) -> io::Result<()> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error),
     }
+}
+
+/// Start-up only: a crash mid-write can leave `<checkpoint>.next-<attempt>`
+/// beside the checkpoint; no write is in flight before initialization.
+pub(crate) fn discard_temporaries(path: &Path) -> io::Result<()> {
+    let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+        return Err(invalid("privacy checkpoint path must be an absolute file"));
+    };
+    let mut prefix = name.to_owned();
+    prefix.push(".next-");
+    let prefix = prefix.as_encoded_bytes();
+    let entries = match fs::read_dir(parent) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        other => other?,
+    };
+    for entry in entries {
+        let entry = entry?;
+        if entry.file_name().as_encoded_bytes().starts_with(prefix) {
+            remove(&entry.path())?;
+        }
+    }
+    Ok(())
 }
 
 fn temporary(path: &Path, attempt: BootId) -> io::Result<PathBuf> {

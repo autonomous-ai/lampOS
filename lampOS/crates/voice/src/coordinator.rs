@@ -4707,6 +4707,7 @@ fn conversation_with_gate(
         if let (Some(walk), Some(epoch)) = (onboarding.as_mut(), onboarding_epoch.as_ref()) {
             walk.set_privacy_context(
                 epoch.clone(),
+                rig.privacy_controls,
                 onboarding_privacy_receipt.clone(),
                 onboarding_location.as_deref().filter(|_| {
                     says.is_some() && bus_out.is_some() && !trace.onboarding_privacy_disabled

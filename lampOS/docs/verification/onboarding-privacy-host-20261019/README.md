@@ -6,7 +6,8 @@ These are macOS ARM64 host checks; no lamp was accessed for this batch.
 ## Scope and boundaries
 
 The privacy step needs whole invitation playback, a fresh Controls-qualified
-close, verified microphone/camera teardown, and a fresh same-source open with
+close, the voice's verified microphone teardown (the camera's close is not
+observed; see Review fixes), and a fresh same-source open with
 normal input readiness. The model can skip, but cannot certify it. The core
 skill uses an exact current invitation token; the runner keeps evidence and
 acknowledged progress. A hardware-owner profile supplies switch location;
@@ -108,3 +109,42 @@ cargo +1.96.0 test --offline -j2 -p lamp-msgs -p lamp-skills -p lamp-setup -p la
 
 Earlier full-workspace and eight-crate results retain their stated bases.
 Exact-head ARM64 and physical evidence remain outstanding.
+
+## Review fixes (19 October 2026, Third's privacy review on PR #1792)
+
+On head `76e6342ee`, uncommitted:
+
+- Privacy is available only with a receipt source (`LAMP_PRIVACY_CONTROLS=on`);
+  with the GPIO worker it is `not_available` and the walk goes on
+  (`without_a_receipt_source_privacy_is_unavailable_and_the_walk_goes_on`).
+- The camera's close is not proven by this step: the voice verifies its own
+  teardown, and the eyes close the camera on their 1.5 s permit timeout, which
+  nothing here observes. The eyes' 1 Hz `diagnostics` health report names the
+  camera's state but is not a privacy-grade signal and the voice doesn't read
+  it. Done's note now claims the microphones only. Proving the camera's close
+  remains open on #1802.
+- A close read just before the invitation's end is processed is offered again,
+  not failed (`a_close_read_just_before_arming_is_offered_again_not_failed`).
+- Start-up removes `privacy-pending.json.next-*` left by a crash mid-write
+  (`start_up_removes_temporaries_a_crash_left_mid_write`).
+
+Gates on this change, from `lampOS/` with the environment above, one fresh
+target directory, run in this order:
+
+```sh
+cargo +1.96.0 fmt --all --check
+cargo +1.96.0 clippy --offline -j2 --workspace --all-targets -- -D warnings
+cargo +1.96.0 test --offline -j2 -p lamp-voice --lib -- --test-threads=1 onboarding privacy say::
+cargo +1.96.0 test --offline -j2 -p lamp-voice --lib -- --test-threads=1 without_a_receipt_source_privacy_is_unavailable_and_the_walk_goes_on a_close_read_just_before_arming_is_offered_again_not_failed start_up_removes_temporaries_a_crash_left_mid_write
+cargo +1.96.0 test --offline -j2 -p lamp-msgs -p lamp-skills -p lamp-setup -- --test-threads=1 onboarding
+cargo +1.96.0 test --offline -j2 -p lamp-update --test install -- --test-threads=1
+cargo +1.96.0 test --offline -j2 -p lamp-voice --no-fail-fast -- --test-threads=1
+cargo +1.96.0 build --offline -j2 --workspace
+```
+
+Formatting and strict all-target workspace clippy passed. Focused lamp-voice
+tests: 157 passed, 0 failed; the three new tests: 3 passed. msgs, skills and
+setup onboarding tests: 5 passed, 0 failed across 26 summaries. Install: 52
+passed, 0 failed. Full lamp-voice: 2,331 passed, 0 failed, 12 ignored across
+32 summaries. Workspace build passed. The counts in earlier sections keep
+their stated bases; exact-head ARM64 and physical evidence remain outstanding.

@@ -442,6 +442,7 @@ fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
     match operation {
         Operation::Initialize => {
             privacy::discard_checkpoint(&paths.checkpoint)?;
+            privacy::discard_temporaries(&paths.checkpoint)?;
             let next = paths.progress.with_extension("storage-next");
             match fs::remove_file(next) {
                 Ok(()) => {}
@@ -854,6 +855,22 @@ mod tests {
         let recovered = idle(&client);
         assert!(recovered.ready);
         assert!(recovered.failed.is_none());
+        owner.finish(Duration::from_secs(2)).unwrap();
+    }
+
+    #[test]
+    fn start_up_removes_temporaries_a_crash_left_mid_write() {
+        let files = Files::new();
+        let paths = files.paths();
+        let mut leftover = paths.checkpoint.as_os_str().to_owned();
+        leftover.push(".next-0123456789abcdef0123456789abcdef");
+        let leftover = std::path::PathBuf::from(leftover);
+        fs::write(&leftover, b"partial").unwrap();
+        fs::write(paths.progress.with_extension("storage-next"), b"partial").unwrap();
+        let mut owner = ServiceStorage::start(paths.clone()).unwrap();
+        assert!(idle(&owner.client()).ready);
+        assert!(!leftover.exists());
+        assert!(!paths.progress.with_extension("storage-next").exists());
         owner.finish(Duration::from_secs(2)).unwrap();
     }
 }

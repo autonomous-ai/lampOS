@@ -297,7 +297,9 @@ fn fresh_token() -> io::Result<u64> {
     })
 }
 
-const PRIVACY_DONE: &str = "(Their physical switch closed both microphones and camera, and they opened it again. Briefly confirm that the switch works. Nothing more.)";
+// Only the voice's own teardown is verified; the eyes close the camera on
+// their own permit timeout, which this step does not observe (#1802).
+const PRIVACY_DONE: &str = "(Their physical switch closed the microphones, and they opened it again. Briefly confirm that the switch works. Nothing more.)";
 const PRIVACY_FAILED: &str = "(The privacy-switch check was not completed. Briefly say they can try it again later by redoing setup. Do not claim the switch was tested.)";
 
 pub struct Onboarding {
@@ -655,14 +657,18 @@ impl Onboarding {
     }
 
     /// Memory-only context. The profile's location is trusted input, never
-    /// inferred from a model or from an unverified observation.
+    /// inferred from a model or from an unverified observation. Without a
+    /// receipt source (`LAMP_PRIVACY_CONTROLS=on`; the GPIO worker sends no
+    /// receipt) no offer can ever be made, so the step is not available.
     pub(crate) fn set_privacy_context(
         &mut self,
         epoch: privacy::Epoch,
+        receipt_source: bool,
         receipt: Option<PrivacyReceipt>,
         verified_location: Option<&str>,
     ) {
         let location = verified_location
+            .filter(|_| receipt_source)
             .filter(|value| {
                 !value.trim().is_empty()
                     && value.chars().count() <= 160
@@ -874,8 +880,16 @@ impl Onboarding {
             controls_session: receipt.controls_session.clone(),
             physical: receipt.physical.clone(),
         };
+        let early = acquisition.physical.stamp.at_us <= attempt.delivered_at_us();
         match attempt.observe_close(acquisition, now_us) {
             Ok(()) => Some(privacy::Checkpoint::new(attempt, self.privacy_path())),
+            // A slide read just before the invitation's end was processed is
+            // the person acting early, not a failed check: offer it again.
+            Err(_) if early => {
+                self.privacy_flow.erase_pending = true;
+                self.retry_privacy(now_us);
+                Some(privacy::Checkpoint::discard(self.privacy_path()))
+            }
             Err(_) => {
                 self.privacy_flow.erase_pending = true;
                 self.privacy_flow.pending_result = Some((Outcome::Failed, None));
@@ -1586,7 +1600,7 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
                 }
                 (Some(Step::Privacy), Some(_)) => {
                     return (
-                        json!({"error":"Privacy is completed only by the physical switch closing microphones and camera and reopening. You can only skip it if they ask."}),
+                        json!({"error":"Privacy is completed only by the physical switch closing the microphones and reopening. You can only skip it if they ask."}),
                         true,
                     );
                 }

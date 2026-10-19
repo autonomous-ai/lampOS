@@ -77,6 +77,7 @@ impl Drop for Store {
 fn context(walk: &mut Onboarding, now: u64, seq: u64, muted: bool) {
     walk.set_privacy_context(
         epoch(),
+        true,
         Some(receipt(seq, now, muted)),
         Some("at its verified profile location"),
     );
@@ -238,10 +239,41 @@ fn no_person_means_no_privacy_invitation_and_missing_profile_is_unavailable() {
     let (_store, mut walk) = walk();
     walk.tick(T, START_QUIET_US, true, false, None, true);
     assert!(walk.privacy_pending().invitations.is_empty());
-    walk.set_privacy_context(epoch(), Some(receipt(2, T, false)), None);
+    walk.set_privacy_context(epoch(), true, Some(receipt(2, T, false)), None);
     walk.tick(T, START_QUIET_US, true, false, face(), true);
     walk.drain_storage_for_test(T);
     assert_eq!(walk.kept().steps["privacy"].outcome, Outcome::NotAvailable);
+}
+
+#[test]
+fn without_a_receipt_source_privacy_is_unavailable_and_the_walk_goes_on() {
+    // The product's GPIO worker sends no receipt and its unit sets no
+    // LAMP_PRIVACY_CONTROLS: a verified location alone must not stall the walk.
+    let (_store, mut walk) = walk();
+    walk.set_privacy_context(epoch(), false, None, Some("on its base"));
+    walk.tick(T, START_QUIET_US, true, false, face(), true);
+    walk.drain_storage_for_test(T);
+    assert_eq!(walk.kept().steps["privacy"].outcome, Outcome::NotAvailable);
+    assert!(walk.privacy_pending().invitations.is_empty());
+    walk.tick(T + 1, START_QUIET_US, true, false, face(), true);
+    assert_eq!(walk.led.as_ref().unwrap().step, Step::WhereYouSit);
+}
+
+#[test]
+fn a_close_read_just_before_arming_is_offered_again_not_failed() {
+    let (_store, mut walk) = walk();
+    let token = offer(&mut walk, T, 1);
+    // The open read (stamped T) is still fresh when the invitation's end is
+    // processed 40 ms later; the slide was read 10 ms before that.
+    deliver(&mut walk, token, T + 40_000);
+    let checkpoint = walk
+        .take_close_candidate(&receipt(2, T + 30_000, true), T + 41_000)
+        .unwrap();
+    assert!(checkpoint.is_discard());
+    assert!(walk.privacy_flow.pending_result.is_none());
+    pump(&mut walk, T + 41_000);
+    assert!(!walk.kept().steps.contains_key("privacy"));
+    assert_ne!(offer(&mut walk, 3 * T, 3), token);
 }
 
 #[test]
