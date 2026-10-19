@@ -485,8 +485,8 @@ fn publish_and_watch(enabled: bool, events: Vec<TouchEvent>) -> (Watched, usize)
     let mut publisher = bus
         .publisher_declared(TouchEvent::TOPIC, &TouchEvent::declaration(), "controls")
         .unwrap();
-    // The subscriber is found by the publisher's next discovery.
-    std::thread::sleep(Duration::from_millis(250));
+    // The subscriber's socket is in `subs/` before the publisher is made,
+    // and a new publisher reads `subs/` at its first publish: no wait.
     for event in &events {
         publisher.publish_json(event.stamp.at_us, event).unwrap();
     }
