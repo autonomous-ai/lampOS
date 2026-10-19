@@ -418,6 +418,9 @@ that owns it:
 | `room/state` | the voice's provider worker, on each change and once a second | the policy, and Expression |
 | `room/presence` | the eyes, with `LAMP_PRESENCE=on`, from their looks and `voice/heard` ([presence.md](presence.md)) | `lamp-skills` (Light out when you leave); Messages (#1673) |
 | `voice/timing`, `voice/activity`, `voice/playout` | the voice, with `LAMP_EXPRESSION_OUT=on` ([expression.md](expression.md), "What the voice says, as built") | Expression |
+| `expression/rest_request` | `lamp-skills`, with `LAMP_SKILL_ROUTINES=on` and an enabled routine | Expression, with `LAMP_REST_REQUESTS=on` |
+| `expression/rest_state` | `lamp-expression`, with `LAMP_REST_REQUESTS=on` | Skills' routine manager |
+| `output/caps` | `lamp-actions`, with `LAMP_OUTPUT_CAPS=on` | Voice's ring worker, with `LAMP_OUTPUT_CAPS=on` |
 | `policy/decisions` | the policy ([policy.md](policy.md)) | nothing yet |
 | `body/joint_states` | the body ([body.md](body.md), "On the bus") | nothing yet; recorded to measure how the lamp moves |
 | `light/command` | the actions program ([actions.md](actions.md)); `lamp-cloud`, the app's Light row ([cloud.md](cloud.md)) | the voice's ring worker |
@@ -466,6 +469,32 @@ The new payload timestamps explicitly use the shared host monotonic clock
 and boot identity. This does not change the meaning of existing bus header
 `at_us`: that remains a publisher-private timestamp. Expression's replay
 importer warns when it estimates a shared timeline from legacy wall stamps.
+
+`expression_topics()` also declares `expression/rest_request` (event,
+one-second period, 500 ms lifespan) and `expression/rest_state` (latest,
+200 ms period, 500 ms lifespan). Skills' request is a clock/session/episode
+bound rest, wake or cancel intent with at most a three-second lease.
+Expression publishes the correlated planning receipt; completed does not
+prove that an actuator moved. The feature switches default off. Both
+messages accept additive fields, including nested requests and stamps, but
+refuse unknown operation or phase values. The owners still enforce freshness,
+privacy and cancellation; declaring a topic grants no actuator authority.
+
+## Optional output restrictions
+
+`output_caps_topics()` declares `output/caps`, an Actions-owned latest
+`OutputCaps` snapshot every second with a three-second admission lifespan.
+It contains a persisted revision and up to eight source-owned light/volume
+ceilings. With `LAMP_OUTPUT_CAPS=on`, Actions publishes the full set, including
+an empty set after release, and Voice's ring worker consumes it for ordinary
+light output. Actions applies the volume ceiling itself. A lost heartbeat
+does not release an admitted restriction; unknown wall time retains it.
+Ceilings combine by minimum and do not grant output authority. Snapshot and
+nested entry fields are additive; the separate private Actions socket
+commands stay strict. See [msgs.md](msgs.md#optional-output-restrictions)
+and [Bedtime and Morning](bedtime-morning.md) for the validation and clock
+boundaries. These declarations are recognized by `declaration_of()` and
+leave the original seventeen topics unchanged.
 
 ## Optional Controls topics (Third, 2026-10-14)
 

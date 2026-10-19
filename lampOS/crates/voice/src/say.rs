@@ -39,6 +39,14 @@
 //!   why, when the lamp is not at rest as a say needs it, or a sound
 //!   played less than [`SOUND_EVERY_US`] ago ([`may_play_sound`]).
 //!   `spoken` then means played whole, with no gap in its playback.
+//! - **A built-in cue**: `cue: "hum"` makes the existing short hum at its
+//!   fixed -35 dBFS default on the client's thread, without a file or model
+//!   request. It is a sound through the same queue, quiet, rarity, privacy
+//!   and playback gates. Head-tap tuning does not change this cue.
+//! - **An existing start deadline**: optional `start_before_us` is an
+//!   absolute `lamp_ipc::monotonic_us` deadline on this host. It can only
+//!   shorten the relative expiry, including time spent reaching or reading
+//!   the socket. The caller keeps responsibility for its generation checks.
 //!
 //! Nothing of what is said is logged: the skill's name, the priority and
 //! the outcome only.
@@ -211,10 +219,27 @@ pub struct Request {
     pub words: Words,
     pub priority: u8,
     pub expires_in_ms: u64,
+    /// An optional same-host monotonic start deadline, never refreshed by
+    /// reading the line or taking it on a later voice pass.
+    start_before_us: Option<u64>,
     /// For a `from: tasks` ask, the task whose news it is for: it is
     /// given that task's news and no other, so that the skill's moves go
     /// with its own task (the reviewer on #1042). None: any news.
     pub task: Option<u64>,
+}
+
+impl Request {
+    fn expires_at_us(&self, read_at_us: u64) -> u64 {
+        let relative = read_at_us.saturating_add(self.expires_in_ms.saturating_mul(1_000));
+        self.start_before_us
+            .map_or(relative, |deadline| relative.min(deadline))
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Cue {
+    Hum,
 }
 
 #[derive(Deserialize)]
@@ -232,8 +257,12 @@ struct Wire {
     #[serde(default)]
     sound: Option<String>,
     #[serde(default)]
+    cue: Option<Cue>,
+    #[serde(default)]
     priority: Option<u8>,
     expires_in_ms: u64,
+    #[serde(default)]
+    start_before_us: Option<u64>,
 }
 
 /// Read and check one request line. The reason, if refused, names the
@@ -250,20 +279,23 @@ pub fn parse(line: &str) -> Result<Request, String> {
     {
         return Err("skill is 1 to 64 of a-z, 0-9, - and _".into());
     }
-    let words = match (wire.note, wire.text, wire.from, wire.sound) {
-        (Some(note), None, None, None) => Words::Note(note),
-        (None, Some(text), None, None) => Words::Text(text),
-        (None, None, Some(from), None) => {
+    let words = match (wire.note, wire.text, wire.from, wire.sound, wire.cue) {
+        (Some(note), None, None, None, None) => Words::Note(note),
+        (None, Some(text), None, None, None) => Words::Text(text),
+        (None, None, Some(from), None, None) => {
             Words::From(Source::named(&from).ok_or_else(|| "from is schedule or tasks".to_owned())?)
         }
-        (None, None, None, Some(sound)) => {
+        (None, None, None, Some(sound), None) => {
             if !sound.starts_with('/') || sound.len() > 1_024 || sound.chars().any(char::is_control)
             {
                 return Err("sound is an absolute path of at most 1024 bytes".into());
             }
             Words::SoundAt(PathBuf::from(sound))
         }
-        _ => return Err("exactly one of note, text, from and sound".into()),
+        (None, None, None, None, Some(Cue::Hum)) => {
+            Words::Sound(crate::head_cue::hum(crate::head_cue::DBFS))
+        }
+        _ => return Err("exactly one of note, text, from, sound and cue".into()),
     };
     if let Words::Note(said) | Words::Text(said) = &words
         && (said.trim().is_empty()
@@ -289,6 +321,7 @@ pub fn parse(line: &str) -> Result<Request, String> {
         words,
         priority,
         expires_in_ms: wire.expires_in_ms,
+        start_before_us: wire.start_before_us,
         task: wire.task,
     })
 }
@@ -297,10 +330,12 @@ pub fn parse(line: &str) -> Result<Request, String> {
 /// expires: its `expires_in_ms` from the moment its line was read, on the
 /// shared monotonic clock (`lamp_ipc::monotonic_us`, the voice's own clock
 /// outside a test's scenario), so that no wait for the voice's loop
-/// lengthens it (the reviewer on #954).
+/// lengthens it (the reviewer on #954). An absolute start deadline may
+/// shorten it; the original read time still bounds a `from` ask's lifetime.
 struct Asked {
     request: Request,
     answer: mpsc::Sender<Answer>,
+    read_at_us: u64,
     expires_at_us: u64,
 }
 
@@ -359,6 +394,29 @@ pub(crate) fn ticket_for_test(skill: &str) -> (Ticket, mpsc::Receiver<Answer>) {
         },
         answered,
     )
+}
+
+/// A parsed wire request a stepped coordinator fixture delivers at its clock.
+#[cfg(test)]
+#[derive(Clone)]
+pub(crate) struct LineForTest {
+    request: Request,
+    incoming: mpsc::Sender<Asked>,
+    answer: mpsc::Sender<Answer>,
+}
+
+#[cfg(test)]
+impl LineForTest {
+    pub(crate) fn read_at(self, read_at_us: u64) {
+        self.incoming
+            .send(Asked {
+                expires_at_us: self.request.expires_at_us(read_at_us),
+                request: self.request,
+                answer: self.answer,
+                read_at_us,
+            })
+            .unwrap();
+    }
 }
 
 /// The voice's side: what has been asked and waits to be said.
@@ -438,6 +496,23 @@ impl Says {
         Self::by_hand().0
     }
 
+    /// Parse the actual Say wire format; a fixture chooses when it was read.
+    /// This bypasses only socket transport, not payload or expiry validation.
+    #[cfg(test)]
+    pub(crate) fn line_for_test(line: &str) -> (Self, LineForTest, mpsc::Receiver<Answer>) {
+        let (says, incoming) = Self::by_hand();
+        let (answer, answered) = mpsc::channel();
+        (
+            says,
+            LineForTest {
+                request: parse(line).unwrap(),
+                incoming,
+                answer,
+            },
+            answered,
+        )
+    }
+
     /// For a test of the voice's turn: one `from` ask for what `source`
     /// keeps, waiting until `expires_at_us`, and where its answer goes.
     #[cfg(test)]
@@ -465,9 +540,11 @@ impl Says {
                 words: Words::From(source),
                 priority: NORMAL_PRIORITY,
                 expires_in_ms: 60_000,
+                start_before_us: None,
                 task,
             },
             answer,
+            read_at_us: expires_at_us.saturating_sub(60_000_000),
             expires_at_us,
         })
         .unwrap();
@@ -487,9 +564,11 @@ impl Says {
                 words: Words::Sound(samples),
                 priority: NORMAL_PRIORITY,
                 expires_in_ms: 60_000,
+                start_before_us: None,
                 task: None,
             },
             answer,
+            read_at_us: 0,
             expires_at_us: u64::MAX,
         })
         .unwrap();
@@ -513,9 +592,11 @@ impl Says {
                 words: Words::Note(note.into()),
                 priority,
                 expires_in_ms: 60_000,
+                start_before_us: None,
                 task: None,
             },
             answer,
+            read_at_us: 0,
             expires_at_us: u64::MAX,
         })
         .unwrap();
@@ -547,12 +628,9 @@ impl Says {
             // A `from` ask lives at most `FROM_LIVES_US` from when its line
             // was read.
             let expires_at_us = match asked.request.words {
-                Words::From(_) => asked.expires_at_us.min(
-                    asked
-                        .expires_at_us
-                        .saturating_sub(asked.request.expires_in_ms.saturating_mul(1_000))
-                        .saturating_add(FROM_LIVES_US),
-                ),
+                Words::From(_) => asked
+                    .expires_at_us
+                    .min(asked.read_at_us.saturating_add(FROM_LIVES_US)),
                 _ => asked.expires_at_us,
             };
             self.waiting.push(Waiting {
@@ -803,12 +881,13 @@ fn serve_client(mut stream: UnixStream, ask: &mpsc::Sender<Asked>, sounds: &Path
             Err(why) => Outcome::Refused(why),
             Ok(request) => {
                 let (answer, answered) = mpsc::channel();
-                let expires_at_us = lamp_ipc::monotonic_us()
-                    .saturating_add(request.expires_in_ms.saturating_mul(1_000));
+                let read_at_us = lamp_ipc::monotonic_us();
+                let expires_at_us = request.expires_at_us(read_at_us);
                 if ask
                     .send(Asked {
                         request,
                         answer,
+                        read_at_us,
                         expires_at_us,
                     })
                     .is_err()
@@ -1314,6 +1393,95 @@ mod tests {
         fs::remove_dir_all(&dir).unwrap();
     }
 
+    #[test]
+    fn the_hum_cue_is_fixed_sound_and_refuses_unknown_or_multiple_payloads() {
+        let request =
+            parse(r#"{"skill":"daily-start","cue":"hum","expires_in_ms":60000}"#).unwrap();
+        assert_eq!(
+            request.words,
+            Words::Sound(crate::head_cue::hum(crate::head_cue::DBFS))
+        );
+        assert_eq!(request.words.turn(), None);
+        for cue in ["other", "Hum", "", "../hum.wav"] {
+            let line = json!({"skill":"daily-start", "cue":cue, "expires_in_ms":60000}).to_string();
+            assert!(parse(&line).is_err());
+        }
+        for (field, value) in [
+            ("note", "hello"),
+            ("text", "hello"),
+            ("from", "schedule"),
+            ("sound", "/a.wav"),
+        ] {
+            let mut line = json!({"skill":"daily-start", "cue":"hum", "expires_in_ms":60000});
+            line[field] = value.into();
+            assert!(
+                parse(&line.to_string())
+                    .unwrap_err()
+                    .contains("exactly one")
+            );
+        }
+        assert!(
+            parse(r#"{"skill":"daily-start","cue":"hum","task":1,"expires_in_ms":1}"#).is_err()
+        );
+    }
+
+    #[test]
+    fn a_hum_cue_uses_the_sound_socket_queue_and_the_existing_quiet_rarity_and_privacy_gate() {
+        let dir = socket_dir("hum");
+        let path = dir.join("say.sock");
+        // A built-in cue needs no sounds folder or WAV to exist.
+        let mut says = Says::serve(&path, None, &dir.join("no-sounds-folder")).unwrap();
+        for state in [
+            SoundNow {
+                muted: true,
+                ..REST
+            },
+            SoundNow {
+                since_turn_us: QUIET_US - 1,
+                ..REST
+            },
+            SoundNow {
+                since_sound_us: Some(SOUND_EVERY_US - 1),
+                ..REST
+            },
+        ] {
+            let client = {
+                let path = path.clone();
+                thread::spawn(move || {
+                    exchange(
+                        &path,
+                        "{\"skill\":\"daily-start\",\"cue\":\"hum\",\"expires_in_ms\":60000}\n",
+                    )
+                })
+            };
+            let until = std::time::Instant::now() + Duration::from_secs(1);
+            let (samples, ticket) = loop {
+                says.poll(0);
+                assert_eq!(says.quiet_needed_us(), None);
+                assert!(says.take(0).is_none(), "a cue must not become a model turn");
+                if let Some(sound) = says.take_sound(0) {
+                    break sound;
+                }
+                assert!(
+                    std::time::Instant::now() < until,
+                    "cue did not reach sound admission"
+                );
+                thread::sleep(Duration::from_millis(2));
+            };
+            assert_eq!(samples, crate::head_cue::hum(crate::head_cue::DBFS));
+            let refusal = may_play_sound(&state).unwrap_err();
+            ticket.answer(Outcome::Refused(refusal.into()));
+            assert_eq!(
+                client.join().unwrap(),
+                format!("{}\n", Outcome::Refused(refusal.into()).line())
+            );
+            assert!(says.take_sound(0).is_none());
+            assert_eq!(says.last_sound_us(), None, "a refused cue did not play");
+        }
+        drop(says);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
     /// An ask as the socket hands it on, expiring at `expires_at_us`.
     fn asked(skill: &str, priority: u8, expires_at_us: u64) -> (Asked, mpsc::Receiver<Answer>) {
         let (answer, answered) = mpsc::channel();
@@ -1324,9 +1492,11 @@ mod tests {
                     words: Words::Note(format!("{skill}'s note")),
                     priority,
                     expires_in_ms: 60_000,
+                    start_before_us: None,
                     task: None,
                 },
                 answer,
+                read_at_us: expires_at_us.saturating_sub(60_000_000),
                 expires_at_us,
             },
             answered,
@@ -1346,6 +1516,7 @@ mod tests {
                 words: Words::Note("Remind them to call the bank.".into()),
                 priority: 8,
                 expires_in_ms: 120_000,
+                start_before_us: None,
                 task: None,
             }
         );
@@ -1407,6 +1578,115 @@ mod tests {
     }
 
     #[test]
+    fn an_absolute_start_deadline_can_only_shorten_the_existing_expiry() {
+        let line = json!({"skill":"daily-start", "cue":"hum", "expires_in_ms":100});
+        let mut request = parse(&line.to_string()).unwrap();
+        assert_eq!(request.start_before_us, None);
+        assert_eq!(request.expires_at_us(1_000_000), 1_100_000);
+        for (deadline, expiry) in [
+            (0, 0),
+            (999_999, 999_999),
+            (1_050_000, 1_050_000),
+            (u64::MAX, 1_100_000),
+        ] {
+            let mut line = line.clone();
+            line["start_before_us"] = json!(deadline);
+            request = parse(&line.to_string()).unwrap();
+            assert_eq!(request.expires_at_us(1_000_000), expiry);
+        }
+        for invalid in [json!(-1), json!(1.5), json!("1000000")] {
+            let mut line = line.clone();
+            line["start_before_us"] = invalid;
+            assert!(parse(&line.to_string()).is_err());
+        }
+    }
+
+    #[test]
+    fn a_deadline_passed_before_socket_read_is_not_refreshed_by_reading_or_polling() {
+        let (mut client, server) = UnixStream::pair().unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let deadline = lamp_ipc::monotonic_us().saturating_sub(1);
+        assert!(deadline > 0);
+        writeln!(
+            client,
+            "{}",
+            json!({"skill":"daily-start", "cue":"hum", "expires_in_ms":60000,
+                "start_before_us":deadline})
+        )
+        .unwrap();
+        let (send, received) = mpsc::channel();
+        let server = thread::spawn(move || serve_client(server, &send, Path::new("/unused")));
+        let one = received.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(one.read_at_us > deadline);
+        assert_eq!(one.expires_at_us, deadline);
+        assert!(matches!(one.request.words, Words::Sound(_)));
+        let (mut says, ask) = Says::by_hand();
+        ask.send(one).unwrap();
+        let now = lamp_ipc::monotonic_us();
+        says.poll(now);
+        assert_eq!(says.waiting(), 0);
+        assert!(says.take_sound(now).is_none());
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+        assert_eq!(response, "{\"outcome\":\"expired\"}\n");
+        server.join().unwrap();
+    }
+
+    #[test]
+    fn a_queued_sound_cannot_be_taken_at_or_after_its_original_deadline() {
+        let read_at_us = 100_000_000;
+        let deadline = read_at_us + 2_000;
+        for taken_at in [deadline, deadline + 1] {
+            let request = parse(
+                &json!({"skill":"daily-start", "cue":"hum", "expires_in_ms":60000,
+                    "start_before_us":deadline})
+                .to_string(),
+            )
+            .unwrap();
+            let (answer, answered) = mpsc::channel();
+            let (mut says, ask) = Says::by_hand();
+            ask.send(Asked {
+                expires_at_us: request.expires_at_us(read_at_us),
+                request,
+                answer,
+                read_at_us,
+            })
+            .unwrap();
+            says.poll(deadline - 1);
+            assert_eq!(says.waiting(), 1);
+            assert!(says.take_sound(taken_at).is_none());
+            assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Expired)));
+        }
+    }
+
+    #[test]
+    fn an_absolute_deadline_does_not_move_a_source_asks_read_time_backwards() {
+        let read_at_us = 100_000_000;
+        let deadline = read_at_us + FROM_LIVES_US / 2;
+        let request = parse(
+            &json!({"skill":"task-news", "from":"tasks", "expires_in_ms":60000,
+                "start_before_us":deadline})
+            .to_string(),
+        )
+        .unwrap();
+        let (answer, answered) = mpsc::channel();
+        let (mut says, ask) = Says::by_hand();
+        ask.send(Asked {
+            expires_at_us: request.expires_at_us(read_at_us),
+            request,
+            answer,
+            read_at_us,
+        })
+        .unwrap();
+        says.poll(deadline - 1);
+        assert!(says.asks_for(Source::Tasks, deadline - 1));
+        assert!(says.take_from(Source::Tasks, None, deadline).is_none());
+        assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Expired)));
+    }
+
+    #[test]
     fn the_highest_priority_goes_first_then_the_oldest_and_the_late_expire() {
         let (mut says, ask) = Says::by_hand();
         let (news, news_answer) = asked("task-news", 5, 61_000_000);
@@ -1456,6 +1736,7 @@ mod tests {
                 words: Words::From(Source::Tasks),
                 priority: NORMAL_PRIORITY,
                 expires_in_ms: 30_000,
+                start_before_us: None,
                 task: None,
             }
         );
@@ -1472,7 +1753,7 @@ mod tests {
             ),
             (
                 r#"{"skill":"x","from":"tasks","note":"n","expires_in_ms":5}"#,
-                "exactly one of note, text, from and sound",
+                "exactly one of note, text, from, sound and cue",
             ),
         ] {
             assert_eq!(parse(line).unwrap_err(), why, "{line}");
@@ -1524,6 +1805,7 @@ mod tests {
         let (mut late, late_answer) = asked("reminders", 8, 3_600_000_000);
         late.request.words = Words::From(Source::Schedule);
         late.request.expires_in_ms = 3_600_000;
+        late.read_at_us = 0;
         let (note, _) = asked("stretch", 3, 3_600_000_000);
         ask.send(late).unwrap();
         ask.send(note).unwrap();
@@ -1804,7 +2086,7 @@ mod tests {
             exchange(&path, "{\"skill\":\"x\",\"expires_in_ms\":5}\n"),
             format!(
                 "{}\n",
-                Outcome::Refused("exactly one of note, text, from and sound".into()).line()
+                Outcome::Refused("exactly one of note, text, from, sound and cue".into()).line()
             )
         );
         let client = {

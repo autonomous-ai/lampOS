@@ -1,0 +1,213 @@
+{
+  "head": "0e8817fd6cfc6efbcd62c6b93c86a0d48c66db30",
+  "integration_base": "b919291458c3618838c5f4b56520cf3b2cd739a5",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "source_only": true,
+  "source_file_count": 1592,
+  "source_tree_sha256": "fdb6f962327b919062e369fcb08aead4466b69c2b612c222861001f5a6d1a608",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.74,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 125.64,
+      "log_sha256": "5903e335b007a2dc541075aa9cb92e549cb3c3ab6945c64e658459758d4eca20",
+      "summaries": []
+    },
+    {
+      "stage": "engine_bedtime",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "bedtime_words_use_the_second_routes_written_path_independently_of_reminders",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 61.14,
+      "log_sha256": "36c14a5672dd340907a40445042c89e8d43ed13fbb8eb92209fd1c2b07bf4d69",
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2261 filtered out; finished in 0.01s"
+      ]
+    },
+    {
+      "stage": "exact_say",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "a_scheduled_exact_say_uses_only_the_second_route_and_finishes_spoken",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.29,
+      "log_sha256": "3a6fa727613e461c53d8be1754860f37432fcd7c2530496947a903d0d4acf7ec",
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2261 filtered out; finished in 0.13s"
+      ]
+    },
+    {
+      "stage": "local_hum",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "the_bedtime_morning_hum_plays_on_second_only_without_provider_input",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.57,
+      "log_sha256": "42d5f099b2a06f8d02ff9820d4853b926764c8d42ad62745e811d30b540b5cce",
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2261 filtered out; finished in 0.42s"
+      ]
+    },
+    {
+      "stage": "expiry_and_quiet",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "an_expired_scheduled_say_or_an_early_hum_sends_nothing_on_second_only",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.48,
+      "log_sha256": "517f5b0291ff16720bcd32ee567094e98dd7a851b5c9110e13f5b9468d1f0c96",
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2261 filtered out; finished in 0.33s"
+      ]
+    },
+    {
+      "stage": "skills",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 82.82,
+      "log_sha256": "35e91fffbd882f288ff6a4e31d17f4b696c467d40e5ab23c75ccd55a0f2b71e4",
+      "summaries": [
+        "test result: ok. 67 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.87s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.66s",
+        "test result: ok. 107 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 46.85s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "stage": "build",
+      "command": [
+        "cargo",
+        "build",
+        "--workspace"
+      ],
+      "exit_code": 0,
+      "seconds": 77.38,
+      "log_sha256": "af82d22659e30108894f61779241289dc524b2ea22f295d7812e4091496c61f6",
+      "summaries": []
+    }
+  ],
+  "scope": "Four focused second-route cases and the complete Skills suite, plus formatting, strict workspace/all-target Clippy and workspace build. This is not a complete host test gate. The native ARM64 PR run is the gate of record per the first builder.",
+  "all_source_hashes_still_match": true,
+  "changed_source_sha256": {
+    "lampOS/Cargo.lock": "fb99287f9c8cf62ae7d60bed8fe90ae98106e4a0a561b68922879d137a13e469",
+    "lampOS/crates/actions/src/caps.rs": "5f414884e4f4ec91337a91e8ca14825a237f7e0a7201877441beb60c8eb12fc4",
+    "lampOS/crates/actions/src/caps_service.rs": "aeff574e48237990546bb29da423b2614bf96327020b5cdf84107de141591aac",
+    "lampOS/crates/actions/src/lib.rs": "cbc068cbc919e6c82a36600daa4947c79644f83acfd2b82e8344ff534e012aaf",
+    "lampOS/crates/actions/src/main.rs": "560fa6a3f4a4ce83e9515091bb51714aef573e0c8924e4140ce2d8c19047ae61",
+    "lampOS/crates/actions/src/server.rs": "275976023c6f3da61fb34d39de6b1b4da55d07c19265c05422fe2f4b16e1ef9d",
+    "lampOS/crates/actions/src/sound.rs": "8f92ab5aaa1f926d51d9c9f912385854a4edfff58efc4c161048b090680fae60",
+    "lampOS/crates/actions/tests/caps.rs": "53ec7160a33e0eba01eb995c690dd80c68fef2a3b5e746047e8cca6b55177488",
+    "lampOS/crates/expression/src/alive.rs": "784c92aedfb8b6a46c6e884d5a3c7c93f3c077fb9e05146fa6aa1662a1126066",
+    "lampOS/crates/expression/src/engine.rs": "6f524099806b8f8d8f2d9f5d4035bd181e49ce73a0eac37bade799578162119a",
+    "lampOS/crates/expression/src/main.rs": "d84229d43de251bcd8e2c23cc823f911146eb8a5e78213009d617e55943c8ab3",
+    "lampOS/crates/expression/src/rest.rs": "a8ae7d704d4556ba6d99bfcceae53d38719a64bc335bc6e4d09d8566abdf6e8f",
+    "lampOS/crates/expression/src/runtime.rs": "6043efc1c81bcb0bdbaa344271724f2aab16dc190c29646b681ba7ac7b16ab05",
+    "lampOS/crates/expression/tests/rest_requests.rs": "decd773d6a5cf6c89e9d2692230f61d3fdd6b92f6ee92c49493fa7c5ec4175f3",
+    "lampOS/crates/msgs/src/expression.rs": "1c476b67226f3dab46d25a5ade35d284a6a1112a4d2007d8719631a138bc5ca8",
+    "lampOS/crates/msgs/src/lib.rs": "b36e1de15f9c4179d7b9f35fa3f2cc0baeb83dc0f1d5b7dd975b7b095effd069",
+    "lampOS/crates/msgs/src/output_caps.rs": "e74148080869e6f1177e7312f814fcf8553725d9789fbb301ff1089eb7fd0f77",
+    "lampOS/crates/msgs/tests/expression.rs": "81f2f6e3a25ebe0a9cabca68999cf7f26477a42beb608e982749e37c84d028d0",
+    "lampOS/crates/schedule/src/client.rs": "def4d454164e563dc5c59dedff8075ae3b5b1a65541dfe40823211f9455293f5",
+    "lampOS/crates/schedule/tests/client.rs": "75705ff530a4295c108b3214fd1f7e6df454e35024ea90a5187725659d5defc1",
+    "lampOS/crates/setup/fixtures/reset-plan-example.json": "3a4dac97ae3fb6ea6045a79a65dc8ce1f74c7ff45612b93573438c7c31da0507",
+    "lampOS/crates/setup/fixtures/reset-plan-product.json": "d03e26e7f9e252c1c0b440ab72e44be64087e81f5871e6fc84b55bcd172daecf",
+    "lampOS/crates/setup/tests/reset.rs": "8ee01669f48c535829df01c2f6db8fd7affbc0dcdc924ae5cc6169110727b2e7",
+    "lampOS/crates/skills/Cargo.toml": "0fe65819c58e21bc5c460e870dd156359842b2e053ec0c29eb69c357aec8225b",
+    "lampOS/crates/skills/src/daily.rs": "1a91547178f227466a2af470c53765f557178da3f1f0b6ee509f0a83ebd32505",
+    "lampOS/crates/skills/src/lib.rs": "45a6a1bf8e844d5a5816b67db8b1dd155ee692dc9930de69f794a619e17e6fc9",
+    "lampOS/crates/skills/src/limits.rs": "0fcd7baddc925f41204fc3fde1f73d9be9f1b1c3c896a041fbf1f654405f2296",
+    "lampOS/crates/skills/src/main.rs": "f31d288809825f09bc40e57dbcce54b3065ad41db4490e3e3ea9a7cd4eb1385f",
+    "lampOS/crates/skills/src/package.rs": "83ccc99caa952fb9935d5099ab5d16143d1a19281cfff7c689dcdfd7c2dfdeb9",
+    "lampOS/crates/skills/src/routine.rs": "15818157567c1f41fc36cc0fa66dd5292a0634987f45f7e7d001694daacad3bc",
+    "lampOS/crates/skills/tests/daily_engine.rs": "91bb704afcdc395adac90b501469d19e78fa7462a7adf16ead6869c7752227e8",
+    "lampOS/crates/skills/tests/package.rs": "277cdc5406ff1a10bdb145bf6b184bca6fd676a952c275c54aecbb5fb1da19ed",
+    "lampOS/crates/skills/tests/routine_service.rs": "9ed5520f887b6b7cde8675c235f6cafe694d0e900f7ccb5380de5d97d2963e73",
+    "lampOS/crates/skills/tests/skills.rs": "11f526b811b334bee0ae1edc6a20abd3a264f5ad60ffada312817af797800676",
+    "lampOS/crates/update/src/install.rs": "e46a8bdfe1c57dc969ead638dce5fe41dfa1f556213ed49a8170f7d64120b323",
+    "lampOS/crates/update/tests/install.rs": "c67be7132fbcce17fee8a97d6e2452d5e47b950d4e05f48882711daad5694f81",
+    "lampOS/crates/voice-eval/src/export.rs": "b83760389deb70607d9782c3efa52d2c68618d856813c7abb3dca2a4dc33fa35",
+    "lampOS/crates/voice/src/coordinator.rs": "68924758512befbd5e14c0efa4fcaf519d441944227708fdfd1d585f4c5189c5",
+    "lampOS/crates/voice/src/coordinator/tests/second_route.rs": "fc83eef542ce3d6f740dfe0adac4b74ddb8db0d34e31ae2b8330c3bc44599615",
+    "lampOS/crates/voice/src/lib.rs": "a76457e32842c45bfd51f35cefe180cd72f12df759494219e3349c7a0017cd5b",
+    "lampOS/crates/voice/src/main.rs": "89a7405d274475fa60d5720d6c7c0e25cc54e84b693384a977987622220b4b38",
+    "lampOS/crates/voice/src/ring_caps.rs": "fd5af34b9c465923bbf58b8fc5d741e14036c59d1050b472ae9f3928532be471",
+    "lampOS/crates/voice/src/ring_worker.rs": "8116d202ea16c02c5a26d009bf8dc3f05b10ad663c849fcbd5b48081946e159f",
+    "lampOS/crates/voice/src/say.rs": "641097b8e4133807dce06a9b3c6f75b644bf497175be63eee6a562b9cb80c00a",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "4aa28c77b3a0e3f005a974bf6b8f8ccf1feecedfc7660033aa2e693d369f1789",
+    "lampOS/crates/voice/tests/ring_worker.rs": "55d09cb5ebf191b83c427ab676659820bf6eb58ff7c4697691cf59ef5feb7f54",
+    "lampOS/deploy/product/lamp-actions.service": "b7c57fc0bdd9eb1f76574d1ed81b4e6a8013cdcdc2df80094311713ac350cf73",
+    "lampOS/deploy/product/lamp-skills.service": "c2db349d364868ac9637801565278cc1a25cc38f6b4e1fc7cd75592e68ef62e0",
+    "lampOS/skill-creator/SKILL.md": "dfca5009f5bdab2ebb3ffd7c3e3bfbd2981f474e1905b24039abec3aeea8eafb",
+    "lampOS/skill-creator/references/skill-folder.md": "3a435bd2025c9b3a4d964dd2eb547fa3ac6824f465106273815ff51a7cec27a3",
+    "lampOS/skills/bedtime-morning/SKILL.md": "deac0f3ae41da7076ec4a6f536e78b06e9099817b37fd039f587126f55223f69",
+    "lampOS/skills/bedtime-morning/skill.toml": "911c85ce79d63d6b27f50386d56b0d394bfad8e775df1a38bc60b409e1bce5d8",
+    "lampOS/skills/bedtime-morning/tests/README.md": "0be7f66a46b90ec5461f4b56d3a727f6051ea77f1d63d73e85069a69459d3013"
+  },
+  "source_manifest_note": "All non-document source hashes were checked after the commands and again before the evidence-only publication amendment. The full source count and digest cover unchanged files too."
+}

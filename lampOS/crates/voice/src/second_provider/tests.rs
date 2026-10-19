@@ -1605,6 +1605,83 @@ async fn the_only_voice_never_says_it_sounds_different() {
     assert_eq!(turn(&mut engine).await, expected(2));
 }
 
+/// A routine's optional exact speech is a Say written turn, not a due
+/// reminder. The second route sends its instruction to chat and its answer
+/// to speech with the reminder switch either way; it never opens STT.
+#[tokio::test]
+async fn bedtime_words_use_the_second_routes_written_path_independently_of_reminders() {
+    for reminders in [false, true] {
+        for words in ["Good evening.", "Good morning."] {
+            let mut chats = VecDeque::from([vec![text(words), Ok(ChatEvent::Done)]]);
+            if reminders {
+                chats.push_back(vec![text("Time to stretch."), Ok(ChatEvent::Done)]);
+            }
+            let script = Arc::new(Script {
+                chats: Mutex::new(chats),
+                // A written turn must never ask this empty STT script.
+                ..Script::default()
+            });
+            let (engine, calls, _) = scripted(script.clone());
+            let mut engine = engine.announcing(false).saying_reminders(reminders);
+            let request = crate::say::parse(
+                &json!({
+                    "skill": "bedtime-morning",
+                    "text": words,
+                    "priority": 8,
+                    "expires_in_ms": 3_600_000,
+                })
+                .to_string(),
+            )
+            .expect("the routine's exact-word Say request");
+            let instruction = request.words.turn().expect("a written turn");
+            assert_eq!(instruction, format!("{} {words}", crate::say::AS_WRITTEN));
+            engine.submit(written(1, &instruction));
+            assert_eq!(
+                tokio::time::timeout(Duration::from_secs(3), turn(&mut engine))
+                    .await
+                    .expect("the routine's written turn completes"),
+                [
+                    "started:1".to_owned(),
+                    format!("said:{words}"),
+                    format!("audio:{}", words.len()),
+                    "generated".into(),
+                    "complete".into(),
+                ],
+                "reminders={reminders}, words={words}"
+            );
+            assert_eq!(
+                script.asked.lock().unwrap()[0].last(),
+                Some(&Message::user(&instruction))
+            );
+            assert_eq!(script.samples_heard.load(Ordering::Relaxed), 0);
+            assert!(calls.lock().unwrap().is_empty());
+
+            // A real reminder still obeys its separate opt-in. This control
+            // catches accidentally treating the routine as a reminder.
+            engine.submit(reminder(2, "stretch"));
+            let reminder_output = tokio::time::timeout(Duration::from_secs(3), turn(&mut engine))
+                .await
+                .expect("the reminder is completed or deferred");
+            if reminders {
+                assert_eq!(
+                    reminder_output,
+                    [
+                        "started:2",
+                        "said:Time to stretch.",
+                        "audio:16",
+                        "generated",
+                        "complete",
+                    ]
+                );
+                assert_eq!(script.asked.lock().unwrap().len(), 2);
+            } else {
+                assert_eq!(reminder_output, ["deferred:Disabled"]);
+                assert_eq!(script.asked.lock().unwrap().len(), 1);
+            }
+        }
+    }
+}
+
 #[tokio::test]
 async fn a_turn_spoken_over_stops_its_chat_and_speech_and_sends_nothing_more() {
     let script = Arc::new(Script {

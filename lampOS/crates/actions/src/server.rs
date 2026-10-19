@@ -63,6 +63,7 @@ fn answer<S: Mixer, L: Light>(
     mut stream: UnixStream,
     executive: &mut Executive<S, L>,
     schedule: Option<&crate::schedule::Adapter>,
+    mut caps: Option<&mut crate::caps_service::Service>,
 ) {
     let started = Instant::now();
     let served = (|| -> io::Result<(String, Value, Option<Outcome>)> {
@@ -82,39 +83,55 @@ fn answer<S: Mixer, L: Light>(
                 request.get("args").unwrap_or(&Value::Null),
             ))
         });
-        let (name, response, outcome) = match (call, schedule) {
-            (Some((name, args)), Some(adapter)) if crate::schedule::is_tool(name) => {
-                let exact = request
-                    .as_ref()
-                    .and_then(Value::as_object)
-                    .is_some_and(|r| {
-                        r.len() == 3
-                            && r.keys()
-                                .all(|k| matches!(k.as_str(), "op" | "name" | "args"))
-                    });
-                let response = if exact {
-                    adapter.call(name, args)
-                } else {
-                    serde_json::json!({"ok":false,"code":"bad_arguments","error":"I need the exact reminder arguments before I can do that."})
-                };
-                (name.to_owned(), response, None)
-            }
-            (Some((name, args)), _) if crate::is_app_call(name) => {
-                let response = executive
-                    .app_call(name, args)
-                    .expect("an app call is answered");
-                (name.to_owned(), response, None)
-            }
-            (Some((name, args)), _) => {
-                let outcome = executive.call(name, args);
-                let line = outcome.line_for(name, executive.short);
-                (name.to_owned(), line, Some(outcome))
-            }
-            (None, _) => {
-                let outcome = Outcome::Failed("I can't do that.".into());
-                ("(not a call)".to_owned(), outcome.line(), Some(outcome))
+        let cap_op = request
+            .as_ref()
+            .and_then(|request| request.get("op"))
+            .and_then(Value::as_str)
+            .filter(|op| crate::caps_service::is_operation(op));
+        let (name, response, outcome) = if let Some(op) = cap_op {
+            let response = match caps.as_mut() {
+                Some(caps) => caps.answer(&line, &mut executive.sound),
+                None => crate::caps_service::unavailable(),
+            };
+            (op.to_owned(), response, None)
+        } else {
+            match (call, schedule) {
+                (Some((name, args)), Some(adapter)) if crate::schedule::is_tool(name) => {
+                    let exact = request
+                        .as_ref()
+                        .and_then(Value::as_object)
+                        .is_some_and(|r| {
+                            r.len() == 3
+                                && r.keys()
+                                    .all(|k| matches!(k.as_str(), "op" | "name" | "args"))
+                        });
+                    let response = if exact {
+                        adapter.call(name, args)
+                    } else {
+                        serde_json::json!({"ok":false,"code":"bad_arguments","error":"I need the exact reminder arguments before I can do that."})
+                    };
+                    (name.to_owned(), response, None)
+                }
+                (Some((name, args)), _) if crate::is_app_call(name) => {
+                    let response = executive
+                        .app_call(name, args)
+                        .expect("an app call is answered");
+                    (name.to_owned(), response, None)
+                }
+                (Some((name, args)), _) => {
+                    let outcome = executive.call(name, args);
+                    let line = outcome.line_for(name, executive.short);
+                    (name.to_owned(), line, Some(outcome))
+                }
+                (None, _) => {
+                    let outcome = Outcome::Failed("I can't do that.".into());
+                    ("(not a call)".to_owned(), outcome.line(), Some(outcome))
+                }
             }
         };
+        if let Some(caps) = caps.as_mut() {
+            caps.observe_volume_result(&name, &response);
+        }
         let mut reply = response.to_string();
         reply.push('\n');
         stream.write_all(reply.as_bytes())?;
@@ -129,10 +146,19 @@ fn answer<S: Mixer, L: Light>(
             // Its own fixed sentences, never a caller's words.
             eprintln!("lamp-actions: {name}: not done in {took} ms: {said}");
         }
+        // The cap reconciler reads once a second. Successful observation
+        // is not an action or a useful journal transition.
+        Ok((name, reply, None)) if name == "caps_get" && reply["ok"] == true => {}
         Ok((name, reply, None)) => {
             // Neither reminder text nor arbitrary service messages are logged.
             let status = if reply["ok"] == true {
-                "done"
+                if matches!(name.as_str(), "caps_put" | "caps_remove") {
+                    // Persistence acceptance is distinct from mixer readback
+                    // and ring publication, which the reply reports separately.
+                    "accepted"
+                } else {
+                    "done"
+                }
             } else {
                 reply["code"].as_str().unwrap_or("unavailable")
             };
@@ -196,6 +222,27 @@ pub fn serve_reporting_with_schedule<S: Mixer, L: Light>(
     serve_with_clock(directory, executive, stop, health, schedule, &Instant::now)
 }
 
+/// Output caps are independent of Schedule and never enter the model catalog.
+/// Open their state only after owning the socket and clearing stale readiness.
+pub fn serve_reporting_with_caps<S: Mixer, L: Light>(
+    directory: &Path,
+    executive: &mut Executive<S, L>,
+    stop: &AtomicBool,
+    health: Option<lamp_bus::Publisher>,
+    schedule: Option<&crate::schedule::Adapter>,
+    config: Option<&crate::caps_service::Config>,
+) -> io::Result<()> {
+    serve_configured(
+        directory,
+        executive,
+        stop,
+        health,
+        schedule,
+        &Instant::now,
+        || config.map(crate::caps_service::Service::open).transpose(),
+    )
+}
+
 /// [`serve_reporting_with_schedule`] with the clock its two periods are
 /// read on ([`LOOK_AGAIN`] and [`REPORT_EVERY`]): for a test that moves
 /// that clock on instead of waiting out the lamp's seconds. A caller's
@@ -204,12 +251,73 @@ pub fn serve_with_clock<S: Mixer, L: Light>(
     directory: &Path,
     executive: &mut Executive<S, L>,
     stop: &AtomicBool,
-    mut health: Option<lamp_bus::Publisher>,
+    health: Option<lamp_bus::Publisher>,
     schedule: Option<&crate::schedule::Adapter>,
     now: &dyn Fn() -> Instant,
 ) -> io::Result<()> {
+    serve_with_clock_and_caps(directory, executive, stop, health, schedule, now, None)
+}
+
+/// The existing fixture clock with an optional cap service using its own
+/// injected host/wall clock. Product startup uses `serve_reporting_with_caps`.
+pub fn serve_with_clock_and_caps<S: Mixer, L: Light>(
+    directory: &Path,
+    executive: &mut Executive<S, L>,
+    stop: &AtomicBool,
+    health: Option<lamp_bus::Publisher>,
+    schedule: Option<&crate::schedule::Adapter>,
+    now: &dyn Fn() -> Instant,
+    caps: Option<crate::caps_service::Service>,
+) -> io::Result<()> {
+    serve_configured(directory, executive, stop, health, schedule, now, || {
+        Ok(caps)
+    })
+}
+
+struct ServingFiles<'a>(&'a Path);
+impl Drop for ServingFiles<'_> {
+    fn drop(&mut self) {
+        for name in [READY_FILE, CATALOG_FILE, CALL_SOCKET] {
+            let _ = std::fs::remove_file(self.0.join(name));
+        }
+    }
+}
+
+fn set_ready(directory: &Path, ready: bool, previous: &mut Option<bool>) -> io::Result<()> {
+    if *previous == Some(ready) {
+        return Ok(());
+    }
+    if ready {
+        put(directory, READY_FILE, "ready\n")?;
+    } else {
+        match std::fs::remove_file(directory.join(READY_FILE)) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    *previous = Some(ready);
+    Ok(())
+}
+
+fn serve_configured<S: Mixer, L: Light>(
+    directory: &Path,
+    executive: &mut Executive<S, L>,
+    stop: &AtomicBool,
+    mut health: Option<lamp_bus::Publisher>,
+    schedule: Option<&crate::schedule::Adapter>,
+    now: &dyn Fn() -> Instant,
+    start_caps: impl FnOnce() -> io::Result<Option<crate::caps_service::Service>>,
+) -> io::Result<()> {
     std::fs::create_dir_all(directory)?;
     let listener = listen(directory)?;
+    let _files = ServingFiles(directory);
+    let mut ready = None;
+    set_ready(directory, false, &mut ready)?;
+    let mut caps = start_caps()?;
+    if let Some(caps) = caps.as_mut() {
+        caps.tick(&mut executive.sound)?;
+    }
     let offered_now = |executive: &mut Executive<S, L>| {
         let mut offered = executive.offered();
         if schedule.is_some() {
@@ -219,7 +327,11 @@ pub fn serve_with_clock<S: Mixer, L: Light>(
     };
     let mut offered: Vec<Function> = offered_now(executive);
     put(directory, CATALOG_FILE, &catalog_file(&offered))?;
-    put(directory, READY_FILE, "ready\n")?;
+    set_ready(
+        directory,
+        caps.as_ref().is_none_or(|caps| caps.ready()),
+        &mut ready,
+    )?;
     let names = |offered: &[Function]| -> String {
         offered.iter().map(|f| f.name).collect::<Vec<_>>().join(" ")
     };
@@ -228,16 +340,33 @@ pub fn serve_with_clock<S: Mixer, L: Light>(
     let mut reported: Option<Instant> = None;
     let mut answered = 0u64;
     while !stop.load(Ordering::Acquire) {
+        if let Some(caps) = caps.as_mut() {
+            caps.tick(&mut executive.sound)?;
+        }
+        set_ready(
+            directory,
+            caps.as_ref().is_none_or(|caps| caps.ready()),
+            &mut ready,
+        )?;
         if let Some(health) = health.as_mut()
             && reported.is_none_or(|at| now().saturating_duration_since(at) >= REPORT_EVERY)
         {
             reported = Some(now());
-            let _ = health.publish_json(lamp_ipc::monotonic_us(), &report(&offered, answered));
+            let mut diagnostic = report(&offered, answered);
+            if let Some(caps) = caps.as_ref() {
+                diagnostic = diagnostic.with("output_caps_ready", caps.ready());
+            }
+            let _ = health.publish_json(lamp_ipc::monotonic_us(), &diagnostic);
         }
         match listener.accept() {
             Ok((stream, _)) => {
                 answered += 1;
-                answer(stream, executive, schedule)
+                answer(stream, executive, schedule, caps.as_mut());
+                set_ready(
+                    directory,
+                    caps.as_ref().is_none_or(|caps| caps.ready()),
+                    &mut ready,
+                )?;
             }
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => std::thread::sleep(IDLE),
             Err(error) => {
@@ -255,8 +384,10 @@ pub fn serve_with_clock<S: Mixer, L: Light>(
             }
         }
     }
-    let _ = std::fs::remove_file(directory.join(READY_FILE));
-    let _ = std::fs::remove_file(directory.join(CATALOG_FILE));
-    let _ = std::fs::remove_file(directory.join(CALL_SOCKET));
+    if let Some(caps) = caps.as_ref() {
+        // A stop request may win the next loop boundary after a failed
+        // mutation. It must not turn that recorded failure into success.
+        caps.check()?;
+    }
     Ok(())
 }
