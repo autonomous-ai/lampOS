@@ -86,3 +86,6 @@ list".
 - **#1595** (the reminder list's open part): taken; its "kind" part waits on #1682 (First, 11:39: build it after `steps.sh`).
 - #1682 (b) → **#1744**: `deploy/factory/steps.sh` (four steps, dry unless `--write`; step 1 stands the arm at 30% and 100% and writes this arm's `--stand`) + `steps-test.sh`. The reviewer's 2 P2 and 2 P3 at `791b74bf5`: `lamp-body-mood` instead of Python, Ctrl-C eases the arm back, dry touch, CI step. The review also exposed `as_body … &` leaving the body orphaned, arm up (now fixed). Tests 30/30.
 - #1595 kind: `kind` (`timer` | `reminder`) on the Schedule item view, from the stored deadline's elapsed part; branch `thirteen/reminder-kind`.
+- #1752 merged by the reviewer; #1595 closed. #1744 approved (one commit `b020337e3`; the CI step went back to DevOps).
+- **#933** (moves while it speaks): taken. The design is on #933 (12:4x), and the first builder said yes (12:32). → **#1759** takes over #1365 (Third's product `speaking` section, stacked on #1067); #1365 closed with a pointer.
+- lamp-cb94, read-only under the lock with its person's yes: `/etc/lampOS/update/` backed up and logged in Twelve's change log; `/etc/lampOS/body/` absent; Expression from 16 Oct (no `sway_yaw`); its catalogue equals the product's. No unattended stand (the first builder, 12:41): #1744's run and #933's A/B wait for the person at the arm.
