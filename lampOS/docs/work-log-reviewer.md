@@ -4,6 +4,38 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 15:56 #1788: open point settled at c98c7547e; first builder's
+- 15:54 merged #1834 (hw-bench role file, docs)
+- 15:53 merged #1832 (hw-first burn-in script, robots/, by hand; no lampOS ARM64 for that path)
+- 15:52 merged #1824 (skills host-clock tests to realtime group, tests/config, #1806)
+- 15:51 merged #1820 (skills dance tests faster, tests only, #1806)
+- 15:50 read #1775 rebased: no finding; first builder merges
+- 15:45 gated #1792: clean; first builder's
+- 15:44 #1825 ARM64 failed: P2, a copied localtime is named 'localtime' on Linux
+- 15:37 first read #1792 (onboarding privacy proof): privacy path + msgs + install, first builder's
+- 15:36 merged #1823 (lamp-near-call crate, used by nothing yet)
+- 15:35 reviewed #1828 (Harness at boot via user manager HOME): no finding; install path, first builder's
+- 15:28 reviewed #1825 (lamp-schedule --zone system, behaviour-neutral): no finding, merge on green
+- 15:25 reviewed #1822 (voice zone via lamp-local-time): no finding; on by default, first builder's or mine after a lamp run under #1821
+- 15:23 first read #1818 (key terms incl. known faces' names sent to Deepgram, off unless set, on #1712's branch): P2 privacy call for the first builder
+- 15:22 reviewed #1823 (lamp-near-call crate, used by nothing): no finding, merge on green
+- 15:18 gated #1817 (refile of #1782): green; first builder merges
+- 15:11 gated #1794: clean; first builder's
+- 15:08 first read #1782 (voice/turn + hello quiet to the lamp): msgs type on every lamp, fold; first builder's
+- 15:03 gated #1748: clean; first builder's
+- 15:01 merged #1813 (cloud.md: what the backend reads from a report, docs, no ARM64 by rule)
+- 15:01 merged #1805 (voice says computers' own names, off unless set)
+- 14:59 first reads #1748 (mic1 PCM on bus) and #1794 (memory tools bound to request): first builder's
+- 14:59 merged #1780 (install.md: what harness-on trusts, docs)
+- 14:55 first read #1811 (activity judge follows the sitter, stacked on #1760/#1747): first builder's with the stack
+- 14:55 merged #1796 (reports stop by voice reaches lamp-cloud)
+- 14:52 gated #1772 rebased: no finding; first builder's
+- 14:47 reviewed #1805 (voice says computers' own names, off unless set): no finding, merge on green
+- 14:39 #1804 (lamp-c0a4 owner file) tied to #1789's role call; first read #1801 (min_updater, stacked on #1788)
+- 14:38 reviewed #1796 (reports stop by voice reaches lamp-cloud): no finding, merge on green
+- 14:35 full read #1788: open point, timer may run a missing back binary on round-only lamps; P3 network refuse; first builder's
+- 14:34 merged #1787 (Not feeling well core skill, not in product)
+- 14:23 merged #1784 (journal height from published faces, #1771's P3)
 - 14:18 reviewed #1789 (thirteen's role file names lamp-c0a4): loosens ssh and use rules; role call for the first builder
 - 14:16 reviewed #1787 (Not feeling well core skill, not in product): no finding, merge on green
 - 14:13 first read #1788 (lamp-update self-switch, off unless set): conflicts; root timer every 2 min on every lamp may fail where the back binary is missing; first builder's
