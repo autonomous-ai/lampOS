@@ -13,9 +13,9 @@ use std::{
         net::UnixStream,
     },
     path::Path,
-    process::{Child, Command, Stdio},
+    process::{Child, Command, Output, Stdio},
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, PoisonError, RwLock, RwLockReadGuard,
         atomic::{AtomicBool, Ordering},
     },
     thread::{self, JoinHandle},
@@ -37,6 +37,42 @@ fn sample(ms: u64) -> ClockSample {
         boot_id: "test-boot".into(),
         wall_trusted: true,
     }
+}
+
+/// A spawn and a test letting go of a schedule directory it takes again
+/// take turns (#1569 row 27). A child spawned by one test thread holds a
+/// copy of every descriptor, the directory's lock among them, until its
+/// exec closes the close-on-exec ones, and `spawn` returns only after that;
+/// a service started again on the same directory in that moment finds it
+/// `already owned`. So a spawn takes the turn alone ([`spawned`]), and
+/// letting go of a store shares it ([`Running::stop`], and the finite
+/// service in `a_finite_service_stops_and_releases_its_owner`): no child
+/// spawned before can still hold what was let go. It was shown in
+/// lamp-tasks' `tests/runtime.rs`; here it failed so in two workspace
+/// sweeps on this Mac, and this file runs too briefly for a rate to show
+/// alone. nextest, a process for each test, is not affected.
+static SPAWNS: RwLock<()> = RwLock::new(());
+
+fn share() -> RwLockReadGuard<'static, ()> {
+    SPAWNS.read().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// `command` spawned alone in the turn ([`SPAWNS`]).
+fn spawned(command: &mut Command) -> Child {
+    let _turn = SPAWNS.write().unwrap_or_else(PoisonError::into_inner);
+    command.spawn().unwrap()
+}
+
+/// `command`'s output, as `Command::output` gives it, spawned in the turn.
+fn output_of(command: &mut Command) -> Output {
+    spawned(
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    )
+    .wait_with_output()
+    .unwrap()
 }
 
 struct Running {
@@ -100,6 +136,8 @@ impl Running {
         }
     }
     fn stop(&mut self) {
+        // The service lets go of its store in the turn's share.
+        let _share = share();
         self.stop.store(true, Ordering::Release);
         if let Some(handle) = self.handle.take() {
             handle.join().unwrap().unwrap();
@@ -444,18 +482,22 @@ fn a_finite_service_stops_and_releases_its_owner() {
     s.stop();
     let mut config = s.config.clone();
     config.run_for = Some(Duration::from_millis(100));
-    serve(config, s.clock.clone(), Arc::new(AtomicBool::new(false))).unwrap();
+    {
+        // It lets go of the store in the turn's share, as a stop does.
+        let _share = share();
+        serve(config, s.clock.clone(), Arc::new(AtomicBool::new(false))).unwrap();
+    }
     s.start();
     assert_eq!(s.ask(json!({"op":"status"}))["items"], 0);
 }
 #[test]
 fn cli_default_off_does_not_require_a_clock_or_touch_paths() {
     let root = tempfile::tempdir().unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_lamp-schedule"))
-        .args(["serve", "--zone", "Bad/Zone", "--dir"])
-        .arg(root.path().join("data"))
-        .output()
-        .unwrap();
+    let output = output_of(
+        Command::new(env!("CARGO_BIN_EXE_lamp-schedule"))
+            .args(["serve", "--zone", "Bad/Zone", "--dir"])
+            .arg(root.path().join("data")),
+    );
     assert!(output.status.success());
     assert_eq!(
         serde_json::from_slice::<Value>(&output.stdout).unwrap()["enabled"],
@@ -470,10 +512,7 @@ fn cli_rejects_unknown_and_repeated_options() {
         vec!["serve", "--enable", "--enable"],
         vec!["serve", "--run-for-ms", "0"],
     ] {
-        let output = Command::new(env!("CARGO_BIN_EXE_lamp-schedule"))
-            .args(args)
-            .output()
-            .unwrap();
+        let output = output_of(Command::new(env!("CARGO_BIN_EXE_lamp-schedule")).args(args));
         assert!(!output.status.success());
     }
 }
@@ -511,7 +550,7 @@ impl Drop for ChildGuard {
     }
 }
 fn cli(config: &Config) -> ChildGuard {
-    ChildGuard(
+    ChildGuard(spawned(
         Command::new(env!("CARGO_BIN_EXE_lamp-schedule"))
             .args([
                 "serve",
@@ -529,10 +568,8 @@ fn cli(config: &Config) -> ChildGuard {
             .arg("--bus-root")
             .arg(&config.bus_root)
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .unwrap(),
-    )
+            .stderr(Stdio::null()),
+    ))
 }
 fn wait_cli(config: &Config, child: &mut ChildGuard) {
     let start = Instant::now();
