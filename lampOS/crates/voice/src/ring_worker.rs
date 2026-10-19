@@ -56,6 +56,8 @@ fn now() -> MonoTime {
 /// [`Senses::default`].
 #[derive(Default)]
 pub struct Senses {
+    /// Enabled cap intake, dark until a complete valid snapshot is accepted.
+    pub caps: Option<crate::ring_caps::RingCaps>,
     pub light: Option<(RingLight, Lit)>,
     pub eye: bool,
     /// The strong eye ([`Face::eye_strong`]), only with `eye`.
@@ -111,6 +113,41 @@ pub fn run(mut link: WorkerChannels, controller_boot: BootId) -> io::Result<()> 
     }
 }
 
+/// The bounded directed worker uses the same caps as the continuous worker.
+#[cfg(target_os = "linux")]
+pub fn run_with_caps(
+    mut link: WorkerChannels,
+    controller_boot: BootId,
+    bus_root: Option<&std::path::Path>,
+) -> io::Result<()> {
+    let senses = Senses {
+        caps: Some(open_caps(bus_root)),
+        ..Senses::default()
+    };
+    match lamp_ring::linux::open(controller_boot) {
+        Ok((ring, _configuration)) => run_guarded(link, controller_boot, ring, false, None, senses),
+        Err(error) => report_start_failure(&mut link, error),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn open_caps(bus_root: Option<&std::path::Path>) -> crate::ring_caps::RingCaps {
+    let opened = bus_root
+        .ok_or_else(|| io::Error::other("output caps require --bus-root"))
+        .and_then(|root| {
+            boot_clock().and_then(|clock| crate::ring_caps::RingCaps::on(root, &clock))
+        });
+    match opened {
+        Ok(caps) => caps,
+        Err(error) => {
+            eprintln!(
+                "lamp-voice ring: output caps unavailable; ordinary output stays dark: {error}"
+            );
+            crate::ring_caps::RingCaps::dark()
+        }
+    }
+}
+
 /// What the continuous ring runs with, as `lamp-voice ring` is started.
 #[cfg(target_os = "linux")]
 #[derive(Clone, Copy, Debug, Default)]
@@ -122,6 +159,7 @@ pub struct RingOptions<'a> {
     pub head_touch: bool,
     pub light_requests: bool,
     pub light_keep: Option<&'a std::path::Path>,
+    pub output_caps: bool,
 }
 
 /// Supervisor-only lifetime selection. This removes the finite test ceiling,
@@ -150,7 +188,9 @@ pub fn run_continuous(
         head_touch,
         light_requests,
         light_keep,
+        output_caps,
     } = options;
+    let caps = output_caps.then(|| open_caps(bus_root));
     let light = bus_root.and_then(|root| match RingLight::on_keeping(root, light_keep) {
         Ok((mut light, begins)) => {
             // Without them the ring still shows the person's light.
@@ -186,6 +226,7 @@ pub fn run_continuous(
             }
         });
     let senses = Senses {
+        caps,
         light,
         eye,
         eye_strong,
@@ -473,6 +514,7 @@ fn service(
     // The lamp's own light, which is that face at rest: the one last asked
     // for on the bus, and from here on whatever is asked for.
     let Senses {
+        mut caps,
         light,
         eye,
         eye_strong,
@@ -489,6 +531,7 @@ fn service(
     // From zero, so a late startup black write in GuardedRing::new is said too.
     let mut late_said = 0;
     let mut lapse = Lapse::default();
+    let mut cap_ceiling = if caps.is_some() { 0 } else { 120 };
     // With LAMP_STALLS=on: a pass of this loop, or a gap between two, of
     // 50 ms or more is recorded, against its lease (#1178).
     let mut stalls = crate::stalls::Stalls::from_environment("ring");
@@ -538,6 +581,16 @@ fn service(
         // only a bounded few at a time (#849 review).
         if let Some(head) = head.as_mut() {
             face.hand(head.tick(at));
+        }
+        if let Some(caps) = caps.as_mut() {
+            let next = caps.tick(at);
+            if next < cap_ceiling {
+                // A tighter cap must not leave an earlier bright frame
+                // latched while no new turn frame arrives. This is an
+                // explicit protective blank, not lost turn authority.
+                ring.off().map_err(io::Error::other)?;
+            }
+            cap_ceiling = next;
         }
         if budget > 0 && pending.is_none() {
             pending = link.receive_frame()?;
@@ -592,8 +645,8 @@ fn service(
                     {
                         reject(link, frame, reason.into())?;
                     } else {
-                        let ceiling =
-                            ChannelCeiling::new(frame.ceiling).map_err(io::Error::other)?;
+                        let ceiling = ChannelCeiling::new(frame.ceiling.min(cap_ceiling))
+                            .map_err(io::Error::other)?;
                         if let Some(sight) = sight.as_mut() {
                             face.toward(sight.tick(monotonic_us()));
                         }
@@ -643,6 +696,8 @@ fn service(
             && at.saturating_sub(rested_at) >= RESTING_INTERVAL_US
         {
             rested_at = at;
+            let ceiling = ChannelCeiling::new(u16::from(ceiling.get()).min(cap_ceiling))
+                .map_err(io::Error::other)?;
             let pixels = face.render(Mood::Resting, 0, at, ceiling.get());
             let own_light = face.rests_on_its_light(at);
             rest(ring, &pixels, ceiling, own_light, light.as_mut())?;

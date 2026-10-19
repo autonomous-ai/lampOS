@@ -286,7 +286,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 25] = [
+const PERSON_STORES: [&str; 27] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -307,6 +307,10 @@ const PERSON_STORES: [&str; 25] = [
     "/var/lib/lampos-tasks/.harness/hook-routes",
     "/var/lib/lampos-tasks/.harness/logs",
     "/var/lib/lampos-schedule/store",
+    // Daily routine claims and durable output restrictions belong to this
+    // owner even when their switches are currently off.
+    "/var/lib/lampos-skills-state",
+    "/var/lib/lampos-output-caps",
     "/var/lib/lampos-policy",
     "/var/lib/lampOS/voice/sessions",
     "/var/lib/lampOS/voice/schedule-delivery",
@@ -416,6 +420,50 @@ fn the_product_plan_is_the_example_stopped_by_systemd() {
         },
         example
     );
+}
+
+#[test]
+fn the_product_reset_wipes_daily_claims_and_caps_but_keeps_service_directories() {
+    let plan: Plan =
+        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+    plan.check().unwrap();
+    let root = Root::new();
+    let stores = ["lampos-skills-state", "lampos-output-caps"];
+    for store in stores {
+        let path = root.path(store);
+        fs::create_dir(&path).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+        // Wipe the whole store, including a write interrupted by power loss
+        // and any state kept aside, rather than one currently known filename.
+        for file in ["state", "state.new", "set-aside/previous"] {
+            let file = path.join(file);
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(file, b"previous owner's state").unwrap();
+        }
+    }
+    fs::write(root.path("lampos-skills-state/daily.json"), b"{}").unwrap();
+    fs::write(
+        root.path("lampos-output-caps/schedule.sqlite3"),
+        b"snapshot",
+    )
+    .unwrap();
+    fs::write(root.path("kept-setting"), b"kept").unwrap();
+    for store in stores {
+        let installed = Path::new("/var/lib").join(store);
+        assert!(
+            plan.wipe.contains(&installed),
+            "{store} is absent from the product plan"
+        );
+        let local = root.path(store);
+        reset::wipe(&local).unwrap();
+        assert!(local.is_dir());
+        assert_eq!(fs::read_dir(&local).unwrap().count(), 0);
+        assert_eq!(
+            fs::metadata(&local).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+    }
+    assert_eq!(fs::read(root.path("kept-setting")).unwrap(), b"kept");
 }
 
 fn event(at_us: u64, held_us: u64) -> TouchEvent {

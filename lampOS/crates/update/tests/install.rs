@@ -987,7 +987,8 @@ fn every_skill_folder_is_in_the_product_or_says_why_not() {
 /// lamp gets `lamp-skills` and every product skill whole but its tests,
 /// byte for byte, and no other skill. The voice speaks them through its say
 /// service; its own hello is off, so the lamp greets once, and its reminders
-/// and task news wait for their skills' asks, so each is told once.
+/// and task news wait for their skills' asks, so each is told once. Installed
+/// skills still keep their own enabled default; installation does not run one.
 #[test]
 fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
     let mut lamp = Lamp::new(188, &[]);
@@ -1053,6 +1054,163 @@ fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
     // voice reads at each session (#1656), not the actions part's.
     assert!(skills.contains("--tools-dir /run/lampos-skills"));
     assert!(service.contains(&"Environment=LAMP_ACTIONS_DIR=/run/lampos-actions"));
+}
+
+#[test]
+fn the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs() {
+    let mut lamp = Lamp::new(195, &[]);
+    lamp.install().unwrap();
+    let root = lamp.on("/var/lib/lampOS/skills");
+    let installed: Vec<_> = install::PRODUCT_SKILLS
+        .iter()
+        .map(|name| lamp_skills::load(&root.join(name)).unwrap())
+        .collect();
+    assert_eq!(installed.len(), 7);
+    let bedtime = installed
+        .iter()
+        .find(|skill| skill.name == "bedtime-morning")
+        .unwrap();
+    assert!(!bedtime.enabled);
+    assert!(bedtime.tool.is_none());
+    assert_eq!(bedtime.kind, lamp_skills::SkillKind::Core);
+    assert_eq!(bedtime.version.as_deref(), Some("1.0.0"));
+    assert_eq!(
+        bedtime.permissions,
+        lamp_skills::Permissions {
+            topics: vec!["humans/faces/tracked".into(), "voice/state".into()],
+            speak: true,
+            light: true,
+            body: true,
+            output_limits: true,
+            ..Default::default()
+        }
+    );
+    assert!(root.join("bedtime-morning/SKILL.md").is_file());
+    // Inventory includes the disabled core and its grants; only live skills
+    // contribute functions. The six live skills still offer Dance alone.
+    let inventory = lamp_skills::load_each(&root);
+    assert_eq!(inventory.len(), 7);
+    assert!(inventory.iter().all(|(_, skill)| skill.is_ok()));
+    let listed = lamp_skills::package::list(&root).unwrap();
+    let row = listed
+        .lines()
+        .find(|line| line.split_whitespace().next() == Some("bedtime-morning"))
+        .unwrap();
+    assert_eq!(
+        row.split_whitespace().take(4).collect::<Vec<_>>(),
+        ["bedtime-morning", "core", "1.0.0", "disabled;"]
+    );
+    assert!(
+        listed
+            .lines()
+            .last()
+            .unwrap()
+            .starts_with("The skills here give the model 1 function (dance)."),
+        "{listed}"
+    );
+    let (live, errors) = lamp_skills::load_all(&root);
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(live.len(), 6);
+    assert!(live.iter().all(|skill| skill.name != bedtime.name));
+    assert_eq!(
+        lamp_skills::tools_file(&installed),
+        lamp_skills::tools_file(&live)
+    );
+    // Even a caller that passes the disabled file directly cannot subscribe
+    // its triggers or advertise it beside the product's live tools.
+    assert!(
+        lamp_skills::Engine::new(vec![bedtime.clone()], true)
+            .topics()
+            .is_empty()
+    );
+    assert_eq!(
+        lamp_skills::tools_file(std::slice::from_ref(bedtime)),
+        serde_json::json!({"tools":[]})
+    );
+}
+
+#[test]
+fn product_routine_state_is_private_persistent_and_keeps_new_switches_off() {
+    let mut lamp = Lamp::new(196, &[]);
+    lamp.install().unwrap();
+    for (unit, directory, argument, path) in [
+        (
+            "lamp-skills.service",
+            "lampos-skills-state",
+            "--daily-state",
+            "/var/lib/lampos-skills-state/daily.json",
+        ),
+        (
+            "lamp-actions.service",
+            "lampos-output-caps",
+            "--caps-dir",
+            "/var/lib/lampos-output-caps",
+        ),
+    ] {
+        let installed =
+            fs::read_to_string(lamp.on(&format!("/etc/systemd/system/{unit}"))).unwrap();
+        let service = section(&installed, "Service");
+        for required in [
+            format!("User={}", install::USER),
+            format!("Group={}", install::USER),
+            format!("StateDirectory={directory}"),
+            "StateDirectoryMode=0700".into(),
+            "ProtectSystem=strict".into(),
+        ] {
+            assert_eq!(
+                service.iter().filter(|line| **line == required).count(),
+                1,
+                "{unit}: {required}"
+            );
+        }
+        let command = service
+            .iter()
+            .find_map(|line| line.strip_prefix("ExecStart="))
+            .unwrap();
+        let arguments: Vec<_> = command.split_whitespace().collect();
+        assert_eq!(
+            arguments
+                .windows(2)
+                .filter(|pair| pair[0] == argument)
+                .collect::<Vec<_>>(),
+            [&[argument, path][..]],
+            "{unit}"
+        );
+        assert!(Path::new(path).starts_with(format!("/var/lib/{directory}")));
+    }
+    for (unit, text) in install::PRODUCT {
+        for line in section(text, "Service") {
+            for switch in [
+                "LAMP_SKILL_ROUTINES",
+                "LAMP_REST_REQUESTS",
+                "LAMP_OUTPUT_CAPS",
+            ] {
+                assert!(!line.contains(&format!("{switch}=on")), "{unit}: {line}");
+            }
+        }
+    }
+    // Actions needs no caps path while off, and the product's new argument
+    // alone must not open persistent storage or opt into the cap service.
+    let caps = Path::new("/var/lib/lampos-output-caps");
+    let bus = Path::new("/run/lampos-bus");
+    assert!(
+        lamp_actions::caps_service::Config::configured(None, None, None)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        lamp_actions::caps_service::Config::configured(None, Some(caps), Some(bus))
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        lamp_actions::caps_service::Config::configured(
+            Some(std::ffi::OsStr::new("on")),
+            None,
+            Some(bus)
+        )
+        .is_err()
+    );
 }
 
 /// The skills' tools were in the actions part's folder, which systemd

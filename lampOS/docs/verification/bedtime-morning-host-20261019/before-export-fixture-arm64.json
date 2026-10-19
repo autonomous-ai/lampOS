@@ -1,0 +1,95 @@
+{
+  "head": "c7f9c908796fb58b6846dff2361b725b16f74132",
+  "event": "pull_request",
+  "tested_checkout": "9eeb73f0a019d1fd0c65db5bcd8e8d4704a5988c",
+  "tested_base": "da0806945ec6319fc1ce13443cd46945d317bca5",
+  "checkout_note": "Pull-request run tests the GitHub merge commit; the artifact is named for the PR head.",
+  "run": 39221703897,
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39221703897",
+  "conclusion": "success",
+  "nextest_passed": 7520,
+  "nextest_leaky": 1,
+  "nextest_skipped": 48,
+  "doc_tests": 4,
+  "own_harness_tests": 12,
+  "relay_signals_ok": true,
+  "log_sha256": "2e3f1df3093f026d6ed17c15181b9dbe18b89c5d35d2287b9fded1c73832d0c6",
+  "warnings": [
+    "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost",
+    "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp",
+    "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost",
+    "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+  ],
+  "steps": [
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "system packages",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Rust 1.96.0",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/cache@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run taiki-e/install-action@v2",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "build (release, the lamps' binaries)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "SHA-256 of each binary",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/upload-artifact@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Post Run actions/cache@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Post Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ]
+}

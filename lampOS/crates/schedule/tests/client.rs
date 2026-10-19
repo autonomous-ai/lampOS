@@ -1,5 +1,5 @@
 //! Scripted Unix endpoints only; no lamp or production Schedule service.
-use lamp_schedule::client::{ErrorKind, MAX_BYTES, exchange};
+use lamp_schedule::client::{ErrorKind, MAX_BYTES, connect, exchange, exchange_guarded};
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -36,6 +36,70 @@ fn read_request(stream: &mut UnixStream) -> Value {
 }
 fn until() -> Instant {
     Instant::now() + Duration::from_secs(3)
+}
+
+#[test]
+fn standalone_connect_returns_nonblocking_without_sending_a_request() {
+    let (_root, socket, listener) = fixture();
+    let stream = connect(&socket, until()).unwrap();
+    assert!(
+        rustix::fs::fcntl_getfl(&stream)
+            .unwrap()
+            .contains(rustix::fs::OFlags::NONBLOCK)
+    );
+    let (mut peer, _) = listener.accept().unwrap();
+    peer.set_nonblocking(true).unwrap();
+    assert_eq!(
+        peer.read(&mut [0]).unwrap_err().kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+}
+
+#[test]
+fn guarded_exchange_checks_authority_after_connect_before_sending() {
+    use std::sync::{Arc, Mutex, mpsc};
+
+    let (_root, socket, listener) = fixture();
+    let allowed = Arc::new(Mutex::new(true));
+    let revoked = Arc::clone(&allowed);
+    let (send, receive) = mpsc::sync_channel(1);
+    let worker = thread::spawn(move || {
+        let mut stream = incoming(listener);
+        *revoked.lock().unwrap() = false;
+        send.send(()).unwrap();
+        assert_eq!(stream.read(&mut [0]).unwrap(), 0);
+    });
+    let error = exchange_guarded(&socket, &json!({"op":"set"}), until(), || {
+        receive.recv_timeout(Duration::from_secs(1)).unwrap();
+        let guard = allowed.lock().unwrap();
+        (*guard).then_some(guard)
+    })
+    .unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Unavailable);
+    assert!(!error.may_have_sent);
+    worker.join().unwrap();
+}
+
+#[test]
+fn guarded_exchange_releases_authority_before_waiting_for_reply() {
+    use std::sync::{Arc, Mutex};
+
+    let (_root, socket, listener) = fixture();
+    let allowed = Arc::new(Mutex::new(true));
+    let revoked = Arc::clone(&allowed);
+    let worker = thread::spawn(move || {
+        let mut stream = incoming(listener);
+        assert_eq!(read_request(&mut stream), json!({"op":"set"}));
+        *revoked.lock().unwrap() = false;
+        stream.write_all(b"{\"ok\":true}\n").unwrap();
+    });
+    let answer = exchange_guarded(&socket, &json!({"op":"set"}), until(), || {
+        let guard = allowed.lock().unwrap();
+        (*guard).then_some(guard)
+    })
+    .unwrap();
+    assert_eq!(answer, json!({"ok":true}));
+    worker.join().unwrap();
 }
 
 #[test]
@@ -80,6 +144,10 @@ fn validates_path_object_and_size_before_opening_a_socket() {
 fn expired_deadline_never_connects_and_missing_socket_is_not_sent() {
     let (_root, socket, listener) = fixture();
     listener.set_nonblocking(true).unwrap();
+    let error = connect(&socket, Instant::now()).unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Timeout);
+    assert!(!error.may_have_sent);
+    assert!(listener.accept().is_err());
     let error = exchange(&socket, &json!({}), Instant::now()).unwrap_err();
     assert_eq!(error.kind, ErrorKind::Timeout);
     assert!(!error.may_have_sent);
@@ -210,6 +278,9 @@ fn full_unix_accept_queue_is_unavailable_not_a_false_connection() {
         }
     }
     assert!(full);
+    let error = connect(&socket, until()).unwrap_err();
+    assert_eq!(error.kind, ErrorKind::Unavailable);
+    assert!(!error.may_have_sent);
     let error = exchange(&socket, &json!({}), until()).unwrap_err();
     assert_eq!(error.kind, ErrorKind::Unavailable);
     assert!(!error.may_have_sent);

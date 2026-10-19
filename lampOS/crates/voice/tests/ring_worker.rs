@@ -84,13 +84,18 @@ impl Rig {
         Self::start_with(fail_at, false)
     }
     fn start_with(fail_at: &[usize], late_first: bool) -> Self {
-        Self::start_full(fail_at, late_first, None)
+        Self::start_full(fail_at, late_first, None, None)
     }
     /// With the all-day worker's senses, for the head's requests (#711).
     fn start_with_senses(senses: Senses) -> Self {
-        Self::start_full(&[], false, Some(senses))
+        Self::start_full(&[], false, Some(senses), None)
     }
-    fn start_full(fail_at: &[usize], late_first: bool, senses: Option<Senses>) -> Self {
+    fn start_full(
+        fail_at: &[usize],
+        late_first: bool,
+        senses: Option<Senses>,
+        resting: Option<u16>,
+    ) -> Self {
         let directory = SessionDirectory::create().unwrap();
         let boot = new_boot().unwrap();
         let child_boot = new_boot().unwrap();
@@ -116,7 +121,7 @@ impl Rig {
         let (tx, completion) = mpsc::channel();
         let worker = thread::spawn(move || {
             let _ = tx.send(match senses {
-                Some(senses) => run_with_sink_senses(link, boot, sink, None, senses),
+                Some(senses) => run_with_sink_senses(link, boot, sink, resting, senses),
                 None => run_with_sink(link, boot, sink),
             });
         });
@@ -227,6 +232,233 @@ fn present(rig: &Rig, frame: RingFrame) {
     assert!(
         matches!(rig.event(), WorkerEvent::Ring { report: RingFeedback::Presented { requested_at_us, .. } } if requested_at_us == frame.requested_at_us)
     );
+}
+
+fn cap_peak(frame: &EncodedFrame) -> u8 {
+    frame.bytes()[lamp_ring::PRIMER_BYTES..lamp_ring::PRIMER_BYTES + lamp_ring::PIXEL_COUNT * 24]
+        .chunks_exact(8)
+        .map(|bits| {
+            bits.iter()
+                .fold(0, |value, bit| (value << 1) | u8::from(*bit == 0xfc))
+        })
+        .max()
+        .unwrap_or(0)
+}
+
+fn publish_cap(publisher: &mut lamp_bus::Publisher, revision: u64, limit: u16) {
+    let wall = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    let value = lamp_msgs::OutputCaps {
+        stamp: lamp_msgs::ClockStamp {
+            clock_id: "caps-test-boot".into(),
+            at_us: monotonic_us(),
+            sequence: publisher.totals().published + 1,
+        },
+        session_id: publisher.boot().into(),
+        revision,
+        entries: vec![lamp_msgs::OutputCap {
+            source: "daily-rest".into(),
+            token: format!("revision-{revision}"),
+            issued_unix_ms: wall,
+            valid_until_unix_ms: wall + 60_000,
+            light_channel_max: Some(limit),
+            volume_raw_max: None,
+        }],
+    };
+    publisher.publish_json(value.stamp.at_us, &value).unwrap();
+}
+
+fn cap_input(
+    limit: u16,
+) -> (
+    SessionDirectory,
+    lamp_bus::Publisher,
+    lamp_voice::ring_caps::RingCaps,
+) {
+    let directory = SessionDirectory::create().unwrap();
+    let bus = lamp_bus::Bus::new(&directory.path).unwrap();
+    let mut publisher = bus
+        .publisher_declared(
+            lamp_msgs::OutputCaps::TOPIC,
+            &lamp_msgs::OutputCaps::declaration(),
+            lamp_msgs::OutputCaps::SOURCE,
+        )
+        .unwrap();
+    let mut caps = lamp_voice::ring_caps::RingCaps::on(&directory.path, "caps-test-boot").unwrap();
+    publish_cap(&mut publisher, 1, limit);
+    let until = Instant::now() + Duration::from_secs(1);
+    while caps.tick(monotonic_us()) != limit {
+        assert!(Instant::now() < until, "initial cap never arrived");
+        thread::sleep(Duration::from_millis(2));
+    }
+    (directory, publisher, caps)
+}
+
+#[test]
+fn output_caps_start_dark_before_any_snapshot_even_with_a_valid_turn() {
+    let mut rig = Rig::start_with_senses(Senses {
+        caps: Some(lamp_voice::ring_caps::RingCaps::dark()),
+        ..Senses::default()
+    });
+    rig.ready();
+    let (mut controller, owner) = conversation(rig.boot);
+    present(&rig, frame(&mut controller, owner, 200_000));
+    assert_eq!(rig.colored(), 0);
+    rig.control(Control::Stop);
+    rig.finish().unwrap();
+}
+
+#[test]
+fn output_caps_clamp_turn_frames_and_tightening_blanks_latched_pixels_without_a_new_frame() {
+    let (directory, mut publisher, caps) = cap_input(30);
+    let mut rig = Rig::start_with_senses(Senses {
+        caps: Some(caps),
+        ..Senses::default()
+    });
+    rig.ready();
+    let (mut controller, owner) = conversation(rig.boot);
+    let mut bright = frame(&mut controller, owner, 250_000);
+    bright.ceiling = 120;
+    present(&rig, bright);
+    thread::sleep(Duration::from_millis(90));
+    let mut original = frame(&mut controller, owner, 250_000);
+    original.ceiling = 120;
+    present(&rig, original);
+    let before = rig.writes.lock().unwrap().frames.len();
+    let peak = cap_peak(&rig.writes.lock().unwrap().frames[before - 1]);
+    assert!(peak > 0 && peak <= 30, "turn peak {peak}");
+    let began = Instant::now();
+    publish_cap(&mut publisher, 2, 12);
+    loop {
+        let blanked = {
+            let writes = rig.writes.lock().unwrap();
+            writes.frames[before..].contains(&EncodedFrame::black())
+        };
+        if blanked {
+            break;
+        }
+        assert!(
+            began.elapsed() < Duration::from_millis(150),
+            "tightening did not actively blank"
+        );
+        thread::sleep(Duration::from_millis(1));
+    }
+    assert!(
+        monotonic_us() < original.permit.expires_at().as_micros(),
+        "blank must precede permit expiry"
+    );
+    let mut bright = frame(&mut controller, owner, 200_000);
+    bright.ceiling = 120;
+    present(&rig, bright);
+    assert!(cap_peak(rig.writes.lock().unwrap().frames.last().unwrap()) <= 12);
+    rig.control(Control::Stop);
+    rig.finish().unwrap();
+    drop(publisher);
+    std::fs::remove_dir_all(&directory.path).unwrap();
+}
+
+#[test]
+fn output_caps_clamp_resting_frames_and_preserve_the_persons_light_off_setting() {
+    let (directory, publisher, caps) = cap_input(12);
+    let bus = lamp_bus::Bus::new(&directory.path).unwrap();
+    let mut person = bus
+        .publisher_declared(
+            lamp_msgs::Light::TOPICS[0],
+            &lamp_msgs::Light::declaration(),
+            "actions",
+        )
+        .unwrap();
+    person
+        .publish_json(
+            monotonic_us(),
+            &lamp_msgs::Light::new(true, "white", 5).unwrap(),
+        )
+        .unwrap();
+    let light = lamp_voice::ring_light::RingLight::on(&directory.path).unwrap();
+    let mut rig = Rig::start_full(
+        &[],
+        false,
+        Some(Senses {
+            caps: Some(caps),
+            light: Some(light),
+            ..Senses::default()
+        }),
+        Some(40),
+    );
+    rig.ready();
+    let mut controller = Controller::new(rig.boot, now());
+    controller
+        .set_microphone_permission(now(), Permission::Allowed)
+        .unwrap();
+    let until = now().checked_add(900_000).unwrap();
+    controller
+        .set_capture(now(), CaptureState::RetainingUntil(until))
+        .unwrap();
+    controller
+        .set_admission(now(), AdmissionState::OpenUntil(until))
+        .unwrap();
+    let began = Instant::now();
+    loop {
+        rig.control(Control::Authority {
+            snapshot: controller.snapshot(now()).unwrap(),
+        });
+        if began.elapsed() >= Duration::from_millis(150) && rig.colored() >= 4 {
+            break;
+        }
+        assert!(began.elapsed() < Duration::from_millis(500));
+        thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        rig.writes
+            .lock()
+            .unwrap()
+            .frames
+            .iter()
+            .all(|frame| cap_peak(frame) <= 12)
+    );
+    person
+        .publish_json(
+            monotonic_us(),
+            &lamp_msgs::Light::new(false, "white", 5).unwrap(),
+        )
+        .unwrap();
+    let off = Instant::now();
+    loop {
+        // The existing face eases toward the ember, including fractional
+        // pixel rounding. Keep input genuinely ready while it settles.
+        let until = now().checked_add(900_000).unwrap();
+        controller
+            .set_capture(now(), CaptureState::RetainingUntil(until))
+            .unwrap();
+        controller
+            .set_admission(now(), AdmissionState::OpenUntil(until))
+            .unwrap();
+        rig.control(Control::Authority {
+            snapshot: controller.snapshot(now()).unwrap(),
+        });
+        let person_is_off = bus
+            .latest(lamp_voice::ring_light::DRAWN_TOPIC)
+            .unwrap()
+            .is_some_and(|message| !message.parse::<lamp_msgs::Light>().unwrap().on);
+        let peak = cap_peak(rig.writes.lock().unwrap().frames.last().unwrap());
+        if person_is_off && (1..=3).contains(&peak) {
+            break;
+        }
+        assert!(
+            off.elapsed() < Duration::from_secs(1),
+            "light-off ember did not settle: peak {peak}"
+        );
+        thread::sleep(Duration::from_millis(5));
+    }
+    // Existing light-off behavior is the three-step readiness ember, not a
+    // request to turn the person's full light on when a cap is present.
+    assert!(cap_peak(rig.writes.lock().unwrap().frames.last().unwrap()) <= 3);
+    rig.control(Control::Stop);
+    rig.finish().unwrap();
+    drop((person, publisher));
+    std::fs::remove_dir_all(&directory.path).unwrap();
 }
 
 #[test]

@@ -17,9 +17,13 @@ Slice=lampos-parts.slice
 SupplementaryGroups=audio
 RuntimeDirectory=lampos-actions
 RuntimeDirectoryMode=0755
+# Private durable cap state, separate from the runtime socket directory.
+# The path does not turn LAMP_OUTPUT_CAPS on.
+StateDirectory=lampos-output-caps
+StateDirectoryMode=0700
 Environment=LAMP_SCHEDULE_TOOLS=on
 Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
-ExecStart=/opt/lampOS/actions/current/lamp-actions --dir /run/lampos-actions --mixer-card allwinnerhdmi --mixer-control Speaker --volume-ceiling 100 --bus-root /run/lampos-bus
+ExecStart=/opt/lampOS/actions/current/lamp-actions --dir /run/lampos-actions --mixer-card allwinnerhdmi --mixer-control Speaker --volume-ceiling 100 --bus-root /run/lampos-bus --caps-dir /var/lib/lampos-output-caps
 Restart=on-failure
 RestartSec=2s
 StandardInput=null

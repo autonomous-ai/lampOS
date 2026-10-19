@@ -137,10 +137,12 @@ must not leave a step silently undone)*.
 
 | Key | Required | What it is |
 |---|---|---|
+| `enabled` | no | Boolean, true by default for existing skills. False still validates the folder but removes its active triggers and model tools |
+| `[limits]` | no | A local `during = { from, to }` window and one or both of `light_channel_max` (12–120) and `volume_raw_max` (1–100). Private, durable restrictions; requires `permissions.output_limits = true` and the routine and cap switches. See [Bedtime and Morning](bedtime-morning.md#durable-output-ceilings) |
 | `needs` | no | The parts it uses (`eyes`, `ears`, `air`, `voice`, `body`, `light`, ...): which bodies it suits, as V1's capabilities. Kept, not checked yet; what it may do is `[permissions]`, which is checked |
 | `kind` | no | `core` (comes with the lamp, always there, never removed) or `installable` (its owner puts it on and takes it off), `installable` without it (below, "Core and installable skills") |
 | `version` | no, but a package needs it | The skill's own version, `MAJOR.MINOR.PATCH`, three whole numbers without leading zeros (`"1.0.0"`) |
-| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, each `true` or left out. A key not listed refuses the skill, and so does a read or a step it does not give |
+| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, `output_limits`, each `true` or left out. A key not listed refuses the skill, and so does a read or a step it does not give |
 | `[trigger]` or `[[trigger]]` | yes, unless it has a `tool` | When the skill runs: one table, or several, each checked on its own |
 | `tool` | no | A function the model may call, which runs the steps (below, "Tools for the model"). A lowercase letter, then at most 47 lowercase letters, digits and `_`. It is described to the model with `SKILL.md`'s description, which is then at most 1,024 bytes and says when to call it |
 | `[choice]` | no | The tool's one argument the model picks from named values: `name` (a lowercase letter, then at most 31 lowercase letters, digits and `_`), `about` (what it means, told to the model, at most 256 bytes) and `one_of` (1 to 16 different plain names), with an optional `default`, one of them: a call that gives none is made as that value (#1679: Light show's party, Point the light's ahead). The model may leave it out. Only with a `tool` |
@@ -148,6 +150,9 @@ must not leave a step silently undone)*.
 | `[again]` | no | When the tool runs again soon after it ran: `within` (a duration) and `if_heard` (at least one entry, each one or more whole words; any case). Within `within` of the tool's last run, counted from when that run began, a call runs only if the newest thing heard on `voice/heard`, finished or not, its pieces joined as the voice joins them, began after that run began and has one of the entries among its whole words (an entry of two words, as "one more", in a row); otherwise nothing is done and the model is answered with the error `told` (at most 256 bytes; a general "you just did this" without it). A word is what is between characters that are not letters or digits, so "dance" is not in "guidance" nor "again" in "against". Nothing heard since counts as not asked. A refused call does not count as a run. With it, `lamp-skills` subscribes to `voice/heard`. Only with a `tool` |
 | `still` | no | What the model is told, as an error, of a call while the tool's last run is under way, in a skill with no pose (`do.body.mood`) and no `do.look`: nothing is done, and it does not count as a run (at most 256 bytes; "I'm still doing that." without it). Only with a `tool` |
 | `trigger.topic` | yes | The topic it listens to |
+| `trigger.present` | no | Explicit presence or absence on `humans/faces/tracked`; false requires a fresh, valid empty face list, never a missing camera |
+| `trigger.during` | no | Local `{ from = "HH:MM", to = "HH:MM" }`, start included and end excluded; overnight windows are allowed. Unknown time holds the trigger back |
+| `trigger.once_per_day` | no | Boolean, false by default. Requires a named trigger and `during`, disallows `each`, and consumes a durable daily chance before Policy or output; needs `--daily-state` |
 | `trigger.field` with one of `equals`, `above`, `below` | yes, except on `humans/faces/tracked` | What a message must show for the trigger to hold. A number is compared as a number, anything else exactly. On `humans/faces/tracked` without them, it holds while a face is in view |
 | `trigger.when` | no | `present` (the default): it holds, and has held for `for`. `appears`: it holds where it did not just before, once each time. `leaves` and `changes` are refused for now |
 | `trigger.near` | no | On `humans/faces/tracked` alone: only a face at least this share of the picture's height counts (Welcome back: 0.14, the voice's Arrival's line for someone at the desk) |
@@ -176,10 +181,12 @@ must not leave a step silently undone)*.
 | `do.light` | no | A file in `lights/`, written as its name, or a table in place. A file `lights/NAME.toml` holds the same keys. `{ colour, level, for }`, with an optional `pattern = { kind, period, low }` (#940 item 3: `breathe`, `candle` or `pulse`; the period its kind's default when none, 6 s for a breath (4–12 s), 1.5 s for a candle (1–4 s), 4 s for a pulse (3–6 s); `low` only for a breath, from 1, its default, to under `level`; a candle at `level` 3 or more, a pulse at 2 or more; a pattern needs `level` named; no blink, flash or rainbow: a lamp is not a machine), asks the actions part for `light_colour`, then steps the light to `level` (1 to 5) with `light_brighter` or `light_dimmer` calls, counted from the level `light/state` shows; with that level not known it is left and the run says so. `for` holds the light in a run with no say. `{ dim = N }` asks for `light_dimmer` N times. A light is held until the run ends (the say ends, the run's longest `for`, or its last clip ends, whichever is last) and is then given back. With `until = "ends"` (#1021), only in a skill with a trigger and no `tool` (a tool's run has no trigger to end it), a dim, or a colour (#1681: Not feeling well's pale breath), is held instead until the trigger that ran it stops holding (its test fails past its `gap`), or its topic's newest value expires (its header's `expires_ms`), or, when that value names no lifespan, its topic says nothing for 15 minutes, or a reload (the folder is looked at every 2 s) finds its skill removed, no longer dimming `until = "ends"`, or with no trigger at that place in the skill on the same topic; then it is given back, but only if the light is still as the run left it (on, the colour and the level its steps left: N steps under, at the lowest, or the colour at its level): a light someone changed meanwhile is left as it is. The run stays under way meanwhile. A skill reloaded with the same trigger (its place in the skill and its topic) and still dimming `until = "ends"` keeps its hold, whatever else was edited: its end comes as before *(chosen: an edit is not an end, and a removed skill or trigger has nothing left to end its hold, the reviewer on #1066)*. With the Policy asked (`LAMP_SKILLS_ASK=policy`), the end is told whether or not it said `say_now`, and is let pass when no run holds anything; a `say_now` that comes after that end (the trigger's own, or a reload's) does nothing. With `LAMP_LIGHT_REQUESTS=on` it is asked of the ring instead, and the person's light is never touched (#940, below); a dim or a colour held `until = "ends"` is asked of the ring until its trigger ends, its pattern with it, and then given back the same way; through the actions part a colour's pattern is steady. A colour held `until = "ends"` takes no `for` and no `keep`: it has no while of its own, and it is given back, so it is never the person's. Or `{ out = true }` (#1677): the light shown, off (the ring's ember, never dark), asked only of the ring with `LAMP_LIGHT_REQUESTS=on`; through the actions part it is left alone and the run says so (`light out: left alone, since only the ring puts it out`), since that would turn the person's own light off and keep it so across a restart. No light on: left alone. With `over` (1 to 60 s, `LightRequest::FADE_MS`) the ring fades into it over that long, as falling asleep ([presence.md](presence.md)), and `done` says `light out: asked of the ring, faded into over 30000 ms`; with `until = "ends"` it is held and given back as a dim is. `out` takes no colour, dim, level, for or pattern, and `over` goes with `out` only *(chosen, until a skill needs a slow colour)*. With `keep = true` (#1679), only in a skill its `tool` alone starts and only with a colour, no `for` and no pattern, the light is the person's, as if they had asked for the colour and the level themselves: set through the actions part whatever `LAMP_LIGHT_REQUESTS` says, never given back, and set again by a call while the run is under way (Light scenes: a scene changed while the head is down) |
 | `do.show` | no | A light show (#1679), `shows/NAME.toml`: its `[[light]]` frames, 2 to 30, each `colour`, `level` (1 to 5) and `for` (2 s to 20 s), with a `pattern` as a light's, the whole show a minute at most: slow enough to read as a light that changes, never a flicker. Each frame's light in turn, asked of the ring with `LAMP_LIGHT_REQUESTS=on` (its breaths move) or set through the actions part (steady), then the light given back as any light of the run. It stops before its next frame, looked at every 200 ms, once the body is pushed, the lamp paused or the voice listening (someone spoke), and the light is given back then. Only in a skill its `tool` alone starts: a show is played only when a person asks, never on its own. Needs `light` |
 | `do.say` | no | A note for the voice to say in its own words, through the voice's say service (#954). One a skill. The run's other steps are made, in their order, when the voice begins the say, so the look and the light come with the words, and none if it is never begun. A light changed is given back when the say ends. In a tool's run the note goes to the model in the call's answer instead. Or `{ from = "schedule" }` or `{ from = "tasks" }`: words the voice keeps itself and says when asked, the reminder due or the news of work handed over (#939, (c), the first builder's 12:32). The voice keeps the words and their delivery (a reminder's acknowledgement, news told once); the skill says when, and moves and lights with them as with a note. Sent to the say service as `from` in place of `note`, at priority 8 for `schedule` and 5 for `tasks`. Any other `from`, another key beside it, or a `from` in a skill with a `tool` refuses the skill: what the voice keeps is said when a trigger starts the skill, never from the model's call (Fourth on #1033). Or a table of the skill's own words (#1684): `{ text = "..." }`, said as written, sent as the say service's `text` byte for byte, or `{ note = "..." }`, a note as above; each 1 to 900 bytes with no control characters, with an optional `priority`, 0 to 8 (5 without it; 9 is the voice's own), and `expires`, 1 s to 1 h (30 s without it): not begun by then, the say is `expired` and its run makes nothing. The voice says `text` in its own voice through the model, which is told "Say exactly these words, in your own voice, and nothing else:" ([speaking-first.md](speaking-first.md#asked-by-another-part-the-say-service-939)): the words are never the model's own, but the voice does not check what was spoken against them. Any other key, both `text` and `note`, or the table in a skill with a `tool` refuses the skill: the model answers a call in its own turn, so a tool's say is the note for it. Below, "A say's priority, the voice's turns, and sleep" |
+| `do.cue` | no | Only `"hum"`: a fixed quiet sound through Say, without a file. Shares the single say/sound slot and is refused on model-callable skills |
+| `do.rest` | no | `{ op = "rest", during = { from, to } }`, or `op = "wake"` / `"cancel"` without a window. Automatic non-item triggers only; leased to Expression. Wake must complete before accompanying presentation; unknown operations are refused |
 | `do.sound` | no | A file in `sounds/`, written as its name: `sound = "ding"` plays `sounds/ding.wav` (#938). Checked at load by the voice's own check (`lamp_voice::say::read_sound`), and the skill refused with why: a regular file, not a link, of at most 148,140 bytes; a WAV of 16-bit mono PCM at 24 kHz (the speaker path's rate), 1 frame to 3 s; no 10 ms of it louder than -30 dBFS RMS (well under the lamp's speech) and no sample past -12 dBFS. Played by the voice, through its say service (`LAMP_SAY=on`) as `{"sound": PATH}`, the file's absolute path; the voice reads it again, only from under the skills folder, and plays it as a turn of its own, so it never overlaps speech ([speaking-first.md](speaking-first.md), the say service). A lamp not at rest as a say needs it (paused, muted, speaking, listening, owing an answer, a reminder due, within 15 s of its last turn) does not play it, nor a second sound within 30 s, and the voice refuses it at once, never later; the run's `done` says why (`sound: refused (the lamp is speaking)`). One say or sound a skill: the run's other steps are made when the voice begins it, as with a say. Refused in a skill with a `tool`: a tool is called while the voice answers |
 | `do.after` | no | `"say"`: this step and every one after it are made when the say ends, not as it begins: the skill's own say in an earlier step, which ends with its outcome, or in a skill with a `tool`, the line the model says after the call, which ends when `voice/state` is `resting` or `listening` again. A line that ends in `listening` was cut, the person speaking over it: then none of the steps after it is made, and the run's `done` says "the line was cut". `thinking` after `speaking` is still the line, since its sound plays on (lamp-06c1, 2026-10-16: 20 ms of `speaking`, then 15 s of `thinking`, through a line of about 2 s), so that wait ends at most 4 s after the speaking began. The run waits at most 5 s for the speaking to begin, and goes on at once if `voice/state` was not said within 3 s. Not after a say never begun. A light changed is then given back when the last clip ends |
 | `do.on` | no | A trigger's `name`: the step is made only in a run that trigger started (Task news: `happy` for done, `caring` and a dimmer light for failed). A step without it is made in every run. One say for each run: one among the steps without `on`, and one for each trigger with its own. Not with `after` in the same skill *(chosen, until a skill needs both)* (#1021) |
-| `do.if_choice` | no | Values of the `[choice]` (each once): the step is made only in a call that chose one of them, or whose `default` is one (#1679: a scene's own light and pose). Its body, light and show only: no say, sound or look, which are the same for every choice. Not with `on`. An `after = "say"` on it is every run's wait: the steps after it wait in each |
+| `do.if_choice` | no | Values of the `[choice]` (each once): the step is made only in a call that chose one of them, or whose `default` is one (#1679: a scene's own light and pose). Its body, light and show only: no say, sound or look, which are the same for every choice, and no automatic cue or rest step. Not with `on`. An `after = "say"` on it is every run's wait: the steps after it wait in each |
 | `do.look` | no | `true`: the voice's full look (#836). Only in a skill with a `tool` and no trigger: the call's answer carries `"look": true` and tells the model to say "Let me take a look."; lamp-skills makes the run's body and light before it answers, and the voice takes its full look for that turn itself as the answer's first audio plays, whatever the model says, its still in the model's next turn, or a note that it could not see if none comes (#941) |
 
 A duration is a whole number and one of `ms`, `s`, `m` or `h` (`"5m"`).
@@ -463,8 +470,10 @@ skills".)
 `lamp-update install` puts it on a home lamp (#811): the product unit
 `deploy/product/lamp-skills.service`, every product skill in
 `/var/lib/lampOS/skills` (since 19 October: Welcome back, Reminders, Task
-news, Stretch break, Stuffy air and Dance, `install::PRODUCT_SKILLS`; Desk
-tutor and its marks wait for the full look in the product,
+news, Stretch break, Stuffy air and Dance, plus Bedtime and Morning installed
+but disabled pending its lamp comparison, `install::PRODUCT_SKILLS`; Desk
+tutor and its marks wait for the full look in the product, and Light out,
+Light scenes, Point the light and Light show await their lamp qualification,
 `install::NOT_PRODUCT_SKILLS`), and the product voice with the say service
 on, its own hello off, and its reminders and task news waiting for their
 skills (`LAMP_SCHEDULE_SPEAK=skill`, `LAMP_TASK_NEWS=skill`; install.md).
@@ -554,7 +563,7 @@ talk to end says so with a `[[while]]` on `voice/state` and a `wait`, as
 Stuffy air does; one that needs only a pause leaves it out and gives
 priority 8.
 
-**While the lamp is asleep, nothing is said.** The say service lives in the
+**During manual sleep or privacy mute, nothing is said.** The say service lives in the
 voice's conversation: it is made as a run begins (`Says::from_environment`
 in `run_inner`), and a run ends on the software mute, the sleep from a hand
 held on the head (reason `sleep`) as well as the person's own, and on the
@@ -568,6 +577,13 @@ either. A say waiting as the lamp is put to sleep is answered `dropped
 spent, as for a say refused (with a `rearm`, until the field has passed its
 line again). #1684's additions leave this as it is: its design (§3) has the
 first tier not wake a sleeping lamp.
+
+Routine-owned rest is separate from manual sleep and privacy. Its wake can
+release only the rest that the routine owns; it cannot reopen either mute.
+An exact or ranked say accompanying that wake still waits for correlated
+completion and carries the original transition's `start_before_us`. Its
+authored `expires` cannot extend that deadline, and changed definitions or
+an expired permit refuse the request before the Say socket write.
 
 ### Four additions to V2
 
@@ -615,8 +631,9 @@ removed when no skill has a tool, and answers on `DIR/call.sock` the way
 the actions part does ([tools.md](tools.md#the-skills)). Beside `tools`,
 the file's `body` names the tools whose skill asks for the body
 (`[permissions] body`), when any does: a text from the Autonomous app never
-runs one (#1673, [messages.md](messages.md)). It's a key of the file's own,
-not of each tool, which the voice's function declarations would refuse. It makes `DIR` and
+runs one (#1673, [messages.md](messages.md)). Disabled skills enter neither
+`tools` nor `body`; with no enabled body tool, `body` is omitted. It's a key of
+the file's own, not of each tool, which the voice's function declarations would refuse. It makes `DIR` and
 the socket at its start, and again, with the file, at a look (every 2 s)
 that finds the socket gone from a `DIR` still there, saying so. With `DIR`
 itself gone it ends, not zero, with a line: as its user, under its sandbox,
@@ -755,6 +772,7 @@ and a skill that says neither is installable.
 | Light out when you leave (#1677) | core | The owner's: the light going out when nobody is there is something every lamp does. It does nothing without the eyes' `room/presence` (`LAMP_PRESENCE=on`), and until its lamp check it is not in the product's install (`install::NOT_PRODUCT_SKILLS`), so turning presence on for Messages (#1673) does not turn it on too ([presence.md](presence.md)) |
 | Not feeling well (#1681) | core | A failed part shown as a creature a little unwell: on `lamp/health`'s `error` for 30 s, or its `quiet_ms` past 5 minutes (a part that came up well and stopped), one sleepy droop and a pale, slow breath until it ends. Not in the product's install until its lamp check (`install::NOT_PRODUCT_SKILLS`) |
 | Light scenes, Point the light, Light show | core | Asked for by a person, never on their own (#1679): a scene's light, kept, with the head over the desk for reading and focus; the head over the desk and turned toward what the model's look saw there ("light my book"); a show of slow-changing colours under a minute. Not in the product's install yet (`NOT_PRODUCT_SKILLS`): not yet tried on a lamp, and three more functions would put a product session past its 32 without `LAMP_USE_SKILL=on` |
+| Bedtime and Morning | core, disabled | Installed for every product lamp, with authored evening, rest, morning and output-limit data; no active trigger or tool until enabled after its lamp comparison |
 | Desk tutor, Desk tutor's marks | installable | Desk tutor reads handwriting from the full look's still (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`), which a product lamp does not take: its working frame, 320 across, cannot read a page. With its marks, its two functions would also take a product session past its 32 (#1667's count). Its marks are called only after its look. Both become core once the full look is in the product and a session can take their functions (#1668) |
 
 Which of the skills to come are core and which installable is the owner's
@@ -762,12 +780,12 @@ list in [v1-verdicts.md](v1-verdicts.md), "The owner's scope decisions,
 2026-10-19".
 
 A core skill comes with the lamp: `lamp-update install` writes it (on
-`lamp-voice` today, Welcome back alone; with #1667, all six), and a core
+the product, seven folders with Bedtime and Morning disabled and the other six enabled), and a core
 skill's file taken away by hand is written again at the next install. `lamp-skills remove`
 refuses it, and `lamp-skills install` refuses a folder or a package that
 says it is core, or that would take the place of a core skill on the lamp.
 A core skill also keeps its tool's name: the program loads no other skill
-with it. `kind` changes nothing else the program does.
+with it, including while disabled. `kind` and `enabled` are separate: disabled folders still validate and remain in inventory, while contributing no active trigger, read subscription or advertised tool.
 
 **On a running lamp.** Four commands, each run on the lamp, as root (the
 product's skills folder is root's; the part itself only reads it, under
@@ -819,7 +837,7 @@ it does not know).
 - **`list`** says, a line each, every skill folder's name, kind, version
   (`-` for none) and what it may use, or why it does not load, as the
   running program loads them (a tool's name taken among them), then the
-  functions they give the model:
+  functions they give the model. Disabled folders remain listed with a disabled marker; their tools are excluded from that count:
 
       NAME          KIND         VERSION  MAY USE
       desk-tutor    installable  1.0.0    speak, light, body, look
@@ -851,10 +869,11 @@ skill without the table may do nothing (least privilege):
 ```toml
 [permissions]
 topics = ["humans/faces/tracked", "voice/state"]   # the topics it reads
-speak = true    # a note or the voice's own words (say), or a sound
+speak = true    # say, sound, or the fixed cue
 light = true    # the light steps
-body = true     # a look at a face, a gesture, a move, a pose
+body = true     # a face look, gesture, move, pose, or rest/wake/cancel intent
 look = true     # the full look's picture for the model (do.look)
+output_limits = true  # private declarative light/volume restrictions
 actions = []    # the actions part's functions it may call by name
 ```
 
@@ -864,8 +883,13 @@ actions = []    # the actions part's functions it may call by name
   said), and `schedule/due` for a `say = { from = "schedule" }` or
   `tasks/status` for a `say = { from = "tasks" }` (the person's reminder,
   the news of their work: a skill started by anything else could otherwise
-  have them said at its own moment). Each step needs its key: a `body` step `body`, a `light` step
-  `light`, a `say` or a `sound` `speak`, and `look = true` `look`. A skill
+  have them said at its own moment). A routine also declares its implicit
+  `voice/state` read, even without an explicit condition. An internal
+  `clock/local` trigger declares that read but adds no external subscription.
+  Each step needs its key: body steps and rest/wake/cancel need `body`, light
+  needs `light`, say/sound/cue need `speak`, and `look = true` needs `look`.
+  `[limits]` needs the separate `output_limits` grant, not a general action
+  permission. A skill
   that reads or does anything more is not loaded, and the journal says
   what it lacks: `lamp-skills: not loaded: /var/lib/lampOS/skills/x: not
   permitted: a [[while]] reads voice/state, and voice/state is not in
@@ -883,7 +907,13 @@ actions = []    # the actions part's functions it may call by name
   not sent, not counted as made (no clip waited on, no light given back),
   and the journal says so: `lamp-skills: skill:x: refused body.gesture:
   body.gesture needs body = true in [permissions], which it does not give`.
-  A say refused is never asked, so nothing that comes with it is made. The
+  A say or cue refused is never asked, so nothing that comes with it is made.
+  Routine body and accompanying cue grants are checked before any rest or
+  wake request leaves the program; a denied hum cannot first wake the lamp.
+  Expression receipts and cap snapshots are the service's ownership checks,
+  not additional reads made available to a skill. Private limit definitions
+  are validated before replacing the accepted batch. Revocation stops new
+  caps while allowing cleanup of the service's already-owned exact tokens. The
   actions part is called for the light's own functions (`light_colour`,
   `light_brighter`, `light_dimmer`, `light_off`) only with `light`, and for
   any other only when `actions` names it. No step names an action yet:
@@ -1038,7 +1068,7 @@ where it goes:
 | Hello when someone comes back to the desk | The Welcome back skill on a product lamp and on lamp-4ace; the voice's own (`speak_up.rs`, asking the Policy, #883) is off on both and only records when one was due | Skill: Welcome back |
 | A reminder or timer coming due | The Reminders skill on a product lamp (`LAMP_SCHEDULE_SPEAK=skill`), asking while the voice rests, so one due during a talk is said when it ends, with the look: the voice keeps the words and says it itself when no ask comes within 10 s. The voice's reminder consumer, timing it too, on lamp-4ace (`on`) | Skill: Reminders (setting one stays a voice tool) |
 | News of a task handed to Claude Code or Codex, and progress news | The Task news skill on a product lamp for done and failed (`LAMP_TASK_NEWS=skill`): the voice keeps the words and tells it itself when no ask comes within 10 s of having it (at once, without the sway, for news that settled while nobody was there: the skill's ask is gone 20 s after the work settles, and an item's run cannot wait), as it does stopped and asking news, which no skill takes. The voice (`task_news.rs`) on lamp-4ace; progress news is the Policy's act, off in the product | Skill: Task news |
-| Sleep at night, waking in the morning | Expression's catalogue (`alive`) | Skill: Bedtime and Morning, later |
+| Sleep at night, waking in the morning | [Bedtime and Morning](bedtime-morning.md), disabled until measured | Skill selects local windows and fresh absence/arrival; Expression keeps the owned renderer and reflexes |
 | Turning to a voice, looking away to think, back before its first word, nods while speaking | Voice, body, Expression | Built in: the conversation, under a second |
 | A tap on the head, a hand held on it, three seconds to sleep | Controls, Expression, voice (#711, #849) | Built in: a reflex, under 150 ms |
 | One startled glance at a bang | Expression (`Sudden`) | Built in: a reflex |
@@ -1053,6 +1083,43 @@ Built-in gestures (the nod on "yes") use the same move and expression
 library as skills.
 
 ## The first skills
+
+[Bedtime and Morning](bedtime-morning.md) (#1672) is an installed core skill
+that stays `enabled = false` until its lamp comparison. With exact
+`LAMP_SKILL_ROUTINES=on`, Skills can load routines with `[limits]` or a
+`rest` step. Without it they have no active triggers or tools. A disabled
+skill is excluded from `tools.json`, including the `use_skill` catalogue.
+
+Generic additions: per-trigger `during = { from, to }` local windows,
+named `once_per_day = true` with `--daily-state PATH`, and explicitly
+observed `present = false` on the tracked face topic. A missing camera
+does not count as absence. Daily chances commit before Policy or output;
+refusal and restart do not refund them. Routines require a fresh resting
+Voice heartbeat (under three seconds); a gap resets the quiet duration.
+
+These local windows and daily claims can also constrain a `rise` trigger.
+A delayed Policy answer must still find the rise and window holding; an
+accepted reload resets the rise history and invalidates the pending scheduled
+run's generation. None of those events refunds a consumed daily chance.
+
+`rest = { op = "rest", during = { from, to } }` starts a leased intent;
+`op = "wake"` and `op = "cancel"` take no window. Unknown operations are
+refused. The shared `skills` publisher identifies the skill in its payload.
+Rest admission is not motion confirmation. A wake waits for correlated
+planner completion, at most twelve seconds, before its following sound.
+The fixed `cue = "hum"` uses Say's existing privacy, quiet and rarity checks;
+it adds no file asset or model call. The ordinary Policy gate still applies
+when configured: its late-night/absent-person fallback can refuse a routine.
+A plain say, exact/ranked say table, sound or cue occupies the same single
+speech slot in a run and needs `speak` permission. No priority bypasses the
+routine's permission, completion, generation or original-deadline checks.
+
+Output `[limits]` run independently of a presentation's permission, through
+private Actions operations. The accepted generation contains at most eight
+cap-bearing skills; an over-capacity reload is refused as a whole. Light
+and volume ceilings compose by minimum, and release never restores an old
+person setting. These interfaces and their default-off switches are detailed
+in [Bedtime and Morning](bedtime-morning.md).
 
 | Skill | Trigger | What it does | Replaces |
 |---|---|---|---|

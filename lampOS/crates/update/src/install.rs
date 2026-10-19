@@ -161,8 +161,10 @@ pub const PRODUCT: &[(&str, &str)] = &[
     ),
 ];
 
-/// The skills every lamp runs: each a folder of `lampOS/skills/`, put in
+/// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
+/// Seven are installed; the six established skills are enabled. Bedtime and
+/// Morning remains disabled until its lamp comparison (#1672).
 /// Every behaviour that has a skill runs as the skill (the owner, 19 Oct):
 /// the voice's own hello is off in `lamp-voice.service`, and its reminders
 /// and task news wait for the skill's ask (`LAMP_SCHEDULE_SPEAK=skill`,
@@ -174,6 +176,7 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "stretch-break",
     "stuffy-air",
     "dance",
+    "bedtime-morning",
 ];
 
 /// The skills of `lampOS/skills/` a lamp does not get yet, each with why.
@@ -272,6 +275,8 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("stuffy-air", "SKILL.md"),
     skill_file!("dance", "skill.toml"),
     skill_file!("dance", "SKILL.md"),
+    skill_file!("bedtime-morning", "skill.toml"),
+    skill_file!("bedtime-morning", "SKILL.md"),
 ];
 
 /// Setup's two settings (docs/setup.md, "On a lamp"), written only with

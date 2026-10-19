@@ -339,14 +339,19 @@ is not. One JSON line in:
   and the news'), `text`, words to say as they are (the model is told
   "Say exactly these words, in your own voice, and nothing else:" before
   them), at most 900 bytes with no control characters, `from`, words
-  the voice keeps itself (below), and `sound`, a skill's own short sound
-  (below).
+  the voice keeps itself (below), `sound`, a skill's own short sound
+  (below), or `cue: "hum"`, the fixed quiet hum used by a routine.
 - `priority`, 0 to 9, 5 if left out: higher first, the oldest first among
   equals.
 - `expires_in_ms`, 1 ms to an hour, from when its line was read: not begun
   by then, it is `expired`. Its time is looked at again as it is begun, so
   that none begins after it, however long it waited for the voice's loop
   (the reviewer on #954). A line is at most 4,096 bytes with its newline.
+- Optional `start_before_us` is an absolute deadline on this host's
+  monotonic clock. The start must precede both that deadline and the
+  read-relative expiry. Routine clients preserve their original transition
+  deadline here; a delayed connection or read cannot give the hum a new
+  lifetime. Existing clients that omit it keep their current behavior.
 
 When the voice begins the turn, one line, so that the body and the light
 can move with the words (the first builder on #939):
@@ -403,6 +408,12 @@ provider request, no face on the ring. `begun` comes as it is begun, and
 `spoken` means played whole with no gap in its playback (`dropped`
 otherwise: a person speaking over it ends it as any turn). The voice traces
 `skill_sound` with the skill, whether it plays and why not.
+
+`cue: "hum"` uses the same sound admission and speaker path. Its samples
+come from the existing head-cue renderer at -35 dBFS, without a file, model
+request or extra actuator writer. It is an alternative to every other
+content field; other cue values are refused. Its acoustic result remains
+part of [Bedtime and Morning's lamp comparison](bedtime-morning.md).
 
 **When it is said.** After a due reminder and before the hello and the
 news, through a reminder's gates: no reply owed or queued, the speaker

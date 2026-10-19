@@ -1,0 +1,71 @@
+# Authored defaults, off until the first lamp comparison (#1672).
+enabled = false
+needs = ["eyes", "voice", "body", "light"]
+kind = "core"
+version = "1.0.0"
+
+[permissions]
+topics = ["humans/faces/tracked", "voice/state"]
+speak = true
+light = true
+body = true
+output_limits = true
+
+# Restrictions do not wait for a presentation or for someone to be there.
+[limits]
+during = { from = "21:00", to = "06:00" }
+light_channel_max = 24
+volume_raw_max = 35
+
+[[trigger]]
+name = "evening"
+topic = "humans/faces/tracked"
+present = true
+near = 0.14
+for = "30s"
+wait = "1m"
+rearm = "ends"
+during = { from = "21:00", to = "23:00" }
+once_per_day = true
+
+[[trigger]]
+name = "bedtime"
+topic = "humans/faces/tracked"
+present = false
+for = "15m"
+rearm = "ends"
+during = { from = "23:00", to = "06:00" }
+once_per_day = true
+
+[[trigger]]
+name = "morning"
+topic = "humans/faces/tracked"
+present = true
+near = 0.14
+for = "3s"
+wait = "1m"
+rearm = "ends"
+during = { from = "06:00", to = "10:00" }
+once_per_day = true
+
+[[while]]
+topic = "voice/state"
+field = "state"
+equals = "resting"
+for = "30s"
+
+[ask]
+policy = "nudge"
+
+[[do]]
+on = "evening"
+light = { colour = "warm", level = 2, for = "8s", pattern = { kind = "breathe", period = "8s", low = 1 } }
+
+[[do]]
+on = "bedtime"
+rest = { op = "rest", during = { from = "23:00", to = "10:00" } }
+
+[[do]]
+on = "morning"
+rest = { op = "wake" }
+cue = "hum"

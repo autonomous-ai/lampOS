@@ -81,6 +81,45 @@ pub fn privacy_muted_in(message: Option<lamp_bus::Message>) -> bool {
 /// How often the live service tells the planner the local time of day.
 pub const DAYTIME_EVERY_US: u64 = 60_000_000;
 const DRAIN_LIMIT: usize = 32;
+pub const REST_REQUESTS_ENVIRONMENT: &str = "LAMP_REST_REQUESTS";
+
+pub fn rest_requests_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// Preserve the source's monotonic stamp. The header binds the generic skill
+/// and publisher incarnation; the engine checks clock, target and lease age.
+pub fn rest_from_message(
+    message: &Message,
+    wall_ms: u64,
+) -> io::Result<lamp_msgs::ExpressionRestRequest> {
+    use lamp_msgs::ExpressionRestRequest;
+    if message.header.topic != ExpressionRestRequest::TOPIC
+        || message.header.type_name.as_deref() != Some(ExpressionRestRequest::TYPE)
+        || message.header.kind != lamp_bus::Kind::Event
+        || message.expired
+        || message.header.expired_at(wall_ms)
+        || message.header.at_unix_ms > wall_ms.saturating_add(50)
+        || message.payload.len() > 4096
+    {
+        return Err(invalid("invalid or expired rest transport"));
+    }
+    let request: ExpressionRestRequest = message
+        .parse()
+        .map_err(|error| invalid(error.to_string()))?;
+    request
+        .check()
+        .map_err(|error| invalid(error.to_string()))?;
+    if message.header.source != ExpressionRestRequest::SOURCE
+        || message.header.boot != request.skill_session_id
+        || message.header.seq != request.stamp.sequence
+    {
+        return Err(invalid(
+            "rest publisher identity or sequence differs from its payload",
+        ));
+    }
+    Ok(request)
+}
 
 fn invalid(why: impl Into<String>) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, why.into())
@@ -368,6 +407,7 @@ pub struct Service {
     /// nothing is asked of the body or the light.
     pause: lamp_body::pause_in::PauseIn,
     paused: bool,
+    rest: Option<(Subscriber, Publisher)>,
     pub counts: Counts,
     _lock: File,
 }
@@ -427,9 +467,45 @@ impl Service {
             clock_unset: false,
             pause: lamp_body::pause_in::PauseIn::on(bus.clone()),
             paused: false,
+            rest: None,
             counts: Counts::default(),
             _lock: lock,
         })
+    }
+
+    /// Opt-in intake only; Expression retains its existing actuator writers.
+    /// Manual sleep is followed even when the optional head animation is off.
+    pub fn with_rest_requests(mut self, bus: &Bus) -> io::Result<Self> {
+        use lamp_msgs::{ExpressionRestRequest, ExpressionRestState};
+        if self.rest.is_some() {
+            return Ok(self);
+        }
+        self.rest = Some((
+            bus.subscribe_typed(
+                ExpressionRestRequest::TOPIC,
+                "expression",
+                ExpressionRestRequest::TYPE,
+            )?,
+            bus.publisher_declared(
+                ExpressionRestState::TOPIC,
+                &ExpressionRestState::declaration(),
+                "expression",
+            )?,
+        ));
+        if !self
+            .inputs
+            .iter()
+            .any(|input| input.topic() == VoiceMute::TOPIC)
+        {
+            self.inputs.push(bus.subscribe_typed(
+                VoiceMute::TOPIC,
+                "expression",
+                VoiceMute::TYPE,
+            )?);
+        }
+        self.privacy = Some(bus.clone());
+        self.engine = self.engine.with_rest_requests();
+        Ok(self)
     }
 
     /// Also read the head's requests and state from `--touch` Controls
@@ -478,6 +554,16 @@ impl Service {
     /// sleeping through any behavior. Each valid topic has a bounded budget.
     pub fn step(&mut self, now: impl Fn() -> u64, wall_ms: u64) -> Output {
         let began = now();
+        if self.rest.is_some() {
+            self.engine.set_rest_paused(began, self.pause.paused());
+            if let Some(bus) = &self.privacy {
+                self.engine.set_privacy_muted(privacy_muted_in(
+                    bus.latest(lamp_msgs::MicrophonePrivacy::TOPIC)
+                        .ok()
+                        .flatten(),
+                ));
+            }
+        }
         if let Some((bus, looked)) = self.online.as_mut()
             && looked.is_none_or(|at| began.saturating_sub(at) >= 1_000_000)
         {
@@ -585,8 +671,38 @@ impl Service {
                 }
             }
         }
-        // A look up at a tap ends when the switch closes under it (#711).
-        if self.engine.looking_up()
+        if let Some((requests, _)) = &mut self.rest {
+            for _ in 0..DRAIN_LIMIT {
+                let message = match requests.recv(Duration::ZERO) {
+                    Ok(Some(message)) => message,
+                    Ok(None) => break,
+                    Err(_) => {
+                        self.counts.input_errors += 1;
+                        break;
+                    }
+                };
+                let received = now();
+                self.engine.set_rest_paused(received, self.pause.paused());
+                if let Some(bus) = &self.privacy {
+                    self.engine.set_privacy_muted(privacy_muted_in(
+                        bus.latest(lamp_msgs::MicrophonePrivacy::TOPIC)
+                            .ok()
+                            .flatten(),
+                    ));
+                }
+                let observed_wall = wall_ms.saturating_add(received.saturating_sub(began) / 1_000);
+                match rest_from_message(&message, observed_wall).and_then(|request| {
+                    self.engine
+                        .ingest_rest_with_gap(received, request, message.gap > 0)
+                        .map_err(|error| invalid(error.to_string()))
+                }) {
+                    Ok(()) => self.counts.accepted += 1,
+                    Err(_) => self.counts.refused += 1,
+                }
+            }
+        }
+        // Read privacy again at the final planning boundary.
+        if (self.engine.looking_up() || self.rest.is_some())
             && let Some(bus) = &self.privacy
         {
             let latest = bus.latest(lamp_msgs::MicrophonePrivacy::TOPIC);
@@ -594,10 +710,11 @@ impl Service {
                 .set_privacy_muted(privacy_muted_in(latest.ok().flatten()));
         }
         let at_us = now();
-        let mut output = self.engine.tick(at_us);
         // Paused by the keeper: no new request to the body or the light;
         // those already sent run out with their leases.
         let paused = self.pause.paused();
+        self.engine.set_rest_paused(at_us, paused);
+        let mut output = self.engine.tick(at_us);
         if paused != self.paused {
             self.paused = paused;
             eprintln!(
@@ -630,6 +747,11 @@ impl Service {
             .last_state
             .is_none_or(|last| at_us.saturating_sub(last) >= 200_000)
         {
+            if let Some((_, receipt)) = &mut self.rest
+                && let Some(rest) = self.engine.rest_state(at_us)
+            {
+                account(&mut self.counts, receipt.publish_json(at_us, &rest));
+            }
             account(
                 &mut self.counts,
                 self.state.publish_json(at_us, &output.state),
