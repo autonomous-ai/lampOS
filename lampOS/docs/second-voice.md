@@ -1001,6 +1001,11 @@ configuration; a configuration that still names it is refused by name, so
 it is moved, not left behind. No key is written in a log, a test or this
 page.
 
+**A dated search.** The search function's description (`net::search::DESCRIPTION`)
+asks for the month and year the model was told in a query for news,
+results and prices: on lamp-4ace on 19 Oct "Who won the last Formula One
+race?" found last season's.
+
 **Through the company relay.** The relay serves Gemini's speech at
 `https://campaign-api.autonomous.ai/api/v1/ai/v1/google-search/v1beta`
 (V1's path, `hal/drivers/voice/tts/gemini.py`), with the relay's key in

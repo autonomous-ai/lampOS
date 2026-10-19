@@ -50,6 +50,12 @@ pub struct Search {
     backend: Backend,
 }
 
+/// What the model is told of the search. The month and year go in a query
+/// for news, results and prices (#1712: on lamp-4ace on 19 Oct "Who won the
+/// last Formula One race?" found last season's; the first builder: "try a
+/// dated query").
+pub(crate) const DESCRIPTION: &str = "Look something up on the web that you cannot know yourself: today's news, a score, opening hours, a price. One short query; for news, results and prices, put the month and year you were told in it, so it finds this month's, not last year's. Say what you found in a sentence or two.";
+
 impl Search {
     /// DeepSeek's Search & Fetch API.
     pub fn deepseek(key: &str) -> Result<Self> {
@@ -78,15 +84,12 @@ impl Search {
         })
     }
 
-    /// The functions as the model is told them: the search, then for
+    /// The functions as the model is told them ([`DESCRIPTION`]): the search, then for
     /// DeepSeek the fetch.
     pub fn declarations(&self) -> Vec<lamp_gemini::Tool> {
         let mut tools = vec![lamp_gemini::Tool {
             name: NAME.into(),
-            description: "Look something up on the web that you cannot know yourself: \
-                today's news, a score, opening hours, a price. One short query; say \
-                what you found in a sentence or two."
-                .into(),
+            description: DESCRIPTION.into(),
             parameters: Some(json!({
                 "type": "object",
                 "properties": {"query": {"type": "string", "description": "What to search for, in a few words."}},
@@ -249,6 +252,13 @@ pub(crate) fn results(answer: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #1712: news, results and prices are searched with the month and year.
+    #[test]
+    fn news_results_and_prices_are_searched_with_the_month_and_year() {
+        assert!(DESCRIPTION.contains("put the month and year you were told in it"));
+        assert!(DESCRIPTION.starts_with("Look something up on the web"));
+    }
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     #[test]
