@@ -67,17 +67,18 @@ pub struct Places {
     /// `lamp-skills`' folder, core and installable skills side by side.
     pub folder: PathBuf,
     /// The skills a person turned off by voice, a name a line, kept by
-    /// `lamp-skills --state-dir` (#1837, in review); a snooze is kept only
-    /// in its memory, so it is never known here.
+    /// `lamp-skills --state-dir` (#1886); a snooze is kept only in its
+    /// memory, so it is never known here.
     pub off: PathBuf,
 }
 
 impl Places {
-    /// The product's: the unit's `--dir`, and the state folder #1837 names.
+    /// The product's: the unit's `--dir`, and its `--state-dir`'s off file
+    /// (`deploy/product/lamp-skills.service`, the folder #1732 shares).
     pub fn product() -> Self {
         Self {
             folder: "/var/lib/lampOS/skills".into(),
-            off: "/var/lib/lampos-skills/off".into(),
+            off: "/var/lib/lampos-skills-state/off".into(),
         }
     }
 }

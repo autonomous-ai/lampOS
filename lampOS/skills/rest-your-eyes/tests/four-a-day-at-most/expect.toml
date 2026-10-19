@@ -1,0 +1,54 @@
+# 09:00, five hours at the desk, moving now and then (each noticed): at 45
+# minutes and once an hour after, four times, and not a fifth.
+clock = "09:00"
+
+[[expect]]
+at = "45m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "45m"
+within = "1m"
+call = "light"
+args = { dim = 1 }
+
+
+[[expect]]
+at = "105m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "105m"
+within = "1m"
+call = "light"
+args = { dim = 1 }
+
+
+[[expect]]
+at = "165m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "165m"
+within = "1m"
+call = "light"
+args = { dim = 1 }
+
+
+[[expect]]
+at = "225m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "225m"
+within = "1m"
+call = "light"
+args = { dim = 1 }

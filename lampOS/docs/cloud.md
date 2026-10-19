@@ -178,11 +178,11 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   core. Nothing writes `made: here` yet: the lamp skill creator will, when
   it makes one.
 - **`can_remove`**: false for a core skill, true for the others.
-- **`can_turn_off`**: the skill has a `[stop]` (#1837, in review) and loads;
-  the app's switch on a core row. Until #1837 is on `lamp-voice` a skill with
-  a `[stop]` does not load, so it is false for every skill.
+- **`can_turn_off`**: the skill has a `[stop]` (#1886) and loads; the
+  app's switch on a core row. No product skill has one, so it is false for
+  every product skill; the wellbeing skills (#1685, installable) share one.
 - **`off`**: with a `[stop]`, true when the skill is turned off, as
-  `lamp-skills --state-dir` keeps it (#1837, `/var/lib/lampos-skills/off`,
+  `lamp-skills --state-dir` keeps it (#1886, `/var/lib/lampos-skills-state/off`,
   a name a line), false when it is not; it may be snoozed until the morning
   then, which `lamp-skills` keeps only in memory. Null without a `[stop]`,
   or when the off file can't be read.
