@@ -379,6 +379,7 @@ mod tests {
             level,
             lasting: None,
             pattern: None,
+            keep: false,
         }
     }
 
@@ -551,6 +552,7 @@ mod tests {
                 period_ms,
                 low: 1,
             }),
+            keep: false,
         };
         let mut glow = Glow::new(&glows, "calm", None);
         assert_eq!(

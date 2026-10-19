@@ -1,0 +1,12 @@
+# "Energise me": white at its brightest, kept.
+[[call_tool]]
+name = "light_scene"
+at = "0s"
+args = { scene = "energise" }
+
+[[expect]]
+call = "say"
+
+[[expect]]
+call = "light"
+args = { colour = "white", level = 5, keep = true }

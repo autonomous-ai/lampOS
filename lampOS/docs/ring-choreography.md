@@ -495,6 +495,15 @@ that takes the light (`src/ring_light.rs`). Started with
   (the first builder on #940: "something came" twice is a nag), and a pulse
   no frame drew (a turn over it, outranked) is not counted. V1's blink, notification flash
   and rainbow are not taken: they read as a machine (CLAUDE.md's rule 8).
+  A light show a person asks for (Light show, #1679) is a skill's light
+  asked again for each of its frames, a colour held 2 to 20 s with one of
+  these patterns, under a minute in all: the ring sees nothing new, only
+  requests; the show never runs on its own. Its colours do change, which
+  the rule above says a lamp never does: that is the exception for a show a
+  person asked for, as a person would dim the lights for a party, never a
+  light the lamp chooses. A scene (Light scenes) is not
+  a request at all: it is the person's own light, set through the actions
+  part as they asked, and so kept with `LAMP_LIGHT_KEEP=on`.
   A turn's faces, a tap's, an ember and a self-test never move with it.
   A ring without patterns shows the light steady: the field is optional.
   A request may also carry a `fade_ms` (#1677, 1 to 60 s; past either end

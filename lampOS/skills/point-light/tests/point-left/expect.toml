@@ -1,0 +1,24 @@
+# After the look, the book is off to the left: the same, and the pose again
+# turned toward the left, a quarter of the picture across.
+[[call_tool]]
+name = "point_light"
+at = "0s"
+args = { toward = "left" }
+
+[[expect]]
+call = "look"
+
+[[expect]]
+call = "body.mood"
+args = { mood = "reading" }
+
+[[expect]]
+call = "light"
+args = { colour = "white", level = 4, keep = true }
+
+[[expect]]
+call = "say"
+
+[[expect]]
+call = "body.mood"
+args = { mood = "reading", for_ms = 120000, toward = -0.5 }

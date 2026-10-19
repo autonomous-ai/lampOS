@@ -1,0 +1,11 @@
+# "Do a light show": no hint, so a party (the choice's default).
+[[call_tool]]
+name = "light_show"
+at = "0s"
+
+[[expect]]
+call = "say"
+
+[[expect]]
+call = "show"
+args = { show = "party" }

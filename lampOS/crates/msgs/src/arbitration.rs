@@ -85,7 +85,9 @@ pub struct LightRequest {
 /// The ways a skill's light may move (#940 item 3), V1's effects judged by
 /// CLAUDE.md's rule 8: a lamp breathes, flickers like a candle, or sends one
 /// soft pulse around for "something came". It never blinks, flashes or
-/// cycles colours: those read as a machine.
+/// cycles colours on its own: those read as a machine. The one exception is
+/// a light show a person asked for (#1679): its colours change, each held
+/// 2 s or more, under a minute in all, and it stops once someone speaks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PatternKind {

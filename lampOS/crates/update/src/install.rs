@@ -191,6 +191,24 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          until the light going out and coming back has been seen on a lamp: someone reading face \
          down at the desk must never lose their light",
     ),
+    // #1679's three core skills, built and not yet tried on a lamp: each
+    // comes with the product once lamp-4ace has played it with a person.
+    (
+        "light-scenes",
+        "not yet tried on a lamp (#1679), and its function would put a product session past its \
+         32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
+    ),
+    (
+        "point-light",
+        "not yet tried on a lamp (#1679): its turn needs a lamp-body with `toward` and the lamp's \
+         `--gaze`, and its function would put a product session past its 32 without \
+         `LAMP_USE_SKILL=on`",
+    ),
+    (
+        "light-show",
+        "not yet tried on a lamp (#1679), and its function would put a product session past its \
+         32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
+    ),
 ];
 
 /// One file of a product skill, `lampOS/skills/SKILL/FILE`, and where
