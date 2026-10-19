@@ -660,6 +660,9 @@ impl Engine {
                         room.began_over_the_lamp(request);
                     }
                 });
+                // The voice's connection opened while the person speaks, not
+                // by the answer's first sentence (#1712).
+                tokio::spawn(self.shared.services.warm());
                 // Going on from a request whose end went early and was given
                 // up when the person spoke again: its words begin this one,
                 // as Gemini, which heard them, is told (`CUT_OFF_NOTE`). Only

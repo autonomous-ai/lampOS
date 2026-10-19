@@ -919,7 +919,19 @@ service's environment, on this route standing by or alone:
   speech failed (…); ElevenLabs says the sentence`. A sentence Gemini began
   and then lost fails as any voice's does. The journal at start: `lamp-voice
   second: speech is Gemini's (<model>, voice Kore), ElevenLabs for a
-  sentence it cannot start (LAMP_SECOND_SPEECH=gemini)`.
+  sentence it cannot start (LAMP_SECOND_SPEECH=gemini)`. Each sentence's
+  time to its first audio is journaled, with its length and how many were
+  asked beside it, never its words: `lamp-voice second: Gemini's speech
+  began in <ms> ms (<n> characters, <k> more asked and not begun)`. As a
+  spoken line begins, the connection the answer's first sentence takes is
+  opened ahead with a `GET` of the model, unless one was used in the last
+  20 s (`GeminiTts::warm`, `WARM_AFTER`): `lamp-voice second: Gemini's
+  speech connection opened ahead in <ms> ms (HTTP <status>)`. The probe
+  from lamp-4ace on 19 Oct put a new connection at 50 to 500 ms more to
+  the first audio than one kept (first run against the next two). On
+  lamp-4ace at 13:03 on 19 Oct, through the relay, the chat's first event
+  to the first audio was 1.89 s against about 0.65 s with ElevenLabs: these
+  lines are to tell where it goes.
 - **`LAMP_SECOND_CHAT=gemini`:** the text model is Gemini
   (`gemini_chat_model`, absent `gemini-3.6-flash`) through Google's
   OpenAI-compatible endpoint, called directly, not through the relay, with

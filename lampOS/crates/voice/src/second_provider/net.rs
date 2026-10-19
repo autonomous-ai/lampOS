@@ -19,10 +19,10 @@ pub use stt::{Replies, SttStream, check as stt_check};
 pub use tts::{PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream};
 
 /// To open a connection, TLS included.
-const CONNECT: Duration = Duration::from_secs(10);
+pub(crate) const CONNECT: Duration = Duration::from_secs(10);
 /// For a streamed response to say anything more. A chat model thinking
 /// before its first word is the slowest case seen in V1 (6-19 s).
-const STALL: Duration = Duration::from_secs(30);
+pub(crate) const STALL: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {

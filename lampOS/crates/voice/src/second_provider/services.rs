@@ -23,6 +23,11 @@ pub trait Services: Send + Sync + 'static {
     fn sees(&self) -> bool {
         true
     }
+    /// Make ready to speak as a line begins: nothing, unless a voice keeps
+    /// a connection to open ahead ([`GeminiTts::warm`]).
+    fn warm(&self) -> BoxFuture<'static, ()> {
+        Box::pin(async {})
+    }
 }
 
 /// One open utterance.
@@ -168,8 +173,21 @@ fn with_fallback(
         if !GeminiTts::speaks(&text) {
             return Ok(stream::empty().boxed());
         }
+        // Each sentence's time to its first audio, with its length and how
+        // many were asked beside it, never its words (#1712: through the
+        // relay, 1.89 s from the chat's first event to the first audio).
+        let asking = gemini.asking();
+        let asked = std::time::Instant::now();
         match gemini_first(&gemini, &text).await {
-            Ok(speech) => Ok(speech),
+            Ok(speech) => {
+                eprintln!(
+                    "lamp-voice second: Gemini's speech began in {} ms ({} characters, {} more asked and not begun)",
+                    asked.elapsed().as_millis(),
+                    text.chars().count(),
+                    asking.others
+                );
+                Ok(speech)
+            }
             Err(error) => {
                 eprintln!(
                     "lamp-voice second: Gemini's speech failed ({error}); {fallback} says the sentence"
@@ -217,6 +235,20 @@ impl Services for Net {
 
     fn sees(&self) -> bool {
         self.chat.sees()
+    }
+
+    fn warm(&self) -> BoxFuture<'static, ()> {
+        let Some(gemini) = self.gemini_tts.clone() else {
+            return Box::pin(async {});
+        };
+        Box::pin(async move {
+            if let Some((status, took)) = gemini.warm().await {
+                eprintln!(
+                    "lamp-voice second: Gemini's speech connection opened ahead in {} ms (HTTP {status})",
+                    took.as_millis()
+                );
+            }
+        })
     }
 }
 

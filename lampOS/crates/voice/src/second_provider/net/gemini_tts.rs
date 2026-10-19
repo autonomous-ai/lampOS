@@ -7,13 +7,29 @@
 //! ([speech generation](https://ai.google.dev/gemini-api/docs/speech-generation),
 //! read 2026-10-19).
 use super::{
-    Error, Result,
+    CONNECT, Error, Result, STALL,
     chat::Lines,
     chunk, http_client, post,
     tts::{Packets, without_tags},
 };
 use serde_json::{Value, json};
-use std::collections::VecDeque;
+use std::{
+    collections::VecDeque,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::{Duration, Instant},
+};
+
+/// A connection unused this long is opened again ahead of the next
+/// sentence ([`GeminiTts::warm`]): the relay may have closed it, and a new
+/// one cost up to 0.5 s more to the first audio from lamp-4ace (the probe of
+/// 19 Oct, first run against the next two).
+pub const WARM_AFTER: Duration = Duration::from_secs(20);
+/// The most of a warming answer read, so its connection goes back to the
+/// pool; a longer one is dropped with its connection.
+const WARM_BYTES: usize = 64 << 10;
 
 /// A server-sent event of base64 audio stays far under this; a stream
 /// without line ends does not.
@@ -22,8 +38,27 @@ const MAX_LINE: usize = 4 << 20;
 pub struct GeminiTts {
     client: reqwest::Client,
     url: String,
+    /// The model's own address, which a warming `GET` asks.
+    model_url: String,
     key: String,
     voice: String,
+    /// When a sentence or a warming last used the connection.
+    used: Mutex<Option<Instant>>,
+    /// Sentences asked and not yet begun.
+    asking: Arc<AtomicUsize>,
+}
+
+/// A sentence asked of Gemini until its first audio or its failure: how
+/// many others were then asked and not begun.
+pub struct Asking {
+    count: Arc<AtomicUsize>,
+    pub others: usize,
+}
+
+impl Drop for Asking {
+    fn drop(&mut self) {
+        self.count.fetch_sub(1, Ordering::Relaxed);
+    }
 }
 
 impl GeminiTts {
@@ -36,8 +71,11 @@ impl GeminiTts {
         Ok(Self {
             client: http_client()?,
             url: url(base_url, model),
+            model_url: format!("{}/models/{model}", base_url.trim_end_matches('/')),
             key: key.to_owned(),
             voice: voice.to_owned(),
+            used: Mutex::new(None),
+            asking: Arc::default(),
         })
     }
 
@@ -47,12 +85,56 @@ impl GeminiTts {
         !without_tags(text).trim().is_empty()
     }
 
+    /// One more sentence asked, until the [`Asking`] is dropped.
+    pub fn asking(&self) -> Asking {
+        let others = self.asking.fetch_add(1, Ordering::Relaxed);
+        Asking {
+            count: self.asking.clone(),
+            others,
+        }
+    }
+
+    /// Open the connection the next sentence takes, with a `GET` of the
+    /// model, unless one was used within [`WARM_AFTER`]: the status and how
+    /// long it took, or `None` when not asked or nothing came. Asked as a
+    /// line begins, so the answer's first sentence does not open it.
+    pub async fn warm(&self) -> Option<(u16, Duration)> {
+        {
+            let mut used = self.used.lock().ok()?;
+            if used.is_some_and(|at| at.elapsed() < WARM_AFTER) {
+                return None;
+            }
+            *used = Some(Instant::now());
+        }
+        let began = Instant::now();
+        let request = self
+            .client
+            .get(&self.model_url)
+            .header("x-goog-api-key", &self.key);
+        let mut response = tokio::time::timeout(CONNECT + STALL, request.send())
+            .await
+            .ok()?
+            .ok()?;
+        let status = response.status().as_u16();
+        let mut read = 0;
+        while read <= WARM_BYTES {
+            match tokio::time::timeout(STALL, response.chunk()).await {
+                Ok(Ok(Some(bytes))) => read += bytes.len(),
+                _ => break,
+            }
+        }
+        Some((status, began.elapsed()))
+    }
+
     /// Start speaking `text`; its samples come from the stream as they
     /// arrive. Dropping the stream stops the download.
     pub async fn speak(&self, text: &str) -> Result<GeminiSpeech> {
         let Some(body) = body(&self.voice, text) else {
             return Ok(GeminiSpeech::default());
         };
+        if let Ok(mut used) = self.used.lock() {
+            *used = Some(Instant::now());
+        }
         let response = post(
             &self.client,
             &self.url,
@@ -222,6 +304,64 @@ mod tests {
             audio_of(r#"{"error":{"code":429}}"#).unwrap_err(),
             Error::Protocol("speech stream error")
         );
+    }
+
+    /// #1712: a warming `GET` of the model opens the connection, and the
+    /// next sentence goes on it: the server takes one connection only. It is
+    /// not asked again while the connection was used within [`WARM_AFTER`].
+    #[tokio::test]
+    async fn the_connection_opened_ahead_is_the_one_the_sentence_takes() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let audio = format!("data: {}\r\n\r\n", event(&[5; 960]));
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0; 4096];
+            while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                let n = socket.read(&mut buffer).await.unwrap();
+                request.extend_from_slice(&buffer[..n]);
+            }
+            let warmed = String::from_utf8_lossy(&request).into_owned();
+            socket
+                .write_all(b"HTTP/1.1 404 Not Found\r\ncontent-length: 2\r\n\r\n{}")
+                .await
+                .unwrap();
+            let mut request = Vec::new();
+            while !String::from_utf8_lossy(&request).contains("voiceName") {
+                let n = socket.read(&mut buffer).await.unwrap();
+                request.extend_from_slice(&buffer[..n]);
+            }
+            let head = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ncontent-length: {}\r\n\r\n",
+                audio.len()
+            );
+            socket.write_all(head.as_bytes()).await.unwrap();
+            socket.write_all(audio.as_bytes()).await.unwrap();
+            warmed
+        });
+        let tts = GeminiTts::new(
+            &format!("http://{address}/v1beta"),
+            "m-tts",
+            "g-key",
+            "Kore",
+        )
+        .unwrap();
+        let (status, _) = tts.warm().await.unwrap();
+        assert_eq!(status, 404);
+        assert_eq!(tts.warm().await, None, "used a moment ago");
+        let mut speech = tts.speak("Hi.").await.unwrap();
+        assert_eq!(speech.next().await.unwrap(), Some(vec![5; 960]));
+        let warmed = server.await.unwrap();
+        assert!(
+            warmed.starts_with("GET /v1beta/models/m-tts HTTP/1.1"),
+            "{warmed}"
+        );
+        assert!(warmed.contains("x-goog-api-key: g-key"));
+        let asking = tts.asking();
+        assert_eq!((asking.others, tts.asking().others), (0, 1));
+        drop(asking);
+        assert_eq!(tts.asking().others, 0);
     }
 
     /// A local plain HTTP server streams two events cut mid-event: the

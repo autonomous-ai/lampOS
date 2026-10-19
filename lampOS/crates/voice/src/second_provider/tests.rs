@@ -25,6 +25,8 @@ struct Script {
     endless: Option<&'static str>,
     /// Held by every live stream: dropped streams let go of it.
     token: Arc<()>,
+    /// How many times the voice was asked to make ready ([`Services::warm`]).
+    warmed: Arc<AtomicUsize>,
 }
 
 struct ScriptListener {
@@ -104,6 +106,11 @@ impl Services for Script {
             }
         })
         .boxed()
+    }
+
+    fn warm(&self) -> BoxFuture<'static, ()> {
+        self.warmed.fetch_add(1, Ordering::Relaxed);
+        Box::pin(async {})
     }
 }
 
@@ -2269,4 +2276,23 @@ async fn a_line_let_out_only_as_the_conversation_is_asked_with_its_note() {
         asked[1],
         [Message::system("SYSTEM"), Message::user("What time is it?")]
     );
+}
+
+/// #1712: the voice is asked to make ready as each spoken line begins, while
+/// the person speaks, not when the answer's first sentence is cut.
+#[tokio::test]
+async fn the_voice_makes_ready_as_a_line_begins() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What time is it?".to_owned())].into()),
+        chats: Mutex::new([vec![text("Noon."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (mut engine, _, _) = scripted(script.clone());
+    engine.submit(start(1));
+    tokio::task::yield_now().await;
+    assert_eq!(script.warmed.load(Ordering::Relaxed), 1);
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(script.warmed.load(Ordering::Relaxed), 1);
 }
