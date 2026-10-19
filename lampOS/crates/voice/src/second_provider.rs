@@ -101,9 +101,11 @@ pub const COULD_NOT_LOOK: &str = "I couldn't get a good look.";
 /// are answered in the next line's place when that line is held, within
 /// this ([`Shared::cut`], #1712).
 pub const CARRY_WITHIN: Duration = Duration::from_secs(30);
-/// The most of the last line's sound kept for the next: the audio queue's
-/// six seconds, at 16 kHz.
-pub const KEPT_SAMPLES: usize = 6 * 16_000;
+/// The most of the last line's sound kept for the next: its last 1.5 s at
+/// 16 kHz, enough for "Lamp," and a pause. Carried whole, 2 to 4 s of it
+/// held each line's words back 1 to 2.5 s while Deepgram worked through it
+/// (the first builder on lamp-4ace on 19 Oct at 18:56).
+pub const KEPT_SAMPLES: usize = 16_000 * 3 / 2;
 /// A line beginning this soon after the last one ended, that one not
 /// answered, goes on from it: its sound goes first ([`KeptSound`]).
 pub const CARRY_AFTER_END: Duration = Duration::from_millis(1_500);
@@ -952,9 +954,17 @@ impl Engine {
                     .and_then(|last| *last);
                 let carried = self.kept.take().filter(|kept| {
                     let since = kept.ended.map(|end| now.saturating_duration_since(end));
+                    // Only the piece that came back with no words, the name
+                    // cut off on its own: one whose words came back carries
+                    // nothing (#1712, 18:56).
+                    let words_back = last
+                        .as_ref()
+                        .filter(|(of, _)| *of == kept.request)
+                        .map(|(_, words)| !words.trim().is_empty());
                     kept.session == session
                         && kept.request < request
                         && !kept.samples.is_empty()
+                        && words_back != Some(true)
                         && since.is_none_or(|since| since <= KEEP_AFTER_END)
                         && (continues
                             || since.is_some_and(|since| since <= CARRY_AFTER_END)

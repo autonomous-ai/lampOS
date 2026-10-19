@@ -1075,10 +1075,14 @@ after a take-over, but now for every turn:
   the weather?" came as pieces of about 1.3 s, each a speech-to-text stream
   of its own, and the piece with the name got no words (lamp-4ace, 19 Oct,
   16:37 to 16:45: four such pieces around lamp-name's hits, `results 0
-  with words`). The engine keeps the last line's sound, at most 6 s
-  (`KEPT_SAMPLES`). A line in the same session that the coordinator says
-  continues it, or that begins within 1.5 s of its end when it was not
-  answered (`CARRY_AFTER_END`), has that sound sent into its stream first:
+  with words`). The engine keeps the last line's sound, its last 1.5 s
+  (`KEPT_SAMPLES`): carried whole, 2 to 4 s of it held each line's words
+  back 1 to 2.5 s while Deepgram worked through it (18:56). Only a piece
+  that came back with no words carries it, the name cut off on its own; one
+  whose words came back carries nothing. A line in the same session that
+  the coordinator says continues it, or that begins within 1.5 s of its end
+  when it was not answered (`CARRY_AFTER_END`), has that sound sent into
+  its stream first:
   `request N goes on from request M: its <ms> ms of sound go first`. Its
   window then begins where the first piece's did, so a name lamp-name heard
   there counts for it, and the old words are not put before its own as well.

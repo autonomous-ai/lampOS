@@ -3283,3 +3283,49 @@ async fn each_spoken_line_is_asked_with_its_call_note() {
     assert!(asked[1].contains(&Message::system(worker::DECLINE_NOTE)));
     assert!(!asked[1].contains(&Message::system(worker::BY_NAME_NOTE)));
 }
+
+/// #1712, the first builder at 18:56: only a piece that came back with no
+/// words carries its sound, and at most its last 1.5 s. A piece whose words
+/// came back, even held, carries nothing; a long wordless piece carries its
+/// last 1.5 s alone.
+#[tokio::test]
+async fn only_a_wordless_piece_carries_and_only_its_last_moments() {
+    let frame = lamp_audio::CAPTURE_SAMPLES;
+    let run = |first: &'static str, frames: u64| async move {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(first.to_owned()), Ok("what's the weather?".to_owned())].into()),
+            chats: Mutex::new([vec![text("Sunny."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        // The first piece is held, so it is never answered.
+        let mut engine = engine.heeding(Arc::new(|request, _, _, _| {
+            (request == 1).then_some("not said to the lamp")
+        }));
+        engine.submit(start(1));
+        for sequence in 1..=frames {
+            engine.submit(audio_at(1, sequence, 1_000));
+        }
+        engine.submit(end(1));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        engine.submit(start(2));
+        engine.submit(audio_at(2, 1, 9_000));
+        engine.submit(end(2));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        script.samples_heard.load(Ordering::Relaxed) - frames as usize * frame
+    };
+    // The second line's own stream: with a wordless first piece, its sound
+    // first, then its own frame.
+    assert_eq!(run("", 1).await, 2 * frame, "a wordless piece carries");
+    assert_eq!(
+        run("Okay yeah sure.", 1).await,
+        frame,
+        "words came back: nothing carried"
+    );
+    let long = 200; // 2 s of sound
+    assert_eq!(
+        run("", long).await,
+        KEPT_SAMPLES + frame,
+        "its last 1.5 s, then its own"
+    );
+}
