@@ -162,6 +162,25 @@ struct Script {
     camera: bool,
     /// The keeper has paused the lamp before the run begins.
     paused: bool,
+    /// How the privacy worker's observations begin (lamp-4ace, 19 Oct
+    /// 01:19: the first read stale as the voice started).
+    privacy_start: PrivacyStart,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum PrivacyStart {
+    /// Fresh from the first.
+    #[default]
+    Fresh,
+    /// The first 60 ms old when sent, as one that waited in the queue; then
+    /// fresh every 5 ms.
+    StaleFirst,
+    /// The first 60 ms old, and then nothing.
+    StaleThenSilent,
+    /// The second fresh but acquired before the first: out of order.
+    Backwards,
+    /// Fresh, then the 40th (200 ms in, the microphone allowed) 60 ms old.
+    StaleAfterAllowed,
 }
 
 impl Script {
@@ -181,6 +200,7 @@ impl Script {
             ring: false,
             camera: false,
             paused: false,
+            privacy_start: PrivacyStart::Fresh,
         }
     }
     fn then(mut self, when: When, act: Act) -> Self {
@@ -1271,6 +1291,9 @@ struct PrivacyPeer {
     seen: Arc<Mutex<Seen>>,
     muted: Arc<AtomicBool>,
     next: Instant,
+    start: PrivacyStart,
+    sent: u64,
+    first_at: u64,
 }
 
 impl PrivacyPeer {
@@ -1288,8 +1311,19 @@ impl PrivacyPeer {
                 self.seen.lock().unwrap().stopped.push("privacy");
             }
         }
-        if !self.peer.stopped && crate::scenario_clock::instant() >= self.next {
+        let silent = self.start == PrivacyStart::StaleThenSilent && self.sent > 0;
+        if !self.peer.stopped && !silent && crate::scenario_clock::instant() >= self.next {
             let at = monotonic_us();
+            let stale = matches!(
+                self.start,
+                PrivacyStart::StaleFirst | PrivacyStart::StaleThenSilent
+            ) && self.sent == 0
+                || self.start == PrivacyStart::StaleAfterAllowed && self.sent == 39;
+            let backwards = self.start == PrivacyStart::Backwards && self.sent == 1;
+            if self.sent == 0 {
+                self.first_at = at;
+            }
+            self.sent += 1;
             {
                 let mut seen = self.seen.lock().unwrap();
                 if let Some(last) = seen.last_privacy_us {
@@ -1298,7 +1332,13 @@ impl PrivacyPeer {
                 seen.last_privacy_us = Some(at);
             }
             let _ = self.peer.channels.control.send(WorkerEvent::Privacy {
-                acquired_at_us: at,
+                acquired_at_us: if stale {
+                    at - 60_000
+                } else if backwards {
+                    self.first_at - 1_000
+                } else {
+                    at
+                },
                 muted: self.muted.load(Ordering::SeqCst),
             });
             self.next = crate::scenario_clock::instant() + Duration::from_millis(5);
@@ -1429,6 +1469,9 @@ fn run_in(script: Script, trace: &mut SessionState) -> Run {
         seen: seen.clone(),
         muted: muted.clone(),
         next: crate::scenario_clock::instant(),
+        start: script.privacy_start,
+        sent: 0,
+        first_at: 0,
     };
     let state = Peers {
         script,
@@ -2233,6 +2276,93 @@ fn expired_accepted_privacy_rejects_a_fresh_queued_mute_in_stepped_run() {
     // healthy, restartable physical-mute lifecycle.
     assert!(!is_mute(&run.result));
     assert!(run.events("physical_mute").is_empty());
+}
+
+/// Lamp-4ace, 19 Oct 01:19: 0.7 s after a start the voice ended on
+/// `invalid or stale service privacy observation`, the first one read after
+/// it had waited in the queue while the workers started, and came back
+/// muted by the restart guard. Before the microphone is first allowed, such
+/// an observation now closes the gate and is waited past: the next, fresh,
+/// opens it as usual, and the run goes on to its answer and its mute.
+#[test]
+fn a_privacy_observation_read_stale_as_the_voice_starts_is_waited_past() {
+    let _one = one_session();
+    let run = run(Script {
+        privacy_start: PrivacyStart::StaleFirst,
+        ..Script::question(Answer::Complete(12))
+    });
+    run.assert_invariants();
+    assert!(is_mute(&run.result), "{:?}", run.result);
+    assert_eq!(run.events("privacy_stale_at_start").len(), 1);
+    let turn = first(&run);
+    assert_eq!(run.outcomes()[&turn], ["audio_written_unscored"]);
+    assert_eq!(run.events("listening_ready").len(), 1);
+}
+
+/// The same stale first observation with nothing after it: the gate stays
+/// closed, so nothing is heard, and the run ends on the lost freshness once
+/// the starting second has passed, as it did before on the observation
+/// itself.
+#[test]
+fn a_privacy_worker_silent_after_a_stale_first_observation_still_ends_the_run() {
+    let _one = one_session();
+    let run = run(Script {
+        privacy_start: PrivacyStart::StaleThenSilent,
+        ..Script::question(Answer::Complete(12))
+    });
+    assert_eq!(
+        run.result.as_ref().unwrap_err().to_string(),
+        "service privacy freshness lost before next observation"
+    );
+    assert!(!is_mute(&run.result));
+    assert_eq!(run.events("privacy_stale_at_start").len(), 1);
+    assert!(
+        run.events("listening_ready").is_empty(),
+        "nothing was heard"
+    );
+    assert!(run.seen.chunks.is_empty());
+}
+
+/// Only staleness is waited past while the voice starts: an observation
+/// out of order (acquired before the one before it) still ends the run at
+/// once, as before.
+#[test]
+fn a_privacy_observation_out_of_order_as_the_voice_starts_still_ends_the_run() {
+    let _one = one_session();
+    let run = run(Script {
+        privacy_start: PrivacyStart::Backwards,
+        ..Script::question(Answer::Complete(12))
+    });
+    assert_eq!(
+        run.result.as_ref().unwrap_err().to_string(),
+        "invalid or stale service privacy observation"
+    );
+    assert!(run.events("privacy_stale_at_start").is_empty());
+    assert!(
+        run.events("listening_ready").is_empty(),
+        "nothing was heard"
+    );
+}
+
+/// Once the microphone has been allowed, a stale observation ends the run
+/// at once as before, though the starting second has not passed.
+#[test]
+fn a_privacy_observation_read_stale_after_the_microphone_was_allowed_still_ends_the_run() {
+    let _one = one_session();
+    let run = run(Script {
+        privacy_start: PrivacyStart::StaleAfterAllowed,
+        ..Script::question(Answer::Hold(12))
+    });
+    assert_eq!(
+        run.result.as_ref().unwrap_err().to_string(),
+        "invalid or stale service privacy observation"
+    );
+    assert!(run.events("privacy_stale_at_start").is_empty());
+    assert_eq!(
+        run.events("listening_ready").len(),
+        1,
+        "it was allowed first"
+    );
 }
 
 #[test]

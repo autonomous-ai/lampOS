@@ -382,6 +382,23 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   late observation now only keeps the gate closed; the wait ends only when
   no fresh observation has come for 1 s (`UNAVAILABLE_WAIT`). The gate's own
   rules are unchanged: only fresh, ordered, stable observations open it.
+- **A stale privacy observation as the conversation starts.** On lamp-4ace
+  at 01:19 on 19 Oct, 0.7 s after an install's start, the voice ended on
+  "invalid or stale service privacy observation" and came back muted by the
+  restart guard: the first observation the conversation read had waited
+  past its 50 ms in the queue while the voice started its other workers.
+  The same rule as in the wait above now holds there until the microphone
+  is first allowed, within the first second of the privacy worker
+  (`PRIVACY_START_STALE_US`): a stale observation closes the gate, is said
+  once (`a privacy observation N ms old was read as the voice started`,
+  traced as `privacy_stale_at_start`), and a fresh one behind it opens the
+  gate as usual, 60 ms stable. Nothing is heard meanwhile. Still ending the
+  run: an observation out of order; no fresh one by the end of that second
+  (`service privacy freshness lost before next observation`); a worker that
+  never says anything, at its 50 ms as before; and any stale observation
+  once the microphone has been allowed. 18 Oct's 08:34 exit (`service
+  privacy freshness lost …`) is the same kind only if it came before the
+  microphone was allowed; its journal does not say.
 
 Not found yet: the power cut's first exit (exit 1 at 19.8 s, with no message
 of its own) and the provider's "Connection refused" at 24.7 s; that boot's
