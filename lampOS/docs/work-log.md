@@ -19,7 +19,9 @@ Ready for integration: yes (#1996 output caps passed automatic ARM64; inherited 
 
 Ready for integration: no (#1732 ARM64 is green; the authored skill is being split from shared foundations)
 
-Ready for integration: no (#1757 follows Bedtime; latest host attempt failed inherited motion test)
+Ready for integration: no (#1757 follows Bedtime; complete private host gate failed the unchanged Policy and motion fixtures)
+
+Ready for integration: no (#2005 Policy fixture repair passed the complete host gate; automatic ARM64 is running)
 
 Completed: #1966 merged into #1712 at 16:15 UTC as `df722db2d0` after local and automatic ARM64 gates passed
 
@@ -31,9 +33,11 @@ lamp qualification and merging.
 
 The [14:30 UTC checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6269677751)
 acknowledges the missed checkpoint and the new second-route requirement.
-The full Queue and own PR reviews were reread at 17:22 UTC. The current
-integration tip is `3a66c1263b`; #1925, the separate #1976 stress-bar fix,
-#1966 Tasks fix and #1990 motion fixture amendment are merged. Foundation preparation starts at `df722db2d0`. The
+The full Queue and all four own PR review threads were reread at 18:02 UTC
+(712 Queue comments; no reviews, inline comments or unresolved threads on
+#1732, #1757, #1996 or #2005). The current integration tip is `e9d84fbee7`;
+#1925, the separate #1976 stress-bar fix, #1966 Tasks fix, #1990 motion
+fixture amendment and #1940 are merged. Foundation preparation starts at `df722db2d0`. The
 Bedtime publication is based on #1712's `b919291458`: Deepgram, DeepSeek and
 ElevenLabs. No provider session or device is started by these host tests.
 
@@ -197,8 +201,12 @@ source hash matches in both the checkout and source-only copy. These
 results preserve the original failure. First's 16:57 UTC direction is to
 publish the four parts with that inherited failure disclosed. The motion
 owner's test-only #1990 merged at 17:16 UTC as `3a66c1263b`. Its latest
-revision `fb70cdad27` adds separate topic recorders; the earlier native green
-qualified `7537ae2162`, so integration ARM64 must qualify the amendment.
+revision `fb70cdad27` adds separate topic recorders. The [completed integration
+ARM64 run 39292881105](verification/second-integration-checkpoint-20261019/integration-motion-amendment-arm64.json)
+qualifies the amendment at `3a66c1263b`: **7,641 nextest passed (1 leaky),
+48 skipped**, plus **4 doc and 12 separate harness tests**. Release, relay,
+hashes and upload passed. That integration result does not qualify the
+older private Music source.
 Caps is now [#1996](https://github.com/autonomous-ai/lampOS/pull/1996),
 head `e1fdc20374`, into `first/voice-cascade-gemini`. Its automatic
 [ARM64 run 39290958460](https://github.com/autonomous-ai/lampOS/actions/runs/39290958460)
@@ -274,9 +282,37 @@ failures or ignores. Complete Actions, Msgs and Skills passed **486/0/0**,
 none filtered, **143.54 s**; the full ring-worker integration suite passed
 **23/0/0**, **15.42 s**. Workspace build passed **82.97 s**. All **1,610**
 frozen source hashes match in checkout and source-only copy. Voice filters
-overlap and are not a full-suite total. The full 27-crate consumer gate now
-runs on the same private preparation. Music remains queued behind actual
-Bedtime landing and a final port that preserves newer integration changes.
+overlap and are not a full-suite total. The [complete 27-crate consumer gate](verification/second-integration-checkpoint-20261019/music-foundations-consumers-failure.json)
+then finished with **6,980 passed, 2 failed, 30 ignored**, none filtered.
+Non-Update tests reported **6,848/2/29** in **1,099.31 s**; full Update passed
+**132/0/1** in **100.82 s**. The failures were Policy's `a whole request`
+(**164/1/0**, **10.05 s**) and the inherited motion fixture's `1 nods`
+(Voice **2,329/1/12**, **320.20 s**). Both entire fixture blobs match parent
+`7f4cc5c267`; the Policy blob also matches current integration `e9d84fbee7`.
+All **1,610** source hashes still match both copies. This is a failed gate,
+with no hidden filters or unchanged-source retry. Music remains queued
+behind actual Bedtime landing and a final port preserving newer changes.
+
+The separate [Policy fixture repair #2005](https://github.com/autonomous-ai/lampOS/pull/2005)
+is head `0040b45576a8d467a4925523b26dfad102c6e416` on `e9d84fbee7`.
+It gates the first lookup through both unchanged 120 ms deadline checks,
+then releases it. The wait is bounded and disconnects on unwind; the
+single-lookup, complete-request, cache and re-resolution assertions remain.
+Only a private test fixture changes. [Its complete host gate](verification/second-integration-checkpoint-20261019/policy-lookup-host.json)
+passed **264/0/2**, none filtered, **73.90 s**; library **165/0/0**.
+Formatting **3.89 s**, strict all-target Policy Clippy **16.28 s**, and
+build **0.11 s** passed. [Changed-name grep](verification/second-integration-checkpoint-20261019/policy-lookup-consumers.json)
+matches only that private test module. All **1,584** frozen source hashes
+match both copies. [Automatic ARM64 39298987458](https://github.com/autonomous-ai/lampOS/actions/runs/39298987458)
+is running; #2005 remains draft until native qualification. This separate
+repair is not bundled into Music or a Bedtime foundation.
+
+The final Music port must also preserve the held-report scope correction.
+The [reported P2](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6273396615)
+finds `done_though_held` using the sticky session's builder despite holding
+an admitted lease. First assigned the upstream repair and privacy review;
+the regression must use differing sticky and admitted people. The source
+call chain was verified statically; no device reproduction is claimed.
 
 Bedtime and Tasks have only their original automatic PR ARM64 run,
 following First's no-duplicate-dispatch direction. GitHub's [Actions incident](https://www.githubstatus.com/incidents/8tzbpcnl75jp)

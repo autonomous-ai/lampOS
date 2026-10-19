@@ -1,0 +1,112 @@
+{
+  "head": "0040b45576a8d467a4925523b26dfad102c6e416",
+  "integration_base": "e9d84fbee72731300594a0762eae7a9ba33040a5",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "source_only": true,
+  "fresh_isolated_target": true,
+  "source_file_count": 1584,
+  "source_tree_sha256": "5c69c0347aa7548deafae4e5c82ad9a20b91d6b7a4fa848dfcb6a9c166908b34",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.89,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-policy",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 16.28,
+      "log_sha256": "ba693d56082a0931edf7bf3274c5b8a24eb13d3bd13349d7de96c0c6e8da0b2a",
+      "summaries": []
+    },
+    {
+      "stage": "tests",
+      "command": [
+        "cargo",
+        "test",
+        "--no-fail-fast",
+        "-p",
+        "lamp-policy",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 73.9,
+      "log_sha256": "4ee370fdc064662893d6cfc9e9b3f833b4c57f4f0dfdaff3b3da628fa822a53d",
+      "summaries": [
+        "test result: ok. 165 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.79s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.97s",
+        "test result: ok. 7 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.53s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.05s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.79s",
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.12s",
+        "test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.55s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.18s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.52s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "stage": "build",
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "lamp-policy"
+      ],
+      "exit_code": 0,
+      "seconds": 0.11,
+      "log_sha256": "63bd8a3ac13f8b1c160887cdaf9b30715b07e638d60df463cb8815f661518191",
+      "summaries": []
+    }
+  ],
+  "scope": "Complete Policy test-only fixture gate. Changed names are confined to its cfg(test) module; its complete tests run without filters.",
+  "all_source_hashes_still_match": true,
+  "all_frozen_checkout_and_source_copy_hashes_match": true,
+  "platform": "aarch64-apple-darwin",
+  "totals": {
+    "passed": 264,
+    "failed": 0,
+    "ignored": 2,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "limitations": [
+    "Only a private Policy test fixture changed; no product behavior changed.",
+    "Host fixtures; no physical lamp or provider session used.",
+    "Automatic PR ARM64 must separately qualify the tested merge checkout."
+  ]
+}

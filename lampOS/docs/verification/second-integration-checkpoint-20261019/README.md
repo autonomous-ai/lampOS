@@ -1,6 +1,6 @@
 # Second integration checkpoint, 2026-10-19
 
-Current status (17:39 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
+Current status (18:02 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
 passed automatic ARM64: **7,684 nextest (1 leaky), 48 skipped**, plus
 **4 doc and 12 separate harness tests**. [Native evidence](caps-foundation-arm64.json)
 records the exact head, base and merge checkout. The [host motion failure](caps-foundation-motion-failure.json)
@@ -13,7 +13,19 @@ reported **4,418/1/19** outside Update, the inherited motion assertion;
 **132/0/1** and workspace build. The earlier [shared-cache compilation failure](split-composition-initial.json)
 stays recorded. Music's [replacement preflight](music-foundations-preflight.json)
 passed all selected cases after the test-only correction; the [first failure](music-foundations-teardown-failure.json)
-is preserved. Its full consumer gate is now running.
+is preserved. Its [complete 27-crate gate](music-foundations-consumers-failure.json)
+finished with **6,980/2/30**, none filtered: unchanged Policy lookup and
+motion fixtures failed; full Update passed **132/0/1**. All 1,610 source
+hashes match. This remains a failed gate.
+
+[Policy repair #2005](https://github.com/autonomous-ai/lampOS/pull/2005)
+changes only the private lookup fixture. [Full host evidence](policy-lookup-host.json):
+**264/0/2**, none filtered, formatting, strict Clippy and build passed;
+all 1,584 hashes match both copies. [Changed-name scan](policy-lookup-consumers.json)
+is confined to that module. Automatic ARM64 39298987458 is running.
+The [separate integration ARM64 record](integration-motion-amendment-arm64.json)
+qualifies the amended #1990 motion fixture at `3a66c1263b`: **7,641 nextest
+passed (1 leaky), 48 skipped**, plus **4 doc and 12 harness tests**.
 The [work log](../../work-log.md) carries current integration status.
 
 Historical checkpoint (15:26 UTC): #1732 is published as `22c9c730bd` onto #1712.
