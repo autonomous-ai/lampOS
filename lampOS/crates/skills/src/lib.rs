@@ -276,6 +276,11 @@ struct ChoiceFile {
     /// The value a call that gives none is made as (#1679: a light show
     /// asked with no hint is a party). Without it, such a call has none.
     default: Option<String>,
+    /// In a skill with a trigger and no tool (#1669 (e), watching someone
+    /// leave): the choice is this field of the message that fired it, as
+    /// it is when the steps are made. A message whose value is not in
+    /// `one_of`, or has none, does not hold the trigger ([`chooses`]).
+    field: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1758,7 +1763,23 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         Ok(())
     };
     if let Some(choice) = &file.choice {
-        argument(&choice.name, &choice.about)?;
+        match &choice.field {
+            None => argument(&choice.name, &choice.about)?,
+            Some(field) => {
+                if file.tool.is_some() || triggers.is_empty() || choice.default.is_some() {
+                    return Err(
+                        "a choice read from a field is a trigger's: a skill with a trigger, no tool and no default"
+                            .into(),
+                    );
+                }
+                if !plain_name(&choice.name) || field.is_empty() {
+                    return Err(format!(
+                        "choice {:?}: a plain name, and the trigger's field it is read from",
+                        choice.name
+                    ));
+                }
+            }
+        }
         let mut values = choice.one_of.clone();
         values.sort();
         values.dedup();
@@ -3587,7 +3608,7 @@ impl Engine {
                                     && trigger.test.holds(item)
                             })
                         }
-                        _ => trigger.test.holds(value),
+                        _ => trigger.test.holds(value) && chooses(skill, value),
                     }
                 })
         };
@@ -3747,7 +3768,7 @@ impl Engine {
                         watch.disarmed = false;
                     }
                 }
-                if !(rose && trigger.test.holds(&value)) {
+                if !(rose && trigger.test.holds(&value) && chooses(skill, &value)) {
                     if watch
                         .last_held_us
                         .is_none_or(|held| now_us - held >= trigger.gap_us)
@@ -4192,6 +4213,24 @@ fn arguments(skill: &Skill, args: &Value) -> Result<(), String> {
     Ok(())
 }
 
+/// Whether a trigger's message chooses something, for a skill whose
+/// `[choice]` is read from it (`field`, #1669 (e)): only a value in
+/// `one_of` lets it hold, so a message that chooses nothing neither runs
+/// the skill, nor asks the Policy, nor starts its cooldown (the reviewer on
+/// #2012: a departure from the middle used up Watch you leave's ten
+/// minutes). Every other skill's trigger is as its test says.
+fn chooses(skill: &Skill, value: &Value) -> bool {
+    skill
+        .choice
+        .as_ref()
+        .and_then(|choice| Some((choice.field.as_deref()?, choice)))
+        .is_none_or(|(field, choice)| {
+            value[field]
+                .as_str()
+                .is_some_and(|chosen| choice.one_of.iter().any(|one| one == chosen))
+        })
+}
+
 /// One of `count`, picked from the time: the same time picks the same, so a
 /// replay is the same each time.
 fn pick(now_us: u64, count: usize) -> usize {
@@ -4227,7 +4266,14 @@ fn calls(
     let chosen = skill
         .choice
         .as_ref()
-        .and_then(|choice| args[&choice.name].as_str().or(choice.default.as_deref()));
+        .and_then(|choice| match (&choice.field, trigger) {
+            // The trigger's own message, as it fired (#1669 (e)).
+            (Some(field), Some(trigger)) => latest
+                .get(&trigger.topic)
+                .and_then(|(value, _, _)| value[field.as_str()].as_str()),
+            (Some(_), None) => None,
+            (None, _) => args[&choice.name].as_str().or(choice.default.as_deref()),
+        });
     let twice = skill
         .flag
         .as_ref()

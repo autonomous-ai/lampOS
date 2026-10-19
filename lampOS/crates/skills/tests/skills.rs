@@ -323,6 +323,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "stretch-break",
             "stuffy-air",
             "task-news",
+            "watch-you-leave",
             "welcome-back"
         ]
     );
@@ -6543,6 +6544,21 @@ fn the_loader_holds_kept_lights_shows_turns_and_choices_to_their_rules() {
         (
             "tool = \"t\"\n[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\ndefault = \"z\"\n[[do]]\nsay = \"Hi.\"\n".into(),
             "its default",
+        ),
+        // #1669 (e): a choice read from the trigger's field is a trigger's
+        // alone, with no tool and no default.
+        (
+            "tool = \"t\"\n[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\nfield = \"side\"\n[[do]]\nsay = \"Hi.\"\n".into(),
+            "a trigger's",
+        ),
+        // With a trigger too: the tool alone refuses it (the reviewer on #2012).
+        (
+            format!("tool = \"t\"\n{TRIGGERED}[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\nfield = \"side\"\n[[do]]\nif_choice = [\"a\"]\nlight = {{ colour = \"warm\" }}\n"),
+            "a trigger's",
+        ),
+        (
+            format!("{TRIGGERED}[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\nfield = \"side\"\ndefault = \"a\"\n[[do]]\nif_choice = [\"a\"]\nlight = {{ colour = \"warm\" }}\n"),
+            "no default",
         ),
     ]
     .into_iter()

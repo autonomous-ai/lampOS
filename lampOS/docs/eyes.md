@@ -1134,7 +1134,12 @@ With `LAMP_ACTIVITY=on` beside `LAMP_BUS=on`, the eyes also say on
 `room/activity` (`lamp_msgs::RoomActivity`) what the face at the desk shows,
 and on `room/stood_up` (`lamp_msgs::StoodUp`, an event) when someone rose
 out of the chair and left (`crates/eyes/src/activity.rs`, from
-`bus_out.rs`). The eyes see a face, not a body, so each state is read from
+`bus_out.rs`). It says the side of the picture they left by (`side`, `left`
+or `right`) when their face was last seen less than 0.35 of the picture's
+width from that edge as they rose, and no side nearer the middle: for
+watching them go (#1669), a turn toward it is the one the gaze would make
+to a face seen there (body.md, `toward`). 0.35 is provisional, until the
+arm hour sets it. The eyes see a face, not a body, so each state is read from
 the sitter's face against this person's own sitting: the median of its
 first two minutes of looks at the desk (a face at least 0.14 of the picture
 tall, Stretch break's `near`). The sitter is the largest near face when a

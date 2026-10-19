@@ -1,0 +1,2 @@
+{"topic": "body/hand", "declaration": {"type": "lamp_msgs/Hand", "version": 1, "kind": "latest"}}
+{"header": {"topic": "body/hand", "kind": "latest", "enc": "json", "type": "lamp_msgs/Hand", "source": "test", "boot": "6a2f0b8c4d1e3f57", "seq": 1, "at_us": 1, "at_unix_ms": 1792400000000}, "payload_b64": "eyJwdXNoZWQiOmZhbHNlLCJzaW5jZV91cyI6MH0="}

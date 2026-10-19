@@ -1,0 +1,4 @@
+{"topic": "room/stood_up", "declaration": {"type": "lamp_msgs/StoodUp", "version": 1, "kind": "event"}}
+{"header": {"topic": "room/stood_up", "kind": "event", "enc": "json", "type": "lamp_msgs/StoodUp", "source": "test", "boot": "6a2f0b8c4d1e3f57", "seq": 1, "at_us": 10000001, "at_unix_ms": 1792400010000, "expires_ms": 5000}, "payload_b64": "eyJzaXR0aW5nX3MiOjkwMCwic2lkZSI6ImxlZnQifQ=="}
+{"header": {"topic": "room/stood_up", "kind": "event", "enc": "json", "type": "lamp_msgs/StoodUp", "source": "test", "boot": "6a2f0b8c4d1e3f57", "seq": 2, "at_us": 300000001, "at_unix_ms": 1792400300000, "expires_ms": 5000}, "payload_b64": "eyJzaXR0aW5nX3MiOjkwMCwic2lkZSI6InJpZ2h0In0="}
+{"header": {"topic": "room/stood_up", "kind": "event", "enc": "json", "type": "lamp_msgs/StoodUp", "source": "test", "boot": "6a2f0b8c4d1e3f57", "seq": 3, "at_us": 700000001, "at_unix_ms": 1792400700000, "expires_ms": 5000}, "payload_b64": "eyJzaXR0aW5nX3MiOjkwMCwic2lkZSI6InJpZ2h0In0="}
