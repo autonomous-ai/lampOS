@@ -42,6 +42,10 @@ pub trait Light {
 
 /// How long the owner has to show what was asked for.
 pub const CONFIRM_WAIT: Duration = Duration::from_millis(600);
+/// How often what the owner shows is read again while waiting for it: the
+/// ring's own pass, 2 ms. The voice's answer waits for this read, so the
+/// person hears its gap on every light call. It was 15 ms (#1806).
+const CONFIRM_LOOKS: Duration = Duration::from_millis(2);
 const UNCONFIRMED: &str = "I asked for it but could not confirm my light changed.";
 const UNREAD: &str = "I could not tell what my light is showing.";
 const OFF: &str = "My light is off. The faint glow that is left shows I am still listening.";
@@ -59,7 +63,7 @@ fn set<L: Light>(light: &mut L, wanted: Wanted, said: String) -> Outcome {
         if started.elapsed() >= CONFIRM_WAIT {
             return Outcome::Failed(UNCONFIRMED.into());
         }
-        std::thread::sleep(Duration::from_millis(15));
+        std::thread::sleep(CONFIRM_LOOKS);
     }
 }
 
@@ -392,6 +396,56 @@ pub(crate) mod tests {
         fn covered(&mut self) -> bool {
             self.covered
         }
+    }
+
+    /// A ring owner that shows what it is asked only from its second read
+    /// after the ask, as the ring does when its pass comes after the read.
+    struct Late {
+        shown: Wanted,
+        asked: Option<Wanted>,
+        reads: u32,
+    }
+    impl Light for Late {
+        fn there(&mut self) -> bool {
+            true
+        }
+        fn shown(&mut self) -> Option<Wanted> {
+            self.reads += 1;
+            if self.reads >= 2
+                && let Some(asked) = self.asked.take()
+            {
+                self.shown = asked;
+            }
+            Some(self.shown.clone())
+        }
+        fn ask(&mut self, wanted: &Wanted) -> bool {
+            self.asked = Some(wanted.clone());
+            self.reads = 0;
+            true
+        }
+    }
+
+    /// A light the owner shows a moment after the ask is confirmed at the
+    /// next read, `CONFIRM_LOOKS` (2 ms) on, not 15 ms on: the voice's
+    /// answer waits for this read (#1806).
+    #[test]
+    fn a_light_shown_a_moment_after_the_ask_is_confirmed_at_the_next_read() {
+        let mut ring = Late {
+            shown: light(true, "blue", 3),
+            asked: None,
+            reads: 0,
+        };
+        let fastest = (0..5)
+            .map(|call| {
+                let colour = if call % 2 == 0 { "red" } else { "blue" };
+                let started = Instant::now();
+                let outcome = set(&mut ring, light(true, colour, 3), String::new());
+                assert!(matches!(outcome, Outcome::Done(_)), "{outcome:?}");
+                started.elapsed()
+            })
+            .min()
+            .unwrap();
+        assert!(fastest < Duration::from_millis(10), "{fastest:?}");
     }
 
     /// The reviewer on #993: with a skill's glow drawn over the person's

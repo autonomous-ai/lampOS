@@ -226,6 +226,13 @@ what can't be read is said so, and what can't be confirmed within 0.6 s is
 said so. A ring really gone drops out after the grace. A light never seen
 is never offered.
 
+A light call is answered once the ring says it shows the light. The ring
+looks at what is asked on every pass of its 2 ms loop and says it at once,
+and the executive reads that every 2 ms. So a call takes a few milliseconds:
+about 3 ms at the median on the Intel Mac, against about 55 ms before 19 Oct,
+when the ring looked every 50 ms and the executive every 15 ms (#1806;
+`lamp-voice`'s `light_call` test).
+
 ## The app's two calls (#1396)
 
 The Autonomous app's volume slider is answered through the executive too, so

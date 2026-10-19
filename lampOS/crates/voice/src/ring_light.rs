@@ -48,10 +48,12 @@ use std::{io, path::Path, time::Duration};
 
 /// The name the ring's owner publishes under.
 pub const SOURCE: &str = "ring";
-/// What is asked for is looked at this often. A person who asks for a
-/// light hears the answer more than a second later; the ring has changed
-/// long before.
-const LOOK_EVERY_US: u64 = 50_000;
+/// What is asked for is looked at this often: on every pass of the ring's
+/// loop (`ring_worker`'s 2 ms). `lamp-actions` answers a light call only
+/// once this says it shows the light, and the model speaks after that
+/// answer, so the person hears this wait on every light call. It was 50 ms
+/// (#1806).
+const LOOK_EVERY_US: u64 = 2_000;
 /// What is shown is said this often when nothing changes, as the topic
 /// promises, and a state means nothing this long after it was said: a
 /// ring that has stopped is not a light that can be asked for.
@@ -692,6 +694,10 @@ mod tests {
     use super::*;
     use lamp_bus::Kind;
 
+    /// How far these tests move the ring's clock at a time: past a look,
+    /// as when a look was every 50 ms (#1806).
+    const STEP_US: u64 = 50_000;
+
     struct Root(std::path::PathBuf);
     impl Root {
         fn new(name: &str) -> Self {
@@ -725,7 +731,7 @@ mod tests {
     fn taken(ring: &mut RingLight, from_us: &mut u64) -> Option<Lit> {
         let started = std::time::Instant::now();
         while started.elapsed() < Duration::from_secs(5) {
-            *from_us += LOOK_EVERY_US;
+            *from_us += STEP_US;
             if let Some(lit) = ring.tick(*from_us) {
                 return Some(lit);
             }
@@ -776,6 +782,27 @@ mod tests {
         );
     }
 
+    /// A light asked for is taken at the ring's next pass of its loop, not
+    /// at a later look: `lamp-actions` answers the voice only once the
+    /// ring says it shows it (#1806; looks were 50 ms apart).
+    #[test]
+    fn a_light_asked_for_is_taken_at_the_rings_next_pass() {
+        let root = Root::new("light-pass");
+        let (mut ring, _) = RingLight::on(&root.0).unwrap();
+        let bus = Bus::new(&root.0).unwrap();
+        let mut asks = bus
+            .publisher_declared(Light::TOPICS[0], &Light::declaration(), "actions")
+            .unwrap();
+        let mut at = 0u64;
+        ring.tick(at);
+        asks.publish_json(1, &light(true, "blue", 3)).unwrap();
+        assert_eq!(taken(&mut ring, &mut at), Lit::of(true, "blue", 3));
+        // That pass looked. The next light asked is taken one pass on.
+        asks.publish_json(2, &light(true, "red", 3)).unwrap();
+        assert_eq!(ring.tick(at + 2_000), Lit::of(true, "red", 3));
+        assert_eq!(state(&bus), Some(light(true, "red", 3)));
+    }
+
     #[test]
     fn a_light_asked_for_is_taken_shown_and_said_at_once() {
         let root = Root::new("light-asked");
@@ -792,7 +819,7 @@ mod tests {
         // The same again changes nothing.
         asks.publish_json(2, &light(true, "blue", 3)).unwrap();
         for _ in 0..5 {
-            at += LOOK_EVERY_US;
+            at += STEP_US;
             assert_eq!(ring.tick(at), None);
             std::thread::sleep(Duration::from_millis(2));
         }
@@ -832,7 +859,7 @@ mod tests {
         asks.publish_json(3, &serde_json::json!({"rgb": [0, 0, 255]}))
             .unwrap();
         for _ in 0..10 {
-            at += LOOK_EVERY_US;
+            at += STEP_US;
             assert_eq!(ring.tick(at), None);
             std::thread::sleep(Duration::from_millis(2));
         }
@@ -1003,12 +1030,12 @@ mod tests {
         std::thread::sleep(Duration::from_millis(27));
         asks.publish_json(1, &light(false, "blue", 5)).unwrap();
         std::thread::sleep(Duration::from_millis(5));
-        at += LOOK_EVERY_US;
+        at += STEP_US;
         assert_eq!(ring.tick(at), Lit::of(false, "blue", 5));
         assert_eq!(ring.face(), &light(false, "blue", 5));
         // And it stays the person's: the test is not taken later either.
         for _ in 0..5 {
-            at += LOOK_EVERY_US;
+            at += STEP_US;
             ring.tick(at);
         }
         assert_eq!(ring.face(), &light(false, "blue", 5));
@@ -1017,7 +1044,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(5));
         asks.publish_json(2, &light(false, "blue", 5)).unwrap();
         std::thread::sleep(Duration::from_millis(5));
-        at += LOOK_EVERY_US;
+        at += STEP_US;
         ring.tick(at);
         assert_eq!(ring.face(), &light(false, "blue", 5));
         // A test asked after the person's request is still shown.
@@ -1084,7 +1111,7 @@ mod tests {
         );
         glows.publish_json(1, &glow).unwrap();
         for _ in 0..10 {
-            at += LOOK_EVERY_US;
+            at += STEP_US;
             assert_eq!(ring.tick(at), None);
             std::thread::sleep(Duration::from_millis(2));
         }
@@ -1130,7 +1157,7 @@ mod tests {
         other.claim.clock_id = "boot-two".into();
         glows.publish_json(2, &other).unwrap();
         for _ in 0..5 {
-            at += LOOK_EVERY_US;
+            at += STEP_US;
             assert_eq!(ring.tick(at), None);
             std::thread::sleep(Duration::from_millis(2));
         }
@@ -1164,7 +1191,7 @@ mod tests {
     /// Ticks enough for whatever was published to be read.
     fn looked(ring: &mut RingLight, at: &mut u64) {
         for _ in 0..5 {
-            *at += LOOK_EVERY_US;
+            *at += STEP_US;
             ring.tick(*at);
             std::thread::sleep(Duration::from_millis(2));
         }
@@ -1314,7 +1341,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(2));
         glows.publish_json(2, &glow(at)).unwrap();
         for _ in 0..5 {
-            at += LOOK_EVERY_US;
+            at += STEP_US;
             assert_eq!(ring.tick(at), None);
             std::thread::sleep(Duration::from_millis(2));
         }
@@ -1589,7 +1616,7 @@ mod tests {
         assert_eq!(taken(&mut ring, &mut at), Lit::of(true, "white", 2));
         glows.publish_json(2, &glow(at)).unwrap();
         for _ in 0..5 {
-            at += LOOK_EVERY_US;
+            at += STEP_US;
             assert_eq!(ring.tick(at), None);
             std::thread::sleep(Duration::from_millis(2));
         }
@@ -1649,7 +1676,7 @@ mod tests {
         let (mut ring, begins) = RingLight::on_keeping(&root.0, Some(&path)).unwrap();
         assert_eq!(begins, Lit::of(true, "blue", 3).unwrap());
         assert_eq!(ring.now(), &blue);
-        ring.tick(at + LOOK_EVERY_US);
+        ring.tick(at + STEP_US);
         assert_eq!(state(&Bus::new(&root.0).unwrap()), Some(blue.clone()));
         // Switched off, nothing on disk is read.
         let off = Root::new("light-keep-off");
