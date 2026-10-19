@@ -276,6 +276,7 @@ impl Rig {
             rules: u32::from(quiet),
             hello: Unprompted::default(),
             news: Unprompted::default(),
+            keep_light_on: false,
         };
         self.rules.publish_json(0, &rules).unwrap();
     }

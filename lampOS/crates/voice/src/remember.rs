@@ -510,6 +510,49 @@ pub fn start(socket: PathBuf, known: Option<PathBuf>) {
     }
 }
 
+/// How often, and how long apart, the room's rules are asked for at the
+/// voice's start: the memory may start after the voice at boot.
+const START_TRIES: u32 = 30;
+const START_PAUSE: Duration = Duration::from_secs(2);
+const START_READ: Duration = Duration::from_millis(1_500);
+
+/// The room's rules, read from the memory on `socket`, said on
+/// `memory/rules` once as the voice starts with the rules on (from
+/// [`crate::rules::bus_on`]), from a thread of its own (the reviewer on #1747): the bus
+/// is empty after a boot, and a rule such as "keep the light on" must hold
+/// before anyone has spoken. Tries until the memory answers or a session
+/// has said a fact first, for at most a minute.
+pub fn tell_rules_at_start(socket: PathBuf) {
+    let spawned = std::thread::Builder::new()
+        .name("lamp-voice-rules-start".into())
+        .spawn(move || {
+            for _ in 0..START_TRIES {
+                if crate::rules::said() {
+                    return;
+                }
+                if let Some(facts) = room_facts(&socket, START_READ) {
+                    crate::rules::publish_first(&facts);
+                    return;
+                }
+                std::thread::sleep(START_PAUSE);
+            }
+        });
+    if spawned.is_err() {
+        eprintln!("lamp-voice provider: no thread to say the rules at start");
+    }
+}
+
+/// The room's rules as the policy's fact, read within `within`: `None`
+/// when the memory did not answer.
+fn room_facts(socket: &Path, within: Duration) -> Option<lamp_msgs::Rules> {
+    let (room, _) = crate::rules::read(
+        |line, left| bounded_exchange(socket, line, left),
+        None,
+        Instant::now() + within,
+    )?;
+    Some(crate::rules::facts(None, &room, &[]))
+}
+
 /// The request used a function that keeps or forgets: its exchange stays
 /// out of the journal.
 pub fn keep_out(request: u64) {
@@ -1270,7 +1313,17 @@ impl DaysClient {
     ) -> (Value, bool) {
         let until = Instant::now() + deadline.min(crate::tools::ASK_DEADLINE);
         let now = unix_ms();
-        let scope = crate::rules::scope(person);
+        if crate::rules::forgets_light(call) {
+            return self.forget_light(person, until);
+        }
+        // A rule about the light is the room's, whoever says it (#1677):
+        // kept in the room's scope and linked there.
+        let owner = if crate::rules::keeps_light(call) {
+            None
+        } else {
+            person
+        };
+        let scope = crate::rules::scope(owner);
         let line = match crate::rules::request(call, now, &scope) {
             Ok(line) => line,
             Err(told) => return (told, true),
@@ -1343,7 +1396,7 @@ impl DaysClient {
         // The rule is linked before the fence is lifted.
         match self.context.lock() {
             Ok(mut context) => {
-                context.rule(person, shown);
+                context.rule(owner, shown);
                 if writes {
                     context.uncertain_writes = context.uncertain_writes.saturating_sub(1);
                 }
@@ -1369,6 +1422,70 @@ impl DaysClient {
             self.tell_policy(person, until);
         }
         (told, true)
+    }
+
+    /// "You can turn your light off again" (#1677): every rule of the
+    /// room's that keeps the light on is forgotten, whoever is asking, as a
+    /// forgotten rule is, before `until`.
+    fn forget_light(&self, person: Option<&str>, until: Instant) -> (Value, bool) {
+        let scope = crate::rules::scope(None);
+        let left = || until.checked_duration_since(Instant::now());
+        let Some(room) = left()
+            .and_then(|left| {
+                bounded_exchange(&self.socket, &crate::rules::read_request(&scope), left)
+            })
+            .and_then(|answer| crate::rules::rules(&answer))
+        else {
+            return (gone(), false);
+        };
+        let ids: Vec<u64> = room
+            .iter()
+            .filter(|rule| rule.keep_light_on)
+            .map(|rule| rule.id)
+            .collect();
+        if ids.is_empty() {
+            return (
+                json!({"forgotten": false, "note": "Nobody asked you to keep the light on: nothing to take back."}),
+                true,
+            );
+        }
+        // As for any write: journalling waits until it is acknowledged.
+        match self.context.try_lock() {
+            Ok(mut context) => {
+                context.uncertain_writes = context.uncertain_writes.saturating_add(1);
+            }
+            Err(_) => return (gone(), false),
+        }
+        let mut removed = 0;
+        for id in ids {
+            let forget = json!({"op":"forget","person":scope,"id":id});
+            let Some(answer) =
+                left().and_then(|left| bounded_exchange(&self.socket, &forget, left))
+            else {
+                return (gone(), false);
+            };
+            if answer["ok"] != true {
+                return (gone(), false);
+            }
+            removed += answer.get("removed").and_then(Value::as_u64).unwrap_or(0);
+        }
+        // The store removed what was said under them: as for forget_rule.
+        let mut context = self
+            .context
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        context.uncertain_writes = context.uncertain_writes.saturating_sub(1);
+        context.journal_inhibited = true;
+        drop(context);
+        FORGET_THREAD.store(true, Ordering::Release);
+        if let Ok(mut thread) = crate::thread::THREAD.try_lock() {
+            clear_forgotten_thread(&mut thread);
+        }
+        self.tell_policy(person, until);
+        (
+            json!({"forgotten": removed > 0, "note": "The light may go out again when nobody is there."}),
+            true,
+        )
     }
 
     /// Every rule of the room's, and of this person's, read before `until`,
@@ -2681,6 +2798,83 @@ mod tests {
         );
         drop(client);
         std::fs::remove_file(socket).unwrap();
+    }
+
+    /// #1677: "keep the light on" said by a known person is kept in the
+    /// room's scope, and "you can turn your light off again" forgets every
+    /// such rule of the room's, whoever asks, without a number.
+    #[test]
+    fn the_light_rule_is_kept_and_forgotten_in_the_rooms_scope() {
+        use crate::rules::{FORGET_RULE, KEEP_RULE};
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c1".into(),
+            name: name.into(),
+            args,
+        };
+        let (socket, served) = memory_lines("light-rule", 8, |request| {
+            match (request["op"].as_str(), request["person"].as_str()) {
+                (Some("kept"), Some("r-everyone")) => json!({"ok":true,"entries":[
+                    {"id":3,"at_unix_ms":1,"text":"[unprompted greeting never] Don't greet me."},
+                    {"id":9,"at_unix_ms":2,"text":"[unprompted light never] Keep the light on."}
+                ]}),
+                (Some("kept"), _) => json!({"ok":true,"entries":[]}),
+                (Some("remember"), _) => json!({"ok":true,"id":9}),
+                (Some("forget"), _) => json!({"ok":true,"removed":1}),
+                _ => json!({"ok":false,"error":"unexpected"}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let deadline = Duration::from_secs(1);
+        let keep = call(
+            KEEP_RULE,
+            json!({"rule":"Keep the light on.","about":"light","never":true}),
+        );
+        let (told, _) = client.rule_for(&keep, deadline, Some("p-be9688998f085098"));
+        assert_eq!(told["kept_rule"], true, "{told}");
+        let forget = call(FORGET_RULE, json!({"about":"light"}));
+        let (told, _) = client.rule_for(&forget, deadline, Some("p-be9688998f085098"));
+        assert_eq!(told["forgotten"], true, "{told}");
+        let read: Vec<Value> = served
+            .join()
+            .unwrap()
+            .iter()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        // Kept: the room's rules counted, then written there, then both
+        // scopes read for the policy.
+        assert_eq!(read[0]["person"], "r-everyone");
+        assert_eq!(
+            (read[1]["op"].as_str(), read[1]["person"].as_str()),
+            (Some("remember"), Some("r-everyone"))
+        );
+        // Forgotten: the room's rules read, and only the light rule, id 9,
+        // forgotten there; the greeting rule is left.
+        let forgets: Vec<&Value> = read.iter().filter(|line| line["op"] == "forget").collect();
+        assert_eq!(forgets.len(), 1);
+        assert_eq!(forgets[0]["id"], 9);
+        assert_eq!(forgets[0]["person"], "r-everyone");
+        drop(client);
+        std::fs::remove_file(socket).unwrap();
+    }
+
+    /// #1747 (the reviewer's P2): at the voice's start, with no session,
+    /// the room's rules are read and become the fact, "keep the light on"
+    /// with them; a memory that does not answer gives nothing to say.
+    #[test]
+    fn the_rooms_rules_are_read_at_the_start_with_no_session() {
+        let (socket, served) = memory_lines("rules-start", 1, |request| {
+            assert_eq!(request["person"], "r-everyone");
+            json!({"ok":true,"entries":[
+                {"id":9,"at_unix_ms":2,"text":"[unprompted light never] Keep the light on."}
+            ]})
+        });
+        let facts = room_facts(&socket, Duration::from_secs(1)).unwrap();
+        assert!(facts.keep_light_on);
+        assert_eq!((facts.person.as_str(), facts.rules), ("everyone", 1));
+        assert_eq!(served.join().unwrap().len(), 1);
+        std::fs::remove_file(&socket).unwrap();
+        // Nobody listening: nothing.
+        assert_eq!(room_facts(&socket, Duration::from_millis(200)), None);
     }
 
     #[test]

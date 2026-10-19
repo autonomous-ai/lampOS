@@ -1096,6 +1096,12 @@ pub struct Rules {
     /// News the lamp brings unasked: progress and results of work (#765).
     #[serde(default)]
     pub news: Unprompted,
+    /// Asked to keep the light on (#1677): the light does not go out when
+    /// nobody is there. The room's, whoever asked. Absent from an older
+    /// voice's message: not asked. Written only when true, so a message
+    /// that holds nothing about the light is as before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub keep_light_on: bool,
 }
 
 /// When the lamp was asked not to say one kind of thing unprompted, every
@@ -2072,6 +2078,7 @@ mod tests {
                     not_while_talking: true,
                     ..Unprompted::default()
                 },
+                keep_light_on: false,
             },
             "{\"person\":\"p-be9688998f085098\",\"quiet\":false,\"quiet_mornings\":true,\"rules\":2,\
              \"hello\":{\"never\":false,\"not_before_minute\":540,\"not_from_minute\":null,\"not_while_talking\":false},\
