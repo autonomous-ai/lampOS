@@ -1845,6 +1845,7 @@ dependencies = [
  "lamp-bus",
  "lamp-camera",
  "lamp-ipc",
+ "lamp-local-time",
  "lamp-msgs",
  "lamp-turn-end",
  "lamp-turn-owner",
@@ -1973,6 +1974,15 @@ dependencies = [
  "lamp-msgs",
  "sha2",
  "tract-onnx",
+]
+
+[[package]]
+name = "lamp-near-call"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

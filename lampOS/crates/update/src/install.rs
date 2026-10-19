@@ -191,6 +191,11 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          until the light going out and coming back has been seen on a lamp: someone reading face \
          down at the desk must never lose their light",
     ),
+    (
+        "not-feeling-well",
+        "not yet tried on a lamp (#1681): whether its droop and dim on `lamp/health`'s `error` \
+         read as a lamp a little unwell, not a status light, is for the lamp check",
+    ),
     // #1679's three core skills, built and not yet tried on a lamp: each
     // comes with the product once lamp-4ace has played it with a person.
     (
@@ -385,6 +390,13 @@ pub const GROUPS: &[&str] = &["audio", "video", "dialout", "i2c", "gpio"];
 /// in: the tasks part's state folder (`deploy/product/lamp-tasks.service`).
 pub const HARNESS: &str = "/usr/local/bin/harness";
 pub const HARNESS_HOME: &str = "/var/lib/lampos-tasks";
+/// Harness's own installer, the address its header names as where it is
+/// published (openharness `cli/scripts/install.sh`). Per user, with no
+/// root and no question asked; what it fetches is checked against Harness's
+/// sha256 metadata (#1676, the lead on #1711).
+pub const HARNESS_INSTALLER: &str = "https://cdn.autonomous.ai/harness/cli/install.sh";
+/// The part that hands work to Harness, started again once Harness is on.
+const TASKS_UNIT: &str = "lamp-tasks.service";
 /// What says Harness was set to start at boot: written in lamp-update's
 /// records only after `harness service install` succeeded. Not the files
 /// the CLI leaves: it writes its unit before registering it, and keeps it
@@ -464,6 +476,13 @@ pub trait Host {
     /// Harness still has, or a daemon still running as `user`. Never stopped
     /// here: stopping Harness is Harness's own.
     fn harness_off(&mut self, user: &str, home: &str) -> Result<Vec<String>, String>;
+    /// Harness on the lamp for `user` (`lamp-update harness-on`, #1676):
+    /// `home` made the user's own, Harness's own installer run as `user`
+    /// with that `HOME`, then [`HARNESS`] linked to the launcher it wrote.
+    /// Never a copy of Harness of this program's own.
+    fn harness_on(&mut self, user: &str, home: &str) -> Result<(), String>;
+    /// `systemctl restart` of one unit.
+    fn restart(&mut self, unit: &str) -> Result<(), String>;
 }
 
 /// The machine itself: only with the root `/`.
@@ -499,6 +518,14 @@ impl Host for System {
 
     fn harness_off(&mut self, user: &str, home: &str) -> Result<Vec<String>, String> {
         harness_off_with(&mut output_of, user, home)
+    }
+
+    fn harness_on(&mut self, user: &str, home: &str) -> Result<(), String> {
+        harness_on_with(&mut output_of, user, home)
+    }
+
+    fn restart(&mut self, unit: &str) -> Result<(), String> {
+        run(Command::new("systemctl").args(["restart", unit]))
     }
 
     fn utc_offset_minutes(&mut self, zone: &str) -> Result<i32, String> {
@@ -595,6 +622,40 @@ pub fn harness_off_with(run: &mut Runner, user: &str, home: &str) -> Result<Vec<
         }
     }
     Ok(left)
+}
+
+/// [`Host::harness_on`]'s steps, each through `run`, in this order: `id -u`;
+/// `home` made `user`'s own, 0700; as `user`, with `home` as its `HOME`, its
+/// runtime folder, a plain `PATH` and `SHELL=/bin/sh` (so the installer's one
+/// PATH line goes in `home`'s `.profile`), Harness's installer fetched and
+/// run (`curl … | sh`, as Harness says to install it); its launcher checked;
+/// then [`HARNESS`] linked to it. A failing step stops it there, before the
+/// link, so a lamp is never left with a link to nothing.
+pub fn harness_on_with(run: &mut Runner, user: &str, home: &str) -> Result<(), String> {
+    let uid = uid_of(run, user)?;
+    run(&["install", "-d", "-o", user, "-g", user, "-m", "0700", home].map(str::to_owned))?;
+    let mut installer: Vec<String> = ["runuser", "-u", user, "--", "env"]
+        .map(str::to_owned)
+        .into();
+    installer.extend([
+        format!("HOME={home}"),
+        format!("XDG_RUNTIME_DIR=/run/user/{uid}"),
+        "PATH=/usr/local/bin:/usr/bin:/bin".to_owned(),
+        "SHELL=/bin/sh".to_owned(),
+        "sh".to_owned(),
+        "-c".to_owned(),
+        format!("curl -fsSL --proto =https --tlsv1.2 {HARNESS_INSTALLER} | sh"),
+    ]);
+    run(&installer)?;
+    let launcher = format!("{home}/.local/bin/harness");
+    run(&["test".to_owned(), "-x".to_owned(), launcher.clone()])?;
+    run(&[
+        "ln".to_owned(),
+        "-sfn".to_owned(),
+        launcher,
+        HARNESS.to_owned(),
+    ])?;
+    Ok(())
 }
 
 /// What `harness service status --json` still says of Harness's service:
@@ -1337,6 +1398,58 @@ pub fn harness_off(
         say(line);
     }
     Ok(left)
+}
+
+/// `lamp-update harness-on` (#1676 B5): Harness on a lamp lampOS is
+/// installed on, as the person's computer has it. Without Harness at
+/// [`HARNESS`], [`Host::harness_on`] puts it there with Harness's own
+/// installer; one already there is kept as it is. Then Harness at boot, as
+/// [`install`] sets it, with its record, if not yet set; then the tasks part
+/// is started again, so it hands over with Harness, but only when something
+/// changed. Signing in is the person's, and not done here. Run again, it
+/// changes nothing. What changed is returned.
+pub fn harness_on(
+    root: &Path,
+    records: &str,
+    host: &mut dyn Host,
+    say: &mut dyn FnMut(&str),
+) -> Result<Vec<String>, String> {
+    let on = |path: &str| root.join(path.trim_start_matches('/').trim_end_matches('/'));
+    let folder = on(records);
+    if !folder.is_dir() {
+        return Err(format!(
+            "{} is not there: lampOS is not installed, so Harness has no user to run as",
+            folder.display()
+        ));
+    }
+    let _lock = Records::new(folder.clone())
+        .lock()
+        .map_err(|error| format!("another lamp-update is running: {error}"))?;
+    let mut changed = Vec::new();
+    if on(HARNESS).exists() {
+        say(&format!("Harness is already at {HARNESS}: kept as it is"));
+    } else {
+        host.harness_on(USER, HARNESS_HOME)?;
+        changed.push(format!(
+            "Harness installed for {USER} by its own installer, at {HARNESS}"
+        ));
+    }
+    let done = folder.join(HARNESS_DONE);
+    if !done.exists() {
+        // A failure leaves nothing recorded: the next run asks again.
+        host.harness_at_boot(USER, HARNESS_HOME)?;
+        write_whole(&done, format!("{USER} {HARNESS_HOME}\n").as_bytes(), 0o644)
+            .map_err(|error| format!("{}: {error}", done.display()))?;
+        changed.push(format!("Harness starts at boot as {USER}"));
+    }
+    if !changed.is_empty() {
+        host.restart(TASKS_UNIT)?;
+        changed.push(format!("{TASKS_UNIT} started again"));
+    }
+    for line in &changed {
+        say(line);
+    }
+    Ok(changed)
 }
 
 /// Each model missing on the lamp, fetched and checked by size and SHA-256

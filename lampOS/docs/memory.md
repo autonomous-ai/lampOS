@@ -399,8 +399,13 @@ then use that person's scope:
   2,400, and not at all when theirs filled them, so an answer is no longer
   than before. Their entries come first and carry `"theirs":true`. Either
   part not answering is a memory that did not answer.
-- **Each exchange** goes to the journal of whoever was known at the lamp when
-  the request was over, read then, not when the writer sends it. With Days,
+- **Each exchange** keeps the person scope already stored in the conversation
+  thread when that exchange was created. Finishing a request or flushing a batch
+  does not look at the current face again: A's exchange stays A's after B appears,
+  and a room exchange stays in the room. Both legacy and Days writers receive
+  each exchange's own scope; keep/forget exclusions remain request-specific.
+  This preserves the existing thread attribution, not a newly authenticated
+  speaker identity at request admission. With Days,
   an exchange links only that person's sources, because the store numbers
   and links records within one person; a different person at the lamp ends
   the conversation being collected, which is sent to `conversation_end` in
@@ -554,9 +559,14 @@ facts stay `remember`.
   about the greeting or the news said unprompted by a typed mark after it,
   `[unprompted <greeting|news|both> never not_before=<minute>
   not_from=<minute> not_while_talking] ` with only the limits asked; the
-  marks are taken off before anything is told to the model.
+  marks are taken off before anything is told to the model. A rule to keep
+  the light on (#1677) is `[unprompted light never] `, and is the room's:
+  kept in `r-everyone` whoever says it, and taken back with `forget_rule`
+  and `about = "light"`, no number, which forgets every such rule of the
+  room's ([presence.md](presence.md)).
 - **Typed when kept (#813).** `keep_rule` takes, beside `rule`, the
-  optional `about` (`greeting`, `news` or `both`) with `never`,
+  optional `about` (`greeting`, `news`, `both`, or `light` with `never`
+  only) with `never`,
   `not_before` / `not_from` (`HH:MM`, 24 hours, local) and
   `not_while_talking`, filled by the model. A limit without `about`, a time
   that is not `HH:MM`, or `not_before` equal to `not_from` is refused with
@@ -766,3 +776,33 @@ fixtures and exact timing boundaries are in
 [the host evidence](verification/memory-health-host-20261014/README.md) and
 [Fourth's log](work-log-fourth.md). Flash contention during count scans,
 long-lived bus filesystem stalls and the real Health unit remain for First.
+
+### Request-bound tool scope
+
+Both voice routes bind memory tool calls to an immutable observation at input
+admission. The face file's original three-second freshness deadline is preserved
+across cache refreshes. Admission reads a nonblocking cache; a missing, expired,
+or contended observation uses the room scope. It does not fall back to a sticky
+conversation owner or a shadow voice candidate. The Second route refreshes off
+its input loop, with at most one filesystem read outstanding.
+
+The request owner holds revocable authority identified by worker, session and
+request. Ending microphone input keeps this authority alive for the answer;
+retirement, replacement, failure and owner destruction revoke it. Parked and
+blocking tools retain the original scope rather than looking up the face again.
+Memory transport checks authority before sending and suppresses private results
+returned after revocation. A write already accepted by Memory cannot be undone
+by canceling its caller. Typed conversations continue to use the room scope.
+
+This boundary fixes tool attribution and cancellation only. A visible face is
+not proof of the speaker. Provider context, snapshots and history still require
+their own session isolation; this change does not establish that a session
+already containing one person's private context is safe for another person.
+Voice matching remains diagnostic until that isolation and real-person
+qualification are complete (#1675).
+
+The added admission work targets less than 100 microseconds: no filesystem or
+network I/O and no waiting for the cache mutex. Privacy invalidation is atomic
+and an in-flight refresh cannot restore an invalidated observation. This is a
+design target, not a measured lamp latency result; target-hardware first-use
+and repeated-admission measurements remain outstanding.

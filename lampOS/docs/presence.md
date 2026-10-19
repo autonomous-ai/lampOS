@@ -39,6 +39,7 @@ each good for 3 s ([msgs.md](msgs.md)):
 |---|---|
 | `someone` | A face seen, or a voice heard, within the last 20 s (`RoomPresence::SOMEONE_WITHIN_S`: the voice's Arrival forgives a face lost for the same 20 s, `speak_up.rs`) |
 | `nobody_s` | How long nobody has been at the lamp, in whole seconds, from the last face or voice, or from when the eyes began looking if neither came since; 0 while someone is there |
+| `by` | While someone is there, what last showed it: `face` or `voice`; absent while nobody is (and from an older eyes'). At each change to someone the eyes also write `lamp-eyes: someone at the lamp (face, 0.21 of the picture tall)` or `(voice)` in their journal (the tallest face as `humans/faces/tracked` publishes it, clamped to the picture), so a run tells a passer-by from someone at the desk (the first builder's lamp check, 19 Oct: four `someone`s in 15 minutes of an office at lunch, cause unknown) |
 
 Counts and times only: no picture, no face, nobody's identity.
 
@@ -110,24 +111,32 @@ the head's pose only and leaves the light as it is; the skill does not
 start then. A light that went out before 23:00 stays out until someone
 comes, whatever the hour.
 
-**"Keep the light on" (to do).** Nothing holds it yet. A person who asks for
-their light while it is out gets it at once (the ring's rule: the person's
-`light/command` is over any skill's ask), but it goes out again the next
-time nobody is there. The place for it is the voice's typed memory rules
-(`LAMP_MEMORY_RULES=on`, `memory/rules`, `lamp_msgs::Rules`): a field such
-as `light: Unprompted` (its `never` set by "keep the light on", its minutes
-by "not before nine"), said at each session open as `hello` and `news` are,
-and a condition in the skill:
+**"Keep the light on."** Said to the lamp ("keep the light on", "don't turn
+your light off when I leave"), it is kept as a rule with the voice's typed
+memory rules (`LAMP_MEMORY_RULES=on`): `keep_rule` with `about = "light"`
+and `never`, kept in the room's scope (`r-everyone`) whoever says it, since
+the light is one thing everyone at the lamp shares and it goes out only when
+nobody is there (the first builder, 19 Oct). `memory/rules` then says
+`keep_light_on: true`, and the skill's condition stops it:
 
     [[while]]
     topic = "memory/rules"
     field = "keep_light_on"
     not_equals = true
+    unknown = "holds"
 
-That needs two things first: the rule kept by the voice, and the condition
-holding when `memory/rules` has said nothing (today a `[[while]]` on a topic
-with no value never holds, so the skill would never run on a lamp without
-the rules switch).
+`unknown = "holds"` lets it run on a lamp without the rules switch, where
+`memory/rules` says nothing; a value that has run out still does not hold.
+With the switch on, the voice reads the room's rules once as it starts and
+says them (`remember::tell_rules_at_start`, trying for up to a minute while
+the memory starts), so the rule holds after a reboot before anyone has
+spoken; a session that says its fact first is never replaced by it.
+"You can turn your light off again" is `forget_rule` with `about = "light"`
+and no number: every such rule of the room's goes, whoever asks (the room's
+rules are not numbered for a known person). A person who asks for their
+light while it is out gets it at once (the person's `light/command` is over
+any skill's ask); said into a dark lamp, "keep the light on" is a voice
+heard, so `someone` comes back and the skill's ask ends with it.
 
 ## Switching it on
 

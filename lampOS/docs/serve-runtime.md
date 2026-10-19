@@ -658,6 +658,13 @@ host regressions for #1620 cover one or both audio workers finishing after
 900 ms against the 750 ms diagnostic grace; they do not establish why a
 worker was late on a lamp.
 
+At the shared shutdown deadline, the coordinator checks each remaining child's
+exit status again before forcing it to stop: an earlier child's native reap may
+have taken time while a later child exited on its own. An observed normal exit
+does not erase an earlier cleanup failure; a nonzero exit still fails cleanup
+and is recorded as `worker_exit_failed`, not `worker_forced_shutdown`. The exit
+check does not extend the deadline or bypass the worker's resource cleanup.
+
 Serve waits with only its GPIO privacy worker while physically muted. A fresh
 active mute closes the full runtime and returns to that wait only after verified
 cleanup; stable unmute then creates new capture/provider identities. Unknown or

@@ -24,6 +24,20 @@ pub struct RoomPresence {
     /// last face seen or voice heard, or, with neither since the eyes began
     /// looking, since they began. 0 while someone is there.
     pub nobody_s: u32,
+    /// While someone is there, what last showed it: a face or a voice
+    /// (#1677, the first builder's lamp check), so a run can tell a passer-by
+    /// from someone at the desk. Absent while nobody is, and from an older
+    /// eyes' message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<SeenBy>,
+}
+
+/// What showed someone at the lamp.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SeenBy {
+    Face,
+    Voice,
 }
 
 impl RoomPresence {
@@ -51,6 +65,11 @@ impl RoomPresence {
 
     /// Someone there has been away for no time.
     pub fn check(&self) -> Result<(), Invalid> {
+        if !self.someone && self.by.is_some() {
+            return Err(Invalid(
+                "nobody is at the lamp, and by says what showed someone".into(),
+            ));
+        }
         if self.someone && self.nobody_s != 0 {
             return Err(Invalid(format!(
                 "someone is at the lamp, and nobody_s is {}: 0 while someone is",

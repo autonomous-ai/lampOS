@@ -30,7 +30,7 @@
 //! (`now - ago_ms`, `crate::bus_out`), so another test's worker, on the host
 //! clock, still reads it as four seconds old.
 use super::*;
-use lamp_msgs::NameHeard;
+use lamp_msgs::{NameHeard, TurnVerdict, VoiceTurn};
 use std::sync::atomic::AtomicBool;
 
 /// How old a hearing is when it is said: see the module's notes.
@@ -427,4 +427,96 @@ async fn review_sound_with_the_heard_as_line_the_name_note_says_it_may_sound_lik
             .all(|text| !text.contains(crate::called::NOTE_HEARD_AS)),
         "{told:?}"
     );
+}
+
+/// Listens on the test's bus for each turn's verdict (`voice/turn`,
+/// #1155), from before the worker starts, as the Policy does.
+fn turns(root: &Root) -> lamp_bus::Subscriber {
+    lamp_bus::Bus::new(&root.0)
+        .unwrap()
+        .subscribe(VoiceTurn::TOPIC, "test")
+        .unwrap()
+}
+
+/// Waits up to two seconds on the host for `request` to be told `verdict`.
+/// Other tests' workers that apply the rule say theirs on the same bus,
+/// numbered by their own rigs, so a verdict for another request, or for
+/// this number with the other verdict, is passed over until this one
+/// comes.
+fn told(turns: &mut lamp_bus::Subscriber, request: u64, verdict: TurnVerdict) {
+    let until = std::time::Instant::now() + Duration::from_secs(2);
+    let mut heard = Vec::new();
+    while let Some(left) = until.checked_duration_since(std::time::Instant::now()) {
+        let Some(message) = turns.recv(left).unwrap() else {
+            break;
+        };
+        let turn: VoiceTurn = message.parse().unwrap();
+        if (turn.request, turn.verdict) == (request, verdict) {
+            return;
+        }
+        heard.push((turn.request, turn.verdict));
+    }
+    panic!("request {request} was not told {verdict:?}; heard {heard:?}");
+}
+
+/// #1155: a turn whose answer the rule holds, in a busy room's new
+/// session, is told held back on the bus, as the journal says it, so the
+/// Policy's hello does not count it toward its quiet.
+#[tokio::test(start_paused = true)]
+async fn an_answer_the_rule_holds_is_told_held_back() {
+    let _clock = logical_clock();
+    let _turn = one_at_a_time().await;
+    let root = Root::new();
+    let mut turns = turns(&root);
+    let mut rig = LiveRig::start_with(quick_policy(), in_a_busy_room());
+    let mut dial = rig.ready().await;
+    let request = rig.speak(&mut dial, false, true).await;
+    dial.service.send(heard("How was your weekend?")).await;
+    assert!(matches!(
+        rig.output().await,
+        ProviderOutput::Transcript { request: None, .. }
+    ));
+    dial.service.send(provider_audio(9, 480)).await;
+    dial.service.send(idle_complete()).await;
+    let first = rig.output().await;
+    assert!(
+        matches!(first, ProviderOutput::TurnComplete { request: done, idle: true } if done == request),
+        "{}",
+        what(&first)
+    );
+    told(&mut turns, request, TurnVerdict::HeldBack);
+    rig.stop().await;
+}
+
+/// #1155: a turn the rule lets out, in a quiet room, is told answered.
+#[tokio::test(start_paused = true)]
+async fn an_answer_the_rule_lets_out_is_told_answered() {
+    let _clock = logical_clock();
+    let _turn = one_at_a_time().await;
+    let root = Root::new();
+    let mut turns = turns(&root);
+    let mut options = in_a_busy_room();
+    options.attention = Some(|| (crate::room_told::Room::Quiet, false));
+    let mut rig = LiveRig::start_with(quick_policy(), options);
+    let mut dial = rig.ready().await;
+    let request = rig.speak(&mut dial, false, true).await;
+    dial.service.send(heard("What time is it?")).await;
+    assert!(matches!(
+        rig.output().await,
+        ProviderOutput::Transcript { request: None, .. }
+    ));
+    dial.service.send(provider_audio(9, 480)).await;
+    let first = rig.output().await;
+    assert!(
+        matches!(first, ProviderOutput::Audio { request: played, .. } if played == request),
+        "{}",
+        what(&first)
+    );
+    dial.service.send(idle_complete()).await;
+    assert!(matches!(
+        rig.output().await,
+        ProviderOutput::TurnComplete { .. }
+    ));
+    told(&mut turns, request, TurnVerdict::Answered);
+    rig.stop().await;
 }

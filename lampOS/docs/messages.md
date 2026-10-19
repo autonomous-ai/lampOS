@@ -105,16 +105,18 @@ the room's Live session or the speaker.
     are kept and forgotten only when the person asks at the lamp, in
     person." This is so for every request not heard at the lamp, a request
     the lamp wrote itself too, as marks are (`tools::run_call`).
-  - **The room's things:** every other function runs as a spoken line's does:
-    the light, the volume, timers and skills, Dance included. So someone
-    away can change the room's light, or make the lamp move, while another
-    person is at the desk (the reviewer on #1713). For the owner's own app
-    the light, the volume and timers seem right.
-  - **Open, before `LAMP_MESSAGES` goes on anywhere:** whether a skill that
-    moves the body is taken from a text. A lamp that moves because of a text
-    nobody in the room sent looks odd (CLAUDE.md's rule 8). The Fourth
-    recommends not: a text would refuse a skill whose `skill.toml` asks for
-    the body, as faces are refused, and say it can do that only at the lamp.
+  - **The room's things:** the light, the volume, timers and skills that
+    don't move the lamp run as a spoken line's do, the owner's to ask for
+    from the app.
+  - **Decided (the first builder, 19 Oct 11:53): a skill that moves the
+    body is never run for a text,** Dance included. A lamp that moves
+    because of a text nobody in the room sent looks wrong (CLAUDE.md's rule
+    8). `lamp-skills` names the tools whose skill asks for the body
+    (`[permissions] body`) in its tools file, as `body` beside `tools`
+    (`docs/skills.md`). A text's call to one, by its own name or through
+    `use_skill`, is refused before the skills are asked:
+    "That one moves me, so I do it only when someone asks me at the lamp."
+    (`tools::MOVES_ONLY_AT_THE_LAMP`). Said at the lamp, it runs as before.
 - **A task asked for in a text** is started only by a "yes" typed in the same
   chat within 120 s. Each chat's texts are numbered in a block of their own,
   apart from the spoken ones (`messages::same_chat`, `agent_tasks::may_confirm`).
@@ -128,9 +130,16 @@ the room's Live session or the speaker.
 ## News when you're away
 
 - **Given with the next text** (built, off with the rest): news of work
-  handed over that the lamp hasn't told aloud is given with the answer to
-  the person's next text, once. That's work finished, stopped, waiting for
-  the person, or a hand-over that failed; not progress.
+  **asked for by text** that the lamp hasn't told aloud is given with the
+  answer to the person's next text, once. That's work finished, stopped,
+  waiting for the person, or a hand-over that failed; not progress.
+  - **Only work asked for by text** (decided, the first builder, 19 Oct
+    11:53): in a shared home, another person's work must not reach the
+    owner's phone. Work asked for at the lamp is told at the lamp, as
+    before. A task started by a typed "yes" is kept as a text's
+    (`task_news::keep_typed`, `<store>:<task>`), in the process and in
+    `tasks-typed` beside the file of what was told, so a worker started
+    again still knows it.
   - The second route's worker reads the tasks part on a thread of its own
     every 10 s (`task_news::ForTexts`, with the worker's own tasks part), so
     a text never waits on it.
@@ -189,9 +198,17 @@ the room's Live session or the speaker.
   the next text's answer is given the news, typed, and keeps it as given;
   the text after has none; a model that can't answer gives none.
 - `task_news::tests::news_for_texts_is_read_beside_them_and_kept_told_once_given`:
-  through a stand-in tasks part, the news is read beside the texts, its note
-  typed without the spoken opening, and once given it is in the file of
-  what was told, so the voice's own reader doesn't offer it aloud.
+  through a stand-in tasks part with one task asked for by text and one at
+  the lamp, only the text's is given, its note typed without the spoken
+  opening; once given it is in the file of what was told, so the voice's
+  own reader doesn't offer it aloud, and still offers the other.
+- `agent_tasks::tests::work_asked_for_by_text_is_kept_as_a_texts`: a task
+  said yes to by text is kept as a text's; one said yes to at the lamp
+  isn't.
+- `tools::tests::a_text_never_runs_a_skill_that_moves_the_body`: by its
+  own name or through `use_skill`, a text's call to Dance is refused and
+  the skills are never asked; a text runs one that doesn't move; at the
+  lamp, Dance runs.
 - `crates/voice/tests/typed_memory.rs`: with Sam in view, a spoken
   `remember` is kept as Sam's, and a typed `remember` and `recall` ask the
   room's memory alone.

@@ -655,12 +655,35 @@ this room" until someone asks to be recognised.
   - `{"forget":"Minh"}` answers `{"forgot":true}` once the file no longer
     has it, nor any set-aside file with a list of people (#1505: each is
     rewritten 0600, or removed when nothing is left in it). A set-aside
-    file that cannot be searched might hold the face, so the answer is then
-    `{"error":"storage"}`, never `{"forgot":false}`: one with no list of
-    people, or with a person whose `name` is no plain string. A rewrite's
-    temporary file a crash left there (`….json.new`) is neither searched nor
-    counted, and a `set-aside` that is a link is never followed (`forget`
-    refuses, health counts it as one).
+    file that cannot be searched might hold the face: one with no list of
+    people, or with a person whose `name` is no plain string. **Then the
+    forget waits for it** (#1586): the answer is `{"forgot":…,
+    "unsearched":N}`, never "not known" and never a fault.
+    - **What's kept:** a hash of the name, which a guess can undo, with when
+      it was asked, in `set-aside/forgets-pending` (0600), until the forget
+      finishes or a factory reset. The hash is a plain SHA-256 of its lower
+      case: the lamp has to match the name later, so for anyone with the
+      lamp's disk it is the name, lightly hidden, beside set-aside files
+      that hold names in plain text anyway (the reviewer and Twelve on
+      #1767).
+    - **Finishing it:** at each start and each forget, a face of a waiting
+      name **kept before the forget was asked** is dropped: read back into
+      the people file, or in a set-aside file that can be searched now
+      (one that says no time it was kept counts as before). Someone
+      remembered after they asked is kept, since their later word stands
+      (Twelve's P2 on #1767). Once nothing is left that cannot be searched,
+      the forgets are done and the file goes. The times are the wall
+      clock's: a lamp whose clock went back after a forget (a start before
+      the time is synced) would date a later "remember me" before it and
+      drop it once more. That's rare, and it errs toward forgetting (the
+      reviewer on #1767).
+    - It's never counted or searched as anyone's records, and the reset
+      empties it with the folder. While anything waits, each forget reads
+      every set-aside file again: a few files of at most 256 KiB today,
+      worth a look if set-aside grows. A rewrite's temporary file a
+    crash left there (`….json.new`) is neither searched nor counted, and a
+    `set-aside` that is a link is never followed (`forget` refuses with
+    `{"error":"storage"}`, health counts it as one).
   - `{"list":true}` answers the names.
   - `{"who":true}` answers who is at the lamp now, or `null`.
   - Remembering someone already known replaces their prints.
@@ -672,6 +695,12 @@ this room" until someone asks to be recognised.
   `LAMP_EYES_WHO_SOCKET` names the socket):
   - The model has two functions, `remember_my_face` and `forget_my_face`,
     each with the name. They are called only when the person asks.
+  - A forget that waits for set-aside files (#1586) is told as what it is,
+    never "My eye could not do that just now": forgotten, or not known by
+    that name, and that a few old face records the lamp couldn't read are
+    kept apart, forgotten in too if they ever come back, and cleared by a
+    factory reset (`known_faces::FORGOTTEN_SOME_KEPT_APART`,
+    `NOT_KNOWN_SOME_KEPT_APART`).
   - The hello for someone known is by name. With no known face, it is by
     the name typed at setup, when `LAMP_PERSON_NAME` gives one
     ([speaking-first.md](speaking-first.md), #806).
@@ -881,6 +910,54 @@ same way: before 2026-10-14 it was not given while the camera was not
 permitted, so the eyes read as gone from the bus whenever they were not
 looking.
 
+### How familiar a remembered person is (`--visits on`, #1670)
+
+Off unless `lamp-eyes --visits on`, which needs the recogniser (`--recogniser`, `--people`, `--who-socket`). Only
+for someone who asked to be remembered. The first builder's ruling on #1670
+(12:19): keep less than a day-by-day record, and the owner decides whether
+it is on in the product.
+
+- **Kept:** one number per remembered person in `people.json`
+  (`familiar`), beside one time of scoring for the whole file
+  (`scored_at_unix_s`). A person is counted when recognised, at most once
+  in 16 hours, **in memory only**: nothing is written at a visit. The
+  counts reach the file once **03:00 at the lamp** has passed (the lamp's
+  zone, `/etc/localtime` through `lamp-local-time`, followed as it changes;
+  UTC if it can't be read, said once), at the eyes' next once-a-minute look
+  whoever is at the lamp: every number is faded to that 03:00, each count
+  since is added (one a counted day), and the file is written with that
+  03:00 as its time of scoring. So neither the file's fields nor the time
+  it was written say when anyone came, only that a night passed (the
+  reviewer on #1763; the first builder's 13:38 for the hour). The first
+  scoring waits for the next 03:00 too. Numbers halve every fourteen days
+  (`who.rs`, `People::seen`, `People::score`). A restart before the day
+  ends loses that day's counts, and one in the same day may count someone
+  twice. Both fields are optional and only add, so the file keeps version
+  1. "Forget my face" removes the number and any count not yet written,
+  and the product reset empties the file.
+- **Levels:** `new` under 2, `regular` from 2 (about once a week, kept
+  up), `close` from 8 (about three days a week). These are authored, and
+  get tuned from real scores after a week on the office lamps.
+- **Said:** with `LAMP_BUS=on`, at each recognition (every 2 s while a face
+  is near) the level of the remembered person at the lamp, or `null` for
+  nobody near, someone not remembered or not recognised, on
+  `humans/familiar` (`lamp_msgs::HumanFamiliar`, good for 5 s). No name is
+  in it.
+- **Told:** when someone asks to be remembered, the eyes' answer carries
+  `"visits": true`, and the voice tells the model to say in one short
+  sentence that the lamp will notice how often they come by, so it can
+  greet them more warmly (`known_faces.rs`, `VISITS_LINE`).
+
+Tests (a lamp at UTC+7): counted once in 16 hours with nothing written;
+written only once 03:00 local has passed, once, scored as of that 03:00; `regular` on the
+third day, before it is written, and `close` after two weeks of days;
+halved in fourteen days and back to `new`; read back from the file; only
+the number and the time of scoring are written, nothing for someone never
+seen; and forgetting takes the number and an unwritten count
+(`who.rs`). The level is said only with the switch, from the eyes, with no
+name (`bus_out.rs`). The voice's line comes only with `visits: true`. Not
+run on a lamp.
+
 ### Whether anyone is at the lamp (`LAMP_PRESENCE=on`, #1677)
 
 With `LAMP_PRESENCE=on` beside `LAMP_BUS=on`, the eyes also say on
@@ -893,7 +970,10 @@ and at once when `someone` changes, each good for 3 s
 `humans/faces/tracked`; a voice is any line on `voice/heard`, which the eyes
 subscribe to as `eyes_presence`, timed by when the voice heard it. With no
 look for 5 s nothing is said, so a closed camera never reads as nobody, and
-the count begins again when looks come back. It is the one signal the light
+the count begins again when looks come back. While someone is there it also
+says `by`, what last showed it (`face` or `voice`), and writes one journal
+line at each change to someone, with a face's height as a share of the
+picture. It is the one signal the light
 going out and Messages read ([presence.md](presence.md)). A presence switch
 whose subscription fails is said once in the journal, and the faces are
 published as before. Not run on a lamp: its cost there is part of

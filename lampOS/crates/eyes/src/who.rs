@@ -45,6 +45,57 @@ const MOST_FILE_BYTES: u64 = 256 * 1024;
 /// dropped (#1505). The folder is 0700, each file 0600, and the product
 /// reset empties it, since these are face prints.
 pub const SET_ASIDE: &str = "set-aside";
+/// How quickly a remembered person's familiarity fades (#1670): it halves
+/// in fourteen days without them.
+pub const FAMILIAR_HALF_LIFE_S: u64 = 14 * 86_400;
+/// A person is counted once in this long at most: about once a day, with
+/// no day or time of anyone's kept (the eyes know no local day).
+pub const COUNTED_EVERY_S: u64 = 16 * 3_600;
+/// The familiarity at which a remembered person is `regular` (about once a
+/// week, kept up) and `close` (about three days a week): authored, to be
+/// tuned from real scores after a week on the office lamps (#1670).
+pub const REGULAR_FROM: f32 = 2.0;
+pub const CLOSE_FROM: f32 = 8.0;
+/// The day's counts are written at this hour of the lamp's local day, when
+/// nobody is likely near (the first builder on #1763, 13:38).
+pub const SCORED_AT_HOUR: i64 = 3;
+
+/// The last 03:00 at the lamp ([`SCORED_AT_HOUR`]) at or before `now_unix_s`,
+/// for a lamp `offset_s` east of UTC, in Unix seconds.
+pub fn scoring_hour(now_unix_s: u64, offset_s: i64) -> u64 {
+    let local = now_unix_s as i64 + offset_s;
+    let since = (local - SCORED_AT_HOUR * 3_600).rem_euclid(86_400);
+    (local - since - offset_s).max(0) as u64
+}
+
+/// The forgets that wait in the set-aside folder until they can be finished
+/// (#1586): each name, hashed, of someone who asked to be forgotten while a
+/// set-aside file could not be searched for them, and when they asked. A
+/// face of theirs kept before then that comes back, read back into the
+/// people file or in a set-aside file that can be searched, is dropped at
+/// once; one remembered after, at their own later word, is kept (Twelve's
+/// P2 on #1767). Once nothing is left that cannot be searched, the file
+/// goes. Never counted or searched as people's records, and emptied by the
+/// reset with the folder.
+pub const PENDING_FORGETS: &str = "forgets-pending";
+
+/// One forget that waits: the name's hash ([`name_hash`]) and when it was
+/// asked.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct Waiting {
+    hash: String,
+    at_unix_s: u64,
+}
+
+/// What a forget did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Forgot {
+    /// The name was found and taken out of the file or a set-aside file.
+    pub forgot: bool,
+    /// Set-aside files that could not be searched for it: the forget waits
+    /// for them ([`PENDING_FORGETS`]).
+    pub unsearched: usize,
+}
 
 /// Where the five marks of a face sit in the recogniser's 112 by 112
 /// picture: the eye on the left of the picture, the other eye, the nose and
@@ -195,12 +246,49 @@ pub struct Person {
     pub name: String,
     pub prints: Vec<Vec<f32>>,
     pub added_unix_s: u64,
+    /// How familiar they are (#1670, `--visits`): one number that rises by
+    /// one each day they are seen and halves every fourteen without them,
+    /// as of the file's `scored_at_unix_s`. No dates or days are kept, and
+    /// it goes with their prints when they are forgotten. An optional field
+    /// that only adds, so the file keeps its version (the rule above).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub familiar: Option<f32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct Kept {
     version: u32,
+    /// When every person's familiarity was last brought to now: the eyes'
+    /// own time of scoring, not anyone's visit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    scored_at_unix_s: Option<u64>,
     people: Vec<Person>,
+}
+
+/// How familiar a remembered person at the lamp is (#1670).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Familiar {
+    New,
+    Regular,
+    Close,
+}
+
+impl Familiar {
+    fn of(score: f32) -> Self {
+        if score >= CLOSE_FROM {
+            Self::Close
+        } else if score >= REGULAR_FROM {
+            Self::Regular
+        } else {
+            Self::New
+        }
+    }
+}
+
+/// `score` as of `from_unix_s`, faded to `now_unix_s`.
+fn faded(score: f32, from_unix_s: u64, now_unix_s: u64) -> f32 {
+    let days = now_unix_s.saturating_sub(from_unix_s) as f64 / FAMILIAR_HALF_LIFE_S as f64;
+    (f64::from(score) * 0.5f64.powf(days)) as f32
 }
 
 /// A name a person gives: letters, with spaces, hyphens and apostrophes
@@ -224,6 +312,17 @@ fn same_name(a: &str, b: &str) -> bool {
 pub struct People {
     path: PathBuf,
     people: Vec<Person>,
+    /// When their familiarity was last brought to now ([`Kept`]).
+    scored_at: Option<u64>,
+    /// Who was counted, and when, since these eyes started: kept in memory
+    /// only, so nothing on disk says when anyone was at the lamp. A restart
+    /// may count someone twice in a day.
+    counted: Vec<(String, u64)>,
+    /// Who was counted since the file was last scored: added to it at the
+    /// next 03:00 at the lamp ([`Self::score`]), never at a visit, so neither
+    /// the file nor its time says when anyone came (the reviewer on #1763).
+    /// A restart before then loses them.
+    unscored: Vec<String>,
 }
 
 impl People {
@@ -248,6 +347,9 @@ impl People {
                 return Ok(Self {
                     path,
                     people: Vec::new(),
+                    scored_at: None,
+                    counted: Vec::new(),
+                    unscored: Vec::new(),
                 });
             }
             Err(error) => return Err(error.into()),
@@ -262,6 +364,9 @@ impl People {
             Ok(Self {
                 path: path.clone(),
                 people: Vec::new(),
+                scored_at: None,
+                counted: Vec::new(),
+                unscored: Vec::new(),
             })
         };
         if bytes.len() as u64 > MOST_FILE_BYTES {
@@ -296,7 +401,16 @@ impl People {
                 _ => aside.push(entry.clone()),
             }
         }
-        let opened = Self { path, people };
+        let scored_at = value
+            .get("scored_at_unix_s")
+            .and_then(serde_json::Value::as_u64);
+        let mut opened = Self {
+            path,
+            people,
+            scored_at,
+            counted: Vec::new(),
+            unscored: Vec::new(),
+        };
         if !aside.is_empty() {
             let kept = write_set_aside(
                 &opened.path,
@@ -311,6 +425,11 @@ impl People {
                 kept.display(),
                 opened.people.len()
             );
+        }
+        // A forget that waited may be finished now (#1586): never a reason
+        // not to start.
+        if let Err(error) = opened.finish_pending() {
+            eprintln!("lamp-eyes: the forgets that wait could not be finished now: {error}");
         }
         Ok(opened)
     }
@@ -367,6 +486,7 @@ impl People {
             name: name.clone(),
             prints,
             added_unix_s: now_unix_s,
+            familiar: None,
         });
         self.save(&next)?;
         self.people = next;
@@ -419,8 +539,24 @@ impl People {
     /// rewritten 0600 or removed when nothing is left. A set-aside file that
     /// cannot be searched (no such list) might hold the face, so the answer
     /// is then an error, never "not known".
-    pub fn forget(&mut self, name: &str) -> Result<bool> {
+    ///
+    /// Then the forget waits for them (#1586): the name, hashed, is kept in
+    /// [`PENDING_FORGETS`], and the answer says how many could not be
+    /// searched beside whether the name was found where it could be.
+    pub fn forget(&mut self, name: &str) -> Result<Forgot> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs());
+        self.forget_at(name, now)
+    }
+
+    /// [`Self::forget`], asked at `now_unix_s`.
+    pub fn forget_at(&mut self, name: &str, now_unix_s: u64) -> Result<Forgot> {
         let name = name.trim();
+        // Their counts not yet scored go too (#1670).
+        self.unscored.retain(|counted| !same_name(counted, name));
+        self.counted
+            .retain(|(counted, _)| !same_name(counted, name));
         let mut next = self.people.clone();
         next.retain(|person| !same_name(&person.name, name));
         let mut forgot = next.len() != self.people.len();
@@ -428,20 +564,150 @@ impl People {
             self.save(&next)?;
             self.people = next;
         }
-        let (aside, unsearched) = forget_set_aside(&self.path, name)?;
+        let (aside, unsearched) = forget_set_aside(&self.path, |other, _| same_name(other, name))?;
         forgot |= aside;
         if unsearched > 0 {
-            return Err(format!(
-                "{unsearched} set-aside files of people could not be searched for that name"
-            )
-            .into());
+            // Asked again, it waits from the later word.
+            let hash = name_hash(name);
+            let mut waiting = pending(&self.path)?;
+            waiting.retain(|wait| wait.hash != hash);
+            waiting.push(Waiting {
+                hash,
+                at_unix_s: now_unix_s,
+            });
+            keep_pending(&self.path, &waiting)?;
         }
-        Ok(forgot)
+        self.finish_pending()?;
+        Ok(Forgot { forgot, unsearched })
+    }
+
+    /// The forgets waiting ([`PENDING_FORGETS`]) finished where they can
+    /// be: a face of theirs kept before they asked and read back into the
+    /// people file is dropped, and so is one in a set-aside file that can be
+    /// searched now (one with no time it was kept counts as before). A face
+    /// remembered after they asked is theirs to keep. Once no set-aside file
+    /// is left that cannot be searched, they are done and the file goes.
+    fn finish_pending(&mut self) -> Result<()> {
+        let waiting = pending(&self.path)?;
+        if waiting.is_empty() {
+            return Ok(());
+        }
+        let is_waiting = |name: &str, added: Option<u64>| {
+            let hash = name_hash(name);
+            waiting
+                .iter()
+                .any(|wait| wait.hash == hash && added.is_none_or(|added| added < wait.at_unix_s))
+        };
+        let next: Vec<Person> = self
+            .people
+            .iter()
+            .filter(|person| !is_waiting(&person.name, Some(person.added_unix_s)))
+            .cloned()
+            .collect();
+        if next.len() != self.people.len() {
+            self.save(&next)?;
+            eprintln!(
+                "lamp-eyes: {} people asked to be forgotten were back in {}; forgotten again",
+                self.people.len() - next.len(),
+                self.path.display()
+            );
+            self.people = next;
+        }
+        let (_, unsearched) = forget_set_aside(&self.path, is_waiting)?;
+        if unsearched == 0 {
+            keep_pending(&self.path, &[])?;
+            eprintln!(
+                "lamp-eyes: {} forgets that waited for set-aside files are finished",
+                waiting.len()
+            );
+        }
+        Ok(())
+    }
+
+    /// A remembered person seen at the lamp now (#1670, `--visits`): once in
+    /// [`COUNTED_EVERY_S`] at most, they are counted, in memory only. Nothing
+    /// is written: the count reaches the file at the next UTC day boundary
+    /// ([`Self::score`]). Whether they were counted. An unknown name is
+    /// nothing.
+    pub fn seen(&mut self, name: &str, now_unix_s: u64) -> bool {
+        if !self.people.iter().any(|person| person.name == name) {
+            return false;
+        }
+        self.counted
+            .retain(|(_, at)| now_unix_s.saturating_sub(*at) < COUNTED_EVERY_S);
+        if self.counted.iter().any(|(counted, _)| counted == name) {
+            return false;
+        }
+        self.counted.push((name.to_owned(), now_unix_s));
+        self.unscored.push(name.to_owned());
+        true
+    }
+
+    /// Call often, whoever is at the lamp, with the lamp's offset from UTC:
+    /// once 03:00 at the lamp has passed since the file was last scored,
+    /// every number is faded to that 03:00, each count since is added, and
+    /// the file is written with that 03:00 as its time of scoring. So the
+    /// file, and the time it was written, say only that a night passed,
+    /// never when anyone came. Whether it wrote.
+    pub fn score(&mut self, now_unix_s: u64, offset_s: i64) -> Result<bool> {
+        let day = scoring_hour(now_unix_s, offset_s);
+        // Never scored: today is where scoring begins, in memory only, so
+        // the first write too waits for the next day to begin.
+        let Some(scored_at) = self.scored_at else {
+            self.scored_at = Some(day);
+            return Ok(false);
+        };
+        if scored_at >= day {
+            return Ok(false);
+        }
+        let scored = self.people.iter().any(|person| person.familiar.is_some());
+        if self.unscored.is_empty() && !scored {
+            return Ok(false);
+        }
+        let from = scored_at;
+        let mut next = self.people.clone();
+        for person in &mut next {
+            let mut score = person.familiar.map(|score| faded(score, from, day));
+            let counts = self
+                .unscored
+                .iter()
+                .filter(|name| **name == person.name)
+                .count();
+            if counts > 0 {
+                score = Some(score.unwrap_or(0.0) + counts as f32);
+            }
+            person.familiar = score;
+        }
+        self.save_scored(&next, Some(day))?;
+        self.people = next;
+        self.scored_at = Some(day);
+        self.unscored.clear();
+        Ok(true)
+    }
+
+    /// How familiar this remembered person is now, counts not yet scored
+    /// included; `None` for a name not remembered.
+    pub fn familiar(&self, name: &str, now_unix_s: u64) -> Option<Familiar> {
+        let person = self.people.iter().find(|person| person.name == name)?;
+        let kept = person.familiar.map_or(0.0, |score| {
+            faded(score, self.scored_at.unwrap_or(now_unix_s), now_unix_s)
+        });
+        let pending = self
+            .unscored
+            .iter()
+            .filter(|counted| **counted == name)
+            .count();
+        Some(Familiar::of(kept + pending as f32))
     }
 
     fn save(&self, people: &[Person]) -> Result<()> {
+        self.save_scored(people, self.scored_at)
+    }
+
+    fn save_scored(&self, people: &[Person], scored_at_unix_s: Option<u64>) -> Result<()> {
         let text = serde_json::to_vec(&Kept {
             version: 1,
+            scored_at_unix_s,
             people: people.to_vec(),
         })?;
         let mut temporary = self.path.clone().into_os_string();
@@ -688,6 +954,70 @@ fn is_temporary(file: &Path) -> bool {
     file.extension().is_some_and(|extension| extension == "new")
 }
 
+/// Whether `file` in the set-aside folder is people's records: not a
+/// rewrite's temporary file, nor the forgets that wait ([`PENDING_FORGETS`]).
+fn is_a_record(file: &Path) -> bool {
+    !is_temporary(file) && file.file_name().is_none_or(|name| name != PENDING_FORGETS)
+}
+
+/// A name as the forgets that wait keep it: a plain SHA-256 of its lower
+/// case, not the name. It hides the name from a glance at the file, not from
+/// someone who tries the household's few names, and it is kept only beside
+/// the set-aside files, which hold names in plain text anyway (Twelve's P3
+/// on #1767).
+fn name_hash(name: &str) -> String {
+    let digest = Sha256::digest(name.trim().to_lowercase().as_bytes());
+    digest.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// The forgets that wait beside the people file at `path`
+/// ([`PENDING_FORGETS`]); none when there is no such file.
+fn pending(path: &Path) -> io::Result<Vec<Waiting>> {
+    let file = path
+        .parent()
+        .unwrap_or(Path::new("/"))
+        .join(SET_ASIDE)
+        .join(PENDING_FORGETS);
+    let bytes = match std::fs::read(&file) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+    };
+    #[derive(Deserialize)]
+    struct Kept {
+        forget: Vec<Waiting>,
+    }
+    serde_json::from_slice::<Kept>(&bytes)
+        .map(|kept| kept.forget)
+        .map_err(|_| io::Error::other(format!("{} is not a list of forgets", file.display())))
+}
+
+/// The forgets that wait written whole, 0600, or the file removed when
+/// there are none.
+fn keep_pending(path: &Path, waiting: &[Waiting]) -> io::Result<()> {
+    let folder = set_aside_folder(path)?;
+    let file = folder.join(PENDING_FORGETS);
+    if waiting.is_empty() {
+        return match std::fs::remove_file(&file) {
+            Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
+            _ => sync_folder(&folder),
+        };
+    }
+    let temporary = folder.join(format!("{PENDING_FORGETS}.new"));
+    let mut out = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&temporary)?;
+    out.write_all(&serde_json::to_vec(
+        &serde_json::json!({ "forget": waiting }),
+    )?)?;
+    out.sync_all()?;
+    std::fs::rename(&temporary, &file)?;
+    sync_folder(&folder)
+}
+
 /// The folder synced, so what was set aside is there before the people
 /// file is changed.
 fn sync_folder(folder: &Path) -> io::Result<()> {
@@ -734,10 +1064,14 @@ fn write_set_aside(path: &Path, why: &str, bytes: &[u8]) -> io::Result<PathBuf> 
     Ok(kept)
 }
 
-/// That name's entries taken out of every set-aside file with a list of
+/// The entries that `matches`, by their name and when they were kept (none
+/// when they say no time), taken out of every set-aside file with a list of
 /// people: the file rewritten 0600, or removed once nothing is left.
 /// Whether any were, and how many set-aside files could not be searched.
-fn forget_set_aside(path: &Path, name: &str) -> io::Result<(bool, usize)> {
+fn forget_set_aside(
+    path: &Path,
+    matches: impl Fn(&str, Option<u64>) -> bool,
+) -> io::Result<(bool, usize)> {
     let folder = path.parent().unwrap_or(Path::new("/")).join(SET_ASIDE);
     match std::fs::symlink_metadata(&folder) {
         Ok(metadata) if metadata.is_dir() => {}
@@ -754,7 +1088,7 @@ fn forget_set_aside(path: &Path, name: &str) -> io::Result<(bool, usize)> {
     let (mut forgot, mut unsearched) = (false, 0);
     for entry in entries {
         let entry = entry?;
-        if !entry.file_type()?.is_file() || is_temporary(&entry.path()) {
+        if !entry.file_type()?.is_file() || !is_a_record(&entry.path()) {
             continue;
         }
         let file = entry.path();
@@ -783,7 +1117,14 @@ fn forget_set_aside(path: &Path, name: &str) -> io::Result<(bool, usize)> {
             !person
                 .get("name")
                 .and_then(serde_json::Value::as_str)
-                .is_some_and(|other| same_name(other, name))
+                .is_some_and(|name| {
+                    matches(
+                        name,
+                        person
+                            .get("added_unix_s")
+                            .and_then(serde_json::Value::as_u64),
+                    )
+                })
         });
         if list.len() == before {
             continue;
@@ -828,7 +1169,7 @@ pub fn set_aside_count(path: &Path) -> usize {
     entries
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
-        .filter(|entry| !is_temporary(&entry.path()))
+        .filter(|entry| is_a_record(&entry.path()))
         .map(|entry| {
             let mut bytes = Vec::new();
             let read = File::open(entry.path())
@@ -979,9 +1320,121 @@ mod tests {
         people.remember("a", vec![print(1.7)], 2).unwrap();
         assert_eq!(people.names(), vec!["a".to_owned()]);
         assert_eq!(people.who(&print(0.3)), None);
-        assert!(people.forget("A").unwrap());
-        assert!(!people.forget("A").unwrap());
+        assert!(people.forget("A").unwrap().forgot);
+        assert!(!people.forget("A").unwrap().forgot);
         assert!(People::open(path).unwrap().names().is_empty());
+    }
+
+    /// #1670 (`--visits`): a remembered person is counted at most once in
+    /// 16 hours, in memory; nothing is written at a visit. Once a UTC day
+    /// has begun, the counts reach the file, scored as of that day's start,
+    /// so neither the file nor its time of scoring says when anyone came
+    /// (the reviewer on #1763). The number rises by one a counted day and
+    /// halves in fourteen days without them, and the level follows it,
+    /// counts not yet written included. Forgetting them takes the number
+    /// and their counts.
+    #[test]
+    fn a_remembered_person_grows_familiar_once_a_day_and_fades_and_is_forgotten() {
+        const DAY: u64 = 86_400;
+        let path = file("familiar");
+        let mut people = People::open(path.clone()).unwrap();
+        people.remember("Ann", vec![print(0.3)], 1).unwrap();
+        people.remember("Bo", vec![print(1.7)], 1).unwrap();
+        let before = std::fs::read(&path).unwrap();
+        // A lamp at UTC+7. Visits at 19:00 local; 03:00 local is `night`.
+        const OFFSET: i64 = 7 * 3_600;
+        let t = 1_000 * DAY + DAY / 2;
+        let night = scoring_hour(t, OFFSET);
+        assert_eq!((night as i64 + OFFSET) % DAY as i64, 3 * 3_600);
+        let visit = |n: u64| t + n * DAY;
+        let scoring = |n: u64| night + n * DAY + 60;
+        // Never seen is new; someone not remembered is nothing.
+        assert_eq!(people.familiar("Ann", t), Some(Familiar::New));
+        assert_eq!(people.familiar("Cy", t), None);
+        assert!(!people.seen("Cy", t));
+        // Counted once, not again within 16 hours, and nothing written.
+        assert!(people.seen("Ann", visit(0)));
+        assert!(!people.seen("Ann", visit(0) + COUNTED_EVERY_S - 1));
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        // Never scored: scoring begins at the last 03:00, with no write; and
+        // none before the next 03:00.
+        assert!(!people.score(t + 60, OFFSET).unwrap());
+        assert!(!people.score(night + DAY - 60, OFFSET).unwrap());
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        // Past 03:00: written once, scored as of that 03:00.
+        assert!(people.score(scoring(1), OFFSET).unwrap());
+        let text: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(text["scored_at_unix_s"], night + DAY);
+        assert!(!people.score(scoring(1) + 60, OFFSET).unwrap());
+        // Seen on two more days: regular, before the third is written.
+        assert!(people.seen("Ann", visit(1)));
+        assert_eq!(people.familiar("Ann", visit(1)), Some(Familiar::New));
+        people.score(scoring(2), OFFSET).unwrap();
+        assert!(people.seen("Ann", visit(2)));
+        assert_eq!(people.familiar("Ann", visit(2)), Some(Familiar::Regular));
+        // Every day for two weeks: close.
+        for day in 3..=16 {
+            people.score(scoring(day), OFFSET).unwrap();
+            people.seen("Ann", visit(day));
+        }
+        people.score(scoring(17), OFFSET).unwrap();
+        let after = visit(17);
+        assert_eq!(people.familiar("Ann", after), Some(Familiar::Close));
+        // Read back from the file, the same; its time of scoring is a
+        // 03:00 at the lamp.
+        let kept = People::open(path.clone()).unwrap();
+        assert_eq!(kept.familiar("Ann", after), Some(Familiar::Close));
+        assert_eq!(
+            (kept.scored_at.unwrap() as i64 + OFFSET) % DAY as i64,
+            3 * 3_600
+        );
+        // Away: halved in fourteen days, and so on, down to new.
+        let score = |people: &People, at: u64| {
+            let person = people.people.iter().find(|p| p.name == "Ann").unwrap();
+            faded(person.familiar.unwrap(), people.scored_at.unwrap(), at)
+        };
+        let now = score(&kept, after);
+        assert!((score(&kept, after + FAMILIAR_HALF_LIFE_S) - now / 2.0).abs() < 1e-4);
+        assert_eq!(
+            kept.familiar("Ann", after + 8 * FAMILIAR_HALF_LIFE_S),
+            Some(Familiar::New)
+        );
+        // Only one number a person and one time of scoring are written.
+        let text: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        let mut keys: Vec<&str> = text
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(keys, ["people", "scored_at_unix_s", "version"]);
+        for person in text["people"].as_array().unwrap() {
+            let mut keys: Vec<&str> = person
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect();
+            keys.sort_unstable();
+            let never_seen = ["added_unix_s", "name", "prints"];
+            let seen = ["added_unix_s", "familiar", "name", "prints"];
+            assert!(keys == never_seen || keys == seen, "{keys:?}");
+        }
+        assert!(
+            text["people"][1].get("familiar").is_none(),
+            "Bo was never seen"
+        );
+        // Forgotten: the number goes with the prints, and a count not yet
+        // written goes too.
+        let mut people = People::open(path.clone()).unwrap();
+        assert!(people.seen("Ann", after));
+        assert!(people.forget("Ann").unwrap().forgot);
+        assert!(!people.score(after + DAY, OFFSET).unwrap());
+        assert!(!std::fs::read_to_string(&path).unwrap().contains("Ann"));
+        assert_eq!(people.familiar("Ann", after), None);
     }
 
     /// The first builder's 13:24: a face known as "A" is asked to be kept
@@ -1273,7 +1726,7 @@ mod tests {
         let mut people = People::open(path.clone()).unwrap();
         assert_eq!(set_aside_count(&path), 2);
         assert!(
-            people.forget("cy").unwrap(),
+            people.forget("cy").unwrap().forgot,
             "set aside, and forgotten there"
         );
         assert_eq!(set_aside_count(&path), 1);
@@ -1283,7 +1736,7 @@ mod tests {
             assert!(!kept.contains("\"Cy\""), "{kept}");
         }
         // The last one in a file: the file goes.
-        assert!(people.forget("Di").unwrap());
+        assert!(people.forget("Di").unwrap().forgot);
         assert!(set_aside_files(&path).is_empty());
         // A whole file moved aside, from a newer build.
         let path = file("forget-whole");
@@ -1296,20 +1749,67 @@ mod tests {
         .unwrap();
         let mut people = People::open(path.clone()).unwrap();
         assert!(people.names().is_empty());
-        assert!(people.forget("Ed").unwrap());
+        assert!(people.forget("Ed").unwrap().forgot);
         assert!(set_aside_files(&path).is_empty());
-        assert!(!people.forget("Ed").unwrap(), "not known anywhere now");
+        assert!(
+            !people.forget("Ed").unwrap().forgot,
+            "not known anywhere now"
+        );
     }
 
-    /// A set-aside file that cannot be searched might hold the face: the
-    /// answer is an error, never "not known".
+    /// #1586: a set-aside file that cannot be searched might hold the face.
+    /// The forget says so (never "not known", never a fault) and waits: a
+    /// face of theirs read back is dropped at once, and once the file can be
+    /// searched it is forgotten there and nothing waits any more.
     #[test]
-    fn a_set_aside_file_that_cannot_be_searched_makes_forget_an_error() {
-        let path = file("forget-unsearched");
-        std::fs::write(&path, "not json").unwrap();
+    fn a_forget_that_cannot_reach_a_set_aside_file_waits_and_is_finished_when_it_can() {
+        let path = file("forget-waits");
+        let good = serde_json::to_string(&print(0.2)).unwrap();
+        let folder = path.parent().unwrap().join(SET_ASIDE);
+        std::fs::create_dir(&folder).unwrap();
+        let unreadable = folder.join("people-whole-0000.json");
+        std::fs::write(&unreadable, "not json").unwrap();
+        let fay = format!(
+            r#"{{"version":1,"people":[{{"name":"Fay","prints":[{good}],"added_unix_s":1}}]}}"#
+        );
+        std::fs::write(&path, &fay).unwrap();
         let mut people = People::open(path.clone()).unwrap();
-        let refused = people.forget("Fay").unwrap_err().to_string();
-        assert!(refused.contains("could not be searched"), "{refused}");
+        assert_eq!(people.names(), ["Fay"]);
+        assert_eq!(
+            people.forget("Fay").unwrap(),
+            Forgot {
+                forgot: true,
+                unsearched: 1
+            }
+        );
+        assert!(people.names().is_empty());
+        // It waits, hashed: the name itself is never kept for it, and it is
+        // not counted as anyone's record.
+        let waiting = std::fs::read_to_string(folder.join(PENDING_FORGETS)).unwrap();
+        assert!(!waiting.to_lowercase().contains("fay"), "{waiting}");
+        assert_eq!(set_aside_count(&path), 1);
+        // Read back into the file (by a later build, or by hand): forgotten
+        // again at once.
+        std::fs::write(&path, &fay).unwrap();
+        let people = People::open(path.clone()).unwrap();
+        assert!(people.names().is_empty());
+        assert!(!std::fs::read_to_string(&path).unwrap().contains("Fay"));
+        assert!(folder.join(PENDING_FORGETS).exists(), "still waits");
+        // The set-aside file can be searched now, and holds her: forgotten
+        // there, and nothing waits.
+        std::fs::write(&unreadable, &fay).unwrap();
+        let mut people = People::open(path.clone()).unwrap();
+        assert!(!unreadable.exists(), "her record was all that was in it");
+        assert!(!folder.join(PENDING_FORGETS).exists());
+        assert_eq!(set_aside_count(&path), 0);
+        assert_eq!(
+            people.forget("Fay").unwrap(),
+            Forgot {
+                forgot: false,
+                unsearched: 0
+            }
+        );
+
         // A set-aside person whose name is no plain string might be anyone,
         // so it cannot be searched either (the reviewer on #1558).
         let path = file("forget-nameless");
@@ -1320,12 +1820,57 @@ mod tests {
         .unwrap();
         let mut people = People::open(path.clone()).unwrap();
         assert_eq!(set_aside_count(&path), 1);
-        assert!(people.forget("Cy").is_err());
+        assert_eq!(
+            people.forget("Cy").unwrap(),
+            Forgot {
+                forgot: false,
+                unsearched: 1
+            }
+        );
         assert_eq!(
             set_aside_count(&path),
             1,
             "kept: nothing can be told about it"
         );
+    }
+
+    /// Twelve's P2 on #1767: a waiting forget covers only the faces kept
+    /// before it was asked. Someone remembered again after is theirs to
+    /// keep, across a start and a forget of someone else, while their old
+    /// record still goes once its set-aside file can be searched.
+    #[test]
+    fn someone_remembered_after_a_waiting_forget_is_kept() {
+        let path = file("forget-then-remember");
+        let folder = path.parent().unwrap().join(SET_ASIDE);
+        std::fs::create_dir(&folder).unwrap();
+        let unreadable = folder.join("people-whole-0000.json");
+        std::fs::write(&unreadable, "not json").unwrap();
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(people.forget_at("Fay", 100).unwrap().unsearched, 1);
+        people
+            .remember("Fay", vec![print(0.7)], 200)
+            .expect("remembered again");
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(people.names(), ["Fay"], "her later word stands");
+        people.forget_at("Gus", 300).unwrap();
+        assert_eq!(People::open(path.clone()).unwrap().names(), ["Fay"]);
+        // Her old record, kept before she asked, still goes when it can be
+        // searched; her new one stays.
+        let good = serde_json::to_string(&print(0.2)).unwrap();
+        std::fs::write(
+            &unreadable,
+            format!(
+                r#"{{"version":1,"people":[{{"name":"Fay","prints":[{good}],"added_unix_s":50}},{{"name":"Fay","prints":[{good}]}}]}}"#
+            ),
+        )
+        .unwrap();
+        let people = People::open(path.clone()).unwrap();
+        assert!(
+            !unreadable.exists(),
+            "both old records gone, the timeless one too"
+        );
+        assert_eq!(people.names(), ["Fay"]);
+        assert!(!folder.join(PENDING_FORGETS).exists());
     }
 
     /// A temporary file a crash left in `set-aside/` is neither counted nor
@@ -1339,7 +1884,7 @@ mod tests {
         std::fs::write(folder.join("people-person-0000.json.new"), "cut sho").unwrap();
         let mut people = People::open(path.clone()).unwrap();
         assert_eq!(set_aside_count(&path), 0);
-        assert!(!people.forget("Hal").unwrap());
+        assert!(!people.forget("Hal").unwrap().forgot);
 
         let path = file("aside-linked");
         let elsewhere = path.parent().unwrap().join("elsewhere");

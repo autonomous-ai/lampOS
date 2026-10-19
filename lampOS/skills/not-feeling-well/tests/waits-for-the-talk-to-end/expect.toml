@@ -1,0 +1,22 @@
+# From 10:00, the error from 60 s to 300 s; voice/state listening at 50.5 s,
+# speaking at 52.5 s, resting at 150.5 s. Nothing during the talk; it droops
+# and dims at the first health after it rests, 155 s (wait = "1h"), and
+# gives the light back at 305 s.
+clock = "10:00"
+
+[[expect]]
+at = "155s"
+within = "1s"
+call = "body.gesture"
+args = { gesture = "sleepy" }
+
+[[expect]]
+at = "155s"
+within = "1s"
+call = "light"
+args = { dim = 1, until = "ends" }
+
+[[expect]]
+at = "305s"
+within = "1s"
+call = "ends"

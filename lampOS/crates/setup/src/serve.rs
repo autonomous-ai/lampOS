@@ -49,6 +49,9 @@ fn default_zone_env() -> PathBuf {
 fn default_backend() -> PathBuf {
     "/etc/lampOS/setup/backend.json".into()
 }
+fn default_reports() -> PathBuf {
+    "/etc/lampOS/setup/reports.json".into()
+}
 
 /// The server's written configuration.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -97,6 +100,12 @@ pub struct Config {
     /// it yet; the reset's plan removes it.
     #[serde(default = "default_backend")]
     pub backend: PathBuf,
+    /// The person's answer to "Send health reports to Autonomous?" (#1683):
+    /// `{"share": bool, "asked": 1, "at": …}`, root's, 0644, for
+    /// `lamp-cloud` to read. Written at every setup, a no included; the
+    /// reset's plan removes it.
+    #[serde(default = "default_reports")]
+    pub reports: PathBuf,
     /// Run once the hotspot is up and once serving ends: V1's nginx, which
     /// serves V1's page and passes `/api/` here, is on only during setup.
     #[serde(default)]
@@ -129,6 +138,7 @@ impl Config {
             &self.timezone_file,
             &self.zone_env,
             &self.backend,
+            &self.reports,
         ] {
             if !path.is_absolute() {
                 return Err(format!("{} is not absolute", path.display()));
@@ -179,6 +189,10 @@ pub struct Status {
     /// which Lamp it set up from this (#1396, decided 19 Oct); `lamp-cloud`
     /// says the same on every MQTT reply.
     pub generation: &'static str,
+    /// Whether the person's yes to health and crash reports was kept by the
+    /// last setup (#1683), so the app can show it after a reconnect. Read
+    /// only: the app sets it later through `lamp-cloud`, not here.
+    pub share_reports: bool,
 }
 
 /// The `generation` a V2 lamp's setup reports; V1's server has no such field.
@@ -195,6 +209,7 @@ impl Status {
             set_up_completed: false,
             runtime_phase: String::new(),
             generation: GENERATION,
+            share_reports: false,
         }
     }
 }
@@ -233,6 +248,16 @@ pub struct SetupRequest {
     pub fa_channel: String,
     #[serde(default, deserialize_with = "text")]
     pub fd_channel: String,
+    /// Health and crash reports (#1683): only the JSON `true` is a yes.
+    /// Absent, `false`, `null`, `"true"`, `1` or anything else is no, so an
+    /// app that does not ask, V1's page and this crate's own all mean no.
+    #[serde(default, deserialize_with = "only_true")]
+    pub share_reports: bool,
+}
+
+/// Whether the field is the JSON `true`, and nothing else.
+fn only_true<'de, D: serde::Deserializer<'de>>(given: D) -> Result<bool, D::Error> {
+    Ok(Value::deserialize(given)? == Value::Bool(true))
 }
 
 /// A link field as text: a string as given, a number or `true`/`false` as its
@@ -349,6 +374,8 @@ pub struct Accepted {
     pub timezone: Option<String>,
     /// The backend's link, when the request carried a whole one.
     pub backend: Option<Backend>,
+    /// Whether the person said yes to health and crash reports (#1683).
+    pub share_reports: bool,
 }
 
 /// Shown in place of a secret, so a debug line never logs the Wi-Fi password
@@ -371,6 +398,7 @@ impl fmt::Debug for SetupRequest {
             .field("mqtt_password", &HIDDEN)
             .field("fa_channel", &self.fa_channel)
             .field("fd_channel", &self.fd_channel)
+            .field("share_reports", &self.share_reports)
             .finish()
     }
 }
@@ -384,6 +412,7 @@ impl fmt::Debug for Accepted {
             .field("name", &self.name)
             .field("timezone", &self.timezone)
             .field("backend", &self.backend)
+            .field("share_reports", &self.share_reports)
             .finish()
     }
 }
@@ -428,6 +457,7 @@ pub fn check(request: &SetupRequest, config: &Config) -> Result<Accepted, String
         name: (!name.is_empty()).then(|| name.to_owned()),
         timezone: zone_known(timezone, &config.zoneinfo).then(|| timezone.to_owned()),
         backend: backend_link(request).ok(),
+        share_reports: request.share_reports,
     })
 }
 
@@ -466,6 +496,11 @@ pub trait Save {
     fn timezone(&mut self, zone: &str) -> io::Result<()>;
     /// The backend's link, root's and private (#1396).
     fn backend(&mut self, link: &Backend) -> io::Result<()>;
+    /// The person's answer on health and crash reports (#1683). Nothing by
+    /// default: only [`Files`] keeps it.
+    fn reports(&mut self, _share: bool) -> io::Result<()> {
+        Ok(())
+    }
     fn marker(&mut self) -> io::Result<()>;
 }
 
@@ -538,6 +573,33 @@ fn put_in_place(temporary: &Path, path: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// The wording of the reports question the person answered (#1683): a
+/// later wording that asks for more starts at no until they are asked again.
+pub const REPORTS_ASKED: u64 = 1;
+
+/// What setup keeps of the person's answer on reports, at `at`.
+pub fn reports_record(share: bool, at: SystemTime) -> Value {
+    let seconds = at.duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    let (days, rest) = ((seconds / 86_400) as i64, seconds % 86_400);
+    // Howard Hinnant's civil-from-days.
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    let at = format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        rest / 3_600,
+        rest / 60 % 60,
+        rest % 60
+    );
+    json!({"share": share, "asked": REPORTS_ASKED, "at": at})
+}
+
 /// The files named in the configuration.
 pub struct Files<'a>(pub &'a Config);
 
@@ -605,6 +667,14 @@ impl Save for Files<'_> {
         let mut bytes = serde_json::to_vec_pretty(link).map_err(io::Error::other)?;
         bytes.push(b'\n');
         write_private(&self.0.backend, &bytes)
+    }
+    fn reports(&mut self, share: bool) -> io::Result<()> {
+        let mut bytes = serde_json::to_vec(&reports_record(share, SystemTime::now()))
+            .map_err(io::Error::other)?;
+        bytes.push(b'\n');
+        // 0644: `lamp-cloud` runs as `lampos` and reads it where it is.
+        let temporary = stage(&self.0.reports, &bytes, 0o644)?;
+        put_in_place(&temporary, &self.0.reports)
     }
     fn marker(&mut self) -> io::Result<()> {
         write_private(&self.0.marker, b"")
@@ -713,6 +783,7 @@ pub fn run(
     let failure = match joined {
         Joined::Failed { reason } => Some(reason.detail().to_owned()),
         Joined::Connected => {
+            let mut reports_kept = false;
             // The key last, just before the marker, so a name or zone that
             // cannot be saved leaves the key there as it was (the reviewer on
             // #1120).
@@ -734,12 +805,21 @@ pub fn run(
                         "lamp-setup: the backend's link could not be saved ({why}); setup goes on without it"
                     );
                 }
+                // Best effort too (#1683): an answer that cannot be kept is
+                // a no, never a failed setup.
+                match save.reports(accepted.share_reports) {
+                    Ok(()) => reports_kept = accepted.share_reports,
+                    Err(why) => eprintln!(
+                        "lamp-setup: the answer on reports could not be saved ({why}); reports stay off"
+                    ),
+                }
             })
             .and_then(|()| match &accepted.credential {
                 Some(key) => save.credential(key),
                 None => Ok(()),
             })
             .and_then(|()| save.marker());
+            status.lock().unwrap().share_reports = saved.is_ok() && reports_kept;
             match saved {
                 Ok(()) => None,
                 Err(_) => {

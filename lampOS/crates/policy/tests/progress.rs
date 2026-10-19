@@ -246,6 +246,7 @@ impl Rig {
                 never: no_news,
                 ..Unprompted::default()
             },
+            keep_light_on: false,
         };
         self.rules.publish_json(0, &rules).unwrap();
     }

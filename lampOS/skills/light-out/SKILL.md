@@ -15,7 +15,8 @@ it was again: the colour and the level the person chose, which the lamp
 keeps. It does the same if the lamp stops looking (the privacy switch, a
 mute): it never puts the light out on someone it cannot see.
 
-It does this once each time the desk is left. It keeps still at night (23:00
+If anyone asks it to keep the light on, it does, for everyone, until someone
+says it may turn the light off again. It does this once each time the desk is left. It keeps still at night (23:00
 to 06:00, the lamp's local time), when the night is the lamp's sleep; if
 nobody has been there since the night, the light goes out at 06:00. It never
 puts the light out in the middle of a conversation: if the ten minutes come

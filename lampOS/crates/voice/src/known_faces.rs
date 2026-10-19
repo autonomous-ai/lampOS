@@ -649,15 +649,44 @@ fn run_with(socket: &Path, call: &ToolCall, checked: bool, said: &Said) -> (Valu
     }
 }
 
+/// A face forgotten while old face records the eyes couldn't read are kept
+/// apart (#1586): what the person is told, plainly.
+pub const FORGOTTEN_SOME_KEPT_APART: &str = "Forgotten. Tell them so, and that a few old face records you could not read are kept apart: if those ever come back, their face is forgotten in them too, and a factory reset clears them.";
+/// No face of that name where the eyes could look, while old face records
+/// they couldn't read are kept apart (#1586).
+pub const NOT_KNOWN_SOME_KEPT_APART: &str = "You did not know a face by that name. A few old face records you could not read are kept apart: if one is theirs, it is forgotten if they ever come back, and a factory reset clears them.";
+/// What the person who asked to be remembered is told when the lamp also
+/// counts how often they come by (#1670): one short line, in the lamp's
+/// own words.
+pub const VISITS_LINE: &str = "Also say, in one short sentence, that you'll notice how often they come by, so you can greet them more warmly.";
+
 /// What the eyes said, in words the model can say.
 fn told(answer: &Value) -> Value {
     if let Some(name) = answer.get("remembered").and_then(Value::as_str) {
+        // With visits counted (`lamp-eyes --visits on`), the person is told so
+        // in one line, as they are remembered (the first builder on #1670).
+        if answer.get("visits").and_then(Value::as_bool) == Some(true) {
+            return json!({
+                "ok": true,
+                "remembered": name,
+                "also_say": VISITS_LINE,
+            });
+        }
         return json!({"ok": true, "remembered": name});
     }
-    match answer.get("forgot").and_then(Value::as_bool) {
-        Some(true) => return json!({"ok": true}),
-        Some(false) => return json!({"error": "I did not know a face by that name."}),
-        None => {}
+    // Set-aside files the eyes couldn't search: the forget waits for them,
+    // and the person is told what was forgotten and what wasn't (#1586),
+    // not that the eye failed.
+    let unsearched = answer
+        .get("unsearched")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    match (answer.get("forgot").and_then(Value::as_bool), unsearched) {
+        (Some(true), 0) => return json!({"ok": true}),
+        (Some(false), 0) => return json!({"error": "I did not know a face by that name."}),
+        (Some(true), _) => return json!({"ok": true, "note": FORGOTTEN_SOME_KEPT_APART}),
+        (Some(false), _) => return json!({"error": NOT_KNOWN_SOME_KEPT_APART}),
+        (None, _) => {}
     }
     if answer.get("error").and_then(Value::as_str) == Some("known_as")
         && let Some(known) = answer.get("known_as").and_then(Value::as_str)
@@ -683,20 +712,70 @@ fn told(answer: &Value) -> Value {
     json!({"error": words})
 }
 
-/// Who of the remembered people is at the lamp now: the name in the eyes'
-/// file, written in the last three seconds.
-pub fn known_now(path: &Path) -> Option<String> {
-    let modified = std::fs::metadata(path).ok()?.modified().ok()?;
-    let age = SystemTime::now()
-        .duration_since(modified)
-        .unwrap_or_default();
-    if age > FRESH {
-        return None;
+/// A fresh source-file observation, with expiry anchored to the source age.
+/// This identifies a visible face, not the speaker, and never extends session
+/// ownership. Reading belongs off the input/audio path.
+#[derive(Clone, Debug)]
+pub struct FaceObservation {
+    name: String,
+    valid_until: Instant,
+}
+
+impl FaceObservation {
+    pub fn read(path: &Path) -> Option<Self> {
+        use std::io::Read;
+        // Anchor before file I/O so slow reads cannot renew source freshness.
+        let now = Instant::now();
+        let wall = SystemTime::now();
+        let file = std::fs::File::open(path).ok()?;
+        let modified = file.metadata().ok()?.modified().ok()?;
+        let mut bytes = Vec::new();
+        // The source is a small name file. Refuse oversized/corrupt files.
+        file.take(4097).read_to_end(&mut bytes).ok()?;
+        if bytes.len() > 4096 {
+            return None;
+        }
+        let text = String::from_utf8(bytes).ok()?;
+        let observation = Self::from_source(text.trim(), modified, wall, now)?;
+        observation.is_fresh(Instant::now()).then_some(observation)
     }
-    let text = std::fs::read_to_string(path).ok()?;
-    let name = text.trim();
-    (!name.is_empty() && name.len() <= MOST_NAME_BYTES && !name.chars().any(char::is_control))
-        .then(|| name.to_owned())
+
+    fn from_source(
+        name: &str,
+        modified: SystemTime,
+        wall: SystemTime,
+        now: Instant,
+    ) -> Option<Self> {
+        let age = wall.duration_since(modified).ok()?;
+        let remaining = FRESH.checked_sub(age)?;
+        if remaining.is_zero()
+            || name.is_empty()
+            || name.len() > MOST_NAME_BYTES
+            || name.chars().any(char::is_control)
+        {
+            return None;
+        }
+        Some(Self {
+            name: name.to_owned(),
+            valid_until: now.checked_add(remaining)?,
+        })
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn valid_until(&self) -> Instant {
+        self.valid_until
+    }
+    pub fn is_fresh(&self, now: Instant) -> bool {
+        now < self.valid_until
+    }
+}
+
+/// Existing face lookup, backed by a bounded observation read. Future or
+/// expired source timestamps fail closed rather than appearing freshly seen.
+pub fn known_now(path: &Path) -> Option<String> {
+    FaceObservation::read(path).map(|observation| observation.name)
 }
 
 /// The file the eyes keep the known person's name in while they are at the
@@ -801,13 +880,64 @@ mod tests {
     use super::*;
 
     #[test]
+    fn observations_expire_from_source_age_without_renewal_on_reread() {
+        let monotonic = Instant::now();
+        let wall = SystemTime::UNIX_EPOCH + Duration::from_secs(100);
+        let modified = wall - Duration::from_secs(2);
+        let first = FaceObservation::from_source("Ann", modified, wall, monotonic).unwrap();
+        assert_eq!(first.valid_until(), monotonic + Duration::from_secs(1));
+        let later = Duration::from_millis(500);
+        let again =
+            FaceObservation::from_source("Ann", modified, wall + later, monotonic + later).unwrap();
+        assert_eq!(first.valid_until(), again.valid_until());
+        assert!(!again.is_fresh(monotonic + Duration::from_secs(1)));
+        assert!(
+            FaceObservation::from_source("Ann", modified, wall + Duration::from_secs(1), monotonic)
+                .is_none()
+        );
+        assert!(
+            FaceObservation::from_source("Ann", wall + Duration::from_nanos(1), wall, monotonic)
+                .is_none()
+        );
+        for invalid in ["", "Ann\nBob"] {
+            assert!(FaceObservation::from_source(invalid, wall, wall, monotonic).is_none());
+        }
+    }
+
+    #[test]
     fn what_the_eyes_say_becomes_words_the_model_can_say() {
         assert_eq!(
             told(&json!({"remembered":"Minh"})),
             json!({"ok":true,"remembered":"Minh"})
         );
+        // #1670: with visits counted, the person is told so in one line;
+        // a `visits` that isn't true says nothing more.
+        assert_eq!(
+            told(&json!({"remembered":"Minh","visits":true})),
+            json!({"ok":true,"remembered":"Minh","also_say":VISITS_LINE})
+        );
+        assert_eq!(
+            told(&json!({"remembered":"Minh","visits":"yes"})),
+            json!({"ok":true,"remembered":"Minh"})
+        );
         assert_eq!(told(&json!({"forgot":true})), json!({"ok":true}));
         assert!(told(&json!({"forgot":false}))["error"].is_string());
+        // #1586: some set-aside records couldn't be searched. What was
+        // forgotten is said, and what is kept apart, never "My eye could not
+        // do that".
+        assert_eq!(
+            told(&json!({"forgot":true,"unsearched":1})),
+            json!({"ok":true,"note":FORGOTTEN_SOME_KEPT_APART})
+        );
+        assert_eq!(
+            told(&json!({"forgot":false,"unsearched":2})),
+            json!({"error":NOT_KNOWN_SOME_KEPT_APART})
+        );
+        // A real fault is still the eye's.
+        assert_eq!(
+            told(&json!({"error":"storage"})),
+            json!({"error":"My eye could not do that just now."})
+        );
         for code in [
             "no_face",
             "too_far",

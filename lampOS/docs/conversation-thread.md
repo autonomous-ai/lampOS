@@ -169,6 +169,11 @@ lamp-4ace it has acted about a dozen times with no fault.
 
 ## Each person's own thread
 
+Completed exchanges carry their stored owner through the memory handoff. A batch
+can contain different people and room exchanges; each retains its own scope.
+The person visible when the batch finishes does not replace those stored scopes.
+This does not change the attribution or session-switching rules below.
+
 With a memory and eyes that remember faces (#764), each exchange is kept
 as whose it was: the room's, or the memory id (never the name) of the
 known person the eyes name at the lamp as it is made, or, with no name

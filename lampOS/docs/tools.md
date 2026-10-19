@@ -191,7 +191,9 @@ product's is `/run/lampos-skills`), and the voice reads and calls them the
 same way, at the same session open and within the same deadline:
 
     <skills>/tools.json   each skill's tool, described with its SKILL.md description,
-                          with the parameters of its choice and flag, if it has them
+                          with the parameters of its choice and flag, if it has them,
+                          and beside the tools, "body": the tools whose skill asks
+                          for the body (a text never runs one, #1673)
     <skills>/call.sock    {"op":"call","name":"dance","args":{"style":"calm"}} -> {"ok":true,"result":{"next":"..."}}
                           arguments that are not the tool's -> {"ok":false,"error":"..."}
 
@@ -394,6 +396,21 @@ remember ([memory.md](memory.md#what-a-person-teaches-and-corrects-813)):
 
 Without the switch none of these is declared and a call of one of these
 names is not the memory's.
+
+## `reports_stop`, a system function
+
+With `LAMP_REPORTS=on` in the voice unit (the worker's `--reports-stop`,
+after `--use-skill`) a session is told of `reports_stop`, with no
+arguments: "stop sending reports" (#1683, [cloud.md](cloud.md), "Health and
+crash reports"). It is the voice's own, never a skill, and comes before the
+executive's and the skills' functions, so it is never the one cut past 32;
+a skill cut for it is named on the setup line (#1706). The voice puts
+`{"share": false}` on `reports/request` and answers from `lamp-cloud`'s
+`reports/state` within 2 s: `{"ok": true, "say": "I've stopped sending
+reports."}`, or "I'm not sending any reports." when they were off. With
+nobody taking the ask (`lamp-cloud` not running), or no answer in time, it
+says so and never claims a stop. Only a request a person said runs it.
+There is no function to turn reports on: that is the person's own screen.
 
 ## `the_time`, the voice's own
 

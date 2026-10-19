@@ -139,7 +139,7 @@ back at start, a wake that does not reach home, and a shoulder that does
 not come down when it is lowered all end with torque off on all five, after
 the hold where there is one. Every way a run ends passes through one place
 (`run_alive`) that does this. It is not done when the body is asked to
-stop, on a refusal to start (one for a hot or loaded joint has let go
+stop (unless `--let-go-at-stop on`, below), on a refusal to start (one for a hot or loaded joint has let go
 already, and one of a lamp found standing lets go once it has folded), or
 under `--overload release`, where torque is already off. A
 standing lamp whose shoulder or elbow cannot be read (`Stop::BadTemperature`,
@@ -1714,6 +1714,7 @@ four rows, "Without it" is what `off` leaves.
 | `--limp on\|off` (default on while giving way) | a hand forcing a joint past V1's contact floor slumps the lamp (below) | `off`: gives way without the slump | on or off; on needs `--give-way` |
 | `--torque on` | take hold of a joint found without torque: its goal written as where it is, then torque on, and refused if it then moves more than 12 counts | a joint without torque is refused, and torque is not written | on or off |
 | `--wake on` (default) | with `--home`, a joint found out of where it may start but within 400 counts of home is brought home slowly before anything else; a shoulder left up with its elbow folded is lowered first; in the run, a joint held 30 to 50 counts short of its goal, still, rests where it is (see "Waking") | such a joint is refused | on or off |
+| `--let-go-at-stop on\|off` (default off; the factory's, #1682) | asked to stop (SIGINT or SIGTERM), a lamp that got down, its head within 20 counts of home and its arm of its folded counts (inside the tracking bound and the arm's goal step, so an arm left a little short of folded keeps holding), has its last goals written and is then let go, torque off on all five, so that `lamp-body-measure` can read it at rest; a standing lamp folds first, as always, and one that did not get down in time keeps holding (`asked_to_stop_standing_it_folds_first_and_only_then_lets_go_with_let_go_at_stop`, `asked_to_stop_folded_at_rest_it_lets_go_only_with_let_go_at_stop`, `asked_to_stop_with_its_elbow_short_of_folded_it_keeps_holding_with_let_go_at_stop`). The product's unit never passes it | a stop keeps the lamp held, torque on, until the power goes | on or off |
 | `--overload release` | any joint at a load of 800 (80% of `--force-limit` for a joint held to one) for 1.5 s: torque off on all five for 120 s, then held where they are and the head brought home slowly; a second time within ten minutes ends the run, torque off (see "Letting go under overload") | torque is written off only as a run ends on a surprise | release |
 | `--gaze-socket PATH` with `--gaze Y,P` | where the eyes report, and the signed counts of yaw and pitch that a half-picture is worth | never looks | 900 either way |
 | `--gaze-reach Y,P` | the farthest the gaze takes yaw and pitch; the yaw may be wider than `--reach`'s | 250,120 | 500, 200 |

@@ -1,0 +1,5 @@
+# From 10:00, the error from 60 s to 300 s; a talk from 50.5 s to 400.5 s.
+# Nothing: the error is over before the talk is, and the chance it kept is
+# spent with it.
+clock = "10:00"
+none = true

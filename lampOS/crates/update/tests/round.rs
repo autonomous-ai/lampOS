@@ -1462,6 +1462,14 @@ impl lamp_update::install::Host for InstallHost {
     fn harness_off(&mut self, _: &str, _: &str) -> Result<Vec<String>, String> {
         Ok(Vec::new())
     }
+
+    fn harness_on(&mut self, _: &str, _: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn restart(&mut self, _: &str) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 /// Every binary the product starts, and the voice's worker, each the line

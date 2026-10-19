@@ -17,7 +17,7 @@ version = "1.0.0"
 # What it may read and use, and nothing more: whether anyone is at the lamp,
 # the voice's state, and the light. It never speaks or moves.
 [permissions]
-topics = ["room/presence", "voice/state"]
+topics = ["room/presence", "voice/state", "memory/rules"]
 light = true
 
 [trigger]
@@ -31,6 +31,12 @@ wait = "1h"               # the lamp speaking when the ten minutes come (a remin
 topic = "voice/state"
 field = "state"
 equals = "resting"
+
+[[while]]                 # not when asked to keep the light on (the room's rule, whoever said it)
+topic = "memory/rules"
+field = "keep_light_on"
+not_equals = true
+unknown = "holds"         # a lamp without the rules switch says nothing on memory/rules: it still goes out
 
 [quiet]                   # not at night: the night is the lamp's sleep (Expression's 23:00 to 06:00)
 from = "23:00"

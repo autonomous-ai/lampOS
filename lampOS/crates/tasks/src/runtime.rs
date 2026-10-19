@@ -5,8 +5,8 @@ use crate::{
         Watched,
     },
     harness::{
-        Cli, CliConfig, Closed, Ended, Launch, LaunchOutcome, Listed, MOST_WAITED, Observation,
-        SignIn, Target,
+        AccountMachine, Cli, CliConfig, Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed,
+        MOST_WAITED, Observation, SignIn, Target,
     },
     progress::{Reads, Tracker},
     protocol::{MAX_LINE_BYTES, MAX_REPLY_BYTES, Request},
@@ -39,6 +39,9 @@ pub const READ_DEADLINE: Duration = Duration::from_millis(300);
 pub const REQUEST_DEADLINE: Duration = Duration::from_millis(1100);
 pub const CLIENT_DEADLINE: Duration = Duration::from_millis(1200);
 pub const STALE_AFTER: Duration = Duration::from_millis(1500);
+/// How often the part says how it is on `diagnostics` while nothing changes
+/// ([`Config::report_every`] on a lamp).
+pub const REPORT_EVERY: Duration = Duration::from_secs(1);
 pub const WORKERS: usize = 4;
 pub const CLIENT_QUEUE: usize = 4;
 pub const REQUEST_QUEUE: usize = 16;
@@ -140,6 +143,11 @@ pub struct Config {
     /// `serve --set-up-later`: the part runs before the lamp is set up for
     /// hand-overs, and says why they are off (#1676). Off unless set.
     pub set_up_later: Option<SetUpLater>,
+    /// How often the part says how it is on `diagnostics` while nothing
+    /// changes: [`REPORT_EVERY`] on a lamp. A change in readiness is said
+    /// at once, whatever this is. Tests pass less, so a test that reads the
+    /// report waits a fraction of a second rather than one (#1128).
+    pub report_every: Duration,
 }
 
 /// What `serve --set-up-later` looks at again, and how often.
@@ -151,7 +159,19 @@ pub struct SetUpLater {
     pub targets: PathBuf,
     /// How often the file and Harness's sign-in are looked at again.
     pub every: Duration,
+    /// `serve --targets-from-machines ENGINE`: while Harness is signed in,
+    /// the targets file is written from the person's machines, every
+    /// [`MACHINES_EVERY_LOOKS`] looks, with this engine. Never over a file
+    /// someone else wrote ([`write_targets_from_machines`]).
+    pub from_machines: Option<EngineKind>,
 }
+
+/// `serve --targets-from-machines` asks Harness for the machines once in
+/// this many looks: every five minutes on a lamp.
+pub const MACHINES_EVERY_LOOKS: u32 = 5;
+/// The folder each written target names on the person's computer: today's
+/// on lamp-4ace (`docs/tasks.md`). Harness makes it the first time.
+pub const MACHINES_PROJECT: &str = "~/harnesses/lamp-tasks";
 
 /// How often `serve --set-up-later` looks at the targets and the sign-in.
 pub const SET_UP_LOOK_EVERY: Duration = Duration::from_secs(60);
@@ -328,6 +348,11 @@ pub trait Adapter: Send + 'static {
     fn signed_in(&self) -> Result<SignIn, String> {
         Err("unsupported".into())
     }
+    /// The machines on the person's account (`serve
+    /// --targets-from-machines`). An adapter without it says so.
+    fn machines(&self) -> Result<Vec<AccountMachine>, String> {
+        Err("unsupported".into())
+    }
     /// There is no Harness program behind this adapter (`serve
     /// --set-up-later`): every hand-over is refused, with why.
     fn absent(&self) -> bool {
@@ -358,6 +383,9 @@ impl Adapter for Cli {
     }
     fn signed_in(&self) -> Result<SignIn, String> {
         Cli::signed_in(self)
+    }
+    fn machines(&self) -> Result<Vec<AccountMachine>, String> {
+        Cli::machines(self)
     }
 }
 
@@ -404,6 +432,12 @@ impl Adapter for Production {
     fn signed_in(&self) -> Result<SignIn, String> {
         match self {
             Self::Cli(cli) => cli.signed_in(),
+            Self::Absent => Err("no_harness".into()),
+        }
+    }
+    fn machines(&self) -> Result<Vec<AccountMachine>, String> {
+        match self {
+            Self::Cli(cli) => cli.machines(),
             Self::Absent => Err("no_harness".into()),
         }
     }
@@ -461,6 +495,7 @@ enum Job {
     Status(String),
     Close(CloseJob),
     SignIn,
+    Machines,
 }
 enum Outcome {
     Launch(u64, LaunchOutcome),
@@ -468,6 +503,7 @@ enum Outcome {
     Status(String, Result<Vec<Listed>, String>),
     Close(CloseJob, Result<Closed, String>),
     SignIn(Result<SignIn, String>),
+    Machines(Result<Vec<AccountMachine>, String>),
 }
 struct Binding {
     path: PathBuf,
@@ -614,8 +650,13 @@ fn owner<C: Clock>(
     // file and the sign-in are next looked at. The first look is at once.
     let mut set_up = set_up_later.as_ref().map(|_| SetUp::default());
     let mut targets_seen = None;
+    let mut names_said = String::new();
     let mut targets_due = Instant::now();
     let mut sign_in_due = Instant::now();
+    let mut machines_due = Instant::now();
+    // What the last write from the machines said, so the journal has one
+    // line a change, not one a look.
+    let mut machines_said = String::new();
     while !stop.load(Ordering::Acquire) {
         if looked_aside.elapsed() >= LOOK_ASIDE_EVERY {
             engine.look_aside();
@@ -626,6 +667,7 @@ fn owner<C: Clock>(
         {
             targets_due = Instant::now() + later.every;
             look_at_targets(&mut engine, &later.targets, &mut targets_seen, found);
+            look_at_names(&mut engine, &later.targets, &mut names_said);
         }
         // Something that may have changed which tasks are watched.
         let mut moved = false;
@@ -645,6 +687,36 @@ fn owner<C: Clock>(
                     // the lamp closed and how it went.
                     eprintln!("tasks: closing task {}'s harness: {result:?}", job.task_id);
                     engine.finish_close(&job, result, &now)
+                }
+                Outcome::Machines(read) => {
+                    if let Some(later) = set_up_later.as_ref()
+                        && let Some(engine) = later.from_machines
+                    {
+                        let said = match read {
+                            Ok(listed) => {
+                                match write_targets_from_machines(&later.targets, &listed, engine) {
+                                    Ok(written) => {
+                                        if written.changed {
+                                            // Read at once, not a minute later.
+                                            targets_due = Instant::now();
+                                        }
+                                        written.said
+                                    }
+                                    Err(error) => {
+                                        format!(
+                                            "task targets not written from the machines: {error}"
+                                        )
+                                    }
+                                }
+                            }
+                            Err(code) => format!("Harness's machines not read: {code}"),
+                        };
+                        if said != machines_said {
+                            eprintln!("tasks: {said}");
+                            machines_said = said;
+                        }
+                    }
+                    Ok(())
                 }
                 Outcome::SignIn(read) => {
                     if let Some(found) = set_up.as_mut() {
@@ -773,6 +845,19 @@ fn owner<C: Clock>(
                             sign_in_due = Instant::now() + later.every;
                             Some(Job::SignIn)
                         })
+                        // The machines, once signed in, less often again.
+                        .or_else(|| {
+                            let later = set_up_later.as_ref()?;
+                            later.from_machines?;
+                            let signed_in = set_up
+                                .as_ref()
+                                .is_some_and(|found| found.sign_in == Some(SignIn::In));
+                            if !signed_in || Instant::now() < machines_due {
+                                return None;
+                            }
+                            machines_due = Instant::now() + later.every * MACHINES_EVERY_LOOKS;
+                            Some(Job::Machines)
+                        })
                 }
             };
             if let Some(job) = next {
@@ -814,6 +899,389 @@ fn owner<C: Clock>(
         };
     }
     Ok(())
+}
+
+/// The targets the person's machines give (`serve
+/// --targets-from-machines`): one for each machine but the lamp itself, at
+/// most 8, newest first as Harness lists them. The first is `office`, the
+/// alias the voice asks for unless told another (`LAMP_TASKS_TARGET`); each
+/// other is its Harness name made into an alias (`MacBook Air` is
+/// `macbook-air`), or `computer` with none, and `-2`, `-3` … where two
+/// would be the same. Each names [`MACHINES_PROJECT`] and `engine`.
+pub fn targets_from_machines(
+    machines: &[AccountMachine],
+    engine: EngineKind,
+) -> BTreeMap<String, Target> {
+    from_machines(machines, engine).0
+}
+
+/// Each computer's own name by its alias, as [`targets_from_machines`]
+/// names them: its Harness name, else its hostname, as a label of at most
+/// [`MOST_NAME_BYTES`] with no control characters; none where nothing is
+/// left (#1676).
+pub fn names_from_machines(machines: &[AccountMachine]) -> BTreeMap<String, String> {
+    from_machines(machines, EngineKind::Claude).1
+}
+
+/// A machine's name as said to the person: control characters out, spaces
+/// at the ends trimmed, cut to [`MOST_NAME_BYTES`] on a character boundary.
+fn label_of(label: &str) -> Option<String> {
+    let clean: String = label.chars().filter(|c| !c.is_control()).collect();
+    let mut name = String::new();
+    for c in clean.trim().chars() {
+        if name.len() + c.len_utf8() > MOST_NAME_BYTES {
+            break;
+        }
+        name.push(c);
+    }
+    let name = name.trim_end().to_owned();
+    (!name.is_empty()).then_some(name)
+}
+
+fn from_machines(
+    machines: &[AccountMachine],
+    engine: EngineKind,
+) -> (BTreeMap<String, Target>, BTreeMap<String, String>) {
+    let mut targets = BTreeMap::new();
+    let mut names = BTreeMap::new();
+    for (index, machine) in machines.iter().filter(|m| !m.current).take(8).enumerate() {
+        let base = if index == 0 {
+            "office".to_owned()
+        } else {
+            alias_of(&machine.label)
+        };
+        let mut alias = base.clone();
+        let mut next = 2;
+        while targets.contains_key(&alias) {
+            alias = format!("{base}-{next}");
+            next += 1;
+        }
+        if let Some(name) = label_of(&machine.label) {
+            names.insert(alias.clone(), name);
+        }
+        targets.insert(
+            alias,
+            Target {
+                machine_id: machine.machine_id.clone(),
+                project: MACHINES_PROJECT.into(),
+                engine,
+            },
+        );
+    }
+    (targets, names)
+}
+
+/// The longest name a computer is told by (#1676).
+pub const MOST_NAME_BYTES: usize = 64;
+
+/// The computers' names beside a targets file: `targets.names.json` beside
+/// `targets.json` (#1676). A file of its own, so an older build, which never
+/// reads it, keeps its hand-overs on a rollback.
+pub fn names_path(targets: &Path) -> PathBuf {
+    targets.with_extension("names.json")
+}
+
+/// The computers' names, read as strictly as the targets: `{"version":1,
+/// "names":{ALIAS:NAME}}`, an owned 0600 file of at most 16384 bytes, each
+/// alias a target alias's shape and once, each name at most
+/// [`MOST_NAME_BYTES`], with no control characters and no spaces at the
+/// ends. Anything else is an error, and the voice then says what it says
+/// today.
+pub fn read_target_names(path: &Path) -> io::Result<BTreeMap<String, String>> {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Document {
+        version: u32,
+        names: serde_json::Map<String, Value>,
+    }
+    let file = OpenOptions::new()
+        .read(true)
+        .custom_flags((rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK).bits() as i32)
+        .open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file()
+        || metadata.nlink() != 1
+        || metadata.uid() != rustix::process::geteuid().as_raw()
+        || metadata.mode() & 0o7777 != 0o600
+        || metadata.len() > 16_384
+    {
+        return Err(invalid(
+            "names must be an owned unlinked 0600 regular file at most 16384 bytes",
+        ));
+    }
+    let mut bytes = Vec::new();
+    file.take(16_385).read_to_end(&mut bytes)?;
+    let document: Document =
+        serde_json::from_slice(&bytes).map_err(|_| invalid("invalid names JSON"))?;
+    if document.version != 1 || document.names.len() > 32 {
+        return Err(invalid("names requires version 1 and at most 32"));
+    }
+    // A key twice is refused: the map read above keeps only the last.
+    if duplicate_key(&bytes) {
+        return Err(invalid("a name given twice"));
+    }
+    let mut names = BTreeMap::new();
+    for (alias, name) in document.names {
+        let Some(name) = name.as_str() else {
+            return Err(invalid("a name that is not text"));
+        };
+        if alias.is_empty()
+            || alias.len() > 40
+            || !alias
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+            || label_of(name).as_deref() != Some(name)
+        {
+            return Err(invalid("invalid name"));
+        }
+        names.insert(alias, name.to_owned());
+    }
+    Ok(names)
+}
+
+/// Whether `names` in a names file has a key twice, read from the bytes.
+fn duplicate_key(bytes: &[u8]) -> bool {
+    struct Keys;
+    impl<'de> serde::de::Visitor<'de> for Keys {
+        type Value = bool;
+        fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("a map")
+        }
+        fn visit_map<M: serde::de::MapAccess<'de>>(self, mut access: M) -> Result<bool, M::Error> {
+            let mut seen = BTreeSet::new();
+            let mut twice = false;
+            while let Some(key) = access.next_key::<String>()? {
+                twice |= !seen.insert(key);
+                access.next_value::<serde::de::IgnoredAny>()?;
+            }
+            Ok(twice)
+        }
+    }
+    struct Names(bool);
+    impl<'de> Deserialize<'de> for Names {
+        fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            struct Top;
+            impl<'de> serde::de::Visitor<'de> for Top {
+                type Value = bool;
+                fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    f.write_str("a names file")
+                }
+                fn visit_map<M: serde::de::MapAccess<'de>>(
+                    self,
+                    mut access: M,
+                ) -> Result<bool, M::Error> {
+                    let mut twice = false;
+                    while let Some(key) = access.next_key::<String>()? {
+                        if key == "names" {
+                            twice |= access.next_value_seed(KeysSeed)?;
+                        } else {
+                            access.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+                    Ok(twice)
+                }
+            }
+            deserializer.deserialize_map(Top).map(Names)
+        }
+    }
+    struct KeysSeed;
+    impl<'de> serde::de::DeserializeSeed<'de> for KeysSeed {
+        type Value = bool;
+        fn deserialize<D: serde::Deserializer<'de>>(
+            self,
+            deserializer: D,
+        ) -> Result<bool, D::Error> {
+            deserializer.deserialize_map(Keys)
+        }
+    }
+    serde_json::from_slice::<Names>(bytes).is_ok_and(|names| names.0)
+}
+
+/// A machine's name as a target alias: lower case letters and digits, one
+/// `-` between words, at most 32 bytes; `computer` when nothing is left.
+fn alias_of(label: &str) -> String {
+    let mut alias = String::new();
+    for c in label.chars() {
+        if c.is_ascii_alphanumeric() {
+            if alias.len() >= 32 {
+                break;
+            }
+            alias.push(c.to_ascii_lowercase());
+        } else if !alias.is_empty() && !alias.ends_with('-') {
+            alias.push('-');
+        }
+    }
+    let alias = alias.trim_end_matches('-');
+    if alias.is_empty() {
+        "computer".into()
+    } else {
+        alias.into()
+    }
+}
+
+/// What one write from the machines did, for the journal.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Written {
+    /// The targets file changed: written, or removed.
+    pub changed: bool,
+    pub said: String,
+}
+
+/// The file beside the targets that names what this part wrote there: the
+/// sha256 of each version it may have left, one a line.
+fn written_mark(path: &Path) -> PathBuf {
+    let mut name = path.as_os_str().to_owned();
+    name.push(".from-machines");
+    PathBuf::from(name)
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// Written beside and renamed over, 0600, synced: a reader sees the old
+/// file or the new one, never half of one.
+fn write_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let mut name = path.as_os_str().to_owned();
+    name.push(format!(".next-{}", std::process::id()));
+    let next = PathBuf::from(name);
+    let _ = fs::remove_file(&next);
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&next)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    fs::rename(&next, path)
+}
+
+/// Write the targets file from the person's machines (`serve
+/// --targets-from-machines`), only where the file is this part's to write:
+/// there is none, or it is one this part wrote (its sha256 is in the mark
+/// beside it). A file someone wrote by hand, or a pairing, is never
+/// touched. With no machine but the lamp, a file this part wrote is
+/// removed: there is no computer any more. The mark is written before the
+/// file, naming both the file there and the new one, so a stop between
+/// the two never leaves a file of its own looking like someone else's.
+pub fn write_targets_from_machines(
+    path: &Path,
+    machines: &[AccountMachine],
+    engine: EngineKind,
+) -> io::Result<Written> {
+    let said = |changed: bool, said: String| Ok(Written { changed, said });
+    let mark = written_mark(path);
+    let present = match fs::read(path) {
+        Ok(bytes) => Some(bytes),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error),
+    };
+    let marked = match fs::read_to_string(&mark) {
+        Ok(text) => text.lines().map(str::to_owned).collect::<Vec<_>>(),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(error),
+    };
+    if let Some(bytes) = &present
+        && !marked.contains(&sha256_hex(bytes))
+    {
+        return said(
+            false,
+            "the targets file was not written from the machines; it is left as it is".into(),
+        );
+    }
+    let (targets, names) = from_machines(machines, engine);
+    let names_file = names_path(path);
+    if targets.is_empty() {
+        if present.is_some() {
+            fs::remove_file(path)?;
+            let _ = fs::remove_file(&mark);
+            let _ = fs::remove_file(&names_file);
+            return said(
+                true,
+                "no machine but the lamp: the task targets written before are removed".into(),
+            );
+        }
+        return said(false, "no machine but the lamp: no task targets".into());
+    }
+    let mut bytes =
+        serde_json::to_vec(&json!({"version":1,"targets":targets})).map_err(io::Error::other)?;
+    bytes.push(b'\n');
+    let count = targets.len();
+    let targets_changed = present.as_deref() != Some(bytes.as_slice());
+    if targets_changed {
+        let new = sha256_hex(&bytes);
+        let lines = present
+            .as_deref()
+            .map(sha256_hex)
+            .into_iter()
+            .chain([new.clone()])
+            .collect::<Vec<_>>()
+            .join("\n");
+        write_atomically(&mark, format!("{lines}\n").as_bytes())?;
+        write_atomically(path, &bytes)?;
+        write_atomically(&mark, format!("{new}\n").as_bytes())?;
+    }
+    // The names beside them, only where the targets are this part's own.
+    let names_changed = keep_names(&names_file, &names)?;
+    let said_now = match (targets_changed, names_changed) {
+        (true, _) => format!("{count} task targets written from the machines"),
+        (false, true) => format!("{count} task targets from the machines, their names written"),
+        (false, false) => format!("{count} task targets from the machines, unchanged"),
+    };
+    said(targets_changed || names_changed, said_now)
+}
+
+/// The names file as `names` says: written whole when it differs, removed
+/// when there are none. Whether it changed.
+fn keep_names(path: &Path, names: &BTreeMap<String, String>) -> io::Result<bool> {
+    let present = match fs::read(path) {
+        Ok(bytes) => Some(bytes),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error),
+    };
+    if names.is_empty() {
+        if present.is_some() {
+            fs::remove_file(path)?;
+            return Ok(true);
+        }
+        return Ok(false);
+    }
+    let mut bytes =
+        serde_json::to_vec(&json!({"version":1,"names":names})).map_err(io::Error::other)?;
+    bytes.push(b'\n');
+    if present.as_deref() == Some(bytes.as_slice()) {
+        return Ok(false);
+    }
+    write_atomically(path, &bytes)?;
+    Ok(true)
+}
+
+/// The computers' names read again (`serve --set-up-later`): a missing
+/// names file is none, and one that is not valid is none too, said once,
+/// so the voice says what it says today (#1676).
+fn look_at_names(engine: &mut Engine<Store>, targets: &Path, said: &mut String) {
+    let (names, now) = match read_target_names(&names_path(targets)) {
+        Ok(names) => {
+            let count = names.len();
+            (names, format!("{count} computer names"))
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            (BTreeMap::new(), "no computer names".to_owned())
+        }
+        Err(error) => (
+            BTreeMap::new(),
+            format!("computer names not valid ({error}); none are told"),
+        ),
+    };
+    engine.set_names(names);
+    if now != *said {
+        eprintln!("tasks: {now}");
+        *said = now;
+    }
 }
 
 /// What makes a targets file another one: written again in place, or
@@ -1379,6 +1847,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                                 Outcome::Close(job, result)
                             }
                             Job::SignIn => Outcome::SignIn(adapter.signed_in()),
+                            Job::Machines => Outcome::Machines(adapter.machines()),
                         };
                         if outcomes_tx.try_send(result).is_err() {
                             break;
@@ -1470,7 +1939,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
             let ready = report.updated.elapsed() <= STALE_AFTER
                 && !owner.is_finished()
                 && !cli.is_finished();
-            if last_publish.is_none_or(|last| last.elapsed() >= Duration::from_secs(1))
+            if last_publish.is_none_or(|last| last.elapsed() >= config.report_every)
                 || last_ready != Some(ready)
             {
                 // The newest hand-over did not reach Harness: with no
@@ -1977,6 +2446,7 @@ mod tests {
             close_told: false,
             targets_newer: None,
             set_up_later: None,
+            report_every: REPORT_EVERY,
         };
         serve_with_adapter::<_, Never>(config, Never, Arc::new(AtomicBool::new(false)), |_| {
             panic!("adapter configured while disabled")
@@ -2069,5 +2539,204 @@ mod tests {
             .kind(),
             io::ErrorKind::InvalidInput
         );
+    }
+
+    fn machine(id: char, label: &str, current: bool) -> AccountMachine {
+        AccountMachine {
+            machine_id: id.to_string().repeat(32),
+            label: label.into(),
+            current,
+        }
+    }
+
+    /// #1676: the lamp itself is left out; the first is `office`, the
+    /// voice's own default; the rest by their names made into aliases,
+    /// each once; at most 8.
+    #[test]
+    fn targets_from_machines_name_the_first_office_and_the_rest_by_name() {
+        let listed = [
+            machine('a', "lamp", true),
+            machine('b', "Office iMac", false),
+            machine('c', "MacBook Air", false),
+            machine('d', "macbook   air!!", false),
+            machine('e', "", false),
+            machine('f', "Café PC — 2", false),
+        ];
+        let targets = targets_from_machines(&listed, EngineKind::Claude);
+        let aliases: Vec<_> = targets.keys().cloned().collect();
+        assert_eq!(
+            aliases,
+            [
+                "caf-pc-2",
+                "computer",
+                "macbook-air",
+                "macbook-air-2",
+                "office"
+            ]
+        );
+        assert_eq!(targets["office"].machine_id, "b".repeat(32));
+        assert_eq!(targets["macbook-air-2"].machine_id, "d".repeat(32));
+        assert!(
+            targets
+                .values()
+                .all(|target| target.engine == EngineKind::Claude
+                    && target.project == MACHINES_PROJECT
+                    && target.validate().is_ok())
+        );
+        let many: Vec<_> = "bcdefghij0"
+            .chars()
+            .map(|id| machine(id, "pc", false))
+            .collect();
+        let eight = targets_from_machines(&many, EngineKind::Codex);
+        assert_eq!(eight.len(), 8);
+        assert!(!eight.values().any(|t| t.machine_id == "0".repeat(32)));
+        assert!(
+            targets_from_machines(&[machine('a', "lamp", true)], EngineKind::Claude).is_empty()
+        );
+        let long = alias_of(&"x".repeat(80));
+        assert_eq!(long.len(), 32);
+    }
+
+    /// #1676: the part writes the targets file only where it is its own: none
+    /// there, or one it wrote. What it writes is read back as strictly as a
+    /// file a person wrote. A file someone else wrote is left as it is, and
+    /// with no machine but the lamp, its own file is removed.
+    #[test]
+    fn targets_are_written_from_machines_only_where_the_file_is_the_parts_own() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("targets.json");
+        let one = [
+            machine('a', "lamp", true),
+            machine('b', "Office iMac", false),
+        ];
+        let two = [
+            machine('a', "lamp", true),
+            machine('b', "Office iMac", false),
+            machine('c', "MacBook Air", false),
+        ];
+        let write = |listed: &[AccountMachine]| {
+            write_targets_from_machines(&path, listed, EngineKind::Claude).unwrap()
+        };
+        assert!(write(&one).changed);
+        let read = read_targets(&path).unwrap();
+        assert_eq!(read.keys().collect::<Vec<_>>(), ["office"]);
+        assert!(!write(&one).changed, "the same: not written again");
+        assert!(write(&two).changed);
+        assert_eq!(read_targets(&path).unwrap().len(), 2);
+        // A stop between the mark and the file: the mark names both, so the
+        // file there is still the part's own.
+        let bytes = fs::read(&path).unwrap();
+        fs::write(
+            written_mark(&path),
+            format!("{}\n{}\n", sha256_hex(&bytes), "0".repeat(64)),
+        )
+        .unwrap();
+        assert!(!write(&two).changed);
+        // No machine but the lamp: its own file goes.
+        assert!(write(&[machine('a', "lamp", true)]).changed);
+        assert!(!path.exists());
+        // A file someone wrote is never touched, then or later.
+        let theirs = br#"{"version":1,"targets":{"desk":{"machine_id":"cccccccccccccccccccccccccccccccc","project":"mine","engine":"codex"}}}"#;
+        fs::write(&path, theirs).unwrap();
+        for listed in [&one[..], &two[..], &[machine('a', "lamp", true)][..]] {
+            let written = write(listed);
+            assert!(!written.changed, "{written:?}");
+            assert_eq!(fs::read(&path).unwrap(), theirs);
+        }
+    }
+
+    /// #1676: each computer's own name, cleaned to a label of at most 64
+    /// bytes; none where nothing is left.
+    #[test]
+    fn names_from_machines_are_clean_labels_by_alias() {
+        let long = "Ä".repeat(40);
+        let listed = [
+            machine('a', "lamp", true),
+            machine('b', "  Office iMac\n", false),
+            machine('c', "MacBook Air", false),
+            machine('d', "", false),
+            machine('e', &long, false),
+        ];
+        let names = names_from_machines(&listed);
+        assert_eq!(names["office"], "Office iMac");
+        assert_eq!(names["macbook-air"], "MacBook Air");
+        assert!(!names.contains_key("computer"));
+        let cut = names.values().find(|name| name.starts_with('Ä')).unwrap();
+        assert_eq!(cut.len(), 64);
+        assert_eq!(cut.chars().count(), 32);
+    }
+
+    /// #1676: the names file is read as strictly as the targets; anything
+    /// else is an error, so the voice says what it says today.
+    #[test]
+    fn the_names_file_is_read_strictly() {
+        let dir = tempfile::tempdir().unwrap();
+        let targets = dir.path().join("targets.json");
+        let path = names_path(&targets);
+        assert_eq!(path, dir.path().join("targets.names.json"));
+        let put = |text: &str, mode: u32| {
+            let _ = fs::remove_file(&path);
+            fs::write(&path, text).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+        };
+        put(
+            r#"{"version":1,"names":{"office":"Office iMac","macbook-air":"MacBook Air"}}"#,
+            0o600,
+        );
+        let names = read_target_names(&path).unwrap();
+        assert_eq!(names.len(), 2);
+        assert_eq!(names["office"], "Office iMac");
+        let long = "x".repeat(65);
+        for bad in [
+            r#"{"version":2,"names":{"office":"Office iMac"}}"#.to_owned(),
+            r#"{"version":1,"names":{"office":"Office iMac"},"more":1}"#.to_owned(),
+            r#"{"version":1,"names":{"office":"A","office":"B"}}"#.to_owned(),
+            r#"{"version":1,"names":{"office":7}}"#.to_owned(),
+            r#"{"version":1,"names":{"office":" Office"}}"#.to_owned(),
+            r#"{"version":1,"names":{"office":"Office\u0007"}}"#.to_owned(),
+            r#"{"version":1,"names":{"office":""}}"#.to_owned(),
+            r#"{"version":1,"names":{"the office":"Office"}}"#.to_owned(),
+            format!(r#"{{"version":1,"names":{{"office":"{long}"}}}}"#),
+            "not json".to_owned(),
+        ] {
+            put(&bad, 0o600);
+            assert!(read_target_names(&path).is_err(), "{bad}");
+        }
+        put(r#"{"version":1,"names":{"office":"Office iMac"}}"#, 0o644);
+        assert!(read_target_names(&path).is_err(), "a file others may read");
+    }
+
+    /// #1676: the names go beside the targets the part writes, change when a
+    /// computer is renamed though its alias stays, and go with them; beside a
+    /// file someone else wrote, nothing is written.
+    #[test]
+    fn names_are_written_beside_the_parts_own_targets() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("targets.json");
+        let names = names_path(&path);
+        let write = |listed: &[AccountMachine]| {
+            write_targets_from_machines(&path, listed, EngineKind::Claude).unwrap()
+        };
+        assert!(
+            write(&[
+                machine('a', "lamp", true),
+                machine('b', "Office iMac", false)
+            ])
+            .changed
+        );
+        assert_eq!(read_target_names(&names).unwrap()["office"], "Office iMac");
+        let renamed = write(&[machine('a', "lamp", true), machine('b', "Studio", false)]);
+        assert!(renamed.changed, "{renamed:?}");
+        assert!(renamed.said.contains("their names written"), "{renamed:?}");
+        assert_eq!(read_target_names(&names).unwrap()["office"], "Studio");
+        assert!(!write(&[machine('a', "lamp", true), machine('b', "Studio", false)]).changed);
+        assert!(write(&[machine('a', "lamp", true), machine('b', "", false)]).changed);
+        assert!(!names.exists(), "no name left: no file");
+        assert!(write(&[machine('a', "lamp", true)]).changed);
+        assert!(!path.exists() && !names.exists());
+        let theirs = br#"{"version":1,"targets":{"desk":{"machine_id":"cccccccccccccccccccccccccccccccc","project":"mine","engine":"codex"}}}"#;
+        fs::write(&path, theirs).unwrap();
+        assert!(!write(&[machine('b', "Office iMac", false)]).changed);
+        assert!(!names.exists());
     }
 }

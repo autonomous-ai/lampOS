@@ -1750,6 +1750,119 @@ fn found_standing_it_is_taken_as_it_is_and_folds_down_when_asked_to_stop() {
     assert!(lamp.goals.iter().all(|write| write.len() == 3));
 }
 
+/// `--let-go-at-stop` (the factory's, #1682; the first builder on #1722,
+/// 19 Oct): a lamp found standing and asked to stop folds down first, as
+/// always, and only then is let go, torque off on all five, so that it can
+/// be read at rest. Without it the same stop keeps holding.
+#[test]
+fn asked_to_stop_standing_it_folds_first_and_only_then_lets_go_with_let_go_at_stop() {
+    for let_go_at_stop in [true, false] {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(1));
+        lamp.arm_moves = true;
+        for (index, at) in [(1usize, 2_650.0f32), (2, 2_600.0), (PITCH, 1_900.0)] {
+            lamp.servos[index].position = at;
+            lamp.servos[index].goal = at as u16;
+            lamp.servos[index].status = 0;
+        }
+        let report = run_standing(
+            &mut lamp,
+            &mut clock,
+            Limits {
+                let_go_at_stop,
+                ..Limits::FOLDED
+            },
+            Some(HOME),
+            Some(standing(100, 60)),
+            || Some((Mood::Resting, 0)),
+            |_| {},
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        // Down first, by its own way, whichever.
+        assert_eq!((lamp.servos[1].goal, lamp.servos[2].goal), (2_050, 2_047));
+        assert!((lamp.servos[1].position - 2_050.0).abs() <= 2.0);
+        assert_eq!(report.let_go_at_stop, let_go_at_stop);
+        if let_go_at_stop {
+            assert_eq!(report.torque_writes, 5, "{report:?}");
+            assert!(lamp.servos.iter().all(|servo| servo.torque == 0));
+        } else {
+            assert_eq!(report.torque_writes, 0);
+            assert!(lamp.servos.iter().all(|servo| servo.torque == 1));
+        }
+    }
+}
+
+/// The rule that keeps a standing arm from dropping (the reviewer's P2 on
+/// #1776): a lamp that did not get down keeps holding even with the option.
+/// Here the elbow stops 40 counts short of folded, which is no surprise (its
+/// goal step is 50) but is not down either.
+#[test]
+fn asked_to_stop_with_its_elbow_short_of_folded_it_keeps_holding_with_let_go_at_stop() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(1));
+    lamp.arm_moves = true;
+    for (index, at) in [(1usize, 2_650.0f32), (2, 2_600.0), (PITCH, 1_900.0)] {
+        lamp.servos[index].position = at;
+        lamp.servos[index].goal = at as u16;
+        lamp.servos[index].status = 0;
+    }
+    lamp.short = Some((2, 40.0));
+    let report = run_standing(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            let_go_at_stop: true,
+            ..Limits::FOLDED
+        },
+        Some(HOME),
+        Some(standing(100, 60)),
+        || Some((Mood::Resting, 0)),
+        |_| {},
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    // Told to fold, it got 40 short of it, and is left resting there.
+    assert!(lamp.servos[2].goal >= 2_080, "{}", lamp.servos[2].goal);
+    assert!(
+        lamp.servos[2].position >= 2_080.0,
+        "{}",
+        lamp.servos[2].position
+    );
+    assert!(!report.let_go_at_stop);
+    assert_eq!(report.torque_writes, 0, "{report:?}");
+    assert!(lamp.servos.iter().all(|servo| servo.torque == 1));
+}
+
+/// And a lamp folded at rest the whole run is let go at the stop with it,
+/// and held without it.
+#[test]
+fn asked_to_stop_folded_at_rest_it_lets_go_only_with_let_go_at_stop() {
+    let mut writes = Vec::new();
+    for let_go_at_stop in [true, false] {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(1));
+        let report = run_standing(
+            &mut lamp,
+            &mut clock,
+            Limits {
+                let_go_at_stop,
+                ..Limits::FOLDED
+            },
+            Some(HOME),
+            Some(standing(100, 60)),
+            || Some((Mood::Resting, 0)),
+            |_| {},
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        assert!(!report.stood);
+        assert_eq!(report.let_go_at_stop, let_go_at_stop);
+        writes.push(report.torque_writes);
+        assert_eq!(
+            lamp.servos.iter().all(|servo| servo.torque == 0),
+            let_go_at_stop
+        );
+    }
+    // The elbow's old flag has its torque written at start either way; the
+    // stop adds one torque off to each of the five.
+    assert_eq!(writes[0], writes[1] + 5, "{writes:?}");
+}
+
 #[test]
 fn a_flag_that_stays_or_a_missing_home_keeps_it_folded_and_it_runs_as_before() {
     // Torque on, then off and on: the flag is still there.

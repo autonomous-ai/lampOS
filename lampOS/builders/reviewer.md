@@ -34,6 +34,12 @@ Every ready pull request into `lamp-voice` (not a draft), oldest first.
      test shows that by comparing what the code does with and without it.
    - Its ARM64 run on the head is green. One that failed only in a test
      that has an open issue for being flaky may be re-run once.
+   - **A PR that changes only docs no build reads** (the docs' and the role
+     files' Markdown, the paths the ARM64 workflow skips for a pull
+     request; the project lead, 19 Oct 2026) has no ARM64 run: it merges
+     on your read alone. The docs that code or tests read (`switches.md`,
+     `memory.md`, `install.md`, `brain-build.md`, `endpoint-detection.md`,
+     `endpoint-pilot.md`) and every skill's `SKILL.md` still run.
    - It touches only what its builder's role file or its task gives it.
    - Its documents are changed in the same pull request and say what the
      code does.

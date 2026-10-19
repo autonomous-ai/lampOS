@@ -509,6 +509,7 @@ fn apply(
         EventKind::Voice(_) => "voice",
         EventKind::Heard => "heard_activity",
         EventKind::Air(_) => "air",
+        EventKind::Familiar(_) => "familiar",
     };
     let changed = engine.apply(
         now_us,

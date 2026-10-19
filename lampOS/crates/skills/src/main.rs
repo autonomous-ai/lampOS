@@ -42,9 +42,6 @@ const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
 /// How often the folder is looked at for a change.
 const RELOAD_EVERY: Duration = Duration::from_secs(2);
 const ACTIONS_TIMEOUT: Duration = Duration::from_secs(2);
-/// A say not begun by then is of no use: the moment has passed.
-/// ponytail: one value for every skill; a `say` field when one needs another.
-const SAY_EXPIRES_MS: u64 = 30_000;
 /// The longest the voice may take between two lines of an answer.
 const SAY_TIMEOUT: Duration = Duration::from_secs(180);
 /// The longest a tool call waits for the main loop, and for the voice's
@@ -1201,7 +1198,12 @@ fn tool_call(
     let made: Vec<Call> = run
         .calls
         .iter()
-        .filter(|call| !matches!(call, Call::Look | Call::Say(_) | Call::SayFrom(..)))
+        .filter(|call| {
+            !matches!(
+                call,
+                Call::Look | Call::Say(_) | Call::Words(_) | Call::SayFrom(..)
+            )
+        })
         .cloned()
         .collect();
     // Nothing but the wait for the say is nothing to make.
@@ -1529,8 +1531,10 @@ fn perform(
         calls
             .iter()
             .filter(|call| {
-                !matches!(call, Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. })
-                    && (glow.is_some() || before.is_some() || !is_light(call))
+                !matches!(
+                    call,
+                    Call::Say(_) | Call::Words(_) | Call::SayFrom(..) | Call::Sound { .. }
+                ) && (glow.is_some() || before.is_some() || !is_light(call))
             })
             .cloned()
             .collect()
@@ -1540,7 +1544,13 @@ fn perform(
     // keeps itself (#939); or to play the skill's own sound (#938), which
     // it plays at once or refuses at once, with why.
     let asking = calls.iter().find_map(|call| match call {
-        Call::Say(note) => Some(("say", json!({"note": note, "priority": 5}))),
+        Call::Say(note) => Some((
+            "say",
+            json!({"note": note, "priority": lamp_skills::SAY_PRIORITY}),
+        )),
+        // Its own words as written, or its note, at its priority and
+        // expiry (#1684): the text goes to the voice as it is in the file.
+        Call::Words(words) => Some(("say", words.ask())),
         Call::SayFrom(source, task) => {
             let mut ask = json!({"from": source.name(), "priority": source.priority()});
             // An item's run names its task: the voice gives it that task's
@@ -1557,7 +1567,12 @@ fn perform(
     // never begun, and nothing it brings is made either.
     if let Some(refused) = calls
         .iter()
-        .filter(|call| matches!(call, Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. }))
+        .filter(|call| {
+            matches!(
+                call,
+                Call::Say(_) | Call::Words(_) | Call::SayFrom(..) | Call::Sound { .. }
+            )
+        })
         .find_map(|call| sockets.may.refuses(call))
     {
         said.push(refused);
@@ -2099,7 +2114,9 @@ fn say(
         stream.set_write_timeout(Some(ACTIONS_TIMEOUT))?;
         let mut ask = asking.clone();
         ask["skill"] = json!(skill);
-        ask["expires_in_ms"] = json!(SAY_EXPIRES_MS);
+        if ask.get("expires_in_ms").is_none() {
+            ask["expires_in_ms"] = json!(lamp_skills::SAY_EXPIRES_MS);
+        }
         writeln!(stream, "{ask}")?;
         let mut lines = BufReader::new(stream.take(64 * 1_024));
         loop {
@@ -2250,7 +2267,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             format!("{first}, held {} s", lasting_us / 1_000_000)
         }
         Call::Show { name, .. } => format!("show {name}: made by its own step"),
-        Call::Say(_) | Call::SayFrom(..) => "say: made by its own step".into(),
+        Call::Say(_) | Call::Words(_) | Call::SayFrom(..) => "say: made by its own step".into(),
         Call::Sound { .. } => "sound: made by its own step".into(),
         Call::Look => "look: the voice's, asked in the call's answer".into(),
         Call::AfterSay => "after the say".into(),

@@ -28,7 +28,9 @@
 //! that only the lamp's own programs can enter.
 use crate::ring_wire::RingPhase;
 use lamp_bus::{Bus, Publisher};
-use lamp_msgs::{LinkFault, Room, RoomState, Speech, Voice, VoiceLink, VoiceState};
+use lamp_msgs::{
+    LinkFault, Room, RoomState, Speech, TurnVerdict, Voice, VoiceLink, VoiceState, VoiceTurn,
+};
 use std::{
     io,
     path::{Path, PathBuf},
@@ -115,6 +117,30 @@ impl RoomOut {
             crate::room_told::Room::Busy => Room::Busy,
         };
         let _ = self.room.publish_json(now_us, &RoomState { state });
+    }
+}
+
+/// Each turn's verdict (`voice/turn`, #1155), from the process that
+/// reaches it: answered, or its answer held back as not said to the lamp.
+/// The Policy's hello counts only turns to the lamp toward its quiet.
+pub struct TurnOut {
+    turn: Publisher,
+}
+
+impl TurnOut {
+    pub fn on(root: &Path) -> io::Result<Self> {
+        let bus = Bus::new(root)?;
+        Ok(Self {
+            turn: bus.publisher_declared(VoiceTurn::TOPIC, &VoiceTurn::declaration(), SOURCE)?,
+        })
+    }
+
+    /// Says `request`'s verdict, once, as it is reached. A send that
+    /// fails changes nothing for the voice.
+    pub fn tell(&mut self, request: u64, verdict: TurnVerdict, now_us: u64) {
+        let _ = self
+            .turn
+            .publish_json(now_us, &VoiceTurn { request, verdict });
     }
 }
 

@@ -203,6 +203,22 @@ fn isolated_signal_child() {
             json!({"kind":"run_start","at_us":monotonic_us(),"scope":"synthetic_service_signal"}),
         )
         .unwrap();
+        // The trace's writer, written once before the run is said ready. In
+        // this re-executed test binary, with the module's tests in parallel,
+        // its first write came late (563 ms in one run, its later ones in
+        // microseconds), and a stop soon after found the stop's 500 ms finish
+        // wait over with the run's rows still queued: the trace held only
+        // `run_start`, never `run_end`. 8 of 15 runs of `termination::`
+        // failed so, and none of 15 with this (#1569 row 30).
+        trace.flush(&mut None, monotonic_us());
+        let written_by = Instant::now() + Duration::from_secs(5);
+        while trace.written_events() == 0 {
+            assert!(
+                Instant::now() < written_by,
+                "the trace's writer never wrote"
+            );
+            thread::sleep(Duration::from_millis(1));
+        }
         if mode == "serve-muted" {
             return muted_signal_child(output, termination, trace);
         }
@@ -670,6 +686,108 @@ fn speaker_finish_failure(speaker_late: bool, capture_late: bool) -> (String, Ve
         .map(|row| row["worker"].clone())
         .collect();
     (result.unwrap_err().to_string(), forced)
+}
+
+/// A later child can exit while native reaping of an earlier child is in
+/// progress. Its old polling result must not trigger another forced stop.
+#[test]
+fn capture_exiting_during_speaker_reap_is_not_forced() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
+    let dir = SessionDirectory::create().unwrap();
+    let (mut speaker, _speaker_peer) = Worker::sleeping_fixture(&dir.path, "speaker");
+    let (mut capture, _capture_peer, capture_input) =
+        Worker::cooperative_ready_fixture(&dir.path, "capture");
+    let (mut provider, _provider_peer, provider_input) =
+        Worker::cooperative_ready_fixture(&dir.path, "provider");
+    let (mut privacy, _privacy_peer, privacy_input) =
+        Worker::cooperative_ready_fixture(&dir.path, "privacy");
+    provider.end_on_stop(provider_input);
+    privacy.end_on_stop(privacy_input);
+    let capture_pid = capture.fixture_pid();
+    speaker.after_terminate(move || {
+        drop(capture_input);
+        // Observe with WNOWAIT: only Rig::shutdown may reap this child.
+        crate::scenario_clock::wait_child_exited(
+            capture_pid,
+            Instant::now() + Duration::from_secs(5),
+        )
+        .unwrap();
+    });
+    let capture_terminations = Arc::new(AtomicUsize::new(0));
+    let observed = capture_terminations.clone();
+    capture.after_terminate(move || {
+        observed.fetch_add(1, Ordering::SeqCst);
+    });
+    let mut rig = Rig {
+        second: None,
+        microphone: crate::options::Microphone::Mic2,
+        end_silence_blocks: None,
+        early_end_blocks: None,
+        faint_level: None,
+        camera: None,
+        motor: None,
+        provider,
+        capture,
+        speaker,
+        privacy,
+        privacy_controls: false,
+        ring: None.into(),
+        ring_channel_ceiling: None,
+        diagnostic_directory: None,
+        noise_suppression: NoiseSuppression::On,
+        turn_taking: TurnTaking::VadOnly,
+        playout_start: PlayoutStart::default(),
+        fixture_at_ms: None,
+        endpoint: None,
+        call_wait_blocks: None,
+        cut_keeps_name: false,
+        asker_first: crate::asker_first::Mode::Off,
+        follows_on: false,
+        paused: Box::new(|| false),
+    };
+    let (mut owner, current, _) = active_reply();
+    let mut reply = Some(current);
+    let mut trace = SessionState::default();
+    let stopped: Result<()> = Err(io::Error::new(
+        io::ErrorKind::Interrupted,
+        "directed run interrupted by SIGTERM",
+    )
+    .into());
+    let error = finish_active_run(
+        &mut rig, &mut owner, &mut reply, &mut trace, &mut None, stopped,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("speaker worker"), "{error}");
+    assert!(
+        error.to_string().contains("forced termination required"),
+        "{error}"
+    );
+    assert_eq!(capture_terminations.load(Ordering::SeqCst), 0);
+    let forced: Vec<_> = trace
+        .iter()
+        .filter(|row| row["kind"] == "worker_forced_shutdown")
+        .map(|row| row["worker"].clone())
+        .collect();
+    assert_eq!(forced, [json!("speaker")]);
+    assert!(!trace.iter().any(|row| row["kind"] == "worker_exit_failed"));
+    for worker in [
+        &mut rig.speaker,
+        &mut rig.capture,
+        &mut rig.provider,
+        &mut rig.privacy,
+    ] {
+        assert!(worker.try_exit().unwrap().is_some(), "{}", worker.role);
+    }
+    assert_eq!(rig.capture.try_exit().unwrap().unwrap().code(), Some(0));
+    assert!(reply.is_none());
+    assert_eq!(
+        owner.snapshot(now()).unwrap().microphone_permission(),
+        Permission::Denied
+    );
 }
 
 fn service_signal_child(output: PathBuf, termination: Termination, mut trace: SessionState) {

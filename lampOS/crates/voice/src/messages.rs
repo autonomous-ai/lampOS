@@ -80,6 +80,11 @@ pub const REQUESTS_FROM: u64 = 1 << 48;
 /// (`agent_tasks::may_confirm`, [`same_chat`]).
 pub const CHAT_BITS: u32 = 24;
 
+/// Whether `request` is a text's, not a spoken one.
+pub fn is_text(request: u64) -> bool {
+    request >= REQUESTS_FROM
+}
+
 /// Whether requests `a` and `b` are both texts of the same chat.
 pub fn same_chat(a: u64, b: u64) -> bool {
     a >= REQUESTS_FROM

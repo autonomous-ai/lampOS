@@ -87,6 +87,7 @@ struct Link {
     socket: UnixDatagram,
     delivered: u64,
     dropped: u64,
+    guarded_dead: bool,
 }
 
 enum Sent {
@@ -114,6 +115,120 @@ impl Link {
             };
         }
     }
+}
+
+/// Sensitive events use separate, bounded storage, never Publisher.datagram.
+/// Clearing is best effort in ordinary process memory, not a hard retention
+/// deadline and not revocation of bytes copied by the kernel or a receiver.
+struct SensitiveDatagram {
+    bytes: Box<[u8]>,
+    len: usize,
+    #[cfg(test)]
+    scrubbed: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+}
+
+impl SensitiveDatagram {
+    fn new() -> Self {
+        Self {
+            bytes: vec![0; wire::MOST_BYTES].into_boxed_slice(),
+            len: 0,
+            #[cfg(test)]
+            scrubbed: None,
+        }
+    }
+
+    fn encode(&mut self, header: &wire::Header, payload: &[u8]) -> io::Result<()> {
+        let mut output = io::Cursor::new(self.bytes.as_mut());
+        serde_json::to_writer(&mut output, header)?;
+        output.write_all(b"\n")?;
+        output.write_all(payload)?;
+        self.len = output.position() as usize;
+        Ok(())
+    }
+
+    fn as_bytes(&self) -> &[u8] {
+        &self.bytes[..self.len]
+    }
+
+    fn scrub(&mut self) {
+        // Clear the whole allocation, including partially encoded errors.
+        self.bytes.fill(0);
+        std::hint::black_box(self.bytes.as_mut());
+        self.len = 0;
+    }
+}
+
+impl Drop for SensitiveDatagram {
+    fn drop(&mut self) {
+        self.scrub();
+        #[cfg(test)]
+        if let Some(observed) = &self.scrubbed {
+            observed.store(self.bytes.iter().all(|byte| *byte == 0), Ordering::SeqCst);
+        }
+    }
+}
+
+fn authority_lost() -> io::Error {
+    io::Error::new(
+        io::ErrorKind::PermissionDenied,
+        "sensitive event authority revoked",
+    )
+}
+
+/// At most two syscall attempts per destination, each with a fresh check.
+/// An arbitrary callback can itself block: callers must provide a pure,
+/// bounded check. A syscall/preemption after the check is not revocable.
+fn guarded_attempt(
+    authorized: &mut impl FnMut() -> bool,
+    mut send: impl FnMut() -> io::Result<usize>,
+) -> io::Result<Sent> {
+    for _ in 0..2 {
+        if !authorized() {
+            return Err(authority_lost());
+        }
+        match send() {
+            Ok(_) => return Ok(Sent::Delivered),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => {
+                return Ok(match error.kind() {
+                    io::ErrorKind::ConnectionRefused | io::ErrorKind::NotFound => Sent::Dead,
+                    _ if error.raw_os_error() == Some(MESSAGE_TOO_LONG) => Sent::TooLong,
+                    _ => Sent::Dropped,
+                });
+            }
+        }
+    }
+    Ok(Sent::Dropped)
+}
+
+/// Shared by the real nonblocking sockets and deterministic adversarial tests.
+fn guarded_fanout(
+    destinations: usize,
+    authorized: &mut impl FnMut() -> bool,
+    mut send: impl FnMut(usize) -> io::Result<usize>,
+) -> (Published, Option<io::Error>) {
+    let mut outcome = Published::default();
+    for index in 0..destinations {
+        let sent = match guarded_attempt(authorized, || send(index)) {
+            Ok(sent) => sent,
+            Err(error) => return (outcome, Some(error)),
+        };
+        match sent {
+            Sent::Delivered => outcome.delivered += 1,
+            Sent::Dropped => outcome.dropped += 1,
+            Sent::Dead => outcome.removed += 1,
+            Sent::TooLong => {
+                return (
+                    outcome,
+                    Some(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "sensitive event exceeds socket datagram limit",
+                    )),
+                );
+            }
+        }
+    }
+    (outcome, None)
 }
 
 pub struct Publisher {
@@ -376,6 +491,131 @@ impl Publisher {
         })
     }
 
+    /// Discover subscribers and refresh presence for guarded event publication.
+    /// This can perform blocking filesystem work. Call it before obtaining a
+    /// sensitive payload; it grants no authority and handles no payload bytes.
+    /// Guarded publication itself never scans or writes presence/latest files.
+    pub fn prepare_guarded_event(&mut self) -> io::Result<()> {
+        if self.header.kind != wire::Kind::Event {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "guarded publication requires an event topic",
+            ));
+        }
+        self.trouble = None;
+        for link in &self.links {
+            if link.guarded_dead {
+                let _ = fs::remove_file(&link.path);
+            }
+        }
+        self.links.retain(|link| !link.guarded_dead);
+        let now = (self.cadence_now)();
+        if self
+            .scanned
+            .is_none_or(|last| now.saturating_duration_since(last) >= self.rescan_every)
+        {
+            self.scan(now);
+        }
+        if self.due(now) || self.unlisted {
+            self.show(now)?;
+        }
+        self.trouble.take().map_or(Ok(()), Err)
+    }
+
+    /// Publish sensitive bytes to the event subscribers already discovered.
+    /// Call `prepare_guarded_event` separately, before borrowing the payload.
+    /// `authorized` must be a pure bounded check of the original permit and
+    /// current revocation fence, not a renewed lease. It is checked before and
+    /// after encoding and immediately before each send and bounded retry.
+    ///
+    /// PermissionDenied may follow partial delivery; totals include sends that
+    /// already succeeded. No filesystem work occurs after encoding, no latest
+    /// value is written, and encoded bytes never enter the reusable datagram.
+    /// Temporary encoded storage is scrubbed on return or unwinding. This is
+    /// not hard-deadline erasure: thread suspension, syscall/kernel buffering,
+    /// receiver copies and the caller's original buffer are outside this API.
+    pub fn publish_bytes_guarded(
+        &mut self,
+        at_us: u64,
+        enc: &str,
+        bytes: &[u8],
+        mut authorized: impl FnMut() -> bool,
+    ) -> io::Result<Published> {
+        if self.header.kind != wire::Kind::Event {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "guarded publication requires an event topic",
+            ));
+        }
+        name::encoding(enc)?;
+        if bytes.len() > wire::MOST_BYTES || enc == wire::NONE && !bytes.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "invalid sensitive event payload length or encoding",
+            ));
+        }
+        if !authorized() {
+            return Err(authority_lost());
+        }
+        let sequence = self
+            .seq
+            .checked_add(1)
+            .ok_or_else(|| io::Error::other("publisher sequence exhausted"))?;
+        let mut header = self.header.clone();
+        header.enc = enc.into();
+        header.seq = sequence;
+        header.at_us = at_us;
+        header.at_unix_ms = wire::unix_ms();
+        let mut datagram = SensitiveDatagram::new();
+        datagram.encode(&header, bytes)?;
+        if !authorized() {
+            return Err(authority_lost());
+        }
+        // Accepted before fanout: a later revocation must never reuse a
+        // sequence already observed by an earlier destination.
+        self.seq = sequence;
+        self.totals.published += 1;
+        let mut destinations = [0usize; MOST_SUBSCRIBERS];
+        let mut count = 0;
+        for (index, link) in self.links.iter().enumerate() {
+            if !link.guarded_dead {
+                destinations[count] = index;
+                count += 1;
+            }
+        }
+        let mut attempts = [0u8; MOST_SUBSCRIBERS];
+        let (outcome, error) = guarded_fanout(count, &mut authorized, |destination| {
+            let index = destinations[destination];
+            attempts[index] += 1;
+            let link = &mut self.links[index];
+            let result = link.socket.send_to(datagram.as_bytes(), &link.path);
+            match &result {
+                Ok(_) => link.delivered += 1,
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::ConnectionRefused | io::ErrorKind::NotFound
+                    ) =>
+                {
+                    link.guarded_dead = true
+                }
+                Err(error)
+                    if error.kind() != io::ErrorKind::Interrupted || attempts[index] == 2 =>
+                {
+                    link.dropped += 1
+                }
+                _ => {}
+            }
+            result
+        });
+        self.totals.delivered += outcome.delivered as u64;
+        self.totals.dropped += outcome.dropped as u64;
+        match error {
+            Some(error) => Err(error),
+            None => Ok(outcome),
+        }
+    }
+
     fn publish(
         &mut self,
         at_us: u64,
@@ -525,6 +765,7 @@ impl Publisher {
                         socket,
                         delivered: 0,
                         dropped: 0,
+                        guarded_dead: false,
                     });
                     found += 1;
                 }
@@ -641,3 +882,7 @@ mod tests {
 #[cfg(test)]
 #[path = "publisher_clock_tests.rs"]
 mod clock_tests;
+
+#[cfg(test)]
+#[path = "guarded_publish_tests.rs"]
+mod guarded_tests;

@@ -1496,8 +1496,27 @@ impl Rig {
                 .enumerate()
                 {
                     if !exited[index] {
-                        let error = worker.terminate_and_reap(io::ErrorKind::TimedOut,
-                            format!("did not stop within shared {} ms deadline; forced termination required", grace.as_millis()));
+                        // Reaping an earlier worker can take time. A later
+                        // worker may have exited since this pass last polled it.
+                        let error = match worker.try_exit() {
+                            Ok(Some(status)) => {
+                                if let Err(error) = worker.exit_result(status) {
+                                    let _ = record(
+                                        trace,
+                                        json!({"kind":"worker_exit_failed", "worker":worker.role,
+                                        "at_us":monotonic_us(), "error":error.to_string()}),
+                                    );
+                                    failure.push(CleanupStage::WorkerExit, &worker.role, error);
+                                }
+                                continue;
+                            }
+                            Ok(None) => worker.terminate_and_reap(io::ErrorKind::TimedOut,
+                                format!("did not stop within shared {} ms deadline; forced termination required", grace.as_millis())),
+                            Err(error) => worker.terminate_and_reap(
+                                io::ErrorKind::Other,
+                                format!("shutdown status failed at deadline: {error}"),
+                            ),
+                        };
                         let _ = record(
                             trace,
                             json!({"kind":"worker_forced_shutdown", "worker":worker.role,
@@ -7918,9 +7937,11 @@ fn conversation_with_gate(
             } else if arrival.speaks() {
                 // By name: someone who asked the lamp to know their face,
                 // else the name typed at setup (`LAMP_PERSON_NAME`, #806).
-                let by_name = crate::person::hello_for(
+                // One beat warmer for someone who comes by often (#1670).
+                let by_name = crate::person::hello_for_familiar(
                     crate::known_faces::known_from_environment().as_deref(),
                     crate::person::from_environment().as_deref(),
+                    arrival.familiar(),
                 );
                 snapshot = commit_written_turn(
                     owner,

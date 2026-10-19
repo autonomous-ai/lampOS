@@ -56,6 +56,8 @@ mod controls;
 pub use controls::*;
 mod ears;
 pub use ears::*;
+mod sound_classes;
+pub use sound_classes::*;
 mod air;
 pub use air::*;
 mod schedule;
@@ -86,6 +88,10 @@ mod chat;
 pub use chat::*;
 mod presence;
 pub use presence::*;
+mod reports;
+pub use reports::*;
+mod familiar;
+pub use familiar::*;
 
 /// Why a message is not one its type allows, in words.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -541,6 +547,44 @@ impl RoomState {
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
     }
+}
+
+/// What the voice made of a turn: answered, or its answer held back as not
+/// said to the lamp.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TurnVerdict {
+    /// Judged said to the lamp: its answer is let out.
+    Answered,
+    /// Judged not said to the lamp (the journal's "its answer is held
+    /// back"): someone in the room talking, not to it.
+    HeldBack,
+}
+
+/// The voice's verdict on a turn (`voice/turn`, #1155), once a turn, as it
+/// is reached: whether the lamp answers it or holds its answer back. The
+/// Policy's hello counts only turns to the lamp toward its quiet.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VoiceTurn {
+    /// The turn's request, as `voice/heard` and `voice/said` number it.
+    pub request: u64,
+    pub verdict: TurnVerdict,
+}
+
+impl VoiceTurn {
+    pub const TYPE: &str = "lamp_msgs/VoiceTurn";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "voice/turn";
+
+    /// One a turn, as its verdict is reached: no period is promised.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
+/// The voice's turns' verdicts (#1155), apart from the first topics.
+pub fn turn_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(VoiceTurn::TOPIC, VoiceTurn::declaration())]
 }
 
 /// The lamp's own light: what is asked for (`light/command`) and what is
@@ -1096,6 +1140,12 @@ pub struct Rules {
     /// News the lamp brings unasked: progress and results of work (#765).
     #[serde(default)]
     pub news: Unprompted,
+    /// Asked to keep the light on (#1677): the light does not go out when
+    /// nobody is there. The room's, whoever asked. Absent from an older
+    /// voice's message: not asked. Written only when true, so a message
+    /// that holds nothing about the light is as before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub keep_light_on: bool,
 }
 
 /// When the lamp was asked not to say one kind of thing unprompted, every
@@ -1293,6 +1343,11 @@ pub fn stop_topics() -> Vec<(&'static str, Declaration)> {
     vec![(StopHeard::TOPIC, StopHeard::declaration())]
 }
 
+/// Semantic room sound is separate from the original topics and level/onset.
+pub fn sound_class_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(SoundClasses::TOPIC, SoundClasses::declaration())]
+}
+
 pub fn declaration_of(topic: &str) -> Option<Declaration> {
     first_topics()
         .into_iter()
@@ -1312,10 +1367,14 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(skills_topics())
         .chain(online_topics())
         .chain(arrival_topics())
+        .chain(turn_topics())
         .chain(skill_ask_topics())
         .chain(privacy_topics())
+        .chain(sound_class_topics())
         .chain(chat_topics())
         .chain(presence_topics())
+        .chain(reports_topics())
+        .chain(familiar_topics())
         .find_map(|(name, declaration)| (name == topic).then_some(declaration))
 }
 
@@ -1618,6 +1677,41 @@ mod tests {
             round_trip(&RoomState { state }, &format!("{{\"state\":\"{word}\"}}"));
         }
         assert!(serde_json::from_str::<RoomState>("{\"state\":\"loud\"}").is_err());
+    }
+
+    /// #1155: a turn's verdict, as the Policy's hello reads it.
+    #[test]
+    fn a_turn_is_answered_or_held_back() {
+        for (verdict, word) in [
+            (TurnVerdict::Answered, "answered"),
+            (TurnVerdict::HeldBack, "held_back"),
+        ] {
+            round_trip(
+                &VoiceTurn {
+                    request: 7,
+                    verdict,
+                },
+                &format!("{{\"request\":7,\"verdict\":\"{word}\"}}"),
+            );
+        }
+        assert!(
+            serde_json::from_str::<VoiceTurn>("{\"request\":7,\"verdict\":\"ignored\"}").is_err()
+        );
+        assert_eq!(VoiceTurn::declaration().kind, Kind::Event);
+        // Its own topic, apart from the first, and known by name.
+        assert_eq!(
+            turn_topics(),
+            [(VoiceTurn::TOPIC, VoiceTurn::declaration())]
+        );
+        assert!(
+            first_topics()
+                .iter()
+                .all(|(topic, _)| *topic != VoiceTurn::TOPIC)
+        );
+        assert_eq!(
+            declaration_of(VoiceTurn::TOPIC),
+            Some(VoiceTurn::declaration())
+        );
     }
 
     #[test]
@@ -2072,6 +2166,7 @@ mod tests {
                     not_while_talking: true,
                     ..Unprompted::default()
                 },
+                keep_light_on: false,
             },
             "{\"person\":\"p-be9688998f085098\",\"quiet\":false,\"quiet_mornings\":true,\"rules\":2,\
              \"hello\":{\"never\":false,\"not_before_minute\":540,\"not_from_minute\":null,\"not_while_talking\":false},\

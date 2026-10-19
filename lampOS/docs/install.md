@@ -221,7 +221,8 @@ from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`) that
 the product doesn't run, and its marks, called only after its look; and
 Light out when you leave (#1677, [presence.md](presence.md)), which reads
 the eyes' `room/presence`, off in the product (`LAMP_PRESENCE`) until its
-lamp check. A test
+lamp check; and Not feeling well (#1681), the droop and dim on
+`lamp/health`'s `error`, until its lamp check. A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
 product lamp tells each session 31 functions of the 32 a session takes
 (`lamp_gemini::MAX_TOOLS`): the voice's own 13, the actions part's 17 and
@@ -567,6 +568,48 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    records nothing, so the next install asks again, and is said; it is taken to the Harness team, not worked around. How a
    home lamp's Harness signs in is theirs too.
 
+   **Put on by `lamp-update harness-on`** (as root, #1676 B5; the first
+   builder and the lead, 19 Oct 10:41: Harness's own installer). On a lamp
+   lampOS is installed on (it refuses without `/var/lib/lampos-update`),
+   with no Harness at `/usr/local/bin/harness`, these steps, in order:
+   `id -u lampos`; `/var/lib/lampos-tasks` made `lampos`'s own (0700);
+   Harness's installer as `lampos` with `HOME=/var/lib/lampos-tasks`,
+   `XDG_RUNTIME_DIR`, `PATH=/usr/local/bin:/usr/bin:/bin` and
+   `SHELL=/bin/sh`: `curl -fsSL --proto =https --tlsv1.2
+   https://cdn.autonomous.ai/harness/cli/install.sh | sh`, the address its
+   header names. Then `test -x` of the launcher it writes,
+   `/var/lib/lampos-tasks/.local/bin/harness`, then `ln -sfn` of it at
+   `/usr/local/bin/harness`.
+   - **What the installer does** (read from `cli/scripts/install.sh`, not
+     ours): per user, with no root and no question. Node, tmux and the CLI
+     go under `~/.harness`, each checked against Harness's sha256 metadata.
+     The launcher is a two-line script that runs `~/.harness/cli/cli.js`,
+     so Harness's own updates change `cli.js` and never the launcher that
+     `lamp-tasks` checks (its executable identity). With `SHELL=/bin/sh` its
+     one PATH line goes into `~/.profile` in that home.
+   - **What it trusts** (the reviewer on #1777): a script fetched from
+     `cdn.autonomous.ai` runs as `lampos`, the user every lampOS part runs
+     as, and its sha256 checks come from the same CDN, so they guard against
+     a bad download, not a bad CDN. That's the installer the first builder
+     and the lead chose (19 Oct 10:41), as Harness's team publishes it.
+   - **Then:** Harness at boot as above, with its record, unless already
+     recorded; then `systemctl restart lamp-tasks.service`, only when
+     something changed.
+   - **Safe to repeat:** a Harness already at `/usr/local/bin/harness`, put
+     there by hand or by an earlier run, is kept as it is and never
+     installed over. Run again, it changes nothing and restarts nothing.
+   - **A failing step stops there,** before the link, so a lamp is never
+     left with a link to nothing. Nothing is recorded, and the next run
+     starts again.
+   - **Signing in is the person's,** not done here. Harness's box ticket
+     (`harness login --ticket`) is the way for a lamp, once the app hands it
+     one (openharness#1410).
+   - **Shown only in tests** (`crates/update/tests/install.rs`): the steps
+     in their order through stand-ins; a Harness already there kept; each
+     failing step leaving no link and no record; run again, nothing. Its
+     lamp check needs a person's `sudo` on a lamp without Harness
+     (lamp-75c9).
+
    **Undone by `lamp-update harness-off`** (as root, #811; the first
    builder's yes on #705, 18 Oct): with that record, as `lampos` with the
    same `HOME` and `XDG_RUNTIME_DIR`, the Harness CLI's own `harness service
@@ -752,6 +795,32 @@ lamp-update check-units --cat units.txt --product lampOS/deploy/product
     it is copied there by hand, and journald reads it when it next starts,
     at the next boot. `journalctl --vacuum-size=20M` shrinks the journal at
     once, with no restart of anything.
+- The night's copy-back of the logs leaves the journal alone:
+  `robots/lamp/rootfs/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf`
+  runs `usr/local/libexec/lamp-ramlog-postrotate` in place of the base's
+  `orangepi-ramlog postrotate` (#1178).
+  - **Why:** at 00:00 the base's `logrotate.service` copies the `/var/log`
+    RAM disk to `/var/log.hdd` (`orangepi-ramlog write`), runs logrotate,
+    then writes every file of `/var/log.hdd` back over its `/var/log` twin
+    with `cat file > dest`. The journal is among them, so journald's open
+    `system.journal` was overwritten in place with the copy taken seconds
+    before. On lamp-4ace at 00:00 on 19 Oct, every read of it said
+    "truncated, ignoring file" until a `journalctl --rotate` at 00:11, and
+    the voice's lines in between were lost. That's read from the base's
+    scripts (on lamp-75c9), not yet reproduced.
+  - **What changes:** the same copy-back, with `/var/log.hdd/journal` left
+    out. The rotated text logs still come back to the RAM disk, and the
+    journal is still copied to the eMMC each night by `write`. Off when
+    `/etc/default/orangepi-ramlog` says `ENABLED` isn't `true`, as the base.
+    `orangepi-truncate-logs` (over 75% of `/var/log`) runs logrotate without
+    the service, so it never copies back.
+  - **Tests:** `lamp-update`'s `tests/image_ramlog.rs` runs the script on a
+    copy shaped as the lamp's (the journal kept, the text logs copied,
+    compressed and numbered ones left out); a copy-back that names the
+    journal fails it.
+  - **Existing lamps:** only a newly imaged lamp has it (#1369), as for the
+    journal's size above. On a lamp in use the two files are copied by hand,
+    then `sudo systemctl daemon-reload`.
 - Which group may read the GPIO chips and the I²C bus on the base image was
   not checked.
 - `lamp-surround` was not read beyond its unit, and `lamp-records` has two

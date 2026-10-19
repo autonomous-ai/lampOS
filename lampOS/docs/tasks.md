@@ -459,7 +459,7 @@ started once its answer is told:
 | Push (`--push-wait`) | One `wait` held per machine with watched tasks, on at most 64 agents, 600 s each (killed at 630 s), beside the CLI worker; the next on a machine no sooner than 3 s after one came back with an end, 30 s after one failed; a pushed task left out until the watch reads it again; 64 KiB stdout |
 | Private persistence | 8 MiB snapshot, 32 MiB database, 40 MiB journal; 4,096-byte pages |
 | SQLite | DELETE journal, FULL sync, fullfsync requested, 2 MiB cache, 50 ms busy wait, no mmap/WAL |
-| Diagnostics | Once a second, with early readiness changes; owner stale after 1,500 ms |
+| Diagnostics | Once a second (`report_every`; tests pass less), with early readiness changes; owner stale after 1,500 ms |
 
 There are seven service threads including main: four clients, the storage
 owner and the CLI worker. Clients never run Harness. The CLI worker never
@@ -660,10 +660,79 @@ are off:
 - **Without the switch** nothing of this is said or read, and the part
   starts, stops and reports as before.
 
-Not yet: writing `targets.json` from `harness machines --json` (#1676 B6
-step 3, which waits on the first builder's word on aliases), installing
-Harness (`lamp-update harness-on`, B5) and signing in a lamp with no
-screen (openharness#1410).
+- **Targets written from the person's machines** (`--targets-from-machines
+  ENGINE`, only with `--set-up-later`; off unless set, #1676 B6 step 3).
+  While Harness is signed in (`signed_in` `yes`, not `offline`), every five
+  looks (five minutes on a lamp, after everything else on the Harness
+  worker), the part runs `harness machines --json` and writes
+  `targets.json` from it:
+  - **which:** every machine but the lamp itself (Harness's `current`), at
+    most 8, newest first as Harness lists them;
+  - **aliases:** the first is `office`, the alias the voice asks for unless
+    `LAMP_TASKS_TARGET` names another, so today's voice finds it with no
+    change. Each other is its Harness name (else its hostname) made into an
+    alias: lower case letters and digits, `-` between words, at most 32
+    bytes (`MacBook Air` is `macbook-air`), `computer` with nothing left,
+    and `-2`, `-3` … where two would be the same;
+  - **each target:** the machine's id, the folder `~/harnesses/lamp-tasks`
+    (lamp-4ace's today; Harness makes it the first time) and `ENGINE`
+    (`claude`, `codex` or `opencode`), until Harness says which engines a
+    machine has (openharness#1410's question 2).
+
+  **Never over someone else's file.** The part writes only where there's
+  no file, or the file is one it wrote: `targets.json.from-machines`
+  beside it holds the sha256 of what it wrote. A file a person or a
+  pairing wrote is left as it is, and the journal says so once. The mark
+  is written before the file and names both the old and the new, so a stop
+  between the two never makes the part's own file look like someone
+  else's. Each write goes beside the file, synced, then renamed over it,
+  0600. With no machine but the lamp, the part removes its own file: no
+  computer again. The file is read back by the look above, at once, with
+  the same strictness, and a task already handed over keeps its target.
+  One journal line a change, with how many targets and never their names.
+- **The computers' own names** (#1676, the first builder at 14:12). Beside
+  the targets it writes, the part writes `targets.names.json`:
+  `{"version":1,"names":{ALIAS:NAME}}`, each name the machine's Harness
+  name (else hostname), control characters out, trimmed, at most 64 bytes.
+  None where nothing is left. A computer renamed keeps its alias and gets
+  its new name. With no computer the file goes with the targets, and
+  beside a file someone else wrote nothing is written.
+  - **Its own file,** not a field of `targets.json`: an older build never
+    reads it, so a rollback keeps its hand-overs, where a field it didn't
+    know would turn them off (#1505). Every store reads one release back
+    (El's #1680 rule), and a label shouldn't cost a lamp its hand-overs.
+  - **Read at each look,** as strictly as the targets: an owned 0600
+    file, version 1, nothing else in it, each alias of a target alias's
+    shape and once, each name as above. A missing or bad file is no names.
+    The journal says how many, never which.
+  - **Told:** `{"op":"targets"}` gives `name` beside `alias` and `engine`
+    for a target that has one.
+  - **Said, with `LAMP_TASKS_MACHINE_NAMES=on`** (off unless set): the
+    voice reads the targets (as with `LAMP_TASKS_WHO`) and keeps the names
+    by alias. The read-back's `where` names the computer the work was
+    prepared for, "Claude Code on your MacBook Air", and a single task's
+    news says the rest of its answer, or that its agent waits, is "on
+    their MacBook Air". With no name for that target, or without the
+    switch, both read as today ("the office computer", "their computer").
+    The descriptions and the session note are not changed: the longest
+    description is at 1,014 of the service's 1,024 bytes, and the computer
+    there isn't yet chosen. Nor are news of several tasks at once, which
+    may be on several computers, and `check_agent_task`'s.
+  - **Tests:** `runtime::tests::names_from_machines_are_clean_labels_by_alias`,
+    `runtime::tests::the_names_file_is_read_strictly`,
+    `runtime::tests::names_are_written_beside_the_parts_own_targets`,
+    `tests/runtime.rs`: `targets_from_machines_are_written_and_used_while_signed_in`
+    (the names told, and a rename), the voice's
+    `agent_tasks::tests::with_machine_names_each_computer_is_said_by_its_own_name`
+    (two computers, one with none, the switch off; a read-back that
+    ignores the names fails it) and
+    `agent_tasks::tests::the_machine_names_switch_is_taken_on_its_own`.
+
+Not yet: installing Harness (`lamp-update harness-on`, B5) and signing in a
+lamp with no screen (Harness's box ticket, `harness login --ticket`; #1410).
+The reset plan doesn't list `targets.json.from-machines`. A mark left after
+a reset changes nothing: a missing file is the part's to write anyway, and
+a file a person writes has another sha256.
 
 Tests: `engine::tests::targets_read_again_are_used_from_then_on_and_a_task_keeps_its_own`,
 `engine::tests::targets_for_a_newer_build_read_again_are_off_until_valid_ones_come`,
@@ -673,7 +742,13 @@ Tests: `engine::tests::targets_read_again_are_used_from_then_on_and_a_task_keeps
 (a mutation that reads the file only once fails it),
 `without_set_up_later_the_report_is_as_before`,
 `tests/runtime_failures.rs`: `set_up_later_runs_with_no_harness_and_no_targets_and_refuses_with_why`
-(the real binary; without the switch the same start fails).
+(the real binary; without the switch the same start fails),
+`tests/harness.rs`: `the_machines_are_one_call_read_as_harness_lists_them`,
+`runtime::tests::targets_from_machines_name_the_first_office_and_the_rest_by_name`,
+`runtime::tests::targets_are_written_from_machines_only_where_the_file_is_the_parts_own`
+(writing over a file without the part's mark fails it),
+`tests/runtime.rs`: `targets_from_machines_are_written_and_used_while_signed_in`
+(asking while signed out fails it), `targets_from_machines_needs_an_engine_and_set_up_later`.
 
 ## Host qualification and first lamp check
 
@@ -1152,9 +1227,11 @@ Progress is the Policy's to time already and is told as before.
 
 ### Given with a text (#1673, off unless `LAMP_MESSAGES=on`)
 
-News the lamp hasn't told aloud is given with the answer to the person's
-next text from the Autonomous app, once, and then kept in the same file of
-what was told, so the voice doesn't tell it aloud after
+News of work asked for by text that the lamp hasn't told aloud is given
+with the answer to the person's next text from the Autonomous app, once,
+and then kept in the same file of what was told, so the voice doesn't tell
+it aloud after. Work asked for at the lamp is told at the lamp, never by
+text: a task started by a typed "yes" is kept as a text's (`tasks-typed`)
 ([messages.md](messages.md#news-when-youre-away)).
 
 ### News too long for one written turn (2026-10-15, 02:31)

@@ -1191,7 +1191,8 @@ pub async fn run_with_continuation(
         );
         // The rules' typed fact for the policy, when rules are on.
         if let Some(root) = files.bus_root.as_deref().filter(|_| crate::rules::on()) {
-            crate::rules::bus_on(root);
+            // The room's rules hold from the start, before anyone speaks.
+            crate::rules::bus_on(root, socket);
         }
     }
     // Who work can go to, if the person may name them.
@@ -1466,6 +1467,16 @@ async fn serve_with_visual<C: Connect>(
         crate::bus_out::RoomOut::on(root)
             .map_err(|error| {
                 eprintln!("lamp-voice provider: the room is not published on the bus: {error}")
+            })
+            .ok()
+    });
+    // Each turn's verdict, as the journal says it below (#1155).
+    let mut turn_out = BUS_ROOT.get().and_then(|root| {
+        crate::bus_out::TurnOut::on(root)
+            .map_err(|error| {
+                eprintln!(
+                    "lamp-voice provider: turns' verdicts are not published on the bus: {error}"
+                )
             })
             .ok()
     });
@@ -2018,7 +2029,11 @@ async fn serve_with_visual<C: Connect>(
                     && presence_read_at.is_none_or(|at| at.elapsed() >= Duration::from_millis(500))
                 {
                     presence_read_at = Some(Instant::now());
-                    let fresh = crate::known_faces::known_now(path);
+                    let refresh = intake.handoff.memory_face.begin_refresh();
+                    let observation = intake.handoff.authority.filter(|state| state.camera_allowed(MonoTime::from_micros(monotonic_us())))
+                        .and_then(|_| crate::known_faces::FaceObservation::read(path));
+                    let fresh = observation.as_ref().map(|face| face.name().to_owned());
+                    intake.handoff.memory_face.replace(refresh, observation);
                     let named = fresh.as_deref().map(crate::remember::person_id);
                     counted = presence.seen(fresh, Instant::now()).map(str::to_owned);
                     let whose = counted.as_deref().map(crate::remember::person_id);
@@ -2590,6 +2605,13 @@ async fn serve_with_visual<C: Connect>(
                                 .filter(|(of, _)| *of == request)
                                 .map(|(_, rise)| format!(" (the room microphone {rise:.1} dB over its quiet)"))
                                 .unwrap_or_default();
+                            if let (Some(out), Some(verdict)) = (turn_out.as_mut(), verdict.as_ref()) {
+                                let told = match verdict {
+                                    crate::attention::Verdict::Hold(_) => lamp_msgs::TurnVerdict::HeldBack,
+                                    _ => lamp_msgs::TurnVerdict::Answered,
+                                };
+                                out.tell(request, told, monotonic_us());
+                            }
                             match verdict {
                                 Some(crate::attention::Verdict::Hold(why)) => {
                                     eprintln!("lamp-voice provider: request {request}: its answer is held back: {why}{rise}");
@@ -2678,7 +2700,7 @@ async fn serve_with_visual<C: Connect>(
                                     && !attention.names_the_schedule()
                                     && !attention.answers_the_lamps_question(),
                             });
-                        desk.called(&provider, lineage, call, held, turn)
+                        desk.called(&provider, lineage, call, held, turn, intake.handoff.memory_lease(lineage))
                     }
                     // Calls the service withdrew are not run if they still
                     // wait for the Policy's decision (#800).
@@ -2870,6 +2892,7 @@ struct Turn {
 }
 /// One of the lamp's actions kept for the turn's decision.
 struct Parked {
+    memory: Option<crate::memory_scope::ScopeLease>,
     lineage: lamp_gemini::Lineage,
     call: lamp_gemini::ToolCall,
     turn: Turn,
@@ -2880,6 +2903,7 @@ const MOST_CALL_LINES: usize = 64;
 /// A call the executive or the memory was asked, with what to tell the
 /// model.
 struct Asked {
+    memory: Option<crate::memory_scope::ScopeLease>,
     session: SessionId,
     request: u64,
     call: lamp_gemini::ToolCall,
@@ -2978,6 +3002,7 @@ impl ToolDesk {
         call: lamp_gemini::ToolCall,
         held: bool,
         turn: Option<Turn>,
+        memory: Option<crate::memory_scope::ScopeLease>,
     ) {
         use crate::tools::Route;
         let request = lineage.request.get();
@@ -3002,6 +3027,7 @@ impl ToolDesk {
                     | Route::Faces(..)
                     | Route::Mark(_)
                     | Route::Onboarding(_)
+                    | Route::ReportsStop
             )
         {
             let (sent, sent_us) = tell(&crate::tools::declined());
@@ -3062,6 +3088,7 @@ impl ToolDesk {
                 call.name
             );
             self.parked.push(Parked {
+                memory,
                 lineage,
                 call,
                 turn,
@@ -3126,10 +3153,11 @@ impl ToolDesk {
             | Route::Tasks(_)
             | Route::Faces(..)
             | Route::Mark(_)
-            | Route::Onboarding(_))
+            | Route::Onboarding(_)
+            | Route::ReportsStop)
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
-                self.run(provider, lineage, call, route, called_us);
+                self.run(provider, lineage, call, route, called_us, memory);
             }
             Route::Executive(_)
             | Route::UseSkill(_)
@@ -3139,6 +3167,7 @@ impl ToolDesk {
             | Route::Faces(..)
             | Route::Mark(_)
             | Route::Onboarding(_)
+            | Route::ReportsStop
             | Route::Nobody => {
                 let (sent, sent_us) = tell(&crate::tools::unavailable());
                 self.line(
@@ -3159,6 +3188,7 @@ impl ToolDesk {
     }
     /// Run one call on a thread of its own, its answer taken on a later
     /// tick ([`Self::answer`]).
+    #[allow(clippy::too_many_arguments)]
     fn run<C: Connect>(
         &mut self,
         provider: &Supervisor<C>,
@@ -3166,6 +3196,7 @@ impl ToolDesk {
         call: lamp_gemini::ToolCall,
         route: crate::tools::Route,
         called_us: u64,
+        memory: Option<crate::memory_scope::ScopeLease>,
     ) {
         use crate::tools::Route;
         let request = lineage.request.get();
@@ -3182,6 +3213,7 @@ impl ToolDesk {
                 | Route::Tasks(_)
                 | Route::Faces(..)
                 | Route::Mark(_)
+                | Route::ReportsStop
         ) {
             self.acted = Some(request);
             // Something done is the lamp answering, words or none (#829,
@@ -3206,8 +3238,17 @@ impl ToolDesk {
             .name("lamp-voice-ask".into())
             .spawn(move || {
                 let started = Instant::now();
-                let (whom, told, answered, news) = answered(&route, &work, request, heard);
+                let (whom, told, answered, news) = match memory.as_ref() {
+                    Some(scope) => answered_scoped(&route, &work, request, heard, scope),
+                    None => (
+                        "unavailable request",
+                        crate::tools::unavailable(),
+                        false,
+                        None,
+                    ),
+                };
                 let _ = asked.send(Asked {
+                    memory,
                     session,
                     request,
                     call: work,
@@ -3349,6 +3390,7 @@ impl ToolDesk {
                             parked.call,
                             route,
                             parked.called_us,
+                            parked.memory,
                         );
                     } else {
                         let sent = provider
@@ -3465,7 +3507,7 @@ impl ToolDesk {
     ) {
         while let Ok(done) = self.answers.try_recv() {
             self.waiting = self.waiting.saturating_sub(1);
-            let taken = send(&done);
+            let taken = done.memory.as_ref().is_none_or(|scope| scope.is_current()) && send(&done);
             let sent_us = monotonic_us();
             // The look is the voice's, not the model's to remember (#941),
             // and only a skill's answer asks for it: no other part makes a
@@ -3549,13 +3591,16 @@ impl ToolDesk {
 /// what the model is told, whether that part answered, and the news key a
 /// `check_agent_task` answer held, taken out of what the model is told. Only
 /// the tasks part's own answer can carry news (#1390).
-pub(crate) fn answered(
+/// Dispatch using the immutable request scope, including detached jobs.
+pub(crate) fn answered_scoped(
     route: &crate::tools::Route,
     call: &lamp_gemini::ToolCall,
     request: u64,
     heard: bool,
+    scope: &crate::memory_scope::ScopeLease,
 ) -> (&'static str, serde_json::Value, bool, Option<String>) {
-    let (whom, (mut told, answered)) = crate::tools::run_call(route, call, request, heard);
+    let (whom, (mut told, answered)) =
+        crate::tools::run_call_scoped(route, call, request, heard, scope);
     let news = matches!(route, crate::tools::Route::Tasks(_))
         .then(|| crate::agent_tasks::take_news_key(&mut told))
         .flatten();
@@ -4014,7 +4059,10 @@ impl ProviderIntake {
     fn new(boot: BootId, now_us: u64) -> Self {
         Self {
             guard: BoundaryGuard::new(boot, MonoTime::from_micros(now_us)),
-            handoff: InputHandoff::default(),
+            handoff: InputHandoff {
+                memory_worker: Some(boot),
+                ..InputHandoff::default()
+            },
             output_flow: OutputSender::default(),
             last_control_us: now_us,
             saw_allowed: false,
@@ -4026,6 +4074,7 @@ impl ProviderIntake {
 
     fn stop(&mut self) {
         self.stopped = true;
+        self.handoff.memory_scope = None;
         self.retained = None;
         self.guard.invalidate();
     }
@@ -4229,6 +4278,10 @@ impl ProviderIntake {
 /// history, but for the same-voice check's first 3 s of the line in hand.
 #[derive(Default)]
 struct InputHandoff {
+    memory_worker: Option<BootId>,
+    memory_face: crate::memory_scope::FaceCache,
+    memory_scope: Option<crate::memory_scope::RequestScope>,
+
     /// The newest note given and to which request: a request sends only
     /// its newest, so what it was given goes with what it is given next.
     noted: Option<(u64, String)>,
@@ -4324,6 +4377,8 @@ struct InputHandoff {
 /// The newest line's input, kept as it was offered so that it can be sent
 /// once more if its connection is lost before any output (#705, Step B).
 struct Kept {
+    memory_revoked: bool,
+    memory_snapshot: crate::memory_scope::ScopeSnapshot,
     request: RequestId,
     generation: u64,
     /// Its blocks in order, each with its own sequence, up to
@@ -4375,6 +4430,8 @@ impl InputHandoff {
 impl Kept {
     fn new(request: RequestId, generation: u64) -> Self {
         Self {
+            memory_revoked: false,
+            memory_snapshot: crate::memory_scope::ScopeSnapshot::room(),
             request,
             generation,
             blocks: Vec::new(),
@@ -4416,6 +4473,39 @@ struct SubmittedInput {
 }
 
 impl InputHandoff {
+    fn bind_memory(
+        &mut self,
+        request: RequestId,
+        session: SessionId,
+        snapshot: crate::memory_scope::ScopeSnapshot,
+    ) {
+        self.memory_scope = self.memory_worker.map(|worker| {
+            crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker,
+                    session: session.get(),
+                    request: request.get(),
+                },
+                snapshot,
+            )
+        });
+    }
+
+    fn memory_lease(
+        &self,
+        lineage: lamp_gemini::Lineage,
+    ) -> Option<crate::memory_scope::ScopeLease> {
+        self.memory_scope
+            .as_ref()
+            .map(|owner| owner.lease())
+            .filter(|lease| {
+                lease.is_current()
+                    && lease.key().request == lineage.request.get()
+                    && lease.key().session == lineage.session.get()
+                    && !self.retired(lineage.request.get())
+            })
+    }
+
     /// Whether `request` is no longer the lamp's: retired, given up, or
     /// failed. A call made in it is not to be run any more (#800).
     fn retired(&self, request: u64) -> bool {
@@ -4518,6 +4608,38 @@ impl InputHandoff {
         }
         if let Some(request) = self.given_up_before_sure(state) {
             crate::thread::unsay(request);
+        }
+        if self.memory_scope.as_ref().is_some_and(|scope| {
+            let key = scope.lease().key();
+            key.request <= self.retired_through.max(self.failed_through)
+                || self
+                    .authority
+                    .is_some_and(|old| old.microphone_generation() != state.microphone_generation())
+                || state.microphone_permission() != lamp_turn_owner::Permission::Allowed
+        }) {
+            self.memory_scope = None;
+        }
+        if state.camera_permission() != lamp_turn_owner::Permission::Allowed
+            || self
+                .authority
+                .is_some_and(|old| old.camera_generation() != state.camera_generation())
+        {
+            self.memory_face.invalidate();
+            if let Some(kept) = self
+                .kept
+                .as_mut()
+                .filter(|kept| kept.memory_snapshot.person().is_some())
+            {
+                kept.memory_revoked = true;
+            }
+            if self.memory_scope.as_ref().is_some_and(|scope| {
+                scope
+                    .lease()
+                    .scope()
+                    .is_some_and(|snapshot| snapshot.person().is_some())
+            }) {
+                self.memory_scope = None;
+            }
         }
         self.authority = Some(state);
         Ok(())
@@ -4652,6 +4774,7 @@ impl InputHandoff {
             self.kept = None;
             return false;
         }
+        self.memory_scope = None;
         kept.refused = true;
         kept.replay = None;
         kept.lost = Some(KeptLoss {
@@ -4694,7 +4817,7 @@ impl InputHandoff {
             return;
         }
         let generation_now = self.authority.map(|state| state.microphone_generation());
-        if generation_now != Some(kept.generation) {
+        if kept.memory_revoked || generation_now != Some(kept.generation) {
             match kept.lost {
                 Some(loss) => self.give_up(loss, crate::resend::Refused::OtherGeneration),
                 None => self.kept = None,
@@ -4738,6 +4861,7 @@ impl InputHandoff {
                 return self.give_up(loss, why);
             }
             let request = kept.request;
+            let memory_snapshot = kept.memory_snapshot.clone();
             if input.resend(session, request).is_err() {
                 return self.give_up(loss, crate::resend::Refused::NotTaken);
             }
@@ -4760,6 +4884,7 @@ impl InputHandoff {
                     session.get()
                 );
             }
+            self.bind_memory(request, session, memory_snapshot);
             self.submitted = Some(SubmittedInput {
                 request,
                 session,
@@ -4822,6 +4947,13 @@ impl InputHandoff {
     /// submitted, and it is never treated as open again.
     fn fail(&mut self, request: u64) {
         self.failed_through = self.failed_through.max(request);
+        if self
+            .memory_scope
+            .as_ref()
+            .is_some_and(|scope| scope.lease().key().request <= request)
+        {
+            self.memory_scope = None;
+        }
         if self
             .submitted
             .is_some_and(|submitted| submitted.request.get() <= request)
@@ -4950,6 +5082,11 @@ impl InputHandoff {
                 if let Err(refusal) = input.written(expected, request, &note, None) {
                     return self.refused_start(request, refusal);
                 }
+                self.bind_memory(
+                    request,
+                    expected,
+                    crate::memory_scope::ScopeSnapshot::room(),
+                );
                 self.submitted = Some(SubmittedInput {
                     request,
                     session: expected,
@@ -4996,6 +5133,8 @@ impl InputHandoff {
                 if let Some(voices) = self.voices.as_mut() {
                     voices.began(request.get(), !over_the_lamps_voice);
                 }
+                let memory_snapshot = self.memory_face.snapshot(Instant::now());
+                self.bind_memory(request, expected, memory_snapshot.clone());
                 self.submitted = Some(SubmittedInput {
                     request,
                     session: expected,
@@ -5007,6 +5146,7 @@ impl InputHandoff {
                 // connection is lost before any output (#705, Step B).
                 if self.resend {
                     let mut kept = Kept::new(request, generation);
+                    kept.memory_snapshot = memory_snapshot;
                     // Half of an utterance: the next session would hear it
                     // without what went before. A note goes again with it
                     // (`resend_upkeep`); a stop's is one.
@@ -5200,6 +5340,11 @@ impl InputHandoff {
                     LOOKED_AT_US.store(now_us, std::sync::atomic::Ordering::Relaxed);
                 }
                 // Started and ended at once: nothing more is sent for it.
+                self.bind_memory(
+                    request,
+                    expected,
+                    crate::memory_scope::ScopeSnapshot::room(),
+                );
                 self.submitted = Some(SubmittedInput {
                     request,
                     session: expected,
@@ -5540,6 +5685,7 @@ mod tests {
     fn each_call_answered_is_kept_for_the_record_with_when_it_came_and_was_sent() {
         let mut desk = ToolDesk::new(crate::tools::Settings::default());
         let asked = |request: u64, name: &str, answered: bool| Asked {
+            memory: None,
             session: SessionId::new(2).unwrap(),
             request,
             call: lamp_gemini::ToolCall {
@@ -5607,6 +5753,7 @@ mod tests {
     fn a_call_answered_with_a_look_asks_the_coordinator_for_it_once_it_is_sent() {
         let mut desk = ToolDesk::new(crate::tools::Settings::default());
         let asked = |request: u64, told: serde_json::Value, skill: bool, heard: bool| Asked {
+            memory: None,
             session: SessionId::new(2).unwrap(),
             request,
             call: lamp_gemini::ToolCall {
@@ -5658,6 +5805,7 @@ mod tests {
     fn an_answer_with_news_hands_its_key_on_once_it_is_sent() {
         let mut desk = ToolDesk::new(crate::tools::Settings::default());
         let asked = |request: u64, news: Option<&str>| Asked {
+            memory: None,
             session: SessionId::new(2).unwrap(),
             request,
             call: lamp_gemini::ToolCall {
@@ -5696,6 +5844,7 @@ mod tests {
         let mut desk = ToolDesk::new(crate::tools::Settings::default());
         desk.asked
             .send(Asked {
+                memory: None,
                 session: SessionId::new(2).unwrap(),
                 request: 9,
                 call: lamp_gemini::ToolCall {
@@ -6061,6 +6210,130 @@ mod tests {
             follows_on: false,
             over_the_lamps_voice: false,
         }
+    }
+
+    fn memory_handoff() -> InputHandoff {
+        InputHandoff {
+            memory_worker: Some(BootId::new([9; 16]).unwrap()),
+            ..InputHandoff::default()
+        }
+    }
+
+    fn cache_face(handoff: &InputHandoff, name: &str) {
+        let path =
+            std::env::temp_dir().join(format!("live-memory-scope-{}-{name}", std::process::id()));
+        std::fs::write(&path, name).unwrap();
+        let refresh = handoff.memory_face.begin_refresh();
+        handoff
+            .memory_face
+            .replace(refresh, crate::known_faces::FaceObservation::read(&path));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn memory_scope_exists_before_first_answer_and_does_not_follow_new_face() {
+        let mut owner = controller();
+        let mut handoff = memory_handoff();
+        let sink = RecordingSink::default();
+        let request = authorize(&mut owner, &mut handoff);
+        cache_face(&handoff, "Ann");
+        handoff
+            .submit(start(request, &handoff), NOW, &sink)
+            .unwrap();
+        let lineage = lamp_gemini::Lineage {
+            session: SessionId::new(1).unwrap(),
+            request: RequestId::new(request).unwrap(),
+        };
+        let first = handoff.memory_lease(lineage).unwrap();
+        assert_eq!(
+            first.scope().unwrap().person(),
+            Some(crate::remember::person_id("Ann").as_str())
+        );
+        cache_face(&handoff, "Bob");
+        handoff.submit(end(request, &handoff), NOW, &sink).unwrap();
+        assert_eq!(
+            first.scope().unwrap().person(),
+            Some(crate::remember::person_id("Ann").as_str())
+        );
+        assert!(handoff.memory_lease(lineage).is_some());
+        handoff.fail(request);
+        assert!(!first.is_current());
+        assert!(handoff.memory_lease(lineage).is_none());
+    }
+
+    #[test]
+    fn camera_denial_revokes_personal_jobs_and_prevents_resend_from_restoring_scope() {
+        for coalesced_reopen in [false, true] {
+            let mut owner = controller();
+            owner
+                .set_camera_permission(time(), Permission::Allowed)
+                .unwrap();
+            let mut handoff = memory_handoff();
+            handoff.resend = true;
+            let sink = RecordingSink::default();
+            let request = authorize(&mut owner, &mut handoff);
+            cache_face(&handoff, "CameraAnn");
+            handoff
+                .submit(start(request, &handoff), NOW, &sink)
+                .unwrap();
+            let delayed = handoff.memory_scope.as_ref().unwrap().lease();
+            assert!(delayed.scope().unwrap().person().is_some());
+            owner
+                .set_camera_permission(time(), Permission::Denied)
+                .unwrap();
+            if coalesced_reopen {
+                owner
+                    .set_camera_permission(time(), Permission::Allowed)
+                    .unwrap();
+                let before = handoff.authority.unwrap();
+                let after = owner.snapshot(time()).unwrap();
+                assert_eq!(before.camera_permission(), after.camera_permission());
+                assert_ne!(before.camera_generation(), after.camera_generation());
+            }
+            handoff
+                .observe_authority(owner.snapshot(time()).unwrap())
+                .unwrap();
+            assert!(!delayed.is_current());
+            assert!(
+                handoff
+                    .memory_face
+                    .snapshot(Instant::now())
+                    .person()
+                    .is_none()
+            );
+            assert!(handoff.kept.as_ref().unwrap().memory_revoked);
+            handoff.resend_upkeep(&sink, NOW);
+            assert!(handoff.kept.is_none());
+            assert!(handoff.memory_scope.is_none());
+        }
+    }
+
+    #[test]
+    fn replaced_or_dropped_request_revokes_detached_leases_even_when_numbers_are_reused() {
+        let mut handoff = memory_handoff();
+        let request = RequestId::new(7).unwrap();
+        let session = SessionId::new(1).unwrap();
+        handoff.bind_memory(request, session, crate::memory_scope::ScopeSnapshot::room());
+        let delayed = handoff.memory_scope.as_ref().unwrap().lease();
+        handoff.bind_memory(request, session, crate::memory_scope::ScopeSnapshot::room());
+        let replacement = handoff.memory_scope.as_ref().unwrap().lease();
+        assert!(!delayed.is_current());
+        assert!(replacement.is_current());
+        drop(handoff);
+        assert!(!replacement.is_current());
+    }
+
+    #[test]
+    fn stopped_intake_revokes_scope_before_detached_job_finishes() {
+        let mut intake = ProviderIntake::new(BootId::new([9; 16]).unwrap(), NOW);
+        intake.handoff.bind_memory(
+            RequestId::new(7).unwrap(),
+            SessionId::new(1).unwrap(),
+            crate::memory_scope::ScopeSnapshot::room(),
+        );
+        let delayed = intake.handoff.memory_scope.as_ref().unwrap().lease();
+        intake.stop();
+        assert!(!delayed.is_current());
     }
 
     #[test]
@@ -8779,6 +9052,7 @@ mod tests {
                 lead_in: false,
                 asked: false,
                 accounts: false,
+                machine_names: false,
                 needs: None,
                 staff_note: noted,
             }),
@@ -8922,6 +9196,7 @@ mod tests {
                 lead_in: false,
                 asked: false,
                 accounts: false,
+                machine_names: false,
                 needs: None,
                 staff_note: true,
             }),

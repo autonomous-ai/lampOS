@@ -173,6 +173,12 @@ and `conversation_end` and `session_close` in their scope. The source union
 keeps each ID with its person. With nobody known no request carries a
 `person` and nothing above changes.
 
+Completed conversation exchanges use the person already stored on each thread
+exchange when they are handed to `finished_exchange_for`. A later face change
+or a mixed batch cannot reassign them to one current person. Room exchanges
+remain unscoped. This journal handoff does not change direct tool lookups,
+session snapshots or voice identity authorization.
+
 ### Rules (#813)
 
 With `LAMP_MEMORY_RULES=on` as well (passed to the provider like
