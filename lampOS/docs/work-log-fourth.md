@@ -4903,6 +4903,12 @@ A usage limit paused me from about 00:40 to 06:2x.
   - It took two merges and two fixes: `Stop::Held` for a call the Policy holds, and `lamp-voice`'s closed-early test given `finish_told`'s argument.
   - The reviewer found nothing at 06:46. The three crates' tests are running here, and ARM64 is in progress.
 
+## 2026-10-20, 06:58 ICT: claimed, the name lost when a line begins as the lamp's reply ends
+
+- **The fault** (the first builder on #1722, 06:56): in the hand-overs, "Hey Lamp, ask Codex to write a haiku about coffee." got no reply in 3 of the last 4 hourly runs. It's said as the lighthouse story ends. Its request opened after the reply, heard 8 of the 10 words, and was held for no name, while the stop-words stream had heard it.
+- **The plan:** a line whose speech began in the reply's last 2–3 s is given its sound from that start, one line only, never the name twice. Off unless set, with a test, onto #1712, and the plan on #1722 before code.
+- **#2079, the third landing,** is gated (3155 passed, 0 failed), read by the reviewer with no finding, and waits for its ARM64.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
