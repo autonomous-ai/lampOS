@@ -4,6 +4,7 @@ pub mod light;
 pub mod reset;
 pub mod scan;
 pub mod serve;
+pub mod wake;
 pub mod wifi;
 
 use lamp_bus::Subscriber;

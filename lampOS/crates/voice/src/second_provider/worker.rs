@@ -94,6 +94,10 @@ impl Gate {
             );
             self.skipped_expired = 0;
         }
+        engine.memory_camera(
+            state.camera_allowed(MonoTime::from_micros(now_us)),
+            state.camera_generation(),
+        );
         self.last_control_us = now_us;
         if let Some(owner) = state.owner() {
             if owner.turn() <= self.retired_through || owner.turn() < self.highest_seen {
@@ -355,6 +359,9 @@ pub fn serve(
         .as_deref()
         .map(crate::known_faces::known_file_of)
         .filter(|_| socket.is_some());
+    let scope_file = who.clone();
+    let face_cache = Arc::new(crate::memory_scope::FaceCache::default());
+    let scoped_settings = tools.clone();
     let days = crate::remember::days_from_environment();
     // Told after the character with `LAMP_TASKS_ASKED=on`, as the Live route is (#854).
     let tasks = tools.tasks.clone();
@@ -416,6 +423,22 @@ pub fn serve(
             .unwrap_or_else(|_| crate::tools::unavailable())
         })
     });
+    let scoped_runner: crate::second_provider::ScopedToolRunner =
+        Arc::new(move |request, heard, name, args, scope| {
+            let settings = scoped_settings.clone();
+            Box::pin(async move {
+                let call = lamp_gemini::ToolCall {
+                    id: String::new(),
+                    name,
+                    args,
+                };
+                tokio::task::spawn_blocking(move || {
+                    crate::tools::answer_scoped(&settings, &call, request, heard, &scope)
+                })
+                .await
+                .unwrap_or_else(|_| crate::tools::unavailable())
+            })
+        });
     let system: crate::second_provider::System = Arc::new(system);
     let mut engine = Engine::new(
         Arc::new(net),
@@ -425,6 +448,7 @@ pub fn serve(
         },
         runner.clone(),
     )
+    .with_memory_scope(boot, face_cache.clone(), scoped_runner)
     .checking_sounds(checked)
     .waiting_with_a_sound(wait_cue)
     .saying_when_down(down_line)
@@ -460,6 +484,22 @@ pub fn serve(
                 .and_then(|mut heeding| heeding.heed(request, said, heard, from))
         }));
     }
+    // Each judged turn's verdict on the bus, for the Policy's hello (#1155).
+    if let Some(root) = files.bus_root.as_deref() {
+        match crate::bus_out::TurnOut::on(root) {
+            Ok(out) => {
+                let out = Mutex::new(out);
+                engine = engine.telling_verdicts(Arc::new(move |request, verdict| {
+                    if let Ok(mut out) = out.lock() {
+                        out.tell(request, verdict, lamp_ipc::monotonic_us());
+                    }
+                }));
+            }
+            Err(error) => eprintln!(
+                "lamp-voice second: turns' verdicts are not published on the bus: {error}"
+            ),
+        }
+    }
     if checked {
         let file = thread.clone();
         engine = engine.answering_the_lamp(Arc::new(move |request| {
@@ -476,7 +516,33 @@ pub fn serve(
         let (character, tools) = texts_from;
         runtime.spawn(texts_task(chat, character, tools, root));
     }
-    runtime.block_on(run(channels, boot, engine, thread))
+    runtime.block_on(async move {
+        // At most one filesystem read is outstanding; admission only reads the
+        // nonblocking cache. Aborting the refresh prevents any later poll.
+        let refresh = scope_file.map(|path| {
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_millis(200));
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                loop {
+                    interval.tick().await;
+                    let token = face_cache.begin_refresh();
+                    let path = path.clone();
+                    let observation = tokio::task::spawn_blocking(move || {
+                        crate::known_faces::FaceObservation::read(&path)
+                    })
+                    .await
+                    .ok()
+                    .flatten();
+                    face_cache.replace(token, observation);
+                }
+            })
+        });
+        let result = run(channels, boot, engine, thread).await;
+        if let Some(refresh) = refresh {
+            refresh.abort();
+        }
+        result
+    })
 }
 
 /// Whether a checked sound heard for `request` may be the person's answer

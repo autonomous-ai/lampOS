@@ -35,6 +35,10 @@ pub struct Kept {
     /// (`ready`, `connecting`, `down`), with `down_for_s` (#830).
     pub link: Option<String>,
     pub down_for_s: Option<u64>,
+    /// Whether it has said `ok` at least once since this program started:
+    /// a part that came up well, so that its going quiet later is a part
+    /// that stopped, not one that never came up (#1681, `quiet_ms`).
+    pub heard_well: bool,
 }
 
 /// What became of a report.
@@ -67,6 +71,11 @@ impl Parts {
         if self.kept.len() >= MOST_PARTS && !self.kept.contains_key(&report.name) {
             return Taken::Full;
         }
+        let heard_well = report.level == Level::Ok
+            || self
+                .kept
+                .get(&report.name)
+                .is_some_and(|kept| kept.heard_well);
         self.kept.insert(
             report.name.clone(),
             Kept {
@@ -75,6 +84,7 @@ impl Parts {
                 at,
                 link: fact(report, "link").map(one_line),
                 down_for_s: fact(report, "down_for_s").and_then(|value| value.parse().ok()),
+                heard_well,
             },
         );
         Taken::Kept
@@ -483,6 +493,13 @@ pub fn mark_selftest(health: &mut Health, item: HealthItem) {
 ///   and the message of the first item that is not ok, or, when only a
 ///   missing part makes the lamp not ok, that part's name and `has never
 ///   reported`.
+/// - `quiet_ms` is the age of the longest-quiet part that has said `ok` at
+///   least once ([`Kept::heard_well`]) and has not been heard from for
+///   longer than `stale_after`; 0 when there is none (#1681). A part that
+///   restarts for a few seconds is quiet only for those seconds; one that
+///   never reported, or never said `ok`, never counts. Nor does one whose
+///   last word was `error`: it keeps that level while quiet, and the
+///   lamp's `error` already says it, so one failure is not told twice.
 ///
 /// What comes out passes `Health::check`.
 pub fn health(
@@ -526,6 +543,13 @@ pub fn health(
             .cmp(&a.level.rank())
             .then_with(|| a.name.cmp(&b.name))
     });
+    let quiet_ms = reports
+        .values()
+        .filter(|kept| kept.heard_well && kept.level != Level::Error)
+        .map(|kept| millis(now.saturating_duration_since(kept.at)))
+        .filter(|age_ms| *age_ms > limit)
+        .max()
+        .unwrap_or(0);
     let mut missing: Vec<String> = Vec::new();
     for name in expected {
         if !reports.contains_key(name) && !missing.contains(name) {
@@ -543,6 +567,7 @@ pub fn health(
         message,
         items,
         missing,
+        quiet_ms,
     }
 }
 
@@ -1368,6 +1393,69 @@ mod tests {
         assert_eq!(health.items[0].message, "warming up");
     }
 
+    /// #1681, the first builder's 11:19 rule: a part counts as quiet
+    /// (`quiet_ms`) once it has said it is well at least once and has then
+    /// gone unheard past the stale time. A part restarting for a few
+    /// seconds is quiet only those seconds; a part never heard from, or
+    /// never well, does not count.
+    #[test]
+    fn quiet_ms_is_how_long_a_part_that_was_well_has_been_unheard() {
+        let now = Instant::now() + Duration::from_secs(3_600);
+        let expected = vec!["eyes".to_owned(), "body".to_owned()];
+        // Well, then nothing for 5 minutes and a little: it counts, and
+        // the longest-quiet such part is the one said.
+        let mut parts = Parts::new();
+        parts.take(&report(Level::Ok, "eyes", ""), now - ms(301_000));
+        parts.take(&report(Level::Ok, "voice", ""), now - ms(40_000));
+        parts.take(&report(Level::Ok, "body", ""), now - ms(100));
+        let lamp = health(parts.reports(), now, &expected, STALE);
+        assert_eq!(lamp.check(), Ok(()));
+        assert_eq!(lamp.quiet_ms, 301_000);
+        // A short restart: well, quiet 3 s, well again. Quiet for those
+        // seconds only, and then not at all.
+        let mut parts = Parts::new();
+        parts.take(&report(Level::Ok, "body", ""), now - ms(9_000));
+        parts.take(&report(Level::Ok, "body", ""), now - ms(6_000));
+        assert_eq!(health(parts.reports(), now, &[], STALE).quiet_ms, 6_000);
+        parts.take(&report(Level::Ok, "body", ""), now - ms(500));
+        assert_eq!(health(parts.reports(), now, &[], STALE).quiet_ms, 0);
+        // Within the stale time is not quiet.
+        let mut parts = Parts::new();
+        parts.take(&report(Level::Ok, "body", ""), now - ms(5_000));
+        assert_eq!(health(parts.reports(), now, &[], STALE).quiet_ms, 0);
+        // Never heard from (missing at boot): stale, but not quiet.
+        let parts = Parts::new();
+        let lamp = health(parts.reports(), now, &expected, STALE);
+        assert_eq!(lamp.level, Level::Stale);
+        assert_eq!(lamp.quiet_ms, 0);
+        // Heard from but never well (an error from its first report, then
+        // silence): the error says it, not quiet_ms.
+        let mut parts = Parts::new();
+        parts.take(
+            &report(Level::Error, "eyes", "no camera"),
+            now - ms(400_000),
+        );
+        assert_eq!(health(parts.reports(), now, &[], STALE).quiet_ms, 0);
+        // Well once, then an error, then silence: it keeps its error,
+        // which says it already, and is not counted again.
+        let mut parts = Parts::new();
+        parts.take(&report(Level::Ok, "eyes", ""), now - ms(500_000));
+        parts.take(
+            &report(Level::Error, "eyes", "no frames"),
+            now - ms(400_000),
+        );
+        let lamp = health(parts.reports(), now, &[], STALE);
+        assert_eq!((lamp.level, lamp.quiet_ms), (Level::Error, 0));
+        // Well, then a warning, then silence: a stopped part all the same.
+        let mut parts = Parts::new();
+        parts.take(&report(Level::Ok, "eyes", ""), now - ms(500_000));
+        parts.take(
+            &report(Level::Warn, "eyes", "slow frames"),
+            now - ms(400_000),
+        );
+        assert_eq!(health(parts.reports(), now, &[], STALE).quiet_ms, 400_000);
+    }
+
     #[test]
     fn a_report_is_kept_by_its_name_and_the_newest_replaces_the_one_before() {
         let now = Instant::now();
@@ -1384,6 +1472,7 @@ mod tests {
                 at: now + ms(10),
                 link: None,
                 down_for_s: None,
+                heard_well: true,
             }
         );
     }

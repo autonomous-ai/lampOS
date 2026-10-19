@@ -1179,6 +1179,19 @@ pub(crate) fn who(task: &Value) -> &'static str {
     }
 }
 
+/// Where the rest of a task's answer is: "their MacBook Air" for a computer
+/// known by its own name (`LAMP_TASKS_MACHINE_NAMES`, #1676), else "their
+/// computer", as without it.
+pub(crate) fn their_computer(task: &Value) -> String {
+    task["target_alias"]
+        .as_str()
+        .and_then(crate::agent_tasks::machine_name)
+        .map_or_else(
+            || "their computer".to_owned(),
+            |name| format!("their {name}"),
+        )
+}
+
 /// At most `most` characters of `text` on one line, with no double quotes
 /// to end the note's quotation early.
 pub(crate) fn quoted(text: &str, most: usize) -> (String, bool) {
@@ -1195,6 +1208,7 @@ pub(crate) fn quoted(text: &str, most: usize) -> (String, bool) {
 /// nothing to tell.
 fn note(task: &Value, data: &Value, age_ms: u64) -> Option<String> {
     let who = who(task);
+    let computer = their_computer(task);
     let (asked, _) = quoted(task["text"].as_str()?, MOST_TASK_CHARS);
     let (answer, cut) = quoted(
         data["answer"].as_str().unwrap_or_default(),
@@ -1218,21 +1232,21 @@ fn note(task: &Value, data: &Value, age_ms: u64) -> Option<String> {
             "{opening} {who} {when} finished the task they gave it: \"{asked}\". Its answer is long; it begins: \"{answer}{more}\". \
              Tell them now in one or two natural spoken sentences, as a good chief of staff would: \"Oh, {who} just finished…\" (\"earlier\" if it was a while ago), \
              then its gist in one plain line from that beginning (a story: who it is about and what happens; code: what it does now), \
-             then that the rest is on their computer. Never only that. No code, lists, file paths or links, and no question.)"
+             then that the rest is on {computer}. Never only that. No code, lists, file paths or links, and no question.)"
         ),
         "idle" => format!(
             "{opening} {who} {when} finished the task they gave it: \"{asked}\". What it came back with: \"{answer}{more}\". \
              Tell them now, the way a good chief of staff tells the person they work for: one or two natural spoken sentences, \
              starting with something like \"Oh, {who} just finished…\" (or \"earlier\" if it was a while ago), then the gist of the result in plain words. \
-             Do not read out code, lists, file paths or links; if there is more than fits, say the rest is on their computer. No question at the end.)"
+             Do not read out code, lists, file paths or links; if there is more than fits, say the rest is on {computer}. No question at the end.)"
         ),
         "needs-input" if answer.is_empty() && more.is_empty() => format!(
             "{opening} {who} has stopped and is waiting for them about the task they gave it: \"{asked}\". {})",
-            waiting(who, "")
+            waiting(who, &computer, "")
         ),
         "needs-input" => format!(
             "{opening} {who} has stopped and is waiting for them about the task they gave it: \"{asked}\". What it last said: \"{answer}{more}\". {})",
-            waiting(who, answer)
+            waiting(who, &computer, answer)
         ),
         _ => format!(
             "{opening} {who} stopped without finishing the task they gave it: \"{asked}\". What it last said: \"{answer}{more}\". \
@@ -1332,9 +1346,9 @@ fn note_together(parts: &[&Finished]) -> Option<String> {
 /// 0.4.6's `show` carries no question while it waits (probed 2026-10-15,
 /// #770): `answer` is empty or the previous answer. So the model is never
 /// asked to voice a question it was not given.
-pub(crate) fn waiting(who: &str, answer: &str) -> String {
+pub(crate) fn waiting(who: &str, computer: &str, answer: &str) -> String {
     let tell = format!(
-        "Tell them once, in one short sentence, that {who} is waiting for them on their computer and that they can answer it there."
+        "Tell them once, in one short sentence, that {who} is waiting for them on {computer} and that they can answer it there."
     );
     if answer.is_empty() {
         format!(

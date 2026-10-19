@@ -1545,7 +1545,7 @@ fn the_program_does_nothing_without_the_skip() {
 /// Everything the tests' own skills read and use, for the tests of other
 /// things than permissions: a skill without `[permissions]` may do nothing.
 const GRANTED: &str = "\n[permissions]\n\
-                       topics = [\"air/indoor\", \"air/state\", \"humans/faces/tracked\", \"schedule/due\", \
+                       topics = [\"air/indoor\", \"memory/rules\", \"air/state\", \"humans/faces/tracked\", \"schedule/due\", \
                        \"tasks/status\", \"voice/heard\", \"voice/state\"]\n\
                        speak = true\nlight = true\nbody = true\nlook = true\n";
 
@@ -2012,6 +2012,61 @@ fn a_not_equals_condition_holds_while_the_field_is_anything_else_for_its_time() 
     assert!(load(&both).unwrap_err().contains("not_equals"));
 }
 
+/// #1677: `unknown = "holds"` holds while its topic has said nothing yet
+/// (a lamp without the rules), never on a value that says otherwise, and
+/// not on one that has run out; left out, a silent topic holds nothing.
+#[test]
+fn an_unknown_holds_condition_holds_only_while_its_topic_has_said_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = |unknown: &str| {
+        format!(
+            "[trigger]\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\n\
+             [[while]]\ntopic = \"memory/rules\"\nfield = \"keep_light_on\"\nnot_equals = true\n{unknown}\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nlight = {{ dim = 1 }}\n"
+        )
+    };
+    let holds = skill_with(dir.path(), "holds", &toml("unknown = \"holds\"\n"));
+    let plain = skill_with(dir.path(), "plain", &toml(""));
+    let high = r#"{"co2_ppm":1300,"feel":"stuffy"}"#;
+    // Nothing on memory/rules: only the skill asked to hold runs.
+    assert_eq!(runs_at(&holds, &[(1, "air/state", high)]).len(), 1);
+    assert!(runs_at(&plain, &[(1, "air/state", high)]).is_empty());
+    // Asked to keep the light on: neither runs; not asked: both do.
+    for (rules, runs) in [
+        (r#"{"keep_light_on":true}"#, 0),
+        (r#"{"keep_light_on":false}"#, 1),
+    ] {
+        for skill in [&holds, &plain] {
+            let messages = [(0, "memory/rules", rules), (1, "air/state", high)];
+            assert_eq!(runs_at(skill, &messages).len(), runs, "{rules}");
+        }
+    }
+    // A value that has run out is not "said nothing": it holds no more.
+    let mut engine = Engine::new(vec![load(&holds).unwrap()], true);
+    engine.observe(
+        "memory/rules",
+        0,
+        br#"{"keep_light_on":false}"#,
+        Some(1_000),
+    );
+    assert!(
+        engine
+            .observe("air/state", 5_000_000, high.as_bytes(), None)
+            .is_empty()
+    );
+    // With for or present it is refused, and anything but "holds" is.
+    for (extra, why) in [
+        (
+            "unknown = \"holds\"\nfor = \"10s\"\n",
+            "without for or present",
+        ),
+        ("unknown = \"always\"\n", "unknown is \"holds\""),
+    ] {
+        let bad = skill_with(dir.path(), "bad", &toml(extra));
+        assert!(load(&bad).unwrap_err().contains(why), "{extra}");
+    }
+}
+
 #[test]
 fn a_condition_changed_by_a_reload_begins_again() {
     let dir = tempfile::tempdir().unwrap();
@@ -2128,6 +2183,14 @@ fn a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go() {
         "{:?}",
         seen.events
     );
+}
+
+/// A reading pose's definition, checked with no program and no clock: the
+/// mood must be one the body knows, with its `for`, of at most 2 minutes.
+/// Apart from the test above, which runs one at a time in the realtime
+/// group (#1806).
+#[test]
+fn a_reading_pose_needs_a_known_mood_and_a_for_of_at_most_two_minutes() {
     let dir = tempfile::tempdir().unwrap();
     for (step, why) in [
         ("body = { mood = \"dance\", for = \"3s\" }", "not one of"),
@@ -4022,7 +4085,9 @@ fn the_dance_asking(
     let mut line = String::new();
     BufReader::new(&stream).read_line(&mut line).unwrap();
     assert!(line.contains("Say you will."), "{line}");
-    std::thread::sleep(Duration::from_millis(200));
+    // At once: the program takes the voice's latest state when it looks
+    // (`said_lately`), so `speaking` said before it begins to wait is seen
+    // all the same (#1806).
     voice
         .publish_json(1, &serde_json::json!({"state": "speaking"}))
         .unwrap();
@@ -4155,8 +4220,9 @@ fn a_clip_the_body_said_dropped_is_followed_by_nothing() {
 }
 
 /// #940: under arbitration the body names whose a drop was, why and who
-/// holds the body; the run says so, and takes no other skill's drop of the
-/// same clip as its own.
+/// holds the body; the run says so. The next three tests are the same
+/// dance's other cases, one each so that each runs beside the others
+/// (#1806: together they took 4.4 s).
 #[test]
 fn a_clip_dropped_for_another_skill_says_why_and_who_holds_the_body() {
     let (_, played, _, done, reached) = the_dance_asking(false, Line::Said, Says::Busy, true);
@@ -4170,7 +4236,12 @@ fn a_clip_dropped_for_another_skill_says_why_and_who_holds_the_body() {
         "{}",
         done.why
     );
-    // The run's last clip has no next to wait on it: said at the run's end.
+}
+
+/// #940: the run's last clip has no next to wait on it: its drop is said at
+/// the run's end.
+#[test]
+fn a_last_clip_dropped_for_another_skill_is_said_at_the_runs_end() {
     let (_, played, _, done, reached) = the_dance_asking(false, Line::Said, Says::LastBusy, true);
     assert_eq!((played.len(), reached), (1, 2), "{}", done.why);
     assert!(
@@ -4179,13 +4250,21 @@ fn a_clip_dropped_for_another_skill_says_why_and_who_holds_the_body() {
         "{}",
         done.why
     );
-    // Without the skill's switch (and so on a product lamp, the body's off
-    // too), the run says nothing new of a last clip dropped (the reviewer
-    // on #1473).
+}
+
+/// Without the skill's switch (and so on a product lamp, the body's off
+/// too), the run says nothing new of a last clip dropped (the reviewer on
+/// #1473).
+#[test]
+fn without_body_requests_a_last_clip_dropped_is_not_said() {
     let (_, played, _, done, _) = the_dance_asking(false, Line::Said, Says::LastBusy, false);
     assert_eq!(played.len(), 1, "{}", done.why);
     assert!(!done.why.contains("the body dropped"), "{}", done.why);
-    // Another skill's nod dropped is not this run's: both are played.
+}
+
+/// #940: another skill's nod dropped is not this run's: both are played.
+#[test]
+fn another_skills_dropped_clip_is_not_the_runs_own() {
     let (_, played, _, done, reached) =
         the_dance_asking(false, Line::Said, Says::AnothersFirst, true);
     assert_eq!((played.len(), reached), (2, 2), "{}", done.why);

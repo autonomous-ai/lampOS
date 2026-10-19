@@ -437,9 +437,10 @@ product does it with systemd alone (#811):
 | `lamp-setup.service` | at boot, `WantedBy=multi-user.target`, only while `/var/lib/lampos-setup/done` is missing and setup's two settings exist | the hotspot and V1's setup page until the home's Wi-Fi and the person's settings are saved; then writes the marker |
 | `lampos-setup-done.path` | at boot, `WantedBy=multi-user.target` | starts `lampos.target` once the marker exists: the moment setup writes it, and at every later boot |
 | `lamp-setup-reset.service` | in the target, after setup | the reset button held 5 s: stops the lamp, wipes, removes the marker, reboots into setup |
+| `lamp-waking.service` | early at boot, `WantedBy=sysinit.target`, only once the marker exists | the waking face until the voice asks for the ring (#1681, [ring-choreography.md](ring-choreography.md), "The waking face"); off unless `LAMP_WAKING_FACE=on`, and then it exits at once |
 
-Setup and its reset start the same binary, `/opt/lampOS/setup/current/lamp-setup`.
-`install` writes and enables all three and starts none.
+Setup, its reset and the waking face start the same binary, `/opt/lampOS/setup/current/lamp-setup`.
+`install` writes and enables all four and starts none.
 
 ## The install command
 
@@ -559,10 +560,29 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    written only after `harness service install` succeeded; the CLI's own
    files are no proof, since it writes its unit before registering it and
    keeps it when a later step fails, the reviewer on #934): makes `/var/lib/lampos-tasks` `lampos`'s own (0700, the
-   tasks unit's state folder), runs `loginctl enable-linger lampos` (a user
-   manager for `lampos` from boot, with no login), then the Harness CLI's
-   own `harness service install` as `lampos` with
-   `HOME=/var/lib/lampos-tasks` and its `XDG_RUNTIME_DIR`. No unit of
+   tasks unit's state folder); gives `lampos`'s own user manager that folder
+   as its `HOME`, with a drop-in
+   `/etc/systemd/system/user@<uid>.service.d/lamp-home.conf`
+   (`Environment=HOME=/var/lib/lampos-tasks`), `systemctl daemon-reload`
+   and `systemctl try-restart user@<uid>.service` (a manager already
+   running takes it; one not running is left alone); runs `loginctl
+   enable-linger lampos` (a user manager for `lampos` from boot, with no
+   login, started with that `HOME`); then the Harness CLI's own `harness
+   service install` as `lampos` with `HOME=/var/lib/lampos-tasks` and its
+   `XDG_RUNTIME_DIR`.
+   - **Why the drop-in** (#1676): `lampos` is created with no home
+     (`/nonexistent`), and a user manager looks for user units under its
+     `HOME`. Without the drop-in, Harness wrote its unit under
+     `/var/lib/lampos-tasks/.config/systemd/user` and the manager answered
+     "Unit file harnessd.service does not exist" (lamp-75c9, 19 Oct 14:52).
+     With it, on lamp-75c9 at 15:13, the manager's `HOME` was the folder
+     (PAM didn't set it back), and Harness's service installed and ran
+     (`installed`, `registered`, `running`).
+   - **Only that manager:** it runs nothing but Harness. The 13 other
+     product units that run as `lampos` keep the `HOME` systemd gives them
+     from the user database. Changing `lampos`'s passwd home would have
+     moved all of them into the tasks part's folder (the first builder,
+     14:58). No unit of
    install's own: the daemon's runtime, entry point and platform variable
    are the Harness team's (docs/harness.md). A refusal stops the install,
    records nothing, so the next install asks again, and is said; it is taken to the Harness team, not worked around. How a
@@ -587,6 +607,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      so Harness's own updates change `cli.js` and never the launcher that
      `lamp-tasks` checks (its executable identity). With `SHELL=/bin/sh` its
      one PATH line goes into `~/.profile` in that home.
+   - **What it trusts** (the reviewer on #1777): a script fetched from
+     `cdn.autonomous.ai` runs as `lampos`, the user every lampOS part runs
+     as, and its sha256 checks come from the same CDN, so they guard against
+     a bad download, not a bad CDN. That's the installer the first builder
+     and the lead chose (19 Oct 10:41), as Harness's team publishes it.
    - **Then:** Harness at boot as above, with its record, unless already
      recorded; then `systemctl restart lamp-tasks.service`, only when
      something changed.
@@ -611,7 +636,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    uninstall`, then `harness stop`, since the uninstall starts the daemon
    again the usual way (`cli/src/lib/serviceCommand.ts`; the verbs read from
    Harness 0.4.17 on lamp-75c9, Nine on #705); then `harness service status
-   --json` and `loginctl disable-linger lampos`; then the record goes, last,
+   --json` and `loginctl disable-linger lampos`; then the manager's `HOME`
+   drop-in removed and `systemctl daemon-reload`; then the record goes, last,
    so a failure keeps it and a later run tries again. Without the record it
    changes nothing; without Harness at `/usr/local/bin/harness` it refuses
    and keeps the record. Harness itself, the sign-in under

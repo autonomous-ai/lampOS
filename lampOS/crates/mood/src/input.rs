@@ -3,8 +3,8 @@
 use crate::engine::{Event, EventKind, FaceTarget};
 use lamp_bus::{Declaration, Kind, Message};
 use lamp_msgs::{
-    AirState, ClockStamp, ControlGesture, ControlIntent, ControlsState, Faces, NameHeard,
-    ScheduleDue, Speech, SuddenSound, Voice, VoiceState,
+    AirState, ClockStamp, ControlGesture, ControlIntent, ControlsState, Faces, HumanFamiliar,
+    NameHeard, ScheduleDue, Speech, SuddenSound, Voice, VoiceState,
 };
 use std::{collections::BTreeSet, fmt};
 
@@ -39,7 +39,7 @@ impl InputSpec {
     }
 }
 
-pub const INPUTS: [InputSpec; 9] = [
+pub const INPUTS: [InputSpec; 10] = [
     InputSpec {
         topic: VoiceState::TOPIC,
         type_name: VoiceState::TYPE,
@@ -111,6 +111,16 @@ pub const INPUTS: [InputSpec; 9] = [
         kind: Kind::Latest,
         source: "schedule",
         max_age_ms: 3_000,
+    },
+    // How familiar the remembered person at the lamp is (#1670): said with
+    // each recognition, every 2 s, good for 5.
+    InputSpec {
+        topic: HumanFamiliar::TOPIC,
+        type_name: HumanFamiliar::TYPE,
+        version: HumanFamiliar::VERSION,
+        kind: Kind::Latest,
+        source: "eyes",
+        max_age_ms: 5_000,
     },
 ];
 
@@ -220,6 +230,7 @@ enum Payload {
     Air(AirState),
     Name(NameHeard),
     Schedule(ScheduleDue),
+    Familiar(HumanFamiliar),
 }
 
 impl Payload {
@@ -482,6 +493,7 @@ impl InputAdapter {
             }
             Payload::Sudden(value) => value.short.then_some(EventKind::SuddenSound),
             Payload::Air(value) => Some(EventKind::Air(value.co2_ppm)),
+            Payload::Familiar(value) => Some(EventKind::Familiar(value.level)),
             Payload::Name(value) => (value.score >= 0.9).then_some(EventKind::Name),
             Payload::Schedule(value) => {
                 if let Some(notice) = value.oldest {
@@ -655,6 +667,11 @@ fn parse(message: &Message, index: usize) -> Result<Payload, InputError> {
             let value: ScheduleDue = message.parse().map_err(malformed)?;
             value.check().map_err(|_| InputError::InvalidPayload)?;
             Payload::Schedule(value)
+        }
+        9 => {
+            let value: HumanFamiliar = message.parse().map_err(malformed)?;
+            value.check().map_err(|_| InputError::InvalidPayload)?;
+            Payload::Familiar(value)
         }
         _ => return Err(InputError::UnknownTopic),
     })

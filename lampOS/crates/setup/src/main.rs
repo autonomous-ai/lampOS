@@ -38,6 +38,9 @@ usage: lamp-setup COMMAND [OPTIONS]
   resume-reset --plan FILE [--enable]
       At start, before the lamp: finish a reset a power cut interrupted.
       Without --enable it only says whether one is unfinished.
+  wake
+      From power-on until the voice asks for the ring: the waking face
+      (#1681). Only with LAMP_WAKING_FACE=on; otherwise it exits at once.
 
 The plan names the setup marker, the reset journal, the paths to wipe and
 the stop and reboot commands (docs/setup.md, \"The reset\").
@@ -102,6 +105,12 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     if command == "--help" || command == "-h" {
         print!("{USAGE}");
         return Ok(true);
+    }
+    if command == "wake" {
+        if given.next().is_some() {
+            return Err("wake takes no options".into());
+        }
+        return wake();
     }
     let (mut options, enabled) = options(given)?;
     let plan_path = PathBuf::from(options.remove("--plan").ok_or("--plan is required")?);
@@ -323,6 +332,48 @@ fn setup_light(on: bool, _: &Arc<Mutex<Status>>) -> Option<Light> {
         eprintln!("lamp-setup: the setup light needs a lamp's ring, and there is none here");
     }
     None
+}
+
+/// `wake`: the waking face until the voice asks for the ring
+/// (`lamp_setup::wake`), only with its switch on.
+fn wake() -> Result<bool, Box<dyn std::error::Error>> {
+    let switch = std::env::var(lamp_setup::wake::SWITCH).ok();
+    if !lamp_setup::wake::switched_on(switch.as_deref()) {
+        eprintln!(
+            "lamp-setup: the waking face is off ({} is not on); the ring is the voice's",
+            lamp_setup::wake::SWITCH
+        );
+        return Ok(true);
+    }
+    let socket = Path::new(lamp_ring::waking::RELEASE_SOCKET);
+    // One left from an earlier start; the unit's runtime folder is fresh.
+    if std::fs::symlink_metadata(socket)
+        .is_ok_and(|metadata| std::os::unix::fs::FileTypeExt::is_socket(&metadata.file_type()))
+    {
+        std::fs::remove_file(socket)?;
+    }
+    let listener = std::os::unix::net::UnixListener::bind(socket)?;
+    let ended = wake_on_ring(listener);
+    // Gone, so a later open of the voice's goes on at once.
+    let _ = std::fs::remove_file(socket);
+    eprintln!("lamp-setup: the waking face has ended: {ended:?}");
+    Ok(ended == lamp_setup::wake::Ended::Released)
+}
+
+#[cfg(target_os = "linux")]
+fn wake_on_ring(listener: std::os::unix::net::UnixListener) -> lamp_setup::wake::Ended {
+    lamp_setup::wake::run(
+        listener,
+        lamp_ring::linux::open_waking,
+        |line| eprintln!("lamp-setup: {line}"),
+        lamp_setup::wake::RETRY,
+    )
+}
+
+#[cfg(not(target_os = "linux"))]
+fn wake_on_ring(_: std::os::unix::net::UnixListener) -> lamp_setup::wake::Ended {
+    eprintln!("lamp-setup: the waking face needs a lamp's ring, and there is none here");
+    lamp_setup::wake::Ended::SocketFailed
 }
 
 /// Serving itself, from the hotspot until it is time to stop.

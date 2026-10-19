@@ -628,6 +628,32 @@ name was heard in a busy room and nobody is turned to the lamp" gives the
 rise over the request's sound so far, when the name is heard, or "no rise
 of the room microphone read". Nothing the lamp does changes.
 
+**This home's bar, measured at setup (#753, `lamp-near-call`, nothing
+reads it yet).** 18 dB is one evening's guess at one desk. Setup asks the
+person to say the lamp's name from their own chair, and each answer is
+one try (`near_try`):
+- the name heard once on `name/heard` within 6 s of the prompt's end, at
+  0.95 or more;
+- mic1's largest rise over its quiet from the hearing's start to 1 s
+  after, the lamp's own voice left out.
+
+A try doesn't count if the lamp spoke from 0.5 s before the hearing to the
+end of that second. Its echo would be in the number, and speech anywhere
+else in the window is not. Three tries are needed, from at most five
+prompts, and setup stops asking once five can't reach three (`asks_again`).
+The bar is the quietest try less 3 dB, held to 16–24 dB (`near_rise`). It
+is never under 16 because people farther off reached 15.1 dB, and never
+over 24 so a loud talker isn't left with a raised voice as the only way in.
+No bar is set, and the rule keeps 18, with fewer than three tries or when
+they spread over more than 10 dB.
+
+Only numbers are kept, never sound: `/var/lib/lampOS/voice/near-call.json`
+(0600, written whole), `{"near_rise_db", "tries": [{"rise_db", "score"}],
+"at_unix_s"}`. A file whose bar its own tries don't make is not used.
+Setup's step (Seventh) takes the tries. The rule reading the bar on both
+routes, behind its own switch, and the reset's removal of the file come
+next.
+
 What each costs. 5: in a busy room a question put to the lamp without
 its name in the service's text and without a face turned to it is not
 answered, nor one from someone whose face the camera cannot see or with the

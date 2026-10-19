@@ -28,7 +28,7 @@ use crate::{
 use lamp_bus::{Bus, Notice, Publisher, Subscriber};
 use lamp_msgs::{
     Decision, Diagnostic, Faces, Level, NameHeard, RoomState, Rules, SkillAsk, Speech, TaskStatus,
-    Voice, VoiceArrival, VoiceState,
+    Voice, VoiceArrival, VoiceState, VoiceTurn,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
@@ -509,6 +509,13 @@ impl Ear {
             wait = Duration::ZERO;
         }
         taken
+    }
+
+    /// Its source's comings and goings, passed over unsaid: for a topic
+    /// silent between its messages for longer than the bus's lease, whose
+    /// source would otherwise be said gone and back around each one.
+    fn sources_unsaid(&mut self) {
+        let _ = self.subscriber.notices();
     }
 
     /// Say what has changed about the topic's source. True if it has just
@@ -1679,6 +1686,15 @@ fn run_inner<D: Decider + Send + 'static>(
         Some(_) => Some(Ear::new(bus, VoiceArrival::TOPIC, VoiceArrival::TYPE)?),
         None => None,
     };
+    // The voice's verdict on each turn, only with `--hello-quiet
+    // to-the-lamp` (#1155): a turn held back as not said to the lamp is
+    // taken back from the hello's quiet.
+    let mut turns = match hello.as_ref() {
+        Some(hello) if hello.quiet_to_the_lamp() => {
+            Some(Ear::new(bus, VoiceTurn::TOPIC, VoiceTurn::TYPE)?)
+        }
+        _ => None,
+    };
     // Nor, without `--gate`, the skills' asks (#939).
     let mut skill_asks = match hello.as_ref() {
         Some(hello) if hello.answers_skills() => {
@@ -1747,6 +1763,18 @@ fn run_inner<D: Decider + Send + 'static>(
         let now = Instant::now();
         let now_us = lamp_ipc::monotonic_us();
         let unreadable = &mut policy.totals.unreadable;
+        // A turn's verdict before the voice's state: one for the last turn
+        // is its, though the next has begun in the same look (#1155). Said
+        // once a turn, silent between: its source is not said gone and back
+        // around each, as the voice's words were on 14 October.
+        if let Some(turns) = turns.as_mut() {
+            for turn in turns.take::<VoiceTurn>(Duration::ZERO, unreadable, policy.say) {
+                if let Some(hello) = policy.hello.as_mut() {
+                    hello.verdict(turn.request, turn.verdict);
+                }
+            }
+            turns.sources_unsaid();
+        }
         for (state, at_us) in voice.take_sent::<VoiceState>(Duration::ZERO, unreadable, policy.say)
         {
             if let Some(judges) = policy.judges.as_mut() {
@@ -1945,7 +1973,9 @@ fn run_inner<D: Decider + Send + 'static>(
                 progress.talk(now);
             }
             if let Some(hello) = policy.hello.as_mut() {
-                hello.talk(now);
+                for (piece, _) in &pieces {
+                    hello.heard(now, piece.request);
+                }
             }
         }
         for (piece, at_us) in pieces {

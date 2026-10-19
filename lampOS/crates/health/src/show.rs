@@ -434,6 +434,7 @@ mod tests {
             message: message.into(),
             items,
             missing: missing.iter().map(|name| (*name).to_owned()).collect(),
+            quiet_ms: 0,
         };
         assert_eq!(health.check(), Ok(()));
         health

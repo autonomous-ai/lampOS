@@ -51,6 +51,7 @@ fn envelope(lease: MicrophonePrivacy) -> Message {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Event {
+    Revoke,
     Open,
     Read,
     Discard,
@@ -654,4 +655,219 @@ fn a_receiver_fence_during_open_or_read_closes_before_handing_on_sound() {
         assert_eq!(kinds.last(), Some(&Event::Drop));
         assert_eq!(kinds.contains(&Event::Read), !during_open);
     }
+}
+
+#[test]
+fn pcm_export_requires_a_complete_current_read_and_keeps_its_source_time() {
+    for (allowed, count, read_us, fence_stays) in [
+        (false, BLOCK, 1, true),
+        (true, BLOCK / 2, 1, true),
+        (true, BLOCK, FRESH_US, true),
+        (true, BLOCK, 1, false),
+        (true, BLOCK, 1, true),
+    ] {
+        let mut fixture = Fixture::new();
+        fixture.observe(lease(1, START, allowed)).unwrap();
+        let clock = fixture.clock.clone();
+        let events = fixture.events.clone();
+        let mut handed = Vec::new();
+        fixture
+            .owner
+            .tick_export_while(
+                || clock.get(),
+                || {
+                    Ok(Fake {
+                        clock: clock.clone(),
+                        events: events.clone(),
+                        read_us,
+                        count,
+                        fail_read: false,
+                        fail_discard: false,
+                    })
+                },
+                false,
+                || fence_stays || clock.get() == START,
+                |samples, permit, sequence, at_us| {
+                    assert_eq!(samples, &[100; BLOCK]);
+                    handed.push((permit, sequence, at_us));
+                },
+            )
+            .unwrap();
+        let valid = allowed && count == BLOCK && read_us < FRESH_US && fence_stays;
+        assert_eq!(handed.len(), usize::from(valid));
+        if valid {
+            assert_eq!(handed[0].1, 0);
+            assert_eq!(handed[0].2, START + read_us);
+            assert!(handed[0].0.until_us <= START + FRESH_US);
+            assert_eq!(fixture.owner.samples, [0; BLOCK]);
+        }
+    }
+}
+
+#[test]
+fn pcm_partial_read_is_destroyed_by_mute_and_never_replayed_after_reopen() {
+    let mut fixture = Fixture::new();
+    fixture.observe(lease(1, START, true)).unwrap();
+    assert!(
+        fixture
+            .tick(BLOCK / 2, 0, 1, false, false)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(fixture.owner.filled, BLOCK / 2);
+    fixture.observe(lease(2, START + 1, false)).unwrap();
+    assert_eq!(fixture.owner.samples, [0; BLOCK]);
+    assert_eq!(fixture.owner.filled, 0);
+    let clock = fixture.clock.clone();
+    let mut copies = 0;
+    fixture
+        .owner
+        .tick_export_while(
+            || clock.get(),
+            || panic!("muted"),
+            false,
+            || true,
+            |_, _, _, _| copies += 1,
+        )
+        .unwrap();
+    assert_eq!(copies, 0);
+    // A new controller session reopens from an empty partial block.
+    fixture.clock.set(START + 2);
+    let mut reopened = lease(1, START + 2, true);
+    reopened.session_id = "fedcba9876543210".into();
+    fixture.observe(reopened).unwrap();
+    assert!(
+        fixture
+            .tick(BLOCK / 2, 0, 1, false, false)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(fixture.owner.filled, BLOCK / 2);
+    let mut stamps = Vec::new();
+    fixture
+        .owner
+        .tick_export_while(
+            || clock.get(),
+            || panic!("already open"),
+            false,
+            || true,
+            |_, permit, sequence, at| stamps.push((permit, sequence, at)),
+        )
+        .unwrap();
+    assert_eq!(stamps.len(), 1);
+    assert_eq!(stamps[0].1, 1);
+    assert!(stamps[0].2 >= START + 2);
+}
+
+#[test]
+fn publication_is_revoked_before_driver_discard_even_on_internal_read_failure() {
+    for fail_read in [false, true] {
+        let mut fixture = Fixture::new();
+        fixture.observe(lease(1, START, true)).unwrap();
+        let publication = std::sync::Arc::new(PublicationGate::default());
+        let permit = fixture.owner.maintain(START).unwrap().unwrap();
+        publication.update(Some(permit), 0);
+        let gate = publication.clone();
+        let events = fixture.events.clone();
+        let clock = fixture.clock.clone();
+        fixture.owner.before_close(move || {
+            gate.update(None, 0);
+            assert!(!gate.allows(permit, 0, clock.get()));
+            events.borrow_mut().push((Event::Revoke, clock.get()));
+        });
+        let result = fixture.tick(BLOCK, 0, 1, fail_read, false);
+        if fail_read {
+            assert!(result.is_err());
+        } else {
+            assert!(result.unwrap().is_some());
+            assert!(publication.allows(permit, 0, fixture.clock.get()));
+            fixture.owner.invalidate().unwrap();
+        }
+        assert!(!publication.allows(permit, 0, fixture.clock.get()));
+        let kinds = fixture.kinds();
+        let discard = kinds
+            .iter()
+            .position(|event| *event == Event::Discard)
+            .unwrap();
+        assert_eq!(kinds[discard - 1], Event::Revoke);
+    }
+}
+
+#[test]
+fn closing_between_complete_blocks_leaves_one_sequence_gap_even_for_a_short_mute() {
+    let mut fixture = Fixture::new();
+    fixture.observe(lease(1, START, true)).unwrap();
+    fixture.tick(BLOCK, 0, 1, false, false).unwrap().unwrap();
+    // The first complete block used sequence zero; there is no partial PCM.
+    assert_eq!(fixture.owner.sequence, 1);
+    assert_eq!(fixture.owner.filled, 0);
+    fixture.observe(lease(2, START + 1, false)).unwrap();
+    assert_eq!(fixture.owner.sequence, 2);
+    for _ in 0..100 {
+        fixture.owner.invalidate().unwrap();
+        assert!(fixture.owner.maintain(START + 1).unwrap().is_none());
+    }
+    assert_eq!(fixture.owner.sequence, 2);
+    fixture.clock.set(START + 2);
+    let mut next = lease(1, START + 2, true);
+    next.session_id = "fedcba9876543210".into();
+    fixture.observe(next).unwrap();
+    let clock = fixture.clock.clone();
+    let events = fixture.events.clone();
+    let mut emitted = Vec::new();
+    fixture
+        .owner
+        .tick_export_while(
+            || clock.get(),
+            || {
+                Ok(Fake {
+                    clock: clock.clone(),
+                    events: events.clone(),
+                    count: BLOCK,
+                    read_us: 1,
+                    fail_read: false,
+                    fail_discard: false,
+                })
+            },
+            false,
+            || true,
+            |_, _, sequence, _| emitted.push(sequence),
+        )
+        .unwrap()
+        .unwrap();
+    assert_eq!(emitted, [2]);
+}
+
+#[test]
+fn read_failure_reserves_a_gap_and_sequence_exhaustion_still_drops_the_handle() {
+    let mut fixture = Fixture::new();
+    fixture.observe(lease(1, START, true)).unwrap();
+    assert!(fixture.tick(BLOCK, 0, 1, true, false).is_err());
+    assert_eq!(fixture.owner.sequence, 1);
+    assert!(!fixture.owner.is_open());
+    fixture.owner.invalidate().unwrap();
+    assert_eq!(fixture.owner.sequence, 1);
+
+    let mut fixture = Fixture::new();
+    fixture.observe(lease(1, START, true)).unwrap();
+    fixture.tick(BLOCK / 2, 0, 1, false, true).unwrap();
+    fixture.owner.sequence = u64::MAX;
+    assert!(fixture.owner.invalidate().is_err());
+    assert!(!fixture.owner.is_open());
+    assert_eq!(fixture.owner.filled, 0);
+    assert_eq!(fixture.owner.samples, [0; BLOCK]);
+    assert_eq!(fixture.owner.sequence, u64::MAX);
+    assert_eq!(fixture.kinds().last(), Some(&Event::Drop));
+    assert!(fixture.owner.maintain(START + 1).is_err());
+    let clock = fixture.clock.clone();
+    assert!(
+        fixture
+            .owner
+            .tick(
+                || clock.get(),
+                || panic!("exhaustion must not reopen"),
+                false
+            )
+            .is_err()
+    );
 }

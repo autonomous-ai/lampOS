@@ -372,6 +372,60 @@ show only those colours over the whole ring, no brighter than 24, and black.
 It sends black and closes the device just before the marker that starts the
 lamp, so the voice's ring worker is again the only writer.
 
+### The waking face (#1681)
+
+From power-on until the voice takes the ring, nothing else of a set-up lamp
+lights it, often for a quarter of a minute, and a dark lamp reads as a
+broken one. With `LAMP_WAKING_FACE=on`, `lamp-setup wake`
+(`lamp-waking.service`, early at boot, only once setup's marker exists)
+lights it as a creature waking: the asleep face's warm glow at the bottom
+opens slowly up the ring, as an eye opens, over 20 s, and breathes every
+6 s, never dark at the low of a breath; the bottom stays the brightest,
+and no channel is above 24. It is lit from its first frame and fades the
+rest of the way in over 1.5 s. If no voice has asked for the ring within
+5 minutes, it turns pale and grey over the whole ring over 3 s and
+breathes every 10 s, and stays so, still ready to be asked: a voice that
+never started. No spinner and no blink.
+
+It writes through `lamp_ring::waking::WakingRing`, the third writer that
+needs no permit: it can show only that face and black. The ring opens with
+a lock (`try_lock`), and a ring the voice cannot lock stays off all its
+session, so the hand-over is asked, never raced: `lamp_ring::linux::open`
+(the ring worker) and `open_asleep` (the asleep face) first ask on
+`/run/lampos-waking/release.sock`; the waking face fades out over 600 ms,
+sends black, closes the device and only then answers. `open_privacy` (the
+physical-mute indication) asks for it at once: black and closed with no
+fade, within 100 ms of asking. It waits no longer than 100 ms, and a ring
+still locked then is opened without the lock (`lamp_ring::waking::take`):
+the privacy switch's light never depends on the waking face. A face that
+is alive but stuck may land the frame it was stuck on, and nothing more:
+asked at once, it sends its black only within 50 ms of reading the ask
+and otherwise closes with no frame, and the indication paints again every
+25 ms. The voice's own asks
+are given up after 2 s and the open goes on; that is only for a waking
+face that doesn't answer. With no socket
+(the switch off, or the face already gone) the open goes on at once, as
+before. The setup light's opener and the waking face's own never ask.
+
+Targets, not yet measured on a lamp: first light within 300 ms of the
+unit's start, and the ring dark for at most 1 s at the hand-over. Not
+shown: power-on to the unit's start, and whether `/dev/spidev3.0` is there
+by then (it is tried every 200 ms until it is).
+
+Host tests: `crates/ring/src/waking.rs` (capped and the same on both sides
+of the bottom, closed it is the asleep glow, it only opens, a breath never
+dark, unwell pale over the whole ring; the ask's 2 s bound, the at-once ask's
+100 ms, a missing socket, and the privacy open locking when it can and
+taking the ring when it cannot); `crates/setup/src/wake.rs` (the switch, lit from the first frame,
+the fade-in and the opening, 6 s then 10 s breaths, pale after 5 minutes,
+the fade-out); `crates/setup/tests/wake.rs` (with a real `try_lock` on a
+file: the voice's lock fails while the face shows and succeeds the moment
+it is answered, the privacy ring has it within 100 ms, a face that never
+answers cannot keep the privacy ring dark past 100 ms and writes nothing
+after but the frame it was stuck in, a device that isn't
+there yet is tried again, and an ask before any ring opened is answered at
+once).
+
 ### The lamp's own light
 
 The resting face is also the lamp's light: a colour and a level that

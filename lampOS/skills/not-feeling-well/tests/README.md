@@ -1,6 +1,8 @@
 # Not feeling well's tests
 
-**How they were made.** Not on a lamp (#1681). Each case's `.jsonl` files
+**How they were made.** Not on a lamp (#1681). The four `quiet_ms` cases
+(#1681's third PR) model each part reporting every second and `lamp/health`
+every 5 s only, its `quiet_ms` worked out as `lamp-health` does. Each case's `.jsonl` files
 were written by a script in the format `lamp-bus record` writes, as Light
 out's were: `lamp/health` every 5 s and at once when its level changes,
 each message good for 15 s (`expires_ms`), as `lamp-health serve` says it
@@ -24,6 +26,10 @@ test -p lamp-skills`, which runs every skill's cases).
 | `quiet-at-night` | The first case from 23:00 | Pass: nothing |
 | `waits-out-the-night` | From 07:50, `error` from 60 to 900 s | Pass: nothing in the night; once at 08:00 (600 s), the chance kept; given back at 905 s |
 | `ends-when-health-goes-silent` | From 10:00, `error` from 60 s; the last health at 200 s; `voice/state` every 10 s from 200.5 s | Pass: once at 90 s; given back at 220.5 s, the first message after the health ran out at 215 s |
+| `droops-once-a-part-that-was-well-goes-quiet` | From 10:00, every part well; the eyes' last report at 59.8 s, back at 500.8 s (a crashed part, `quiet_ms`) | Pass: `sleepy` and a dim once at 360 s (300.2 s unheard); given back at 510 s, 10 s after the last health with `quiet_ms` (500 s) |
+| `quiet-on-a-short-restart` | From 10:00, the body restarts five times, gone 6 to 9 s each (stale, then `ok` again) | Pass: nothing (`quiet_ms` at most 5.4 s) |
+| `quiet-on-a-part-never-heard-from` | From 10:00, the eyes expected and never heard from (missing, the lamp `stale` for 10 min) | Pass: nothing (no `quiet_ms`) |
+| `droops-once-for-a-part-that-errs-and-then-stops` | From 10:00, the body says `error` from 60.6 s, its last report at 119.6 s | Pass: once at 95 s (the first `error` health at 65 s); nothing at 5 min of its silence: a part that keeps its `error` is not in `quiet_ms` |
 
 The `sleepy` look has no case: whether the droop and the dim read as a lamp
 a little unwell, not a status light, is for the lamp check. The 30 s and the

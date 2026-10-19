@@ -152,6 +152,7 @@ const PARTS: &[&str] = &[
     "lamp-tasks",
     "lamp-update",
     "lamp-voice",
+    "lamp-waking",
 ];
 
 /// How far a session's last event may be from its files' modification time
@@ -712,6 +713,7 @@ const BUS_TOPICS: &[&str] = &[
     "voice/sound",
     "voice/state",
     "voice/timing",
+    "voice/turn",
 ];
 
 /// Standard base64, as `lamp-bus record` writes payloads.
@@ -1439,6 +1441,7 @@ mod tests {
             line("humans/faces/tracked", 2, json!({"faces": [face, {"id": "b", "xmin": 0.1}]})),
             line("voice/state", 2, json!({"state": "listening"})),
             line("voice/state", 3, json!({"state": SECRETS[13]})),
+            line("voice/turn", 3, json!({"request": 7, "verdict": "held_back"})),
             line("humans/names", 3, json!({"name": SECRETS[10]})),
             line("humans/known/annasmith", 3, json!({})),
             line(SECRETS[12], 3, json!({})),
@@ -1885,6 +1888,10 @@ mod tests {
         // fields... and `person` beside `faces` (the reviewer's P3 on #1165).
         assert_eq!(left["bus_fields_by_topic"]["humans/faces/tracked"], 6);
         assert_eq!(left["bus_messages_by_topic"]["voice/state"], 1);
+        // A turn's verdict (#1155) is lampOS's: counted under its topic, and
+        // what it says left out.
+        assert_eq!(left["bus_messages_by_topic"]["voice/turn"], 1);
+        assert!(!all_output(&out).contains("held_back"));
         // `humans/names`, `humans/known/annasmith` and a secret topic are not
         // lampOS's topics: counted as `other`, never by their names.
         assert_eq!(left["bus_messages_by_topic"]["other"], 3);
