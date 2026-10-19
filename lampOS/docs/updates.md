@@ -1127,7 +1127,7 @@ the file is never read back.
 | memory | a tidy job's input and result (`jobs` table) | JSON in TEXT | none | refused (`tidy.rs:52-93`; `#[should_panic]` test `tidy.rs:395`) | refused (`Category`, `tidy.rs:44`) | not at start: that tidy fails "stored tidy input is invalid" (`days.rs:966`, `1115`, `1135`). Whether the job ever clears is unread |
 | update | `/var/lib/lampos-update/state.json` | JSON | none | read, dropped (`records.rs:50`) | n/a | read when a round acts (`round.rs:503` → `records.rs:270`). Unparseable is set aside as `state.json.corrupt-<ms>` with a line (low); a readable newer one loses its fields on the next save (`records.rs:309`). `peek_state` falls back to empty silently (`records.rs:302`) |
 | update | `/var/lib/lampos-update/journal.json`, a switch under way | JSON | none | read, dropped (`records.rs:104-149`) | n/a | one it can't parse: every round is `Failed("the journal cannot be read")` (`round.rs:498`), never set aside, so updates stop until someone removes it. A newer field about what to put back is not put back |
-| eyes | forgets waiting, `/var/lib/lampos-eyes/set-aside/forgets-pending` | JSON | none | read (`who.rs:136`) | n/a | at start a line, and the eyes start (`who.rs:482-484`); then **every `forget` request fails** (`who.rs:623`) while it can't be read |
+| eyes | forgets waiting, `/var/lib/lampos-eyes/set-aside/forgets-pending` | JSON | none | read | n/a | set aside as `forgets-pending.unreadable-<unix s>` with a line, never counted as records, and forgetting goes on; merged back at a start once it can be read (`who.rs` `pending`, #1680) |
 | skills | skills the person turned off, `/var/lib/lampos-skills-state/off` (cloud reads it too, `cloud/src/skills.rs:81`) | text lines | none | n/a | n/a | a line that isn't a plain name is skipped with no line (`skills/src/lib.rs:3158-3170`) and gone at the next rewrite (`lib.rs:3178-3190`) |
 | cloud | login a ping rotated, `/var/lib/lampos-cloud/rotated.json` | JSON | none | read (`cloud/src/account.rs:14`) | n/a | unreadable falls back to setup's account silently (`main.rs:124-128`); the next rotation overwrites it whole |
 | cloud | queue state, `/var/lib/lampos-cloud/reports/state.json` | JSON | none | read; no `serde(default)`, so a retyped or missing field fails | n/a | **starts empty silently** (`reports.rs:791-793`): `seq` back to 0, the next report reuses seq 1 (tested) |
@@ -1203,7 +1203,11 @@ test does (#1512):
 7. **controls**, **expression** (#2065), **records**, **body**: read their files
    one release forward (one PR each).
 8. The medium rows after: **cloud** (reports deleted and `state.json`
-   reset silently), **eyes** (`forgets-pending`), **skills** (`off`).
+   reset silently), **eyes** (`forgets-pending`: done, set aside with a
+   line), **skills** (`off`). The eyes' `.from-photos` stays as it is: a
+   file it can't read, a later version's included, is deleted on purpose,
+   since unconfirmed prints out of the 30 days' reach are no one's to keep
+   (the reviewer on #1968).
 
 ## Most likely wrong on a lamp
 
