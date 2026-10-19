@@ -1056,7 +1056,7 @@ It needs two files in `/etc/lampOS/voice`, root's and 0600:
 
 | File | Placed by | What reads it |
 |---|---|---|
-| `second.json` | install and the updater, from `deploy/product/settings/second.json` (the relay's `…/api/v1/ai`, `gpt-4.1-mini`, ElevenLabs), kept up to date while it is install's own; a lamp's own is kept | `LAMP_VOICE_SECOND_CONFIG` |
+| `second.json` | install, and an update round before it writes a voice unit that names it, from `deploy/product/settings/second.json` (the relay's `…/api/v1/ai`, `gpt-4.1-mini`, ElevenLabs), kept up to date while it is install's own; a lamp's own is kept. On a lamp whose updater predates the round's step, the voice places the same bytes as it starts when the file is missing (`second_config::place_product_if_missing`; updates.md) | `LAMP_VOICE_SECOND_CONFIG` |
 | `credential` | setup (the user's key), or install from V1's config; the same file `provider.json` names | second.json's `llm_credential_file`, for every service |
 
 Without either, the voice does not start, and the route never falls back to

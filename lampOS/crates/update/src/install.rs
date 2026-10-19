@@ -335,6 +335,9 @@ pub const PROVIDER: &str = include_str!("../../../deploy/product/settings/voice-
 /// ([`CREDENTIAL_PATH`]). Private and kept as `provider.json` is: up to date
 /// while it is install's own, and a lamp's own (lamp-4ace's) kept.
 pub const SECOND_PATH: &str = "/etc/lampOS/voice/second.json";
+/// Where the voice's unit names it: the round places it when the build's
+/// voice unit does (`round::Round::place_second`).
+pub const SECOND_CONFIG_ENV: &str = "LAMP_VOICE_SECOND_CONFIG";
 pub const SECOND: &str = include_str!("../../../deploy/product/settings/second.json");
 /// The voice's key, as `provider.json` names it. It is the user's (the owner on
 /// #806, 2026-10-16 16:13): setup takes it from the account page or the app,
