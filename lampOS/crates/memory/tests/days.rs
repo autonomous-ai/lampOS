@@ -1537,3 +1537,60 @@ fn the_follow_up_request_answers_for_a_person_and_refuses_the_room() {
     let (answer, _) = request(&mut store, json!({"op":"follow_up"}), NOW + 3 * DAY);
     assert_eq!(answer["ok"], false, "{answer}");
 }
+
+/// #1693 (2): a pass that found nothing worth keeping, or failed, closes its
+/// job with nothing kept, so jobs never wait out their day and fill the
+/// bounded queue (`busy` at `MAX_PENDING`).
+#[test]
+fn an_empty_result_closes_the_job_with_nothing_kept_and_frees_its_place() {
+    let scratch = Scratch::new("empty-result");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    let mut sources = vec![];
+    for n in 0..lamp_memory::days::MAX_PENDING {
+        let source = store
+            .append(&room, NOW, &format!("Hello {n}"), "Hi", &[])
+            .unwrap();
+        sources.push(source);
+        store
+            .conversation_end(&room, &format!("c{n}"), &[source])
+            .unwrap();
+    }
+    let extra = store.append(&room, NOW, "One more", "Hi", &[]).unwrap();
+    assert_eq!(
+        store
+            .conversation_end(&room, "full", &[extra])
+            .unwrap_err()
+            .code,
+        "busy"
+    );
+    let first = store.conversation_end(&room, "c0", &[sources[0]]).unwrap();
+    let empty = Output {
+        observations: vec![],
+    };
+    assert_eq!(
+        store.tidy_apply(&room, &first.job, &empty).unwrap(),
+        Vec::<u64>::new()
+    );
+    assert!(
+        store
+            .tidy_apply(&room, &first.job, &empty)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        store
+            .conversation_end(&room, "c0", &[sources[0]])
+            .unwrap_err()
+            .code,
+        "done"
+    );
+    // Its place is free again, and nothing was written.
+    store.conversation_end(&room, "full", &[extra]).unwrap();
+    for id in found(&mut store, &room, "Hello") {
+        assert_ne!(
+            store.record(&room, id).unwrap().unwrap().kind,
+            "observation"
+        );
+    }
+}

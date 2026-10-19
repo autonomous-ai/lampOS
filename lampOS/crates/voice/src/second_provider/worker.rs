@@ -538,6 +538,70 @@ pub fn deepseek_key(
     }
 }
 
+/// The memory's observation pass (#1693 (2), `LAMP_MEMORY_OBSERVE`): this
+/// route's DeepSeek model, thinking off, on the relay or DeepSeek's own API
+/// as the route has it, so a person's conversations go to one outside model
+/// (the first builder on #1693). Asked once per conversation, on the
+/// memory's observation thread with a runtime of its own, within
+/// [`crate::remember::OBSERVE_DEADLINE`]; never on a turn's path.
+fn memory_observer(
+    config: &crate::second_config::SecondConfig,
+    credentials: Option<&std::ffi::OsStr>,
+) -> io::Result<crate::remember::Observer> {
+    let key = deepseek_key(config, credentials)?;
+    let base = config
+        .hosted
+        .deepseek_base_url
+        .clone()
+        .unwrap_or_else(|| crate::second_config::DEEPSEEK_BASE_URL.to_owned());
+    let chat = crate::second_provider::net::Chat::deepseek_at(
+        &base,
+        &config.hosted.deepseek_model,
+        key.expose(),
+        Arc::new(Vec::new),
+        false,
+    )
+    .map_err(|error| io::Error::other(error.to_string()))?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    Ok(Box::new(move |input| {
+        runtime.block_on(async {
+            tokio::time::timeout(
+                crate::remember::OBSERVE_DEADLINE,
+                ask_observations(&chat, input),
+            )
+            .await
+            .ok()
+            .flatten()
+        })
+    }))
+}
+
+/// One observation pass: the prompt, the job as quoted data, and the
+/// model's whole answer read as [`crate::remember::observe_output`].
+async fn ask_observations(
+    chat: &crate::second_provider::net::Chat,
+    input: &serde_json::Value,
+) -> Option<serde_json::Value> {
+    let mut stream = chat
+        .send(&[
+            Message::system(crate::remember::OBSERVE_PROMPT),
+            Message::user(input.to_string()),
+        ])
+        .await
+        .ok()?;
+    let mut text = String::new();
+    while let Some(event) = stream.next().await.ok()? {
+        match event {
+            crate::second_provider::net::ChatEvent::Text(piece) => text.push_str(&piece),
+            crate::second_provider::net::ChatEvent::Done => break,
+            _ => {}
+        }
+    }
+    crate::remember::observe_output(&text)
+}
+
 /// How the journal names where DeepSeek is asked: never a URL.
 fn deepseek_where(hosted: &crate::second_config::Hosted) -> &'static str {
     if hosted.deepseek_base_url.is_some() {
@@ -1104,6 +1168,22 @@ pub fn serve(
     // The voice unit's credentials (`LoadCredential=`), passed to this
     // worker alone (`process.rs`).
     let credentials = std::env::var_os(crate::second_config::CREDENTIALS_ENV);
+    // The memory's observation pass (#1693 (2)), with this route's model.
+    if crate::remember::observe_on() && tools.memory.is_some() {
+        match memory_observer(&config, credentials.as_deref()) {
+            Ok(observer) => {
+                crate::remember::observe_with(observer);
+                eprintln!(
+                    "lamp-voice second: at each conversation's end the memory's observation pass asks {} {} (LAMP_MEMORY_OBSERVE)",
+                    config.hosted.deepseek_model,
+                    deepseek_where(&config.hosted)
+                );
+            }
+            Err(error) => eprintln!(
+                "lamp-voice second: no observation pass, the memory keeps only what it is asked to: {error}"
+            ),
+        }
+    }
     // A web search as functions of its own, with LAMP_SECOND_SEARCH:
     // declared beside the lamp's tools and answered here.
     let search = search_for(&config, route, credentials.as_deref())?.map(Arc::new);
@@ -5490,5 +5570,66 @@ mod memory_switches {
         );
         drop(scope);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+/// #1693 (2): one observation pass asks this route's DeepSeek model with
+/// thinking off, the prompt as the system message and the job as quoted
+/// data, and reads its streamed answer as one JSON object.
+#[cfg(test)]
+mod memory_observer {
+    use serde_json::json;
+    use std::sync::Arc;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[tokio::test]
+    async fn a_pass_asks_deepseek_without_thinking_and_reads_its_streamed_json() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0; 8192];
+            while !String::from_utf8_lossy(&request).contains("\"stream\":true") {
+                let n = socket.read(&mut buffer).await.unwrap();
+                request.extend_from_slice(&buffer[..n]);
+            }
+            socket
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n\
+                      data: {\"choices\":[{\"delta\":{\"content\":\"{\\\"observations\\\":[{\\\"text\\\":\\\"Tea, \"}}]}\n\n\
+                      data: {\"choices\":[{\"delta\":{\"content\":\"no sugar\\\",\\\"category\\\":\\\"preference\\\",\\\"source_ids\\\":[3],\\\"supersedes\\\":null}]}\"}}]}\n\n\
+                      data: [DONE]\n\n",
+                )
+                .await
+                .unwrap();
+            String::from_utf8(request).unwrap()
+        });
+        let chat = crate::second_provider::net::Chat::deepseek_at(
+            &format!("http://{address}"),
+            "deepseek-flash",
+            "secret",
+            Arc::new(Vec::new),
+            false,
+        )
+        .unwrap();
+        let input = json!({"job":"j7","source_ids":[3],"records":[{"id":3,"heard":"synthetic: tea, no sugar"}]});
+        let output = super::ask_observations(&chat, &input).await.unwrap();
+        assert_eq!(
+            output,
+            json!({"observations":[{"text":"Tea, no sugar","category":"preference","source_ids":[3],"supersedes":null}]})
+        );
+        let request = server.await.unwrap();
+        assert!(
+            request.contains("\"model\":\"deepseek-flash\""),
+            "{request}"
+        );
+        assert!(
+            request.contains("\"thinking\":{\"type\":\"disabled\"}"),
+            "{request}"
+        );
+        assert!(request.contains("untrusted history"), "{request}");
+        assert!(request.contains("\\\"job\\\":\\\"j7\\\""), "{request}");
+        assert!(!request.contains("\"tools\""), "{request}");
     }
 }

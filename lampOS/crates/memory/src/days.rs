@@ -1066,6 +1066,17 @@ impl Days {
                 "memory changed while the model was working",
             ));
         }
+        // Nothing worth keeping, or a pass that failed (#1693 (2)): the job
+        // is done with nothing kept, so it neither waits out its day nor
+        // counts towards `busy`. A retry finds it done, as for any result.
+        if output.observations.is_empty() {
+            tx.execute(
+                "UPDATE jobs SET state='done',input='',result='[]' WHERE job=?",
+                [job],
+            )?;
+            tx.commit()?;
+            return Ok(vec![]);
+        }
         let input: tidy::Input =
             serde_json::from_str(&input).map_err(|_| bad("stored tidy input is invalid"))?;
         tidy::validate_output(&input, output).map_err(|_| {

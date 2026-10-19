@@ -361,6 +361,39 @@ the unchanged legacy client, used unless the new Days client is selected.
     (through the voice's Days client against the real store: what recall
     gave goes and something else stays; everything goes, journal included).
 
+- **Kept without being asked** (#1693 (2), `LAMP_MEMORY_OBSERVE=on`,
+  with the Days client, on the second route only; off unless set).
+  - **When:** at each conversation's end (45 s idle, or another person),
+    the voice's Days writer asks for the memory's frozen job
+    (`conversation_end` without `submit`, its answer read up to 48 KiB) and
+    hands it to one observation thread, never on a turn's path.
+  - **The model:** the second route's own DeepSeek model, thinking off, on
+    the relay or DeepSeek's own API as the route has it, so a person's
+    conversations go to one outside model. It is asked with
+    `remember::OBSERVE_PROMPT` (`memory-days.md`'s instruction, plus never
+    to keep health, money or other people's private matters unasked),
+    within 30 s.
+  - **What is kept:** its JSON goes to the memory as `tidy_apply`, which
+    checks it with `tidy.rs`'s own validators and the store's (cited
+    sources from this conversation only, eight at most, 300 bytes each,
+    supersedes only a current one of the same category).
+  - **Nothing, refused, or busy:** a model that fails, gives nothing usable
+    or takes too long, a proposal the memory refuses, or a second job while
+    two wait, closes the job with nothing kept (`tidy_apply` with an empty
+    list), so jobs never wait out their day and fill the memory's queue.
+  - **The journal** says counts and milliseconds only: proposed, kept, or
+    refused and why.
+  - **Privacy:** with it on, each conversation's text leaves the lamp once
+    more, to the same model ([service-privacy.md](service-privacy.md)).
+  - **Tests:** `crates/memory/tests/voice_observe.rs` (the voice's client,
+    the real store, a scripted model: kept, then closed with nothing);
+    `days::an_empty_result_closes_the_job_with_nothing_kept_and_frees_its_place`;
+    `remember::tests::the_observation_pass_reads_only_the_models_one_json_object`;
+    `second_provider::worker::memory_observer` (DeepSeek asked without
+    thinking, a streamed answer read).
+  - **Before it's on:** the dry run on recorded conversations, against the
+    first builder's bar (under 1 in 10 kept wrongly, none intrusive).
+
 - **Once, at a natural moment** (#1693 (3), `LAMP_MEMORY_THREADS=on`,
   with the Days client only; off unless set; both voice routes since
   twelve-P2). A session opened for someone
