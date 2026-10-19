@@ -4,6 +4,28 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 17:33 merged #1864 (Seventh's refused-session tests, tests and docs) as b45aaf45a; #1567 stays open
+- 17:31 regates of #1811 (1963849d4) and #1827 (4f7afb94a) after the rebase: green; first builder's merges
+- 17:30 merged #1862 (Tests' pump-wake tests into the realtime group, config and docs) as 9867cc4dc
+- 17:29 read #1868 (Thirteen's speaking through concentration): no finding; for the first builder (body motion, lamp-4ace's catalogue)
+- 17:23 read #1867 (Thirteen's gaze off without --gaze): no finding; for the first builder (on by default, the body)
+- 17:22 merged #1860 (Sixth's memory.md caution back, docs) as 660248377
+- 17:16 #1859's P3s taken at fb510abf7, gate clean; waiting on an ARM64 run for that head
+- 17:15 read #1864 (Seventh's refused-session tests, tests and docs): no finding; merge on green ARM64
+- 17:13 gate of #1827 (Nine's sitter print): green, the same /tmp/leh clash; needs a rebase after #1811; first builder's merge
+- 17:10 gate of #1811 (Nine's sitter by place): green, the same lamp-voice /tmp/leh clash; first builder's merge
+- 17:09 read #1766 (first builder's look for things): no blocking finding, one P3 (stale [search] comment); needs a rebase and fold
+- 17:09 read #1837 (first builder's skill snooze/off): no blocking finding, one P3 (no fsync on the off file); needs a rebase and fold
+- 17:08 merged #1858 (Tests' GPIO tests on a tenth of the privacy wait, cfg(test) only, #1806) as 4a188e789
+- 17:05 merged #1857 (Tests' ring flood test, Linux keeps its 1,000; tests only, #1569 row 24) as 164f07e0a; #1569 stays open
+- 17:04 gate of #1760 (Nine's room/activity): green; the one eyes failure is lamp-voice's /tmp/leh clash, fixed in #1859; first builder's merge
+- 17:01 read #1859 (Ten's face seems read): no blocking finding, two P3s; for the first builder (FER2013 research-only terms)
+- 16:57 merged #1847 (El's pale breath for Not feeling well) as 4a39f0412; #1681 left open for its lamp check
+- 16:53 merged #1845 (Tests' guard: ARM64 PR paths held to the docs crates read) as f9c9f8d9b
+- 16:51 read #1839 (Sixth's scoped second-route context): no blocking finding, one P3 (memory.md drops a caution that still holds by default); first builder's merge
+- 16:48 merged #1853 (Tests' GPIO test split, tests only, #1806) as d7327b8a7; #1806 left open
+- 16:45 merged #1842 (Eighth's light while muted) as 73e9a2394; closed #1816
+- 16:39 full read of #1732 (Second's bedtime and morning, five slices): nothing changes a product lamp today; four P2s (install order, one late sample ends the night's rest, a clock set forward locks a daily trigger, the reset misses the two new folders) and a msgs/bus docs gap; the first builder's merge
 - 16:31 read #1847 (El's pale breath): no blocking finding, two P3s; needs a rebase after #1835
 - 16:27 merged #1833 (Tests' decline told held_back on voice/turn) as 32b3b5519; closed #1155
 - 16:23 read #1842 (Eighth's light while muted): no blocking finding, one P3 (the doc says tests aren't taken; they are read, never drawn); merge on green ARM64
