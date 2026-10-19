@@ -3,7 +3,8 @@
 # network is kept only once joined, with an address and the broker reached, within 60 s; else the
 # old file and the old network come back (60 s more). Never the hotspot. Then the lamp says what
 # happened through the voice's say service; with no network back, the lost line at most once a
-# minute for 10 minutes. The password is never journalled.
+# minute for 10 minutes, as the voice's recording `wifi_lost`, never through its model (a missing
+# recording is journalled, and nothing said). The password is never journalled.
 [Unit]
 Description=lampOS Wi-Fi changed after setup: one change
 CollectMode=inactive-or-failed
