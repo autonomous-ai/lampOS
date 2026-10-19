@@ -531,7 +531,15 @@ fn both_late_audio_workers_keep_their_cleanup_causes() {
 
 fn speaker_finish_failure(speaker_late: bool, capture_late: bool) -> (String, Vec<Value>) {
     use std::os::unix::fs::PermissionsExt;
-    let output = std::env::temp_dir().join(format!("lv-1620-{}", monotonic_us()));
+    // One folder each: the module's three callers run in parallel, and two
+    // named by the microsecond alone once found the same name taken
+    // (`File exists`, seen 3 times in 45 runs of `termination::`; #1569 row 32).
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let output = std::env::temp_dir().join(format!(
+        "lv-1620-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
     fs::create_dir(&output).unwrap();
     fs::set_permissions(&output, fs::Permissions::from_mode(0o700)).unwrap();
     let (mut owner, current, _) = active_reply();
