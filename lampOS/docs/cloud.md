@@ -102,6 +102,37 @@ is the same light. Two differences from V1 the page should know:
 - **The reset** empties `/var/lib/lampos-cloud` and removes
   `/etc/lampOS/setup/backend.json` with the rest of the person's data.
 
+## What the backend reads
+
+What the backend takes from a lamp's messages on `fd_channel`, and when
+(#1396). Field names and meanings only. Each later change to this contract
+updates this section in the same pull request.
+
+- **The `info` message:** the one said unasked on each connection, and the
+  reply to `cmd: info`. The backend keeps facts about the device from it:
+  - `id`: the device it is about. A message without it is passed over.
+  - `device` stays `"lamp"`: the backend sorts a lamp's messages by it, so
+    another value would change how the lamp is handled.
+  - `mac`, the lamp's `lamp-XXXX` name: kept on the device's record. An
+    `info` without it is passed over.
+  - `version`: kept as the installed build.
+  - `timezone`: kept as the device's zone, when it is a zone name the
+    backend knows.
+  - `local_ip`: kept as the lamp's last known address on its network.
+  - `generation`, `"lamp-v2"` (#1731): kept on the device's record as
+    `os_generation`, which the app reads to tell a Lamp 2 from a V1 lamp.
+  - `type` says which message it is; `time`, `wakeword_enabled` and
+    `voice_input_mode` are not kept.
+
+  A field left out, or empty, never clears a stored value: a message
+  without `generation` keeps the `os_generation` there.
+- **The reply to a `data` kind** (`system.info`, `volume.get`, …) is
+  passed back to whoever asked, the app, and is not stored. So a field that
+  rides every reply, as `generation` does, is kept only from `info`, and a
+  fact said only in a `data` reply reaches the app's page but never the
+  device's record.
+- **Health and crash reports:** to come, see #1683.
+
 ## Not yet known, for the backend (#1396)
 
 - Whether the backend's `connected` comes from MQTT, the ping, or both, and
