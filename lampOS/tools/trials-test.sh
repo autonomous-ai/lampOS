@@ -19,6 +19,7 @@ mkdir -p "$T/bin" "$T/units" "$T/proc" "$T/pids" "$T/state" "$T/skills" "$T/memo
 cat >"$T/argv" <<EOF
 lamp-skills.service /opt/lampOS/skills/x/lamp-skills --dir $T/skills --bus-root /run/lampos-bus --tools-dir /run/lampos-skills
 lamp-memory.service /opt/lampOS/memory/x/lamp-memory --dir $T/memory --socket /run/lampos-memory/memory.sock
+lamp-eyes.service /opt/lampOS/eyes/x/lamp-eyes --known-file $T/eyes/known
 EOF
 
 cat >"$T/bin/systemctl" <<'EOF'
@@ -137,6 +138,20 @@ fi
 exec "$@"
 EOF
 
+# lamp-memory's socket, as the thread row's setup sends to it: each line
+# recorded, and answered as the memory answers it, with ids to carry on.
+cat >"$T/bin/socat" <<'EOF'
+#!/usr/bin/env bash
+read -r line
+echo "$line" >>"$FAKE/memory-sent"
+case $line in
+  *'"op":"append"'*) echo '{"ok":true,"id":7}' ;;
+  *'"op":"conversation_end"'*) echo '{"ok":true,"input":{"job":"j3","person":"p-x","generation":1,"source_ids":[7],"records":[],"previous":[]}}' ;;
+  *'"op":"tidy_apply"'*) echo '{"ok":true,"ids":[8]}' ;;
+  *) echo '{"ok":false}' ;;
+esac
+EOF
+
 # A skill's call: recorded, and the behaviour's line follows.
 cat >"$T/bin/fake-call" <<'EOF'
 #!/usr/bin/env bash
@@ -159,7 +174,8 @@ hasnt() { if grep -qF -- "$3" "$2"; then bad "$1 ('$3' in $2)"; else ok; fi; }
 no_dropin() { if ls "$T/units"/*.d/zz-trial.conf >/dev/null 2>&1; then bad "$1: a drop-in is left"; else ok; fi; }
 reset() {
   rm -rf "$T/units"/* "$T/calls" "$T/journal" "$T/answer" "$T/env-ignored" "$T/restarts" \
-    "$T/restarts-before-failing" "$T/bus" "$T/state"/* "$T/pub-fails" "$T/skills"/* "$T/answer2"
+    "$T/restarts-before-failing" "$T/bus" "$T/state"/* "$T/pub-fails" "$T/skills"/* "$T/answer2" \
+    "$T/memory-sent" "$T/eyes"
   mkdir -p "$T/bus"
   : >"$T/calls"
 }
@@ -367,6 +383,39 @@ wait
 [[ $(cat "$T/memory/days.json") == kept && ! -e $T/memory/new.json ]] && ok || bad "forget: the memory store not put back"
 has "forget: lamp-memory stopped for the copy" "$T/calls" "systemctl stop lamp-memory.service"
 has "forget: the lines to play" "$T/out" 'PLAY: "Forget that."'
+
+# thread: a made-up thread seeded over lamp-memory's socket (an exchange,
+# its conversation's end with the exchange's id, the thread with the job
+# and the id, for the made-up person), the eyes paused, the person's name
+# kept fresh in the known file while the line is played, and the file gone
+# after.
+reset
+answer thread
+# Read once the trial has written it, however long its set-up took (Tests'
+# P2 on #2029): not after a fixed time.
+(for _ in $(seq 1 400); do [[ -s $T/eyes/known ]] && break; sleep 0.05; done
+ cat "$T/eyes/known" >"$T/known-seen" 2>/dev/null) &
+"$SCRIPT" thread >"$T/out" 2>&1; check "thread passes" 0 $?
+wait
+person=p-$(printf %s "trial person" | sha256sum | cut -c1-16)
+[[ $(grep -c . "$T/memory-sent" 2>/dev/null) == 3 ]] && ok || bad "thread: not three lines to the memory"
+has "thread: the exchange, the person's" "$T/memory-sent" "{\"op\":\"append\",\"person\":\"$person\","
+has "thread: the conversation's end cites the exchange" "$T/memory-sent" '"source_ids":[7]}'
+has "thread: the thread with the job" "$T/memory-sent" '"job":"j3","observations":[{'
+has "thread: a thread, citing the exchange" "$T/memory-sent" '"category":"thread","source_ids":[7]'
+has "thread: lamp-eyes paused" "$T/calls" "systemctl stop lamp-eyes.service"
+has "thread: lamp-eyes started again" "$T/calls" "systemctl start lamp-eyes.service"
+[[ $(cat "$T/known-seen" 2>/dev/null) == "Trial Person" ]] && ok || bad "thread: the known file wasn't kept: $(cat "$T/known-seen" 2>/dev/null)"
+[[ ! -e $T/eyes/known ]] && ok || bad "thread: the known file was left"
+has "thread: the line to play" "$T/out" 'PLAY: "Hey Lamp, good morning."'
+# A memory that doesn't answer: the setup fails, and all is put back.
+reset
+mv "$T/bin/socat" "$T/bin/socat.off"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$T/bin/socat"; chmod +x "$T/bin/socat"
+"$SCRIPT" thread >"$T/out" 2>&1; check "thread with no memory answering" 3 $?
+mv "$T/bin/socat.off" "$T/bin/socat"
+has "thread: the setup's failure said" "$T/out" "the setup failed"
+no_dropin "thread after a failed setup"
 
 # The memory store's copy is kept in a 0700 folder under the set-aside
 # place, and gone after: even when the runner can't remove it alone, as

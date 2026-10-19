@@ -79,8 +79,10 @@ DROPIN=zz-trial.conf
 #            out when the unit already has the first of them)
 #   CAUSE    one a line: "pub TOPIC latest|event JSON TYPE", "keep TOPIC
 #            latest JSON TYPE" (published every second until the end),
-#            "call NAME JSON" (a skill's function called on lamp-skills'
-#            call.sock, as the voice calls it), "run COMMAND", or "play LINE"
+#            "keepfile PATH TEXT" (TEXT written to PATH every second until
+#            the end, as a file another part keeps fresh), "call NAME JSON"
+#            (a skill's function called on lamp-skills' call.sock, as the
+#            voice calls it), "run COMMAND", or "play LINE"
 #   AFTER    optional: lines as CAUSE's, run at the end before the units are
 #            restarted (a light given back, a presence ended)
 #   FIRST    optional: for a behaviour that is done only when its cause
@@ -98,10 +100,12 @@ DROPIN=zz-trial.conf
 #            kept from before the trial never passes alone
 #   WAIT     seconds to wait for PROOF after the cause
 # In SETASIDE, SETUP and AFTER, @SKILLS_DIR@, @SKILLS_USER@ and @SKILLS_GROUP@
-# are the running lamp-skills' --dir, user and group, @MEMORY_DIR@ is
-# lamp-memory's --dir, and @SRC@ is TRIALS_SKILLS_SRC.
+# are the running lamp-skills' --dir, user and group, @MEMORY_DIR@ and
+# @MEMORY_SOCKET@ are lamp-memory's --dir and --socket, @EYES_KNOWN_FILE@ is
+# lamp-eyes' --known-file, and @SRC@ is TRIALS_SKILLS_SRC. CAUSE's keepfile
+# takes them too.
 # ---------------------------------------------------------------------------
-ROWS="light-out scenes who-was-here activity forget reports nudges smoky dusty light-show"
+ROWS="light-out scenes who-was-here activity forget thread reports nudges smoky dusty light-show"
 # Rows not here, and why: printed by `list`.
 NOT_HERE="bedtime    Bedtime and Morning (#1732): a draft, not merged; three switches, --zone and its daily state, and it moves the body
 nudges     the other three nudges (#1957): sip-of-water, stand-up and wind-down are tried by hand, as rest-your-eyes is here
@@ -200,6 +204,28 @@ play What about my umbrella?"
       EXAMPLE='lamp-voice second: request 3 chat round 1 called forget'
       IN="lamp-voice.service"
       WAIT=240 ;;
+    thread)
+      # #1733 (lamp-voice), #1930 (#1712's second route): an open thread at
+      # least 6 h old is told once, to a session opened for its person. Its
+      # line: remember.rs THREAD_TOLD (#2023), counts only, no words.
+      # The person is made up, "Trial Person", whose memory id is p- and the
+      # first 16 hex of sha256("trial person"), as remember::person_id makes
+      # it. The setup sends three lines to lamp-memory's socket (socat, else
+      # nc -U): an exchange 7 h ago, its conversation's end, and one thread
+      # observation citing it.
+      ABOUT="a thread brought up once: a session for its person is told one open thread (#1733, #2023)"
+      NOTE="the second route, LAMP_VOICE_ROUTE=second, with LAMP_MEMORY_DAYS=on in the voice, and a build with #2023 (its proof line); socat or nc -U on the lamp for the setup. The person is made up: a name kept fresh in the eyes' known file while the eyes are paused, never a camera. The memory store is set aside and put back"
+      SETASIDE="copy @MEMORY_DIR@ lamp-memory.service"
+      SETUP='s=@MEMORY_SOCKET@; p=p-$(printf %s "trial person" | sha256sum | cut -c1-16); at=$(( $(date +%s) * 1000 - 25200000 )); send() { local a i; for i in 1 2 3 4 5 6 7 8 9 10; do if command -v socat >/dev/null; then a=$(printf "%s\n" "$1" | socat -t 10 - "UNIX-CONNECT:$s"); else a=$(printf "%s\n" "$1" | nc -U -w 10 "$s"); fi; [ -n "$a" ] && { printf "%s\n" "$a"; return 0; }; sleep 1; done; return 1; }; id=$(send "{\"op\":\"append\",\"person\":\"$p\",\"at_unix_ms\":$at,\"heard\":\"my sister wedding is on Saturday\",\"said\":\"That sounds lovely\"}" | sed -n "s/.*\"id\":\([0-9]*\).*/\1/p"); [ -n "$id" ] || exit 1; job=$(send "{\"op\":\"conversation_end\",\"person\":\"$p\",\"conversation\":\"trial-thread\",\"source_ids\":[$id]}" | sed -n "s/.*\"job\":\"\(j[0-9]*\)\".*/\1/p"); [ -n "$job" ] || exit 1; send "{\"op\":\"tidy_apply\",\"person\":\"$p\",\"job\":\"$job\",\"observations\":[{\"text\":\"Their sister wedding is on Saturday\",\"category\":\"thread\",\"source_ids\":[$id],\"supersedes\":null}]}" | grep -q "\"ok\":true"'
+      PAUSE="lamp-eyes.service"
+      SWITCHES="lamp-voice.service|LAMP_MEMORY_THREADS=on"
+      CAUSE="keepfile @EYES_KNOWN_FILE@ Trial Person
+play Hey Lamp, good morning."
+      AFTER="run rm -f @EYES_KNOWN_FILE@"
+      PROOF='told one open thread to ask about'
+      EXAMPLE='lamp-voice provider: a session for someone known was told one open thread to ask about (#1693)'
+      IN="lamp-voice.service"
+      WAIT=120 ;;
     reports)
       # #1755 and #1906 (on lamp-voice): reports/state, every 5 s, says
       # share true while the switch is on and the person's yes stands
@@ -349,6 +375,16 @@ placeholders() { # TEXT: with the @...@ names filled from the running units
     [[ -n $value ]] || { say "lamp-memory.service has no --dir" >&2; exit 3; }
     text=${text//@MEMORY_DIR@/$value}
   fi
+  if [[ $text == *@MEMORY_SOCKET@* ]]; then
+    value=$(arg_of lamp-memory.service --socket)
+    [[ -n $value ]] || { say "lamp-memory.service has no --socket" >&2; exit 3; }
+    text=${text//@MEMORY_SOCKET@/$value}
+  fi
+  if [[ $text == *@EYES_KNOWN_FILE@* ]]; then
+    value=$(arg_of lamp-eyes.service --known-file)
+    [[ -n $value ]] || { say "lamp-eyes.service has no --known-file" >&2; exit 3; }
+    text=${text//@EYES_KNOWN_FILE@/$value}
+  fi
   printf '%s\n' "${text//@SRC@/$SKILLS_SRC}"
 }
 
@@ -494,6 +530,23 @@ act() { # WHEN LINE
         ) &
         KEEPERS="$KEEPERS $!"
       fi
+      ;;
+    keepfile)
+      # keepfile PATH TEXT: written now and every second until the end, as
+      # the part that keeps it fresh would (a known face's name, which the
+      # voice takes as seen for 3 s, known_faces.rs FRESH).
+      local path text
+      rest=$(placeholders "$rest")
+      path=${rest%% *}; text=${rest#* }
+      say "$when: $path kept as \"$text\" every second"
+      local write='mkdir -p "$(dirname "$1")" && printf "%s\n" "$2" >"$1"'
+      $SUDO bash -c "$write" _ "$path" "$text" || { say "FAIL: the $when could not write $path"; return 1; }
+      (
+        while sleep 1; do
+          $SUDO bash -c "$write" _ "$path" "$text" 2>/dev/null || true
+        done
+      ) &
+      KEEPERS="$KEEPERS $!"
       ;;
     call)
       # call NAME JSON: one line in, one line out, as the voice calls.
