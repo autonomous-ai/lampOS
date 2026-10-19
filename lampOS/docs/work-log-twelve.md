@@ -375,3 +375,6 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   through `tidy_apply`. An empty apply now closes a job (memory). Behind
   `LAMP_MEMORY_OBSERVE`, off. ARM64 39279149488 dispatched. Next: the dry
   run against the bar.
+- #1974 merged into #1712. #1909 merged. (4)'s dry run is #1988 onto #1712:
+  `lamp-voice-eval observe-dry` on a copy of a store, through the lamp's own
+  path, with counts printed and words only in a 0600 labels file.
