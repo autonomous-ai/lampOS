@@ -1,0 +1,141 @@
+{
+  "head": "b59fc17757b6f6dc8f0138c8ac1da077fff06726",
+  "integration_base": "175e411c17b061137a5fa94deda21d243e228c21",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "source_only": true,
+  "fresh_isolated_target": true,
+  "source_file_count": 1616,
+  "source_tree_sha256": "b7c5bf3263fe213ce349675fb1380cfd65525c34a28d93554be2cb4b405e3a2b",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.61,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 118.51,
+      "log_sha256": "b8e99dca2478f3f171e56c6200f0e82be22de4ffe7f8cbfd1cb4a88a91cf0c31",
+      "summaries": []
+    },
+    {
+      "stage": "second_provider",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 73.82,
+      "log_sha256": "779b526cea4befa0fcb6867f45616906271cec4e3f495f9ef87e1188d217a117",
+      "summaries": [
+        "test result: ok. 283 passed; 0 failed; 0 ignored; 0 measured; 2088 filtered out; finished in 7.55s"
+      ]
+    },
+    {
+      "stage": "second_route",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "coordinator::tests::second_route::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 16.6,
+      "log_sha256": "2693924ec10ace37d40682e3e89d0b7578f44d5a03444d557f7d891789384897",
+      "summaries": [
+        "test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 2337 filtered out; finished in 16.43s"
+      ]
+    },
+    {
+      "stage": "memory",
+      "command": [
+        "cargo",
+        "test",
+        "--no-fail-fast",
+        "-p",
+        "lamp-memory",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 83.83,
+      "log_sha256": "616e3536d31975875d037ae044aec1e75937bef4a3c02129fd302f9895cf8d16",
+      "summaries": [
+        "test result: ok. 80 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 9.17s",
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.02s",
+        "test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.71s",
+        "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.76s",
+        "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s",
+        "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.95s",
+        "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.36s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.05s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s",
+        "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.27s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.38s",
+        "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "stage": "build",
+      "command": [
+        "cargo",
+        "build",
+        "--workspace"
+      ],
+      "exit_code": 0,
+      "seconds": 78.15,
+      "log_sha256": "35c72017cc650e2210ee59b03fec163c6913c1bd5c2fcc81906373cd5e188ab7",
+      "summaries": []
+    }
+  ],
+  "scope": "Focused integration gates for the newly merged unclear/hum and Memory behavior: full provider module, second-route coordinator module, full Memory suite, strict workspace Clippy and workspace build. Not the final 27-consumer gate.",
+  "all_source_hashes_still_match": true,
+  "all_frozen_checkout_and_source_copy_hashes_match": true,
+  "limits": [
+    "Private preparation on 175e411c17; final Music publication follows actual Bedtime landing.",
+    "The 283-provider and 34-coordinator selectors are filtered suites. Memory totals are 218 passed, 0 failed, 5 ignored, none filtered.",
+    "No acoustic hum, live STT, cloud-provider session, or device qualification.",
+    "The source-verified upstream Memory after-forget P2 is still assigned to its owner and is not covered by the existing Memory suite; a green suite does not resolve it."
+  ]
+}
