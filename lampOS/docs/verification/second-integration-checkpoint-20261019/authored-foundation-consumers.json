@@ -1,0 +1,34 @@
+{
+  "integration_base": "fd31d9c98e283089253b063d6181010846da2741",
+  "grep_command": [
+    "rg",
+    "-n",
+    "PRODUCT_SKILLS|NOT_PRODUCT_SKILLS|bedtime-morning|every_skill_folder_says_its_kind_and_version",
+    "crates/"
+  ],
+  "grep_output_sha256": "2c1a151d90e8f6df44a76f621160b11fb61a7b03ba777f593723634eb7faa963",
+  "matched_files": [
+    "crates/update/src/install.rs",
+    "crates/update/tests/functions.rs",
+    "crates/update/tests/install.rs",
+    "crates/voice/src/coordinator/tests/second_route.rs",
+    "crates/voice/src/second_provider/tests.rs"
+  ],
+  "changed_crates": [
+    "lamp-update"
+  ],
+  "reverse_dependency_closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "workspace_crates": 42,
+  "validation": "The final workspace gate runs every crate in this closure: all lamp-update tests run in the checkout for its inherited parent image fixture; all other suites and the workspace build run in the source-only copy."
+}

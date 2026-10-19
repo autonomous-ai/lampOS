@@ -225,10 +225,28 @@ passed with separate fresh target directories: complete Update **132/0/1**,
 none filtered, **107.68 s**, and source-only workspace build **143.71 s**.
 All **1,593** frozen source hashes match. The failed cache attempt stays
 recorded. Subsequent per-head gates use fresh, separate checkout and
-source-only targets. Rest/Say's full 27-crate gate and scheduled Skills'
-13-crate gate are running on their own frozen commits. Authored Bedtime's
-remaining nine non-Update consumers are also running; its complete Update
-and build results above qualify the same unchanged source.
+source-only targets. [Rest/Say's complete 27-crate gate](verification/second-integration-checkpoint-20261019/rest-foundation-host.json)
+passed **6,776/0/30**, none filtered: non-Update **6,647/0/29** in
+**1,224.96 s**, full Update **129/0/1** in **105.20 s**, formatting
+**3.94 s**, strict workspace Clippy **126.14 s**, build **24.79 s**.
+All **1,585** frozen source hashes match. [Scheduled Skills' 13-crate gate](verification/second-integration-checkpoint-20261019/routine-foundation-host.json)
+passed **4,898/0/20**, none filtered: non-Update **4,767/0/19** in
+**896.43 s**, full Update **131/0/1** in **111.26 s**, formatting
+**4.06 s**, strict workspace Clippy **133.45 s**, build **70.08 s**.
+All **1,590** frozen source hashes match. Both remain local pending the
+preceding foundation's actual merge, then their own automatic ARM64 run.
+
+Authored Bedtime's [complete remaining consumer command](verification/second-integration-checkpoint-20261019/authored-foundation-host-failure.json)
+reported **4,418 passed, 1 failed, 19 ignored**, none filtered,
+**808.28 s**; Voice itself is **2,266/1/12**, **325.44 s**. The inherited
+second-route **1 nods** assertion is the only failure. Its entire fixture
+blob matches parent `fd31d9c98e`, and the failing function matches the
+foundation base `df722db2d0`. Its fresh strict workspace Clippy passed
+**88.20 s**; the same-source full Update **132/0/1** and build results
+above remain valid. Together the selected consumer suites report
+**4,550/1/20**. This remains a failed gate, disclosed under First's 16:57
+publication direction; no unchanged-source retry replaces it. The later
+#1990 motion correction is absent from this frozen head.
 
 Music is committed privately as `c44d66557b` above the four split commits,
 preserving ScopedSystem, notes-aware preparation, bounded TTS and shutdown.
@@ -246,10 +264,19 @@ its scope-revocation, no-second-chat and **300 ms** shutdown assertions,
 then failed its final receive on macOS's closed-peer `ConnectionReset`.
 The fixture now follows the existing terminal-notice contract: check every
 queued event, accept only that closed-peer error, and restore global thread
-state even during unwinding. No production code or bounds changed. A fresh
-preflight starts with that exact Stop test, then the remaining selected
-suites. No passing replacement runtime result is claimed yet. Music remains
-queued behind actual Bedtime landing.
+state even during unwinding. No production code or bounds changed. The
+[replacement preflight](verification/second-integration-checkpoint-20261019/music-foundations-preflight.json)
+passed formatting **4.13 s**, strict workspace Clippy **137.67 s**, the exact
+held-RPC Stop case **1/0/0** (2,341 filtered), all **259 second-provider**
+(2,083 filtered), **46 requested-audio** (2,296 filtered), **3 accepted-decline**
+(2,339 filtered), and **1 prior-action** (2,341 filtered) cases, all without
+failures or ignores. Complete Actions, Msgs and Skills passed **486/0/0**,
+none filtered, **143.54 s**; the full ring-worker integration suite passed
+**23/0/0**, **15.42 s**. Workspace build passed **82.97 s**. All **1,610**
+frozen source hashes match in checkout and source-only copy. Voice filters
+overlap and are not a full-suite total. The full 27-crate consumer gate now
+runs on the same private preparation. Music remains queued behind actual
+Bedtime landing and a final port that preserves newer integration changes.
 
 Bedtime and Tasks have only their original automatic PR ARM64 run,
 following First's no-duplicate-dispatch direction. GitHub's [Actions incident](https://www.githubstatus.com/incidents/8tzbpcnl75jp)

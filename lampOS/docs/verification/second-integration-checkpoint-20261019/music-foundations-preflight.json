@@ -1,0 +1,278 @@
+{
+  "head": "c44d66557bf6c7f8ac541ef4e4fc6498c07b9c65",
+  "integration_base": "7f4cc5c2674afcd0b9cdacd2e93ec0eb42bec733",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "source_only": true,
+  "fresh_isolated_target": true,
+  "source_file_count": 1610,
+  "source_tree_sha256": "4cd87757044de883f2dedad6ef4ab7bf109c415211496c4cc0d16bff0fd9a333",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 4.13,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 137.67,
+      "log_sha256": "9783918b806c13326827ce55f7711ba0f1b489319dc893b3c21cffada4c952e9",
+      "summaries": []
+    },
+    {
+      "stage": "stop_during_music_rpc",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 66.45,
+      "log_sha256": "91e887d9260541c7a776ce4e2adddf0971598a410b6ca3f9c79c5ff1a7d869e1",
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2341 filtered out; finished in 0.01s"
+      ],
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 2341
+      }
+    },
+    {
+      "stage": "second_provider",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 7.7,
+      "log_sha256": "96f3e64f46b20c38bc722f756071d5908842a28739d08587f94fecd27ce364d6",
+      "summaries": [
+        "test result: ok. 259 passed; 0 failed; 0 ignored; 0 measured; 2083 filtered out; finished in 7.53s"
+      ],
+      "counts": {
+        "passed": 259,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 2083
+      }
+    },
+    {
+      "stage": "requested_audio",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "requested_audio",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 1.64,
+      "log_sha256": "b70312fbd50b00441c2b5c65ef62e88e8b183b9df65dfe7fb3fd383b3496d85b",
+      "summaries": [
+        "test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 2296 filtered out; finished in 1.46s"
+      ],
+      "counts": {
+        "passed": 46,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 2296
+      }
+    },
+    {
+      "stage": "accepted_decline",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "accepted_decline",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.46,
+      "log_sha256": "38c077a4c2aebf69b781f35d1c5955918cbe88d8ff6d31e93c4ea2899b1cfda9",
+      "summaries": [
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 2339 filtered out; finished in 0.29s"
+      ],
+      "counts": {
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 2339
+      }
+    },
+    {
+      "stage": "prior_action",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "a_music_action_before_decline",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.21,
+      "log_sha256": "1493edd2fbd6ff80dd79d70a51400fae02620425fad76e0f0b752a7329574fc4",
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2341 filtered out; finished in 0.04s"
+      ],
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 2341
+      }
+    },
+    {
+      "stage": "shared_crates",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-actions",
+        "-p",
+        "lamp-msgs",
+        "-p",
+        "lamp-skills",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 143.54,
+      "log_sha256": "62fc66cdca97be97e4c3936579449321706a068c88b60bc5c01e8298923b6efb",
+      "summaries": [
+        "test result: ok. 60 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.33s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.61s",
+        "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.50s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.97s",
+        "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.08s",
+        "test result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s",
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 67 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.49s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s",
+        "test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.44s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.18s",
+        "test result: ok. 106 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 46.05s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "counts": {
+        "passed": 486,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      }
+    },
+    {
+      "stage": "ring_worker",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--test",
+        "ring_worker",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 15.42,
+      "log_sha256": "7ac6074351db6865988c8a10e25a20cb650c1b144a0d0fed16d6035ca9a1e3fa",
+      "summaries": [
+        "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.99s"
+      ],
+      "counts": {
+        "passed": 23,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      }
+    },
+    {
+      "stage": "build",
+      "command": [
+        "cargo",
+        "build",
+        "--workspace"
+      ],
+      "exit_code": 0,
+      "seconds": 82.97,
+      "log_sha256": "01e2b434fdb371662b51497e1645ebffc84e8f189832ff52c6dfa5a20d199007",
+      "summaries": []
+    }
+  ],
+  "scope": "Focused combined integration preflight; filters overlap and are not a complete workspace gate.",
+  "all_source_hashes_still_match": true,
+  "all_frozen_checkout_and_source_copy_hashes_match": true,
+  "limits": [
+    "Focused preflight only; overlapping Voice filters are not added into a whole-suite count.",
+    "The real worker/IPC held-RPC Stop fixture preserves the 300 ms shutdown bound, but speech/model services are simulated. No device or cloud latency is established.",
+    "Final Music port and full consumer/native qualification follow actual Bedtime landing."
+  ]
+}

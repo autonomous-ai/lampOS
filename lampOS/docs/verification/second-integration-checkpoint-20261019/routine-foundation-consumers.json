@@ -1,0 +1,46 @@
+{
+  "integration_base": "0bbbe5234d0df0d7b3cc99ab8c6a8195a638485f",
+  "grep_command": [
+    "rg",
+    "-n",
+    "once_per_day|exchange_guarded|with_daily_journal|RoutineService|Call::Rest|output_limits|load_each",
+    "crates/"
+  ],
+  "grep_output_sha256": "2e6e09e297cce87c7ac7247ae015e98a0c0ea315de20b9325d9ebd5516b38468",
+  "matched_files": [
+    "crates/schedule/src/client.rs",
+    "crates/schedule/tests/client.rs",
+    "crates/skills/src/lib.rs",
+    "crates/skills/src/limits.rs",
+    "crates/skills/src/main.rs",
+    "crates/skills/src/package.rs",
+    "crates/skills/tests/daily_engine.rs",
+    "crates/skills/tests/package.rs",
+    "crates/skills/tests/routine_service.rs",
+    "crates/skills/tests/skills.rs",
+    "crates/update/tests/install.rs"
+  ],
+  "changed_crates": [
+    "lamp-schedule",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update"
+  ],
+  "reverse_dependency_closure": [
+    "lamp-actions",
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-schedule",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "workspace_crates": 42,
+  "validation": "The final workspace gate runs every crate in this closure: all lamp-update tests run in the checkout for its inherited parent image fixture; all other suites and the workspace build run in the source-only copy."
+}

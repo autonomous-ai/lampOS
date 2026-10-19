@@ -1,0 +1,59 @@
+{
+  "integration_base": "e1fdc20374f638899e612ef0967d3d414c29708a",
+  "grep_command": [
+    "rg",
+    "-n",
+    "ExpressionRest|RestRequest|RestState|RestIntent|SayCue|start_before_us|rest_requests",
+    "crates/"
+  ],
+  "grep_output_sha256": "5cc63c746af34959fc72d4b785e075247dd02612443f508e1bd51d9ddccf4daf",
+  "matched_files": [
+    "crates/expression/src/engine.rs",
+    "crates/expression/src/main.rs",
+    "crates/expression/src/rest.rs",
+    "crates/expression/src/runtime.rs",
+    "crates/expression/tests/rest_replay.rs",
+    "crates/expression/tests/rest_requests.rs",
+    "crates/msgs/src/expression.rs",
+    "crates/msgs/src/lib.rs",
+    "crates/voice/src/coordinator/tests/second_route.rs",
+    "crates/voice/src/say.rs"
+  ],
+  "changed_crates": [
+    "lamp-expression",
+    "lamp-msgs",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "reverse_dependency_closure": [
+    "lamp-actions",
+    "lamp-air",
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-controls",
+    "lamp-ears",
+    "lamp-expression",
+    "lamp-eyes",
+    "lamp-health",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-mood",
+    "lamp-msgs",
+    "lamp-name",
+    "lamp-policy",
+    "lamp-records",
+    "lamp-schedule",
+    "lamp-selftest",
+    "lamp-settings",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-surround",
+    "lamp-tasks",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "workspace_crates": 42,
+  "validation": "The final workspace gate runs every crate in this closure: all lamp-update tests run in the checkout for its inherited parent image fixture; all other suites and the workspace build run in the source-only copy."
+}
