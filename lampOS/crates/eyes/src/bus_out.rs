@@ -287,13 +287,14 @@ impl BusOut {
         self.alive_at_us = now_us;
         let _ = self.faces.publish_json(now_us, &seen);
         if let Some(presence) = self.presence.as_mut() {
-            let tall = found
+            // The tallest face as published, clamped to the picture, so the
+            // journal's height matches `humans/faces/tracked`.
+            let tall = seen
+                .faces
                 .iter()
-                .map(|face| face.height / filled.1.max(1) as f32)
+                .map(|face| face.ymax - face.ymin)
                 .reduce(f32::max);
-            presence
-                .away
-                .looked(now_us, tall.filter(|_| !seen.faces.is_empty()));
+            presence.away.looked(now_us, tall);
         }
     }
 
@@ -666,6 +667,41 @@ mod tests {
             "{said:?}"
         );
         assert_eq!(said.len(), before_voice + 6, "{said:?}");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// The journal's height is the published face's: a face cut by the
+    /// picture's edge counts only what is in the picture, and a box with no
+    /// size once clamped counts for nothing.
+    #[test]
+    fn the_journals_height_is_the_published_faces() {
+        let root = std::path::PathBuf::from(format!("/tmp/leh-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        out.say_presence(&bus).unwrap();
+        // 200 of 480 tall, from 400: 80 of it in the picture.
+        out.saw(
+            &[face(240.0, 400.0, 160.0, 200.0, 0.0)],
+            &[],
+            PICTURE,
+            1_000_000,
+        );
+        let away = &out.presence.as_ref().unwrap().away;
+        assert_eq!(away.cause(), "face, 0.17 of the picture tall");
+        // Wholly below the picture, beside a face 96 tall: only the second counts.
+        out.saw(
+            &[
+                face(240.0, 500.0, 300.0, 400.0, 0.0),
+                face(40.0, 100.0, 80.0, 96.0, 0.0),
+            ],
+            &[],
+            PICTURE,
+            2_000_000,
+        );
+        let away = &out.presence.as_ref().unwrap().away;
+        assert_eq!(away.cause(), "face, 0.20 of the picture tall");
         std::fs::remove_dir_all(&root).unwrap();
     }
 

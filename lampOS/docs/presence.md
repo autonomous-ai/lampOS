@@ -39,7 +39,7 @@ each good for 3 s ([msgs.md](msgs.md)):
 |---|---|
 | `someone` | A face seen, or a voice heard, within the last 20 s (`RoomPresence::SOMEONE_WITHIN_S`: the voice's Arrival forgives a face lost for the same 20 s, `speak_up.rs`) |
 | `nobody_s` | How long nobody has been at the lamp, in whole seconds, from the last face or voice, or from when the eyes began looking if neither came since; 0 while someone is there |
-| `by` | While someone is there, what last showed it: `face` or `voice`; absent while nobody is (and from an older eyes'). At each change to someone the eyes also write `lamp-eyes: someone at the lamp (face, 0.21 of the picture tall)` or `(voice)` in their journal, so a run tells a passer-by from someone at the desk (the first builder's lamp check, 19 Oct: four `someone`s in 15 minutes of an office at lunch, cause unknown) |
+| `by` | While someone is there, what last showed it: `face` or `voice`; absent while nobody is (and from an older eyes'). At each change to someone the eyes also write `lamp-eyes: someone at the lamp (face, 0.21 of the picture tall)` or `(voice)` in their journal (the tallest face as `humans/faces/tracked` publishes it, clamped to the picture), so a run tells a passer-by from someone at the desk (the first builder's lamp check, 19 Oct: four `someone`s in 15 minutes of an office at lunch, cause unknown) |
 
 Counts and times only: no picture, no face, nobody's identity.
 
