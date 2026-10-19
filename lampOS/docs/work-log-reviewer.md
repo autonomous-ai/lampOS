@@ -4,6 +4,26 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 14:18 reviewed #1789 (thirteen's role file names lamp-c0a4): loosens ssh and use rules; role call for the first builder
+- 14:16 reviewed #1787 (Not feeling well core skill, not in product): no finding, merge on green
+- 14:13 first read #1788 (lamp-update self-switch, off unless set): conflicts; root timer every 2 min on every lamp may fail where the back binary is missing; first builder's
+- 14:13 #1773 follow-on P2 fixed; first builder's
+- 14:13 merged #1776 (lamp-body --let-go-at-stop, off by default, factory)
+- 14:08 merged #1778 (skills rise trigger, exact words, say priority; first PR of #1684)
+- 14:07 reviewed #1778 (skills: rise trigger, exact words, say priority): no finding, merge on green
+- 14:05 reviewed #1784 (journal height from published faces): no finding, merge on green
+- 14:01 #1773: mute-light wait fixed at 4888663cc; follow-on P2, a late painter's black frame can blank the mute light
+- 13:58 #1781 (refile of #1767, folded) and #1707 (folded): no finding left; first builder's
+- 13:58 #1776 P2 fixed at be0b7ee34; merge on green
+- 13:51 merged #1777 (lamp-update harness-on, run by hand; B5 of #1676)
+- 13:50 reviewed #1707 (ears/classes contract in msgs): no finding, fold; msgs + mic path, first builder's
+- 13:47 #1767 Twelve's P2 fixed at 18a668191; asked to fold; first builder's
+- 13:46 #1763 P2 fixed at 8e78e591d; P3 UTC midnight vs the asked 03:00 local; first builder's
+- 13:44 reviewed #1768 (journal keeps each exchange's own scope): no finding; on by default, first builder's
+- 13:44 reviewed #1777 (lamp-update harness-on): no finding, merge on green
+- 13:42 reviewed #1776 (lamp-body --let-go-at-stop): P2, the 'only when down' condition has no test that fails without it
+- 13:38 reviewed #1771 (room/presence says by face or voice): no finding; msgs field, first builder's
+- 13:38 merged #1770 (lamp-tasks targets from Harness machines, off unless set; B6 step 3 of #1676)
 - 13:36 first read #1775 (warmer hello by familiarity, stacked on #1772/#1763): first builder's with the stack
 - 13:35 reviewed #1655 (lamp-actions keeps its folder across restart): one P3; on by default, first builder's
 - 13:33 first read #1772 (Mood carries the familiar level, stacked on #1763): first builder's with #1763
