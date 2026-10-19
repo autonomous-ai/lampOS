@@ -2,11 +2,12 @@ name: CI
 
 on:
   # The V1 checks (Go, web, HAL, CTS) skip a change that only touches lampOS:
-  # lampos-arm64.yml checks those. A change touching anything else still runs them.
+  # lampos-arm64.yml and lampos-clippy.yml check those. A change touching
+  # anything else still runs them.
   push:
-    paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml']
+    paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/workflows/lampos-clippy.yml']
   pull_request:
-    paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml']
+    paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/workflows/lampos-clippy.yml']
 
 jobs:
   go:
