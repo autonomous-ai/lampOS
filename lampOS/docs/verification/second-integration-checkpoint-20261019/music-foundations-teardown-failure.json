@@ -1,0 +1,73 @@
+{
+  "head": "c82c04d6dfbe6656ddaac6a96b0a055e091d2e30",
+  "integration_base": "7f4cc5c2674afcd0b9cdacd2e93ec0eb42bec733",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "source_only": true,
+  "fresh_isolated_target": true,
+  "source_file_count": 1610,
+  "source_tree_sha256": "1de5e252e48776255e6db1295470a6f909626f587f939d00bcba136cb0933ba5",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 4.12,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 130.92,
+      "log_sha256": "170d855c95cb0d6fc9c345a181b03d10a4ca1f237434d79b79a7ade1930febd1",
+      "summaries": []
+    },
+    {
+      "stage": "second_provider",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "seconds": 77.46,
+      "log_sha256": "55d97c92370d931b4f3a366dee639d27984b1deba01f730827dc12139a7e4b49",
+      "summaries": [
+        "test result: FAILED. 258 passed; 1 failed; 0 ignored; 0 measured; 2083 filtered out; finished in 7.42s"
+      ]
+    }
+  ],
+  "scope": "Focused combined integration preflight; filters overlap and are not a complete workspace gate.",
+  "all_frozen_source_copy_hashes_match": true,
+  "failure": {
+    "test": "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply",
+    "location": "crates/voice/src/second_provider/worker.rs:4129:73",
+    "error": "Os { code: 54, kind: ConnectionReset, message: Connection reset by peer } during the final data-channel drain",
+    "outer_summary": "258 passed; 1 failed; 0 ignored; 2083 filtered out; finished in 7.42s",
+    "scope": "New test fixture teardown. The earlier held-RPC, revoked-scope, worker/shutdown under 300 ms and no-second-chat assertions passed. Remaining preflight stages were not reached."
+  }
+}

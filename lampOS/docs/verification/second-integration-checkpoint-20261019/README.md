@@ -1,6 +1,18 @@
 # Second integration checkpoint, 2026-10-19
 
-Current status (15:26 UTC): #1732 is published as `22c9c730bd` onto #1712.
+Current status (17:30 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
+passed automatic ARM64: **7,684 nextest (1 leaky), 48 skipped**, plus
+**4 doc and 12 separate harness tests**. [Native evidence](caps-foundation-arm64.json)
+records the exact head, base and merge checkout. The [host motion failure](caps-foundation-motion-failure.json)
+and [remaining passing targets](caps-foundation-unreached.json) stay separate.
+The other three foundation gates continue locally; [isolated composition checks](split-composition-isolated.json)
+passed complete Update **132/0/1** and workspace build after the recorded
+[shared-cache compilation failure](split-composition-initial.json). Music's
+[first new preflight failure](music-foundations-teardown-failure.json) is
+preserved; its test-only macOS teardown correction is under validation.
+The [work log](../../work-log.md) carries current integration status.
+
+Historical checkpoint (15:26 UTC): #1732 is published as `22c9c730bd` onto #1712.
 Its [fresh preflight](bedtime-publication-preflight.json) passed four
 second-route cases, full Skills **220/0/0**, formatting, strict workspace
 Clippy and build. Native ARM64 **39277565437** is pending and is the gate of
