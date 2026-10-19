@@ -288,6 +288,46 @@ fn a_quiet_voice_and_a_loud_one_nod_and_sway_alike() {
     }
 }
 
+/// Seventh on #1722, 22:25: the voice's meter stops at 1.0, and the second
+/// route's coordinator test reads 0.8 to 1.0 throughout (a mean of 0.96). A
+/// voice that fills the meter, its running level 1.0, would put the stress
+/// bar at 1.03, out of reach: never a nod, where the fixed bars nodded as
+/// each sentence began. The bar stops under the meter's top, so it still
+/// nods there: once for each of its three sentences.
+#[test]
+fn a_voice_loud_enough_to_fill_the_meter_still_nods_as_each_sentence_begins() {
+    let mut lamp = Lamp::new(catalogue(true), Room::Quiet);
+    let mut outputs = Vec::new();
+    let mut at = 0;
+    while at < 10_500_000 {
+        let speaking = (1_000_000..9_000_000).contains(&at);
+        if at % 100_000 == 0 {
+            lamp.parts(
+                at,
+                if speaking {
+                    Voice::Speaking
+                } else {
+                    Voice::Resting
+                },
+            );
+        }
+        if speaking {
+            // The meter full through every sentence, silent in the pauses.
+            let level = if level(at - 1_000_000) == 0.0 {
+                0.0
+            } else {
+                1.0
+            };
+            lamp.piece(at, level);
+        }
+        outputs.push((at, lamp.engine.tick(at)));
+        at += TICK;
+    }
+    let nods = starts(&outputs, "nodding on a stressed word");
+    assert!(nods >= 3, "{nods} nods");
+    assert!(starts(&outputs, "swaying between sentences") >= 1);
+}
+
 /// Relative bars still keep silence silent: an answer that is all hiss
 /// stresses no word and pauses no sentence.
 #[test]
