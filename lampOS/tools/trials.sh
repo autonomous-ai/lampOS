@@ -116,7 +116,7 @@ DROPIN=zz-trial.conf
 # (units a trial installs go there too, gone at a reboot), and @ETC@ is
 # TRIALS_ETC. CAUSE's keepfile takes them too.
 # ---------------------------------------------------------------------------
-ROWS="light-out scenes who-was-here activity forget thread reports nudges smoky dusty light-show settings"
+ROWS="light-out scenes who-was-here activity forget thread reports nudges smoky dusty light-show settings look point"
 # Rows not here, and why: printed by `list`.
 NOT_HERE="bedtime    Bedtime and Morning (#1732): a draft, not merged; three switches, --zone and its daily state, and it moves the body
 nudges     the other three nudges (#1957): sip-of-water, stand-up and wind-down are tried by hand, as rest-your-eyes is here
@@ -385,6 +385,46 @@ run systemctl stop lamp-setup-change.socket 'lamp-setup-change@*.service'; rm -f
       EXAMPLE='lamp-setup: change: the time zone is now Asia/Bangkok'
       IN='lamp-setup-change@*'
       WAIT=30 ;;
+    look)
+      # #1871 (on lamp-voice, installable): "Look for my keys", asked out
+      # loud, for the arm hour's row 3. The model calls look_for with the
+      # desk first, then left, right, far left, far right, five looks at
+      # most, each with the head down over the desk (the reading pose) and
+      # the base turned toward the place; someone speaking ("stop") ends the
+      # search within a fifth of a second (lamp-skills main.rs, wait_out),
+      # and the head is up about 2 s later. Its line: the skill's Done, when
+      # the search ends (spoken over, or two minutes after the last look).
+      ABOUT="look for my keys: look_for searches the desk, then a few places either side, until it's found or told to stop (#1871)"
+      NOTE="a build with #1871, the voice's full look (LAMP_LOOK_FULL=on, lamp-eyes --full-look; lamp-4ace has both) and the second route giving every function (no LAMP_SECOND_FEW_TOOLS). It MOVES: the head comes down over the desk and the base turns, so a hand near the arm. Put keys on the desk to one side first. Say the line; say \"stop\" to end it, or wait two minutes after it finds them"
+      SETASIDE="copy @SKILLS_DIR@/look-for-things"
+      SETUP="rm -rf @SKILLS_DIR@/look-for-things && cp -a @SRC@/look-for-things @SKILLS_DIR@/look-for-things
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/look-for-things"
+      SWITCHES="lamp-skills.service|LAMP_LIGHT_REQUESTS=on"
+      CAUSE="play Hey Lamp, look for my keys."
+      PROOF='look-for-things Done'
+      # The why is the run's steps' reports joined by "; " (main.rs
+      # perform): left out here rather than guessed.
+      EXAMPLE='lamp-skills: look-for-things Done: …'
+      IN="lamp-skills.service"
+      WAIT=240 ;;
+    point)
+      # #1730 (on lamp-voice, held out of the product): "light my book", for
+      # the arm hour's row 4. The model calls point_light: the head down over
+      # the desk (the reading pose) and a clear white light, kept as the
+      # person's; one look; and, only if the book is off to one side, a
+      # second call that turns the base toward it. The pose holds two
+      # minutes, then the run ends. Its line: the skill's Done.
+      ABOUT="point the light: point_light brings the head over the desk and turns toward the book (#1730)"
+      NOTE="a build with #1730, the voice's full look (lamp-4ace has it) and every function given. It MOVES: the head comes down over the desk and the base may turn, so a hand near the arm. Put a book on the desk a little to one side first. The white light is kept as the person's afterwards: ask for the light you want after"
+      SETASIDE="copy @SKILLS_DIR@/point-light"
+      SETUP="rm -rf @SKILLS_DIR@/point-light && cp -a @SRC@/point-light @SKILLS_DIR@/point-light
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/point-light"
+      SWITCHES="lamp-skills.service|LAMP_LIGHT_REQUESTS=on"
+      CAUSE="play Hey Lamp, light my book."
+      PROOF='point-light Done'
+      EXAMPLE='lamp-skills: point-light Done: …'
+      IN="lamp-skills.service"
+      WAIT=240 ;;
     *) return 1 ;;
   esac
 }
