@@ -461,8 +461,9 @@ that takes the light (`src/ring_light.rs`). Started with
 
 - begins with the light last asked for, which the bus keeps as the newest
   value of `light/command`, or with the first light if there is none;
-- looks every 50 ms for a light asked for on `light/command`
-  (`lamp_msgs/Light`) and eases the ring into it. A request that is not a
+- looks for a light asked for on `light/command` (`lamp_msgs/Light`)
+  on about every pass of its 2 ms loop (every 50 ms before #1806, which
+  the person heard on each light call), and eases the ring into it. A request that is not a
   light there is (a colour that does not exist, a level outside 1 to 5,
   something that is not a `Light`) is passed over;
 - says what it shows on `light/state` when that changes and once a
@@ -606,10 +607,12 @@ running" (mobile on lamp-0c89, #1396).
 - **With the switch on:** on a lamp with a ring and the bus on, the
   muted wait opens the same light, with `LAMP_LIGHT_KEEP`'s file if that's
   on. It ticks it at each look of the wait, about every 2 ms, and the
-  light looks for commands every 50 ms.
+  light looks for commands at each of those ticks (#1806; every 50 ms
+  before).
 - **What it says and takes:** the person's light is said once a second and
   at each change, and a light asked for is taken, so the app can read and
-  set it. A command reaches `light/state` within the light's 50 ms look.
+  set it. A command reaches `light/state` at the light's next look, about
+  2 ms (50 ms before #1806).
 - **Nothing is drawn:** the ring shows what the wait shows today, the
   privacy face, the asleep face or dark, and nothing goes on
   `light/drawn`. Requests (`light/request`) are not taken while muted. A

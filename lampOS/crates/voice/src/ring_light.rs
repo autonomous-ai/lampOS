@@ -48,8 +48,11 @@ use std::{io, path::Path, time::Duration};
 
 /// The name the ring's owner publishes under.
 pub const SOURCE: &str = "ring";
-/// What is asked for is looked at this often: on every pass of the ring's
-/// loop (`ring_worker`'s 2 ms). `lamp-actions` answers a light call only
+/// What is asked for is looked at this often: on about every pass of the
+/// ring's loop (`ring_worker`'s 2 ms; a pass that drew a cue frame reads
+/// its clock late, so the next can come under 2 ms and wait a pass, which
+/// only happens inside a turn, whose face does not show the light; El on
+/// #1900). `lamp-actions` answers a light call only
 /// once this says it shows the light, and the model speaks after that
 /// answer, so the person hears this wait on every light call. It was 50 ms
 /// (#1806).
