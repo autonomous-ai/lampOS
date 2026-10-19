@@ -135,6 +135,44 @@ pub struct Config {
     pub light: bool,
 }
 
+/// The configuration's fields, as [`read`] knows them.
+pub const FIELDS: [&str; 20] = [
+    "listen",
+    "marker",
+    "credential",
+    "policy_key",
+    "name",
+    "country",
+    "interface",
+    "hotspot_address",
+    "page",
+    "zoneinfo",
+    "localtime",
+    "timezone_file",
+    "zone_env",
+    "backend",
+    "reports",
+    "display_name",
+    "web_start",
+    "web_stop",
+    "free_port",
+    "light",
+];
+
+/// Read a written configuration, one version ahead (#1680): a field this
+/// build does not know is dropped and named in the returned lines; the rest
+/// is read and checked as before.
+pub fn read(bytes: &[u8]) -> Result<(Config, Vec<String>), String> {
+    let mut value: Value =
+        serde_json::from_slice(bytes).map_err(|error| format!("the configuration: {error}"))?;
+    let mut notes = Vec::new();
+    crate::drop_unknown_fields(&mut value, "setup configuration", &FIELDS, &mut notes);
+    let config: Config =
+        serde_json::from_value(value).map_err(|error| format!("the configuration: {error}"))?;
+    config.check()?;
+    Ok((config, notes))
+}
+
 impl Config {
     pub fn check(&self) -> Result<(), String> {
         for path in [

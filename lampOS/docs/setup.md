@@ -192,11 +192,37 @@ going dark, then the hotspot coming back with the setup light (below). Where `re
 `watch-reset` run in the boot order, and with what rights, waits on the
 keeper's owner (the fifth builder, asked on #702).
 
+`serve.json` is read one version ahead (#1680, `docs/updates.md`): a field
+this build doesn't know is dropped and named in the journal. The reset plan
+follows the rule agreed on #2060, so a reset is all or nothing:
+
+- **Anything to wipe is a plain absolute path's text in `wipe`**, which every
+  build wipes. A newer plan's extra path is wiped here too, and is still
+  checked against what is never wiped (`PROTECTED`).
+- **Keeping something back goes only in `keep_back: [...]`.** This build
+  knows no `keep_back` entry yet, so each one is dropped with a journal line
+  and what it would keep is wiped: the privacy-safe side, a pairing lost at
+  worst. A `keep_back` that isn't a list is refused as a bad value.
+- **A `wipe` entry that isn't a path's text, or any other field this build
+  doesn't know, refuses the reset** (`reset::Refused::Ahead`): nothing is
+  journalled, the marker stays and nothing is wiped. `reset-now`,
+  `resume-reset` and `check` exit 2 with the reason in the journal.
+  `watch-reset` keeps watching instead: each 5 s hold is logged as refused and
+  the person is told "Nothing was wiped. Update me, then reset again." through
+  the voice's say service (skill `reset`, `docs/speaking-first.md`). That is
+  the reset's only line to the person: words for the voice's model, so said
+  only while the lamp has a network and `LAMP_SAY=on`, with no recording.
+- A bad known value, an empty `wipe`, or JSON that doesn't read is still
+  refused (`reset::Refused::Bad`), as before.
+
 Host tests (`crates/setup/tests/reset.rs`): the order of the steps, a failed
 stop wiping nothing, a wipe that fails halfway keeping the journal and marker
 until `resume-reset` finishes, a start with no journal touching nothing,
 refused plans, every reason an event is not a reset, the watcher on a real bus
-acting once and only logging with the switch off, the command line, and the
+acting once and only logging with the switch off, the watcher of a refused
+plan telling each hold and wiping nothing, a plan one version ahead (an
+unknown `wipe` kind or field refused with nothing touched, an extra path
+wiped, an unknown `keep_back` entry dropped and wiped), the command line, and the
 example plan covering every store of the person's listed above.
 
 ## Joining the home's Wi-Fi (built, not yet served)

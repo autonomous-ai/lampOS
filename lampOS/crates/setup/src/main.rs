@@ -99,8 +99,11 @@ fn plan(path: &Path) -> Result<Plan, Box<dyn std::error::Error>> {
     if bytes.len() > 16_384 {
         return Err("the plan exceeds 16 KiB".into());
     }
-    let plan: Plan = serde_json::from_slice(&bytes)?;
-    plan.check()?;
+    // One version ahead (#1680): read, with what was passed over said.
+    let (plan, notes) = reset::read(&bytes)?;
+    for note in notes {
+        eprintln!("lamp-setup: {}: {note}", path.display());
+    }
     Ok(plan)
 }
 
@@ -134,7 +137,20 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     }
     let (mut options, enabled) = options(given)?;
     let plan_path = PathBuf::from(options.remove("--plan").ok_or("--plan is required")?);
-    let plan = plan(&plan_path)?;
+    let plan = match plan(&plan_path) {
+        Ok(plan) => plan,
+        Err(error) => {
+            // A newer build's plan this build refuses (#2060): no reset runs,
+            // and the watcher stays to tell the person who holds the button.
+            if command == "watch-reset"
+                && let Some(reset::Refused::Ahead(_)) = error.downcast_ref::<reset::Refused>()
+            {
+                eprintln!("lamp-setup: {}: {error}", plan_path.display());
+                return watch_refused(options, enabled);
+            }
+            return Err(error);
+        }
+    };
     match command.as_str() {
         "check" => {
             if enabled || !options.is_empty() {
@@ -163,26 +179,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             Ok(true)
         }
         "watch-reset" => {
-            let bus = match options.remove("--bus-root") {
-                Some(root) => Bus::new(root)?,
-                None => Bus::from_environment()?,
-            };
-            let clock = clock_id(options.get("--clock-id"))?;
-            options.remove("--clock-id");
-            let until = match options.remove("--seconds") {
-                Some(seconds) => {
-                    let seconds: u64 = seconds
-                        .parse()
-                        .ok()
-                        .filter(|n| (1..=86_400).contains(n))
-                        .ok_or("--seconds must be 1..86400")?;
-                    Some(Instant::now() + Duration::from_secs(seconds))
-                }
-                None => None,
-            };
-            if !options.is_empty() {
-                return Err("watch-reset does not take that option".into());
-            }
+            let (bus, clock, until) = watch_options(&mut options)?;
             let act = || start_reset(&plan, &plan_path);
             // A power cut right after a reset's journal, before its marker
             // went, leaves both: the lamp started, so carry on with it here.
@@ -352,6 +349,62 @@ fn wifi_change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std:
     Ok(true)
 }
 
+/// `watch-reset`'s own options: the bus, this boot's clock and how long.
+fn watch_options(
+    options: &mut BTreeMap<String, String>,
+) -> Result<(Bus, String, Option<Instant>), Box<dyn std::error::Error>> {
+    let bus = match options.remove("--bus-root") {
+        Some(root) => Bus::new(root)?,
+        None => Bus::from_environment()?,
+    };
+    let clock = clock_id(options.get("--clock-id"))?;
+    options.remove("--clock-id");
+    let until = match options.remove("--seconds") {
+        Some(seconds) => {
+            let seconds: u64 = seconds
+                .parse()
+                .ok()
+                .filter(|n| (1..=86_400).contains(n))
+                .ok_or("--seconds must be 1..86400")?;
+            Some(Instant::now() + Duration::from_secs(seconds))
+        }
+        None => None,
+    };
+    if !options.is_empty() {
+        return Err("watch-reset does not take that option".into());
+    }
+    Ok((bus, clock, until))
+}
+
+/// `watch-reset` with a plan this build refuses (#2060): each valid reset is
+/// refused before its journal and the marker, logged, and said to the person
+/// through the voice's say service ([`reset::SAY_REFUSED`]). The reset does
+/// not speak otherwise, so this is its first line to the person; it is words
+/// for the voice's model, said only while the lamp has a network and the say
+/// service is on, with no recording behind it.
+fn watch_refused(
+    mut options: BTreeMap<String, String>,
+    enabled: bool,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let (bus, clock, until) = watch_options(&mut options)?;
+    let mut touch = bus.subscribe_typed(TouchEvent::TOPIC, NAME, TouchEvent::TYPE)?;
+    let mouth = lamp_setup::wifi_change::SayService::product();
+    let watched = lamp_setup::watch_refused(
+        &mut touch,
+        &clock,
+        enabled,
+        until,
+        lamp_ipc::monotonic_us,
+        |line| eprintln!("lamp-setup: {line}"),
+        || mouth.say_as("reset", reset::SAY_REFUSED),
+    )?;
+    println!(
+        "{}",
+        serde_json::json!({"enabled": enabled, "watched": format!("{watched:?}")})
+    );
+    Ok(true)
+}
+
 /// Hand the reset to a unit of its own (`detach`), outside `lampos.target`:
 /// the keeper's stop would otherwise end this watcher, and the reset with it,
 /// after the marker is gone and before the wipe and the reboot.
@@ -378,8 +431,10 @@ fn serve_config(path: &Path) -> Result<lamp_setup::serve::Config, Box<dyn std::e
     if bytes.len() > 16_384 {
         return Err("the configuration exceeds 16 KiB".into());
     }
-    let config: lamp_setup::serve::Config = serde_json::from_slice(&bytes)?;
-    config.check()?;
+    let (config, notes) = lamp_setup::serve::read(&bytes)?;
+    for note in notes {
+        eprintln!("lamp-setup: {}: {note}", path.display());
+    }
     Ok(config)
 }
 
