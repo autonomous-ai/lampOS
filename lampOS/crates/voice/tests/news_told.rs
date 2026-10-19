@@ -9,7 +9,7 @@
 use lamp_tasks::{
     engine::{CLOSE_RETRY_MS, Clock as Sample},
     harness::{Closed, EngineKind, Launch, LaunchOutcome, Observation, Target},
-    runtime::{Adapter, Clock, Config, request, serve_with_adapter},
+    runtime::{Adapter, Clock, Config, REPORT_EVERY, request, serve_with_adapter},
 };
 use lamp_voice::task_news::{BootClock, TaskNews};
 use serde_json::{Value, json};
@@ -114,6 +114,7 @@ impl Place {
             close_told: true,
             targets_newer: None,
             set_up_later: None,
+            report_every: REPORT_EVERY,
         };
         let mut place = Self {
             root,
