@@ -15,6 +15,27 @@ use std::{
     path::Path,
 };
 
+/// The photo folder, made the eyes' own (0700) if it isn't there; a
+/// folder already there is refused unless it is a folder, not a link, and
+/// no one else's to read (#1968: lamp-cloud, the same user, writes into
+/// it).
+pub fn ready(dir: &Path) -> io::Result<()> {
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+    match std::fs::symlink_metadata(dir) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            std::fs::DirBuilder::new().mode(0o700).create(dir)
+        }
+        Err(error) => Err(error),
+        Ok(meta) if !meta.file_type().is_dir() => {
+            Err(io::Error::other("the photo folder is not a folder"))
+        }
+        Ok(meta) if meta.permissions().mode() & 0o077 != 0 => Err(io::Error::other(
+            "the photo folder is open to others; it must be 0700",
+        )),
+        Ok(_) => Ok(()),
+    }
+}
+
 /// The largest photo read.
 pub const MOST_BYTES: u64 = 8 << 20;
 /// A second face this share of the first's height or more makes the photo
@@ -403,6 +424,26 @@ mod tests {
         std::fs::create_dir(dir.join("sub")).unwrap();
         assert_eq!(take(&dir, "sub"), Err(NotTaken::Unreadable));
         std::fs::remove_dir_all(outside.parent().unwrap()).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn the_photo_folder_is_made_the_eyes_own_or_refused() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = folder("ready");
+        let photos = dir.join("photos");
+        ready(&photos).unwrap();
+        assert_eq!(
+            std::fs::metadata(&photos).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        ready(&photos).unwrap();
+        std::fs::set_permissions(&photos, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(ready(&photos).is_err());
+        std::fs::write(dir.join("file"), b"").unwrap();
+        assert!(ready(&dir.join("file")).is_err());
+        std::os::unix::fs::symlink(&dir, dir.join("link")).unwrap();
+        assert!(ready(&dir.join("link")).is_err());
         std::fs::remove_dir_all(dir).unwrap();
     }
 

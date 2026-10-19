@@ -10,6 +10,7 @@ pub mod chat;
 pub mod lamp;
 pub mod light;
 pub mod online;
+pub mod photos;
 pub mod ping;
 pub mod reports;
 pub mod settings;

@@ -87,6 +87,11 @@ pub trait Lamp {
     fn changes(&self) -> Option<std::sync::Arc<crate::settings::Changes>> {
         None
     }
+    /// Where a face from the app's photo goes, and the eyes to ask (#1968,
+    /// `crate::photos`): there only with `LAMP_PHOTO_FACES=on`.
+    fn photos(&self) -> Option<crate::photos::Place> {
+        None
+    }
 }
 
 /// How long a preview is shown after the last one, as V1's: an abandoned
@@ -180,6 +185,14 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let line = crate::settings::line(kind, data)?;
             changes.start(kind, line);
             Ok(None)
+        }
+        // A face from a photo the app sends (#1968): handed to the eyes,
+        // which keep it unconfirmed until its person says yes at the lamp.
+        // It comes over the lamp's own account channel only.
+        "faces.add_photo" if lamp.photos().is_some() => {
+            let place = lamp.photos().ok_or_else(|| not_here(kind))?;
+            let (name, photo) = crate::photos::asked(data)?;
+            crate::photos::add(&place, &name, &photo, crate::chat::now_ms()).map(Some)
         }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the

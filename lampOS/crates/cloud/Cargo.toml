@@ -25,6 +25,9 @@ webpki-roots = "1"
 # lamp-skills' own loader, from its folder, as `lamp-skills list` reads them;
 # toml for what a folder that does not load says of itself.
 lamp-skills = { path = "../skills" }
+# A photo from the app, base64 in its JSON (`faces.add_photo`, #1968), as the
+# voice decodes a look's picture.
+base64 = "=0.22.1"
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 
 [dev-dependencies]

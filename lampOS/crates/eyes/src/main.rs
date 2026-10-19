@@ -510,6 +510,10 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         let _ = writeln!(stream, "{value}");
     }
 
+    // The photo folder, the eyes' own, before anything is asked of it.
+    if let Some(dir) = &arguments.photo_dir {
+        lamp_eyes::photo::ready(dir)?;
+    }
     let detector = Detector::load(&arguments.model)?;
     let mut mesh = match (&arguments.mouth_model, &arguments.mouth_runtime) {
         (Some(model), Some(runtime)) => {

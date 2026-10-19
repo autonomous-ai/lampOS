@@ -74,6 +74,9 @@ pub struct Real {
     /// Names and the time zone changed after setup, with
     /// `LAMP_SETTINGS_CHANGE=on` (#1959).
     pub changes: Option<std::sync::Arc<crate::settings::Changes>>,
+    /// Where a face from the app's photo goes, with `LAMP_PHOTO_FACES=on`
+    /// (#1968, `crate::photos`).
+    pub photos: Option<crate::photos::Place>,
 }
 
 /// Texts from the app (`crate::chat`, #1673): whether they are taken, the
@@ -538,6 +541,10 @@ impl Lamp for Real {
         self.changes.clone()
     }
 
+    fn photos(&self) -> Option<crate::photos::Place> {
+        self.photos.clone()
+    }
+
     fn new_run(&mut self, now_ms: u64) -> String {
         self.texts.stream.new_run(now_ms)
     }
@@ -676,6 +683,7 @@ mod tests {
             reports: None,
             skills: None,
             changes: None,
+            photos: None,
         };
         let level = Volume {
             volume: 35,
@@ -798,6 +806,7 @@ mod tests {
             reports: None,
             skills: None,
             changes: None,
+            photos: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
         // No ring yet.
