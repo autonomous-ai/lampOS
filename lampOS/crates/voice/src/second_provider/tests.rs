@@ -1650,6 +1650,7 @@ async fn the_chat_is_given_the_exchanges_it_is_told_between_the_system_and_the_q
         script.clone(),
         Arc::new(|| Told {
             text: "SYSTEM".into(),
+            after: None,
             history: vec![
                 Message::user("Capital of France?"),
                 Message::assistant("Paris."),
@@ -1666,6 +1667,44 @@ async fn the_chat_is_given_the_exchanges_it_is_told_between_the_system_and_the_q
             Message::system("SYSTEM"),
             Message::user("Capital of France?"),
             Message::assistant("Paris."),
+            Message::user("How many live there?"),
+        ]
+    );
+}
+
+/// #1712, the first builder at 18:56: with what changes told apart
+/// ([`Told::after`]), it goes after the exchanges and before the turn's
+/// notes and words, so the request begins with what stays.
+#[tokio::test]
+async fn what_changes_is_told_after_the_exchanges_and_before_the_notes_and_words() {
+    let script = Arc::new(Script {
+        chats: Mutex::new([vec![text("About two million."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let now = Instant::now();
+    let tools: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| Told {
+            text: "CHARACTER".into(),
+            after: Some("IT IS NOON".into()),
+            history: vec![
+                Message::user("Capital of France?"),
+                Message::assistant("Paris."),
+            ],
+        }),
+        tools,
+        Arc::new(move || now),
+    );
+    engine.submit(written(1, "How many live there?"));
+    turn(&mut engine).await;
+    assert_eq!(
+        script.asked.lock().unwrap()[0],
+        [
+            Message::system("CHARACTER"),
+            Message::user("Capital of France?"),
+            Message::assistant("Paris."),
+            Message::system("IT IS NOON"),
             Message::user("How many live there?"),
         ]
     );

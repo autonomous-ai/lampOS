@@ -1085,6 +1085,16 @@ pub fn serve(
     .then(|| place.clone().or_else(crate::local_time::zone_place_here))
     .flatten();
     let weather_now = weather.clone();
+    // What stays first, and the rest after the exchanges (#1712).
+    let steady_first = std::env::var(crate::second_provider::STEADY_FIRST_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if steady_first {
+        eprintln!(
+            "lamp-voice second: a spoken turn's request begins with the character and the skills, and the memory, the time, the room and the thread go after the exchanges (LAMP_SECOND_STEADY_FIRST)"
+        );
+    }
     let system = move || {
         let now = Instant::now();
         let Ok(mut sessions) = sessions.lock() else {
@@ -1121,12 +1131,22 @@ pub fn serve(
                 Instant::now(),
             ),
         );
-        system_message(
-            &character,
-            crate::agent_tasks::noted(time, tasks.as_ref()).as_deref(),
-            &(memory + &facts(session_fact && !going_on, room) + &skills),
-            file.as_deref(),
-        )
+        let time = crate::agent_tasks::noted(time, tasks.as_ref());
+        let facts = facts(session_fact && !going_on, room);
+        if steady_first {
+            steady_first_message(
+                format!("{character}{skills}"),
+                &format!("{memory}{}{facts}", time.as_deref().unwrap_or_default()),
+                file.as_deref(),
+            )
+        } else {
+            system_message(
+                &character,
+                time.as_deref(),
+                &(memory + &facts + &skills),
+                file.as_deref(),
+            )
+        }
     };
     let staff = tools
         .tasks
@@ -2261,7 +2281,35 @@ pub(crate) fn system_message(
     file: Option<&Path>,
 ) -> Told {
     let told = format!("{character}{}{memory}", time.unwrap_or_default());
-    let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(told.len());
+    let (thread, history) = thread_and_history(told.len(), file);
+    Told {
+        text: told + &thread,
+        after: None,
+        history,
+    }
+}
+
+/// [`system_message`] with what stays told first, as
+/// `LAMP_SECOND_STEADY_FIRST=on` asks (#1712, the first builder at 18:56):
+/// `steady`, the character and the skills, as the system message, and
+/// `changing`, the memory note, the time and the room's facts, with the
+/// thread, after the exchanges ([`Told::after`]). A service's prompt cache
+/// then holds the character, the tools and the exchanges from one request
+/// to the next; the time alone changes every minute.
+pub(crate) fn steady_first_message(steady: String, changing: &str, file: Option<&Path>) -> Told {
+    let (thread, history) = thread_and_history(steady.len() + changing.len(), file);
+    let after = format!("{changing}{thread}").trim_start().to_owned();
+    Told {
+        text: steady,
+        after: (!after.is_empty()).then_some(after),
+        history,
+    }
+}
+
+/// The thread in the room `used` bytes of the system message leave it,
+/// and the exchanges as messages, both under the thread's one lock.
+fn thread_and_history(used: usize, file: Option<&Path>) -> (String, Vec<Message>) {
+    let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(used);
     let now = Instant::now();
     let (thread, recent) = crate::thread::current(file, |thread| {
         (
@@ -2270,10 +2318,10 @@ pub(crate) fn system_message(
         )
     })
     .unwrap_or_default();
-    Told {
-        text: told + &thread.unwrap_or_default(),
-        history: recent.into_iter().flat_map(messages).collect(),
-    }
+    (
+        thread.unwrap_or_default(),
+        recent.into_iter().flat_map(messages).collect(),
+    )
 }
 
 /// What a text's answer (#1673) is told, and how its functions run. It is
@@ -2351,6 +2399,7 @@ pub(crate) fn texts_task(
 pub(crate) fn texts_system_message(character: &str, time: Option<&str>, memory: &str) -> Told {
     Told {
         text: format!("{character}{}{memory}", time.unwrap_or_default()),
+        after: None,
         history: Vec::new(),
     }
 }
@@ -3241,6 +3290,20 @@ mod tests {
                 Message::assistant("Try some tea. It is calm.")
             ]
         );
+        // With what stays first (#1712, the first builder at 18:56): the
+        // character alone first; the memory, the time and the thread after
+        // the exchanges, which are the same.
+        let steady = steady_first_message(
+            "You are a lamp.".into(),
+            &format!("{} It is noon.", crate::remember::told()),
+            Some(&file),
+        );
+        assert_eq!(steady.text, "You are a lamp.");
+        let after = steady.after.clone().unwrap_or_default();
+        assert!(after.starts_with("Your memory\n"), "{after}");
+        assert!(after.contains("- coffee black\n") && after.contains(" It is noon."));
+        assert!(after.contains("Person: What should I drink?\nYou: Try some tea. It is calm.\n"));
+        assert_eq!(steady.history, told.history);
         // Forgotten, then another person's turn, then back: nothing of it
         // is told or given again (first builder's reviewer on #778).
         crate::thread::THREAD.lock().unwrap().forget();
@@ -3252,6 +3315,11 @@ mod tests {
         let told = system_message("You are a lamp.", None, "", Some(&file));
         assert!(told.history.is_empty(), "{:?}", told.history);
         assert!(!told.text.contains("Try some tea"), "{}", told.text);
+        // Nothing changing and no thread: no message after the exchanges.
+        assert_eq!(
+            steady_first_message("You are a lamp.".into(), "", Some(&file)).after,
+            None
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

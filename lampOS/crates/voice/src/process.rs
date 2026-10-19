@@ -1069,6 +1069,7 @@ fn second_route_worker_environment(
         crate::second_provider::net::weather::ENVIRONMENT,
         crate::second_provider::PREPARED_ENVIRONMENT,
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
+        crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
     ]
@@ -1108,6 +1109,7 @@ mod tests {
         for name in [
             crate::second_provider::net::key_terms::ENVIRONMENT,
             crate::second_config::FLUX_ENV,
+            crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             assert_eq!(
@@ -1344,6 +1346,7 @@ mod tests {
                     "Hanoi, Vietnam"
                 } else if name == crate::second_provider::net::weather::ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
+                    || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
                 {
                     "on"
                 } else if name == crate::second_provider::FIRST_WORDS_ENVIRONMENT {
@@ -1408,6 +1411,7 @@ mod tests {
                     "LAMP_SECOND_KNOWN_NAMES=on",
                     "LAMP_SECOND_PREPARED=on",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
+                    "LAMP_SECOND_STEADY_FIRST=on",
                     "LAMP_SECOND_WEATHER=on",
                 ],
             ),
