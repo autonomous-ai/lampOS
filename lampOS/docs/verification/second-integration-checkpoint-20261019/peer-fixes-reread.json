@@ -1,0 +1,28 @@
+{
+  "reviewed_at": "2026-10-19T19:31:00Z",
+  "speaking_face": {
+    "pr": 2008,
+    "head": "2f4863f03e1fca03cd41ae3a07ac0784bba66fc8",
+    "merge": "d99eee947b49ecc98e525c1666c9be2408d75280",
+    "source": "The final PR patch and production snippets fetched directly at the actual merge through the GitHub connector.",
+    "engine_blob": "97bcb2d5653f469506805937ae63eff0d863746b",
+    "worker_blob": "3ad4ff31a05881cdfc415420d1e9771f46794d4c",
+    "conclusion": "The reported configuration P2 is closed by refusal: the worker requires scopes_context before starting the face reader, and Engine independently refuses seeing_who_speaks without a scoped builder.",
+    "limits": "Static confirmation only. No runtime or lamp test. The separate reviewer follow-ups for paired-file ordering, unique frame counting and off-path coverage remain with the owner."
+  },
+  "forget_current": {
+    "pr": 2020,
+    "head": "da8d479f18c073dd536f60ee6f5781fd06c80676",
+    "conclusion": "The settled-writer reproduction is fixed: acknowledged forgotten:true clears current, so a subsequent remember omits deleted source IDs. Store validation is unchanged.",
+    "known_remaining_limit": "As already reported by the reviewer, a previously queued writer job can republish its private conversation.sources after the clear. The regression does not cover that race.",
+    "evidence": "Final PR patch and real-client/store test read; no independent runtime execution."
+  },
+  "latest_integration_observed": "2a2d1c5ecad0f1979bb429a27a4043784859a6c3",
+  "merged_since_previous_rehearsal": [
+    2007,
+    2008,
+    2016,
+    2017
+  ],
+  "publication_status": "Review comments prepared but unconfirmed: local GitHub TLS failures; connector read works, comment writes return403. No approval rejection."
+}

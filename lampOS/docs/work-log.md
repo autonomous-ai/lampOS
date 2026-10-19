@@ -15,7 +15,35 @@ log and nothing a lamp runs ([joining.md](joining.md),
 
 ## Current checkpoint: 2026-10-19
 
-Ready for integration: no (#1996 passed automatic ARM64; newer switch documentation conflicts and needs a clean rebase; inherited host motion failure remains disclosed)
+Latest read and work, **19:31 UTC**: the connector read all **778 Queue comments**
+and all comments and review threads on the four own open PRs. #2005 has a
+clean peer read; its existing upper timing bound is the reviewer's unchanged
+P3. #2007, #2008, #2016 and #2017 have merged into #1712; the observed tip
+is `2a2d1c5ec`. #1973 is still open, so the target remains #1712.
+
+The clean caps rebase `3ad17c000` on `175e411c17` passed its complete
+[27-consumer gate](verification/second-integration-checkpoint-20261019/caps-rebased-host.json):
+**6,768 passed, 0 failed, 30 ignored, none filtered**. Non-Update was
+**6,636/0/29** in **1,093.04 s**; full Update **132/0/1** in **94.26 s**.
+Formatting **3.45 s**, strict workspace Clippy **124.81 s**, and workspace
+build **24.21 s** passed. All **1,589** hashes match both copies. The
+[changed-name scan](verification/second-integration-checkpoint-20261019/caps-rebased-consumers.json)
+covers six changed crates and 27 consumers. This replaces the documentation
+conflict; it does not inherit the old head's native qualification. Rest/Say
+preparation `f0fbb20e7` moves the explicit zero-listeners assertion into its
+own foundation and is running its fresh complete consumer gate.
+
+The [peer re-read](verification/second-integration-checkpoint-20261019/peer-fixes-reread.json)
+confirms #2008's configuration P2 is fixed in actual merge `d99eee947`: both
+worker activation and Engine refuse a missing scoped builder. #2020 fixes
+the original settled-writer remember/forget/remember sequence; the reviewer's
+already-reported queued-writer race remains. These are source reviews, not
+independent runtime or lamp tests. Local GitHub REST/GraphQL and Git transport
+still fail intermittently at TLS; the connector can read but refuses comment
+writes. Prepared comments, local log commits and the caps publication remain
+unconfirmed remotely. No automatic approval rejection is involved.
+
+Ready for integration: no (#1996 clean rebase passed the complete host gate; publication and automatic ARM64 for the new head are pending)
 
 Ready for integration: no (#1732 ARM64 is green; the authored skill is being split from shared foundations)
 

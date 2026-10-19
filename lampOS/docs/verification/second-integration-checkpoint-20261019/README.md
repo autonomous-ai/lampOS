@@ -1,6 +1,17 @@
 # Second integration checkpoint, 2026-10-19
 
-Current status (18:56 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
+Current status (19:31 UTC): the clean output-caps rebase `3ad17c000` passed
+the [complete host gate](caps-rebased-host.json): **6,768/0/30**, none
+filtered, with formatting, strict workspace Clippy and build green. All
+1,589 hashes match both copies; [27 consumers](caps-rebased-consumers.json)
+are covered. Publication and the new automatic ARM64 run remain pending.
+Rest/Say's fresh consumer gate is running. [Peer re-read](peer-fixes-reread.json)
+closes the speaking-face configuration P2 in actual merge `d99eee947` and
+records #2020's fix and its already-known queued-writer limit. GitHub reads
+are available through the connector; writes and Git transport remain blocked
+by connectivity or connector permissions. No remote update is claimed.
+
+Earlier checkpoint (18:56 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
 passed automatic ARM64: **7,684 nextest (1 leaky), 48 skipped**, plus
 **4 doc and 12 separate harness tests**. [Native evidence](caps-foundation-arm64.json)
 records the exact head, base and merge checkout. The [host motion failure](caps-foundation-motion-failure.json)
