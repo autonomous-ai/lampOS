@@ -4861,6 +4861,23 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#1993:** Jarvis's P2 (a short or soft last word could be dropped) is agreed. The fix (a bar relative to the line's loudest block, a one-block margin, stop words keeping `CloseStream`) is written and applies to #1712's head. It goes in after the P1.
 - **The relay probe** (`probe-cascade --wire`, #1934): written with tests and docs, waiting for the checkout.
 
+## 2026-10-20, 03:43 ICT: the landing (#1973) is merged into lamp-voice; #2017 merged; #2024 up and re-read; #1993's fix gating
+
+- **#1973, the landing, is merged into `lamp-voice`** (the first builder, after the reviewer's 03:25 with no finding and ARM64 39318679555 green on `063050fe5`). The second route is now the main voice branch's default.
+  - #1712's head up to `026728a70` (#1940 … #2025) and 29 of `lamp-voice`'s commits went in, with every conflict kept on both sides.
+  - Two fixes the gate found:
+    - `only_the_name` reads a call as the second route does;
+    - the reset test counts both sides' new stores.
+  - Gate: 4656 passed, 0 failed.
+- **#2017, #2002's P1, is merged into #1712:** a piece that came back as the lamp's name alone begins the next line. The reviewer found nothing. With #2002 it puts lamp-4ace at 1.8–2.0 s from end of speech to first sound.
+- **#2024, `probe-cascade --wire`** for where the relay's time goes (#1934):
+  - its six findings are fixed, the P2 among them: the lamp command now gives the relay's URL;
+  - the reviewer found nothing left at 03:38;
+  - tried once from this office with a key that isn't one: the relay costs about 60 ms more to connect and 60 ms more to shake hands.
+  - It's the first builder's to fold and merge, and to run on lamp-4ace.
+- **#1993:** Jarvis's P2 and P3s. The quiet end is judged against the line's own loudest block (30 dB, floor −60 dBFS) to one block, and a stop word's stream keeps `CloseStream`. Three mutations each fail a test. It's gating at `9144b0bf2`.
+- **Disk:** my checkout's `target` had reached 79 GB (the first builder, 02:31). `cargo clean` removed 95.3 GiB, taking the Mac from 11 to 89 GiB free, and the gate script now cleans past 20 GB first.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
