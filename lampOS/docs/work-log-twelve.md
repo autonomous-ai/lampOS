@@ -392,3 +392,8 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #2003 also carries the observation rule, one step back, at the first
   builder's yes (`7996c39e7`): the pinned test is changed with its reason, and
   the kettle test is added.
+- #2003 merged. Second's P2 (a stale `current` after a forget refused the
+  next remember) is fixed in #2020, with the regression. The synthetic dry run
+  (20 made-up conversations, scored against the bar) is #2021; the real
+  DeepSeek run waits on where its key comes from. The thread trial row is
+  designed and waits on Tests' yes; its proof line is #2023.
