@@ -4701,6 +4701,15 @@ A usage limit paused me from about 00:40 to 06:2x.
   - a text never runs a skill that moves the body (`lamp-skills`' tools file says which do);
   - a text is given news only of work asked for by text.
 
+## 2026-10-19, 14:18 ICT: #1758 and #1781 merged; the DeepSeek route's hearing half begun; the onboarding measurement agreed with Seventh
+
+- **#1758 merged** (13:02): a text never runs a skill that moves the body, and is given news only of work asked for by text.
+- **#1781 merged** (14:15), folded from #1767 (closed 13:56): a forget that can't reach a set-aside people file says what was forgotten and what wasn't, and finishes when the file is back. Faces remembered after the forget are kept.
+- **The hearing half of the DeepSeek route's quality plan** (the first builder, 13:09 and 13:36), one PR each on top of #1712:
+  - **Deepgram key terms:** with `LAMP_SECOND_KNOWN_NAMES=on`, the second route's speech to text also listens for the names the lamp knows: the setup name, its agents and the known faces. They are read every minute on their own thread, so no line waits. Gating now; the first run's one failure was the worker-environment test, which hadn't been told of the new switch.
+  - **A Flux trial behind a switch,** English only, against Nova-3 with `Finalize` on the same lines: next. The protocol is read (`ForceEndTurn`, `EndOfTurn`'s `trigger`, `CloseStream`).
+- **#753, Seventh's onboarding step:** the measurement is posted and agreed (14:06). Each try is the name heard once at 0.95 or more, and mic1's largest rise in the second after it. The lamp speaking spoils only that span, from 0.5 s before the hearing. The bar is the quietest of three tries less 3 dB, held to 16–24, kept as numbers only. The functions and the file come as a small crate of their own, `lamp-near-call`, after the key-terms PR. The consumer behind `LAMP_ATTENTION_NEAR_CALIBRATED` comes after that.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
