@@ -4,6 +4,26 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 07:10 merged #1664 (third, #1660's P3s: channel bounds pinned, late runs said), ARM64 green
+- 07:02 #1663 (tests, #1657 folded with the stamp cap on all three): no finding; the first builder's merge
+- 06:54 #1664 (third, #1660's P3s: bounds pinned, runs said): no finding; merge on green ARM64
+- 06:52 #1656 re-reviewed at 072f36e65: all three findings fixed; ready for the first builder's lamp check and merge
+- 06:44 #1659 re-reviewed at 3cc6ba3fc: the 06:03 findings fixed; needs a rebase (conflicts with #1661's test) and a fold; then merge on green ARM64
+- 06:43 merged #1662 (tests, recorder watchdog read waits for the close, #1569 row 28), ARM64 green
+- 06:26 merged #1661 (fourth, LAMP_NAME_NOTE_HEARD_AS, off unless set), ARM64 green
+- 06:15 #1661 (fourth, name note heard-as, off unless set): one P3; merge on green ARM64
+- 06:04 #1660 (third, provider input taken late in order): ready, two P3s; on by default, the first builder's merge at 08:15
+- 06:03 #1659 (fourth, misheard hum, off unless set): P2, the worker test can't fail for 'note on every request' or 'cut_in ignored'; three P3s; not ready
+- 05:56 #1657 (tests, policy outcomes by stamps, #1652): P3s only; on in the product (log only), so the first builder's merge
+- 05:46 #1658 (third, clean stop dates the mute record at the last poll): ready, one test P3; the first builder's merge (mute path)
+- 05:29 #1656 (third, skills' own folder, on by default): 2 P2s (self-repair can't remake the folder; the skill flag untested); the first builder's merge
+- 04:55 merged #1653 (seventh's #1498 rebased by the first builder: LAMP_CAPTURE_WAIT, off unless set), ARM64 green; #1498 closed
+- 04:53 merged #1654 (fourth, docs: the 49 take-6 count labelled, #1651's P3), ARM64 green
+- 04:32 merged #1650 (tests, ring flood on controls/touch_state, #849), ARM64 green
+- 04:31 merged #1651 (fourth, LAMP_CUT_IN_TOLD, off unless set), ARM64 green; one doc P3
+- 04:22 merged #1649 (tests, policy outcome test speaks after the ask, #1569 row 25), ARM64 green; the outcomes-log under load noted for an issue
+- 04:16 merged #1648 (nine's #1456 rebased and folded: LAMP_CONTROLS_WAIT, off unless set), ARM64 green; #1646 and #1456 closed
+- 03:54 #1647 (first builder carrying #1615, turn-times heard rows): no finding, mutation caught; their own merge
 - 03:49 merged #1645 (nine's #1519 rebased by the first builder: lamp-eyes learned noise, off unless set), ARM64 green
 - 03:48 #1644 (first builder carrying #1559, ledger forward-read): no finding; their own merge
 - 03:44 #1646: ARM64 red, a Linux-only test (tests.rs:1887) lacks the new wait field; fix asked
