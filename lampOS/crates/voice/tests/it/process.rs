@@ -82,7 +82,7 @@ fn a_worker_role_not_on_the_voices_list_is_never_started() {
 /// anything runs, so a command added there and not to the list fails here.
 #[test]
 fn every_command_the_voice_dispatches_is_on_its_list_and_no_other_runs() {
-    let source = include_str!("../src/main.rs");
+    let source = include_str!("../../src/main.rs");
     let mut dispatched = std::collections::BTreeSet::new();
     for marker in ["command==\"", "command == \""] {
         for (at, _) in source.match_indices(marker) {

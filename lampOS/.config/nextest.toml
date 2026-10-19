@@ -29,7 +29,7 @@ realtime = { max-threads = 1 }
 
 [[profile.default.overrides]]
 filter = '''
-    binary_id(lamp-voice::capture_hold_worker)
+    (binary_id(lamp-voice::it) & test(/^capture_hold_worker::/))
   | (binary_id(lamp-voice) & test(=coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff))
   | (binary_id(lamp-health::program) & test(=between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone))
   | (binary_id(lamp-skills::skills) & (test(=asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait) | test(=a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go) | test(=asking_the_policy_a_hello_made_and_not_noticed_rests) | test(=the_program_keeps_a_skill_off_across_a_restart) | test(=the_program_forgets_a_snooze_at_a_restart)))
@@ -54,7 +54,7 @@ default-filter = 'all()'
 #   cargo nextest run --release --workspace --profile realtime -j 1
 [profile.realtime]
 default-filter = '''
-    binary_id(lamp-voice::capture_hold_worker)
+    (binary_id(lamp-voice::it) & test(/^capture_hold_worker::/))
   | (binary_id(lamp-voice) & test(=coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff))
   | (binary_id(lamp-health::program) & test(=between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone))
   | (binary_id(lamp-skills::skills) & (test(=asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait) | test(=a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go) | test(=asking_the_policy_a_hello_made_and_not_noticed_rests) | test(=the_program_keeps_a_skill_off_across_a_restart) | test(=the_program_forgets_a_snooze_at_a_restart)))
