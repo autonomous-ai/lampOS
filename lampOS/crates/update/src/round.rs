@@ -31,6 +31,7 @@ use crate::{
     fetch::{Channel, Fetch},
     judge::{Before, UnitState, Watch, part_of},
     manifest::{self, Manifest},
+    own,
     product_skills::{self, Bundle},
     quiet::{BETWEEN_TURNS, QUIET, Quiet},
     records,
@@ -84,6 +85,12 @@ pub struct Config {
     pub watch: Duration,
     /// Bytes kept free on the disk beyond the new build.
     pub keep_free: u64,
+    /// `LAMP_UPDATE_SELF=on`: once the parts run a build, lamp-update
+    /// switches to that build's own binary too (crate::own, #1680).
+    pub self_switch: bool,
+    /// The folder this program runs from, as the lamp names it
+    /// (`/opt/lampOS/update/<sha256>/`), when it is one: never pruned.
+    pub running: Option<String>,
 }
 
 impl Config {
@@ -121,6 +128,14 @@ pub enum Outcome {
     NotQuiet(String),
     /// Switched, and every part well.
     Switched(u64),
+    /// The parts run build `sequence`, and `update/current` now names its
+    /// lamp-update (`to`) instead of `from`: started in this program's
+    /// place, it must confirm itself (crate::own).
+    SelfSwitched {
+        sequence: u64,
+        from: String,
+        to: String,
+    },
     /// Switched, a part was not well (or the switch was cut short), and the
     /// previous build was put back. `after` is how the parts were then.
     RolledBack {
@@ -178,6 +193,7 @@ impl Outcome {
             Self::Would(_) => "would",
             Self::NotQuiet(_) => "not-quiet",
             Self::Switched(_) => "switched",
+            Self::SelfSwitched { .. } => "self-switched",
             Self::RolledBack { .. } => "rolled-back",
             Self::Failed(_) => "failed",
         }
@@ -201,6 +217,12 @@ impl std::fmt::Display for Outcome {
             Self::Switched(sequence) => {
                 write!(f, "switched to build {sequence}; every part is well")
             }
+            Self::SelfSwitched { sequence, from, to } => write!(
+                f,
+                "build {sequence} runs; lamp-update switches from its build {} to {}, which must confirm itself",
+                &from[..from.len().min(12)],
+                &to[..to.len().min(12)]
+            ),
             Self::RolledBack {
                 sequence,
                 why,
@@ -307,6 +329,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         records,
         quiet,
         skills_back: Vec::new(),
+        seen: None,
     };
     if !config.apply {
         let state = run.records.peek_state();
@@ -326,7 +349,24 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         Ok(lock) => lock,
         Err(error) => return Outcome::Failed(error.to_string()),
     };
-    let outcome = run.acting();
+    // A switch of lamp-update's own not yet confirmed: no round acts, so
+    // an updater restarted in phase 2, or the old one run by hand, never
+    // begins a second round (#1680). The new one confirms before its first.
+    if let Ok(Some(pending)) = own::pending(run.records.folder()) {
+        let outcome = Outcome::Refused(format!(
+            "lamp-update's own switch to its build {} is not confirmed yet",
+            &pending.new[..pending.new.len().min(12)]
+        ));
+        run.records.log(outcome.kind(), &outcome.kept());
+        return outcome;
+    }
+    let mut outcome = run.acting();
+    if config.self_switch
+        && let Outcome::Switched(sequence) | Outcome::UpToDate(sequence) = outcome
+        && let Some(switched) = run.own(sequence)
+    {
+        outcome = switched;
+    }
     run.records.log(outcome.kind(), &outcome.kept());
     outcome
 }
@@ -339,6 +379,8 @@ struct Run<'r, 'w> {
     /// The product skills' files this round's switch wrote, or may have,
     /// as they were: put back with the units.
     skills_back: Vec<SkillBack>,
+    /// The manifest the round read, checked.
+    seen: Option<Manifest>,
 }
 
 /// A unit as it is to be put back.
@@ -514,6 +556,7 @@ impl Run<'_, '_> {
                 manifest.channel, self.config.channel
             )));
         }
+        self.seen = Some(manifest.clone());
         if let Some(installed) = &state.installed {
             if manifest.sequence == installed.sequence {
                 return Err(Outcome::UpToDate(manifest.sequence));
@@ -1409,6 +1452,105 @@ impl Run<'_, '_> {
         self.put_back(&mut state, &journal.build, &backs, None, why, String::new())
     }
 
+    /// Phase 1 of lamp-update's own switch (crate::own), once the parts run
+    /// build `sequence`: its lamp-update installed beside, `self.json`
+    /// written, then `update/current` moved. None when lamp-update already
+    /// runs that binary, the build has none, it was put back before, or
+    /// `update/current` is not install's link. What goes wrong is said, and
+    /// the parts' outcome stands.
+    fn own(&mut self, sequence: u64) -> Option<Outcome> {
+        let manifest = self.seen.take().filter(|seen| seen.sequence == sequence)?;
+        match self.own_switch(&manifest) {
+            Ok(switched) => switched,
+            Err(why) => {
+                self.say(&format!("lamp-update's own build is not switched: {why}"));
+                None
+            }
+        }
+    }
+
+    fn own_switch(&mut self, manifest: &Manifest) -> Result<Option<Outcome>, String> {
+        let Some(file) = manifest.files.iter().find(|file| file.name == own::BINARY) else {
+            return Ok(None);
+        };
+        let link = self.config.on(own::CURRENT);
+        let Ok(old) = fs::read_link(&link) else {
+            return Ok(None);
+        };
+        let old = old.to_string_lossy().into_owned();
+        if !unit::is_build_folder(&unit::folder(own::FOLDER, &old))
+            || file_sha256(&link.join(own::BINARY)).is_ok_and(|sha| sha == file.sha256)
+            || own::refused(self.records.folder()).contains(&file.sha256)
+        {
+            return Ok(None);
+        }
+        let new_folder = unit::folder(own::FOLDER, &file.sha256);
+        let there = self.config.on(&new_folder);
+        let wants = vec![Want {
+            name: own::BINARY.to_owned(),
+            source: Source::Build(file.clone()),
+            size: file.size,
+        }];
+        if !holds(&there, &wants) {
+            if there.exists() {
+                return Err(format!("{new_folder} holds other files than the build's"));
+            }
+            let free = self
+                .world
+                .disk
+                .free(&self.config.on(unit::INSTALLED))
+                .map_err(|error| format!("the disk's free room cannot be read: {error}"))?;
+            if free < file.size.saturating_add(self.config.keep_free) {
+                return Err(format!(
+                    "the disk has {} MB free, and {} MB are kept free",
+                    free / 1_000_000,
+                    self.config.keep_free / 1_000_000
+                ));
+            }
+            let temporary = filling(&there);
+            if let Err(outcome) = self.fill(manifest, &temporary, &wants) {
+                let _ = fs::remove_dir_all(&temporary);
+                return Err(outcome.to_string());
+            }
+            fs::rename(&temporary, &there)
+                .and_then(|()| sync_parent(&there))
+                .map_err(|error| format!("{new_folder} cannot be named: {error}"))?;
+            let mut state = self
+                .records
+                .state(self.world.say)
+                .map_err(|error| format!("the state cannot be read: {error}"))?;
+            if !state.made.contains(&new_folder) {
+                state.made.push(new_folder.clone());
+            }
+            self.records
+                .save_state(&state)
+                .map_err(|error| format!("the state cannot be written: {error}"))?;
+            self.say(&format!(
+                "installed {new_folder} beside {}",
+                unit::folder(own::FOLDER, &old)
+            ));
+        }
+        own::begin(self.records.folder(), &old, &file.sha256)
+            .map_err(|error| format!("self.json cannot be written: {error}"))?;
+        replace_link(&link, &file.sha256).map_err(|error| {
+            format!(
+                "{} cannot be pointed at {}: {error}",
+                own::CURRENT,
+                file.sha256
+            )
+        })?;
+        self.say(&format!(
+            "lamp-update switches to its build {}; it must confirm itself within {} min",
+            &file.sha256[..12],
+            own::DEADLINE.as_secs() / 60
+        ));
+        Ok(Some(Outcome::SelfSwitched {
+            sequence: manifest.sequence,
+            from: old,
+            to: file.sha256.clone(),
+        }))
+    }
+
     /// Removes the folders this program made that no unit names now, nor
     /// any unit kept from before the last switch: the lamp keeps its build
     /// and the one before. Its own folder, which its unit starts it from,
@@ -1428,6 +1570,14 @@ impl Run<'_, '_> {
             unit::program(&text).or_else(|| unit::linked_program(&text, &self.config.root))
         }) {
             named.insert(program.folder());
+        }
+        // The folder this program runs from: a round started by hand has no
+        // unit of its own to name it, and after phase 1 of its own switch
+        // `update/current` names another while it still runs (#1680).
+        if let Some(folder) = &self.config.running
+            && folder.starts_with(own::FOLDER)
+        {
+            named.insert(folder.clone());
         }
         // Named before the last switch: by a unit kept, or a link kept.
         named.extend(

@@ -343,8 +343,11 @@ and the job fails without moving the head.
     unit or link names now, nor any unit or link as it was before the last
     switch, are removed: the lamp keeps its build and the one before. The
     folder `lamp-update.service` starts this program from (install's
-    `update/current`) is kept too, since no round switches it (#1680). A
-    folder it did not make (every one installed by hand) is never removed.
+    `update/current`) is kept too, since no round switches it (#1680), and
+    so is the folder the running binary is in, when it is under
+    `/opt/lampOS/update/`: a round started by hand has no unit of its own to
+    name it, and after phase 1 of its own switch `update/current` names
+    another while it still runs. A folder it did not make (every one installed by hand) is never removed.
 
 ### The product's skills
 
@@ -500,8 +503,80 @@ when `lamp-update install` is run again, which installs every product
 part's newest build beside the old and moves each link, its own among them,
 without restarting anything; the new updater runs from its next start.
 Replacing the link under a running updater is safe on Linux: the program
-already running stays mapped. A round that switches the updater itself, at
-the end of a switch and watched like a part, is not built.
+already running stays mapped.
+
+### lamp-update switching itself (`LAMP_UPDATE_SELF`, off)
+
+With `LAMP_UPDATE_SELF=on` in `lamp-update.service`'s environment, a round
+also moves lamp-update to its build's own binary (`own.rs`, #1680). Off, or
+absent, a round is exactly as above: no `self.json` is ever written, so the
+confirmation and lamp-update-back find nothing to do. The product unit does
+not set it yet.
+
+1. **Phase 1.** Once a round's parts run build N (the round switched to it,
+   or found it up to date), and N's `lamp-update` is not the one
+   `update/current` names, nor one refused before, the round installs it
+   beside in `update/<sha256>/` (checked like any part's, with room for it
+   and `--keep-free-mb` to spare), writes `self.json`, then moves
+   `update/current`. The outcome is `SelfSwitched`, and `serve` (or `once`)
+   `exec`s the new binary in its own place, with the same options: the same
+   process, so systemd restarts nothing and the records' lock, opened
+   close-on-exec, is let go. An `exec` that fails puts the link back at once.
+2. **Phase 2.** The new binary, before its first round, confirms itself only
+   once a dry round (nothing applied) has fetched the channel's manifest and
+   checked its signature, and it has read `state.json` under the lock; then
+   `self.json` goes. A binary that cannot reach the channel or refuses the
+   manifest waits and tries again every 30 s, and doesn't confirm.
+3. **Back.** `lamp-update-back` is a copy of the installed build's
+   `lamp-update` at `/usr/local/lib/lampos/lamp-update-back`. Only `install`
+   writes it, and it is outside `lamp-update.service`'s `ReadWritePaths`, so
+   no round can change it. `lamp-update-back.service` runs it as
+   `lamp-update-back back`. It is started by `lamp-update.service`'s
+   `OnFailure=` and every 2 min by `lamp-update-back.timer`. When
+   `self.json` is there and lamp-update is not `active`/`running`, or 10 min
+   (`own::DEADLINE`) have passed since the link moved, it points
+   `update/current` at the old build again, adds the new binary's SHA-256 to
+   `self-refused` (never switched to again), removes `self.json`, and runs
+   `systemctl reset-failed` and `restart --no-block lamp-update`. Otherwise it
+   ends, having changed nothing. The unit has
+   `ConditionPathExists=/usr/local/lib/lampos/lamp-update-back`: on a lamp
+   not installed since #1680 (a round never adds a unit: it changes only
+   units already on the lamp, and never `lamp-update.service`), the timer
+   and `OnFailure=` find the condition unmet and systemd skips the start,
+   which is not a failure. lamp-health reads parts' reports on the bus, not
+   systemd's unit states, so a skipped or failed lamp-update-back is no part
+   in error either way.
+
+**A good build cut off from the channel is put back.** The confirmation
+needs the channel: a new lamp-update that cannot reach it for the 10 min of
+the deadline, a network down or a router restarting, is put back and its
+binary added to `self-refused`, though nothing was wrong with it. This is
+on purpose (the first builder's rule on #1680: if the channel can't be
+reached, wait for it and don't confirm; the deadline then puts the old one
+back): an updater that has not shown it can fetch and check a signed
+manifest is not trusted to be the one that updates the lamp. The parts'
+own rounds go on with the old lamp-update. What recovers it is the next
+release whose `lamp-update` binary differs (a new SHA-256 is not refused):
+the lamp switches to that one as to any other. A later build with a
+byte-for-byte identical `lamp-update` stays refused, so a lamp seen with
+`self-refused` after an outage is waiting for a release that changes
+lamp-update, not broken.
+
+**One lock.** There is no lamp-update timer: `serve` runs its rounds in one
+process. Every round, `install`, the confirmation and lamp-update-back take
+the same lock (`flock` on `/var/lib/lampos-update/lock`, not waiting). While
+`self.json` waits, every round is refused before it reads the channel, so an
+updater restarted in phase 2, or the old binary run by hand, never starts a
+second round.
+
+**`self.json` is a contract for good.** The lamp-update-back on a lamp is as
+old as its install, and it must read what any later lamp-update writes. The
+file is `{"version": 1, "old": "<64 hex>", "new": "<64 hex>", "at_unix_ms": N}`.
+These four keep their meaning in every version. A later version may add
+fields, and back reads any version and ignores fields it does not know. Back
+does three things only: the link, the refusal and the restart. The deadline
+is on the wall clock: on a lamp without a battery clock, a switch made
+before NTP set the time may be put back early, or late, once it is set.
 
 ## What was measured, and where
 
@@ -545,6 +620,23 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   a blank lamp given build 1 by `lamp-update install`, then a round that
   switches to build 2, keeps `update/current` naming a folder that is there.
   Without the fix the round removes that folder and the test fails.
+- lamp-update switching itself (#1680, `tests/round.rs`, on a lamp given
+  build 1 by `install`, with `self_switch` on unless said): a new updater
+  that confirms keeps its switch, and a later failure or the deadline leaves
+  it; a new binary that exits at once (a real `#!/bin/sh` `exit 1`, run) is
+  put back by `OnFailure=`'s run of back and refused; one that runs but isn't
+  confirmed is waited for at 1 min and put back after 10; one that refuses
+  every manifest (another key) or cannot reach the channel never confirms,
+  and is put back by the deadline; while `self.json` waits a round is
+  refused with the lamp byte for byte the same, and with the lock held
+  elsewhere the confirmation, back and a round all do nothing; with the
+  switch off the round switches the parts and lamp-update stays, and back
+  and the confirmation write nothing; install writes back at its fixed path,
+  0755, outside `ReadWritePaths`, and two self-switching rounds leave it as
+  it was; back reads a `self.json` of version 5 with fields it doesn't know.
+  Prune keeps the running binary's folder, both in a round by hand with no
+  lamp-update unit and in one made by the old binary after its own switch.
+  Without the fix both tests fail.
 - The real HTTPS path, once, by hand (the ignored test
   `a_release_file_from_github`): 646 bytes of this repository's
   `models/ambernet` release, through GitHub's redirect to
@@ -692,7 +784,12 @@ committed, never the owner's real key). `L` is the runbook's SSH alias.
 - CI publishing: the job above has not run; no key exists.
 - A power cut during a switch, on the lamp's storage: the journal is
   tested with the files a cut would leave, on the Mac.
-- lamp-update updating itself (its own unit is never a part), the keeper,
+- lamp-update switching itself on a lamp (`LAMP_UPDATE_SELF`): tested on
+  the Mac only (`tests/round.rs`, #1680), with a new binary that exits at
+  once run for real and lamp-update-back called as its unit would call it.
+  The `exec`, `OnFailure=`, the timer and the `systemctl` calls haven't run
+  under systemd. The rehearsal on lamp-4ace is the first builder's.
+- The keeper,
   `lampos.target`, timers, models and libraries a build does not carry,
   configuration under `/etc/lampOS` (but for `second.json`, above), and a
   part new to a lamp.

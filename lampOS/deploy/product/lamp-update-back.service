@@ -1,0 +1,26 @@
+# lamp-update-back: puts lamp-update's own previous build back (lampOS/docs/updates.md, #1680). Started by
+# lamp-update.service's failure (OnFailure=) and by lamp-update-back.timer. Only when lamp-update switched to its
+# own new build (LAMP_UPDATE_SELF=on) and that build has not confirmed itself, and lamp-update is not running or ten
+# minutes have passed, does it point /opt/lampOS/update/current at the build before, refuse the new one and start
+# lamp-update again; otherwise it ends at once. It starts from a fixed path that only `lamp-update install` writes:
+# no round switches it, and lamp-update.service cannot even write it, so a new lamp-update that cannot start is put
+# back all the same. Outside lampos.target, as lamp-update is.
+[Unit]
+Description=lampOS updates, lamp-update's own build put back (lamp-update-back)
+# A lamp not installed since #1680 has no lamp-update-back yet: the timer and OnFailure= then skip it (a condition
+# not met is not a failure, and lamp-health reads no unit's state) rather than failing with no ExecStart.
+ConditionPathExists=/usr/local/lib/lampos/lamp-update-back
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/lib/lampos/lamp-update-back back
+StandardInput=null
+SyslogIdentifier=lamp-update-back
+TimeoutStartSec=60
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/lampOS/update /var/lib/lampos-update
+ProtectHome=yes
+PrivateTmp=yes

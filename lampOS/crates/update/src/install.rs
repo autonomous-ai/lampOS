@@ -134,6 +134,16 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-update.service",
         include_str!("../../../deploy/product/lamp-update.service"),
     ),
+    // lamp-update's fallback, from its fixed path: started by lamp-update's
+    // failure and by its timer (#1680, crate::own).
+    (
+        "lamp-update-back.service",
+        include_str!("../../../deploy/product/lamp-update-back.service"),
+    ),
+    (
+        "lamp-update-back.timer",
+        include_str!("../../../deploy/product/lamp-update-back.timer"),
+    ),
     // The passive self-test, five minutes after the lamp starts and every
     // six hours (#812). Its service is started by its timer alone.
     (
@@ -487,7 +497,11 @@ const HARNESS_DONE: &str = "harness-at-boot";
 const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
 
 /// Services started by a timer of their own, and never enabled themselves.
-const TIMED: &[&str] = &["lamp-records.service", "lamp-selftest.service"];
+const TIMED: &[&str] = &[
+    "lamp-records.service",
+    "lamp-selftest.service",
+    "lamp-update-back.service",
+];
 
 /// The units enabled: the target, and what starts outside it.
 fn enabled() -> Vec<String> {
@@ -499,6 +513,7 @@ fn enabled() -> Vec<String> {
             "lampos.target",
             "lamp-records.timer",
             "lamp-selftest.timer",
+            "lamp-update-back.timer",
             "lampos-setup-done.path",
         ])
         .map(str::to_owned)
@@ -935,6 +950,20 @@ pub fn install(
     }
     for ((part, _), build) in wanted.iter().zip(&builds) {
         link(config, part, build, &mut changed)?;
+    }
+    // lamp-update-back, a copy of this build's lamp-update at a fixed path:
+    // written here alone, never by a round, which cannot even write it, so
+    // a lamp-update that cannot start is still put back (#1680).
+    if let Some(((part, _), build)) = wanted
+        .iter()
+        .zip(&builds)
+        .find(|((part, _), _)| part.binary == crate::own::BINARY)
+    {
+        let from = config
+            .on(&unit::folder(&part.folder, build))
+            .join(&part.binary);
+        let bytes = fs::read(&from).map_err(|error| format!("{}: {error}", from.display()))?;
+        put(config, crate::own::BACK, &bytes, 0o755, &mut changed)?;
     }
 
     // The units and the tmpfiles. systemd must be told of any of them
@@ -1871,18 +1900,16 @@ mod tests {
     #[test]
     fn every_product_part_starts_through_its_current_link() {
         let parts = parts();
-        for (name, text) in PRODUCT
-            .iter()
-            .filter(|(name, _)| name.ends_with(".service"))
-        {
+        // lamp-update-back starts from its fixed path, which no round
+        // switches (#1680).
+        let linked =
+            |name: &&str| name.ends_with(".service") && *name != "lamp-update-back.service";
+        for (name, text) in PRODUCT.iter().filter(|(name, _)| linked(name)) {
             assert!(part(text).is_some(), "{name} starts through a current link");
         }
         // Setup, its reset and the waking face share one binary, and so do
         // the air and its bus clock; every other service is a part.
-        let services = PRODUCT
-            .iter()
-            .filter(|(name, _)| name.ends_with(".service"))
-            .count();
+        let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
         assert_eq!(parts.len(), services - 3, "every product service is a part");
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");

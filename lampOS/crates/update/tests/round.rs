@@ -12,6 +12,7 @@ use lamp_update::{
     fetch::{Channel, Fetch},
     judge::UnitState,
     manifest::{self, File, Manifest, Unit, sha256_hex},
+    own,
     quiet::Heard,
     round, unit,
     world::{self, Clock, Disk, Ears, Systemd},
@@ -279,6 +280,25 @@ fn controls_unit(build: &str) -> String {
     )
 }
 
+/// A process one test starts holds, from its fork to its exec, a copy of
+/// every file the other tests have open, a records' lock among them: that
+/// lock, let go by its test and taken again, is then "another lamp-update
+/// is at work". A test that starts a process holds `FORKS` to write until
+/// it has started; each take of the lock holds it to read.
+static FORKS: std::sync::RwLock<()> = std::sync::RwLock::new(());
+
+fn no_fork() -> std::sync::RwLockReadGuard<'static, ()> {
+    FORKS
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn forking() -> std::sync::RwLockWriteGuard<'static, ()> {
+    FORKS
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// A lamp made of files, its channel, and the rest of its world.
 struct Lamp {
     _folder: tempfile::TempDir,
@@ -382,6 +402,8 @@ impl Lamp {
             quiet_wait: Duration::from_secs(600),
             watch: Duration::from_secs(60),
             keep_free: 256_000_000,
+            self_switch: false,
+            running: None,
         };
         Self {
             _folder: folder,
@@ -459,6 +481,7 @@ impl Lamp {
     }
 
     fn round(&mut self) -> Outcome {
+        let _no_fork = no_fork();
         let clock = FakeClock(Rc::clone(&self.now));
         let talking = self.talking.take().unwrap_or_else(|| Box::new(|_| false));
         let mut ears = FakeEars {
@@ -550,7 +573,10 @@ fn build_two(lamp: &mut Lamp) -> Manifest {
 fn a_round_that_sets_damaged_records_aside_keeps_the_keys_marked() {
     use lamp_update::install;
     const V1_KEY: &str = "previous-owners-key-0123456789";
-    let prepare = |root: &Path| install::provision_device_key(root, install::RECORDS, &mut |_| {});
+    let prepare = |root: &Path| {
+        let _no_fork = no_fork();
+        install::provision_device_key(root, install::RECORDS, &mut |_| {})
+    };
     let keys = |root: &Path| {
         install::KEY_PATHS.map(|path| root.join(path.trim_start_matches('/')).exists())
     };
@@ -952,6 +978,7 @@ fn the_journal_line_is_the_units_own_last_cleaned_and_cut() {
 /// holds is read whole; one that fails gives nothing.
 #[test]
 fn a_command_is_read_within_its_bound_and_killed_after() {
+    let _forking = forking();
     let began = std::time::Instant::now();
     let hung = world::output_within(
         std::process::Command::new("sleep").arg("30"),
@@ -2072,7 +2099,9 @@ impl Lamp {
             models: Vec::new(),
         };
         let mut host = InstallHost(lamp.root.clone());
+        let no_fork = no_fork();
         lamp_update::install::install(&config, &mut lamp.channel, &mut host, &mut |_| {}).unwrap();
+        drop(no_fork);
         lamp.systemd.units.clear();
         for entry in fs::read_dir(lamp.root.join("etc/systemd/system")).unwrap() {
             let entry = entry.unwrap();
@@ -2185,4 +2214,416 @@ fn a_round_that_cannot_place_second_json_writes_no_unit() {
         voice_unit(&sha("voice 1"))
     );
     assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+}
+
+/// Build `sequence` of the product, with lamp-update's own binary `updater`.
+fn product_build_with_updater(lamp: &mut Lamp, sequence: u64, updater: &str) -> Manifest {
+    let texts: Vec<(String, String)> = lamp_update::install::parts()
+        .into_iter()
+        .map(|part| part.binary)
+        .chain(["lamp-turn-end".to_owned()])
+        .map(|name| {
+            let text = if name == "lamp-update" {
+                updater.to_owned()
+            } else if name == "lamp-skills" {
+                skills_with_checks(&sequence.to_string(), "")
+            } else {
+                format!("{name} {sequence}")
+            };
+            (name, text)
+        })
+        .collect();
+    let binaries: Vec<(&str, &str)> = texts
+        .iter()
+        .map(|(name, text)| (name.as_str(), text.as_str()))
+        .collect();
+    lamp.publish(sequence, &binaries, &[])
+}
+
+/// What `systemctl show` says of lamp-update.service.
+fn update_unit(active: &str, sub: &str) -> UnitState {
+    UnitState {
+        unit: "lamp-update.service".into(),
+        active: active.into(),
+        sub: sub.into(),
+        pid: 0,
+        restarts: 0,
+    }
+}
+
+impl Lamp {
+    /// Installed, with lamp-update switching itself (`LAMP_UPDATE_SELF=on`).
+    fn installed_switching_itself() -> Self {
+        let mut lamp = Lamp::installed();
+        lamp.config.self_switch = true;
+        lamp
+    }
+
+    fn records(&self) -> PathBuf {
+        self.root.join("var/lib/lampos-update")
+    }
+
+    /// The build `update/current` names.
+    fn own_build(&self) -> String {
+        fs::read_link(self.root.join("opt/lampOS/update/current"))
+            .unwrap()
+            .display()
+            .to_string()
+    }
+
+    /// The new lamp-update confirming itself, as the build `running` from:
+    /// only after a dry round has read and checked the channel's manifest.
+    fn confirm(&mut self, running: &str) -> own::Confirm {
+        let _no_fork = no_fork();
+        let clock = FakeClock(Rc::clone(&self.now));
+        let mut ears = FakeEars {
+            now: Rc::clone(&self.now),
+            talking: Box::new(|_| false),
+            root: self.root.clone(),
+        };
+        let disk = FakeDisk(self.free);
+        let said = &mut self.said;
+        let mut say = |line: &str| said.push(line.to_owned());
+        let mut world = World {
+            channel: &mut self.channel,
+            systemd: &mut self.systemd,
+            ears: &mut ears,
+            disk: &disk,
+            clock: &clock,
+            say: &mut say,
+        };
+        own::confirm(&self.config, &mut world, Some(running)).unwrap()
+    }
+
+    /// lamp-update-back, as its timer or `OnFailure=` starts it.
+    fn back(&mut self, unit: UnitState, now_unix_ms: u64) -> own::Back {
+        let _no_fork = no_fork();
+        let records = self.records();
+        let said = &mut self.said;
+        own::back(&records, &self.root, now_unix_ms, &unit, &mut |line| {
+            said.push(line.to_owned())
+        })
+        .unwrap()
+    }
+
+    fn pending(&self) -> Option<own::Pending> {
+        own::pending(&self.records()).unwrap()
+    }
+}
+
+/// #1680: a new lamp-update that starts and confirms itself keeps its
+/// switch: the fallback leaves it, and the next round is as any other.
+#[test]
+fn a_new_updater_that_confirms_keeps_its_switch() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert_eq!(
+        lamp.round(),
+        Outcome::SelfSwitched {
+            sequence: 2,
+            from: old.clone(),
+            to: new.clone()
+        },
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.own_build(), new);
+    assert_eq!(
+        lamp.read("/opt/lampOS/update/current/lamp-update"),
+        "lamp-update 2"
+    );
+    let pending = lamp.pending().unwrap();
+    assert_eq!(
+        (pending.old.as_str(), pending.new.as_str()),
+        (old.as_str(), new.as_str())
+    );
+
+    assert_eq!(lamp.confirm(&new), own::Confirm::Confirmed);
+    assert!(lamp.pending().is_none());
+    // Neither a failure later nor the deadline puts back a confirmed one.
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), u64::MAX),
+        own::Back::Nothing
+    );
+    assert_eq!(lamp.own_build(), new);
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert_eq!(lamp.own_build(), new);
+}
+
+/// #1680, the first builder's test: a new binary that exits at once,
+/// before it has read anything, never confirms; `OnFailure=` starts the
+/// fallback, which puts the old link back and refuses that binary.
+#[test]
+fn a_new_updater_that_exits_at_once_is_put_back() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "#!/bin/sh\nexit 1\n");
+    let new = sha("#!/bin/sh\nexit 1\n");
+    assert!(
+        matches!(lamp.round(), Outcome::SelfSwitched { .. }),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.own_build(), new);
+    let forking = forking();
+    let status =
+        std::process::Command::new(lamp.root.join("opt/lampOS/update/current/lamp-update"))
+            .args(["serve", "--channel-url", CHANNEL])
+            .status()
+            .unwrap();
+    drop(forking);
+    assert_eq!(status.code(), Some(1));
+    assert!(lamp.pending().is_some(), "it exited without confirming");
+
+    let back = lamp.back(update_unit("failed", "failed"), records_now());
+    assert!(matches!(back, own::Back::PutBack(_)), "{back:?}");
+    assert_eq!(lamp.own_build(), old);
+    assert_eq!(
+        lamp.read("/opt/lampOS/update/current/lamp-update"),
+        "lamp-update 1"
+    );
+    assert!(lamp.pending().is_none());
+    assert_eq!(own::refused(&lamp.records()), vec![new.clone()]);
+    // The old updater, started again, does not take that binary again.
+    assert_eq!(lamp.round(), Outcome::UpToDate(2), "{:?}", lamp.said);
+    assert_eq!(lamp.own_build(), old);
+}
+
+/// #1680: a new lamp-update that runs but never confirms (it hangs) is put
+/// back by the deadline's timer, and not before.
+#[test]
+fn a_new_updater_not_confirmed_by_the_deadline_is_put_back() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    let at = lamp.pending().unwrap().at_unix_ms;
+    let running = update_unit("active", "running");
+    assert_eq!(lamp.back(running.clone(), at + 60_000), own::Back::Waiting);
+    assert_eq!(lamp.own_build(), sha("lamp-update 2"));
+    let late = at + own::DEADLINE.as_millis() as u64 + 1;
+    assert!(matches!(lamp.back(running, late), own::Back::PutBack(_)));
+    assert_eq!(lamp.own_build(), old);
+    assert!(lamp.pending().is_none());
+}
+
+/// #1680, the race: every round, the confirmation and the fallback take
+/// the one lock of the records, and no round starts while a switch of
+/// lamp-update's own waits to be confirmed: a restart in phase 2 (or the
+/// old binary run by hand) never begins a second round.
+#[test]
+fn no_second_round_begins_while_lamp_updates_own_switch_waits() {
+    let mut lamp = Lamp::installed_switching_itself();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    let restarts = lamp.calls().len();
+
+    // Not yet confirmed: a round is refused and changes nothing.
+    let before = lamp.lamp_files();
+    product_build_with_updater(&mut lamp, 3, "lamp-update 3");
+    let refused = lamp.round();
+    assert!(
+        matches!(&refused, Outcome::Refused(why) if why.contains("not confirmed")),
+        "{refused:?}"
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert_eq!(lamp.calls().len(), restarts, "nothing restarted");
+
+    // A process that is not the new build does not confirm it.
+    let old = lamp.pending().unwrap().old;
+    assert_eq!(lamp.confirm(&old), own::Confirm::NotOwn);
+    assert!(lamp.pending().is_some());
+
+    // While another holds the lock, none of them acts.
+    let held = {
+        let _no_fork = no_fork();
+        lamp_update::records::Records::new(lamp.records())
+            .lock()
+            .unwrap()
+    };
+    assert_eq!(lamp.confirm(&new), own::Confirm::Busy);
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), u64::MAX),
+        own::Back::Busy
+    );
+    assert!(matches!(lamp.round(), Outcome::Failed(_)));
+    assert_eq!(lamp.own_build(), new);
+    drop(held);
+
+    assert_eq!(lamp.confirm(&new), own::Confirm::Confirmed);
+    assert!(
+        matches!(lamp.round(), Outcome::SelfSwitched { sequence: 3, .. }),
+        "{:?}",
+        lamp.said
+    );
+}
+
+/// #1680: with `LAMP_UPDATE_SELF` off (or absent) a round is as before:
+/// lamp-update's own link stays, nothing is waited for, and the fallback
+/// and the confirmation have nothing to do.
+#[test]
+fn with_the_switch_off_lamp_update_never_switches_itself() {
+    assert!(!own::on(None));
+    assert!(!own::on(Some("off")));
+    assert!(!own::on(Some("yes")));
+    assert!(own::on(Some("on")));
+
+    let mut lamp = Lamp::installed();
+    assert!(!lamp.config.self_switch);
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.own_build(), old);
+    assert!(lamp.pending().is_none());
+    assert!(!lamp.exists(&format!("/opt/lampOS/update/{}", sha("lamp-update 2"))));
+    let before = lamp.files();
+    assert_eq!(lamp.confirm(&old), own::Confirm::Nothing);
+    assert_eq!(
+        lamp.back(update_unit("failed", "failed"), u64::MAX),
+        own::Back::Nothing
+    );
+    assert_eq!(lamp.files(), before, "nothing written");
+}
+
+/// #1680: install writes the fallback at its fixed path, outside what
+/// lamp-update.service may write, and starts it from lamp-update's failure
+/// and from its timer; no round touches it, not even one that switches
+/// lamp-update itself.
+#[test]
+fn install_writes_the_fallback_and_no_round_touches_it() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut lamp = Lamp::installed_switching_itself();
+    assert_eq!(lamp.read(own::BACK), "lamp-update 1");
+    let mode = fs::metadata(lamp.root.join(own::BACK.trim_start_matches('/')))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o755);
+
+    let unit = lamp.read("/etc/systemd/system/lamp-update.service");
+    assert!(
+        unit.lines()
+            .any(|line| line == "OnFailure=lamp-update-back.service")
+    );
+    let writes = unit
+        .lines()
+        .find_map(|line| line.strip_prefix("ReadWritePaths="))
+        .unwrap();
+    assert!(
+        !writes
+            .split_whitespace()
+            .any(|path| own::BACK.starts_with(path.trim_start_matches('-'))),
+        "{writes}"
+    );
+    let back = lamp.read("/etc/systemd/system/lamp-update-back.service");
+    assert!(
+        back.contains(&format!("ExecStart={} back", own::BACK)),
+        "{back}"
+    );
+    let timer = lamp.read("/etc/systemd/system/lamp-update-back.timer");
+    assert!(timer.contains("Unit=lamp-update-back.service"), "{timer}");
+
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    lamp.confirm(&sha("lamp-update 2"));
+    product_build_with_updater(&mut lamp, 3, "lamp-update 3");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    assert_eq!(lamp.read(own::BACK), "lamp-update 1");
+}
+
+/// Now, on the clock the records keep their times by.
+fn records_now() -> u64 {
+    lamp_update::records::unix_ms()
+}
+
+/// #1680, the first builder at 11:40: a new lamp-update that starts but
+/// cannot check a manifest (here, it reads another key) never confirms,
+/// however often it tries, and the deadline puts the old one back. One
+/// that cannot reach the channel does not confirm either.
+#[test]
+fn a_new_updater_that_refuses_every_manifest_is_put_back() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    let key = lamp.config.key;
+    lamp.config.key = throwaway().public_key().as_ref().try_into().unwrap();
+    for _ in 0..3 {
+        let confirm = lamp.confirm(&new);
+        assert!(matches!(confirm, own::Confirm::NotProven(_)), "{confirm:?}");
+    }
+    lamp.config.key = key;
+    lamp.channel.offline = true;
+    let confirm = lamp.confirm(&new);
+    assert!(matches!(confirm, own::Confirm::NotProven(_)), "{confirm:?}");
+    assert!(lamp.pending().is_some());
+    let late = lamp.pending().unwrap().at_unix_ms + own::DEADLINE.as_millis() as u64 + 1;
+    let back = lamp.back(update_unit("active", "running"), late);
+    assert!(matches!(back, own::Back::PutBack(_)), "{back:?}");
+    assert_eq!(lamp.own_build(), old);
+}
+
+/// #1680, the first builder at 11:40: `self.json` is a contract for good.
+/// lamp-update-back is written once, by install, so the one a lamp has
+/// reads what any later lamp-update writes: a newer version, with fields it
+/// does not know, still names the old build and the new and when.
+#[test]
+fn the_fallback_reads_a_self_json_written_by_a_later_updater() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = lamp.own_build();
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    let new = sha("lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    let path = lamp.records().join("self.json");
+    let written: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(written["version"], own::VERSION);
+    let later = format!(
+        r#"{{"version":5,"old":"{old}","new":"{new}","at_unix_ms":{},"why":"a field of V5's","models":["x"]}}"#,
+        records_now()
+    );
+    fs::write(&path, later).unwrap();
+    let back = lamp.back(update_unit("failed", "failed"), records_now());
+    assert!(matches!(back, own::Back::PutBack(_)), "{back:?}");
+    assert_eq!(lamp.own_build(), old);
+    assert_eq!(own::refused(&lamp.records()), vec![new]);
+}
+
+/// #1680, the first builder's P3 on #1737: a round started by hand, on a
+/// lamp with no unit of lamp-update's own to name its folder, keeps the
+/// folder the running binary is in.
+#[test]
+fn a_round_by_hand_keeps_the_folder_it_runs_from() {
+    let mut lamp = Lamp::installed();
+    fs::remove_file(lamp.root.join("etc/systemd/system/lamp-update.service")).unwrap();
+    let running = format!("/opt/lampOS/update/{}/", lamp.own_build());
+    lamp.config.running = Some(running.clone());
+    product_build(&mut lamp, 2);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert!(
+        lamp.exists(&format!("{running}lamp-update")),
+        "{:?}",
+        lamp.said
+    );
+}
+
+/// #1680, the first builder's P3 on #1737: after phase 1, `update/current`
+/// names the new build while the old binary still runs; a round it makes
+/// then keeps the old binary's folder.
+#[test]
+fn a_round_after_its_own_switch_keeps_the_old_binarys_folder() {
+    let mut lamp = Lamp::installed_switching_itself();
+    let old = format!("/opt/lampOS/update/{}/", lamp.own_build());
+    product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    assert!(matches!(lamp.round(), Outcome::SelfSwitched { .. }));
+    assert_eq!(lamp.confirm(&sha("lamp-update 2")), own::Confirm::Confirmed);
+    // The old binary, still running, makes a round that prunes.
+    lamp.config.running = Some(old.clone());
+    product_build_with_updater(&mut lamp, 3, "lamp-update 2");
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    assert!(lamp.exists(&format!("{old}lamp-update")), "{:?}", lamp.said);
 }

@@ -515,7 +515,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    manifest; renamed only when whole. A folder already there and holding
    exactly the build's files is kept. Only when every folder is whole does
    any `current` link move, each replaced whole by a new link renamed over
-   it.
+   it. Then it copies the build's `lamp-update` to
+   `/usr/local/lib/lampos/lamp-update-back` (0755) if that file isn't already
+   the same: lamp-update's fallback, which only install writes and no round
+   can (updates.md, "lamp-update switching itself", #1680).
 5. Writes each product unit and `lampos.conf`, each only if it is not
    already exactly that. A unit, `lampos.conf` or setting found already
    holding install's exact bytes is given install's mode (0644; the voice's
@@ -601,8 +604,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    `lampos.conf` is written (step 5), and after anything else changed.
 8. If systemd is owed: `systemd-tmpfiles --create`, `systemctl
    daemon-reload`, and `systemctl enable` of every part, `lampos.target`,
-   `lamp-update.service`, `lamp-records.timer` and `lamp-selftest.timer`
-   (its service is started by the timer alone, as the records' check is);
+   `lamp-update.service`, `lamp-records.timer`, `lamp-selftest.timer` and
+   `lamp-update-back.timer` (each timer's service is started by the timer
+   alone; lamp-update-back's also by lamp-update's `OnFailure=`, #1680);
    then records the debt
    paid. It starts nothing and never writes setup's marker. A run whose
    enable fails, or that is stopped anywhere after its first unit is

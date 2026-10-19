@@ -2936,3 +2936,26 @@ fn a_refused_service_install_records_nothing_and_keeps_the_drop_in() {
     lamp.install().unwrap();
     assert!(lamp.on("var/lib/lampos-update/harness-at-boot").exists());
 }
+
+/// The reviewer on #1788: a lamp that has not run `install` since #1680 has
+/// no lamp-update-back at its fixed path. Its unit's condition then skips
+/// it, from the timer or from lamp-update's `OnFailure=`, rather than
+/// failing every 2 min with a missing `ExecStart`.
+#[test]
+fn lamp_update_back_waits_for_its_binary_rather_than_failing() {
+    let back = PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-update-back.service")
+        .unwrap()
+        .1;
+    let unit = section(back, "Unit");
+    assert!(
+        unit.contains(&format!("ConditionPathExists={}", lamp_update::own::BACK).as_str()),
+        "{unit:?}"
+    );
+    let exec = section(back, "Service")
+        .into_iter()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    assert!(exec.starts_with(&format!("ExecStart={} ", lamp_update::own::BACK)));
+}

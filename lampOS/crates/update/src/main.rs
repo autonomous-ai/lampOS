@@ -6,14 +6,16 @@ use lamp_update::{
     Config, Outcome, World,
     fetch::Web,
     install::{self, Install, System},
-    manifest, publish, round,
-    world::{BusEars, Deaf, Ears, Monotonic, Statvfs, Systemctl},
+    judge::UnitState,
+    manifest, own, publish, round,
+    world::{BusEars, Deaf, Ears, Monotonic, Statvfs, Systemctl, Systemd},
 };
 use std::{
     collections::BTreeMap,
     fs,
+    os::unix::process::CommandExt,
     path::{Path, PathBuf},
-    process::ExitCode,
+    process::{Command, ExitCode},
     time::Duration,
 };
 
@@ -24,6 +26,7 @@ lamp-update check|once|serve --channel-url URL [--channel NAME] [--key-file PATH
 lamp-update install --channel-url URL [--channel NAME] [--key-file PATH] [--setup on|off]
 lamp-update harness-off
 lamp-update harness-on
+lamp-update back
 lamp-update check-units --cat FILE [--product DIR]
 lamp-update manifest --binaries DIR --deploy DIR --skills DIR --channel NAME --sequence N --commit SHA --files-url URL
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
@@ -51,6 +54,12 @@ harness-on puts Harness on a lamp lampOS is installed on: without Harness at
         /var/lib/lampos-tasks) and linked there; then Harness at boot as install sets
         it; then lamp-tasks started again. Signing in is the person's. Run again, it
         changes nothing. As root, on the lamp itself.
+back    lamp-update-back (installed as /usr/local/lib/lampos/lamp-update-back, started by
+        lamp-update.service's failure and its timer): when lamp-update switched to its own
+        new build (LAMP_UPDATE_SELF=on) and that build has not confirmed itself, and
+        lamp-update is not running or 10 minutes have passed, update/current names the
+        old build again, the new one is refused, and lamp-update is started again.
+        Otherwise it changes nothing. As root, on the lamp itself.
 
   --channel-url   the channel's folder, https://.../ or file:///.../, ending in /
   --channel       the channel followed (lamp-voice)
@@ -108,6 +117,7 @@ fn main() -> ExitCode {
         "install" => install(&options),
         "harness-off" => harness_off(&options),
         "harness-on" => harness_on(&options),
+        "back" => back(&options),
         "check-units" => return check_units(&options),
         "manifest" => make_manifest(&options),
         "sign" => sign(&options),
@@ -306,6 +316,44 @@ fn harness_on(options: &BTreeMap<String, String>) -> Result<(), String> {
     Ok(())
 }
 
+/// `lamp-update back`: lamp-update-back, at its fixed path (#1680).
+fn back(options: &BTreeMap<String, String>) -> Result<(), String> {
+    known(options, &[])?;
+    let records = Path::new(lamp_update::install::RECORDS);
+    let unit = lamp_update::round::OWN_UNIT;
+    let state = Systemctl::default()
+        .states(&[unit.to_owned()])?
+        .into_iter()
+        .find(|state| state.unit == unit)
+        .unwrap_or_default();
+    let mut say = |line: &str| eprintln!("lamp-update-back: {line}");
+    match own::back(
+        records,
+        Path::new("/"),
+        lamp_update::records::unix_ms(),
+        &state,
+        &mut say,
+    )? {
+        own::Back::PutBack(_) => {
+            // Started again whatever brought it here: its start limit may
+            // have been reached.
+            let _ = Command::new("systemctl")
+                .args(["reset-failed", unit])
+                .status();
+            let started = Command::new("systemctl")
+                .args(["restart", "--no-block", unit])
+                .status()
+                .map_err(|error| format!("systemctl: {error}"))?;
+            if !started.success() {
+                return Err(format!("{unit} could not be started again"));
+            }
+        }
+        own::Back::Busy => say("another lamp-update is at work; the timer comes again"),
+        own::Back::Nothing | own::Back::Waiting => {}
+    }
+    Ok(())
+}
+
 fn sign(options: &BTreeMap<String, String>) -> Result<(), String> {
     known(options, &["key-file", "manifest", "out"])?;
     let key =
@@ -418,6 +466,7 @@ fn config(
         .cloned()
         .or_else(|| std::env::var(lamp_bus::ROOT_VARIABLE).ok())
         .unwrap_or_else(|| lamp_bus::DEFAULT_ROOT.to_owned());
+    let running = running_folder(&root);
     let config = Config {
         root,
         units: "/etc/systemd/system/".into(),
@@ -430,6 +479,8 @@ fn config(
         quiet_wait: seconds(options, "quiet-wait-s", 3600)?,
         watch: seconds(options, "watch-s", 60)?,
         keep_free: keep_free_mb * 1_000_000,
+        self_switch: own::on(std::env::var(own::SWITCH).ok().as_deref()),
+        running,
     };
     Ok((
         config,
@@ -438,10 +489,20 @@ fn config(
     ))
 }
 
+/// The folder this binary runs from, as the lamp names it under `root`:
+/// `/opt/lampOS/update/<sha256>/` on a product lamp.
+fn running_folder(root: &Path) -> Option<String> {
+    let exe = std::env::current_exe().ok()?.canonicalize().ok()?;
+    let root = root.canonicalize().ok()?;
+    let folder = exe.parent()?.strip_prefix(&root).ok()?;
+    Some(format!("/{}/", folder.display()))
+}
+
 fn status(outcome: &Outcome) -> u8 {
     match outcome {
         Outcome::UpToDate(_)
         | Outcome::Switched(_)
+        | Outcome::SelfSwitched { .. }
         | Outcome::Would(_)
         | Outcome::NothingPublished => 0,
         Outcome::Unreachable(_) => 3,
@@ -476,13 +537,53 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     let mut systemd = Systemctl::default();
     let clock = Monotonic::default();
     eprintln!(
-        "lamp-update: {command} channel={} url={} lamp={} apply={} key={}",
+        "lamp-update: {command} channel={} url={} lamp={} apply={} self={} key={}",
         config.channel,
         config.channel_url,
         config.lamp,
         if config.apply { "on" } else { "off" },
+        if config.self_switch { "on" } else { "off" },
         manifest::fingerprint(&config.key)
     );
+    if config.apply {
+        // Phase 2 of a switch of its own: confirmed only once a dry round
+        // has checked the channel's manifest. Until then no round acts;
+        // lamp-update-back's deadline puts the old build back if it never is.
+        let running = std::env::current_exe()
+            .ok()
+            .and_then(|exe| Some(exe.parent()?.file_name()?.to_string_lossy().into_owned()));
+        let mut told = String::new();
+        loop {
+            let confirmed = {
+                let mut world = World {
+                    channel: &mut channel,
+                    systemd: &mut systemd,
+                    ears: ears.as_mut(),
+                    disk: &Statvfs,
+                    clock: &clock,
+                    say: &mut say,
+                };
+                own::confirm(&config, &mut world, running.as_deref())
+            };
+            let why = match confirmed {
+                Ok(own::Confirm::Confirmed) => {
+                    eprintln!("lamp-update: confirmed: lamp-update runs its new build");
+                    break;
+                }
+                Ok(own::Confirm::Nothing | own::Confirm::NotOwn) => break,
+                Ok(own::Confirm::NotProven(why)) => format!("not confirmed yet: {why}"),
+                Ok(own::Confirm::Busy) => {
+                    "not confirmed yet: another lamp-update is at work".into()
+                }
+                Err(why) => format!("not confirmed: {why}"),
+            };
+            if why != told {
+                eprintln!("lamp-update: {why}");
+                told = why;
+            }
+            let _ = ears.listen(Duration::from_secs(30));
+        }
+    }
     let mut last = String::new();
     loop {
         let outcome = {
@@ -497,6 +598,25 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             round(&config, &mut world)
         };
         let text = outcome.to_string();
+        if let Outcome::SelfSwitched { .. } = outcome {
+            // Phase 1 done: the new build runs in this program's place,
+            // with the same options. An exec that fails returns here.
+            eprintln!("lamp-update: {text}");
+            let program = config.on(own::CURRENT).join(own::BINARY);
+            let error = Command::new(&program)
+                .args(std::env::args_os().skip(1))
+                .exec();
+            eprintln!(
+                "lamp-update: {} cannot be started: {error}",
+                program.display()
+            );
+            let not_running = UnitState::default();
+            let records = config.on(&config.records);
+            if let Err(why) = own::back(&records, &config.root, u64::MAX, &not_running, &mut say) {
+                eprintln!("lamp-update: its own build cannot be put back: {why}");
+            }
+            continue;
+        }
         if command != "serve" {
             println!("{text}");
             return ExitCode::from(status(&outcome));
