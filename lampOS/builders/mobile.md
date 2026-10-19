@@ -10,8 +10,8 @@ corrects it where it must be.
 - **Person:** a colleague on the BFF (backend-for-frontend) team who starts its sessions (named
   in the team's own channels, not in this public repository); a Claude Code
   session they start
-- **Lamp(s):** none, until its person or the first builder names one
-- **Lamp address:** none
+- **Lamp(s):** lamp-0c89, the mobile team's own lamp, for the app's phone tests (named by the first builder on #1396, 19 Oct, at the lead's 12:1x on #1711), with its person at it for anything that moves, plays or installs
+- **Lamp address:** kept on the operator's Mac, never in this repository
 - **Owner file:** none
 
 ## Branches it may push
@@ -47,7 +47,7 @@ in the app's repository, unless the first builder hands it over.
 
 ## It may not
 
-- Touch any lamp until one is named here and its owner file names mobile.
+- Touch any lamp but lamp-0c89, or touch lamp-0c89 without its person's yes for an install, a restart, or anything that moves or plays.
 - Cut a lamp's power, or move it without first saying what will move.
 - Touch another builder's branch or crates unless a task says so; push to
   `lamp-voice`.
