@@ -350,3 +350,7 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - #820 (3), Expression, was already on `lamp-local-time` with a New York test.
   What's left is units, which are the first builder's. Build 3265
   (`850fdfb68`) named for #1693 (4)'s scenes tonight.
+- #1822 rebased over #1794's memory scope lease (a conflict in `remember.rs`)
+  and merged (`e3134347a`). #1825 folded into one commit (`27e91fe74`) at the
+  reviewer's ask. #1870 (draft): lamp-4ace's Policy, Schedule and Skills to
+  `--zone system`; out of draft once #1825 is in. #1826 merged.
