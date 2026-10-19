@@ -29,7 +29,8 @@ Ready for lamp-voice: no (#1694 is a draft; real-office measurement remains).
   and unchanged base `6275fcc8c`. Its flag guards precede its shared lock.
   Reported to First/Fourth/Tests on #705, comment 6257345423; its source was
   left unchanged, and the complete group was run serially instead.
-- ARM64 run 39183891203 for `350d0b232` is pending at this checkpoint.
+- ARM64 run 39183891203 for `350d0b232` completed successfully; reported
+  once on #1694. Artifact: `lampos-arm64-350d0b2326a84ee18c88e46eb150a71a901350e0`.
   No lamp changed. A synthetic-clip smoke of the new debug `serve-pinned`
   produced 512 values (13141 ms load, 1420 ms inference); host shape proof,
   not office accuracy or lamp latency.
@@ -37,9 +38,16 @@ Ready for lamp-voice: no (#1694 is a draft; real-office measurement remains).
   lamp" to shared lamp-52e6 access through Fifth, with hostname, loan,
   restore and test-assignment scope. First may assign real-lamp tests;
   this is no live availability claim or reservation.
+  Reviewer: no finding; First/Fifth own the role decision and merge.
+  ARM64 39183953029 is green on `d41f52b5e`, reported once on #1695.
 - #828: posted the scorer workspace/stderr fix (comment 6257071711), with
   local contract tests and the mic2 table check. The first builder owns
   the name-anchored overnight matcher. Real-voice data remains needed.
+- First transferred the operator-led session to lamp-52e6. Delivered the
+  step-4 Stop sheet and scorer command to Fifth on #705 (6257570423), then
+  the built native Mac replay tools (6257580536). Frozen binaries, hashes,
+  script and sheet are in `/private/tmp/sixth-stop-52e6/`. No real take has
+  arrived or been scored; actual annotations must use the lamp's clock.
 - At the owner's request, audited old open PRs and reported the actual
   review/merge prerequisites to First on #705 (comment 6257226292).
 
