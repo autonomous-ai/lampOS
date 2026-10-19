@@ -899,8 +899,20 @@ after a take-over, but now for every turn:
   words. With `LAMP_NAME_NOTE_BUSY=face`, in a busy room only with someone
   turned to the lamp or the name heard surely; the journal says why not.
   So is the staff note (`LAMP_STAFF_NOTE`).
-- **Live route only, so not on this route:** a tool's look (`LookAsked`;
-  this route's looks come from its words, "Let me look."), the same-voice
+- **The look by its own call.** With a full look (`LAMP_EYES_LOOK_FILE` and
+  `LAMP_LOOK_FULL`), spoken turns are offered `take_a_look`
+  (`second_provider::LOOK_CALL`, `worker::with_look`; texts are not) and
+  told "When you would look, call take_a_look" (`worker::LOOK_CALL_NOTE`).
+  The call asks the coordinator for the turn's full look (`LookAsked`, as a
+  skill's look step does), the lamp says "Let me look." if the model said
+  nothing, and the turn ends with no further round; the picture comes in
+  the look turn after it. In a turn the lamp wrote itself the look is
+  dropped (`LookAsked` with why). The journal says `request N called
+  take_a_look: the look is asked of the coordinator`. The look by the
+  words "Let me look." stays beside it (`speak_up::asks_to_look`); both
+  ask for the same turn's look, which is taken once. The first builder on
+  #1712: a phrase rule is easy to trip.
+- **Live route only, so not on this route:** the same-voice
   check,
   `LAMP_CUT_IN_TOLD`, `LAMP_FOLLOWS_ON`, `LAMP_GOING_ON_ASKS`, the head tap
   and `--addressed` for whom it answers, sight, camera and air facts, and

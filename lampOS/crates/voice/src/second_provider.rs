@@ -97,6 +97,10 @@ pub const LOOK_BEGIN_WITHIN: Duration = Duration::from_secs(5);
 /// What the lamp says when a look's first round has not begun within
 /// [`LOOK_BEGIN_WITHIN`]: after "Let me look.", silence reads as broken.
 pub const COULD_NOT_LOOK: &str = "I couldn't get a good look.";
+/// The function the model looks with on this route ([`Engine::looking_by_call`]).
+pub const LOOK_CALL: &str = "take_a_look";
+/// What the lamp says as it looks by a call the model made with no words.
+pub const LOOKING: &str = "Let me look.";
 /// With Gemini's speech, the answer's first piece goes once this many words
 /// have come, if no sentence or clause ended sooner
 /// ([`Engine::cutting_first_words`]; the first builder on #1712: "cut at the
@@ -249,6 +253,10 @@ struct Shared {
     hold: Option<CallHold>,
     /// Told a spoken request's words before its chat ([`Engine::hearing_words`]).
     words_heard: Option<WordsHeard>,
+    /// The model looks by calling [`LOOK_CALL`] ([`Engine::looking_by_call`]).
+    look_by_call: bool,
+    /// The request begun last, with its session, for a look asked by a call.
+    begun: Mutex<Option<(u64, u64)>>,
     /// The answer's first piece goes once this many words have come
     /// ([`Engine::cutting_first_words`]).
     first_words: Option<usize>,
@@ -501,6 +509,8 @@ impl Engine {
                 did: None,
                 hold: None,
                 words_heard: None,
+                look_by_call: false,
+                begun: Mutex::new(None),
                 first_words: None,
             }),
             output,
@@ -609,6 +619,19 @@ impl Engine {
     pub fn cutting_first_words(mut self, words: usize) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.first_words = Some(words);
+        }
+        self
+    }
+
+    /// The model looks by calling [`LOOK_CALL`], not only by its words: the
+    /// coordinator is asked for the turn's full look (`LookAsked`, as for a
+    /// skill's look step), the lamp says [`LOOKING`] if the model said
+    /// nothing, and the turn ends there; its picture comes in the look turn
+    /// after it (the first builder on #1712: a phrase rule is easy to trip).
+    /// Before any turn only.
+    pub fn looking_by_call(mut self) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.look_by_call = true;
         }
         self
     }
@@ -988,6 +1011,9 @@ impl Engine {
         }
         self.turn = None;
         self.begun_last = Some((request, session));
+        if let Ok(mut begun) = self.shared.begun.lock() {
+            *begun = Some((request, session));
+        }
         self.urgent.push_back(ProviderOutput::Started {
             request,
             session,
@@ -1567,6 +1593,44 @@ async fn answer(
             }
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
                 return Err(Stop::Silent);
+            }
+            // A look asked by its own call (#1712): the coordinator takes the
+            // turn's full look, and the turn ends here; its picture comes in
+            // the look turn after it. Only in a turn someone spoke.
+            if shared.look_by_call && calls.iter().any(|call| call.name == LOOK_CALL) {
+                if let Some(rest) = split.finish() {
+                    queue.push(rest).await?;
+                }
+                let session = shared
+                    .begun
+                    .lock()
+                    .ok()
+                    .and_then(|begun| *begun)
+                    .filter(|(of, _)| *of == request)
+                    .map(|(_, session)| session);
+                let dropped = if !heard {
+                    Some("the turn is one the lamp wrote itself")
+                } else if session.is_none() {
+                    Some("its turn is not the one in hand")
+                } else {
+                    None
+                };
+                eprintln!(
+                    "lamp-voice second: request {request} called {LOOK_CALL}: {}",
+                    dropped.unwrap_or("the look is asked of the coordinator")
+                );
+                let asked_look = ProviderOutput::LookAsked {
+                    request,
+                    session: session.unwrap_or_default(),
+                    dropped: dropped.map(str::to_owned),
+                };
+                if !shared.emit(asked_look).await {
+                    return Err(Stop::Gone);
+                }
+                if dropped.is_none() && !queue.started {
+                    queue.push(LOOKING.to_owned()).await?;
+                }
+                return Ok(());
             }
             if let Some(rest) = split.finish() {
                 queue.push(rest).await?;

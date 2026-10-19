@@ -2423,3 +2423,68 @@ async fn the_words_heard_are_told_before_the_chat_begins() {
         "told once, before any chat"
     );
 }
+
+/// #1712: a look the model asks for by its call goes to the coordinator for
+/// the turn's full look; the lamp says it will look, and the turn ends with
+/// no further round. In a turn the lamp wrote itself, the look is dropped.
+#[tokio::test]
+async fn a_look_asked_by_its_call_goes_to_the_coordinator_and_ends_the_turn() {
+    let looking = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call("c1", LOOK_CALL, json!({}))])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What do you see?".to_owned())].into()),
+        chats: Mutex::new([looking(), looking()].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.looking_by_call();
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let mut asked = None;
+    let mut said = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the turn ends");
+        match event {
+            ProviderOutput::LookAsked {
+                request, dropped, ..
+            } => asked = Some((request, dropped)),
+            ProviderOutput::Transcript {
+                request: Some(_),
+                text,
+                ..
+            } if !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { .. } => break,
+            _ => {}
+        }
+    }
+    assert_eq!(asked, Some((1, None)));
+    assert_eq!(said, [LOOKING]);
+    assert_eq!(
+        script.asked.lock().unwrap().len(),
+        1,
+        "no round after the look"
+    );
+    engine.submit(written(2, "Tell the person what you see."));
+    let mut dropped = None;
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the turn ends");
+        match event {
+            ProviderOutput::LookAsked { dropped: why, .. } => dropped = why,
+            ProviderOutput::TurnComplete { .. } => break,
+            _ => {}
+        }
+    }
+    assert_eq!(
+        dropped.as_deref(),
+        Some("the turn is one the lamp wrote itself")
+    );
+}

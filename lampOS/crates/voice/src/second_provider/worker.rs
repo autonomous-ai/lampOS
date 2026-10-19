@@ -637,9 +637,28 @@ fn lone_words(heard: &str) -> bool {
     (1..=2).contains(&words) && !heard.contains('?') && !crate::not_speech::short_word(heard)
 }
 
-/// The character with [`SPOKEN_NOTE`] after it.
-fn spoken_character(character: &str) -> String {
-    format!("{character}{SPOKEN_NOTE}")
+/// Told after [`SPOKEN_NOTE`] when the model looks by a call (#1712).
+pub(crate) const LOOK_CALL_NOTE: &str = " When you would look, call take_a_look: it is how you look, and you will then be shown what you see.";
+
+/// The character with [`SPOKEN_NOTE`] after it, and [`LOOK_CALL_NOTE`]
+/// when the model looks by a call.
+fn spoken_character(character: &str, look_by_call: bool) -> String {
+    let look = if look_by_call { LOOK_CALL_NOTE } else { "" };
+    format!("{character}{SPOKEN_NOTE}{look}")
+}
+
+/// The lamp's functions with the look's after them, within Live's bound of
+/// [`lamp_gemini::MAX_TOOLS`] (#1712).
+pub(crate) fn with_look(mut tools: Vec<lamp_gemini::Tool>) -> Vec<lamp_gemini::Tool> {
+    if tools.len() < lamp_gemini::MAX_TOOLS {
+        tools.push(lamp_gemini::Tool {
+            name: crate::second_provider::LOOK_CALL.into(),
+            description: "Look with your eye at what is in front of you: when someone asks what you see, shows you something, or asks how they or something looks. Call it instead of answering; you will then be shown what you see, and answer from that. Never for looking something up on the web.".into(),
+            parameters: None,
+            silent: false,
+        });
+    }
+    tools
 }
 
 /// A search begun from a request's words before the model asks (#1712):
@@ -841,7 +860,22 @@ pub fn serve(
         )),
         _ => None,
     };
-    let net = services(config, &provider, route, credentials.as_deref(), declare)?;
+    // With a full look, spoken turns look by a call of their own (#1712);
+    // texts, which see nothing, are not offered it.
+    let look_by_call = files.look.is_some() && files.look_full;
+    let spoken_declare: crate::second_provider::net::Declare = if look_by_call {
+        let declare = declare.clone();
+        Arc::new(move || with_look(declare()))
+    } else {
+        declare.clone()
+    };
+    let net = services(
+        config,
+        &provider,
+        route,
+        credentials.as_deref(),
+        spoken_declare,
+    )?;
     let thread = files.thread;
     let file = thread.clone();
     let clock = tools.clock;
@@ -872,7 +906,7 @@ pub fn serve(
     // their own (`texts_task`).
     let texts_from = (character.clone(), tools.clone());
     // Spoken turns only: a text is typed, not heard (#1712).
-    let character = spoken_character(&character);
+    let character = spoken_character(&character, look_by_call);
     let sessions = std::sync::Mutex::new(Sessions::default());
     let place = crate::local_time::place_here();
     if let Some(place) = &place {
@@ -969,6 +1003,9 @@ pub fn serve(
     // a few words, not the whole first sentence (#1712).
     if route.gemini_speech {
         engine = engine.cutting_first_words(crate::second_provider::FIRST_WORDS);
+    }
+    if look_by_call {
+        engine = engine.looking_by_call();
     }
     // A hand-over waiting for its yes, with the tasks part (#1712).
     if has_tasks {
@@ -2988,8 +3025,10 @@ mod tests {
     /// character comes first, unchanged.
     #[test]
     fn spoken_turns_are_told_to_answer_the_likeliest_meaning() {
-        let told = super::spoken_character("CHARACTER");
+        let told = super::spoken_character("CHARACTER", false);
         assert!(told.starts_with("CHARACTER\n\n"));
+        assert!(!told.contains("take_a_look"));
+        assert!(super::spoken_character("CHARACTER", true).ends_with(super::LOOK_CALL_NOTE));
         assert!(told.contains("answer it for the likeliest meaning, here first"));
         assert!(told.contains("ask back only when you cannot guess at all"));
         assert!(told.contains("for the time of day it is now"));
@@ -3065,6 +3104,24 @@ mod tests {
         );
         let again = runner(5, true, "web_search".into(), args).await;
         assert!(again.get("error").is_some(), "{again}");
+    }
+
+    /// #1712: the look's function follows the lamp's, while there is room.
+    #[test]
+    fn the_look_is_offered_after_the_lamps_functions_while_there_is_room() {
+        let tool = |name: &str| lamp_gemini::Tool {
+            name: name.into(),
+            description: String::new(),
+            parameters: None,
+            silent: false,
+        };
+        let looked = super::with_look(vec![tool("light_on")]);
+        let names: Vec<&str> = looked.iter().map(|tool| tool.name.as_str()).collect();
+        assert_eq!(names, ["light_on", crate::second_provider::LOOK_CALL]);
+        let full: Vec<_> = (0..lamp_gemini::MAX_TOOLS)
+            .map(|n| tool(&format!("f{n}")))
+            .collect();
+        assert_eq!(super::with_look(full).len(), lamp_gemini::MAX_TOOLS);
     }
 
     /// #1712: the lamp's place follows its time, or stands alone.
