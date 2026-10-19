@@ -42,7 +42,8 @@ on:
   # A pull request that changes only docs a build never reads skips this run (the
   # project lead, 19 Oct 2026, #1711): the docs' and the role files' Markdown. The
   # docs that code or tests read are named again below, so a change to one still
-  # runs. Find them with `git grep -o 'docs/[a-z0-9_-]*\.md' lampOS/crates`. A
+  # runs. lampOS/crates/update/tests/ci_paths.rs fails when a crate reads one that
+  # isn't (#1791's guard). A
   # skill's SKILL.md is part of the skill, so lampOS/skills/** always runs. The
   # push to lamp-voice keeps every run: its artifact is what lamps install.
   # Such a PR merges without ARM64 once the reviewer has read it
