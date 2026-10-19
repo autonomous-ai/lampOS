@@ -986,14 +986,30 @@ With `LAMP_ACTIVITY=on` beside `LAMP_BUS=on`, the eyes also say on
 and on `room/stood_up` (`lamp_msgs::StoodUp`, an event) when someone rose
 out of the chair and left (`crates/eyes/src/activity.rs`, from
 `bus_out.rs`). The eyes see a face, not a body, so each state is read from
-each look's largest face against this person's own sitting: the median of
-its first two minutes of looks at the desk (a face at least 0.14 of the
-picture tall, Stretch break's `near`). Leaning in is the face 1.25 times as
-tall, held 10 s; leaning back 0.8 times, 10 s; head down its centre lower
-by a quarter of its height and the nose lower between the eyes and mouth by
-0.12, 20 s (reading, writing or a phone held low, not told apart); sitting
-low the centre lower by half its height, two minutes. No near face for 20 s
-is away; a sitting goes on through a gap under two minutes. Standing up is
+the sitter's face against this person's own sitting: the median of its
+first two minutes of looks at the desk (a face at least 0.14 of the picture
+tall, Stretch break's `near`). The sitter is the largest near face when a
+sitting starts, and from then on the near face nearest their last place,
+within a face's height of it or of where they sat, whoever is larger: in an
+office a colleague near the desk is often the largest face. Head down is
+the nose lower between the eyes and mouth by 0.12 than it sat, held 20 s
+(reading, writing or a phone held low, not told apart), whatever the face's
+size, since a head bowed over the desk comes closer too; leaning in is the
+face 1.25 times as tall, held 10 s. No sitter for 20 s is away; a sitting
+goes on through a gap under two minutes.
+
+At lamp-75c9 (19 Oct, one person, an open office, the lamp beside the
+laptop at about face height) leaning in was seen (1.52 times as tall). Head
+down, as first written (the centre a quarter of the face lower), was not:
+the face came closer (1.21 times) and only 0.06 of its height lower, so it
+is the pitch alone now, and 0.12 is the design's line until a run sets it.
+Leaning back (0.99 times) and sitting low (0.15 of the face lower against
+half) could not be seen from that place and were dropped; they come back
+only if a lamp in front of a person shows them. While a sitting with its
+baseline is followed the journal says every 2 s `lamp-eyes: sitter 1.04 as
+tall as sat, 0.03 of its height lower, pitch 0.52 (sat 0.50), AtDesk`, numbers
+only, for the next run. Someone else in the sitter's own place, at their
+distance, is still taken for them (the run's leave step). Standing up is
 the face rising by half its height and shrinking to 0.85 of it within 2 s,
 then not seen for 2 s, said once. Nothing is said with no look for 5 s.
 States and counts only: no box, no picture, nobody's identity. Arithmetic on

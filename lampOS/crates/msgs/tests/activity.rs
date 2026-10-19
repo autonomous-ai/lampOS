@@ -22,27 +22,22 @@ fn activity_is_a_state_and_three_counts() {
         reading
     );
     reading.check().unwrap();
-    for state in [
-        "away",
-        "at_desk",
-        "leaning_in",
-        "leaning_back",
-        "head_down",
-        "sitting_low",
-    ] {
+    for state in ["away", "at_desk", "leaning_in", "head_down"] {
         let text = format!(r#"{{"state":"{state}","for_s":1,"sitting_s":0,"baseline":true}}"#);
         assert!(
             serde_json::from_str::<RoomActivity>(&text).is_ok(),
             "{state}"
         );
     }
-    assert!(
-        serde_json::from_str::<RoomActivity>(
-            r#"{"state":"slumped","for_s":1,"sitting_s":1,"baseline":true}"#
-        )
-        .is_err()
-    );
-    // Away has no sitting; leaning or lower needs the baseline.
+    // Not states (leaning back and sitting low were dropped, #1678).
+    for state in ["slumped", "leaning_back", "sitting_low"] {
+        let text = format!(r#"{{"state":"{state}","for_s":1,"sitting_s":1,"baseline":true}}"#);
+        assert!(
+            serde_json::from_str::<RoomActivity>(&text).is_err(),
+            "{state}"
+        );
+    }
+    // Away has no sitting; leaning in or head down needs the baseline.
     let away = RoomActivity {
         state: Activity::Away,
         for_s: 30,

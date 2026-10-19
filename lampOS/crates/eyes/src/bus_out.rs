@@ -366,7 +366,7 @@ impl BusOut {
             presence.away.looked(now_us, tall);
         }
         if let Some(activity) = self.activity.as_mut() {
-            activity.judge.looked(now_us, Look::largest(found, filled));
+            activity.judge.looked(now_us, &Look::all(found, filled));
         }
     }
 
@@ -400,6 +400,10 @@ impl BusOut {
             }
             if let Some(up) = activity.judge.stood_up(now_us) {
                 let _ = activity.stood.publish_json(now_us, &up);
+            }
+            // Numbers only, so a scripted sitting can set the lines (#1678).
+            if let Some(line) = activity.judge.journal(now_us) {
+                eprintln!("lamp-eyes: {line}");
             }
         }
     }
