@@ -34,6 +34,11 @@ pub const WORKERS: usize = 4;
 pub const CLIENT_QUEUE: usize = 4;
 pub const REQUEST_QUEUE: usize = 16;
 pub const STALE_AFTER: Duration = Duration::from_millis(1500);
+/// How often the part says how it is on `diagnostics` and `schedule/due`
+/// while nothing changes ([`Config::report_every`] on a lamp): the period
+/// `schedule/due` declares (`ScheduleDue::declaration`), which a longer one
+/// would make late.
+pub const REPORT_EVERY: Duration = Duration::from_secs(1);
 
 pub trait Clock: Send + 'static {
     fn sample(&self) -> io::Result<ClockSample>;
@@ -126,6 +131,11 @@ pub struct Config {
     pub bus_root: PathBuf,
     pub zone: String,
     pub run_for: Option<Duration>,
+    /// How often the part says how it is while nothing changes:
+    /// [`REPORT_EVERY`] on a lamp. A new revision or a change in readiness
+    /// is said at once, whatever this is. Tests pass less, so a test that
+    /// reads the report waits a fraction of a second rather than one (#1806).
+    pub report_every: Duration,
 }
 
 #[derive(Clone)]
@@ -537,8 +547,7 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
             // one that stopped progressing (#869).
             let stopped_as_asked = ended && stop.load(Ordering::Acquire);
             let should_publish = !stopped_as_asked
-                && (last_publish
-                    .is_none_or(|last: Instant| last.elapsed() >= Duration::from_secs(1))
+                && (last_publish.is_none_or(|last: Instant| last.elapsed() >= config.report_every)
                     || last_revision != Some(report.due.revision)
                     || was_ready != Some(ready));
             if should_publish {
@@ -696,6 +705,7 @@ mod tests {
             bus_root: root.path().join("b"),
             zone: "Etc/UTC".into(),
             run_for: Some(Duration::from_secs(5)),
+            report_every: REPORT_EVERY,
         };
         let result = thread::spawn(move || {
             BEFORE_OWNER_CHECK.with(|slot| *slot.borrow_mut() = Some(Box::new(hook)));

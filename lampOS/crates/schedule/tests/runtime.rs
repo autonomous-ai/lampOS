@@ -96,6 +96,9 @@ impl Running {
             bus_root: root.path().join("b"),
             zone: "Etc/UTC".into(),
             run_for: None,
+            // A report every 50 ms, not the lamp's second, so a test that
+            // reads it waits a fraction of a second (#1806).
+            report_every: Duration::from_millis(50),
         };
         let clock = Injected(Arc::new(Mutex::new(sample(0))));
         let stop = Arc::new(AtomicBool::new(false));
@@ -220,6 +223,7 @@ fn disabled_service_never_reads_clock_or_creates_any_path() {
         bus_root: root.path().join("bus"),
         zone: "Bad/Zone".into(),
         run_for: None,
+        report_every: Duration::from_millis(50),
     };
     serve(config, Unreadable, Arc::new(AtomicBool::new(false))).unwrap();
     assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
