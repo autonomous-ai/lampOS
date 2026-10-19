@@ -230,6 +230,16 @@ impl Gate {
     }
 }
 
+/// Whether a turn is told and kept for its admitted memory scope (#1675):
+/// its recall, history, Days note and answer that person's or the room's,
+/// never the sticky session owner's. `on` only; otherwise as before.
+pub const SCOPED_CONTEXT_ENVIRONMENT: &str = "LAMP_SECOND_SCOPED_CONTEXT";
+
+/// Whether the service's environment says `LAMP_SECOND_SCOPED_CONTEXT=on`.
+pub fn scoped_context_from_environment() -> bool {
+    std::env::var(SCOPED_CONTEXT_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// Where the coordinator reads whether a slow first round makes a sound
 /// (sixth-P3, [`super::CUE_AFTER`]). `on` only.
 pub const WAIT_CUE_ENVIRONMENT: &str = "LAMP_SECOND_WAIT_CUE";
@@ -377,12 +387,25 @@ pub fn serve(
     // their own (`texts_task`).
     let texts_from = (character.clone(), tools.clone());
     let sessions = std::sync::Mutex::new(Sessions::default());
-    let system = move || {
+    // With a lease, the turn is told for its admitted scope alone: that
+    // person's (or the room's) Days note and exchanges, never those of the
+    // person the eyes or the sticky session name when its chat begins.
+    let told_for = move |lease: Option<&crate::memory_scope::ScopeLease>| {
         let now = Instant::now();
         let Ok(mut sessions) = sessions.lock() else {
             return Told::default();
         };
-        let (changed, person) = sessions.open(who.as_deref(), now);
+        let (opened, person) = sessions.open(who.as_deref(), now);
+        let (changed, person) = match lease {
+            None => (opened, person),
+            Some(lease) => {
+                let Some(scope) = lease.scope() else {
+                    return Told::default();
+                };
+                let person = scope.person().map(str::to_owned);
+                (sessions.told_for(&person), person)
+            }
+        };
         let memory = match &socket {
             Some(socket) if days => sessions.frozen(changed, |session| {
                 crate::remember::told_for_session(socket, session, person.as_deref())
@@ -406,8 +429,16 @@ pub fn serve(
                 .as_deref(),
             &(memory + &facts(session_fact && !going_on, room) + &skills),
             file.as_deref(),
+            person.as_deref(),
         )
     };
+    let told_for = Arc::new(told_for);
+    let scoped_system = scoped_context_from_environment().then(|| {
+        let told_for = told_for.clone();
+        Arc::new(move |lease: &crate::memory_scope::ScopeLease| told_for(Some(lease)))
+            as crate::second_provider::ScopedSystem
+    });
+    let system = move || told_for(None);
     let runner: ToolRunner = Arc::new(move |request, heard, name, args| {
         let settings = tools.clone();
         Box::pin(async move {
@@ -448,7 +479,7 @@ pub fn serve(
         },
         runner.clone(),
     )
-    .with_memory_scope(boot, face_cache.clone(), scoped_runner)
+    .with_memory_scope(boot, face_cache.clone(), scoped_runner, scoped_system)
     .checking_sounds(checked)
     .waiting_with_a_sound(wait_cue)
     .saying_when_down(down_line)
@@ -847,6 +878,8 @@ struct Sessions {
     /// Runs of turns opened so far: the Days session number.
     opened: u64,
     note: Option<String>,
+    /// The admitted scope the Days note was last asked for.
+    scoped: Option<Option<String>>,
 }
 impl Sessions {
     /// Open the thread for whoever is at the lamp now ([`Thread::opening`]):
@@ -869,6 +902,13 @@ impl Sessions {
         (changed, thread.opened_for().map(str::to_owned))
     }
 
+    /// Whether `person`'s admitted scope differs from the last turn's.
+    fn told_for(&mut self, person: &Option<String>) -> bool {
+        let changed = self.scoped.as_ref() != Some(person);
+        self.scoped = Some(person.clone());
+        changed
+    }
+
     /// The Days note for this run of turns, asked anew when the person changed.
     fn frozen(&mut self, changed: bool, ask: impl FnOnce(u64) -> String) -> String {
         if changed || self.note.is_none() {
@@ -889,19 +929,21 @@ impl Sessions {
 /// its own, and "and how many live there?" needs the one before. Taken
 /// from the thread under the same lock as the recall, after the thread's
 /// forgetting and reload, so a forgotten exchange is never given back.
+/// Only `whose` exchanges are given: a person's memory id, or none for the room.
 pub(crate) fn system_message(
     character: &str,
     time: Option<&str>,
     memory: &str,
     file: Option<&Path>,
+    whose: Option<&str>,
 ) -> Told {
     let told = format!("{character}{}{memory}", time.unwrap_or_default());
     let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(told.len());
     let now = Instant::now();
     let (thread, recent) = crate::thread::current(file, |thread| {
         (
-            thread.recall(now, room),
-            thread.recent(now, HISTORY_WITHIN, HISTORY_EXCHANGES),
+            thread.recall_for(whose, now, room),
+            thread.recent_for(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES),
         )
     })
     .unwrap_or_default();
@@ -1015,7 +1057,19 @@ pub const HISTORY_WITHIN: Duration = Duration::from_secs(300);
 /// its transcripts: the person's words, the lamp's (not the announcement),
 /// and at the turn's end the exchange to the memory's journal and the
 /// thread to its file.
+#[cfg(test)]
 pub(crate) fn keep(event: &ProviderOutput, file: Option<&Path>) {
+    keep_scoped(event, file, None)
+}
+
+fn keep_scoped(
+    event: &ProviderOutput,
+    file: Option<&Path>,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) {
+    if lease.is_some_and(|lease| !lease.is_current()) {
+        return;
+    }
     let now = Instant::now();
     match event {
         ProviderOutput::Transcript {
@@ -1035,7 +1089,19 @@ pub(crate) fn keep(event: &ProviderOutput, file: Option<&Path>) {
             // Sentences come trimmed, those after the first with a space
             // before; the thread joins its pieces as given.
             if let Ok(mut thread) = crate::thread::THREAD.lock() {
-                thread.lamp(*request, &format!("{} ", text.trim_start()), now);
+                let text = format!("{} ", text.trim_start());
+                match lease {
+                    Some(lease) => {
+                        if lease.key().request != *request {
+                            return;
+                        }
+                        let Some(scope) = lease.scope() else {
+                            return;
+                        };
+                        thread.lamp_for(*request, &text, now, scope.person());
+                    }
+                    None => thread.lamp(*request, &text, now),
+                }
             }
         }
         ProviderOutput::TurnComplete { request, .. } => {
@@ -1132,7 +1198,12 @@ pub async fn run(
                 if let ProviderInput::Written { request, text, .. } = &command
                     && let Ok(mut thread) = crate::thread::THREAD.lock()
                 {
-                    thread.written(*request, text);
+                    // A written request is admitted as the room's.
+                    if engine.scopes_context() {
+                        thread.written_for(*request, text, None);
+                    } else {
+                        thread.written(*request, text);
+                    }
                 }
                 engine.submit(command);
             }
@@ -1148,7 +1219,11 @@ pub async fn run(
         if pending.is_none() {
             pending = engine.try_output();
             if let Some(event) = &pending {
-                keep(event, thread.as_deref());
+                let lease = engine
+                    .scopes_context()
+                    .then(|| engine.memory_lease())
+                    .flatten();
+                keep_scoped(event, thread.as_deref(), lease.as_ref());
             }
         }
         if let Some(event) = pending.take() {
@@ -1664,6 +1739,7 @@ mod tests {
             Some(" It is noon."),
             &crate::remember::told(),
             Some(&file),
+            None,
         );
         assert!(
             told.text
@@ -1689,7 +1765,7 @@ mod tests {
             thread.at_lamp(whose.map(str::to_owned));
             thread.opening(Instant::now());
         }
-        let told = system_message("You are a lamp.", None, "", Some(&file));
+        let told = system_message("You are a lamp.", None, "", Some(&file), None);
         assert!(told.history.is_empty(), "{:?}", told.history);
         assert!(!told.text.contains("Try some tea"), "{}", told.text);
         std::fs::remove_dir_all(&dir).unwrap();
@@ -1720,7 +1796,7 @@ mod tests {
         ] {
             keep(&event, None);
         }
-        let spoken = system_message("You are a lamp.", Some(" It is noon."), "", None);
+        let spoken = system_message("You are a lamp.", Some(" It is noon."), "", None, None);
         assert!(
             spoken.text.contains("Under the blue mat."),
             "{}",

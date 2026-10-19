@@ -1780,6 +1780,9 @@ async fn memory_scope_is_bound_before_answer_and_revoked_with_the_turn() {
         lamp_turn_owner::BootId::new([9; 16]).unwrap(),
         cache.clone(),
         runner,
+        Some(Arc::new(|_: &crate::memory_scope::ScopeLease| {
+            Told::from("SYSTEM".to_owned())
+        })),
     );
     engine.memory_camera(true, 1);
     cache.replace(
@@ -1847,6 +1850,9 @@ async fn dropping_engine_revokes_memory_scope_even_when_task_holds_a_lease() {
         lamp_turn_owner::BootId::new([10; 16]).unwrap(),
         Arc::default(),
         runner,
+        Some(Arc::new(|_: &crate::memory_scope::ScopeLease| {
+            Told::from("SYSTEM".to_owned())
+        })),
     );
     engine.submit(start(1));
     let lease = engine
@@ -1900,6 +1906,9 @@ async fn revoked_tool_result_is_not_sent_to_another_chat_round() {
             lamp_turn_owner::BootId::new([11; 16]).unwrap(),
             Arc::default(),
             runner,
+            Some(Arc::new(|_: &crate::memory_scope::ScopeLease| {
+                Told::from("SYSTEM".to_owned())
+            })),
         )
         .announcing(false);
     engine.submit(start(1));
@@ -1925,4 +1934,66 @@ async fn revoked_tool_result_is_not_sent_to_another_chat_round() {
     .unwrap()
     .unwrap();
     assert_eq!(script.asked.lock().unwrap().len(), 1);
+}
+
+/// #1675: a scoped turn is told for its admitted person, not for whoever the
+/// eyes see when its chat begins; a written turn is told as the room's.
+#[tokio::test]
+async fn scoped_system_is_built_for_the_admitted_scope_not_the_face_in_view() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    let path = std::env::temp_dir().join(format!(
+        "sixth-scoped-system-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    let observe = |cache: &FaceCache, name: &str| {
+        std::fs::write(&path, name).unwrap();
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&path),
+        );
+    };
+    let cache = Arc::new(FaceCache::default());
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What is on my list?".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![text("Tea."), Ok(ChatEvent::Done)],
+                vec![text("Noted."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let runner: ScopedToolRunner =
+        Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+    let mut engine = engine
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([12; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            Some(Arc::new(|lease: &ScopeLease| {
+                Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+            })),
+        )
+        .announcing(false);
+    engine.memory_camera(true, 1);
+    observe(&cache, "A");
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    // B steps in front of the lamp before the chat is asked.
+    observe(&cache, "B");
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    engine.submit(written(2, "Remind me later."));
+    turn(&mut engine).await;
+    let asked = script.asked.lock().unwrap();
+    let a = crate::remember::person_id("A");
+    assert_eq!(
+        asked[0][0],
+        Message::system(format!("for {:?}", Some(a.as_str())))
+    );
+    assert_eq!(asked[1][0], Message::system("for None"));
+    std::fs::remove_file(path).unwrap();
 }
