@@ -4892,6 +4892,17 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#1993 is approved by Jarvis** (04:31), and is the first builder's to merge. **Its new P3, a lone loud block raising the bar, is #2046** (a draft until #1993 is in #1712): the peak is the median of three blocks. Gate: 2547 passed.
 - **Disk:** the gate script cleaned a 21 GB target before the `--kept` gate, as it now does.
 
+## 2026-10-20, 06:52 ICT: #1993, #2044, #2046, #2051 and #2056 merged; the relay's time pinned; the thinking move's numbers; the third landing up
+
+- **#1993 and its click fix #2046 are merged into #1712.** The quiet end's bar is the line's own, to one block, and its peak the median of five blocks, so a click or a double tap doesn't cut a soft last word. Jarvis and the reviewer read both.
+- **The relay (#1934):** `--wire --kept` (#2044, with #2051 for its review) ran on lamp-4ace (the first builder, 05:30). On a kept connection the relay still adds 408–430 ms before its first byte, and slow start after idle only 14 ms. So the lamp's side is done, and what's left is the relay's own work (questions 2 and 3 for its owners). `LAMP_SECOND_FEW_TOOLS` saves 2.2 KB of a 20 KB request, and no turn fits one flight.
+- **#2056 put back #1712's compile:** #1944's route checks were written before #1984 gave `tool_runner` a `policed` argument. Every voice PR's ARM64 failed until it was in.
+- **The thinking move (B), with Thirteen's #2053:** in `lamp-body`'s simulated run on lamp-4ace's settings, the base moved 88 counts after its glance in a 3 s wait, at up to 100 a second. With #2053 it moves 0, and the head's 25 counts stay. No speed change is needed unless the lamp still hears it.
+- **Found and flagged:** #1960 merged into #1954's branch after #1954 was in #1712, so it was lost. Nine brought it back as #2064.
+- **#2079, the third landing** (#1712's head onto `lamp-voice` for the arm hour): head `b8a2985a8`.
+  - It took two merges and two fixes: `Stop::Held` for a call the Policy holds, and `lamp-voice`'s closed-early test given `finish_told`'s argument.
+  - The reviewer found nothing at 06:46. The three crates' tests are running here, and ARM64 is in progress.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
