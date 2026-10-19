@@ -13,7 +13,7 @@ set -uo pipefail
 SCRIPT=$(cd "$(dirname "$0")" && pwd)/trials.sh
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
-mkdir -p "$T/bin" "$T/units" "$T/proc" "$T/pids" "$T/state" "$T/skills" "$T/memory"
+mkdir -p "$T/bin" "$T/units" "$T/proc" "$T/pids" "$T/state" "$T/skills" "$T/memory" "$T/run"
 
 # Each unit's own command line, as systemctl show prints ExecStart.
 cat >"$T/argv" <<EOF
@@ -117,6 +117,17 @@ case $1 in
 esac
 EOF
 
+# sudo: runs the command, and removes as root would what its owner can't
+# write (a set-aside of a folder the runner doesn't own).
+cat >"$T/bin/fake-sudo" <<'EOF'
+#!/usr/bin/env bash
+echo "sudo $*" >>"$FAKE/sudo-calls"
+if [[ $1 == rm ]]; then
+  for a in "${@:2}"; do [[ $a != -* && -e $a ]] && chmod -R u+w "$a" 2>/dev/null; done
+fi
+exec "$@"
+EOF
+
 # A skill's call: recorded, and the behaviour's line follows.
 cat >"$T/bin/fake-call" <<'EOF'
 #!/usr/bin/env bash
@@ -126,7 +137,7 @@ echo '{"ok":true}'
 EOF
 chmod +x "$T/bin/"*
 
-export PATH="$T/bin:$PATH" FAKE=$T TRIALS_UNIT_DIR=$T/units TRIALS_PROC=$T/proc TRIALS_SUDO= \
+export PATH="$T/bin:$PATH" FAKE=$T TRIALS_UNIT_DIR=$T/units TRIALS_ASIDE_DIR=$T/run TRIALS_PROC=$T/proc TRIALS_SUDO= \
   LAMP_BUS_BIN=$T/bin/lamp-bus TRIALS_CALL=$T/bin/fake-call TRIALS_WAIT=2
 
 pass=0 fail=0
@@ -285,6 +296,21 @@ wait
 [[ $(cat "$T/memory/days.json") == kept && ! -e $T/memory/new.json ]] && ok || bad "forget: the memory store not put back"
 has "forget: lamp-memory stopped for the copy" "$T/calls" "systemctl stop lamp-memory.service"
 has "forget: the lines to play" "$T/out" 'PLAY: "Forget that."'
+
+# The memory store's copy is kept in a 0700 folder under the set-aside
+# place, and gone after: even when the runner can't remove it alone, as
+# the person's memories under lamp-memory's own 0700 folder.
+reset
+rm -rf "$T/memory"; mkdir -p "$T/memory/private"
+echo "theirs" >"$T/memory/private/days.json"
+chmod 0500 "$T/memory/private"
+(sleep 1; for d in "$T/run"/lampos-trial-*; do stat -f '%Lp' "$d" 2>/dev/null || stat -c '%a' "$d"; done >"$T/aside-mode") &
+TRIALS_SUDO=$T/bin/fake-sudo TRIALS_WAIT=2 "$SCRIPT" forget >"$T/out" 2>&1; check "forget with a folder the runner can't write" 1 $?
+wait
+[[ $(cat "$T/aside-mode" 2>/dev/null) == 700 ]] && ok || bad "the set-aside folder wasn't 0700: $(cat "$T/aside-mode" 2>/dev/null)"
+[[ -z $(ls -A "$T/run") ]] && ok || bad "a set-aside copy was left: $(ls -A "$T/run")"
+[[ $(cat "$T/memory/private/days.json" 2>/dev/null) == theirs ]] && ok || bad "the memory store not put back"
+chmod -R u+w "$T/memory"
 
 # A unit that wasn't running is stopped again, not left running.
 reset

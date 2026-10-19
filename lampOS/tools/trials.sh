@@ -34,6 +34,8 @@
 # Settings (the lamp needs none; the tests in trials-test.sh set them):
 #   TRIALS_SKILLS_SRC  the build's lampOS/skills folder (../skills beside this)
 #   TRIALS_UNIT_DIR    where drop-ins go (/run/systemd/system)
+#   TRIALS_ASIDE_DIR   where set-asides are kept (/run: tmpfs, so a reboot
+#                      never leaves a copy of what was set aside)
 #   TRIALS_PROC        where a process's environ and cmdline are read (/proc)
 #   TRIALS_SUDO        the command to run as root (sudo, or nothing as root)
 #   TRIALS_WAIT        overrides every row's wait, in seconds
@@ -46,6 +48,7 @@ usage() { sed -n '7,9p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 HERE=$(cd "$(dirname "$0")" && pwd)
 SKILLS_SRC=${TRIALS_SKILLS_SRC:-$HERE/../skills}
 UNIT_DIR=${TRIALS_UNIT_DIR:-/run/systemd/system}
+ASIDE_DIR=${TRIALS_ASIDE_DIR:-/run}
 PROC=${TRIALS_PROC:-/proc}
 if [[ -n ${TRIALS_SUDO+set} ]]; then
   SUDO=$TRIALS_SUDO
@@ -151,7 +154,7 @@ lamp-eyes.service|LAMP_ACTIVITY=on"
       # no line of its own: the chat's call names it, second_provider.rs,
       # "request {} chat round {} called {}".
       ABOUT="forget on request: 'Forget that.' calls forget (#1723, #1930)"
-      NOTE="LAMP_MEMORY_DAYS=on in the voice (lamp-4ace has it). Play the four lines in order, each when the answer before has ended. 'Forget everything' needs a face the eyes know, so it isn't tried here. The memory store is set aside and put back"
+      NOTE="the second route, LAMP_VOICE_ROUTE=second, as lamp-4ace runs: the proof is its chat's line, which Live never writes; and LAMP_MEMORY_DAYS=on in the voice (lamp-4ace has it). Play the four lines in order, each when the answer before has ended. 'Forget everything' needs a face the eyes know, so it isn't tried here. The memory store is set aside and put back"
       SETASIDE="copy @MEMORY_DIR@ lamp-memory.service"
       SWITCHES="lamp-voice.service|LAMP_MEMORY_FORGET_ALL=on"
       CAUSE="play Hey Lamp, remember my violet umbrella is in the car.
@@ -279,6 +282,11 @@ restart() { # UNIT
   return 1
 }
 
+# The set-aside folder is root's and 0700 (it can hold a copy of the
+# person's memories), so it is only looked into and written as root.
+aside_has() { $SUDO test -e "$ASIDE/$1" || $SUDO test -L "$ASIDE/$1"; }
+aside_mark() { $SUDO touch "$ASIDE/$1"; }
+
 KEEPERS=""
 PUT_BACK_DONE=0
 put_back() {
@@ -300,17 +308,17 @@ put_back() {
     n=$((n + 1))
     set -- $(placeholders "$line")
     path=$2 stop=${3:-}
-    [[ -e "$ASIDE/$n.taken" ]] || continue
+    aside_has "$n.taken" || continue
     [[ -n $stop ]] && { $SUDO systemctl stop "$stop" || failed=1; }
     $SUDO rm -rf "$path" || failed=1
-    if [[ -e "$ASIDE/$n/x" || -L "$ASIDE/$n/x" ]]; then
+    if aside_has "$n/x"; then
       $SUDO cp -a "$ASIDE/$n/x" "$path" || failed=1
     fi
     [[ -n $stop ]] && { $SUDO systemctl start "$stop" || failed=1; }
     say "put back: $path"
   done < <(lines "$SETASIDE")
   for unit in $(units_of_switches); do
-    if [[ -e "$ASIDE/was-stopped.$unit" ]]; then
+    if aside_has "was-stopped.$unit"; then
       $SUDO systemctl stop "$unit" || failed=1
       say "put back: $unit stopped again, as it was"
     else
@@ -424,13 +432,14 @@ trial() { # ROW [--dry]
     exit 0
   fi
 
-  ASIDE=$(mktemp -d "${TMPDIR:-/tmp}/trial-$row.XXXXXX")
-  trap 'put_back; rm -rf "$ASIDE"' EXIT
+  ASIDE=$($SUDO mktemp -d "$ASIDE_DIR/lampos-trial-$row.XXXXXX") || { say "no set-aside folder in $ASIDE_DIR"; exit 3; }
+  $SUDO chmod 0700 "$ASIDE"
+  trap 'put_back; $SUDO rm -rf "$ASIDE"' EXIT
   trap 'exit 130' INT TERM
   [[ -z $NOTE ]] || say "needs: $NOTE"
   local unit
   for unit in $(units_of_switches); do
-    [[ $(systemctl is-active "$unit" 2>/dev/null) == active ]] || touch "$ASIDE/was-stopped.$unit"
+    [[ $(systemctl is-active "$unit" 2>/dev/null) == active ]] || aside_mark "was-stopped.$unit"
   done
 
   local path n=0 stop
@@ -438,7 +447,7 @@ trial() { # ROW [--dry]
     n=$((n + 1))
     set -- $(placeholders "$line")
     path=$2 stop=${3:-}
-    mkdir -p "$ASIDE/$n"
+    $SUDO mkdir -p "$ASIDE/$n"
     [[ -n $stop ]] && { $SUDO systemctl stop "$stop" || { say "could not stop $stop"; exit 3; }; }
     if [[ -e $path || -L $path ]]; then
       $SUDO cp -a "$path" "$ASIDE/$n/x" || { say "could not set aside $path"; exit 3; }
@@ -446,7 +455,7 @@ trial() { # ROW [--dry]
     else
       say "set aside: $path (not there: removed after)"
     fi
-    touch "$ASIDE/$n.taken"
+    aside_mark "$n.taken"
     [[ -n $stop ]] && { $SUDO systemctl start "$stop" || { say "could not start $stop again"; exit 3; }; }
   done < <(lines "$SETASIDE")
   while IFS= read -r line; do
