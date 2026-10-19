@@ -4,6 +4,43 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 13:36 first read #1775 (warmer hello by familiarity, stacked on #1772/#1763): first builder's with the stack
+- 13:35 reviewed #1655 (lamp-actions keeps its folder across restart): one P3; on by default, first builder's
+- 13:33 first read #1772 (Mood carries the familiar level, stacked on #1763): first builder's with #1763
+- 13:33 first read #1773 (waking face, off unless set): P2, the mute light's open can wait 2 s on a stuck painter and then fail; privacy path, first builder's
+- 13:31 merged #1765 (lamp-tasks report period configurable, lamp unchanged, #1128)
+- 13:31 merged #1769 (hardware-process P3s, docs)
+- 13:30 reviewed #1770 (lamp-tasks targets from Harness machines, off unless set): no finding, merge on green
+- 13:27 #1767: Twelve's P2 (re-remembered person dropped again) holds; corrected my review to not ready
+- 13:26 reviewed #1767 (forget my face with an unsearchable set-aside file): one P3; privacy path, first builder's
+- 13:25 merged #1761 (hand-controls release test waits only when an input is sent, tests only, #1128)
+- 13:24 reviewed #1763 (familiarity per remembered person, off unless --visits on): P2, the file keeps the time of the last counted visit despite the claim; first builder's
+- 13:16 first read of draft #1699 (prepare to unplug): conflicts, fold; first builder's after a lamp trial
+- 13:14 reviewed #1769 (hardware-process P3s, docs): no finding, merge on green
+- 13:12 merged #1751 (serve signal tests' first trace row before ready, tests only, #1569 row 30)
+- 13:12 #1755 full read at a4746b326: no blocking finding; first builder's
+- 13:03 reviewed #1739 (first builder's joining.md hardware rules): no finding; merges after #1762; #1762 to merge on green, the first builder's #1739 says the same split
+- 13:03 reviewed #1762 (hardware process + hw-first role, docs): no finding; asked the first builder for the role call, then merge on green
+- 13:02 merged #1758 (texts never move the body; text news only of text work; off unless set)
+- 13:01 reviewed #1758 (texts never move the body; text news only of text work; off unless set): no finding, merge on green
+- 12:54 #1760 (room/activity, off unless set, stacked on #1747) first read: msgs types + product skill change, first builder's
+- 12:54 #1755 (reports, off unless set) first read: drop attribution line, fold; msgs types + setup changes on every lamp, first builder's; full read to follow
+- 12:53 reviewed #1759 (product catalogue speaking section, stacked on #1067): no finding; on by default + lamp A/B, first builder's
+- 12:52 merged #1754 (speaker-finish test folders unique, tests only, #1569 row 32)
+- 12:50 reviewed #1715 (shutdown rechecks child exit before forcing): no finding; default + mic path, first builder's
+- 12:50 merged #1723 (forget by source_id; forget everything for a known person only; off unless set)
+- 12:39 #1747 P2 fixed at 93884fc2b (rules read at start); one P3; first builder's
+- 12:38 closed #1595 (last part merged as #1752)
+- 12:38 merged #1752 (timer/reminder kind in list; first builder's yes at 12:25)
+- 12:36 merged #1730 (light-scenes, point-light, light-show core skills, not in product)
+- 12:33 merged #1737 (update prune keeps lamp-update's own folder; first builder's yes at 11:48)
+- 12:29 reviewed #1756 (ramlog copy-back skips the open journal, image): no finding, one question; first builder's after a lamp run
+- 12:29 merged #1745 (turn-end switches kept on lamp-4ace, docs only)
+- 12:27 reviewed #1749 (Expression liveliness from Mood, stacked on #1728): one P3; first builder's with #1728
+- 12:26 #1752: first builder said merge on green
+- 12:24 reviewed #1752 (timer/reminder kind in list): no finding; on by default, first builder's
+- 12:21 #1728 P3s taken at ebec1f8be; first builder's merge
+- 12:21 #1744 P2s fixed at 791b74bf5; asked to fold and to move the workflow lines to a DevOps PR (my earlier yes was wrong); first builder's watched run
 - 12:14 reviewed #1747 (keep the light on): P2, rules not published at voice start so the rule lapses after a reboot; msgs field, first builder's
 - 12:14 merged #1743 (relay_clock child in Perl, tests only, #1569 row 31)
 - 12:04 re-reviewed #1728 (one breath from Mood): three P3s; msgs field + always-on readers, handed to the first builder
