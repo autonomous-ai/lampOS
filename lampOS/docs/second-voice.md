@@ -199,14 +199,22 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   lines, but on 114 its answer reached about 0.48 s short of the audio
   sent, so the words waited for `CloseStream`: 652 ms after the line's
   end at the median, 1.7 s at p90, against 280 ms when it covered. The
-  stream knows where the line's sound ends: the end of its last 20 ms
-  block over about -45 dBFS (`SOUND_RMS`). When the finals cover it to
-  within 0.15 s (`SOUND_PAST`, under a short word's 0.29 s), with nothing
-  pending, the answer's words are the line's at once. The journal adds
-  `, the rest quiet: sound to S ms` to `words from=finalize`. Sound left
-  past the answer, as "Hang on."'s "on", still waits for `CloseStream`.
-  With `LAMP_SECOND_STT_SOURCE=raw` a noisy room's level can stay over
-  the bar, and then it waits as before. If 1 s passes with no covering
+  stream knows where the line's sound ends (`LineSound`): the end of its
+  last block within 30 dB of the line's loudest block so far and over
+  about -60 dBFS. The bar is the line's own, so a far voice's soft last
+  word counts as sound (Jarvis on #1993); after the canceller, talk near
+  the lamp is at -21 to -31 dBFS and the quiet between sounds near
+  -75 dBFS (the first builder on #1712, 15:42). When the finals cover
+  that end to within one block (`COVERED`, 0.05 s), with nothing pending,
+  the answer's words are the line's at once. The journal adds
+  `, the rest quiet: sound to S ms` to `words from=finalize`. Any sound
+  past the answer is a word left and still waits for `CloseStream`:
+  "Hang on."'s "on", a word loud for 0.10 s after a 40 ms gap, or one at
+  -48 dBFS. A level that stays up after the words, a noisy room, keeps
+  the line waiting as before. Only a request's line ends this way
+  (`SttStream::finish`); a stop word's stream (`finished`) keeps
+  `CloseStream`, since over the lamp the canceller can take a stop word
+  under any bar (#828). If 1 s passes with no covering
   finals, `CloseStream` and up to 15 s in all for its final words, as
   before. `CloseStream` is sent in
   every case to close the socket, but waited on only in that fallback.
