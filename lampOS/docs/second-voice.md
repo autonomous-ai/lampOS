@@ -460,9 +460,13 @@ order is kept. A written turn is the same from the chat on.
     - the decline (`not_for_me`), which a busy room needs at every turn;
     - `use_skill`, which the skills' lines in the instruction name;
     - setup's walk (`setup_step`, `redo_setup`), which a setup talk calls at
-      every turn.
-  - **Behind `more_functions`:** the memory's (`remember`, `recall`,
-    `forget`, `forget_everything`), the faces', the time elsewhere
+      every turn;
+    - the memory's `remember`, `recall` and `forget`, asked of a lamp all
+      day. Behind `more_functions`, on lamp-4ace at 00:29 on 20 Oct,
+      "remember my violet umbrella is in the car" and "forget that" were
+      answered in words, nothing kept or forgotten, while `recall`, which
+      the memory note names, was called (the first builder on #1722, 00:34).
+  - **Behind `more_functions`:** `forget_everything`, the faces', the time elsewhere
     (`the_time`), a mark for review, the stop of reports, and any skill
     function given on its own.
   - **Once the model calls it in a turn**, the route answers it itself, with
@@ -1345,7 +1349,15 @@ after a take-over, but now for every turn:
   the first builder's scoring of 19 Oct: "what is the weather like in
   Hanoi" was answered "You asking what the weather's like here today?",
   "Night!" came at 1 pm (the character's example), and a poem had two
-  lines. A text is typed, not heard, and is not told it.
+  lines. A text is typed, not heard, and is not told it. With a memory
+  (`LAMP_MEMORY_SOCKET`), `worker::MEMORY_CALLS_NOTE` follows: to remember
+  call `remember` ("saying you will is not keeping it"), to forget
+  something remembered for them call `forget` ("'Forget it' or 'never mind'
+  about the conversation is not that": it would delete what they asked the
+  lamp to keep; the reviewer and the first builder on #2007, 01:17 and
+  01:18), and for an earlier conversation call `recall`. The memory note
+  itself names only `recall`, and on lamp-4ace on 20 Oct DeepSeek answered
+  "remember …" and "forget that" in words (#1722, 00:34).
 - **The time, as it is asked** (`local_time::told_asked_here`, spoken
   turns and texts): each request is built as it is asked, so it is told
   the time then, exactly and with the words a person says it in, "It is
@@ -1830,7 +1842,31 @@ lamp ended 20 steps louder. Live calls `volume_down`, then `volume_up`.
 It prints, for each arm and line, how many requests called each function
 first (`none` for an answer in words) and how many were right. Then it names
 the arms that were right every time on every line. Counts only, no words.
-Run it like `probe-cache`, where lamp-actions runs:
+
+**Then the memory's seven lines** (`MEMORY_LINES`: `trials.sh forget`'s
+four, the first builder on #1722, 00:34: on lamp-4ace "remember my violet
+umbrella is in the car" and "forget that" were answered in words, with
+every function given, while Live called `remember` and `forget`). In order:
+- "Hey Lamp, remember my violet umbrella is in the car." (`remember`);
+- "What was the name of that café I mentioned last week?" (counted);
+- "Oh, forget it, it doesn't matter." and "Never mind, forget I asked.",
+  each right when it does **not** call `forget`, asked while the umbrella is
+  kept (the reviewer and the first builder on #2007);
+- "What do you remember about my umbrella?" (`recall`);
+- "Lamp, forget that." (`forget`);
+- "What about my umbrella?" (counted).
+
+The counted lines are right in words or a `recall` that finds nothing. Each
+is asked with the ones before as right history, with every function, in
+two arms:
+- `memory-today`: the spoken character (`SPOKEN_NOTE`), the changing part
+  and the memory note as `LAMP_MEMORY_DAYS` tells it (`DAYS_NOTE`, which
+  names only `recall`);
+- `memory-note`: the same with `worker::MEMORY_CALLS_NOTE`, which names
+  `remember`, `forget` and `recall`.
+
+Its verdict names the arms right every time on the judged lines. Run it like
+`probe-cache`, where lamp-actions runs:
 
 ```sh
 systemd-run --pty --wait \

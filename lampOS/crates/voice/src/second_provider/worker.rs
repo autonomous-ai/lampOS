@@ -872,6 +872,15 @@ fn lone_words(heard: &str) -> bool {
 /// Told after [`SPOKEN_NOTE`] when the model looks by a call (#1712).
 pub(crate) const LOOK_CALL_NOTE: &str = " When you would look, call take_a_look: it is how you look, and you will then be shown what you see.";
 
+/// Told after [`SPOKEN_NOTE`] when the voice has a memory (#1712, the first
+/// builder at 00:34 on #1722: on lamp-4ace, "remember my violet umbrella is
+/// in the car" and "forget that" were answered in words, nothing kept or
+/// forgotten; the memory note names only recall). Live called both.
+/// "Forget it" about the talk itself is not a forget: it would delete what
+/// they asked the lamp to keep (the reviewer and the first builder on
+/// #2007, 01:17 and 01:18).
+pub(crate) const MEMORY_CALLS_NOTE: &str = " When someone asks you to remember something, call remember: saying you will is not keeping it. When they ask you to forget something you remembered for them, call forget. 'Forget it' or 'never mind' about the conversation is not that. For something from an earlier conversation, call recall.";
+
 /// Whether a hearing of the name at `at_us` with `score` is one since
 /// `from_us`, as the rule takes a hearing for a line.
 fn name_counts(score: f32, at_us: u64, from_us: u64) -> bool {
@@ -897,9 +906,10 @@ pub(crate) fn call_note(by_name: bool) -> &'static str {
 
 /// The character with [`SPOKEN_NOTE`] after it, and [`LOOK_CALL_NOTE`]
 /// when the model looks by a call.
-fn spoken_character(character: &str, look_by_call: bool) -> String {
+pub(crate) fn spoken_character(character: &str, look_by_call: bool, memory: bool) -> String {
     let look = if look_by_call { LOOK_CALL_NOTE } else { "" };
-    format!("{character}{SPOKEN_NOTE}{look}")
+    let memory = if memory { MEMORY_CALLS_NOTE } else { "" };
+    format!("{character}{SPOKEN_NOTE}{look}{memory}")
 }
 
 /// The lamp's functions with the look's after them, within Live's bound of
@@ -1284,7 +1294,7 @@ pub fn serve(
     // their own (`texts_task`).
     let texts_from = (character.clone(), tools.clone());
     // Spoken turns only: a text is typed, not heard (#1712).
-    let character = spoken_character(&character, look_by_call);
+    let character = spoken_character(&character, look_by_call, tools.memory.is_some());
     let sessions = std::sync::Mutex::new(Sessions::default());
     let place = crate::local_time::place_here();
     if let Some(place) = &place {
@@ -1780,6 +1790,12 @@ pub(crate) fn given_at_once(name: &str) -> bool {
             crate::second_provider::net::search::NAME,
             crate::second_provider::net::search::FETCH,
             crate::second_provider::LOOK_CALL,
+            // Asked of a lamp all day; behind `more_functions` DeepSeek
+            // answered "remember …" and "forget that" in words (#1712, the
+            // first builder at 00:34 on #1722).
+            crate::remember::REMEMBER,
+            crate::remember::RECALL,
+            crate::remember::FORGET,
         ]
         .contains(&name)
 }
@@ -3769,7 +3785,9 @@ mod tests {
 
     /// #1712, the first builder at 18:56: with `LAMP_SECOND_FEW_TOOLS=on` a
     /// spoken turn's request is given its few functions and one that names
-    /// the rest; once the model has called it, every function.
+    /// the rest; once the model has called it, every function. The memory's
+    /// remember, recall and forget are among the few (the first builder at
+    /// 00:34 on #1722); forgetting everything stays behind it.
     #[test]
     fn a_spoken_turn_is_given_its_few_functions_and_the_rest_behind_one() {
         let tool = |name: &str| lamp_gemini::Tool {
@@ -3782,6 +3800,9 @@ mod tests {
             "not_for_me",
             "the_time",
             "remember",
+            "recall",
+            "forget",
+            "forget_everything",
             "light_on",
             "volume_up",
             "set_timer",
@@ -3805,6 +3826,9 @@ mod tests {
             names(&given),
             [
                 "not_for_me",
+                "remember",
+                "recall",
+                "forget",
                 "light_on",
                 "volume_up",
                 "set_timer",
@@ -3816,11 +3840,11 @@ mod tests {
             ]
         );
         assert!(
-            given[8].description.starts_with(
-                "Your other functions, not given to you yet: the_time, remember, remember_my_face. "
+            given[11].description.starts_with(
+                "Your other functions, not given to you yet: the_time, forget_everything, remember_my_face. "
             ),
             "{}",
-            given[8].description
+            given[11].description
         );
         // Called: the next round has every one, as declared.
         let mut after = asked.to_vec();
@@ -5074,10 +5098,23 @@ mod tests {
     /// character comes first, unchanged.
     #[test]
     fn spoken_turns_are_told_to_answer_the_likeliest_meaning() {
-        let told = super::spoken_character("CHARACTER", false);
+        let told = super::spoken_character("CHARACTER", false, false);
         assert!(told.starts_with("CHARACTER\n\n"));
         assert!(!told.contains("take_a_look"));
-        assert!(super::spoken_character("CHARACTER", true).ends_with(super::LOOK_CALL_NOTE));
+        assert!(super::spoken_character("CHARACTER", true, false).ends_with(super::LOOK_CALL_NOTE));
+        // #1712 (the first builder at 00:34): with a memory, remember,
+        // forget and recall are named; without one, none is.
+        assert!(!told.contains("call remember"));
+        let remembers = super::spoken_character("CHARACTER", false, true);
+        assert!(remembers.ends_with(super::MEMORY_CALLS_NOTE));
+        for call in [
+            "call remember",
+            "call forget",
+            "call recall",
+            "'Forget it' or 'never mind' about the conversation is not that",
+        ] {
+            assert!(remembers.contains(call), "{call}");
+        }
         assert!(told.contains("answer it for the likeliest meaning, here first"));
         assert!(
             !told.contains("not_for_me"),
