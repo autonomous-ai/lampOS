@@ -2895,6 +2895,15 @@ fn asking_the_policy_in(
     root: &Path,
     clock: &Clock,
 ) -> (Running, Bus, mpsc::Receiver<(String, Instant)>) {
+    asking_the_policy_with(root, clock, &hello_after_a_second())
+}
+
+/// [`asking_the_policy_in`] with this hello.
+fn asking_the_policy_with(
+    root: &Path,
+    clock: &Clock,
+    hello: &str,
+) -> (Running, Bus, mpsc::Receiver<(String, Instant)>) {
     fs::create_dir(root.join("skills")).unwrap();
     let bus = Bus::new(root.join("bus")).unwrap();
     let voice = UnixListener::bind(root.join("say.sock")).unwrap();
@@ -2912,7 +2921,7 @@ fn asking_the_policy_in(
     // (#1128). On a clock the test moves it is put in after, as before.
     let on_the_host = clock.socket.is_none();
     if on_the_host {
-        skill_with(&root.join("skills"), "hello", &hello_after_a_second());
+        skill_with(&root.join("skills"), "hello", hello);
     }
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
     command
@@ -2933,7 +2942,7 @@ fn asking_the_policy_in(
     let running = Running(command.spawn().unwrap());
     clock.started();
     if !on_the_host {
-        skill_with(&root.join("skills"), "hello", &hello_after_a_second());
+        skill_with(&root.join("skills"), "hello", hello);
         clock.skip(RELOAD);
     }
     let deadline = Instant::now() + Duration::from_secs(20);
@@ -3101,6 +3110,77 @@ fn asking_the_policy_a_skill_acts_only_on_a_say_now_that_names_its_ask() {
     // Only the first say_now was said, the late one passed over too.
     std::thread::sleep(Duration::from_millis(300));
     assert_eq!(said.try_iter().count(), 0);
+}
+
+/// The next ask on `skills/ask`, within `wait`.
+fn next_ask(asks: &mut lamp_bus::Subscriber, wait: Duration) -> Option<serde_json::Value> {
+    let deadline = Instant::now() + wait;
+    while Instant::now() < deadline {
+        if let Some(message) = asks.recv(Duration::from_millis(50)).unwrap() {
+            return Some(serde_json::from_slice(&message.payload).unwrap());
+        }
+    }
+    None
+}
+
+/// #1685, the program: with the Policy asked, a hello with `[rest]` that
+/// nobody noticed (the face still there, not turned to the lamp, not moved,
+/// past its while) rests once a `say_now` made it, and the next face is not
+/// asked about; one the Policy said `wait` to made nothing, so the next face
+/// is.
+#[test]
+fn asking_the_policy_a_hello_made_and_not_noticed_rests() {
+    for (choice, asked_again) in [("say_now", false), ("wait", true)] {
+        // Short: a socket's whole path has to fit in 103 bytes.
+        let dir = tempfile::Builder::new()
+            .prefix("sr")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let root = dir.path();
+        let bus = Bus::new(root.join("bus")).unwrap();
+        let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+        let mut asks = bus.subscribe("skills/ask", "policy").unwrap();
+        let mut decisions = bus
+            .publisher_declared(
+                "policy/decisions",
+                &lamp_msgs::Decision::declaration(),
+                "policy",
+            )
+            .unwrap();
+        let clock = Clock::at(root);
+        let hello = format!(
+            "{}[rest]\nafter_ignored = 1\nwithin = \"10s\"\n",
+            hello_after_a_second()
+        );
+        let (_running, bus, said) = asking_the_policy_with(root, &clock, &hello);
+        let mut eyes = bus
+            .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+            .unwrap();
+        let face: serde_json::Value = serde_json::from_str(FACE).unwrap();
+        a_face_appears(&mut eyes, &clock, false);
+        let ask = next_ask(&mut asks, Duration::from_secs(5)).expect("the face asked about");
+        decisions
+            .publish_json(
+                1,
+                &serde_json::json!({"ask": ask["ask"], "about": "hello", "choice": choice,
+                    "shadow": false, "probability": 0.9, "answers": {}, "by": "rule",
+                    "took_ms": 3}),
+            )
+            .unwrap();
+        let answer = next_answer(&mut events, Instant::now() + Duration::from_secs(5));
+        assert_eq!(answer.allowed, Some(choice == "say_now"), "{answer:?}");
+        if choice == "say_now" {
+            said.recv_timeout(Duration::from_secs(2)).unwrap();
+        }
+        eyes.publish_json(1, &face).unwrap();
+        clock.skip(Duration::from_secs(11));
+        a_face_appears(&mut eyes, &clock, false);
+        assert_eq!(
+            next_ask(&mut asks, Duration::from_secs(1)).is_some(),
+            asked_again,
+            "{choice}"
+        );
+    }
 }
 
 /// On the lamp's own clock, without `--clock-control`: a Policy that
@@ -6944,4 +7024,412 @@ fn exact_words_reach_the_voice_unchanged_at_their_priority() {
     assert!(done.contains("light warm: done"), "{done}");
     assert!(done.contains("say: spoken"), "{done}");
     assert!(done.contains("light given back to on blue at 3"), "{done}");
+}
+
+/// A nudge started by a stuffy room, as the nudges' limits are tested with
+/// (#1685): `top` is the limits, `trigger` added to the trigger.
+fn nudge_skill(dir: &Path, name: &str, top: &str, trigger: &str) -> lamp_skills::Skill {
+    load(&skill_with(
+        dir,
+        name,
+        &format!(
+            "{top}\n[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n{trigger}\n[ask]\npolicy = \"nudge\"\n[[do]]\nlight = {{ colour = \"warm\", for = \"5s\" }}\n"
+        ),
+    ))
+    .unwrap()
+}
+
+/// Once each stuffy spell: a chance had is spent until the air is good
+/// again for ten minutes, as Stuffy air's.
+const ONCE: &str = "rearm = { below = 1000, for = \"10m\" }";
+
+/// The skills a stuffy-room reading at `at_ms` starts.
+fn stuffy(engine: &mut Engine, at_ms: u64) -> Vec<String> {
+    engine
+        .observe("air/indoor", at_ms * 1_000, br#"{"co2":1200}"#, None)
+        .into_iter()
+        .filter(|run| !run.calls.is_empty())
+        .map(|run| run.skill)
+        .collect()
+}
+
+/// #1685: `most_a_day` lets a skill start itself that many times a local
+/// day, counted from the local date with the time known: after midnight it
+/// may again.
+#[test]
+fn most_a_day_lets_a_skill_start_itself_that_often_a_local_day() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = nudge_skill(dir.path(), "sip", "most_a_day = 2", "");
+    assert_eq!(skill.most_a_day, Some(2));
+    let mut engine = Engine::new(vec![skill], true);
+    // 23:59:57 local (UTC+7) at 0 s.
+    engine.clock(420, 0, 1_792_429_197_000);
+    let runs: Vec<usize> = (0..6)
+        .map(|at| stuffy(&mut engine, at * 1_000).len())
+        .collect();
+    // 23:59:57 and :58, not :59; 00:00:00 and :01 again, not :02.
+    assert_eq!(runs, [1, 1, 0, 1, 1, 0]);
+}
+
+/// #1685: `[active]` lets a skill start itself only between its hours. A
+/// chance outside them is kept, as in the quiet hours, and taken at the
+/// trigger's first message once they begin; with the local time not known,
+/// never.
+#[test]
+fn an_active_window_starts_a_skill_only_between_its_hours() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = || {
+        nudge_skill(
+            dir.path(),
+            "sip",
+            "[active]\nfrom = \"10:00\"\nto = \"17:00\"",
+            ONCE,
+        )
+    };
+    // 09:59:58 local at 0 s.
+    let mut engine = Engine::new(vec![skill()], true);
+    engine.clock(0, 0, 1_792_403_998_000);
+    let runs: Vec<usize> = (0..4)
+        .map(|at| stuffy(&mut engine, at * 1_000).len())
+        .collect();
+    assert_eq!(runs, [0, 0, 1, 0]);
+    // 16:59:59 local at 0 s: none at 17:00 on.
+    let mut evening = Engine::new(vec![skill()], true);
+    evening.clock(0, 0, 1_792_429_199_000);
+    let runs: Vec<usize> = (1..4)
+        .map(|at| stuffy(&mut evening, at * 1_000).len())
+        .collect();
+    assert_eq!(runs, [0, 0, 0]);
+    let mut unknown = Engine::new(vec![skill()], true);
+    assert!((0..4).all(|at| stuffy(&mut unknown, at * 1_000).is_empty()));
+}
+
+/// #1685: a `[budget]` is shared by its group: its runs an hour between
+/// them, the smallest `per_hour` a member names. The second's chance is
+/// kept, and taken once the hour since the first has passed. A skill in no
+/// group is not held back.
+#[test]
+fn a_shared_budget_gives_its_group_its_runs_an_hour_between_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let first = nudge_skill(
+        dir.path(),
+        "sip",
+        "[budget]\ngroup = \"nudges\"\nper_hour = 1",
+        ONCE,
+    );
+    let second = nudge_skill(
+        dir.path(),
+        "eyes",
+        "[budget]\ngroup = \"nudges\"\nper_hour = 2",
+        ONCE,
+    );
+    assert_eq!(second.budget, Some(("nudges".to_owned(), 2)));
+    let alone = nudge_skill(dir.path(), "other", "", ONCE);
+    let mut engine = Engine::new(vec![first, second, alone], true);
+    assert_eq!(stuffy(&mut engine, 0), ["sip", "other"]);
+    assert!(stuffy(&mut engine, 1_800_000).is_empty());
+    assert!(stuffy(&mut engine, 3_599_999).is_empty());
+    assert_eq!(stuffy(&mut engine, 3_600_000), ["eyes"]);
+    // Two an hour between two that both say two.
+    let two = |name: &str| {
+        nudge_skill(
+            dir.path(),
+            name,
+            "[budget]\ngroup = \"breaks\"\nper_hour = 2",
+            ONCE,
+        )
+    };
+    let mut engine = Engine::new(vec![two("a"), two("b"), two("c")], true);
+    assert_eq!(stuffy(&mut engine, 0), ["a", "b"]);
+    assert!(stuffy(&mut engine, 60_000).is_empty());
+}
+
+/// A face at the desk, a fifth of the picture wide, its box from `left`
+/// and `top` and `tall` of the picture, turned to the lamp or not.
+fn desk_face(left: f32, top: f32, tall: f32, facing: bool) -> String {
+    format!(
+        r#"{{"faces":[{{"id":"a","xmin":{left},"ymin":{top},"xmax":{},"ymax":{},"confidence":0.9,"facing":{facing}}}]}}"#,
+        left + 0.2,
+        top + tall
+    )
+}
+
+/// The face as the run began: centred across, its centre 0.4 down, 0.2
+/// tall.
+fn seated(facing: bool) -> String {
+    desk_face(0.4, 0.3, 0.2, facing)
+}
+
+fn faces(engine: &mut Engine, at_ms: u64, faces: &str) {
+    engine.observe(
+        "humans/faces/tracked",
+        at_ms * 1_000,
+        faces.as_bytes(),
+        None,
+    );
+}
+
+fn heard(engine: &mut Engine, at_ms: u64, text: &str) {
+    engine.observe(
+        "voice/heard",
+        at_ms * 1_000,
+        format!(r#"{{"text":"{text}","finished":true}}"#).as_bytes(),
+        None,
+    );
+}
+
+/// A resting nudge every 20 s, its while 10 s, resting after `after`
+/// unnoticed.
+fn resting_skill(dir: &Path, after: u32) -> lamp_skills::Skill {
+    nudge_skill(
+        dir,
+        "sip",
+        &format!("[rest]\nafter_ignored = {after}\nwithin = \"10s\""),
+        "cooldown = \"20s\"",
+    )
+}
+
+/// #1685: `[rest]`. A run nobody noticed in its while (no face turned to
+/// the lamp, the face not moved, nothing heard, someone still in view)
+/// counts; after `after_ignored` of them in a row the skill rests until the
+/// next local 06:00, or 12 h with the local time not known.
+#[test]
+fn a_skill_rests_until_the_morning_after_runs_nobody_noticed() {
+    let dir = tempfile::tempdir().unwrap();
+    // 20:59:28 local (UTC+7) at 0 s, so the second run's while ends at
+    // 21:00:00 local, nine hours before the morning.
+    for (clock, rests_s) in [
+        (None, 32 + 12 * 3_600),
+        (Some(1_792_418_368_000), 32 + 9 * 3_600),
+    ] {
+        let mut engine = Engine::new(vec![resting_skill(dir.path(), 2)], true);
+        if let Some(unix_ms) = clock {
+            engine.clock(420, 0, unix_ms);
+        }
+        assert!(engine.topics().contains(&"humans/faces/tracked".to_owned()));
+        assert!(engine.topics().contains(&"voice/heard".to_owned()));
+        for (at, ran) in [(0, 1), (21, 1), (42, 0)] {
+            faces(&mut engine, at * 1_000, &seated(false));
+            assert_eq!(stuffy(&mut engine, at * 1_000).len(), ran, "at {at} s");
+            // Shifting a little, and nothing that is words.
+            faces(
+                &mut engine,
+                (at + 5) * 1_000,
+                &desk_face(0.45, 0.3, 0.22, false),
+            );
+            heard(&mut engine, (at + 6) * 1_000, " ");
+            faces(&mut engine, (at + 11) * 1_000, &seated(false));
+        }
+        assert_eq!(
+            engine.resting_until("sip", 42_000_000),
+            Some(rests_s * 1_000_000)
+        );
+        assert!(stuffy(&mut engine, rests_s * 1_000 - 1).is_empty());
+        assert_eq!(stuffy(&mut engine, rests_s * 1_000).len(), 1, "the morning");
+        assert_eq!(engine.resting_until("sip", rests_s * 1_000_000), None);
+    }
+    // One unnoticed is not two.
+    let mut engine = Engine::new(vec![resting_skill(dir.path(), 2)], true);
+    faces(&mut engine, 0, &seated(false));
+    stuffy(&mut engine, 0);
+    engine.tick(11_000_000);
+    assert_eq!(engine.resting_until("sip", 11_000_000), None);
+}
+
+/// #1685: with the Policy asked, a run is watched for once it is made (its
+/// answer `say_now`, the program telling [`Engine::made`]): a run it said no
+/// to showed nothing, so is not one nobody noticed. The day's most and the
+/// budget count it when asked, as the cooldown does.
+#[test]
+fn with_the_policy_asked_only_a_run_made_can_be_ignored() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut engine = Engine::new(vec![resting_skill(dir.path(), 1)], false).asking_the_policy();
+    faces(&mut engine, 0, &seated(false));
+    let asked = engine.observe("air/indoor", 0, br#"{"co2":1200}"#, None);
+    assert!(asked.iter().all(|run| run.ask.is_some()), "{asked:?}");
+    engine.tick(11_000_000);
+    assert_eq!(engine.resting_until("sip", 11_000_000), None, "said no");
+    faces(&mut engine, 21_000, &seated(false));
+    assert_eq!(
+        engine
+            .observe("air/indoor", 21_000_000, br#"{"co2":1200}"#, None)
+            .len(),
+        1
+    );
+    engine.made("sip", 22_000_000);
+    engine.tick(31_500_000);
+    assert_eq!(engine.resting_until("sip", 31_500_000), None, "its while");
+    engine.tick(32_001_000);
+    assert!(engine.resting_until("sip", 32_001_000).is_some(), "made");
+    let mut engine = Engine::new(
+        vec![nudge_skill(dir.path(), "once", "most_a_day = 1", "")],
+        false,
+    )
+    .asking_the_policy();
+    assert_eq!(
+        engine
+            .observe("air/indoor", 0, br#"{"co2":1200}"#, None)
+            .len(),
+        1
+    );
+    assert!(
+        engine
+            .observe("air/indoor", 1_000_000, br#"{"co2":1200}"#, None)
+            .is_empty()
+    );
+}
+
+/// #1685: a run is noticed, and the count of runs nobody noticed begins
+/// again, by a face turned to the lamp, the face moved across or down,
+/// nearer or farther, a word, or nobody left in view as its while ends:
+/// each alone keeps a skill resting after one from resting; nothing of it
+/// rests it.
+#[test]
+fn a_run_noticed_by_a_look_a_move_a_word_or_leaving_is_not_ignored() {
+    let dir = tempfile::tempdir().unwrap();
+    for how in [
+        "nothing", "turned", "across", "down", "nearer", "farther", "a word", "gone",
+    ] {
+        let mut engine = Engine::new(vec![resting_skill(dir.path(), 1)], true);
+        faces(&mut engine, 0, &seated(false));
+        assert_eq!(stuffy(&mut engine, 0).len(), 1, "{how}");
+        faces(&mut engine, 4_000, &seated(false));
+        match how {
+            "turned" => faces(&mut engine, 5_000, &seated(true)),
+            "across" => faces(&mut engine, 5_000, &desk_face(0.6, 0.3, 0.2, false)),
+            "down" => faces(&mut engine, 5_000, &desk_face(0.4, 0.5, 0.2, false)),
+            "nearer" => faces(&mut engine, 5_000, &desk_face(0.4, 0.25, 0.3, false)),
+            "farther" => faces(&mut engine, 5_000, &desk_face(0.4, 0.35, 0.14, false)),
+            "a word" => heard(&mut engine, 5_000, "not now"),
+            "gone" => faces(&mut engine, 9_000, NOBODY),
+            _ => {}
+        }
+        // After its while, nothing counts: someone turning to it then.
+        engine.tick(10_001_000);
+        faces(&mut engine, 10_500, &seated(true));
+        assert_eq!(
+            engine.resting_until("sip", 11_000_000).is_some(),
+            how == "nothing",
+            "{how}"
+        );
+    }
+    // Turned to it after the while: still ignored.
+    let mut engine = Engine::new(vec![resting_skill(dir.path(), 1)], true);
+    faces(&mut engine, 0, &seated(false));
+    stuffy(&mut engine, 0);
+    faces(&mut engine, 10_500, &seated(true));
+    assert!(engine.resting_until("sip", 11_000_000).is_some());
+}
+
+/// #1685: the limits are held to what they are for: each on what a skill
+/// starts itself, a group a plain name, the counts and whiles in bounds.
+#[test]
+fn the_nudge_limits_are_held_to_their_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    let trigger = "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n";
+    let each = "[trigger]\ntopic = \"tasks/status\"\neach = \"settled\"\nkey = \"task\"\nfield = \"state\"\nequals = \"idle\"\nwhen = \"appears\"\n[ask]\npolicy = \"nudge\"\n";
+    let step = "[[do]]\nlight = { colour = \"warm\", for = \"5s\" }\n";
+    for (number, (limit, head, why)) in [
+        (
+            "tool = \"t\"\nmost_a_day = 2\n",
+            "",
+            "in a skill with a trigger",
+        ),
+        (
+            "tool = \"t\"\n[active]\nfrom = \"10:00\"\nto = \"17:00\"\n",
+            "",
+            "in a skill with a trigger",
+        ),
+        (
+            "[budget]\ngroup = \"nudges\"\nper_hour = 1\n",
+            each,
+            "not an each trigger",
+        ),
+        ("[rest]\nafter_ignored = 2\n", each, "not an each trigger"),
+        ("most_a_day = 0\n", trigger, "most_a_day is 1 to 24"),
+        ("most_a_day = 25\n", trigger, "most_a_day is 1 to 24"),
+        (
+            "[active]\nfrom = \"10:00\"\nto = \"10:00\"\n",
+            trigger,
+            "different times",
+        ),
+        (
+            "[active]\nfrom = \"25:00\"\nto = \"10:00\"\n",
+            trigger,
+            "not a time of day",
+        ),
+        (
+            "[budget]\ngroup = \"Nudges\"\nper_hour = 1\n",
+            trigger,
+            "lowercase letters",
+        ),
+        (
+            "[budget]\ngroup = \"my_nudges\"\nper_hour = 1\n",
+            trigger,
+            "lowercase letters",
+        ),
+        (
+            "[budget]\ngroup = \"nudges\"\nper_hour = 0\n",
+            trigger,
+            "per_hour is 1 to 6",
+        ),
+        (
+            "[budget]\ngroup = \"nudges\"\nper_hour = 7\n",
+            trigger,
+            "per_hour is 1 to 6",
+        ),
+        (
+            "[rest]\nafter_ignored = 0\n",
+            trigger,
+            "after_ignored is 1 to 5",
+        ),
+        (
+            "[rest]\nafter_ignored = 6\n",
+            trigger,
+            "after_ignored is 1 to 5",
+        ),
+        (
+            "[rest]\nafter_ignored = 2\nwithin = \"9s\"\n",
+            trigger,
+            "within is 10s to 5m",
+        ),
+        (
+            "[rest]\nafter_ignored = 2\nwithin = \"6m\"\n",
+            trigger,
+            "within is 10s to 5m",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let error = load(&skill_with(
+            dir.path(),
+            &format!("bad{number}"),
+            &format!("{limit}{head}{step}"),
+        ))
+        .unwrap_err();
+        assert!(error.contains(why), "{limit}: {error}");
+    }
+    let good = nudge_skill(
+        dir.path(),
+        "good",
+        "most_a_day = 24\n[active]\nfrom = \"22:00\"\nto = \"06:00\"\n[budget]\ngroup = \"wellbeing-2\"\nper_hour = 6\n[rest]\nafter_ignored = 5",
+        "",
+    );
+    assert_eq!(good.most_a_day, Some(24));
+    assert_eq!(good.budget, Some(("wellbeing-2".to_owned(), 6)));
+    assert_eq!(
+        good.rest,
+        Some(lamp_skills::Rest {
+            after_ignored: 5,
+            within_us: lamp_skills::NOTICED_WITHIN_US
+        })
+    );
+    let edges = nudge_skill(
+        dir.path(),
+        "edges",
+        "most_a_day = 1\n[budget]\ngroup = \"a\"\nper_hour = 1\n[rest]\nafter_ignored = 1\nwithin = \"5m\"",
+        "",
+    );
+    assert_eq!(edges.rest.map(|rest| rest.within_us), Some(300_000_000));
 }

@@ -624,7 +624,7 @@ fn serve(
             answer_asks(
                 answers,
                 &mut asking.waiting,
-                &engine,
+                &mut engine,
                 &mut runs,
                 &mut out,
                 &runner,
@@ -713,7 +713,7 @@ fn serve(
                 answer_asks(
                     answers,
                     &mut asking.waiting,
-                    &engine,
+                    &mut engine,
                     &mut runs,
                     &mut out,
                     &runner,
@@ -1048,7 +1048,7 @@ fn ask_policy_for(
 fn answer_asks(
     answers: &mut Subscriber,
     waiting: &mut HashMap<u64, (lamp_skills::Run, Instant)>,
-    engine: &Engine,
+    engine: &mut Engine,
     runs: &mut Runs,
     out: &mut Publisher,
     runner: &Runner,
@@ -1090,6 +1090,8 @@ fn answer_asks(
             },
         );
         if let Some(calls) = calls.filter(|calls| !calls.is_empty()) {
+            // A `[rest]` watches from here whether it is noticed (#1685).
+            engine.made(&run.skill, clock::now_us());
             start_or_queue(run, calls, runs, out, runner);
         }
     }

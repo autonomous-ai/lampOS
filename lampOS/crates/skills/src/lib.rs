@@ -148,9 +148,57 @@ struct SkillFile {
     still: Option<String>,
     /// Local hours when the skill never starts itself.
     quiet: Option<QuietFile>,
+    /// The most runs it starts itself a local day (#1685's nudges).
+    most_a_day: Option<u32>,
+    /// Local hours when alone it may start itself: `[quiet]`'s opposite.
+    active: Option<QuietFile>,
+    /// A budget of runs an hour, shared by every skill of its group.
+    budget: Option<BudgetFile>,
+    /// A rest until the next morning after runs nobody noticed.
+    rest: Option<RestFile>,
     #[serde(rename = "do")]
     steps: Vec<StepFile>,
 }
+
+/// `[budget]`: the skills naming one `group` start at most `per_hour` runs
+/// an hour between them (#1685: one nudge an hour, the lamp's whole).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BudgetFile {
+    group: String,
+    per_hour: u32,
+}
+
+/// `[rest]`: after `after_ignored` runs in a row that nobody noticed within
+/// `within` of each, the skill rests until the next morning.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RestFile {
+    after_ignored: u32,
+    within: Option<String>,
+}
+
+/// `[rest]` as loaded.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Rest {
+    pub after_ignored: u32,
+    pub within_us: u64,
+}
+
+/// The most runs a day a skill may say it starts itself.
+pub const MOST_A_DAY_AT_MOST: u32 = 24;
+/// The most runs an hour a group may share.
+pub const PER_HOUR_AT_MOST: u32 = 6;
+/// How long after a run a look or a movement counts as noticing it, when
+/// `[rest]` names no `within`.
+pub const NOTICED_WITHIN_US: u64 = 60_000_000;
+/// The morning a rest lasts until, local minutes of the day: 06:00.
+pub const MORNING: u16 = 6 * 60;
+/// A face that moved this share of the picture across or down since the
+/// run, or grew or shrank by this share of its height, has moved.
+pub const NOTICED_MOVE: f32 = 0.15;
+pub const NOTICED_SIZE: f32 = 0.25;
+const HOUR_US: u64 = 3_600_000_000;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -742,6 +790,14 @@ pub struct Skill {
     still: String,
     /// Local minutes of the day, from and to, when it never starts itself.
     quiet: Option<(u16, u16)>,
+    /// The most runs it starts itself a local day.
+    pub most_a_day: Option<u32>,
+    /// Local minutes of the day, from and to, when alone it may start itself.
+    active: Option<(u16, u16)>,
+    /// Its group and that group's runs an hour, as this skill names them.
+    pub budget: Option<(String, u32)>,
+    /// When it rests after runs nobody noticed.
+    pub rest: Option<Rest>,
     /// Each step, and the runs it is made in when not every one: one
     /// trigger's, or a call's that chose one of its values.
     steps: Vec<(Option<Only>, Step)>,
@@ -1670,6 +1726,69 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             Some((from, to))
         }
     };
+    // The nudges' limits (#1685): each on what the lamp starts itself, so
+    // only in a skill with a trigger, and not with an each trigger, whose
+    // items' runs are news, not nudges (chosen).
+    let limited = file.most_a_day.is_some()
+        || file.active.is_some()
+        || file.budget.is_some()
+        || file.rest.is_some();
+    if limited && (triggers.is_empty() || triggers.iter().any(|trigger| trigger.each.is_some())) {
+        return Err(
+            "most_a_day, [active], [budget] and [rest] limit what a skill starts itself: in a skill with a trigger, not an each trigger"
+                .into(),
+        );
+    }
+    if file
+        .most_a_day
+        .is_some_and(|most| !(1..=MOST_A_DAY_AT_MOST).contains(&most))
+    {
+        return Err(format!("most_a_day is 1 to {MOST_A_DAY_AT_MOST}"));
+    }
+    let active = match file.active {
+        None => None,
+        Some(active) => {
+            let (from, to) = (minute_of_day(&active.from)?, minute_of_day(&active.to)?);
+            if from == to {
+                return Err("active: from and to are different times".into());
+            }
+            Some((from, to))
+        }
+    };
+    let budget = match file.budget {
+        None => None,
+        Some(budget) => {
+            if !plain_name(&budget.group) || budget.group.contains('_') {
+                return Err(format!(
+                    "[budget] group {:?}: lowercase letters, digits and hyphens",
+                    budget.group
+                ));
+            }
+            if !(1..=PER_HOUR_AT_MOST).contains(&budget.per_hour) {
+                return Err(format!("[budget] per_hour is 1 to {PER_HOUR_AT_MOST}"));
+            }
+            Some((budget.group, budget.per_hour))
+        }
+    };
+    let rest = match file.rest {
+        None => None,
+        Some(rest) => {
+            if !(1..=5).contains(&rest.after_ignored) {
+                return Err("[rest] after_ignored is 1 to 5".into());
+            }
+            let within_us = rest
+                .within
+                .as_deref()
+                .map_or(Ok(NOTICED_WITHIN_US), duration_us)?;
+            if !(10_000_000..=300_000_000).contains(&within_us) {
+                return Err("[rest] within is 10s to 5m".into());
+            }
+            Some(Rest {
+                after_ignored: rest.after_ignored,
+                within_us,
+            })
+        }
+    };
     let names: Vec<&String> = triggers
         .iter()
         .filter_map(|trigger| trigger.name.as_ref())
@@ -2028,6 +2147,10 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         again,
         still,
         quiet,
+        most_a_day: file.most_a_day,
+        active,
+        budget,
+        rest,
         steps,
     };
     // Least privilege: every read and every step within what it declares,
@@ -2451,6 +2574,101 @@ pub struct Engine {
     ask_policy: bool,
     /// The local time: minutes east of UTC, and one moment on both clocks.
     clock: Option<(i32, u64, u64)>,
+    /// The runs each skill with `most_a_day` started: its day and how many.
+    day_runs: HashMap<String, (i64, u32)>,
+    /// When each group's runs began, within the last hour, by group.
+    group_runs: HashMap<String, std::collections::VecDeque<u64>>,
+    /// Each resting skill's last nudge and how many in a row went unnoticed.
+    nudges: HashMap<String, Nudge>,
+}
+
+/// A skill's last run, for `[rest]`: when it began, whether anyone noticed
+/// it within its while, and the unnoticed runs in a row before it.
+#[derive(Clone, Copy, Debug, Default)]
+struct Nudge {
+    at_us: u64,
+    within_us: u64,
+    after: u32,
+    /// The largest face as the run began: its centre across and down, and
+    /// its height, as shares of the picture.
+    face: Option<[f32; 3]>,
+    noticed: bool,
+    /// The newest faces in its while showed nobody: they got up.
+    gone: bool,
+    judged: bool,
+    ignored: u32,
+    resting_until_us: u64,
+}
+
+/// The largest face of a `humans/faces/tracked` value: its centre across
+/// and down and its height, as shares of the picture.
+fn largest_face(value: &Value) -> Option<[f32; 3]> {
+    serde_json::from_value::<Faces>(value.clone())
+        .ok()?
+        .faces
+        .into_iter()
+        .max_by(|a, b| (a.ymax - a.ymin).total_cmp(&(b.ymax - b.ymin)))
+        .map(|face| {
+            [
+                (face.xmin + face.xmax) / 2.0,
+                (face.ymin + face.ymax) / 2.0,
+                face.ymax - face.ymin,
+            ]
+        })
+}
+
+/// `skill`'s run was made at `now_us`: with `[rest]`, whether it is
+/// noticed is watched for from now, from the largest face now in view.
+fn nudged(
+    nudges: &mut HashMap<String, Nudge>,
+    latest: &HashMap<String, (Value, u64, Option<u64>)>,
+    skill: &Skill,
+    now_us: u64,
+) {
+    let Some(rest) = skill.rest else {
+        return;
+    };
+    let face = Engine::fresh(latest, Faces::TOPIC, now_us).and_then(largest_face);
+    let nudge = nudges.entry(skill.name.clone()).or_default();
+    *nudge = Nudge {
+        at_us: now_us,
+        within_us: rest.within_us,
+        after: rest.after_ignored,
+        face,
+        noticed: false,
+        gone: false,
+        judged: false,
+        ..*nudge
+    };
+}
+
+/// The local day `now_us` is in: its date with the local time known, else
+/// a day of the engine's own clock.
+fn day_of(clock: Option<(i32, u64, u64)>, now_us: u64) -> i64 {
+    match clock {
+        Some((offset, at_us, unix_ms)) => {
+            let ms = i128::from(unix_ms) + (i128::from(now_us) - i128::from(at_us)) / 1_000;
+            (ms.div_euclid(60_000) + i128::from(offset)).div_euclid(1_440) as i64
+        }
+        None => (now_us / 86_400_000_000) as i64,
+    }
+}
+
+/// When the next [`MORNING`] comes after `now_us`, on the engine's clock:
+/// 12 h on with the local time not known.
+fn next_morning_us(clock: Option<(i32, u64, u64)>, now_us: u64) -> u64 {
+    let Some((offset, at_us, unix_ms)) = clock else {
+        return now_us + 12 * HOUR_US;
+    };
+    let ms = i128::from(unix_ms) + (i128::from(now_us) - i128::from(at_us)) / 1_000;
+    let of_day = (ms + i128::from(offset) * 60_000).rem_euclid(86_400_000);
+    let morning = i128::from(MORNING) * 60_000;
+    let wait = if of_day < morning {
+        morning - of_day
+    } else {
+        86_400_000 - of_day + morning
+    };
+    now_us + (wait as u64) * 1_000
 }
 
 fn event(skill: &str, stage: SkillStage, why: String, allowed: Option<bool>) -> SkillEvent {
@@ -2476,6 +2694,9 @@ impl Engine {
             skip_ask,
             ask_policy: false,
             clock: None,
+            day_runs: HashMap::new(),
+            group_runs: HashMap::new(),
+            nudges: HashMap::new(),
         }
     }
 
@@ -2501,11 +2722,97 @@ impl Engine {
         self.clock(local.offset_minutes_at(unix_ms), now_us, unix_ms);
     }
 
+    /// Whether a resting skill's run was noticed, from what the bus says,
+    /// within its while (#1685): a face turned to the lamp (`facing`), the
+    /// largest face moved ([`NOTICED_MOVE`] of the picture across or down,
+    /// or [`NOTICED_SIZE`] of its height nearer or farther: leaning in,
+    /// sitting back, turning to it), or anything heard (`voice/heard`, its
+    /// words never kept). Nobody in the newest faces of its while counts
+    /// too: they got up.
+    fn notice(&mut self, topic: &str, value: &Value, now_us: u64) {
+        let open = |nudge: &Nudge| !nudge.judged && now_us <= nudge.at_us + nudge.within_us;
+        if topic == Speech::TOPICS[0] {
+            if value["text"]
+                .as_str()
+                .is_some_and(|text| !text.trim().is_empty())
+            {
+                for nudge in self.nudges.values_mut().filter(|nudge| open(nudge)) {
+                    nudge.noticed = true;
+                }
+            }
+            return;
+        }
+        if topic != Faces::TOPIC {
+            return;
+        }
+        let Ok(faces) = serde_json::from_value::<Faces>(value.clone()) else {
+            return;
+        };
+        let facing = faces.faces.iter().any(|face| face.facing == Some(true));
+        let now = largest_face(value);
+        for nudge in self.nudges.values_mut().filter(|nudge| open(nudge)) {
+            nudge.gone = faces.faces.is_empty();
+            let moved = match (nudge.face, now) {
+                (Some(was), Some(now)) => {
+                    (now[0] - was[0]).abs() >= NOTICED_MOVE
+                        || (now[1] - was[1]).abs() >= NOTICED_MOVE
+                        || (now[2] - was[2]).abs() >= NOTICED_SIZE * was[2]
+                }
+                _ => false,
+            };
+            if facing || moved {
+                nudge.noticed = true;
+            }
+        }
+    }
+
+    /// Each resting skill's run whose while is over: noticed, or nobody in
+    /// view as it ended (they got up), and the count of runs unnoticed in a
+    /// row begins again; else it grows, and at its skill's `after_ignored`
+    /// the skill rests until the next morning ([`MORNING`], local).
+    fn judge_nudges(&mut self, now_us: u64) {
+        let clock = self.clock;
+        for nudge in self.nudges.values_mut() {
+            if nudge.judged || now_us <= nudge.at_us + nudge.within_us {
+                continue;
+            }
+            nudge.judged = true;
+            if nudge.noticed || nudge.gone {
+                nudge.ignored = 0;
+                continue;
+            }
+            nudge.ignored += 1;
+            if nudge.ignored >= nudge.after {
+                nudge.ignored = 0;
+                nudge.resting_until_us = next_morning_us(clock, now_us);
+            }
+        }
+    }
+
+    /// A run asked of the Policy was made at `now_us`, its answer `say_now`
+    /// and its trigger still holding: with `[rest]`, whether it is noticed
+    /// is watched for from now (#1685). Without the Policy asked, a run is
+    /// watched for as it is started.
+    pub fn made(&mut self, skill: &str, now_us: u64) {
+        if let Some(skill) = self.skills.iter().find(|known| known.name == skill) {
+            nudged(&mut self.nudges, &self.latest, skill, now_us);
+        }
+    }
+
+    /// Until when `skill` rests after runs nobody noticed, if it does.
+    pub fn resting_until(&self, skill: &str, now_us: u64) -> Option<u64> {
+        self.nudges
+            .get(skill)
+            .map(|nudge| nudge.resting_until_us)
+            .filter(|until| now_us < *until)
+    }
+
     /// Time passes with no message: a run held until its trigger ends ends
     /// when the trigger topic's newest value has expired (its header's
     /// `expires_ms`) or, naming no lifespan, when the topic has said nothing
     /// for [`SILENT_ENDS_US`]. Its spell is over with it.
     pub fn tick(&mut self, now_us: u64) -> Vec<Run> {
+        self.judge_nudges(now_us);
         let mut runs = Vec::new();
         for skill in &self.skills {
             for (index, trigger) in skill.triggers.iter().enumerate() {
@@ -2655,6 +2962,11 @@ impl Engine {
                     .filter(|topic| skill.permissions.refuses_reading(topic).is_none())
             })
             .collect();
+        // What judges a `[rest]` is the program's own reading, as the voice's
+        // state for a step after the say is: never the skill's (#1685).
+        if self.skills.iter().any(|skill| skill.rest.is_some()) {
+            topics.extend([Faces::TOPIC.to_owned(), Speech::TOPICS[0].to_owned()]);
+        }
         topics.sort();
         topics.dedup();
         topics
@@ -2784,6 +3096,10 @@ impl Engine {
         let Ok(value) = serde_json::from_slice::<Value>(payload) else {
             return Vec::new();
         };
+        // Whether a run of a resting skill was noticed (#1685), then each
+        // whose while is over judged.
+        self.notice(topic, &value, now_us);
+        self.judge_nudges(now_us);
         // Words still coming count too: the model may call before the end.
         if topic == Speech::TOPICS[0]
             && let Some(text) = value["text"].as_str()
@@ -2970,6 +3286,51 @@ impl Engine {
                     }
                     continue;
                 }
+                // The nudges' limits (#1685). Outside its active hours, or
+                // with its group's hour spent, the chance is kept as in the
+                // quiet hours: taken at the trigger's first message once
+                // they allow it, while it still holds. Past the day's most,
+                // or resting after runs nobody noticed, it is spent.
+                let outside = skill
+                    .active
+                    .is_some_and(|active| minute.is_none_or(|minute| !within(minute, active)));
+                let hour_spent = skill.budget.as_ref().is_some_and(|(group, _)| {
+                    let limit = self
+                        .skills
+                        .iter()
+                        .filter_map(|other| other.budget.as_ref())
+                        .filter(|(named, _)| named == group)
+                        .map(|(_, per_hour)| *per_hour)
+                        .min()
+                        .unwrap_or(u32::MAX);
+                    self.group_runs.get(group).is_some_and(|began| {
+                        began
+                            .iter()
+                            .filter(|at| now_us.saturating_sub(**at) < HOUR_US)
+                            .count() as u64
+                            >= u64::from(limit)
+                    })
+                });
+                if outside || hour_spent {
+                    if trigger.when != When::Appears {
+                        watch.spent = false;
+                        watch.disarmed = false;
+                        watch.waiting_us = None;
+                    }
+                    continue;
+                }
+                let day = day_of(self.clock, now_us);
+                if skill.most_a_day.is_some_and(|most| {
+                    self.day_runs
+                        .get(&skill.name)
+                        .is_some_and(|(on, count)| *on == day && *count >= most)
+                }) || self
+                    .nudges
+                    .get(&skill.name)
+                    .is_some_and(|nudge| now_us < nudge.resting_until_us)
+                {
+                    continue;
+                }
                 if !Self::conditions_hold(&self.latest, &self.holding, skill, now_us) {
                     // Held back by a condition (someone talking): with a
                     // `wait`, the chance is kept while the trigger holds,
@@ -2997,6 +3358,25 @@ impl Engine {
                 }
                 if self.skip_ask || self.ask_policy {
                     watch.ran_us = Some(now_us);
+                    // Counted as the cooldown is: when the run is started,
+                    // or asked of the Policy (#1685).
+                    if skill.most_a_day.is_some() {
+                        let count = self.day_runs.entry(skill.name.clone()).or_insert((day, 0));
+                        if count.0 != day {
+                            *count = (day, 0);
+                        }
+                        count.1 += 1;
+                    }
+                    if let Some((group, _)) = &skill.budget {
+                        let began = self.group_runs.entry(group.clone()).or_default();
+                        began.retain(|at| now_us.saturating_sub(*at) < HOUR_US);
+                        began.push_back(now_us);
+                    }
+                    // Asked of the Policy, a run is watched for once it is
+                    // made ([`Engine::made`]): a no shows nothing to ignore.
+                    if !self.ask_policy {
+                        nudged(&mut self.nudges, &self.latest, skill, now_us);
+                    }
                     // Its end is told even if the Policy says no: with no
                     // run holding anything, the program lets it pass.
                     watch.open = skill.holds_until_ends();
