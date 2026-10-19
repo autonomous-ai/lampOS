@@ -121,6 +121,26 @@ line once, then readiness, and the service runs on to a mute; without it,
 the service ends at the budget with "voice input never became ready". The
 units get the switch after a minute on a lamp with its Wi-Fi off.
 
+**A session the provider refuses at start (#1567, lamp-75c9, 19 Oct):** the
+model's account out of quota, the provider worker says `unavailable`
+(`quota_exceeded`) a second after boot. The serving link never ends on that:
+it asks again only after `refusal_pause` (120 s, `RecoveryPolicy`), once,
+and a session that comes up is reported fresh (`lamp-gemini`
+`a_first_connection_refused_for_quota_is_asked_again_after_the_pause`). To
+the voice it is a link not up yet, so with `LAMP_START_OFFLINE=on` it stays
+up past the budget and becomes ready on the later session; without the
+switch it ends at 25 s, as lamp-75c9 did ten times on a 16 Oct unit, which
+did not carry the switch (the product unit has since e0e23ef8c, 17 Oct).
+Tested through the loop for quota and rate refusals
+(`a_session_refused_at_start_does_not_end_a_service_started_offline`). A
+refusal never reaches the voice as `terminal` on the serving link; on one
+that does (a finite session's), the voice ends in order and stays 120 s
+before leaving (`REFUSAL_WAIT`). Slow ears are the other half of the
+budget: a microphone that starts within 25 s is waited for, one that has not
+by then ends the voice even with the switch, since input not retained is not
+proven
+(`slow_ears_within_the_budget_are_waited_for_and_past_it_end_the_voice`).
+
 ## Step 2: the board knows when its clock is set (`lamp-health --clock kernel`)
 
 `lamp-health serve --clock kernel` reads `clock_synced` from the kernel
