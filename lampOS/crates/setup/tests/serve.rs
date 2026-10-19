@@ -65,6 +65,7 @@ impl Root {
             zone_env: self.0.join("etc/zone.env"),
             backend: self.0.join("etc/backend.json"),
             reports: self.0.join("etc/reports.json"),
+            display_name: self.0.join("etc/display-name"),
             web_start: vec![],
             web_stop: vec![],
             free_port: vec![],

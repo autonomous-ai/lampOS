@@ -52,6 +52,9 @@ fn default_backend() -> PathBuf {
 fn default_reports() -> PathBuf {
     "/etc/lampOS/setup/reports.json".into()
 }
+fn default_display_name() -> PathBuf {
+    "/etc/lampOS/setup/display-name".into()
+}
 
 /// The server's written configuration.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -106,6 +109,12 @@ pub struct Config {
     /// reset's plan removes it.
     #[serde(default = "default_reports")]
     pub reports: PathBuf,
+    /// The lamp's name in the app, changed after setup (`device.rename`,
+    /// #1959, `crate::change`): one line, root's, 0644 for `lamp-cloud` to
+    /// read. Setup itself writes none; the reset's plan removes it. It never
+    /// changes what the lamp answers to.
+    #[serde(default = "default_display_name")]
+    pub display_name: PathBuf,
     /// Run once the hotspot is up and once serving ends: V1's nginx, which
     /// serves V1's page and passes `/api/` here, is on only during setup.
     #[serde(default)]
@@ -139,6 +148,7 @@ impl Config {
             &self.zone_env,
             &self.backend,
             &self.reports,
+            &self.display_name,
         ] {
             if !path.is_absolute() {
                 return Err(format!("{} is not absolute", path.display()));
@@ -602,6 +612,15 @@ pub fn reports_record(share: bool, at: SystemTime) -> Value {
 
 /// The files named in the configuration.
 pub struct Files<'a>(pub &'a Config);
+
+impl Files<'_> {
+    /// The lamp's name in the app (#1959): root's, 0644, so `lamp-cloud`
+    /// (as `lampos`) reads it where it is.
+    pub fn display_name(&mut self, name: &str) -> io::Result<()> {
+        let temporary = stage(&self.0.display_name, format!("{name}\n").as_bytes(), 0o644)?;
+        put_in_place(&temporary, &self.0.display_name)
+    }
+}
 
 impl Save for Files<'_> {
     fn credential(&mut self, key: &str) -> io::Result<()> {

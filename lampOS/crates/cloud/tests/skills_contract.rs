@@ -65,6 +65,7 @@ fn real(skills: Option<skills::Places>) -> Real {
         texts: Texts::default(),
         reports: None,
         skills,
+        changes: None,
     }
 }
 

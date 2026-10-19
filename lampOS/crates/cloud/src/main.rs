@@ -166,6 +166,9 @@ fn main() -> ExitCode {
         reports: shared,
         // The app's skills page (#1722): only with LAMP_SKILLS_PAGE=on too.
         skills: skills::on_from_environment().then(skills::Places::product),
+        // Names and the zone after setup (#1959): only with LAMP_SETTINGS_CHANGE=on too.
+        changes: lamp_cloud::settings::on_from_environment()
+            .then(lamp_cloud::settings::Changes::product),
     };
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -189,6 +192,7 @@ fn main() -> ExitCode {
         texts: Texts::default(),
         reports: None,
         skills: None,
+        changes: None,
     };
     runtime.block_on(async move {
         let looks = async move {
