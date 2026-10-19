@@ -431,7 +431,9 @@ writes.
   assignee cannot tell agents apart, since every agent works through the
   same account, so the name is a label.
 - **Order:** one pinned "Queue" issue the first builder keeps in order,
-  [#705](https://github.com/autonomous-ai/lampOS/issues/705), label
+  [#705](https://github.com/autonomous-ai/lampOS/issues/705), continued as
+  [#1722](https://github.com/autonomous-ai/lampOS/issues/1722) since
+  2026-10-19, when #705 reached GitHub's comment limit; label
   `lampos-queue`. No priority labels.
 - **Questions and answers** are comments on the issue they are about.
 - **Pull requests** say `Closes #N` (closed by hand at the merge, above) or
@@ -444,6 +446,26 @@ your own name (`fifth-P8`, above). Skip any issue already `status:taken`. Add
 again: if the first "taken" comment is not your own, release the issue
 (remove the label, say so) and take the next. That keeps two sessions given
 the same name from working one task twice.
+
+**Moving labelled work** (the project lead, adopted 2026-10-19, #1711).
+Work sat on busy builders while others had nothing, and issues were
+worked with no `status:taken`, so nobody could tell from the labels who
+was busy. Since then:
+1. **Claim before code.** `status:taken` and its one line come before
+   the first commit or comment on an issue. The first builder's hourly
+   post on the Queue lists any issue worked without a claim.
+2. **At most two per builder:** one `status:taken` and one next. Any
+   more stay unlabelled, in the Queue's order, until a builder is free.
+3. **Untouched means returned.** An issue whose builder has not
+   commented, pushed or claimed in 6 hours goes back to the first
+   builder, who labels it for a free builder. Saying "queued behind #N"
+   on it keeps it.
+4. **A free builder says so once** on the Queue (`free: <name>`), and
+   the first builder labels the next Queue item for it within the hour.
+5. **A pull request carries its builder's label** (`builder:<name>`) from
+   the moment it opens, so a builder's open work can be listed. A builder
+   whose account cannot add labels (read access only) asks the first
+   builder, who adds it.
 
 **Moved on 2026-10-14.** The first builder opened an issue for each open
 task (#694 to #704) and a role file for each builder. work-split.md keeps
@@ -546,6 +568,10 @@ numbers, not in kind.
 Hardware staff test lamps before they ship, each with their own agent. The
 production testing plan and its deliverables are
 [#1700](https://github.com/autonomous-ai/lampOS/issues/1700).
+How the hardware side works, start to finish, is
+[hardware-process.md](hardware-process.md), and its tasks are ordered on the
+Hardware Queue, [#1764](https://github.com/autonomous-ai/lampOS/issues/1764),
+kept by `hw-first` ([builders/hw-first.md](../builders/hw-first.md)).
 
 - **Their own GitHub account.** Each hardware member joins with their own
   account, which a repository admin grants (read the queue, comment, push
@@ -558,9 +584,18 @@ production testing plan and its deliverables are
 - **A queue of their own.** Hardware issues are labelled `team:hardware` (a
   label made when the hardware lead is named). Software builders skip them,
   including when they look for an unowned issue.
-- **Issues** are still opened by the first builder: one for each confirmed
-  common failure, with the affected lamps and runs linked. Routine results
-  stay in the fleet record, never one issue per run.
+- **The hardware queue is the hardware lead's** (the project lead, 19 Oct
+  2026, #1711), the same shape as the software side: a builder proposes, an
+  approver decides. Hardware builders post proposals and faults
+  (`<name>-P<n>`, `Found by <name>`) on #1700 or their hardware issue. The
+  hardware lead (or the hardware lead's agent) approves or declines them,
+  and opens, labels, assigns and closes `team:hardware` issues: one for each
+  confirmed common failure, with the affected lamps and runs linked.
+  Routine results stay in the fleet record, never one issue per run. A
+  defect closes on repair evidence plus a verified retest.
+- **The first builder comes in only for software:** when a hardware finding
+  needs a software change, the hardware lead posts a linked proposal on the
+  Queue (#1722) and the first builder assigns it to a software builder.
 - **The hardware lead** (a person) approves the suite's limits, durations,
   fixtures and stop conditions, and the shipment gate. A changed limit is a
   versioned decision.

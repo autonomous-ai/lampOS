@@ -30,15 +30,17 @@ it's what issues are labelled with. This file never names the person or their ac
   hardware revision and batch, the lampOS commit, the suite version, the
   station, each check's verdict and measurement, manual steps with times,
   repairs and the retest.
-- Report a failure on its issue, with the run linked. A failure that two or more lamps share goes to the first
-  builder, who opens one issue for it.
+- Report a failure on its issue, with the run linked. A failure that two or more lamps share goes to the
+  hardware lead, who opens one issue for it.
 - Diagnose with its person, and write down a physical repair. A software
-  change it finds goes on a linked issue, which the first builder assigns.
+  change it finds goes on a linked issue: the hardware lead posts it as a
+  linked proposal on the Queue (#1722), and the first builder assigns it.
 
 ## It may not
 
-- Open issues or make labels (the first builder does, as joining.md's
-  "Only the first builder opens issues" says).
+- Open issues or make labels. For `team:hardware` work the hardware lead
+  (or the hardware lead's agent) does, as joining.md's "Hardware members"
+  says.
 - Change a threshold, a duration or a stop condition. The hardware lead
   does, in a versioned decision.
 - Count a missing, skipped or interrupted test as a pass, or close a defect
@@ -53,5 +55,5 @@ it's what issues are labelled with. This file never names the person or their ac
 
 1. Start it with "you are `<name>`". It reads this file and joining.md.
 2. It checks that this file's lines are filled in and that the person's account can read the hardware queue.
-3. It asks the first builder for its first assignment, on #1700 until the hardware queue exists.
+3. It asks the hardware lead for its first assignment, on #1700 or its `team:hardware` issue.
 4. Its first run is supervised: one known-good lamp through the suite, with the hardware lead at the station.
