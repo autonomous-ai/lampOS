@@ -55,7 +55,12 @@ const USAGE: &str = "usage:
       the counts need the session records too (DIR, default /var/lib/lampOS/voice/sessions, root's)
   lamp-voice-eval lamp-session --runtime LAMP_LIVE --work NEW_ABS_DIR --seconds N
       (--fixture-reply WAV --fixture-sha256 SHA | --provider-config FILE | --serve-config FILE)
-      [--noise-suppression on|off] [--diagnostics] [--allowance-seconds N]";
+      [--noise-suppression on|off] [--diagnostics] [--allowance-seconds N]
+  lamp-voice-eval score JOURNAL --arm NAME FROM TO [--arm NAME FROM TO]...
+      [--scenes DIR --date YYYY-MM-DD --utc-offset +HH:MM]
+      (JOURNAL is `journalctl -u lamp-voice` text of the run alone; FROM and TO are
+      HH:MM or HH:MM:SS by the lamp's clock; DIR holds the played test's scene files
+      and battery summaries; YYYY-MM-DD is the day the first arm begins)";
 
 fn main() {
     match run() {
@@ -181,6 +186,113 @@ fn assets(args: &mut Args, catalog: &StimulusCatalog) -> Result<Option<AssetInde
     }
 }
 
+/// `+HH:MM` or `-HH:MM` as seconds east of UTC.
+fn utc_offset(value: &str) -> Option<i32> {
+    let (sign, rest) = match value.as_bytes().first()? {
+        b'+' => (1, &value[1..]),
+        b'-' => (-1, &value[1..]),
+        _ => return None,
+    };
+    let (hours, minutes) = rest.split_once(':')?;
+    let hours: i32 = hours.parse().ok().filter(|h| (0..=14).contains(h))?;
+    let minutes: i32 = minutes.parse().ok().filter(|m| (0..60).contains(m))?;
+    Some(sign * (hours * 3600 + minutes * 60))
+}
+
+/// An I/O error naming the path it was about (Jarvis on #1899).
+fn named(path: &Path) -> impl FnOnce(std::io::Error) -> Box<dyn std::error::Error + Send + Sync> {
+    let path = path.display().to_string();
+    move |error| invalid(&format!("{path}: {error}"))
+}
+
+/// `score JOURNAL --arm NAME FROM TO ...`: the routes' table, printed.
+fn score(all: &[String]) -> Result<i32> {
+    let (journal, rest) = all.split_first().ok_or_else(|| invalid(USAGE))?;
+    let mut arms = Vec::new();
+    let mut scenes = None;
+    let mut offset = None;
+    let mut day = None;
+    let mut rest = rest;
+    loop {
+        match rest {
+            [flag, name, from, to, more @ ..] if flag == "--arm" => {
+                arms.push(
+                    lamp_voice_eval::score::Arm::parse(name, from, to)
+                        .map_err(|why| invalid(&why))?,
+                );
+                rest = more;
+            }
+            [flag, dir, more @ ..] if flag == "--scenes" => {
+                scenes = Some(PathBuf::from(dir));
+                rest = more;
+            }
+            [flag, value, more @ ..] if flag == "--date" => {
+                day = Some(
+                    lamp_voice_eval::score::day(value)
+                        .ok_or_else(|| invalid("--date is YYYY-MM-DD"))?,
+                );
+                rest = more;
+            }
+            [flag, value, more @ ..] if flag == "--utc-offset" => {
+                offset = Some(
+                    utc_offset(value).ok_or_else(|| invalid("--utc-offset is +HH:MM or -HH:MM"))?,
+                );
+                rest = more;
+            }
+            [] => break,
+            _ => return Err(invalid(USAGE)),
+        }
+    }
+    if arms.is_empty() {
+        return Err(invalid(USAGE));
+    }
+    // Every scene folder holds earlier days' files (Jarvis on #1899).
+    if scenes.is_some() && day.is_none() {
+        return Err(invalid(
+            "--scenes needs --date YYYY-MM-DD, the day the first arm begins by the lamp's clock",
+        ));
+    }
+    // A scene's start is UTC and a battery's day is its file's: with no
+    // offset both fall on the wrong day, and none in an arm.
+    if scenes.is_some() && offset.is_none() {
+        return Err(invalid(
+            "--scenes needs --utc-offset +HH:MM, the lamp's zone (+07:00 for lamp-4ace)",
+        ));
+    }
+    let offset = offset.unwrap_or(0);
+    let mut files = lamp_voice_eval::score::Files {
+        offset,
+        day,
+        ..Default::default()
+    };
+    if let Some(dir) = scenes {
+        for entry in std::fs::read_dir(&dir).map_err(named(&dir))? {
+            let path = entry.map_err(named(&dir))?.path();
+            if path.extension().is_none_or(|extension| extension != "txt") {
+                continue;
+            }
+            let text =
+                String::from_utf8_lossy(&std::fs::read(&path).map_err(named(&path))?).into_owned();
+            if text.starts_with("scenario ") {
+                files.scenes.push(text);
+            } else if text.starts_with("battery ") {
+                let written = std::fs::metadata(&path)
+                    .and_then(|metadata| metadata.modified())
+                    .ok()
+                    .and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok())
+                    .and_then(|at| i64::try_from(at.as_secs()).ok());
+                files.batteries.push((text, written));
+            }
+        }
+    }
+    let text = std::fs::read(journal).map_err(named(Path::new(journal)))?;
+    print!(
+        "{}",
+        lamp_voice_eval::score::score_with(&String::from_utf8_lossy(&text), &arms, &files)
+    );
+    Ok(0)
+}
+
 fn run() -> Result<i32> {
     let mut all: Vec<String> = std::env::args().skip(1).collect();
     if all.is_empty() {
@@ -202,6 +314,7 @@ fn run() -> Result<i32> {
         "fake-clock-slow-transport" => return fixture_commands::slow_transport(all),
         "fake-room-recorder" => return fake_lamp::room_recorder(&all),
         "fake-slow-transport" => return fake_lamp::slow_transport(&all),
+        "score" => return score(&all),
         _ => {}
     }
     let mut args = Args { values: all };
