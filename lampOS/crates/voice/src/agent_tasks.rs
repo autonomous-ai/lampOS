@@ -1278,6 +1278,13 @@ fn run_for(
                     if let Ok(mut waiting) = PENDING.lock() {
                         *waiting = None;
                     }
+                    // Asked for by text: its news goes back by text, and
+                    // only such work's (`task_news::ForTexts`, #1673).
+                    if crate::messages::is_text(pending.request)
+                        && let Some(store) = status.get("store_id").and_then(Value::as_str)
+                    {
+                        crate::task_news::keep_typed(store, pending.id);
+                    }
                     let who = pending.who;
                     (
                         json!({
@@ -2092,6 +2099,83 @@ pub(crate) mod tests {
         // Started once: nothing is waiting any more.
         let (told, _) = run(&place, &call(CONFIRM, json!({})), 5, true, deadline);
         assert!(told.get("error").is_some(), "{told}");
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #1673 (the first builder, 19 Oct): work asked for and said yes to by
+    /// text is kept as a text's, so its news, and only such work's, is given
+    /// in a text. Work asked for at the lamp is not.
+    #[test]
+    fn work_asked_for_by_text_is_kept_as_a_texts() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-typed-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status = |revision: u64| json!({"ok":true,"store_id":"typed-s","revision":revision,"summary":{"session_id":"sess"}});
+        let prepared = |id: u64| json!({"ok":true,"id":id,"prepared_digest":"abc","revision":1});
+        let queued = |id: u64| json!({"ok":true,"id":id,"queued":true,"revision":2});
+        let _seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status(0)),
+                ("request.sock", prepared(7)),
+                ("request.sock", status(1)),
+                ("voice.sock", queued(7)),
+                ("request.sock", status(2)),
+                ("request.sock", prepared(8)),
+                ("request.sock", status(3)),
+                ("voice.sock", queued(8)),
+            ],
+        );
+        let place = Place {
+            directory: directory.clone(),
+            target: "office".into(),
+            who: false,
+            lead_in: false,
+            asked: false,
+            accounts: false,
+            needs: None,
+            staff_note: false,
+        };
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args,
+        };
+        let text = crate::messages::REQUESTS_FROM + 1;
+        let (told, _) = run(
+            &place,
+            &call(START, json!({"task":"Write a poem."})),
+            text,
+            false,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        let (told, _) = run(
+            &place,
+            &call(CONFIRM, json!({})),
+            text + 1,
+            false,
+            PEER_WAIT,
+        );
+        assert!(told["handing_over"] == json!(true), "{told}");
+        // Asked and said yes to at the lamp.
+        let (told, _) = run(
+            &place,
+            &call(START, json!({"task":"Write a story."})),
+            20,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        let (told, _) = run(&place, &call(CONFIRM, json!({})), 21, true, PEER_WAIT);
+        assert!(told["handing_over"] == json!(true), "{told}");
+        let nowhere = directory.join("no-typed-file");
+        assert!(crate::task_news::is_typed("typed-s:7:3", &nowhere));
+        assert!(!crate::task_news::is_typed("typed-s:8:3", &nowhere));
         std::fs::remove_dir_all(directory).unwrap();
     }
 

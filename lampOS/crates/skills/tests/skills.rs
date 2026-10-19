@@ -2535,7 +2535,10 @@ fn a_declared_tool_is_in_the_tools_file_and_a_call_runs_the_skills_steps() {
     };
     assert_eq!(
         file,
-        serde_json::json!({"tools":[{"name":"check_my_work","description":"A test."}]})
+        // A skill that asks for the body is named beside the tools: a text
+        // never runs it (#1673).
+        serde_json::json!({"tools":[{"name":"check_my_work","description":"A test."}],
+            "body":["check_my_work"]})
     );
     // The voice's call, as it asks the actions part.
     let call = |name: &str| {
@@ -3447,7 +3450,7 @@ fn a_tools_choice_and_flag_are_told_to_the_model_and_checked_on_a_call() {
                 "style": {"type": "string", "enum": ["calm", "jazz"], "description": "The mood."},
                 "long": {"type": "boolean", "description": "Twice."},
             }},
-        }]})
+        }], "body": ["jig"]})
     );
     let mut engine = Engine::new(vec![skill], false);
     let mut gestures = |args: serde_json::Value| -> Vec<String> {

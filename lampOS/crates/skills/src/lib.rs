@@ -2771,12 +2771,22 @@ fn calls(
 /// each skill's tool, described with the skill's description. Skills from
 /// [`load_all`] have a name each ([`load_each`]); in any other list a name an
 /// earlier skill took is left out, as [`Engine::tool`] runs the first.
+///
+/// Beside `tools`, `body` names the tools whose skill asks for the body
+/// (`[permissions] body`), when any does: a text from the Autonomous app
+/// never runs one, since a lamp that moves for a text nobody in the room sent
+/// looks wrong (#1673, the first builder, 19 Oct). A key of the file's own,
+/// not of each tool, which the voice's function declarations refuse.
 pub fn tools_file(skills: &[Skill]) -> Value {
     let mut tools: Vec<Value> = Vec::new();
+    let mut moving: Vec<&str> = Vec::new();
     for skill in skills {
         if let Some(name) = &skill.tool
             && !tools.iter().any(|tool| tool["name"] == *name)
         {
+            if skill.permissions.body {
+                moving.push(name);
+            }
             let mut tool = json!({"name": name, "description": skill.description});
             let mut properties = serde_json::Map::new();
             if let Some(choice) = &skill.choice {
@@ -2797,7 +2807,11 @@ pub fn tools_file(skills: &[Skill]) -> Value {
             tools.push(tool);
         }
     }
-    json!({ "tools": tools })
+    if moving.is_empty() {
+        json!({ "tools": tools })
+    } else {
+        json!({ "tools": tools, "body": moving })
+    }
 }
 
 /// What the model is told when its call ran these calls. With a look, to
