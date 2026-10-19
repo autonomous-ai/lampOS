@@ -445,6 +445,43 @@ stopped after. It's refused, with nothing started, when a part is down, Mood
 already runs, a binary is missing or an option is wrong. Judging on's head
 against the plain breath instead of Mood's fails both cases.
 
+**What each reader says it took** (the first builder on #1722, 20 Oct
+03:54): while it takes a fresh state from Mood, the ring says
+`lamp-voice ring: the ring breathes with Mood: pace 0.81` and Expression
+`lamp-expression: Mood's liveliness -0.31`. Each is said first on the first
+fresh state, then on a change of 0.05 or more, at most once a minute
+(`lamp_msgs::MoodTaken`; `ring_mood.rs` `taken_line`, Expression's
+`runtime::liveliness_line`). A number only. With Mood off there's no fresh
+state, so a lamp's journal is as before. With Mood gone and back, its first
+state is said again once the minute since the last line has passed, even at
+the same value (`MoodTaken::gone`).
+
+**The trial, nothing moving:** `lampOS/tools/trials.sh mood`, for the step
+that turns Mood on for lamp-4ace. It runs Expression in shadow: its own command line without `--enable`, in a drop-in
+of its own, so it plans each move on `expression/state` and asks the body
+for nothing. It's refused, with nothing changed, while a Mood already runs
+(`lamp-mood.service` or a trial's left behind). Then, after the trial's mark so the readers' first lines are
+seen, it starts `lamp-mood` as a transient unit (`lamp-trial-mood`,
+`LAMP_MOOD=on`, as Expression's user). It passes on all of these within
+120 s:
+
+- `mood/state`'s breath at a pace other than 1;
+- the ring's line and Expression's line above;
+- `expression/state` with `enabled` false and a drift asked for
+  (`drifting`).
+
+It fails if `mood/state` says a `familiar` level: nobody known.
+Afterwards Mood is stopped, the shadow drop-in removed and Expression
+restarted on its own line, and `light/state`'s value (not the bus's header,
+which changes with every send) must be as it was before. Mood's pace is
+exactly 1 with nothing happening from 07:00 to 22:00, so by day the readers'
+first lines say 1.00 and 0.00, and the trial asks for one clap near the lamp
+40 s after Mood starts. A clap lifts the pace for about 25 s and the
+liveliness for about 40 s, and only one counts in 120 s, so it still shows
+when a change may next be said, a minute after the first. Mood takes
+`ears/sudden` only from the ears, so a message published by hand doesn't move
+it.
+
 ## Replays and the future lamp trial
 
 The authored 24-hour fixture covers sleep through dawn/company/noise,
