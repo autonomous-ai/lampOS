@@ -7,8 +7,12 @@ pub const DEFAULT_BYTES: u64 = 500_000_000;
 pub const DEFAULT_AGE_SECONDS: u64 = 14 * 24 * 60 * 60;
 pub const MAX_ROOTS: usize = 4;
 
+/// The schema this build writes and reads.
+pub const SCHEMA: u32 = 1;
+
+/// `records.json`. A field a newer build writes is read past and named once
+/// ([`read`], #1680); a root `kind` this build doesn't know is refused.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct Config {
     pub schema_version: u32,
     /// No default-on behavior, even if a timer has been installed.
@@ -19,7 +23,6 @@ pub struct Config {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
 pub struct RootConfig {
     pub kind: Kind,
     pub path: std::path::PathBuf,
@@ -32,6 +35,36 @@ pub struct RootConfig {
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
     VoiceServiceMetadata,
+}
+
+/// `records.json` as this build reads it, one release forward (#1680).
+#[derive(Debug)]
+pub enum Read {
+    /// This build's schema: the configuration, and the journal's line
+    /// naming the fields this build does not read, if any.
+    Current(Config, Option<String>),
+    /// A newer schema, by its number: this build prunes nothing with it.
+    Newer(u64),
+}
+
+/// `bytes`, `records.json` at `path`. A newer `schema_version` is told
+/// apart before anything else is read, and never pruned with: what a bump
+/// means is not this build's to guess, and a cleanup deletes. At this
+/// build's schema, a field it doesn't know is read past and named
+/// ([`crate::forward`]); a file that doesn't parse, a bad known value (a
+/// root `kind` it doesn't know) and a key-like field are refused.
+pub fn read(path: &Path, bytes: &[u8]) -> io::Result<Read> {
+    #[derive(Deserialize)]
+    struct Envelope {
+        schema_version: u64,
+    }
+    let envelope: Envelope =
+        serde_json::from_slice(bytes).map_err(|error| crate::forward::unreadable(path, &error))?;
+    if envelope.schema_version > u64::from(SCHEMA) {
+        return Ok(Read::Newer(envelope.schema_version));
+    }
+    let (config, unread) = crate::forward::read(path, bytes)?;
+    Ok(Read::Current(config, unread))
 }
 
 pub fn invalid(message: impl Into<String>) -> io::Error {
@@ -81,7 +114,7 @@ impl Config {
 
     pub fn customer_default() -> Self {
         Self {
-            schema_version: 1,
+            schema_version: SCHEMA,
             enabled: false,
             bus_root: "/run/lampos-bus".into(),
             roots: vec![RootConfig {
@@ -95,7 +128,7 @@ impl Config {
     }
 
     pub fn validate(&self) -> io::Result<()> {
-        if self.schema_version != 1 || self.roots.is_empty() || self.roots.len() > MAX_ROOTS {
+        if self.schema_version != SCHEMA || self.roots.is_empty() || self.roots.len() > MAX_ROOTS {
             return Err(invalid("schema_version must be 1, with one to four roots"));
         }
         absolute_path(&self.bus_root)?;
@@ -175,14 +208,87 @@ mod tests {
         assert_eq!(root.max_age_seconds, 1_209_600);
     }
 
+    fn path() -> &'static Path {
+        Path::new("/etc/lampOS/records.json")
+    }
+
+    /// A kind this build doesn't know is refused, so it can never become a
+    /// path; a field it doesn't know is read past, named, and enables
+    /// nothing (#1680).
     #[test]
     fn unknown_fields_and_kinds_do_not_enable_generic_cleanup() {
         let mut value = serde_json::to_value(Config::customer_default()).unwrap();
         value["roots"][0]["kind"] = "memory".into();
-        assert!(serde_json::from_value::<Config>(value).is_err());
+        let error = read(path(), &serde_json::to_vec(&value).unwrap()).unwrap_err();
+        assert!(
+            error.to_string().contains("not read (data error at line 1"),
+            "{error}"
+        );
+        assert!(!error.to_string().contains("memory"), "{error}");
         let mut value = serde_json::to_value(Config::customer_default()).unwrap();
         value["delete_everything"] = true.into();
-        assert!(serde_json::from_value::<Config>(value).is_err());
+        value["roots"][0]["also"] = "/".into();
+        let Read::Current(config, unread) =
+            read(path(), &serde_json::to_vec(&value).unwrap()).unwrap()
+        else {
+            panic!("this build's schema");
+        };
+        assert_eq!(
+            config.fingerprint(),
+            Config::customer_default().fingerprint()
+        );
+        assert_eq!(
+            unread.as_deref(),
+            Some(
+                "/etc/lampOS/records.json: fields this build does not read, ignored: delete_everything, roots[0].also"
+            )
+        );
+    }
+
+    /// #2052's audit, the records row (#1680): the product's `records.json`
+    /// one release ahead. A newer field at this schema is read past and
+    /// named; a newer schema is told apart before anything else is read,
+    /// and nothing is pruned with it; a key-like field is refused by name.
+    /// Before, every cleanup run failed on any of them.
+    #[test]
+    fn the_products_config_one_release_ahead_is_read_or_told_newer() {
+        let product: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../deploy/product/settings/records.json"
+        ))
+        .unwrap();
+        let ours: Config = serde_json::from_value(product.clone()).unwrap();
+        let mut newer = product.clone();
+        newer["roots"][0]["min_free_bytes"] = 1_000_000_000_u64.into();
+        let Read::Current(config, unread) =
+            read(path(), &serde_json::to_vec_pretty(&newer).unwrap()).unwrap()
+        else {
+            panic!("this build's schema");
+        };
+        config.validate().unwrap();
+        assert_eq!(config.fingerprint(), ours.fingerprint());
+        assert!(
+            unread
+                .unwrap()
+                .ends_with("ignored: roots[0].min_free_bytes")
+        );
+        newer["schema_version"] = 2.into();
+        newer["roots"][0]["kind"] = "memory_days".into();
+        assert!(matches!(
+            read(path(), &serde_json::to_vec(&newer).unwrap()).unwrap(),
+            Read::Newer(2)
+        ));
+        let mut key = product;
+        key["relay_token"] = "sk-not-shown".into();
+        let error = read(path(), &serde_json::to_vec(&key).unwrap())
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("relay_token is named like a key"), "{error}");
+        assert!(!error.contains("sk-not-shown"), "{error}");
+        for broken in [&b"{"[..], br#"{"schema_version":"sk-not-shown"}"#] {
+            let error = read(path(), broken).unwrap_err().to_string();
+            assert!(error.contains("not read ("), "{error}");
+            assert!(!error.contains("sk-not-shown"), "{error}");
+        }
     }
 
     #[test]

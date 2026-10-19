@@ -1,7 +1,7 @@
 use lamp_records::{
     REPORT_SCHEMA_VERSION, RunReport,
-    config::{Config, absolute_path, invalid},
-    json_file::{self, CONFIG_BYTES, ReportRead},
+    config::{Config, Read as ConfigRead, SCHEMA, absolute_path, invalid},
+    json_file::{self, ReportRead},
     report::{RefusedInARow, Reporter, diagnostic_after},
     run,
 };
@@ -162,7 +162,14 @@ fn reporting_with(
     schedule: &mut impl ReportSchedule,
     mut make_reporter: impl FnMut(&Path) -> io::Result<Reporter>,
 ) -> io::Result<()> {
-    let mut config: Config = json_file::read(&config_path, CONFIG_BYTES)?;
+    // Its unread fields are named by the loop's first read, below.
+    let mut config = match json_file::read_config(&config_path, None)? {
+        Some((ConfigRead::Current(config, _), _)) => config,
+        Some((ConfigRead::Newer(_), _)) => {
+            return Err(invalid("records configuration is newer than this build"));
+        }
+        None => return Err(invalid("records configuration cannot be read")),
+    };
     config.validate()?;
     let mut config_stamp = None;
     let mut result_stamp = None;
@@ -174,11 +181,14 @@ fn reporting_with(
     loop {
         let step = schedule.now();
         let at = now()?;
-        let config_result =
-            json_file::read_changed::<Config>(&config_path, CONFIG_BYTES, config_stamp.as_ref());
+        let config_result = json_file::read_config(&config_path, config_stamp.as_ref());
         let config_error = match config_result {
-            Ok(Some((next, stamp))) => match next.validate() {
+            Ok(Some((ConfigRead::Current(next, unread), stamp))) => match next.validate() {
                 Ok(()) => {
+                    // Once each change: a refused one is read again.
+                    if let Some(line) = unread {
+                        eprintln!("lamp-records: {line}");
+                    }
                     if next.bus_root != config.bus_root {
                         publisher = None;
                     }
@@ -188,6 +198,9 @@ fn reporting_with(
                 }
                 Err(_) => Some("records configuration is invalid".to_owned()),
             },
+            Ok(Some((ConfigRead::Newer(_), _))) => {
+                Some("records configuration is newer than this build".to_owned())
+            }
             Ok(None) => None,
             Err(_) => Some("records configuration cannot be read".to_owned()),
         };
@@ -274,7 +287,24 @@ fn check_with(
     report: Option<PathBuf>,
     execute: impl FnOnce(&Config, u64, bool) -> RunReport,
 ) -> io::Result<u8> {
-    let config: Config = json_file::read(&config_path, CONFIG_BYTES)?;
+    // One release forward (#1680): a newer build's fields are read past and
+    // named; with a newer schema nothing is pruned, and the run succeeds.
+    let config = match json_file::read_config(&config_path, None)? {
+        Some((ConfigRead::Current(config, unread), _)) => {
+            if let Some(line) = unread {
+                eprintln!("lamp-records: {line}");
+            }
+            config
+        }
+        Some((ConfigRead::Newer(schema), _)) => {
+            eprintln!(
+                "lamp-records: {}: schema {schema} is newer than this build's {SCHEMA}: nothing is pruned and no result is written until a build that reads it runs",
+                config_path.display()
+            );
+            return Ok(0);
+        }
+        None => return Err(invalid("records configuration cannot be read")),
+    };
     config.validate()?;
     if let Some(path) = &report {
         let temporary = json_file::temporary_path(path)?;
@@ -294,9 +324,10 @@ fn check_with(
                 "report file must be outside record roots and the bus",
             ));
         }
-        // Retain a newer schema whole. Same-schema unknown values,
-        // corruption and unrelated files still require review before
-        // any cleanup runs.
+        // Retain a newer schema whole, and at this schema a newer build's
+        // plain new `mode` (#1680). Other same-schema unknown values,
+        // corruption and unrelated files still require review before any
+        // cleanup runs.
         match json_file::read_report_changed(path, None, now()?) {
             Ok(_) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
