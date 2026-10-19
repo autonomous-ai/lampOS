@@ -58,6 +58,7 @@ fn config(root: &Path) -> Config {
         push_wait: false,
         close_told: false,
         targets_newer: None,
+        set_up_later: None,
     }
 }
 
@@ -489,5 +490,92 @@ fn full_unread_stderr_cannot_hold_storage_failure_exit_or_socket_cleanup() {
     eprintln!(
         "host storage-failure fixture: prefilled stderr={filled} bytes; Prepare start to error exit={:?}; both sockets removed; replacement untouched; no CLI calls",
         failed_at.elapsed()
+    );
+}
+
+/// #1676: with `--set-up-later`, the part starts on a lamp that has neither
+/// Harness nor a targets file yet, and refuses a task with why. Without
+/// it, the same lamp's part stops at start, as before.
+#[test]
+fn set_up_later_runs_with_no_harness_and_no_targets_and_refuses_with_why() {
+    let root = private_root();
+    let config = config(root.path());
+    let home = root.path().join("home");
+    fs::create_dir(&home).unwrap();
+    let command = |set_up_later: bool| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-tasks"));
+        command
+            .args(["serve", "--enable", "--boot-id", "set-up-later", "--dir"])
+            .arg(&config.dir)
+            .arg("--socket")
+            .arg(&config.socket)
+            .arg("--voice-socket")
+            .arg(&config.voice_socket)
+            .arg("--bus-root")
+            .arg(&config.bus_root)
+            .arg("--targets")
+            .arg(root.path().join("targets.json"))
+            .arg("--harness")
+            .arg(root.path().join("no-harness"))
+            .args(["--run-for-ms", "20000"])
+            .env_clear()
+            .env("HOME", &home)
+            .env("PATH", "/usr/bin:/bin")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        if set_up_later {
+            command.arg("--set-up-later");
+        }
+        command
+    };
+    let exit = command(false).status().unwrap();
+    assert!(!exit.success(), "started with no targets file: {exit}");
+    let mut child = ChildGuard(command(true).spawn().unwrap());
+    let until = Instant::now() + FIXTURE_BOUND;
+    while !config.socket.exists() || !config.voice_socket.exists() {
+        assert!(
+            child.0.try_wait().unwrap().is_none(),
+            "Tasks exited before binding"
+        );
+        assert!(Instant::now() < until, "Tasks did not bind");
+        thread::sleep(POLL);
+    }
+    let status = ask(&config.socket, &json!({"op":"status"}));
+    assert_eq!(status["ok"], true, "{status}");
+    assert_eq!(status["summary"]["no_harness"], true);
+    assert_eq!(status["summary"]["targets"], 0);
+    let refused = ask(
+        &config.socket,
+        &json!({
+            "op":"prepare","guard":{"store_id":status["store_id"],"revision":status["revision"],"request_id":"no-harness"},
+            "text":"This fixture has no Harness","target":"desk"
+        }),
+    );
+    assert_eq!(refused["error"], "no_harness", "{refused}");
+    let bus = Bus::new(&config.bus_root).unwrap();
+    let mut watch = bus
+        .subscribe_typed(Diagnostic::TOPIC, "set_up_later_test", Diagnostic::TYPE)
+        .unwrap();
+    let until = Instant::now() + FIXTURE_BOUND;
+    let report = loop {
+        if let Some(message) = watch.recv(Duration::from_secs(2)).unwrap() {
+            let report: Diagnostic = message.parse().unwrap();
+            if report.name == "tasks" {
+                break report;
+            }
+        }
+        assert!(Instant::now() < until, "no tasks diagnostic");
+    };
+    assert_eq!(report.level, Level::Ok);
+    assert_eq!(
+        report.message,
+        "Harness is not installed on this lamp; hand-overs are off until it is"
+    );
+    assert!(
+        report
+            .values
+            .iter()
+            .any(|pair| pair.key == "handovers_off" && pair.value == "no_harness")
     );
 }

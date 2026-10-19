@@ -2,9 +2,11 @@ use lamp_bus::Bus;
 use lamp_msgs::{AgentState, Diagnostic, Level, Sign, TaskStatus};
 use lamp_tasks::{
     engine::{Clock as Sample, WATCH_EARLY_MS},
-    harness::{Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, Observation, Target},
+    harness::{
+        Closed, Ended, EngineKind, Launch, LaunchOutcome, Listed, Observation, SignIn, Target,
+    },
     progress::SETTLED_FOR_MS,
-    runtime::{Adapter, Clock, Config, WaitLane, request, serve_with_adapter},
+    runtime::{Adapter, Clock, Config, SetUpLater, WaitLane, request, serve_with_adapter},
     store::Store,
 };
 use serde_json::{Value, json};
@@ -91,6 +93,8 @@ struct Counts {
     theirs: AtomicBool,
     /// Each `close`, with the machine and agent it named (#1390).
     closes: Mutex<Vec<(String, String)>>,
+    /// Harness is signed out while set (#1676).
+    signed_out: AtomicBool,
 }
 struct ScriptLane(Arc<Counts>);
 impl WaitLane for ScriptLane {
@@ -178,6 +182,13 @@ impl Adapter for Script {
             .push((machine.into(), id.into()));
         Ok(Closed::Closed)
     }
+    fn signed_in(&self) -> Result<SignIn, String> {
+        Ok(if self.counts.signed_out.load(Ordering::SeqCst) {
+            SignIn::Out
+        } else {
+            SignIn::In
+        })
+    }
     fn status(&self, machine: &str) -> Result<Vec<Listed>, String> {
         self.counts.listings.fetch_add(1, Ordering::SeqCst);
         assert_eq!(machine, "0123456789abcdef0123456789abcdef");
@@ -251,6 +262,7 @@ impl Running {
             push_wait: false,
             close_told,
             targets_newer: None,
+            set_up_later: None,
         };
         let mut running = Self {
             root,
@@ -1199,6 +1211,130 @@ fn targets_for_a_newer_build_keep_the_part_running_with_hand_overs_off() {
             .iter()
             .any(|pair| pair.key == "targets_newer" && pair.value == "2")
     );
+}
+
+/// The first `tasks` diagnostic that `wanted` takes, within five seconds.
+fn tasks_diagnostic_until(s: &Running, wanted: impl Fn(&Diagnostic) -> bool) -> Diagnostic {
+    let start = Instant::now();
+    loop {
+        let report = tasks_diagnostic(s);
+        if wanted(&report) {
+            return report;
+        }
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "no such tasks diagnostic: {report:?}"
+        );
+    }
+}
+
+fn said(report: &Diagnostic, key: &str) -> Option<String> {
+    report
+        .values
+        .iter()
+        .find(|pair| pair.key == key)
+        .map(|pair| pair.value.clone())
+}
+
+fn write_targets(path: &std::path::Path, bytes: &[u8]) {
+    // Written beside and renamed in, as a writer of the real file would.
+    let next = path.with_extension("next");
+    fs::write(&next, bytes).unwrap();
+    fs::set_permissions(&next, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::rename(&next, path).unwrap();
+}
+
+fn told_targets(s: &Running) -> usize {
+    s.ask(json!({"op":"targets"}))["targets"]
+        .as_array()
+        .unwrap()
+        .len()
+}
+
+/// #1676: with `serve --set-up-later` the part runs with no targets file,
+/// says there is no computer, and uses the file once it is written, with
+/// no restart. Harness signed out is said; a file that is not valid keeps
+/// the targets before it and is warned of; and a file that is gone leaves
+/// no computer again. Not set up is not unwell: the level stays ok.
+#[test]
+fn set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off() {
+    let mut s = Running::new(false);
+    s.stop();
+    let path = s.root.path().join("targets.json");
+    s.config.targets = BTreeMap::new();
+    s.config.set_up_later = Some(SetUpLater {
+        targets: path.clone(),
+        every: Duration::from_millis(50),
+    });
+    s.start();
+    let report = tasks_diagnostic_until(&s, |d| said(d, "handovers_off").is_some());
+    assert_eq!(
+        said(&report, "handovers_off").as_deref(),
+        Some("no_computer")
+    );
+    assert_eq!(report.level, Level::Ok);
+    assert_eq!(
+        report.message,
+        "No computer to hand tasks to yet: the task targets are missing or empty"
+    );
+    let refused = s.ask(
+        json!({"op":"prepare","guard":s.guard(),"text":"Private scripted task","target":"coding"}),
+    );
+    assert_eq!(refused["error"], "target", "{refused}");
+
+    let targets = json!({"version":1,"targets":{"coding":{"machine_id":"0123456789abcdef0123456789abcdef","project":"project","engine":"codex"}}});
+    write_targets(&path, targets.to_string().as_bytes());
+    let start = Instant::now();
+    while told_targets(&s) != 1 {
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "targets not read again"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    s.prepare();
+    let report = tasks_diagnostic_until(&s, |d| said(d, "handovers_off").is_none());
+    assert_eq!(said(&report, "signed_in").as_deref(), Some("yes"));
+
+    s.counts.signed_out.store(true, Ordering::SeqCst);
+    let report = tasks_diagnostic_until(&s, |d| said(d, "handovers_off").is_some());
+    assert_eq!(
+        said(&report, "handovers_off").as_deref(),
+        Some("not_signed_in")
+    );
+    assert_eq!(said(&report, "signed_in").as_deref(), Some("no"));
+    s.counts.signed_out.store(false, Ordering::SeqCst);
+
+    write_targets(&path, b"{\"version\":1,\"targets\":");
+    let report = tasks_diagnostic_until(&s, |d| said(d, "targets_invalid").is_some());
+    assert_eq!(report.level, Level::Warn);
+    assert_eq!(
+        report.message,
+        "The task targets file changed and is not valid; the targets before it are kept"
+    );
+    assert_eq!(told_targets(&s), 1, "the targets before are kept");
+
+    fs::remove_file(&path).unwrap();
+    let report = tasks_diagnostic_until(&s, |d| {
+        said(d, "handovers_off").as_deref() == Some("no_computer")
+    });
+    assert!(said(&report, "targets_invalid").is_none());
+    assert_eq!(told_targets(&s), 0);
+}
+
+/// Without `serve --set-up-later` nothing of it is said, and the targets
+/// file is not looked at again.
+#[test]
+fn without_set_up_later_the_report_is_as_before() {
+    let s = Running::new(false);
+    s.counts.signed_out.store(true, Ordering::SeqCst);
+    thread::sleep(Duration::from_millis(100));
+    let report = tasks_diagnostic(&s);
+    for key in ["handovers_off", "signed_in", "targets_invalid"] {
+        assert!(said(&report, key).is_none(), "{key}: {report:?}");
+    }
+    assert_eq!(report.message, "");
+    assert_eq!(told_targets(&s), 1);
 }
 
 /// The store once the stopped service's owner has let its folder go. A
