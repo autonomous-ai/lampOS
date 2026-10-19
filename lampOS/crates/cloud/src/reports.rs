@@ -1387,10 +1387,14 @@ pub async fn run(shared: Arc<Shared>, mut sources: impl Sources, build: Option<B
 }
 
 /// The lamp's bus and systemd, as the driver reads them.
+/// The name `lamp-cloud` takes `reports/request` under.
+const REQUESTS_NAME: &str = "cloud_reports";
+
 pub struct Lamp {
     pub bus: Option<lamp_bus::Bus>,
     pub systemctl: PathBuf,
     requests: Option<lamp_bus::Subscriber>,
+    requests_refused: bool,
     state: Option<lamp_bus::Publisher>,
     restarts_read: Option<(Instant, BTreeMap<&'static str, u32>)>,
 }
@@ -1401,6 +1405,7 @@ impl Lamp {
             bus,
             systemctl: "/usr/bin/systemctl".into(),
             requests: None,
+            requests_refused: false,
             state: None,
             restarts_read: None,
         }
@@ -1458,13 +1463,26 @@ impl Sources for Lamp {
         if self.requests.is_none()
             && let Some(bus) = &self.bus
         {
-            self.requests = bus
-                .subscribe_typed(
-                    lamp_msgs::ReportsRequest::TOPIC,
-                    "cloud-reports",
-                    lamp_msgs::ReportsRequest::TYPE,
-                )
-                .ok();
+            // A bus name is `[a-z][a-z0-9_]*`: "cloud-reports" was refused,
+            // and with the error dropped nothing took the voice's "stop
+            // sending reports" (lamp-06c1, 19 Oct, #1755's trial).
+            self.requests = match bus.subscribe_typed(
+                lamp_msgs::ReportsRequest::TOPIC,
+                REQUESTS_NAME,
+                lamp_msgs::ReportsRequest::TYPE,
+            ) {
+                Ok(requests) => Some(requests),
+                Err(error) => {
+                    if !self.requests_refused {
+                        self.requests_refused = true;
+                        eprintln!(
+                            "lamp-cloud reports: can't take {}: {error}",
+                            lamp_msgs::ReportsRequest::TOPIC
+                        );
+                    }
+                    None
+                }
+            };
         }
         let mut asked = Vec::new();
         if let Some(requests) = self.requests.as_mut() {
@@ -1499,6 +1517,111 @@ impl Sources for Lamp {
 pub(crate) mod tests {
     use super::*;
     use lamp_msgs::{HealthItem, PartResult};
+
+    /// Through a real bus, as the voice's `reports_stop` sends it: a no on
+    /// `reports/request` reaches `lamp-cloud` (lamp-06c1, 19 Oct: it didn't).
+    #[test]
+    fn a_no_on_the_bus_reaches_lamp_cloud() {
+        // Short, as `places` is: a Unix socket's path holds 103 bytes on macOS.
+        let root = PathBuf::from(format!("/tmp/lcrq-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut lamp = Lamp::new(Some(bus.clone()));
+        assert_eq!(lamp.requests(), Vec::<bool>::new());
+        assert!(lamp.requests.is_some(), "lamp-cloud took reports/request");
+        let mut out = bus
+            .publisher_declared(
+                lamp_msgs::ReportsRequest::TOPIC,
+                &lamp_msgs::ReportsRequest::declaration(),
+                "voice",
+            )
+            .unwrap();
+        let sent = out
+            .publish_json(1, &lamp_msgs::ReportsRequest { share: false })
+            .unwrap();
+        assert_eq!(sent.delivered, 1);
+        let mut asked = Vec::new();
+        for _ in 0..50 {
+            asked = lamp.requests();
+            if !asked.is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(asked, vec![false]);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The whole path on a real bus, as lamp-06c1 failed it (#1755's trial,
+    /// check d): health is sent, the voice's no arrives on `reports/request`,
+    /// `stopped` goes, and no health follows at the next 15 minutes.
+    #[test]
+    fn the_voices_no_on_the_bus_sends_stopped_and_ends_the_health() {
+        let root = PathBuf::from(format!("/tmp/lcrs-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let places = places("busno");
+        yes(&places);
+        let shared = Shared::new(Reports::open(places.clone()));
+        let mut lamp = Lamp::new(Some(bus.clone()));
+        lamp.systemctl = root.join("no-systemctl");
+        let start = Instant::now();
+        let mut timing = Timing::new(start);
+        // The first health, as the lamp starts with a yes.
+        let first = start + HEALTH_EVERY;
+        step(&shared, &mut lamp, &mut timing, None, first, NOW);
+        let kinds = shared.with(sent_kinds);
+        assert_eq!(kinds, [json!("health")]);
+        shared.with(|reports| {
+            reports.acked(1);
+            reports.unhand(None);
+        });
+        // The voice's "stop sending reports", as `reports_stop` sends it.
+        let mut out = bus
+            .publisher_declared(
+                lamp_msgs::ReportsRequest::TOPIC,
+                &lamp_msgs::ReportsRequest::declaration(),
+                "voice",
+            )
+            .unwrap();
+        let sent = out
+            .publish_json(1, &lamp_msgs::ReportsRequest { share: false })
+            .unwrap();
+        assert_eq!(sent.delivered, 1, "lamp-cloud is listening");
+        let mut at = first + Duration::from_secs(1);
+        for _ in 0..50 {
+            step(&shared, &mut lamp, &mut timing, None, at, NOW + 1);
+            if !shared.with(|reports| reports.consent().share) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+            at += Duration::from_millis(10);
+        }
+        assert!(!shared.with(|reports| reports.consent().share));
+        assert_eq!(shared.with(sent_kinds), [json!("stopped")]);
+        // The next 15 minutes: no health.
+        step(
+            &shared,
+            &mut lamp,
+            &mut timing,
+            None,
+            first + HEALTH_EVERY,
+            NOW + 900,
+        );
+        step(
+            &shared,
+            &mut lamp,
+            &mut timing,
+            None,
+            first + 2 * HEALTH_EVERY,
+            NOW + 1800,
+        );
+        let kinds = shared.with(sent_kinds);
+        assert!(kinds.iter().all(|kind| kind == "stopped"), "{kinds:?}");
+        let _ = fs::remove_dir_all(&root);
+    }
 
     pub(crate) fn places(name: &str) -> Places {
         let root = PathBuf::from(format!("/tmp/lcr-{name}-{}", std::process::id()));
