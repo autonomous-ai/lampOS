@@ -303,6 +303,12 @@ impl From<Vec<Value>> for SessionState {
 
 #[cfg(test)]
 impl SessionState {
+    /// How many events its trace writer has written so far (0 with none).
+    pub(crate) fn written_events(&self) -> u64 {
+        self.writer
+            .as_ref()
+            .map_or(0, |writer| writer.health().written_events)
+    }
     pub(crate) fn with_writer(writer: ServiceTrace) -> Self {
         Self {
             continuous: true,
