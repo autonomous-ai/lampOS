@@ -2246,6 +2246,7 @@ dependencies = [
  "futures-util",
  "gpiocdev",
  "hound",
+ "hyper-util",
  "lamp-actions",
  "lamp-audio",
  "lamp-body",

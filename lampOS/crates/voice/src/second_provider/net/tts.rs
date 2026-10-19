@@ -1,8 +1,14 @@
 //! Streamed speech as 24 kHz mono 16-bit PCM from OpenAI or ElevenLabs, as
 //! V1's `hal/drivers/voice/tts/{openai,elevenlabs}.py` ask for it.
-use super::{Error, Result, chunk, http_client, openai_base, post};
+use super::{Error, Result, chunk, http_client, local_socket, openai_base, post, warm_get};
 use crate::second_config::{SecondConfig, TtsProvider};
 use serde_json::{Value, json};
+use std::{
+    collections::VecDeque,
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
+};
 
 pub const TTS_SAMPLE_RATE: u32 = 24_000;
 /// 40 ms: the most samples one packet carries.
@@ -96,18 +102,19 @@ pub(crate) fn request(
     text: &str,
 ) -> Result<Option<Request>> {
     let model = model.unwrap_or(default_model(provider));
-    let base = openai_base(base_url);
+    let base = service_base(provider, base_url)?;
     let spoken = without_tags(text);
     if spoken.trim().is_empty() {
         return Ok(None);
     }
+    let (header, value) = auth(provider, key);
     let request = match provider {
         // ponytail: every `[...]` is dropped, where V1 drops only its list
         // of ElevenLabs emotion tags; narrow it if bracketed words are lost.
         TtsProvider::OpenAi => Request {
             url: format!("{base}/audio/speech"),
-            header: "authorization",
-            value: format!("Bearer {key}"),
+            header,
+            value,
             body: json!({
                 "model": model,
                 "input": spoken.trim(),
@@ -116,15 +123,6 @@ pub(crate) fn request(
             }),
         },
         TtsProvider::ElevenLabs => {
-            let host = reqwest::Url::parse(&base).map_err(|_| Error::Url)?;
-            let direct = host
-                .host_str()
-                .is_some_and(|h| ELEVENLABS_HOSTS.iter().any(|d| h.eq_ignore_ascii_case(d)));
-            let base = if direct {
-                base
-            } else {
-                format!("{base}/elevenlabs")
-            };
             let voice = voice.unwrap_or(ELEVENLABS_VOICES[0].0);
             let id = ELEVENLABS_VOICES
                 .iter()
@@ -135,8 +133,8 @@ pub(crate) fn request(
             }
             Request {
                 url: format!("{base}/text-to-speech/{id}/stream?output_format=pcm_24000"),
-                header: "xi-api-key",
-                value: key.to_owned(),
+                header,
+                value,
                 // Speed 1.0 is given because, absent, the voice's stored
                 // speed applies (V1).
                 body: json!({
@@ -148,6 +146,32 @@ pub(crate) fn request(
         }
     };
     Ok(Some(request))
+}
+
+/// The provider's API root: OpenAI's `/v1`, or ElevenLabs' (on the
+/// Autonomous proxy, its `/elevenlabs` path).
+fn service_base(provider: TtsProvider, base_url: &str) -> Result<String> {
+    let base = openai_base(base_url);
+    if provider == TtsProvider::OpenAi {
+        return Ok(base);
+    }
+    let host = reqwest::Url::parse(&base).map_err(|_| Error::Url)?;
+    let direct = host
+        .host_str()
+        .is_some_and(|h| ELEVENLABS_HOSTS.iter().any(|d| h.eq_ignore_ascii_case(d)));
+    Ok(if direct {
+        base
+    } else {
+        format!("{base}/elevenlabs")
+    })
+}
+
+/// The provider's key header and its value.
+fn auth(provider: TtsProvider, key: &str) -> (&'static str, String) {
+    match provider {
+        TtsProvider::OpenAi => ("authorization", format!("Bearer {key}")),
+        TtsProvider::ElevenLabs => ("xi-api-key", key.to_owned()),
+    }
 }
 
 pub(super) fn without_tags(text: &str) -> String {
@@ -164,6 +188,38 @@ pub(super) fn without_tags(text: &str) -> String {
     out
 }
 
+/// The configured voice's connection is opened ahead as a line begins
+/// when no request went this long ([`Tts::warm`]), as the chat's is.
+pub const WARM_AFTER: Duration = super::chat::WARM_AFTER;
+/// The most of a warming answer read (a models list), so its connection
+/// goes back to the pool; a longer one is dropped with its connection.
+const WARM_BYTES: usize = 256 << 10;
+/// Local sockets remembered to tell a reused connection from a new one:
+/// more than the pieces of one answer in flight at once.
+const SOCKETS: usize = 8;
+
+/// Whose a piece of speech is, for the journal: its request, and when the
+/// words it answers were heard.
+#[derive(Clone, Copy, Debug)]
+pub struct Turn {
+    pub request: u64,
+    pub heard_at: Instant,
+}
+
+/// One turn's pieces in the journal's summary ([`Tts::told`]).
+#[derive(Default)]
+struct Tally {
+    request: u64,
+    /// Pieces asked, and of them begun (a first audio byte came).
+    asked: u32,
+    begun: u32,
+    reused: u32,
+    chars: usize,
+    /// The first piece's first audio byte after it went, and the slowest.
+    first_ms: Option<u128>,
+    slowest_ms: u128,
+}
+
 pub struct Tts {
     client: reqwest::Client,
     provider: TtsProvider,
@@ -172,6 +228,12 @@ pub struct Tts {
     voice: Option<String>,
     /// The model asked for; absent, the provider's default.
     model: Option<String>,
+    /// When a piece or a warming last went.
+    used: Mutex<Option<Instant>>,
+    /// The local sockets of the latest connections: a response on one of
+    /// them came on a connection reused from the pool.
+    sockets: Mutex<VecDeque<SocketAddr>>,
+    tally: Arc<Mutex<Tally>>,
 }
 
 impl Tts {
@@ -200,12 +262,71 @@ impl Tts {
             key: key.to_owned(),
             voice: voice.map(str::to_owned),
             model: None,
+            used: Mutex::new(None),
+            sockets: Mutex::new(VecDeque::with_capacity(SOCKETS)),
+            tally: Arc::default(),
         })
+    }
+
+    /// Whether `socket` was seen before, remembering it either way.
+    // ponytail: a new connection the OS happens to give a recent local port
+    // reads as reused; ports are rarely handed out again within minutes.
+    fn seen(&self, socket: Option<SocketAddr>) -> bool {
+        let (Some(socket), Ok(mut sockets)) = (socket, self.sockets.lock()) else {
+            return false;
+        };
+        if sockets.contains(&socket) {
+            return true;
+        }
+        if sockets.len() == SOCKETS {
+            sockets.pop_front();
+        }
+        sockets.push_back(socket);
+        false
+    }
+
+    /// The connection opened ahead, as a line begins, when no piece or
+    /// warming went in the last [`WARM_AFTER`] (`LAMP_SECOND_SPEECH_WARM=on`,
+    /// #1712): a `GET` of the provider's `models` with the key, read whole,
+    /// so the answer's first piece goes on a connection already made. No
+    /// text is sent, so no characters are billed (ElevenLabs bills the text
+    /// of speech requests; `GET /v1/models` lists models). Its status and how
+    /// long it took; `None` when not due, or when it failed (the piece then
+    /// connects as before).
+    pub async fn warm(&self) -> Option<(u16, Duration)> {
+        let models = format!(
+            "{}/models",
+            service_base(self.provider, &self.base_url).ok()?
+        );
+        let (header, value) = auth(self.provider, &self.key);
+        let (status, took, socket) = warm_get(
+            &self.client,
+            &self.used,
+            WARM_AFTER,
+            &models,
+            (header, &value),
+            WARM_BYTES,
+        )
+        .await?;
+        self.seen(socket);
+        Some((status, took))
     }
 
     /// Start speaking `text`; its samples come from the stream as they
     /// arrive. Dropping the stream stops the download.
     pub async fn speak(&self, text: &str) -> Result<TtsStream> {
+        self.speak_in(text, None).await
+    }
+
+    /// As [`Tts::speak`], a piece of `turn`'s answer: the journal says when
+    /// it went, on which connection, how soon its first audio byte came and
+    /// its characters, never its words; and the turn's pieces at its end
+    /// ([`Tts::told`]).
+    pub async fn speak_for(&self, text: &str, turn: Turn) -> Result<TtsStream> {
+        self.speak_in(text, Some(turn)).await
+    }
+
+    async fn speak_in(&self, text: &str, turn: Option<Turn>) -> Result<TtsStream> {
         let Some(request) = request(
             self.provider,
             &self.base_url,
@@ -217,6 +338,11 @@ impl Tts {
         else {
             return Ok(TtsStream::default());
         };
+        let sent = Instant::now();
+        if let Ok(mut used) = self.used.lock() {
+            *used = Some(sent);
+        }
+        let index = turn.map(|turn| self.asked(turn.request));
         let response = post(
             &self.client,
             &request.url,
@@ -224,10 +350,106 @@ impl Tts {
             &request.body,
         )
         .await?;
+        let reused = self.seen(local_socket(&response));
+        let piece = turn.zip(index).map(|(turn, index)| Piece {
+            tally: self.tally.clone(),
+            provider: self.provider.name(),
+            request: turn.request,
+            index,
+            sent_ms: sent.duration_since(turn.heard_at).as_millis(),
+            sent,
+            reused,
+            chars: text.chars().count(),
+        });
         Ok(TtsStream {
             response: Some(response),
+            piece,
             ..TtsStream::default()
         })
+    }
+
+    /// One more piece asked for `request`: its number in the turn.
+    fn asked(&self, request: u64) -> u32 {
+        let Ok(mut tally) = self.tally.lock() else {
+            return 0;
+        };
+        if tally.request != request {
+            *tally = Tally {
+                request,
+                ..Tally::default()
+            };
+        }
+        tally.asked += 1;
+        tally.asked
+    }
+
+    /// The journal's line for `request`'s pieces, once its turn is over;
+    /// `None` when it asked this voice for none.
+    pub fn told(&self, request: u64) -> Option<String> {
+        let mut tally = self.tally.lock().ok()?;
+        if tally.request != request || tally.asked == 0 {
+            return None;
+        }
+        let tally = std::mem::take(&mut *tally);
+        Some(format!(
+            "request {request} {}: {} of {} pieces began, {} on a reused connection, {} chars; the first piece's first audio byte {} after it went, the slowest {} ms",
+            self.provider.name(),
+            tally.begun,
+            tally.asked,
+            tally.reused,
+            tally.chars,
+            tally
+                .first_ms
+                .map_or_else(|| "never came".to_owned(), |ms| format!("{ms} ms")),
+            tally.slowest_ms,
+        ))
+    }
+}
+
+/// A turn's piece until its first audio byte, when it is journaled.
+struct Piece {
+    tally: Arc<Mutex<Tally>>,
+    provider: &'static str,
+    request: u64,
+    index: u32,
+    /// After the words were heard.
+    sent_ms: u128,
+    sent: Instant,
+    reused: bool,
+    chars: usize,
+}
+
+impl Piece {
+    /// The piece in the journal's words, its first audio byte `first_ms`
+    /// after it went: never its words.
+    fn told(&self, first_ms: u128) -> String {
+        format!(
+            "request {} {} piece {}: {} chars, sent {} ms after the words were heard on a {} connection; its first audio byte {first_ms} ms after it went",
+            self.request,
+            self.provider,
+            self.index,
+            self.chars,
+            self.sent_ms,
+            if self.reused { "reused" } else { "new" },
+        )
+    }
+
+    fn began(self) {
+        let first_ms = self.sent.elapsed().as_millis();
+        eprintln!("lamp-voice second: {}", self.told(first_ms));
+        let Ok(mut tally) = self.tally.lock() else {
+            return;
+        };
+        if tally.request != self.request {
+            return;
+        }
+        tally.begun += 1;
+        tally.reused += u32::from(self.reused);
+        tally.chars += self.chars;
+        if self.index == 1 {
+            tally.first_ms = Some(first_ms);
+        }
+        tally.slowest_ms = tally.slowest_ms.max(first_ms);
     }
 }
 
@@ -235,7 +457,9 @@ impl Tts {
 pub struct TtsStream {
     response: Option<reqwest::Response>,
     packets: Packets,
-    ready: std::collections::VecDeque<Vec<i16>>,
+    ready: VecDeque<Vec<i16>>,
+    /// Journaled at the first audio byte.
+    piece: Option<Piece>,
 }
 
 impl TtsStream {
@@ -249,9 +473,13 @@ impl TtsStream {
                 return Ok(None);
             };
             match chunk(response).await? {
-                Some(bytes) => self
-                    .ready
-                    .extend(self.packets.push(&bytes).into_iter().map(louder)),
+                Some(bytes) => {
+                    if let Some(piece) = self.piece.take() {
+                        piece.began();
+                    }
+                    self.ready
+                        .extend(self.packets.push(&bytes).into_iter().map(louder));
+                }
                 None => {
                     self.response = None;
                     self.ready.extend(self.packets.finish().map(louder));
@@ -318,6 +546,176 @@ impl Packets {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    /// A local keep-alive HTTP/1.1 server: `GET`s are answered with a short
+    /// models list (or never, with `hang_get`), `POST`s with `pcm`. What it
+    /// gives back: its address, the connections it accepted and each
+    /// request's first line.
+    async fn keeping(
+        pcm: Vec<u8>,
+        hang_get: bool,
+    ) -> (String, Arc<AtomicUsize>, Arc<Mutex<Vec<String>>>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let connections = Arc::new(AtomicUsize::new(0));
+        let asked = Arc::new(Mutex::new(Vec::new()));
+        let (counted, seen) = (connections.clone(), asked.clone());
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                counted.fetch_add(1, Ordering::SeqCst);
+                let (seen, pcm) = (seen.clone(), pcm.clone());
+                tokio::spawn(async move {
+                    let mut buffer = Vec::new();
+                    let mut read = [0; 4096];
+                    loop {
+                        let Some(end) = buffer.windows(4).position(|w| w == b"\r\n\r\n") else {
+                            match socket.read(&mut read).await {
+                                Ok(0) | Err(_) => return,
+                                Ok(n) => buffer.extend_from_slice(&read[..n]),
+                            }
+                            continue;
+                        };
+                        let head = String::from_utf8_lossy(&buffer[..end]).to_lowercase();
+                        let length: usize = head
+                            .lines()
+                            .find_map(|line| line.strip_prefix("content-length:"))
+                            .map_or(0, |n| n.trim().parse().unwrap());
+                        while buffer.len() < end + 4 + length {
+                            match socket.read(&mut read).await {
+                                Ok(0) | Err(_) => return,
+                                Ok(n) => buffer.extend_from_slice(&read[..n]),
+                            }
+                        }
+                        buffer.drain(..end + 4 + length);
+                        let line = head.lines().next().unwrap_or_default().to_owned();
+                        let get = line.starts_with("get");
+                        assert!(head.contains("xi-api-key: k"), "{head}");
+                        seen.lock().unwrap().push(line);
+                        if get && hang_get {
+                            std::future::pending::<()>().await;
+                        }
+                        let body = if get {
+                            br#"{"models":[]}"#.to_vec()
+                        } else {
+                            pcm.clone()
+                        };
+                        let answer =
+                            format!("HTTP/1.1 200 OK\r\ncontent-length: {}\r\n\r\n", body.len());
+                        if socket.write_all(answer.as_bytes()).await.is_err()
+                            || socket.write_all(&body).await.is_err()
+                        {
+                            return;
+                        }
+                    }
+                });
+            }
+        });
+        (format!("http://{address}/v1"), connections, asked)
+    }
+
+    fn turn(request: u64) -> Turn {
+        Turn {
+            request,
+            heard_at: Instant::now(),
+        }
+    }
+
+    async fn said(tts: &Tts, text: &str, request: u64) -> Vec<i16> {
+        let mut speech = tts.speak_for(text, turn(request)).await.unwrap();
+        let mut samples = Vec::new();
+        while let Some(packet) = speech.next().await.unwrap() {
+            samples.extend(packet);
+        }
+        samples
+    }
+
+    /// #1712, the first builder at 19:57: as a line begins after a quiet
+    /// minute, the configured voice's connection is opened with a `GET` of
+    /// `models`, and the answer's first piece goes on it; one used lately,
+    /// or warmed just now, is not asked again.
+    #[tokio::test]
+    async fn an_idle_voice_opens_its_connection_ahead_and_its_first_piece_reuses_it() {
+        let (url, connections, asked) = keeping(vec![1, 0, 2, 0], false).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap();
+        assert_eq!(tts.warm().await.map(|(status, _)| status), Some(200));
+        assert_eq!(tts.warm().await, None, "warmed just now");
+        assert_eq!(said(&tts, "Hello there.", 7).await, [2, 4]);
+        assert_eq!(connections.load(Ordering::SeqCst), 1, "one connection");
+        assert_eq!(
+            *asked.lock().unwrap(),
+            [
+                "get /v1/elevenlabs/models http/1.1",
+                "post /v1/elevenlabs/text-to-speech/21m00tcm4tlvdq8ikwam/stream?output_format=pcm_24000 http/1.1",
+            ]
+        );
+        let told = tts.told(7).unwrap();
+        assert!(
+            told.starts_with(
+                "request 7 ElevenLabs: 1 of 1 pieces began, 1 on a reused connection, 12 chars; the first piece's first audio byte "
+            ),
+            "{told}"
+        );
+        assert_eq!(tts.told(7), None, "told once");
+    }
+
+    /// A voice that spoke lately is not warmed: no `GET` goes.
+    #[tokio::test]
+    async fn a_busy_voice_is_not_warmed() {
+        let (url, connections, asked) = keeping(vec![1, 0], false).await;
+        let tts = Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap();
+        said(&tts, "Hi.", 1).await;
+        assert_eq!(tts.warm().await, None);
+        said(&tts, "Hi again.", 1).await;
+        assert_eq!(connections.load(Ordering::SeqCst), 1);
+        assert!(asked.lock().unwrap().iter().all(|l| l.starts_with("post")));
+        let told = tts.told(1).unwrap();
+        assert!(
+            told.contains("2 of 2 pieces began, 1 on a reused connection, 12 chars"),
+            "{told}"
+        );
+    }
+
+    /// A warming that never answers neither holds the piece up nor fails
+    /// it: the piece makes its own connection.
+    #[tokio::test]
+    async fn a_warming_that_hangs_does_not_hold_the_piece() {
+        let (url, connections, _) = keeping(vec![5, 0], true).await;
+        let tts = Arc::new(Tts::with(TtsProvider::ElevenLabs, &url, "k", None).unwrap());
+        let warming = tokio::spawn({
+            let tts = tts.clone();
+            async move { tts.warm().await }
+        });
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let samples = tokio::time::timeout(Duration::from_secs(2), said(&tts, "Hello.", 3))
+            .await
+            .expect("not held by the warming");
+        assert_eq!(samples, [10]);
+        assert_eq!(connections.load(Ordering::SeqCst), 2);
+        assert!(tts.told(3).unwrap().contains("0 on a reused connection"));
+        warming.abort();
+    }
+
+    /// The piece's journal line has its times, connection and size, never
+    /// its words.
+    #[test]
+    fn a_piece_is_journaled_without_its_words() {
+        let piece = Piece {
+            tally: Arc::default(),
+            provider: "ElevenLabs",
+            request: 2,
+            index: 1,
+            sent_ms: 2185,
+            sent: Instant::now(),
+            reused: true,
+            chars: 42,
+        };
+        assert_eq!(
+            piece.told(690),
+            "request 2 ElevenLabs piece 1: 42 chars, sent 2185 ms after the words were heard on a reused connection; its first audio byte 690 ms after it went"
+        );
+    }
 
     /// #1712, the owner: "use v4 turbo". The model set is asked for; absent,
     /// the provider's default.

@@ -1070,6 +1070,7 @@ fn second_route_worker_environment(
         crate::second_provider::PREPARED_ENVIRONMENT,
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
         crate::second_provider::CHAT_WARM_ENVIRONMENT,
+        crate::second_provider::SPEECH_WARM_ENVIRONMENT,
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
@@ -1350,6 +1351,7 @@ mod tests {
                 } else if name == crate::second_provider::net::weather::ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
+                    || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
                     || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
                 {
@@ -1418,6 +1420,7 @@ mod tests {
                     "LAMP_SECOND_KNOWN_NAMES=on",
                     "LAMP_SECOND_PREPARED=on",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
+                    "LAMP_SECOND_SPEECH_WARM=on",
                     "LAMP_SECOND_STEADY_FIRST=on",
                     "LAMP_SECOND_WEATHER=on",
                 ],

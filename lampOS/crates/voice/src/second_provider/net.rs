@@ -20,7 +20,7 @@ pub use chat::{
 pub use gemini_tts::{GeminiSpeech, GeminiTts};
 pub use sentences::Sentences;
 pub use stt::{Early, Replies, SttStream, check as stt_check};
-pub use tts::{PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream, default_model};
+pub use tts::{PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream, Turn, default_model};
 
 /// To open a connection, TLS included.
 pub(crate) const CONNECT: Duration = Duration::from_secs(10);
@@ -157,6 +157,53 @@ async fn fetch_json(url: &str, authorization: Option<&str>) -> Result<serde_json
         }
     }
     serde_json::from_slice(&bytes).map_err(|_| Error::Protocol("answer"))
+}
+
+/// The local socket a response came on: the same one again means the
+/// connection was reused from the client's pool. HTTP/1.1 only here (no
+/// `http2` feature), so one connection carries one request at a time.
+pub(crate) fn local_socket(response: &reqwest::Response) -> Option<std::net::SocketAddr> {
+    response
+        .extensions()
+        .get::<hyper_util::client::legacy::connect::HttpInfo>()
+        .map(hyper_util::client::legacy::connect::HttpInfo::local_addr)
+}
+
+/// A connection opened ahead with a `GET` of `url` (#1712), unless `used`
+/// says one went within `after`: at most `max` bytes of the answer are read,
+/// so the connection goes back to the pool. The status, how long it took and
+/// the connection's local socket; `None` when not due, or when it failed.
+pub(crate) async fn warm_get(
+    client: &reqwest::Client,
+    used: &std::sync::Mutex<Option<std::time::Instant>>,
+    after: Duration,
+    url: &str,
+    auth: (&'static str, &str),
+    max: usize,
+) -> Option<(u16, Duration, Option<std::net::SocketAddr>)> {
+    let began = std::time::Instant::now();
+    {
+        let mut used = used.lock().ok()?;
+        if used.is_some_and(|at| began.duration_since(at) < after) {
+            return None;
+        }
+        *used = Some(began);
+    }
+    let request = client.get(url).header(auth.0, auth.1);
+    let mut response = tokio::time::timeout(CONNECT + STALL, request.send())
+        .await
+        .ok()?
+        .ok()?;
+    let status = response.status().as_u16();
+    let socket = local_socket(&response);
+    let mut read = 0;
+    while read <= max {
+        match tokio::time::timeout(STALL, response.chunk()).await {
+            Ok(Ok(Some(bytes))) => read += bytes.len(),
+            _ => break,
+        }
+    }
+    Some((status, began.elapsed(), socket))
 }
 
 /// The next piece of a streamed body; `None` at its end.
