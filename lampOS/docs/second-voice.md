@@ -142,7 +142,29 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   weather came back for Hannover. It reaches the second route's worker
   alone, whose journal says `lamp-voice second: speech to text expects N
   words beside the name (LAMP_SECOND_KEY_TERMS)`; the stop words' stream
-  keeps the name alone. A keep-alive
+  keeps the name alone. **With `LAMP_SECOND_KNOWN_NAMES=on`** (#753), the
+  names the lamp knows follow the unit's words, each its own `keyterm`:
+  - the name typed at setup (`LAMP_PERSON_NAME`);
+  - the agents it hands work to, "Claude Code", "Codex" and "OpenCode",
+    when it has a tasks part (on lamp-4ace on 19 Oct "ask Codex" came back
+    "Next to write").
+
+  Never the known faces' names. The list of everyone the lamp remembers
+  would leave the house with every line, including people who asked only
+  to be recognised and haven't spoken (the reviewer on #1818). A name said
+  aloud reaches Deepgram in the audio anyway, but the list is the owner's
+  call (the first builder, 19 Oct 15:42). If the owner says yes, it comes
+  back behind a switch of its own. `docs/eyes.md`'s rule stands: no print
+  and no remembered name leaves the lamp.
+
+  Each is a plain name, once, never "Lamp" again, at most 49 after it
+  (Deepgram takes 100 and 500 tokens, and advises the 20 to 50 that matter
+  most). They are read on a thread of the worker's own every minute
+  (`second_provider::net::key_terms`), so a line never waits on a file.
+  The journal says how many when the count changes (`lamp-voice second:
+  speech to text listens for N names the lamp knows`), never the names.
+  The lamp's zone is not one of them: `Asia/Ho_Chi_Minh` is Hanoi's too,
+  so a place goes in `LAMP_SECOND_KEY_TERMS`. A keep-alive
   every 5 s. Only final segments are kept. At the end of the line, when
   the words are already settled (final segments cover all the audio sent,
   and no interim words or `SpeechStarted` came after them), they are the
