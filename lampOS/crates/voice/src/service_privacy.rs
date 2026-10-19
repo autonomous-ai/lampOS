@@ -199,6 +199,22 @@ fn wait_loop(
 /// How long the wait may go without one fresh privacy observation.
 const UNAVAILABLE_WAIT: Duration = Duration::from_secs(1);
 
+#[cfg(test)]
+thread_local! {
+    /// A test's own wait for the same rule, on its thread only (#1806).
+    static TEST_UNAVAILABLE_WAIT: std::cell::Cell<Option<Duration>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// [`UNAVAILABLE_WAIT`], or in a test that set one, its own.
+fn unavailable_wait() -> Duration {
+    #[cfg(test)]
+    if let Some(wait) = TEST_UNAVAILABLE_WAIT.with(std::cell::Cell::get) {
+        return wait;
+    }
+    UNAVAILABLE_WAIT
+}
+
 fn wait_loop_with_gate(
     worker: &mut Worker,
     boot: BootId,
@@ -266,7 +282,7 @@ fn wait_loop_with_gate(
         let state = gate.state(MonoTime::from_micros(at));
         if state != PrivacyState::Unavailable {
             fresh_since = Instant::now();
-        } else if fresh_since.elapsed() >= UNAVAILABLE_WAIT {
+        } else if fresh_since.elapsed() >= unavailable_wait() {
             return Err(
                 io::Error::other("physical privacy observation unavailable while waiting").into(),
             );
@@ -661,6 +677,9 @@ pub(crate) mod tests {
     /// authority: one test for each, so that each runs beside the others
     /// (#1806: the five one after another took 3.1 s on ARM64).
     fn never_provides_unmute_authority(script: Script) {
+        // The same rule on a tenth of the wait: a missing, broken or stale
+        // reading is given up on after it, as after the lamp's second.
+        TEST_UNAVAILABLE_WAIT.with(|wait| wait.set(Some(UNAVAILABLE_WAIT / 10)));
         let directory = SessionDirectory::create().unwrap();
         let (worker, peer) = mock(&directory.path, script, Arc::new(AtomicBool::new(false)));
         let mut allowed = false;
