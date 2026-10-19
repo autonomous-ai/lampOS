@@ -200,8 +200,10 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   sent, so the words waited for `CloseStream`: 652 ms after the line's
   end at the median, 1.7 s at p90, against 280 ms when it covered. The
   stream knows where the line's sound ends (`LineSound`): the end of its
-  last block within 30 dB of the line's loudest block so far and over
-  about -60 dBFS. The bar is the line's own, so a far voice's soft last
+  last block within 30 dB of the line's peak so far and over about
+  -60 dBFS. The peak is the loudest median of three blocks in a row, so a
+  lone loud block (a click, a tap, a cough) doesn't raise the bar for the
+  words after it (Jarvis on #1993, 04:31). The bar is the line's own, so a far voice's soft last
   word counts as sound (Jarvis on #1993); after the canceller, talk near
   the lamp is at -21 to -31 dBFS and the quiet between sounds near
   -75 dBFS (the first builder on #1712, 15:42). When the finals cover
