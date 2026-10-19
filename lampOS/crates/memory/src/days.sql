@@ -63,3 +63,10 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts5(
 );
 INSERT INTO search(search,rank) VALUES('secure-delete',1);
 CREATE TEMP TABLE IF NOT EXISTS doomed(rid INTEGER PRIMARY KEY);
+-- #1693 (3): an observation asked about once, unprompted. Its row goes with
+-- the observation when that is forgotten. Older builds pass this table over.
+CREATE TABLE IF NOT EXISTS follow_ups (
+    rid INTEGER PRIMARY KEY REFERENCES entries(rid) ON DELETE CASCADE,
+    person TEXT NOT NULL,
+    asked_unix_ms INTEGER NOT NULL
+);

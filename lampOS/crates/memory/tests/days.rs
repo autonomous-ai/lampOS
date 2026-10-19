@@ -1446,3 +1446,94 @@ fn a_failed_import_rolls_back_the_database_and_preserves_all_legacy_bytes_for_re
     assert_eq!((status[0].exchanges, status[0].kept), (1, 1));
     assert!(!journal.exists() && !kept.exists());
 }
+
+/// One open thread of a known person's, made at `now`, from an exchange.
+fn thread(store: &mut Days, person: &Person, now: u64, text: &str) -> u64 {
+    store.maintain(now).unwrap();
+    let said = store.append(person, now, text, "Oh, nice", &[]).unwrap();
+    let job = store
+        .conversation_end(person, &format!("c{now}"), &[said])
+        .unwrap();
+    let mut out = output(text, &[said], None);
+    out.observations[0].category = Category::Thread;
+    store.tidy_apply(person, &job.job, &out).unwrap()[0]
+}
+
+/// #1693 (3): a known person's open thread is given once to ask about,
+/// not on the day it was said, not when too old, at most one a day, never
+/// for the room, and forgetting it removes its record of being asked.
+#[test]
+fn a_follow_up_is_one_open_thread_given_once_a_day_and_never_for_the_room() {
+    let scratch = Scratch::new("follow-up");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    let wedding = thread(&mut store, &minh, NOW, "Sister's wedding is on Saturday");
+    // The same conversation, an hour on: too fresh.
+    store.maintain(NOW + 3_600_000).unwrap();
+    assert_eq!(store.follow_up(&minh).unwrap(), None);
+    // The next morning: given, once.
+    store.maintain(NOW + DAY).unwrap();
+    let given = store.follow_up(&minh).unwrap().expect("one to ask about");
+    assert_eq!(given["id"], wedding);
+    assert_eq!(given["category"], "thread");
+    assert_eq!(given["text"], "Sister's wedding is on Saturday");
+    // Another open thread, old enough: not within the same day.
+    let commute = thread(&mut store, &minh, NOW + DAY, "Tired of the commute");
+    store.maintain(NOW + DAY + 7 * 3_600_000).unwrap();
+    assert_eq!(store.follow_up(&minh).unwrap(), None);
+    // A day on, the other one; the wedding is never given again.
+    store.maintain(NOW + 2 * DAY + 3_600_000).unwrap();
+    assert_eq!(store.follow_up(&minh).unwrap().unwrap()["id"], commute);
+    store.maintain(NOW + 4 * DAY).unwrap();
+    assert_eq!(store.follow_up(&minh).unwrap(), None);
+    // Too old: a thread from three weeks ago isn't given.
+    let mai = person("p-mai");
+    thread(&mut store, &mai, NOW + 4 * DAY, "Starting a new job");
+    store.maintain(NOW + 25 * DAY).unwrap();
+    assert_eq!(store.follow_up(&mai).unwrap(), None);
+    // Never the room's, nor a rules scope.
+    assert_eq!(
+        store.follow_up(&Person::everyone()).unwrap_err().code,
+        "bad_person"
+    );
+    assert_eq!(
+        store.follow_up(&person("r-minh")).unwrap_err().code,
+        "bad_person"
+    );
+    // Forgetting the thread removes its follow-up row with it.
+    assert!(store.forget(&minh, wedding).unwrap() > 0);
+    drop(store);
+    let connection = Connection::open(scratch.0.join(DATABASE)).unwrap();
+    let rows: u64 = connection
+        .query_row(
+            "SELECT count(*) FROM follow_ups WHERE person='p-minh'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(rows, 1, "only the commute's row is left");
+}
+
+/// The protocol's `follow_up`: answered for a person, refused for the room.
+#[test]
+fn the_follow_up_request_answers_for_a_person_and_refuses_the_room() {
+    let scratch = Scratch::new("follow-up-protocol");
+    let mut store = scratch.open(30, NOW);
+    let minh = person("p-minh");
+    let id = thread(&mut store, &minh, NOW, "Sister's wedding is on Saturday");
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up","person":"p-minh"}),
+        NOW + DAY,
+    );
+    assert_eq!(answer["ok"], true, "{answer}");
+    assert_eq!(answer["follow_up"]["id"], id);
+    let (answer, _) = request(
+        &mut store,
+        json!({"op":"follow_up","person":"p-minh"}),
+        NOW + 3 * DAY,
+    );
+    assert_eq!(answer, json!({"ok":true,"follow_up":null}));
+    let (answer, _) = request(&mut store, json!({"op":"follow_up"}), NOW + 3 * DAY);
+    assert_eq!(answer["ok"], false, "{answer}");
+}
