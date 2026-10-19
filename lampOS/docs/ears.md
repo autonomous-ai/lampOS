@@ -2,8 +2,9 @@
 
 `lamp-ears` (`crates/ears`) listens to the lamp's room microphone and says
 two things on the bus: how loud the room is against its own quiet, and when
-a sound rises suddenly out of that quiet. It decides nothing and keeps no
-sound: only levels leave it. With it stopped the lamp talks on as before.
+a sound rises suddenly out of that quiet. By default only levels leave it.
+The explicit PCM export below can also publish mic1 blocks for an authorized
+recording. It decides nothing. With it stopped the lamp talks on as before.
 
 ## Why a part of its own
 
@@ -105,8 +106,8 @@ not microphone electrical power. Device setup and driver calls still need native
 latency qualification; a late return is checked before any sound is used.
 
 One separate Bus pump performs filesystem/socket I/O. Input and metadata-output
-queues each hold at most 16 items, drained at most 16 per tick; no PCM leaves the
-capture thread. Input loss, queue overflow, source restart and failed pump work
+queues each hold at most 16 items, drained at most 16 per tick. PCM never enters
+these queues; the optional PCM handoff below uses a separate single slot. Input loss, queue overflow, source restart and failed pump work
 fence queued output. The original lease is checked again immediately before each
 level/sudden publication; later heartbeats cannot extend queued metadata's lease.
 A blocked Bus operation cannot prevent the independent capture owner expiring
@@ -184,3 +185,70 @@ Taken: level and onset now; a classifier only when a behaviour needs one.
   Expression's, behind a switch, next.
 - The thresholds: chosen, then to be set from what the lamp hears in the
   office.
+
+
+## Optional mic1 PCM export (#1669)
+
+`LAMP_BUS_AUDIO=on` in Ears explicitly opts into raw room audio export. It is
+otherwise off. This requires `LAMP_PRIVACY_CONTROLS=on`; requesting audio without
+that boundary fails before the compatibility capture path can open the device.
+No product unit or default is changed by this code. Voice's same variable still
+controls its own microphone independently.
+
+Ears remains the only room-microphone reader. It publishes `mic1/audio` as the
+existing `lamp_msgs/Audio` Event, `json+pcm`, mono 16 kHz S16LE in 320-sample blocks,
+source `ears`. These are Ears samples, not Voice's post-AEC mic2 samples.
+The Ears-only declaration and message header expire after 50 ms; the existing
+Bus receiver adds its 50 ms transport grace, so blocks older than that combined
+window are skipped by `recv`. Voice's Audio declaration is unchanged. Expiry
+limits delayed delivery, not authorization to act after privacy revocation;
+consumers must still validate current privacy and their own retention policy.
+`Audio.sequence` advances for completed admitted capture blocks including drops.
+Closing an open capture handle or discarding a partial block also reserves a
+sequence gap, so even a short mute/reopen cannot look like continuous audio.
+A gap indicates missing coverage, not an exact duration to fill with silence.
+The envelope uses the original read-completion monotonic timestamp, not a later
+pump time. It is not a hardware ADC timestamp.
+
+The capture owner exposes a complete block only after its post-read lease/fence
+checks. The optional handoff uses `try_lock` and a single slot; contention or a
+valid full slot drops the incoming block instead of waiting. A stale slot is
+cleared before a new offer. The metadata queue never owns PCM. The pump performs
+Bus maintenance, then drains privacy again before taking the slot. It releases
+the slot lock before packing and uses the guarded Event send with the original
+permit and fence checked again.
+Later heartbeats cannot extend a held block's permission. Mute, source restart,
+lease gaps and owner invalidation retire the old capture era.
+
+Buffer clearing is best effort, not secure erasure of compiler/kernel/subscriber
+copies. The final callback cannot retract a datagram already handed to the
+kernel. The ordinary Audio payload does not carry a consumer retention grant:
+recording must be separately authorized, and this is not approval for the
+classifier's two-second retention proposal. See [the review boundaries](ears-pcm-proposal.md)
+and [sound-events.md](sound-events.md). Privacy-owner review and native ARM64
+validation are required before live qualification.
+
+Host tests cover default-off, privacy-required admission, partial-read/mute and
+original deadline behavior, slot contention, stale encoded packets and the
+actual guarded Bus API. Target ALSA checks and hardware CPU/on-off measurements
+remain separate; host tests do not establish their result.
+
+
+Audio publisher creation, maintenance or send failures discard the pending
+block and retry the optional exporter after two seconds, reporting the first
+failure and recovery once. Such an exporter error does not deliberately restart
+the metadata pump or discard healthy level/sudden state. A genuinely blocked
+filesystem operation can still delay lease delivery, which makes the independent
+capture owner close on expiry as before.
+
+Privacy denial stops PCM events; there is no separate "export stopped" event.
+While healthy, the exporter can continue refreshing its source entry during
+mute. A live source therefore does not prove an open microphone. Consumers use
+privacy authority and block freshness, not source presence, for that decision.
+
+The standard deployed bus uses a 2770 root:lampos directory and 0660 sockets;
+any process in the lampos group can subscribe. There is no per-subscriber
+retention enforcement. `lamp-bus record` can persist raw PCM using the caller's
+umask and its serialized-file size cap (64 MiB by default). Operator permission,
+private storage and retention limits are required policy, not a property the
+publisher can enforce after handing a block to a subscriber.

@@ -616,3 +616,23 @@ is still pending; the post-exit reader still validates every byte as complete
 JSONL. The kill/reap, replay, size and stale-socket assertions are unchanged.
 [The #846 regression and gate evidence](verification/bus-live-lines-20261015/README.md)
 cover this test-only change; no recording or crash-recovery guarantee changes.
+
+
+## Guarded Event bytes
+
+`Publisher::prepare_guarded_event()` performs discovery, presence refresh and
+retired-link cleanup before the caller supplies sensitive bytes. It may do
+filesystem I/O and must stay outside the microphone owner and slot lock.
+`publish_bytes_guarded(at_us, enc, bytes, authorized)` then uses the prepared
+links only: it checks the supplied authority before/after encoding and before
+each send/retry, with at most two attempts per link. It performs no filesystem
+maintenance in that path and rejects Latest publishers, which would persist a
+payload. Existing publication APIs keep their behavior.
+
+The guarded encoder has a bounded temporary buffer, cleared on return or
+unwind; it does not leave sensitive bytes in the reusable publisher datagram.
+This is best-effort application buffer clearing, not secure physical erasure.
+`PermissionDenied` may follow partial delivery: earlier kernel/receiver copies
+cannot be retracted. Callers must preserve original source permission in the
+callback; a fresh heartbeat must not grant old samples a new lifetime. Neither
+this API nor ordinary expiry grace establishes consumer retention authorization.
