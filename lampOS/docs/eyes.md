@@ -658,14 +658,25 @@ this room" until someone asks to be recognised.
     file that cannot be searched might hold the face: one with no list of
     people, or with a person whose `name` is no plain string. **Then the
     forget waits for it** (#1586): the answer is `{"forgot":…,
-    "unsearched":N}`, never "not known" and never a fault, and the name,
-    hashed (SHA-256 of its lower case, never the name itself), is kept in
-    `set-aside/forgets-pending` (0600). At each start and each forget, a
-    face of a waiting name read back into the people file is dropped at
-    once, and a set-aside file that can be searched now is searched for it.
-    Once nothing is left that cannot be searched, the forgets are done and
-    the file goes. It's never counted or searched as anyone's records, and
-    the reset empties it with the folder. A rewrite's temporary file a
+    "unsearched":N}`, never "not known" and never a fault.
+    - **What's kept:** a hash of the name, which a guess can undo, with when
+      it was asked, in `set-aside/forgets-pending` (0600), until the forget
+      finishes or a factory reset. The hash is a plain SHA-256 of its lower
+      case: the lamp has to match the name later, so for anyone with the
+      lamp's disk it is the name, lightly hidden, beside set-aside files
+      that hold names in plain text anyway (the reviewer and Twelve on
+      #1767).
+    - **Finishing it:** at each start and each forget, a face of a waiting
+      name **kept before the forget was asked** is dropped: read back into
+      the people file, or in a set-aside file that can be searched now
+      (one that says no time it was kept counts as before). Someone
+      remembered after they asked is kept, since their later word stands
+      (Twelve's P2 on #1767). Once nothing is left that cannot be searched,
+      the forgets are done and the file goes.
+    - It's never counted or searched as anyone's records, and the reset
+      empties it with the folder. While anything waits, each forget reads
+      every set-aside file again: a few files of at most 256 KiB today,
+      worth a look if set-aside grows. A rewrite's temporary file a
     crash left there (`….json.new`) is neither searched nor counted, and a
     `set-aside` that is a link is never followed (`forget` refuses with
     `{"error":"storage"}`, health counts it as one).

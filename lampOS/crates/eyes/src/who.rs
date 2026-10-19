@@ -48,12 +48,22 @@ pub const SET_ASIDE: &str = "set-aside";
 
 /// The forgets that wait in the set-aside folder until they can be finished
 /// (#1586): each name, hashed, of someone who asked to be forgotten while a
-/// set-aside file could not be searched for them. A face of theirs that
-/// comes back, read back into the people file or in a set-aside file that
-/// can be searched, is dropped at once; once nothing is left that cannot be
-/// searched, the file goes. Never counted or searched as people's records,
-/// and emptied by the reset with the folder.
+/// set-aside file could not be searched for them, and when they asked. A
+/// face of theirs kept before then that comes back, read back into the
+/// people file or in a set-aside file that can be searched, is dropped at
+/// once; one remembered after, at their own later word, is kept (Twelve's
+/// P2 on #1767). Once nothing is left that cannot be searched, the file
+/// goes. Never counted or searched as people's records, and emptied by the
+/// reset with the folder.
 pub const PENDING_FORGETS: &str = "forgets-pending";
+
+/// One forget that waits: the name's hash ([`name_hash`]) and when it was
+/// asked.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+struct Waiting {
+    hash: String,
+    at_unix_s: u64,
+}
 
 /// What a forget did.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -448,6 +458,14 @@ impl People {
     /// [`PENDING_FORGETS`], and the answer says how many could not be
     /// searched beside whether the name was found where it could be.
     pub fn forget(&mut self, name: &str) -> Result<Forgot> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs());
+        self.forget_at(name, now)
+    }
+
+    /// [`Self::forget`], asked at `now_unix_s`.
+    pub fn forget_at(&mut self, name: &str, now_unix_s: u64) -> Result<Forgot> {
         let name = name.trim();
         let mut next = self.people.clone();
         next.retain(|person| !same_name(&person.name, name));
@@ -456,35 +474,44 @@ impl People {
             self.save(&next)?;
             self.people = next;
         }
-        let (aside, unsearched) = forget_set_aside(&self.path, |other| same_name(other, name))?;
+        let (aside, unsearched) = forget_set_aside(&self.path, |other, _| same_name(other, name))?;
         forgot |= aside;
         if unsearched > 0 {
-            let mut waiting = pending(&self.path)?;
+            // Asked again, it waits from the later word.
             let hash = name_hash(name);
-            if !waiting.contains(&hash) {
-                waiting.push(hash);
-                keep_pending(&self.path, &waiting)?;
-            }
+            let mut waiting = pending(&self.path)?;
+            waiting.retain(|wait| wait.hash != hash);
+            waiting.push(Waiting {
+                hash,
+                at_unix_s: now_unix_s,
+            });
+            keep_pending(&self.path, &waiting)?;
         }
         self.finish_pending()?;
         Ok(Forgot { forgot, unsearched })
     }
 
     /// The forgets waiting ([`PENDING_FORGETS`]) finished where they can
-    /// be: a face of theirs read back into the people file is dropped, and
-    /// so is one in a set-aside file that can be searched now. Once no
-    /// set-aside file is left that cannot be searched, they are done and
-    /// the file goes.
+    /// be: a face of theirs kept before they asked and read back into the
+    /// people file is dropped, and so is one in a set-aside file that can be
+    /// searched now (one with no time it was kept counts as before). A face
+    /// remembered after they asked is theirs to keep. Once no set-aside file
+    /// is left that cannot be searched, they are done and the file goes.
     fn finish_pending(&mut self) -> Result<()> {
         let waiting = pending(&self.path)?;
         if waiting.is_empty() {
             return Ok(());
         }
-        let is_waiting = |name: &str| waiting.contains(&name_hash(name));
+        let is_waiting = |name: &str, added: Option<u64>| {
+            let hash = name_hash(name);
+            waiting
+                .iter()
+                .any(|wait| wait.hash == hash && added.is_none_or(|added| added < wait.at_unix_s))
+        };
         let next: Vec<Person> = self
             .people
             .iter()
-            .filter(|person| !is_waiting(&person.name))
+            .filter(|person| !is_waiting(&person.name, Some(person.added_unix_s)))
             .cloned()
             .collect();
         if next.len() != self.people.len() {
@@ -762,7 +789,11 @@ fn is_a_record(file: &Path) -> bool {
     !is_temporary(file) && file.file_name().is_none_or(|name| name != PENDING_FORGETS)
 }
 
-/// A name as the forgets that wait keep it: never the name itself.
+/// A name as the forgets that wait keep it: a plain SHA-256 of its lower
+/// case, not the name. It hides the name from a glance at the file, not from
+/// someone who tries the household's few names, and it is kept only beside
+/// the set-aside files, which hold names in plain text anyway (Twelve's P3
+/// on #1767).
 fn name_hash(name: &str) -> String {
     let digest = Sha256::digest(name.trim().to_lowercase().as_bytes());
     digest.iter().map(|b| format!("{b:02x}")).collect()
@@ -770,7 +801,7 @@ fn name_hash(name: &str) -> String {
 
 /// The forgets that wait beside the people file at `path`
 /// ([`PENDING_FORGETS`]); none when there is no such file.
-fn pending(path: &Path) -> io::Result<Vec<String>> {
+fn pending(path: &Path) -> io::Result<Vec<Waiting>> {
     let file = path
         .parent()
         .unwrap_or(Path::new("/"))
@@ -782,17 +813,17 @@ fn pending(path: &Path) -> io::Result<Vec<String>> {
         Err(error) => return Err(error),
     };
     #[derive(Deserialize)]
-    struct Waiting {
-        forget: Vec<String>,
+    struct Kept {
+        forget: Vec<Waiting>,
     }
-    serde_json::from_slice::<Waiting>(&bytes)
-        .map(|waiting| waiting.forget)
+    serde_json::from_slice::<Kept>(&bytes)
+        .map(|kept| kept.forget)
         .map_err(|_| io::Error::other(format!("{} is not a list of forgets", file.display())))
 }
 
 /// The forgets that wait written whole, 0600, or the file removed when
 /// there are none.
-fn keep_pending(path: &Path, waiting: &[String]) -> io::Result<()> {
+fn keep_pending(path: &Path, waiting: &[Waiting]) -> io::Result<()> {
     let folder = set_aside_folder(path)?;
     let file = folder.join(PENDING_FORGETS);
     if waiting.is_empty() {
@@ -862,10 +893,14 @@ fn write_set_aside(path: &Path, why: &str, bytes: &[u8]) -> io::Result<PathBuf> 
     Ok(kept)
 }
 
-/// The entries whose name `matches` taken out of every set-aside file with a
-/// list of people: the file rewritten 0600, or removed once nothing is left.
+/// The entries that `matches`, by their name and when they were kept (none
+/// when they say no time), taken out of every set-aside file with a list of
+/// people: the file rewritten 0600, or removed once nothing is left.
 /// Whether any were, and how many set-aside files could not be searched.
-fn forget_set_aside(path: &Path, matches: impl Fn(&str) -> bool) -> io::Result<(bool, usize)> {
+fn forget_set_aside(
+    path: &Path,
+    matches: impl Fn(&str, Option<u64>) -> bool,
+) -> io::Result<(bool, usize)> {
     let folder = path.parent().unwrap_or(Path::new("/")).join(SET_ASIDE);
     match std::fs::symlink_metadata(&folder) {
         Ok(metadata) if metadata.is_dir() => {}
@@ -911,7 +946,14 @@ fn forget_set_aside(path: &Path, matches: impl Fn(&str) -> bool) -> io::Result<(
             !person
                 .get("name")
                 .and_then(serde_json::Value::as_str)
-                .is_some_and(&matches)
+                .is_some_and(|name| {
+                    matches(
+                        name,
+                        person
+                            .get("added_unix_s")
+                            .and_then(serde_json::Value::as_u64),
+                    )
+                })
         });
         if list.len() == before {
             continue;
@@ -1507,6 +1549,45 @@ mod tests {
             1,
             "kept: nothing can be told about it"
         );
+    }
+
+    /// Twelve's P2 on #1767: a waiting forget covers only the faces kept
+    /// before it was asked. Someone remembered again after is theirs to
+    /// keep, across a start and a forget of someone else, while their old
+    /// record still goes once its set-aside file can be searched.
+    #[test]
+    fn someone_remembered_after_a_waiting_forget_is_kept() {
+        let path = file("forget-then-remember");
+        let folder = path.parent().unwrap().join(SET_ASIDE);
+        std::fs::create_dir(&folder).unwrap();
+        let unreadable = folder.join("people-whole-0000.json");
+        std::fs::write(&unreadable, "not json").unwrap();
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(people.forget_at("Fay", 100).unwrap().unsearched, 1);
+        people
+            .remember("Fay", vec![print(0.7)], 200)
+            .expect("remembered again");
+        let mut people = People::open(path.clone()).unwrap();
+        assert_eq!(people.names(), ["Fay"], "her later word stands");
+        people.forget_at("Gus", 300).unwrap();
+        assert_eq!(People::open(path.clone()).unwrap().names(), ["Fay"]);
+        // Her old record, kept before she asked, still goes when it can be
+        // searched; her new one stays.
+        let good = serde_json::to_string(&print(0.2)).unwrap();
+        std::fs::write(
+            &unreadable,
+            format!(
+                r#"{{"version":1,"people":[{{"name":"Fay","prints":[{good}],"added_unix_s":50}},{{"name":"Fay","prints":[{good}]}}]}}"#
+            ),
+        )
+        .unwrap();
+        let people = People::open(path.clone()).unwrap();
+        assert!(
+            !unreadable.exists(),
+            "both old records gone, the timeless one too"
+        );
+        assert_eq!(people.names(), ["Fay"]);
+        assert!(!folder.join(PENDING_FORGETS).exists());
     }
 
     /// A temporary file a crash left in `set-aside/` is neither counted nor
