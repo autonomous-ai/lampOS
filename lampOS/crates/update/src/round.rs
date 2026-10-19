@@ -1019,7 +1019,8 @@ impl Run<'_, '_> {
 
     /// Removes the folders this program made that no unit names now, nor
     /// any unit kept from before the last switch: the lamp keeps its build
-    /// and the one before. A folder it did not make is never removed.
+    /// and the one before. Its own folder, which its unit starts it from,
+    /// stays too. A folder it did not make is never removed.
     fn prune(&mut self, state: &mut State) {
         // Named now: by a unit, or by a part's current link.
         let mut named: BTreeSet<String> = installed_units(self.config)
@@ -1027,6 +1028,15 @@ impl Run<'_, '_> {
             .into_iter()
             .map(|part| part.program.folder())
             .collect();
+        // Named by this program's own unit, which no round switches: the
+        // folder install linked `update/current` to is what it starts from
+        // at the next boot (#1680).
+        let own = fs::read_to_string(self.config.on(&self.config.units).join(OWN_UNIT));
+        if let Some(program) = own.ok().and_then(|text| {
+            unit::program(&text).or_else(|| unit::linked_program(&text, &self.config.root))
+        }) {
+            named.insert(program.folder());
+        }
         // Named before the last switch: by a unit kept, or a link kept.
         named.extend(
             self.records
