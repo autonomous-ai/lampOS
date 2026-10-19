@@ -8802,3 +8802,57 @@ fn a_history_is_told_to_the_call_from_room_presence_and_held_to_its_rules() {
         assert!(error.contains(why), "{to}: {error}");
     }
 }
+
+/// #1685's mark (`LAMP_WHO_WAS_HERE_KNOWN`; Third's privacy read and the
+/// first builder's (a), 20 Oct on #1997): with the eyes' known file given, a
+/// spell the eyes knew the face in is told as "someone the lamp knows",
+/// never the name, and only to a skill whose permissions say
+/// `known_faces = true`; any other `[history]` skill is told "someone".
+/// Without the file, nothing of the eyes is read.
+#[test]
+fn who_was_here_marks_someone_the_lamp_knows_only_with_known_faces_and_never_names_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let marked = WHO.replace("speak = true", "speak = true\nknown_faces = true");
+    let eyes = tempfile::tempdir().unwrap();
+    let known = eyes.path().join("known");
+    std::fs::write(&known, "Alpha\n").unwrap();
+    let note = |toml: &str, mark: bool| -> String {
+        let who = load(&skill_with(dir.path(), "who", toml)).unwrap();
+        let mut engine = Engine::new(vec![who], true);
+        if mark {
+            engine = engine.marking_known(known.clone());
+        }
+        for at in (0..=60).step_by(2) {
+            engine.observe(
+                "room/presence",
+                at * 1_000_000,
+                br#"{"someone":true,"nobody_s":0,"by":"face"}"#,
+                Some(3_000),
+            );
+        }
+        let calls = engine
+            .tool("who_was_here", &serde_json::json!({}), 61_000_000)
+            .unwrap()
+            .calls;
+        match &calls[..] {
+            [Call::Say(note)] => note.clone(),
+            other => panic!("{other:?}"),
+        }
+    };
+    let told = note(&marked, true);
+    assert!(
+        told.contains("\n- someone the lamp knows has been at the lamp for 1 min"),
+        "{told}"
+    );
+    assert!(!told.contains("Alpha"), "never the name: {told}");
+    // A `[history]` skill without known_faces: someone, the words as before.
+    let unpermitted = note(WHO, true);
+    assert!(
+        unpermitted.contains("\n- someone has been at the lamp for 1 min")
+            && !unpermitted.contains("the lamp knows")
+            && !unpermitted.contains("Alpha"),
+        "{unpermitted}"
+    );
+    // The switch off: the same.
+    assert_eq!(note(&marked, false), unpermitted);
+}
