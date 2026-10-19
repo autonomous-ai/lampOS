@@ -1273,6 +1273,17 @@ fn front_matter(text: &str) -> Result<(String, String), String> {
     Ok((field("name")?, field("description")?))
 }
 
+/// A field's path: names joined by dots, none empty (Jarvis on #1920: a
+/// typo as `scores.` loaded and never held).
+fn path(field: &str) -> Result<(), String> {
+    if field.split('.').any(str::is_empty) {
+        return Err(format!(
+            "field {field:?}: names joined by dots, none of them empty"
+        ));
+    }
+    Ok(())
+}
+
 /// A test from `field` and one of `equals`, `above`, `below`; or, on
 /// `humans/faces/tracked` with none of them, a face in view.
 fn test(
@@ -1285,6 +1296,9 @@ fn test(
     let equals = equals
         .map(|value| serde_json::to_value(value).map_err(|error| error.to_string()))
         .transpose()?;
+    if let Some(field) = &field {
+        path(field)?;
+    }
     match (field, equals, above, below) {
         (None, None, None, None) if topic == Faces::TOPIC => Ok(Test::Faces(0.0)),
         (Some(field), Some(value), None, None) => Ok(Test::Equals(field, value)),
@@ -1353,6 +1367,8 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
     let each = match (file.each, file.key) {
         (None, None) => None,
         (Some(list), Some(key)) if !list.is_empty() && !key.is_empty() => {
+            path(&list)?;
+            path(&key)?;
             // An item's edge is its own: what is timed or counted over the
             // whole topic means nothing for one item (chosen).
             if when != When::Appears
@@ -1410,7 +1426,10 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         }
     };
     let mut test = match (&rise, &file.field, file.above) {
-        (Some(_), Some(field), None) => Test::Number(field.clone()),
+        (Some(_), Some(field), None) => {
+            path(field)?;
+            Test::Number(field.clone())
+        }
         _ => test(&file.topic, file.field, file.equals, file.above, file.below)?,
     };
     match (file.near, &mut test) {
@@ -1601,7 +1620,10 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 condition.below,
             ) {
                 (Some(field), None, None, None) => Test::NotEquals(
-                    field,
+                    {
+                        path(&field)?;
+                        field
+                    },
                     serde_json::to_value(unwanted).map_err(|error| error.to_string())?,
                 ),
                 _ => {
