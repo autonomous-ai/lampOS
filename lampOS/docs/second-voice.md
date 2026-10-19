@@ -289,7 +289,9 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   turn never makes one. On lamp-4ace on 2026-10-16, 9 of 10 backup turns
   waited past 1.5 s.
   With `LAMP_SECOND_DOWN_LINE=on`, a spoken turn whose first round has not
-  begun within its bound says "I can't think right now; give me a minute."
+  begun within its bound, or whose chat refuses it before any word (a
+  status: 401, 402, 429, a 5xx; #1844's B, then the turn fails as before),
+  says "I can't think right now; give me a minute."
   (`DOWN_LINE`) instead of nothing, at most once a minute
   (`DOWN_LINE_EVERY`; the journal: `said it can't think right now`). The
   line is said once by this route's own voice after the first turn is out,
@@ -615,6 +617,31 @@ order is kept. A written turn is the same from the chat on.
   at every start, so none are kept for a later request. A request given up
   before its speech to text finished has no words to give: its successor is
   asked with its own words alone (the reviewer on #1168).
+- **A cut-in, a line that may follow on, and a bare call are told as on
+  the Live route** (#1712, item 4 of the first builder's 20:15), each as a
+  system message just before the person's words, after the stop's:
+  - **A cut-in** (`LAMP_CUT_IN_TOLD=on`, the worker's `--cut-in-told`): a
+    line begun over the lamp's audible answer (`over_the_lamps_voice`),
+    and not the first after a stop, which is told the stop instead, is
+    told `cut_in_told::NOTE`. It is known from the line's start, so a chat
+    begun on its early words (`LAMP_SECOND_PREPARED`) is asked with it
+    and kept; a note known only later (a stop's, a bare call's, a
+    follow-on's) still drops that chat.
+  - **A line that may follow on** (`LAMP_FOLLOWS_ON=on`, the Start's
+    `follows_on`): told `follows_on::NOTE`, unless its End marks a short
+    sound or the rule judged it in a busy room (`Heeding::judged_busy`;
+    with no rule, this process's room now).
+  - **A bare call** (`--call-wait-ms`, `ProviderInput::Called`, which this
+    route dropped before): told `CALLED_NOTE`, so the model answers as
+    someone who hears their name ("Yes?"). A lone name often comes back
+    with no words; such a line is asked as `Lamp.`, the name the
+    coordinator heard, rather than left as a sound. Without `Called`, no
+    words are still no line.
+  - The journal says each: "it began over the lamp's answer, and the
+    model is told so", "the model is told it may follow on from what the
+    lamp said" (or "… in a busy room; the model is not told …"), "only
+    the lamp's name was said, and the model is told so", and "… no words
+    of it came back: asked as the name".
 - **The first request after a stop is told of it.** With
   `LAMP_STOP_TOLD=on`, the first request after a hand or the head stopped
   the lamp carries `after_stop`. Gemini is told so with `STOPPED_NOTE`. This
@@ -1029,6 +1056,29 @@ notes, the tools declared, and the voice state, Expression and the ring on
 the bus. Nothing is held, replayed or switched, and no `voice_route_*`
 record is written.
 
+- **The link, when it is the only voice** (#1844, the first builder's yes,
+  19 Oct; `second_provider/link.rs`). Before, it said Ready once at start
+  and never again, so with the Wi-Fi off every turn failed in silence and
+  `lamp/online` stayed true. Now a turn that fails on the network (a
+  connection refused or reset, a connect that timed out, an answer that
+  never came: `Transport`, `ConnectTimeout`, `ResponseTimeout`, at any of the
+  three services) checks whether the services' hosts answer at all: a bare
+  TCP connection to the chat's, the speech's, speech to text's and Gemini's
+  host at once, nothing sent, any answering within 2 s enough
+  (`PROBE_WITHIN`). One answering: a service was slow or refused, and
+  nothing changes (a status, 401, 429 or 5xx, never checks: the service
+  answered). None: the link is Unavailable with the turn's fault, and the
+  check runs every 30 s (`PROBE_EVERY_US`, as `--reach-probe`) until one
+  answers, when it is Ready again in a new session. The journal says
+  `lamp-voice second: no service host answers after a turn failed on the
+  network: the link is down, checked every 30 s` and `… a service host
+  answers again: the link is back`. So the offline logic follows it as it
+  follows Gemini's ([offline.md](offline.md)): with `LAMP_OFFLINE_VOICE=on`
+  the offline line once and the breath, `lamp/online` false from health and
+  Expression's offline face, and "I'm back online." after; offline speech is
+  a local-only turn that never reaches this worker, which is why the check
+  runs on its own. The first turn of an outage still fails as before (it is
+  what finds it). A standby's link is unchanged.
 - **Its exit ends the voice**, as Gemini's does (`coordinator::mandatory`):
   it is the only voice. A standby's exit is still dropped, and Gemini goes
   on.
@@ -1288,11 +1338,13 @@ after a take-over, but now for every turn:
   #1712: a phrase rule is easy to trip.
 - **Live route only, so not on this route:** the same-voice
   check,
-  `LAMP_CUT_IN_TOLD`, `LAMP_FOLLOWS_ON`, `LAMP_GOING_ON_ASKS`, the head tap
+  `LAMP_GOING_ON_ASKS`, the head tap
   and `--addressed` for whom it answers, sight, camera and air facts, and
   `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).
 - **`voice/link`** (`LAMP_VOICE_LINK`) is this route's link, Ready from its
-  start: a relay outage shows only as failed turns.
+  start. As a standby it stays Ready: an outage shows only as failed turns.
+  As the only voice it goes down and back with the network (below, "The
+  link, when it is the only voice").
 - With `--camera-config` the camera worker still starts for Gemini's picture
   context, which nothing reads here. lamp-4ace's unit sets none.
 

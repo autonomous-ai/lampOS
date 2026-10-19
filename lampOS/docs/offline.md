@@ -242,6 +242,14 @@ internet, not the relay, and nothing in #830 depends on the relay.
   my voice service right now", never the internet's words and never "back
   online" after ([failure-notices.md](failure-notices.md), "Service down").
   Off unless set; silent until its recording is given.
+- **When the second route is the only voice** (`LAMP_VOICE_ROUTE=second`,
+  #1844): it has no relay link of its own to watch, so its worker says its
+  link down when a turn fails on the network and none of its services'
+  hosts answer, and back when one does, checked every 30 s
+  ([second-voice.md](second-voice.md), "The link, when it is the only
+  voice"). The offline line, the breath, `lamp/online` and "back online"
+  then follow as above. `LAMP_REACH_PROBE` and `LAMP_SERVICE_DOWN_LINE`
+  add nothing there: the worker's own check is already the internet's.
 - **What the product sets** (#830, 17 Oct): `LAMP_START_OFFLINE=on` and
   `LAMP_OFFLINE_VOICE=on` in the voice, `--online on` in health, and no
   probe, since it has no second route. Any link loss, the internet's or the

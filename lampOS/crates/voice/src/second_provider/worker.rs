@@ -14,7 +14,6 @@ use super::{
 };
 use crate::{
     provider_flow::OutputSender,
-    provider_link::{LinkContext, ProviderLink, ProviderLinkState},
     provider_worker::{ProviderInput, ProviderOutput},
     transport::{Channel, WorkerChannels},
     wire::{Control, WorkerEvent},
@@ -1069,6 +1068,9 @@ pub fn serve(
     // The unit's Gemini endpoint and voice over the file's (#1712).
     let config = crate::second_config::load_from_path(second_config)?
         .with_environment(|name| std::env::var_os(name))?;
+    // As the lamp's only voice, its link follows whether the services'
+    // hosts answer (#1844, `link.rs`): the hosts checked.
+    let probe_targets = route.only_voice.then(|| probe_targets(&config));
     if config.gemini.base_url != crate::second_config::GEMINI_BASE_URL {
         eprintln!(
             "lamp-voice second: Gemini at {}, voice {}",
@@ -1327,6 +1329,7 @@ pub fn serve(
     )
     .with_memory_scope(boot, face_cache.clone(), scoped_runner, scoped_system)
     .checking_sounds(checked)
+    .telling_cut_ins(files.cut_in_told)
     .waiting_with_a_sound(route.wait_cue)
     .saying_when_down(route.down_line)
     .announcing(!route.only_voice)
@@ -1469,6 +1472,16 @@ pub fn serve(
                 heeding.lock().ok()?.conversation_note_for(request)
             }));
         }
+        // A line that may follow on from the lamp is not told so in a busy
+        // room, as the rule judged it (#1712).
+        {
+            let heeding = heeding.clone();
+            engine = engine.judging_busy(Arc::new(move |request| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.judged_busy(request))
+            }));
+        }
         {
             let heeding = heeding.clone();
             engine = engine.telling_what_it_did(Arc::new(move |did| {
@@ -1564,7 +1577,7 @@ pub fn serve(
                 }
             })
         });
-        let result = run(channels, boot, engine, thread).await;
+        let result = run(channels, boot, engine, thread, probe_targets).await;
         if let Some(refresh) = refresh {
             refresh.abort();
         }
@@ -1934,6 +1947,8 @@ pub(crate) struct Heeding {
     noted: Option<(u64, Option<&'static str>)>,
     /// The request last let out only as the conversation going on.
     alone: Option<u64>,
+    /// The request last judged in a busy room ([`Self::judged_busy`]).
+    busy: Option<u64>,
     /// The request last let out because its words or the lamp's name heard
     /// in its sound called the lamp.
     by_name: Option<u64>,
@@ -2140,6 +2155,7 @@ impl Heeding {
             name_note: None,
             noted: None,
             alone: None,
+            busy: None,
             by_name: None,
             session: 1,
             session_for: None,
@@ -2465,6 +2481,7 @@ impl Heeding {
         }
         self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
+        self.busy = busy.then_some(request);
         // Its words or the name heard called the lamp, not a face alone.
         self.by_name = (played && attention.called_for_itself()).then_some(request);
         // A call let out: the conversation goes on from it.
@@ -2543,6 +2560,13 @@ impl Heeding {
     /// conversation going on ([`CONVERSATION_ALONE`]).
     pub(crate) fn conversation_note_for(&self, request: u64) -> Option<&'static str> {
         (self.alone == Some(request)).then_some(CONVERSATION_ALONE)
+    }
+
+    /// Whether `request` was judged in a busy room: a line that may follow
+    /// on from the lamp is not told so there (`LAMP_FOLLOWS_ON`), as on the
+    /// Live route.
+    pub(crate) fn judged_busy(&self, request: u64) -> bool {
+        self.busy == Some(request)
     }
 }
 
@@ -2852,32 +2876,44 @@ fn save(file: Option<&Path>) {
     }
 }
 
+/// The hosts a down link checks (#1844): the chat's, the speech's, speech
+/// to text's and Gemini's, any answering enough.
+fn probe_targets(config: &crate::second_config::SecondConfig) -> Vec<String> {
+    let stt = match &config.stt {
+        crate::second_config::Stt::Deepgram { .. } => "wss://api.deepgram.com/v1/listen",
+        crate::second_config::Stt::Autonomous { base_url, .. } => base_url.as_str(),
+    };
+    let mut targets: Vec<String> = [
+        config.llm_base_url.as_str(),
+        config.tts_base_url.as_str(),
+        stt,
+        config.gemini.base_url.as_str(),
+    ]
+    .into_iter()
+    .filter_map(super::link::target)
+    .collect();
+    targets.sort();
+    targets.dedup();
+    targets
+}
+
 /// Run the engine as a provider worker until Stop. Readiness is the
 /// fixture's: `Ready`, then one `ProviderLink` Ready on the control plane.
-/// ponytail: the services are not probed first; the link says Ready and a
-/// service that cannot be reached fails that turn. A probe at startup if a
-/// dead key should show as an unavailable link.
+/// The services are not probed first: a service that cannot be reached
+/// fails that turn. With `probe_targets` (the lamp's only voice, #1844) a
+/// turn failed on the network checks whether any of them answers, and none
+/// answering is the link Unavailable until a check every 30 s finds one
+/// (`link.rs`); without, the link stays Ready, as a standby's always has.
 pub async fn run(
     mut channels: WorkerChannels,
     boot: BootId,
     mut engine: Engine,
     thread: Option<PathBuf>,
+    probe_targets: Option<Vec<String>>,
 ) -> io::Result<()> {
     let started_us = monotonic_us();
     channels.control.send(WorkerEvent::Ready)?;
-    let ready = ProviderLink {
-        revision: 1,
-        session: 1,
-        observed_at_us: started_us,
-        source_clock: None,
-        state: ProviderLinkState::Ready {
-            setup_us: monotonic_us() - started_us,
-            attempts: 1,
-            context: LinkContext::Initial,
-            outage_started_at_us: None,
-            after: None,
-        },
-    };
+    let (mut link, ready) = super::link::Watch::new(probe_targets, started_us, monotonic_us());
     ready.validate(monotonic_us())?;
     channels
         .control
@@ -2949,6 +2985,24 @@ pub async fn run(
                     .flatten();
                 keep_scoped(event, thread.as_deref(), lease.as_ref());
             }
+            if let Some(event) = &pending {
+                link.output(monotonic_us(), event);
+            }
+        }
+        // The lamp's only voice tells the coordinator its link (#1844).
+        if let Some((changed, was_down)) = link.tick(monotonic_us()).await {
+            changed.validate(monotonic_us())?;
+            if was_down {
+                eprintln!("lamp-voice second: a service host answers again: the link is back");
+            } else {
+                eprintln!(
+                    "lamp-voice second: no service host answers after a turn failed on the network: the link is down, checked every {} s",
+                    super::link::PROBE_EVERY_US / 1_000_000
+                );
+            }
+            channels
+                .control
+                .send(WorkerEvent::ProviderLink { link: changed })?;
         }
         if let Some(event) = pending.take() {
             gate.may_send(monotonic_us(), &event)?;
@@ -4464,6 +4518,29 @@ mod tests {
         };
         assert!(judged(true).is_some(), "by day, held");
         assert_eq!(judged(false), None, "with on alone, played");
+    }
+
+    /// #1712, item 4 (`LAMP_FOLLOWS_ON`): the rule knows which line it
+    /// judged in a busy room, so that line is not told it may follow on.
+    #[test]
+    fn a_line_judged_in_a_busy_room_is_known_as_judged_busy() {
+        use crate::room_told::Room;
+        let signs = |room| super::Signs {
+            room,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        heeding.judge(9, line, "Lamp, what time is it?", signs(Room::Busy));
+        assert!(heeding.judged_busy(9));
+        assert!(!heeding.judged_busy(8));
+        heeding.judge(10, line, "Lamp, what time is it?", signs(Room::Quiet));
+        assert!(!heeding.judged_busy(10) && !heeding.judged_busy(9));
     }
 
     /// #1712, lamp-4ace's A/B: after a hand-over and 104 s, every line

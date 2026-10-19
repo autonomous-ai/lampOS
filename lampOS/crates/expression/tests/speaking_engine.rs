@@ -145,6 +145,11 @@ fn level(at: u64) -> f32 {
 
 /// An answer of `seconds` from 1 s, then rest: every tick's output.
 fn answer(lamp: &mut Lamp, seconds: u64) -> Vec<(u64, Output)> {
+    answer_at(lamp, seconds, 1.0)
+}
+
+/// As [`answer`], from a voice whose sound is `gain` times this one's.
+fn answer_at(lamp: &mut Lamp, seconds: u64, gain: f32) -> Vec<(u64, Output)> {
     let mut outputs = Vec::new();
     let mut at = 0;
     let end = 1_000_000 + seconds * 1_000_000;
@@ -159,7 +164,7 @@ fn answer(lamp: &mut Lamp, seconds: u64) -> Vec<(u64, Output)> {
             lamp.parts(at, state);
         }
         if speaking {
-            lamp.piece(at, level(at - 1_000_000));
+            lamp.piece(at, level(at - 1_000_000) * gain);
         }
         outputs.push((at, lamp.engine.tick(at)));
         at += TICK;
@@ -256,6 +261,41 @@ fn while_it_speaks_its_head_nods_on_stressed_words_sways_between_sentences_and_s
                 .any(|(_, output)| named(output, "settling as it finishes")),
             "{room:?}"
         );
+    }
+}
+
+/// The first builder, 19 Oct 21:34 on #1722: the bars were tuned on Live's
+/// sound, and the second route's ElevenLabs may sit lower. The same answer
+/// from a voice a third as loud, or a fifth louder (the most a 0..1 level
+/// allows its stressed words), nods on its stressed words and sways between
+/// its sentences as Live's does.
+#[test]
+fn a_quiet_voice_and_a_loud_one_nod_and_sway_alike() {
+    for gain in [0.33, 1.0, 1.2] {
+        let mut lamp = Lamp::new(catalogue(true), Room::Quiet);
+        let outputs = answer_at(&mut lamp, 8, gain);
+        let nods = starts(&outputs, "nodding on a stressed word");
+        assert!((5..=8).contains(&nods), "{gain} {nods}");
+        let sways = starts(&outputs, "swaying between sentences");
+        assert!(sways >= 1, "{gain} {sways}");
+        assert!(
+            outputs
+                .iter()
+                .filter(|(at, _)| *at >= 9_000_000)
+                .any(|(_, output)| named(output, "settling as it finishes")),
+            "{gain}"
+        );
+    }
+}
+
+/// Relative bars still keep silence silent: an answer that is all hiss
+/// stresses no word and pauses no sentence.
+#[test]
+fn a_hiss_is_no_speech_however_quiet_the_voice() {
+    let mut lamp = Lamp::new(catalogue(true), Room::Quiet);
+    let outputs = answer_at(&mut lamp, 8, 0.01);
+    for name in ["nodding on a stressed word", "swaying between sentences"] {
+        assert_eq!(starts(&outputs, name), 0, "{name}");
     }
 }
 
