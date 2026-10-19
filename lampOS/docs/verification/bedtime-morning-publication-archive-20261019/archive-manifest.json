@@ -1,0 +1,193 @@
+{
+  "source_head": "22c9c730bd2def711d0099f2c3b54b26af8e6765",
+  "source_directory": "lampOS/docs/verification/bedtime-morning-host-20261019",
+  "note": "Verification history from the publication before splitting the authored skill from shared runtime foundations. Source hashes identify the original files; archived hashes record the copies, with public CI checkout prefixes normalized where noted. These records qualify only their stated revisions, not future split heads.",
+  "files": [
+    {
+      "name": "README.md",
+      "sha256": "a9f112630684b424bac1df7f7e9d7e1dd3ff64215fa4539cffd146f19cd27788",
+      "bytes": 29901,
+      "archived_name": "README.original.txt",
+      "archived_sha256": "a9f112630684b424bac1df7f7e9d7e1dd3ff64215fa4539cffd146f19cd27788"
+    },
+    {
+      "name": "before-export-fixture-arm64.json",
+      "sha256": "2064210a1595f1b9cea76e98e6fd7ef66a03a0d50e3beb874584db09234bb07f",
+      "bytes": 3393,
+      "normalization": "Public CI checkout prefix removed; test values and raw-log hashes retained.",
+      "archived_name": "before-export-fixture-arm64.json",
+      "archived_sha256": "9214243980a810d2145c1792ead334566cec3430f70b2b0816cb87f81ede771f"
+    },
+    {
+      "name": "before-followup-arm64.json",
+      "sha256": "57bcdddd8c22b098bcef4727b04f4437d25588ff18648a9212b798bc07d2d5bd",
+      "bytes": 3393,
+      "normalization": "Public CI checkout prefix removed; test values and raw-log hashes retained.",
+      "archived_name": "before-followup-arm64.json",
+      "archived_sha256": "b8cddb64744b768dab688c18b2e4bc03d22ca3f970a7d6532bbc399fb4014202"
+    },
+    {
+      "name": "before-followup-full-gate.json",
+      "sha256": "6d121fb7f22e6a5b037fe27a2e9e92f24da528c3e89d9ebb93ebacbbf46d662b",
+      "bytes": 93037,
+      "archived_name": "before-followup-full-gate.json",
+      "archived_sha256": "6d121fb7f22e6a5b037fe27a2e9e92f24da528c3e89d9ebb93ebacbbf46d662b"
+    },
+    {
+      "name": "before-light-out-rebase.json",
+      "sha256": "dfc812c1677779469f8c607286eeb52c5e3c84902bd1ab0e51bc4df88a0d26e5",
+      "bytes": 89162,
+      "archived_name": "before-light-out-rebase.json",
+      "archived_sha256": "dfc812c1677779469f8c607286eeb52c5e3c84902bd1ab0e51bc4df88a0d26e5"
+    },
+    {
+      "name": "before-light-scenes-arm64.json",
+      "sha256": "2867e9a1012d56801cd2fae612b549a7133e04c914ce99b3a5f9c83511b8631e",
+      "bytes": 308,
+      "archived_name": "before-light-scenes-arm64.json",
+      "archived_sha256": "2867e9a1012d56801cd2fae612b549a7133e04c914ce99b3a5f9c83511b8631e"
+    },
+    {
+      "name": "before-light-scenes-rebase.json",
+      "sha256": "40ac6d941739365f4f2a12fd79a4e5ff51da1e893f01521840f01be97d47df7f",
+      "bytes": 89779,
+      "archived_name": "before-light-scenes-rebase.json",
+      "archived_sha256": "40ac6d941739365f4f2a12fd79a4e5ff51da1e893f01521840f01be97d47df7f"
+    },
+    {
+      "name": "before-review-arm64.json",
+      "sha256": "1ef5c358652a5689ea4cab48fec1253b654cc7e390019a336848e2fc4315e7e0",
+      "bytes": 3393,
+      "normalization": "Public CI checkout prefix removed; test values and raw-log hashes retained.",
+      "archived_name": "before-review-arm64.json",
+      "archived_sha256": "21b49c7516ed47b58a6afc25f4d0960b420e18c65893e55d659fec7281304473"
+    },
+    {
+      "name": "before-review-full-gate.json",
+      "sha256": "0c4340035ef333b3cc2b181efda25d5ad94cd9a57c9acb406342201c9b372b48",
+      "bytes": 115226,
+      "archived_name": "before-review-full-gate.json",
+      "archived_sha256": "0c4340035ef333b3cc2b181efda25d5ad94cd9a57c9acb406342201c9b372b48"
+    },
+    {
+      "name": "before-rising-trigger-arm64.json",
+      "sha256": "a0db4ca3948a8ae87f0d7d76f9dd7ba073a741104e99f8e7942adc077e3b7a0d",
+      "bytes": 3131,
+      "normalization": "Public CI checkout prefix removed; test values and raw-log hashes retained.",
+      "archived_name": "before-rising-trigger-arm64.json",
+      "archived_sha256": "1c5c206847d330660314395adb1fc5901bd04d86350d7d8184ac68cd9165aa20"
+    },
+    {
+      "name": "before-rising-trigger-rebase.json",
+      "sha256": "4a7266e20c2954e626ded91a3ea3c4c1c8fdaf464083cd7fc360bbf7d48191e1",
+      "bytes": 38814,
+      "archived_name": "before-rising-trigger-rebase.json",
+      "archived_sha256": "4a7266e20c2954e626ded91a3ea3c4c1c8fdaf464083cd7fc360bbf7d48191e1"
+    },
+    {
+      "name": "before-second-route-gate.json",
+      "sha256": "c9b35eca9c0ad52656334143232d616c0b0e809722c5d500b7f411aa385f02a9",
+      "bytes": 92633,
+      "archived_name": "before-second-route-gate.json",
+      "archived_sha256": "c9b35eca9c0ad52656334143232d616c0b0e809722c5d500b7f411aa385f02a9"
+    },
+    {
+      "name": "before-text-guard-rebase.json",
+      "sha256": "2fc1e6d59be488c70a772c84024de0e4180575da48ddd90887fd0b14dddf3972",
+      "bytes": 89780,
+      "archived_name": "before-text-guard-rebase.json",
+      "archived_sha256": "2fc1e6d59be488c70a772c84024de0e4180575da48ddd90887fd0b14dddf3972"
+    },
+    {
+      "name": "consumer-coverage.json",
+      "sha256": "d4a9224bd7ffdf4e8b2b454cd0e1ff25d5ff57e61325c8d8f69f9c42ec16f89c",
+      "bytes": 2837,
+      "archived_name": "consumer-coverage.json",
+      "archived_sha256": "d4a9224bd7ffdf4e8b2b454cd0e1ff25d5ff57e61325c8d8f69f9c42ec16f89c"
+    },
+    {
+      "name": "earlier-attempts.json",
+      "sha256": "a81fe9e1f137b38424595345a384b110c15ea767893a79af7df082d6fab473ee",
+      "bytes": 4808,
+      "archived_name": "earlier-attempts.json",
+      "archived_sha256": "a81fe9e1f137b38424595345a384b110c15ea767893a79af7df082d6fab473ee"
+    },
+    {
+      "name": "followup-stopped-before-clock-fix.json",
+      "sha256": "0db77f0ba7bd5886f0039e702d6700d9fe978898a8cd8567a8d7e8a5dd09baaf",
+      "bytes": 1285,
+      "archived_name": "followup-stopped-before-clock-fix.json",
+      "archived_sha256": "0db77f0ba7bd5886f0039e702d6700d9fe978898a8cd8567a8d7e8a5dd09baaf"
+    },
+    {
+      "name": "gates.json",
+      "sha256": "c9b35eca9c0ad52656334143232d616c0b0e809722c5d500b7f411aa385f02a9",
+      "bytes": 92633,
+      "archived_name": "gates.json",
+      "archived_sha256": "c9b35eca9c0ad52656334143232d616c0b0e809722c5d500b7f411aa385f02a9"
+    },
+    {
+      "name": "publication-preflight.json",
+      "sha256": "d1d5fdd18ebec5dca373b6232e6f84fd8eeaba950c60755392983526c86a454f",
+      "bytes": 11187,
+      "archived_name": "publication-preflight.json",
+      "archived_sha256": "d1d5fdd18ebec5dca373b6232e6f84fd8eeaba950c60755392983526c86a454f"
+    },
+    {
+      "name": "review-preflight-first-failure.json",
+      "sha256": "799efba615070cedbeda7874b9681ff16ca341c4c900ff68defdfb5278c9b03e",
+      "bytes": 1035,
+      "archived_name": "review-preflight-first-failure.json",
+      "archived_sha256": "799efba615070cedbeda7874b9681ff16ca341c4c900ff68defdfb5278c9b03e"
+    },
+    {
+      "name": "review-preflight-fixture-failure.json",
+      "sha256": "396153d5d5271a98d5c832a348c992ada64775bf0d157b3e1cdec429e015f73f",
+      "bytes": 4404,
+      "archived_name": "review-preflight-fixture-failure.json",
+      "archived_sha256": "396153d5d5271a98d5c832a348c992ada64775bf0d157b3e1cdec429e015f73f"
+    },
+    {
+      "name": "review-preflight.json",
+      "sha256": "54b0479614ed4e293030268fb7a56b58c651a8ec318992de7db324bcbd6eacb8",
+      "bytes": 5509,
+      "archived_name": "review-preflight.json",
+      "archived_sha256": "54b0479614ed4e293030268fb7a56b58c651a8ec318992de7db324bcbd6eacb8"
+    },
+    {
+      "name": "second-route-full-first-failure.json",
+      "sha256": "e03d3df6c0a0ff0487d94b46c064b87af984cad7ee5a07d80266e665d1242ce7",
+      "bytes": 28814,
+      "archived_name": "second-route-full-first-failure.json",
+      "archived_sha256": "e03d3df6c0a0ff0487d94b46c064b87af984cad7ee5a07d80266e665d1242ce7"
+    },
+    {
+      "name": "second-route-preflight-sandbox.json",
+      "sha256": "a78058e37f11161e203176fd354622ef248ce54ed5adcf659c49d29c35b3de7a",
+      "bytes": 192794,
+      "archived_name": "second-route-preflight-sandbox.json",
+      "archived_sha256": "a78058e37f11161e203176fd354622ef248ce54ed5adcf659c49d29c35b3de7a"
+    },
+    {
+      "name": "second-route-preflight.json",
+      "sha256": "32630e4d34098cebdc65ea785df7419564fb1e2b4f482820af3c7ac9fa577b7a",
+      "bytes": 194628,
+      "archived_name": "second-route-preflight.json",
+      "archived_sha256": "32630e4d34098cebdc65ea785df7419564fb1e2b4f482820af3c7ac9fa577b7a"
+    },
+    {
+      "name": "text-integration-coverage.json",
+      "sha256": "0c004e275176d75ef17d6d45ca779202133e4cd8203737c91e30e9c63bca0022",
+      "bytes": 5396,
+      "archived_name": "text-integration-coverage.json",
+      "archived_sha256": "0c004e275176d75ef17d6d45ca779202133e4cd8203737c91e30e9c63bca0022"
+    },
+    {
+      "name": "workspace-before-runtime-integration.json",
+      "sha256": "1391d30402d7a0724368049c33c5d5aafce017217390c64e1321fc38d95e3a70",
+      "bytes": 87170,
+      "archived_name": "workspace-before-runtime-integration.json",
+      "archived_sha256": "1391d30402d7a0724368049c33c5d5aafce017217390c64e1321fc38d95e3a70"
+    }
+  ]
+}

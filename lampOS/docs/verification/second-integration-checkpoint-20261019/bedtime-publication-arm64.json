@@ -1,0 +1,96 @@
+{
+  "head": "22c9c730bd2def711d0099f2c3b54b26af8e6765",
+  "event": "pull_request",
+  "tested_checkout": "f6ce1cc4db8b304dd9a5608cc4df213bc391b93e",
+  "tested_base": "74ea4d028b02e3122e20eb1dc5a66b7a0c3120e8",
+  "checkout_note": "Pull-request run tests the GitHub merge commit; the artifact is named for the PR head.",
+  "run": 39277565437,
+  "url": "https://github.com/autonomous-ai/lampOS/actions/runs/39277565437",
+  "conclusion": "success",
+  "nextest_passed": 7796,
+  "nextest_leaky": 1,
+  "nextest_skipped": 48,
+  "doc_tests": 4,
+  "own_harness_tests": 12,
+  "relay_signals_ok": true,
+  "log_sha256": "3ab1dcb0de5f0cfb12c28980fa0af3c6c22469ebe777acff693e7943aaaf9f35",
+  "warnings": [
+    "warning: output filename collision at lampOS/target/release/examples/progress_cost",
+    "warning: output filename collision at lampOS/target/release/examples/progress_cost.dwp",
+    "warning: output filename collision at lampOS/target/release/examples/replay_cost",
+    "warning: output filename collision at lampOS/target/release/examples/replay_cost.dwp"
+  ],
+  "steps": [
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "system packages",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Rust 1.96.0",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/cache@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run taiki-e/install-action@v2",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "build (release, the lamps' binaries)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "SHA-256 of each binary",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Run actions/upload-artifact@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Post Run actions/cache@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Post Run actions/checkout@v4",
+      "conclusion": "success"
+    },
+    {
+      "job": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ],
+  "warnings_note": "Existing example-output filename collision warnings use repository-relative paths; the raw log SHA-256 remains recorded."
+}

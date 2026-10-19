@@ -15,11 +15,11 @@ log and nothing a lamp runs ([joining.md](joining.md),
 
 ## Current checkpoint: 2026-10-19
 
-Ready for integration: no (#1732 published on #1712; ARM64 39277565437 pending)
+Ready for integration: no (#1732 ARM64 is green; the authored skill is being split from shared foundations)
 
-Ready for integration: no (#1757 follows Bedtime; newer notes-aware preparation in validation)
+Ready for integration: no (#1757 follows Bedtime; latest host attempt failed inherited motion test)
 
-Ready for integration: yes (#1966; local Tasks gate and automatic ARM64 39276235123 passed)
+Completed: #1966 merged into #1712 at 16:15 UTC as `df722db2d0` after local and automatic ARM64 gates passed
 
 The active work is #1672, Bedtime and Morning, followed by the allocated
 requested-music slice of #1685. Queue updates go to
@@ -29,8 +29,9 @@ lamp qualification and merging.
 
 The [14:30 UTC checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6269677751)
 acknowledges the missed checkpoint and the new second-route requirement.
-The full Queue and all three own PR reviews were read at 16:01 UTC. Tasks
-checks and reviews were reread at 16:08 UTC after native completion. The
+The full Queue and own PR reviews were reread at 16:27 UTC. The current
+integration tip is `c1024721ce` after #1925; the separate #1976 motion fix
+and #1966 Tasks fix are merged. Foundation preparation starts at `df722db2d0`. The
 Bedtime publication is based on #1712's `b919291458`: Deepgram, DeepSeek and
 ElevenLabs. No provider session or device is started by these host tests.
 
@@ -58,8 +59,20 @@ four second-route cases each **1 passed, 0 failed, 0 ignored; 2,261 filtered**,
 all Skills tests **220/0/0**, none filtered, **82.82 s**, and workspace build
 **77.38 s**. All **1,592** source hashes matched; publication only amended
 verification documents. [Native ARM64 39277565437](https://github.com/autonomous-ai/lampOS/actions/runs/39277565437)
-is pending. Per First's 22:04 direction, that full workspace run is the gate
-of record; #1732 remains draft until green. The second-route checks cover
+passed **7,796 nextest tests (1 leaky), 48 skipped**, plus **4 doc and 12
+separate harness tests**. [The native record](verification/second-integration-checkpoint-20261019/bedtime-publication-arm64.json)
+identifies merge checkout `f6ce1cc4db8b304dd9a5608cc4df213bc391b93e` against
+`74ea4d028b02e3122e20eb1dc5a66b7a0c3120e8`; release, relay signals, binary
+hashes and upload passed. First's 23:09 scope review keeps #1732 draft:
+the authored skill must be separated from shared runtime foundations.
+The current 90 files comprise 26 verification files (25,678 added lines),
+50 runtime/test files (12,926 added, 246 removed), 11 product documents
+(775 added, 27 removed), and three skill files (109 added). There is one
+commit directly on `b919291458`, with no work-log history in its ancestry.
+The [publication archive](verification/bedtime-morning-publication-archive-20261019/archive-manifest.json)
+preserves the 26 original evidence files while the dependency split is
+prepared. The green counts qualify the original source, not a future split
+head. The second-route checks cover
 exact optional words with reminders both ways, local morning PCM without
 provider input, expiry and the unchanged quiet gate. No cloud or acoustic
 result is claimed.
@@ -77,8 +90,8 @@ records **7,595 nextest passed (1 leaky), 48 skipped**, plus **4 doc** and
 `910e7931e7eaadbdc0f05bcd1b944e02747b0950` against base
 `b919291458c3618838c5f4b56520cf3b2cd739a5`, not the later integration tip.
 Release, relay signals, binary hashes and artifact upload passed. Four
-existing example filename-collision warnings remain recorded. The PR is
-mergeable with no review findings; First merges it separately.
+existing example filename-collision warnings remain recorded. First merged the PR into #1712 at **16:15 UTC** as
+`df722db2d0ee6cb9cd46640e8fc2554065333d13`.
 
 Earlier full host attempts remain failures. The [first attempt](verification/second-integration-checkpoint-20261019/bedtime-second-route-full-first-failure.json)
 on `08d9177cb4` stopped at that Tasks race. The [combined preparation attempt](verification/second-integration-checkpoint-20261019/bedtime-combined-policy-failure.json)
@@ -119,7 +132,7 @@ summaries total **6,891 passed, 1 failed, 43 ignored**, no filters; Voice's
 own summary is **2,309/1/12**. Update and build were not reached. The failing
 function and Expression speaking implementation match the integration base;
 all **1,609** source hashes still match. This remains a failed gate, separate
-from the replacement work; Music does not import the unmerged motion fix.
+from the replacement work; that source predates the separate motion fix.
 
 The newer local preparation is `6d57d9c131d1ca0ded0e0f18661c4b22be8259a7`,
 one Music commit above Bedtime preparation `b48f7660c7` on `74ea4d028b`.
@@ -144,16 +157,30 @@ accepted-decline tests** (2,325 filtered) and **1 prior-action test**
 (2,327 filtered), all with zero failures or ignores. The complete Skills
 suite passed **239/0/0**, none filtered, in **81.43 s**. All **1,609**
 source hashes matched. These Voice filters overlap and are not summed into
-a full-suite total. The complete replacement workspace test/build gate is
-now running on that same frozen source; it reuses only the identical-source
-formatting and Clippy results.
+a full-suite total. The [full host attempt](verification/second-integration-checkpoint-20261019/music-current-route-motion-failure.json)
+then stopped after **1,190.43 s** on the inherited second-route **1 nods**
+assertion. Completed summaries total **6,899 passed, 1 failed, 43 ignored**,
+none filtered, plus **12 separate harness tests**; Voice is **2,315/1/12**
+in **314.67 s**. Update and build were not reached. All **1,609** frozen
+source hashes still match, and the failing function and Expression speaking
+implementation match `74ea4d028b`. The separate #1976 correction has since
+merged into #1712; this frozen source predates it. This is a failed gate,
+not a completed passing workspace run. No unchanged-source rerun is planned.
+
+The requested Bedtime split has three foundations: durable output caps,
+leased rest and bounded Say, then scheduled Skills. The first two are
+independent; scheduled Skills needs both. The final authored skill can stay
+to its three folder files, the install list and the installer test. Shared
+interface tests, private state/reset coverage and disabled switches remain
+with their owning runtime change. The foundation heads will be gated
+separately; the original native result does not qualify a future split.
 
 Bedtime and Tasks have only their original automatic PR ARM64 run,
 following First's no-duplicate-dispatch direction. GitHub's [Actions incident](https://www.githubstatus.com/incidents/8tzbpcnl75jp)
 reported delayed workflow processing at 15:56 UTC. Tasks showed successful
 steps before its run and check finally reported success; the exact evidence
-is recorded above. Bedtime's release build passed and its full tests still
-report in progress. Bedtime remains draft until its own terminal success;
+is recorded above. Bedtime has now also concluded green, with its exact
+merge checkout recorded. It remains draft for the requested scope split;
 Music remains queued for actual landing and final native qualification.
 
 The full Bedtime read returned four P2s and a topic-registration gap. This

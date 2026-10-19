@@ -1,0 +1,42 @@
+{
+  "kind": "source-only focused preflight; not the final upstream integration gate",
+  "source_file_count": 5185,
+  "source_tree_sha256": "5b2d2d8754619117c88fb976dc51f31f54142cb7b7a36188b27b06f91816a64b",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.46,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "test_summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-msgs",
+        "-p",
+        "lamp-setup",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "seconds": 13.57,
+      "log_sha256": "d6df2774ab673db3bad91016038c6dfb438f01109cf70899f336c6620278bb45",
+      "test_summaries": []
+    }
+  ],
+  "disposition": "Strict Clippy stopped on collapsible_if; no tests run."
+}

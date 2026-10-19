@@ -1,0 +1,40 @@
+{
+  "status": "stopped_before_completion",
+  "reason": "Static review found wall-clock sample origin was not retained in routine deadline calculation. No runtime failure was observed; replacement source and gate are required.",
+  "source_head": "49d1ebecb31bbf09c257386d34d9032ad0489083",
+  "completed_stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.6,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 55.93,
+      "log_sha256": "d9b56e65f104adda31f014d46cd82fbe3fc9a93c02a5320ee4fe792471d97a36"
+    }
+  ],
+  "interrupted_stage": {
+    "command": "cargo test --workspace --exclude lamp-update -- --test-threads=1",
+    "status": "terminated by builder after static review; no complete result",
+    "partial_log_sha256": "0251de0724ca6a94e84c4f44050e72bb06cdc959f453611f80c73966542db4a8"
+  },
+  "source_tree_sha256": "1ed754d051d9052530cf0567208494dd6de69dbe7b783d16aa55f1c880f4f14f"
+}
