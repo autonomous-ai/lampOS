@@ -1,0 +1,8 @@
+# Nobody in view at a laugh at 10 s; a face from 30 s and a laugh at 60 s: one glance about 61 s, the first laugh having spent no cooldown (Jarvis on #1929).
+clock = "10:00"
+
+[[expect]]
+at = "61s"
+within = "1s"
+call = "body.gaze"
+args = { look_at = "face" }

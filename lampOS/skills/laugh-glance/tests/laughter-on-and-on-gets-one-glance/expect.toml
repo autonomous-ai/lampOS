@@ -1,0 +1,8 @@
+# A face in view; laughter without a lull from 10 s to 330 s: one glance about 11 s, none when the cooldown ends at 311 s (rearm, Jarvis on #1929).
+clock = "10:00"
+
+[[expect]]
+at = "11s"
+within = "1s"
+call = "body.gaze"
+args = { look_at = "face" }

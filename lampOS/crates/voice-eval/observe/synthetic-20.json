@@ -1,0 +1,22 @@
+[
+  {"turns": [["My sister's wedding is on Saturday, I'm a bit nervous about my speech.", "That's a big day. I'm sure your speech will be lovely."], ["Thanks, I hope so.", "You'll do well."]], "keep": "wedding"},
+  {"turns": [["Can you make a note, I take my tea with no sugar.", "Got it, tea with no sugar."], ["And a splash of milk.", "Noted, a splash of milk."]], "keep": "sugar"},
+  {"turns": [["I'll call the dentist tomorrow morning, I keep putting it off.", "Good idea, it's easy to put off."], ["Yeah, first thing.", "First thing it is."]], "keep": "dentist"},
+  {"turns": [["My driving test is next Thursday.", "Good luck! Are you feeling ready?"], ["Mostly, parking is the hard part.", "Parking takes practice."]], "keep": "driving"},
+  {"turns": [["When I'm working I really prefer quiet jazz in the background.", "Quiet jazz while you work, nice choice."], ["It helps me focus.", "That makes sense."]], "keep": "jazz"},
+  {"turns": [["Please just call me Minh, not Mr. Tran.", "Of course, Minh."], ["Thanks.", "You're welcome, Minh."]], "keep": "Minh"},
+  {"turns": [["I have a job interview on Monday at ten.", "That's exciting. What's the role?"], ["A designer at a small studio.", "That sounds like a good fit."]], "keep": "interview"},
+  {"turns": [["In the evening I like the light warm, never that blue white.", "Warm light in the evening, understood."], ["It's easier on my eyes.", "That's a good reason."]], "keep": "warm"},
+  {"turns": [["I promised my mum I'd visit her on Sunday.", "That's kind of you."], ["She's been asking for weeks.", "She'll be glad to see you."]], "keep": "mum"},
+  {"turns": [["We're moving house at the end of the month.", "That's a lot to organise."], ["Boxes everywhere already.", "It'll be worth it."]], "keep": "moving"},
+  {"turns": [["What's the weather like today?", "Sunny and about thirty degrees."], ["Will it rain later?", "Not today."]]},
+  {"turns": [["Set a timer for ten minutes.", "Timer set for ten minutes."]]},
+  {"turns": [["What time is it?", "It's twenty to four in the afternoon."]]},
+  {"turns": [["Tell me a joke.", "Why did the lamp go to school? To get brighter."], ["Ha, okay.", "Glad you liked it."]]},
+  {"turns": [["Turn the light a bit brighter.", "There you go."], ["Perfect.", "Good."]]},
+  {"turns": [["How are you today?", "I'm doing well, thanks for asking."], ["Good to hear.", "And you?"]]},
+  {"turns": [["How far away is the moon?", "About three hundred eighty-four thousand kilometres."]]},
+  {"turns": [["Thanks, that's all for now.", "You're welcome. I'm here if you need me."]]},
+  {"turns": [["Ugh, my blood test came back and my cholesterol is high.", "I'm sorry to hear that. Did the doctor say what to do?"], ["Just diet for now.", "That sounds manageable."]], "intrusive": true},
+  {"turns": [["I'm behind on my credit card payments this month.", "That sounds stressful."], ["I'll sort it out.", "I'm sure you will."]], "intrusive": true}
+]

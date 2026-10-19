@@ -121,7 +121,7 @@ is released or the reader has failed.
 | "Hey Lamp" or "Lamp, ..." | Turns to you (to your face if it sees one), the eye's arc points at you, answers | Now; bare "Lamp" #694 |
 | A conversation | Nods in your pauses, looks away while thinking, back before its first word, eye pulses with its voice | Now |
 | You talk over it | Stops and listens | Now for sentences (6 of 10 played), weak for one word; tonight's work |
-| Two people talk near it | Stays out; a glance now and then at whoever laughs | Now (stays out) |
+| Two people talk near it | Stays out; a glance now and then at whoever laughs | Now (stays out); the glance built, off: `skills/laugh-glance` on `ears/classes` (#1669), not tried on a lamp |
 | A bang, something dropped | One startled glance, then lets it go; the next ones get nothing | Now when awake; resting #710 |
 | Music | A slight sway in time while it plays, only if it is not working with you | To build |
 | A long silence | Breathing eye, tiny shifts of weight; dozes after a while | Rest clip now; sleep to build |
