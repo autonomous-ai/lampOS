@@ -876,45 +876,48 @@ mod tests {
         assert!(load_from_path(&config).is_err());
     }
 
-    /// #1712, the first builder at 20:01: the product's template
-    /// (`deploy/product/settings/second.json`) is a configuration this
-    /// loader takes, its key files the ones the units name, and with them
-    /// beside it, it loads as lamp-4ace's: the relay for speech to text and
-    /// ElevenLabs for the voice.
+    /// #1712, the first builder at 21:08 and 21:14: the product's template
+    /// (`deploy/product/settings/second.json`, which install places) is a
+    /// configuration this loader takes, on the relay with the one key a lamp
+    /// already has, `/etc/lampOS/voice/credential`: speech to text and the
+    /// voice fall back to the text model's base and key, and the voice is
+    /// ElevenLabs.
     #[test]
-    fn the_products_template_loads_with_the_key_files_the_units_name() {
+    fn the_products_template_loads_on_the_relay_with_the_lamps_one_key() {
         let template = include_str!("../../../deploy/product/settings/second.json");
         let value: serde_json::Value = serde_json::from_str(template).unwrap();
-        assert_eq!(
-            value["llm_credential_file"],
-            "/etc/lampOS/voice/second-llm.key"
-        );
-        assert_eq!(
-            value["stt_credential_file"],
-            "/etc/lampOS/voice/second-stt.key"
-        );
-        assert_eq!(
-            value["tts_credential_file"],
-            "/etc/lampOS/voice/second-tts.key"
-        );
+        let named: Vec<&str> = value
+            .as_object()
+            .unwrap()
+            .iter()
+            .filter(|(field, _)| field.ends_with("_credential_file"))
+            .filter_map(|(_, path)| path.as_str())
+            .collect();
+        assert_eq!(named, ["/etc/lampOS/voice/credential"]);
         let directory = directory("template");
-        let mut moved = template.to_owned();
-        for key in ["second-llm.key", "second-stt.key", "second-tts.key"] {
-            let file = directory.join(key);
-            private(&file, &format!("{key}-secret\n"));
-            moved = moved.replace(
-                &format!("/etc/lampOS/voice/{key}"),
-                &file.display().to_string(),
-            );
-        }
+        let key = directory.join("credential");
+        private(&key, "relay-secret\n");
         let config = directory.join("second.json");
-        private(&config, &moved);
+        private(
+            &config,
+            &template.replace("/etc/lampOS/voice/credential", &key.display().to_string()),
+        );
         let route = load_from_path(&config).unwrap();
-        assert_eq!(route.llm_key.expose(), "second-llm.key-secret");
-        assert_eq!(route.tts_key.expose(), "second-tts.key-secret");
+        assert_eq!(route.llm_key.expose(), "relay-secret");
+        assert_eq!(route.tts_key, route.llm_key);
+        assert_eq!(route.tts_base_url, route.llm_base_url);
         assert_eq!(route.tts_provider, TtsProvider::ElevenLabs);
+        assert_eq!(
+            route.stt,
+            Stt::Autonomous {
+                base_url: route.llm_base_url.clone(),
+                key: route.llm_key.clone(),
+            }
+        );
         assert!(
-            matches!(&route.stt, Stt::Autonomous { key, .. } if key.expose() == "second-stt.key-secret")
+            route
+                .llm_base_url
+                .starts_with("https://campaign-api.autonomous.ai/")
         );
         fs::remove_dir_all(&directory).unwrap();
     }

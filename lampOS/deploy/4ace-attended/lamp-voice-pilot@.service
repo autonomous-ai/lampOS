@@ -25,17 +25,16 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=lamp-voice-pilot-%i
 NoNewPrivileges=yes
-# The pilot's voice is the second route, as lamp-4ace's own (#1712, the first builder at 19:43; lamp-voice-eval's
-# played runs, #1916), with lamp-4ace's second.json and key files in /etc/lampOS/voice (deploy/product/lamp-voice.service
-# names each one).
-LoadCredential=gemini.key:/etc/lampOS/voice/second-llm.key
-LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key
+# The pilot's voice is the second route, as a product lamp's (#1712, the first builder at 19:43; lamp-voice-eval's
+# played runs, #1916): DeepSeek through the relay, with lamp-4ace's /etc/lampOS/voice/second.json and its relay key,
+# and no unit credential (deploy/product/lamp-voice.service).
 Environment=LAMP_VOICE_ROUTE=second
 Environment=LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json
 Environment=LAMP_SECOND_CHAT=deepseek
 Environment=LAMP_SECOND_SEARCH=deepseek
 Environment=LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo
-Environment=LAMP_SECOND_GEMINI_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/google-search/v1beta
+# DeepSeek's chat and search through the relay with second.json's llm_credential_file, so no deepseek.key (#1934, #1939).
+Environment=LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek
 Environment=LAMP_SECOND_DOWN_LINE=on
 Environment=LAMP_SECOND_WAIT_CUE=on
 # Defense in depth only: no motor worker is launched, and this is not a

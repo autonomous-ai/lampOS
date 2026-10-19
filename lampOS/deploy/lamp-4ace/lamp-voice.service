@@ -146,6 +146,8 @@ Environment=LAMP_PROGRESS_NEWS=on
 #   second-stt.key   second.json's stt_credential_file: speech to text;
 #   second-tts.key   second.json's tts_credential_file: the voice;
 #   deepseek.key     DeepSeek's text model and search (the deepseek.key credential).
+# Only this lamp loads DeepSeek's own key and Gemini's, for the A/B of DeepSeek direct against the relay
+# (LAMP_SECOND_DEEPSEEK_BASE_URL in a drop-in); a product lamp needs neither (deploy/product/lamp-voice.service).
 LoadCredential=gemini.key:/etc/lampOS/voice/second-llm.key
 LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key
 Environment=LAMP_VOICE_ROUTE=second

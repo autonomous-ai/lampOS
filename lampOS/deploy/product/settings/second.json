@@ -1,12 +1,6 @@
 {
-  "llm_base_url": "https://relay.example.invalid/v1",
-  "llm_model": "the-relay-text-model",
-  "llm_credential_file": "/etc/lampOS/voice/second-llm.key",
-  "stt_base_url": "https://stt.example.invalid",
-  "stt_credential_file": "/etc/lampOS/voice/second-stt.key",
-  "stt_language": "en",
-  "tts_base_url": "https://tts.example.invalid",
-  "tts_credential_file": "/etc/lampOS/voice/second-tts.key",
-  "tts_provider": "elevenlabs",
-  "tts_voice": "Rachel"
+  "llm_base_url": "https://campaign-api.autonomous.ai/api/v1/ai",
+  "llm_model": "gpt-4.1-mini",
+  "llm_credential_file": "/etc/lampOS/voice/credential",
+  "tts_provider": "elevenlabs"
 }
