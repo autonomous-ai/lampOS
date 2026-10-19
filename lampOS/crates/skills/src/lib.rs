@@ -7,7 +7,8 @@
 //! a recording is replayed.
 use lamp_bus::Header;
 use lamp_msgs::{
-    Faces, Light, LightPattern, LightRequest, PatternKind, SkillEvent, SkillStage, Speech,
+    Activity, Faces, Light, LightPattern, LightRequest, PatternKind, RoomActivity, SkillEvent,
+    SkillStage, Speech, StoodUp,
 };
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -2878,6 +2879,9 @@ struct Nudge {
     /// The largest face as the run began: its centre across and down, and
     /// its height, as shares of the picture.
     face: Option<[f32; 3]>,
+    /// What the eyes said the person at the desk was doing as the run
+    /// began (`room/activity`, #1678), if they said it.
+    activity: Option<Activity>,
     noticed: bool,
     /// The newest faces in its while showed nobody: they got up.
     gone: bool,
@@ -2915,12 +2919,16 @@ fn nudged(
         return;
     };
     let face = Engine::fresh(latest, Faces::TOPIC, now_us).and_then(largest_face);
+    let activity = Engine::fresh(latest, RoomActivity::TOPIC, now_us)
+        .and_then(|value| serde_json::from_value::<RoomActivity>(value.clone()).ok())
+        .map(|activity| activity.state);
     let nudge = nudges.entry(skill.name.clone()).or_default();
     *nudge = Nudge {
         at_us: now_us,
         within_us: rest.within_us,
         after: rest.after_ignored,
         face,
+        activity,
         noticed: false,
         gone: false,
         judged: false,
@@ -3142,6 +3150,29 @@ impl Engine {
                 .is_some_and(|text| !text.trim().is_empty())
             {
                 for nudge in self.nudges.values_mut().filter(|nudge| open(nudge)) {
+                    nudge.noticed = true;
+                }
+            }
+            return;
+        }
+        // The eyes' own word on the person at the desk (#1678), when they
+        // say it: standing up and leaving is noticing; so is any change of
+        // what they are doing from what it was as the run began (looking up
+        // from the page, leaning in or back), and away is gone.
+        if topic == StoodUp::TOPIC {
+            for nudge in self.nudges.values_mut().filter(|nudge| open(nudge)) {
+                nudge.noticed = true;
+            }
+            return;
+        }
+        if topic == RoomActivity::TOPIC {
+            let Ok(activity) = serde_json::from_value::<RoomActivity>(value.clone()) else {
+                return;
+            };
+            for nudge in self.nudges.values_mut().filter(|nudge| open(nudge)) {
+                if activity.state == Activity::Away {
+                    nudge.gone = true;
+                } else if nudge.activity.is_some_and(|was| was != activity.state) {
                     nudge.noticed = true;
                 }
             }
@@ -3370,7 +3401,12 @@ impl Engine {
         // What judges a `[rest]` is the program's own reading, as the voice's
         // state for a step after the say is: never the skill's (#1685).
         if self.skills.iter().any(|skill| skill.rest.is_some()) {
-            topics.extend([Faces::TOPIC.to_owned(), Speech::TOPICS[0].to_owned()]);
+            topics.extend([
+                Faces::TOPIC.to_owned(),
+                Speech::TOPICS[0].to_owned(),
+                RoomActivity::TOPIC.to_owned(),
+                StoodUp::TOPIC.to_owned(),
+            ]);
         }
         topics.sort();
         topics.dedup();
