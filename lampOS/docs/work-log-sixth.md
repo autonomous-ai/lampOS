@@ -6,6 +6,37 @@ lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
 
+## 2026-10-19 — room sound contract and offline scorer (#1669)
+
+Ready for lamp-voice: no. Draft #1707, branch `sixth/ears-sound-events`,
+head `2c13748a0`; Third's privacy review and real-office measurements remain.
+
+- Added `ears/classes` v1 to msgs with strict unavailable/scored variants,
+  source timing, model identity, capture epoch and own-voice evidence.
+  First accepted the topic; live capture requires a separate bounded
+  retention authority reviewed by Third. No live publisher or core skill yet.
+- Host fmt, msgs clippy/tests and workspace build passed. ARM64 on the first
+  typed head caught the missing voice-eval export topic catalogue entry.
+  Fixed it; fmt, voice-eval clippy and the complete voice-eval tests passed.
+  The corrected head has no ARM64 result yet; do not call it green.
+- Offline Rust WAV -> proxy-compatible logmel -> YAMNet ONNX path works on
+  this Mac; four native tests and four independent NumPy feature comparisons
+  passed. This is not direct torchaudio parity. The aggregate scorer has 15
+  tests, explicit thresholds/cooldown, coverage accounting and nearest-rank
+  latency quantiles. Tools and receipts stay in `/private/tmp/sixth-sound-*`.
+- Qualcomm YAMNet v0.59.0 graph, external weights and labels total 14,947,127
+  bytes. Code provenance: wrapper BSD-3-Clause, proxy MIT, original TensorFlow
+  Apache-2.0; bundled-weight redistribution review remains before deployment.
+- Synthetic smoke only: three TTS windows scored speech 0.998922..0.999956.
+  A generated four-second melody was missed at the uncalibrated 0.5 threshold
+  (max music 0.421850). On its 19 windows, frontend+inference took median
+  2.840 ms, max 3.162 ms on this Mac, excluding load/setup/I/O. No office
+  false-events/hour or acoustic onset latency claimed; requested the labeled
+  corpus location from First. Report: #1669 comment 6259154631.
+- Read-only GitHub watch polls every 60 seconds and persists events locally.
+  It does not automatically wake the model after a completed turn.
+  No live capture, device access or audio upload in this checkpoint.
+
 ## 2026-10-19 — voice identity measurement and shared lamp access
 
 Ready for lamp-voice: no (#1694 is a draft; real-office measurement remains).
