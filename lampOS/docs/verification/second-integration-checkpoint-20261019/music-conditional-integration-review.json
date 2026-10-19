@@ -1,0 +1,62 @@
+{
+  "music_head": "c44d66557bf6c7f8ac541ef4e4fc6498c07b9c65",
+  "music_parent": "7f4cc5c2674afcd0b9cdacd2e93ec0eb42bec733",
+  "conditional_peer_inputs": [
+    {
+      "pr": 2007,
+      "head": "53da8b820448ec780ea8f8f4554f34552818eeee",
+      "parent": "3a66c1263b14a16246150979e51dc5bcc381c2d2",
+      "music_overlap": [
+        "lampOS/crates/voice/src/second_provider/worker.rs"
+      ]
+    },
+    {
+      "pr": 2008,
+      "head": "4432552c85fcc42006a804ab723b130135c8e824",
+      "parent": "e9d84fbee72731300594a0762eae7a9ba33040a5",
+      "music_overlap": [
+        "lampOS/crates/voice/src/lib.rs",
+        "lampOS/crates/voice/src/second_provider.rs",
+        "lampOS/crates/voice/src/second_provider/tests.rs",
+        "lampOS/crates/voice/src/second_provider/worker.rs",
+        "lampOS/docs/switches.md"
+      ]
+    }
+  ],
+  "scope": "Read-only review of each unmerged peer delta against private Music preparation, not a combined build or final port.",
+  "findings": [
+    {
+      "severity": "P2",
+      "pr": 2008,
+      "summary": "Speaking-face narrowing can be enabled without scoped context, leaving chat messages on the legacy personal builder.",
+      "review_url": "https://github.com/autonomous-ai/lampOS/pull/2008#issuecomment-6274090141",
+      "evidence": [
+        "worker.rs:1373 constructs ScopedSystem only with LAMP_SECOND_SCOPED_CONTEXT=on.",
+        "worker.rs:1421-1426 independently enables speaking-face narrowing.",
+        "second_provider.rs:1817-1826 narrows the live lease and discards prepared chat.",
+        "second_provider.rs:2226-2229 falls back to the legacy builder without ScopedSystem.",
+        "worker.rs:1312-1328,1363-1378 legacy builder selects current/sticky person and loads personal memory/history.",
+        "second_provider/tests.rs:4135-4144 always supplies a scoped builder."
+      ],
+      "validation": "Root and independent reviewer verified the call chain; no runtime or lamp reproduction."
+    }
+  ],
+  "music_narrowing_conclusion": "No stale person-bound grant exists before final words on the inspected production path: prepared chat buffers events without running tools; narrowing discards it; the admitted final audio runner carries the live lease. Music context binds request identity, not person or scope epoch.",
+  "expected_text_conflicts": [
+    "If #2008 lands, union second_provider/tests.rs speaking-face case with Music peer helpers and Called/private-offer/NEWS tests.",
+    "Union docs/switches.md speaking-face row and current upstream wait-cue defaults."
+  ],
+  "preserve": [
+    "If #2007 lands, retain its three-argument spoken_character and immediate remember/recall/forget declarations alongside Music audio runner."
+  ],
+  "combined_regressions_if_landed": [
+    "Prepared old Music call then other-face narrowing and fresh different final Music call: no old dispatch, one fresh offer, runner sees room scope, boot/session/request/privacy binding unchanged.",
+    "Same-face and ambiguous/no-face controls retain scope; empty final words, synthetic Called and carried-only input cannot authorize Music.",
+    "Camera revocation, newer request or Stop during final narrowing prevent memory calls and Music offers; keep shutdown and IPC-credit deadlines.",
+    "Few-tools memory calls with direct/wrapped Music retain scope and keep private offers out of model messages; cover actual scoped-context activation fix."
+  ],
+  "limitations": [
+    "Both peer heads were unmerged when read. Preserve their actual merged revisions during the final port.",
+    "No source changes, Cargo checks, provider sessions or device access during this audit."
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "head": "7f4cc5c2674afcd0b9cdacd2e93ec0eb42bec733",
+  "parent": "fd31d9c98e283089253b063d6181010846da2741",
+  "integration_head": "e9d84fbee72731300594a0762eae7a9ba33040a5",
+  "merge_base": "df722db2d0ee6cb9cd46640e8fc2554065333d13",
+  "own_changed_files": [
+    "lampOS/crates/update/src/install.rs",
+    "lampOS/crates/update/tests/install.rs",
+    "lampOS/skills/bedtime-morning/SKILL.md",
+    "lampOS/skills/bedtime-morning/skill.toml",
+    "lampOS/skills/bedtime-morning/tests/README.md"
+  ],
+  "overlap_results": [
+    {
+      "path": "lampOS/crates/update/src/install.rs",
+      "merge_exit": 0,
+      "merged_sha256": "0b4f5ded58a40d3d5fa5029af31afef5a86945373be04dfb29325e25bfa58dae",
+      "all_function_names_retained_from_both_sides": true,
+      "input_sha256": {
+        "ours": "e46a8bdfe1c57dc969ead638dce5fe41dfa1f556213ed49a8170f7d64120b323",
+        "base": "babf6edd85b5f704fb89ccbca06ee312147b4eed8076a60b25e0bb1f6ee35960",
+        "theirs": "bc25f859430d50d264f828f1994ea3204eacb69fdf5dc81de1731e141bf71f77"
+      }
+    },
+    {
+      "path": "lampOS/crates/update/tests/install.rs",
+      "merge_exit": 0,
+      "merged_sha256": "7d1cbc0b084be57a396cde9b36d2ce9b87247f61956e29e28d56fef46ed9626c",
+      "all_function_names_retained_from_both_sides": true,
+      "input_sha256": {
+        "ours": "c222d6284f12df441b9b33ea291d630fe27dfe774724f1bdaf72ead5111b84e6",
+        "base": "fa5064649e769c4fc45f847790e88d11ff7f46fc12201f84ae0b1bfc819fb186",
+        "theirs": "69350c27767e6cc7f802a8d8866c3797220c198428cd1549e783fcc0093c324b"
+      }
+    }
+  ],
+  "scope": "Read-only textual integration boundary check of the authored five-file task; no compile or runtime claim for this composed source."
+}
