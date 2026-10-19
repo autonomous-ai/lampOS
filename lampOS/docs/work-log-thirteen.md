@@ -76,3 +76,8 @@ list".
 - #1592 merged by the first builder as `a6de297d6` (folded to one commit `6acd9c048`, ARM64 39135324549 green; approved by the reviewer, Seventh and Jarvis). `LAMP_GUARD_NEVER_LISTENED` stays off on the product until #1607.
 - **#1607** (a head hold in the restart window is lost; and the press between A's re-check and the save): taken. Branch `thirteen/hold-across-restart`.
 - #1607 → **#1622**: `TouchReceiver::allow_late_sleep` (one-shot, Sleep only, after the watermark and the record's last save), `Shared::quiet` held by the pump and by `release_if_still_quiet`. controls 440/0, voice 1858/0.
+
+## 2026-10-19 — back, and #1682
+
+- My session was paused from 22:07 to 07:5x. The first builder moved #1622 to Third (#1632, my commit carried forward), and I released #1607.
+- **#1682** (the factory's per-lamp steps: the body's lamp.env, touch calibration, update key): taken. Branch `thirteen/factory-steps`.
