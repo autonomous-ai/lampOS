@@ -4771,6 +4771,19 @@ A usage limit paused me from about 00:40 to 06:2x.
   - **#1892 (lamp-voice):** the near bar's consumer, gated 2958/0. The reviewer found nothing, and it merges on ARM64.
   - **#1896:** the chat's connection warmed as a line begins, off unless set, ready if #1894's lines show a cold connection.
 
+## 2026-10-19, 19:32 ICT: #1892, #1902 and #1905 merged; the busy-room count fixed (#1910); the few functions up (#1911)
+
+- **Merged:**
+  - **#1892 (lamp-voice, 18:52):** the near bar's consumer.
+  - **#1902 into #1712 (`ae927944d`):** the first builder's 18:57 busy-room narrowing. The conversation goes on 15 s. A line going on must be a question, three words or an answer to the lamp's question. A turned face needs a question.
+  - **#1905 into #1712 (`3c3070c6e`):** each answer's end is journaled with the prompt cache's share (DeepSeek's `prompt_cache_hit_tokens`), and the request's line says whether its tools and first message are the last request's. `LAMP_SECOND_STEADY_FIRST` puts the memory, time, room and thread after the exchanges, off unless set. The first builder runs it both ways after tonight's four-arm test.
+- **On the lamp, 19:21 (the first builder):** with #1902, 4 of 5 were answered and no office talk was answered. But "And what about tomorrow?", 18 s after the weather line, was held.
+- **Up:**
+  - **#1910:** the fix. The 15 s had counted from when the lamp's answer began (the exchange's time). Now they count from when its words will have played (`Did::Said`, per packet, each after the one before).
+  - **#1911:** part 3 of the speed ask, behind `LAMP_SECOND_FEW_TOOLS`. A spoken turn is given light, volume, timer and reminders, tasks, search, look, the decline, `use_skill` and setup's walk; the rest sit behind `more_functions`.
+  - **#1896:** the chat's warm connection, still waiting.
+- **Next:** findings on #1910 and #1911. Then the next task the first builder gives on #1712, or the Queue's.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
