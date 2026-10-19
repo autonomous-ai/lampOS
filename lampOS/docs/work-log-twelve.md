@@ -338,3 +338,15 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   (08a90ec99) installed from a test-signed channel; V1 stopped and backed up;
   voice and eyes up; body waits for #1744's lamp.env; name has no models.
   Handed to Thirteen for #1744 with the person at the arm.
+- #820 (2) is #1825: `lamp-schedule --zone system`. Its ARM64 failed once on a
+  Linux-only case (jiff's `TimeZone::get` found `localtime` in the system's
+  zone folder). The fix names the zone from the link or the name file, checked
+  against the bundled zones. Green on the second run.
+- #1822 shown on lamp-c0a4 with its own build: asked via the Mac's `say`, it
+  told Saigon's time, then New York's after `set-timezone`, with no restart,
+  then Saigon's again. c0a4 is back on 3162's voice.
+- On c0a4: name's models installed (Thirteen's ask). The voice hit
+  `quota_exceeded` and the person lifted the device token limit.
+- #820 (3), Expression, was already on `lamp-local-time` with a New York test.
+  What's left is units, which are the first builder's. Build 3265
+  (`850fdfb68`) named for #1693 (4)'s scenes tonight.
