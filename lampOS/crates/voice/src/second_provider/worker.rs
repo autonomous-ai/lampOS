@@ -2580,6 +2580,21 @@ mod tests {
             &signs(Room::Busy, vec![(10_200_000, heard)], Some(false)),
         );
         assert_eq!(heeding.name_note_for(7), Some(crate::called::note(true)));
+        // Both switches (Fourth on #1712): the heard-as line, and in a busy
+        // room only with someone turned to the lamp.
+        heeding.telling_the_name(true, true);
+        heeding.note_the_name(
+            8,
+            line,
+            &signs(Room::Busy, vec![(10_200_000, heard)], Some(true)),
+        );
+        assert_eq!(heeding.name_note_for(8), Some(crate::called::note(true)));
+        heeding.note_the_name(
+            9,
+            line,
+            &signs(Room::Busy, vec![(10_200_000, heard)], Some(false)),
+        );
+        assert_eq!(heeding.name_note_for(9), None, "busy, nobody turned");
     }
 
     /// #1712: a call the Live route would hold for the Policy is said as
