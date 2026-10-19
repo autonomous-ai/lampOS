@@ -1,0 +1,30 @@
+{
+  "checked_at_utc": "2026-10-19T20:06:51Z",
+  "pull_request": 2020,
+  "head": "31c647f61260811322a6800a4b37797ccb580e9b",
+  "merge": "b8d97178ccf200a694c49c51eafd3f908cde5a21",
+  "review_kind": "Static call-chain review of the actual merged source; no independent runtime reproduction or device check.",
+  "source_blobs": {
+    "lampOS/crates/voice/src/remember.rs": "63bdc83749910166554569c0d6d7bbe5496d9082",
+    "lampOS/crates/memory/tests/voice_forget.rs": "81f66efc038292099b9855cb84a74337442f23dd"
+  },
+  "settled_writer_fix": "Correct: successful forget clears the current conversation IDs.",
+  "remaining_finding": {
+    "severity": "P2",
+    "summary": "A queued writer can restore deleted IDs before the next explicit remember copies them.",
+    "queue_capacity": 32,
+    "end_marker": "The forget path ignores try_send failure. Full queue can drop End; accepted End remains behind older work.",
+    "interleaving": [
+      "A linked exchange is committed, but its writer has not processed the successful answer.",
+      "Successful forget deletes the linked item and exchanges, inhibits new journalling, and clears current.",
+      "The older writer publishes its private source list, including the deleted exchange.",
+      "A foreground remember copies that list before an accepted End executes, or while a full queue has dropped End. The store refuses the explicit memory request."
+    ],
+    "existing_test_limit": "The regression waits for append and sleeps 200 ms before forgetting; it does not hold a successful append across the clear or exercise a full queue.",
+    "requested_coverage": [
+      "Fence pre-forget writer publications independently of End delivery.",
+      "Deterministically cover both accepted and full-queue End interleavings."
+    ]
+  },
+  "publication": "Prepared follow-up remains local: CLI TLS handshake failure and connector comment permission denial prevent posting."
+}

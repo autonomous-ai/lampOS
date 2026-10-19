@@ -1,0 +1,51 @@
+{
+  "integration_base": "f56f8c4cc5d14116b09224eb3c5d59406b709add",
+  "grep_command": [
+    "rg",
+    "-n",
+    "bedtime.morning|BEDTIME|six_core_skills|core_skills",
+    "crates/"
+  ],
+  "grep_output_sha256": "77ce93937c62efcacebfbd6fa921c89b5cc0c9e5f188d0a0b63d87e1494ea5d5",
+  "matched_files": [
+    "crates/actions/src/caps.rs",
+    "crates/skills/tests/skills.rs",
+    "crates/update/src/install.rs",
+    "crates/update/tests/install.rs",
+    "crates/voice/src/coordinator/tests/second_route.rs",
+    "crates/voice/src/second_provider/tests.rs"
+  ],
+  "changed_crates": [
+    "lamp-update"
+  ],
+  "reverse_dependency_closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "workspace_crates": 42,
+  "validation": "Complete suites cover the original 10-crate reverse-dependency closure and the separate grep-only lamp-actions consumer, for 11 crates total, without filters. lamp-actions is not a reverse dependency. All lamp-update tests run in the checkout for its inherited parent image fixture; the other main-gate suites and workspace build run in the source-only copy. The additional full Actions suite is recorded as its own stage in authored-rebased-host.json.",
+  "additional_grep_consumers": [
+    "lamp-actions"
+  ],
+  "validated_packages": [
+    "lamp-actions",
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ]
+}

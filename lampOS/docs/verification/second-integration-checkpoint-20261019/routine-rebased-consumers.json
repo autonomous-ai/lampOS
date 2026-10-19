@@ -1,0 +1,62 @@
+{
+  "integration_base": "f0fbb20e7b0684792b9510801851f5dce7008cc9",
+  "grep_command": [
+    "rg",
+    "-n",
+    "DailyRuntime|DailyState|DailyWindow|routine|Routine|rest::|RestRequest",
+    "crates/"
+  ],
+  "grep_output_sha256": "e00cb87e4c1207516497d4b24282466be538fac35612d82dc1d8b9fff93d329a",
+  "matched_files": [
+    "crates/body/src/body.rs",
+    "crates/body/src/body/tests.rs",
+    "crates/body/src/inspection.rs",
+    "crates/body/src/inspection/tests.rs",
+    "crates/body/src/linux.rs",
+    "crates/expression/src/alive.rs",
+    "crates/expression/src/engine.rs",
+    "crates/expression/src/rest.rs",
+    "crates/expression/src/runtime.rs",
+    "crates/expression/tests/rest_requests.rs",
+    "crates/msgs/src/expression.rs",
+    "crates/msgs/src/lib.rs",
+    "crates/policy/src/progress.rs",
+    "crates/setup/tests/reset.rs",
+    "crates/skills/src/daily.rs",
+    "crates/skills/src/lib.rs",
+    "crates/skills/src/limits.rs",
+    "crates/skills/src/main.rs",
+    "crates/skills/src/routine.rs",
+    "crates/skills/tests/daily_engine.rs",
+    "crates/skills/tests/routine_service.rs",
+    "crates/skills/tests/skills.rs",
+    "crates/surround/tests/worker.rs",
+    "crates/update/tests/install.rs",
+    "crates/voice/src/hand_controls.rs",
+    "crates/voice/src/hand_controls/tests.rs",
+    "crates/voice/src/second_provider/tests.rs"
+  ],
+  "changed_crates": [
+    "lamp-schedule",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update"
+  ],
+  "reverse_dependency_closure": [
+    "lamp-actions",
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-schedule",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "workspace_crates": 42,
+  "validation": "The final workspace gate runs every crate in this closure: all lamp-update tests run in the checkout for its inherited parent image fixture; all other suites and the workspace build run in the source-only copy."
+}
