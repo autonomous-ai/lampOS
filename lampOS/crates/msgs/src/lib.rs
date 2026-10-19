@@ -56,6 +56,8 @@ mod controls;
 pub use controls::*;
 mod ears;
 pub use ears::*;
+mod sound_classes;
+pub use sound_classes::*;
 mod air;
 pub use air::*;
 mod schedule;
@@ -1291,6 +1293,11 @@ pub fn stop_topics() -> Vec<(&'static str, Declaration)> {
     vec![(StopHeard::TOPIC, StopHeard::declaration())]
 }
 
+/// Semantic room sound is separate from the original topics and level/onset.
+pub fn sound_class_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(SoundClasses::TOPIC, SoundClasses::declaration())]
+}
+
 pub fn declaration_of(topic: &str) -> Option<Declaration> {
     first_topics()
         .into_iter()
@@ -1312,6 +1319,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(arrival_topics())
         .chain(skill_ask_topics())
         .chain(privacy_topics())
+        .chain(sound_class_topics())
         .chain(chat_topics())
         .find_map(|(name, declaration)| (name == topic).then_some(declaration))
 }
