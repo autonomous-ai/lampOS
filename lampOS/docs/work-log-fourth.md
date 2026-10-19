@@ -4809,6 +4809,21 @@ A usage limit paused me from about 00:40 to 06:2x.
   - The first builder checked on lamp-4ace (21:14) that the relay key `/etc/lampOS/voice/credential` is the template's key for every path.
 - **Next:** the merge's pull request, then #1940's three items, then item 5 (the hums and holding answer) after #1712 lands.
 
+## 2026-10-19, 22:42 ICT: the landing is up as #1973 on an ARM64 green; #1940 meets the first builder's three conditions
+
+- **#1973, the landing** (`fourth/route-meets-lamp-voice` into `lamp-voice`):
+  - my full gate passed at `ec4f2878f`: 7736 passed, 0 failed, at night;
+  - the first builder's ARM64 run 39274106065 passed at `71904eef2`, which brings in both tips since;
+  - the next commit, `dfa367a85`, has #1712's `74ea4d028`; its pull-request ARM64 runs are queued.
+- **#1940, the lamps' voice on the second route** (head `c5fbfaa57`):
+  - DeepSeek through the relay (#1939), so no unit loads `deepseek.key`;
+  - `second.json` is real relay values on the lamp's one key, `/etc/lampOS/voice/credential`, and install places it as `provider.json` is placed;
+  - `lamp-selftest`'s new `voice_route` part names a missing file;
+  - lamp-4ace's unit also moved to the relay, as the owner asked.
+
+  The first builder's three conditions are met (22:26). They merge it into #1712 on its ARM64 green.
+- **Next:** the landing's runs and its review. The hums moved to Eighth (21:51), so my list is #1973 and #1940 until they land.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
