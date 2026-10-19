@@ -156,6 +156,8 @@ struct Duplex {
     /// When the latest yield began, or the latest fruitless yield was
     /// forgiven: the next is forgiven [`FORGIVE_FRUITLESS_US`] after it.
     last_yield_at_us: Option<u64>,
+    /// Fruitless yields forgiven since hearing began, for the record.
+    forgiven: u32,
     /// A forced yield (`stop/heard`) committed: the reply is to end
     /// ([`PlaybackMask::take_stop_committed`]).
     stop_committed: bool,
@@ -172,6 +174,9 @@ pub(crate) struct Listened {
     /// The score to give the turn detector for this block.
     pub score: f32,
     pub step: Step,
+    /// A fruitless yield was forgiven on this block
+    /// ([`FORGIVE_FRUITLESS_US`]).
+    pub forgiven: bool,
 }
 
 /// A piece of the lamp's own sound that the speaker took: whose turn, how
@@ -239,6 +244,7 @@ impl PlaybackMask {
                 blind: true,
                 fruitless: 0,
                 last_yield_at_us: None,
+                forgiven: 0,
                 stop_committed: false,
                 matched: 0,
                 listened_at_us: 0,
@@ -356,6 +362,7 @@ impl PlaybackMask {
             heard: None,
             score: probability,
             step: Step::Carry,
+            forgiven: false,
         };
         let Some(duplex) = self.duplex.as_mut() else {
             return Ok(unjudged);
@@ -366,14 +373,19 @@ impl PlaybackMask {
         duplex.listened_at_us = at_us;
         // A fruitless yield is forgiven after a spell of the reply with no
         // yield, so a long story is never deaf for its rest.
-        if duplex.fruitless > 0
+        let forgiven = duplex.fruitless > 0
             && duplex
                 .last_yield_at_us
-                .is_some_and(|at| at_us.saturating_sub(at) >= FORGIVE_FRUITLESS_US)
-        {
+                .is_some_and(|at| at_us.saturating_sub(at) >= FORGIVE_FRUITLESS_US);
+        if forgiven {
             duplex.fruitless -= 1;
+            duplex.forgiven = duplex.forgiven.saturating_add(1);
             duplex.last_yield_at_us = Some(at_us);
         }
+        let unjudged = Listened {
+            forgiven,
+            ..unjudged
+        };
         if duplex
             .heard
             .back()
@@ -443,6 +455,7 @@ impl PlaybackMask {
             heard: Some(heard),
             score: Self::held_open(duplex, score),
             step,
+            ..unjudged
         })
     }
     /// While the lamp has stopped for someone, what it hears is one
@@ -548,6 +561,12 @@ impl PlaybackMask {
                 duplex.fruitless >= FRUITLESS_YIELDS,
             )
         })
+    }
+    /// Fruitless yields forgiven since hearing began
+    /// ([`FORGIVE_FRUITLESS_US`]): `fallen_back_at_end` says only whether the
+    /// last reply had fallen back when the session ended (Eighth on #2048).
+    pub fn fruitless_forgiven(&self) -> u32 {
+        self.duplex.as_ref().map_or(0, |duplex| duplex.forgiven)
     }
     /// Hearing, when the latest block was judged.
     fn hearing(&self) -> Option<&Duplex> {
@@ -1940,15 +1959,24 @@ mod tests {
                 assert_eq!(steps.last().unwrap().1, Step::Resume);
             }
             assert!(mask.duplex_summary().unwrap().1, "fallen back");
-            // The lamp goes on speaking, nobody over it.
-            hear(
-                &mut mask,
-                &mut sequence,
-                quiet_blocks(after),
-                0.1,
-                &evidence(40, None),
-                true,
-            );
+            // The lamp goes on speaking, nobody over it. The block that
+            // forgives one says so, and the count keeps it (Eighth on #2048).
+            let mut forgiven = 0;
+            for _ in 0..quiet_blocks(after) {
+                let listened = mask
+                    .listen(
+                        sequence,
+                        0.1,
+                        Some(&evidence(40, None)),
+                        true,
+                        sequence * 10_000,
+                    )
+                    .unwrap();
+                forgiven += u32::from(listened.forgiven);
+                sequence += 1;
+            }
+            assert_eq!(forgiven, u32::from(yields), "{after} s after");
+            assert_eq!(mask.fruitless_forgiven(), forgiven);
             mask.assume_matched();
             let steps = hear(
                 &mut mask,
