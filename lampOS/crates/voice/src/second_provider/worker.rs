@@ -620,6 +620,23 @@ pub fn with_search(
 /// character's example; a poem of two lines).
 pub(crate) const SPOKEN_NOTE: &str = "\n\nYou read what people say as words, and your ears turn some words into others, names and places most of all. When a question is plainly about the weather, a price, a time or a place, answer it for the likeliest meaning, here first, and search if you need to; ask back only when you cannot guess at all. Greet and say goodbye for the time of day it is now. A poem you are asked for has at least four lines.";
 
+/// Why a line of a word or two is held ([`lone_words`]).
+pub(crate) const LONE_WORDS: &str = "a word or two in a conversation, no question and no short word said to the lamp, and nothing shows it was said to the lamp: no name, nobody turned to it";
+
+/// Whether a line let out only as the conversation going on is one or two
+/// words, no question, and no short word said to the lamp
+/// (`not_speech::short_word`: "louder", "thanks", "stop"): the room's,
+/// not a request. On lamp-4ace on 19 Oct "What's the price of gold?" was
+/// heard as "Surprise" and answered "Oh! I do like a surprise." (#1712). "And
+/// Paris?" is a question, and goes on.
+fn lone_words(heard: &str) -> bool {
+    let words = heard
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .count();
+    (1..=2).contains(&words) && !heard.contains('?') && !crate::not_speech::short_word(heard)
+}
+
 /// The character with [`SPOKEN_NOTE`] after it.
 fn spoken_character(character: &str) -> String {
     format!("{character}{SPOKEN_NOTE}")
@@ -1459,14 +1476,17 @@ impl Heeding {
         attention.lamp_asked(signs.lamp_asked);
         attention.set_near(signs.near);
         let turned = signs.turned.filter(|_| self.strict);
-        let verdict =
+        let mut verdict =
             attention.first_output_busy(request, signs.room, signs.going_on, self.strict, turned);
+        let alone = attention.played_on_the_conversation_alone();
+        if alone && lone_words(heard) {
+            verdict = Some(crate::attention::Verdict::Hold(LONE_WORDS));
+        }
         // The verdict for the room this route keeps (`super::room`).
         if let Ok(mut room) = crate::room_told::room().lock() {
             room.judged(request, verdict, false);
         }
-        self.alone = attention
-            .played_on_the_conversation_alone()
+        self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
         match verdict {
             Some(crate::attention::Verdict::Hold(why)) => Some(why),
@@ -2758,6 +2778,29 @@ mod tests {
         let next = (1_003_000_000, 1_004_000_000);
         assert_eq!(heeding.judge(10, next, talk, signs(true, false)), None);
         assert_eq!(heeding.conversation_note_for(10), None);
+        // #1712: a word or two in it, no question and no short word, is the
+        // room's; a short word said to the lamp, or a question, goes on.
+        for (heard, held) in [
+            ("Surprise!", true),
+            ("Oh wow.", true),
+            ("Louder.", false),
+            ("Thank you.", false),
+            ("And Paris?", false),
+            ("What's the price of gold?", false),
+        ] {
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            let verdict = heeding.judge(9, line, heard, signs(true, false));
+            assert_eq!(verdict, held.then_some(super::LONE_WORDS), "{heard}");
+            assert_eq!(heeding.conversation_note_for(9).is_some(), !held, "{heard}");
+        }
+        // With a name, a word or two is the lamp's.
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(
+            heeding.judge(9, line, "Lamp, surprise!", signs(true, false)),
+            None
+        );
         // #1712, line 8 of the battery: in such a line, nothing set to come.
         let mut heeding = super::Heeding::new(false, false, None, None);
         heeding.as_the_only_voice(false, true, false);

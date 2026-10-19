@@ -886,7 +886,12 @@ after a take-over, but now for every turn:
   as the Live route tells it of a call the Policy holds, and the journal
   says `request N asked for set_timer: held, nothing shows it was said to
   the lamp`. At 13:03 on 19 Oct "Yes, give me five minutes", said to
-  someone else, set a five-minute timer.
+  someone else, set a five-minute timer. And such a line of one or two
+  words, with no question in it and not a short word said to the lamp
+  (`not_speech::short_word`: "louder", "thanks", "stop"), is held before
+  the model sees it (`worker::LONE_WORDS`): "What's the price of gold?"
+  heard as "Surprise" was answered "Oh! I do like a surprise." "And
+  Paris?" is a question and goes on.
 - **The name note** (`LAMP_NAME_NOTE`) is given as on the Live route
   (`worker::Heeding::telling_the_name`): a line the lamp's name began, heard
   by `lamp-name` at `called::LEAST_SCORE` or more no more than
