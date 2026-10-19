@@ -1810,7 +1810,8 @@ lamp or by it:
   `answered`, or `held_back` when the answer was held as not said to the
   lamp. On the Live route that is the rule that judges each answer
   ([attention.md](attention.md)); on the second route the same rule, or a
-  short sound with nothing to show it was said to the lamp. A turn nothing
+  short sound with nothing to show it was said to the lamp. On both, the
+  model's own `not_for_me` is `held_back` too (below). A turn nothing
   judged, or with nothing heard, is not told, and counts.
 - **Held back.** The turn's talk is taken back from the quiet: it counts
   again from the talk before the turn began, and nothing more heard,
@@ -1832,9 +1833,12 @@ lamp or by it:
   the seconds since anything was said, all talk counting), for it to judge
   a hello at the lull, and the moment question beside it (`--gate`) counts
   all talk as before.
-- **Not counted yet:** a turn the model itself declines as not for the
-  lamp (`not_for_me`) after the rule let it out. It is told `answered`, and
-  counts.
+- **A turn the model itself declines** as not for the lamp (`not_for_me`,
+  called, or written as words on the second route) is told `held_back` at
+  the decline, after an `answered` if the rule let it out first, and is
+  taken back the same way (the first builder on #1817). One the lamp acted
+  on first is the lamp's: a decline after an action ran (the Live route), or
+  after any tool ran (the second route), is not told.
 
 The policy reads `voice/turn` only with the switch on. Tested with a replay
 of a busy office at the rig's scale (`tests/hello.rs`,

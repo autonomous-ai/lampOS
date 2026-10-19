@@ -1060,8 +1060,11 @@ async fn spoken(
 
 /// How an answer stopped short.
 enum Stop {
-    /// `not_for_me`: nothing more is said.
+    /// Nothing more is said: the chat was given up.
     Silent,
+    /// `not_for_me`: nothing more is said, and the model judged the line
+    /// not said to the lamp.
+    Declined,
     Failed(Fault),
     /// The engine is gone.
     Gone,
@@ -1106,6 +1109,9 @@ async fn answer(
         .then(|| start_speech(shared, &mut speech, ANNOUNCEMENT.to_owned()));
     let (sentences, mut queued) = mpsc::channel(SENTENCES_AHEAD);
     let spoke = AtomicBool::new(false);
+    // Whether a tool ran for this line: one declined after is the lamp's.
+    let ran = AtomicBool::new(false);
+    let acted = &ran;
     let mut queue = Queue {
         shared,
         speech: &mut speech,
@@ -1282,7 +1288,7 @@ async fn answer(
                 );
             }
             if calls.iter().any(|call| call.name == NOT_FOR_ME) {
-                return Err(Stop::Silent);
+                return Err(Stop::Declined);
             }
             if let Some(rest) = split.finish() {
                 queue.push(rest).await?;
@@ -1295,6 +1301,7 @@ async fn answer(
             }
             messages.push(Message::assistant_calls(Some(text), &calls));
             for call in &calls {
+                acted.store(true, Ordering::Relaxed);
                 let result = match (&shared.scoped_tools, &scope) {
                     (Some(run), Some(scope)) => {
                         run(
@@ -1389,6 +1396,20 @@ async fn answer(
             request,
             idle: true,
         },
+        Err(Stop::Declined) => {
+            // A line the model declines is told held back, as a line the
+            // rule holds is, unless a tool ran for it first (#1155, the
+            // first builder on #1817).
+            if let Some(told) = shared.verdicts.as_ref()
+                && !acted.load(Ordering::Relaxed)
+            {
+                told(request, lamp_msgs::TurnVerdict::HeldBack);
+            }
+            ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            }
+        }
         Err(Stop::Failed(reason)) => ProviderOutput::TurnFailed {
             request,
             stage: if spoke.load(Ordering::Relaxed) {
@@ -1455,7 +1476,7 @@ impl Queue<'_> {
         // other is left out, and not run (its arguments are not read).
         if crate::not_speech::bare_call(&text) {
             if text.trim_start().starts_with(NOT_FOR_ME) {
-                return Err(Stop::Silent);
+                return Err(Stop::Declined);
             }
             return Ok(());
         }

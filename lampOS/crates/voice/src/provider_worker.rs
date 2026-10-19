@@ -1695,6 +1695,14 @@ async fn serve_with_visual<C: Connect>(
                         log.tool_call(&line);
                     }
                 }
+                // A line the model itself said was not for it is told held
+                // back, as a line the rule holds is (#1155, the first builder
+                // on #1817). One it acted on first is the lamp's.
+                for request in desk.take_declines() {
+                    if let Some(out) = turn_out.as_mut() {
+                        out.tell(request, lamp_msgs::TurnVerdict::HeldBack, monotonic_us());
+                    }
+                }
                 // A session that has answered nothing for a long run of
                 // requests is replaced the next time nothing is owed on it.
                 if unanswered_requests().load(std::sync::atomic::Ordering::Relaxed) >= RENEW_AFTER_UNANSWERED
@@ -2816,6 +2824,9 @@ struct ToolDesk {
     settings: crate::tools::Settings,
     /// The newest request the model said was not for it.
     declined: Option<u64>,
+    /// Each request declined and not acted on since the worker last took
+    /// them, to be told held back on `voice/turn` (#1155).
+    declines: Vec<u64>,
     /// The newest request in which the executive was asked to do
     /// something. Doing what was asked and then saying it was not for the
     /// lamp cannot both be right, and what was done cannot be undone: the
@@ -2930,6 +2941,7 @@ impl ToolDesk {
         Self {
             settings,
             declined: None,
+            declines: Vec::new(),
             acted: None,
             asked,
             answers,
@@ -3132,6 +3144,7 @@ impl ToolDesk {
             }
             Route::Decline => {
                 self.declined = Some(request);
+                self.declines.push(request);
                 let (sent, sent_us) = tell(&crate::tools::declined());
                 self.line(
                     lineage.session,
@@ -3572,6 +3585,10 @@ impl ToolDesk {
     /// The calls answered since the last take.
     fn take_lines(&mut self) -> Vec<crate::first_output::ToolCallLine> {
         std::mem::take(&mut self.lines)
+    }
+    /// The requests declined since the last take (#1155).
+    fn take_declines(&mut self) -> Vec<u64> {
+        std::mem::take(&mut self.declines)
     }
     /// The requests whose look was asked in a call's answer since the last take.
     fn take_looks(&mut self) -> Vec<(u64, u64, Option<String>)> {
