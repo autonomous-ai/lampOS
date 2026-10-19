@@ -4795,6 +4795,20 @@ A usage limit paused me from about 00:40 to 06:2x.
   - **Step 2:** the product, lamp-52e6, repo lamp-4ace and attended pilot units go on the second route, using lamp-4ace's lines. It adds a `second.json` template and names each key file. The script is ready and runs after the gate.
 - **Next, after #1712 lands (the first builder, 20:15):** item 5 on the second route, the hums and the holding answer, and resending a lost line.
 
+## 2026-10-19, 21:31 ICT: landing #1712: the merge gating again on both new tips; the units up as #1940, held for a product lamp
+
+- **Step 1, the merge:** `fourth/route-meets-lamp-voice` is at `ec4f2878f`.
+  - It now holds `lamp-voice` after #1919 (`12b0056c0`) and #1712's tip `c88aad588`.
+  - It also has the first builder's note: a scoped turn drops the early round.
+  - The first gate was stopped when both tips moved. The new one is past fmt and Clippy, with no failures in 247 test binaries so far. The pull request goes up when it's green.
+- **Step 2 is #1940:** the product, lamp-52e6, repo lamp-4ace and attended pilot units on the second route, with the template and the key files named. The 8 packages that read deploy files pass.
+  - **Held by the first builder (21:08) until a product lamp can start its voice with it.** Three things are owed:
+    - chat and search through the relay (#1939's `LAMP_SECOND_DEEPSEEK_BASE_URL`), so no unit credential;
+    - install placing `second.json`;
+    - a self-test line naming what's missing.
+  - The first builder checked on lamp-4ace (21:14) that the relay key `/etc/lampOS/voice/credential` is the template's key for every path.
+- **Next:** the merge's pull request, then #1940's three items, then item 5 (the hums and holding answer) after #1712 lands.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
