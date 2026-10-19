@@ -657,6 +657,8 @@ const BUS_TOPICS: &[&str] = &[
     "body/hand",
     "body/joint_states",
     "camera/image",
+    "chat/in",
+    "chat/out",
     "controls/gesture",
     "controls/state",
     "controls/touch",

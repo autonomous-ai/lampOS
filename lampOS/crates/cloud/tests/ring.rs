@@ -5,7 +5,7 @@
 //! show.
 use lamp_bus::Bus;
 use lamp_cloud::answer::Lamp;
-use lamp_cloud::lamp::{Places, Real, Ring, Wifi};
+use lamp_cloud::lamp::{Places, Real, Ring, Texts, Wifi};
 use lamp_msgs::Light;
 use lamp_voice::ring_light::RingLight;
 use std::path::PathBuf;
@@ -43,6 +43,7 @@ fn a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_giv
         build: String::new(),
         wifi: Wifi::default(),
         ring: Ring::default(),
+        texts: Texts::default(),
     };
     let mut voice = Bus::new(&bus_root)
         .unwrap()

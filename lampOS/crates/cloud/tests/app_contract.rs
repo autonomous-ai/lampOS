@@ -7,7 +7,7 @@
 //! through JSON as the broker carries it.
 use lamp_bus::Bus;
 use lamp_cloud::answer::answer;
-use lamp_cloud::lamp::{Places, Real, Ring, Wifi};
+use lamp_cloud::lamp::{Places, Real, Ring, Texts, Wifi};
 use lamp_cloud::wire::Identity;
 use lamp_msgs::{Light, LightRequest};
 use serde_json::{Value, json};
@@ -159,6 +159,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         // No `iw` here: the Wi-Fi's name is not one the page reads.
         wifi,
         ring: Ring::default(),
+        texts: Texts::default(),
     };
     let me = Identity {
         device: "lamp".into(),

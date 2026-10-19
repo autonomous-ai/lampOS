@@ -145,6 +145,10 @@ async fn session(
 ) {
     let (client, mut events) = AsyncClient::new(options(account), 64);
     let mut wait = first;
+    // Pieces of the answers to texts, looked for between the broker's
+    // events (#1673, `crate::chat`).
+    let mut tick = tokio::time::interval(crate::chat::TICK);
+    tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     // What was last said, so a state is said once.
     let mut said = String::new();
     let mut tell = |say: &mut dyn Say, line: String| {
@@ -154,7 +158,25 @@ async fn session(
         }
     };
     loop {
-        match events.poll().await {
+        let polled = tokio::select! {
+            polled = events.poll() => polled,
+            _ = tick.tick() => {
+                if lamp.texting() {
+                    let me = identity.borrow().clone();
+                    for data in lamp.chat_events(crate::chat::now_ms()) {
+                        let event = me.data(&now(), "chat.event", &Ok(Some(data))).to_string();
+                        let _ = client.try_publish(
+                            account.fd_channel.as_str(),
+                            QoS::AtLeastOnce,
+                            false,
+                            event,
+                        );
+                    }
+                }
+                continue;
+            }
+        };
+        match polled {
             Ok(Event::Incoming(Packet::ConnAck(_))) => {
                 wait = first;
                 let _ = client.try_subscribe(account.fa_channel.as_str(), QoS::AtLeastOnce);
@@ -440,6 +462,83 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    /// #1673: with texts taken, a `chat.send` on `fa_channel` is acked on
+    /// `fd_channel` with its run, as V1's, and the answer's pieces the lamp
+    /// gives go out after it as `chat.event`. Without texts taken it is V1's
+    /// refusal of a kind this lamp lacks.
+    #[tokio::test]
+    async fn a_text_is_acked_with_its_run_and_its_answer_goes_out_as_chat_events() {
+        let (port, seen) = broker(
+            Broker::Takes,
+            vec![r#"{"cmd":"data","kind":"chat.send","data":{"message":"What time is it?","session_id":"s1"}}"#],
+        )
+        .await;
+        let (accounts_tx, accounts) = watch::channel(Some(account(port)));
+        let (_identity_tx, me) = watch::channel(identity());
+        let lamp = tokio::spawn(async move {
+            let mut lamp = Fake {
+                texting: true,
+                to_give: vec![serde_json::json!({
+                    "run_id": "run-1",
+                    "event": {"type": "chat_response", "state": "final"},
+                })],
+                ..Fake::default()
+            };
+            let mut say = |_: &str| {};
+            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            lamp.texts
+        });
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while publishes(&seen.lock().unwrap())
+            .iter()
+            .all(|(_, reply)| reply["kind"] != "chat.event")
+            && tokio::time::Instant::now() < deadline
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        drop(accounts_tx);
+        let texts = lamp.await.unwrap();
+        assert_eq!(texts.len(), 1);
+        assert_eq!(texts[0].text, "What time is it?");
+        assert_eq!(texts[0].session_id.as_deref(), Some("s1"));
+        let replies = publishes(&seen.lock().unwrap());
+        let ack = replies
+            .iter()
+            .find(|(_, reply)| reply["kind"] == "chat.send")
+            .expect("the ack");
+        assert_eq!(ack.0, "fd/d-42");
+        assert_eq!(ack.1["status"], "success");
+        assert_eq!(ack.1["data"]["run_id"], texts[0].run_id.as_str());
+        assert_eq!(ack.1["data"]["session_id"], "s1");
+        let events: Vec<_> = replies
+            .iter()
+            .filter(|(_, reply)| reply["kind"] == "chat.event")
+            .collect();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].1["type"], "data");
+        assert_eq!(events[0].1["status"], "success");
+        assert_eq!(events[0].1["data"]["event"]["type"], "chat_response");
+        // The ack goes before the answer's pieces.
+        let at = |kind: &str| replies.iter().position(|(_, reply)| reply["kind"] == kind);
+        assert!(at("chat.send") < at("chat.event"));
+
+        // Without texts taken: refused as a kind this lamp lacks.
+        let mut lamp = Fake::default();
+        let refused: serde_json::Value = serde_json::from_str(
+            &reply(
+                &identity(),
+                &mut lamp,
+                br#"{"cmd":"data","kind":"chat.send","data":{"message":"hi"}}"#,
+                "2026-10-19T01:00:00Z",
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(refused["status"], "failure");
+        assert_eq!(refused["error"], crate::wire::not_here("chat.send"));
+        assert!(lamp.texts.is_empty());
     }
 
     /// #1396: the lamp connects as V1 does, subscribes to `fa_channel`, says

@@ -5,8 +5,8 @@
 //! state, the network and the host from `/proc` and `/sys`. Nothing here
 //! needs root.
 use crate::answer::{Lamp, Mic, PREVIEW_HOLDS, Volume};
-use lamp_bus::{Bus, Publisher};
-use lamp_msgs::{Claim, Light, LightRequest, Priority};
+use lamp_bus::{Bus, Publisher, Subscriber};
+use lamp_msgs::{ChatIn, ChatOut, Claim, Light, LightRequest, Priority};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Ipv4Addr, UdpSocket};
@@ -64,6 +64,29 @@ pub struct Real {
     pub wifi: Wifi,
     /// The light asked of the ring.
     pub ring: Ring,
+    /// Texts from the app and the answers to them (#1673).
+    pub texts: Texts,
+}
+
+/// Texts from the app (`crate::chat`, #1673): whether they are taken, the
+/// bus's `chat/in` and `chat/out`, made at first use, and the runs waited
+/// on.
+#[derive(Default)]
+pub struct Texts {
+    pub on: bool,
+    input: Option<Publisher>,
+    output: Option<Subscriber>,
+    stream: crate::chat::Stream,
+}
+
+impl Texts {
+    /// Taken, or not, as `LAMP_MESSAGES` says.
+    pub fn on(on: bool) -> Self {
+        Self {
+            on,
+            ..Self::default()
+        }
+    }
 }
 
 /// What `lamp-cloud` has asked of the ring: its publishers, made at first
@@ -482,6 +505,66 @@ impl Lamp for Real {
             "stale": message.expired,
         }))
     }
+
+    fn texting(&self) -> bool {
+        self.texts.on && self.bus.is_some()
+    }
+
+    fn new_run(&mut self, now_ms: u64) -> String {
+        self.texts.stream.new_run(now_ms)
+    }
+
+    fn send_text(&mut self, text: &ChatIn, now_ms: u64) -> Result<(), String> {
+        let bus = self.bus.as_ref().ok_or(crate::chat::NOBODY)?;
+        // Listened for before the text goes, so no piece of its answer is
+        // missed.
+        if self.texts.output.is_none() {
+            self.texts.output = Some(
+                bus.subscribe_typed(ChatOut::TOPIC, SOURCE, ChatOut::TYPE)
+                    .map_err(|_| crate::chat::NOBODY.to_owned())?,
+            );
+        }
+        let input = match &mut self.texts.input {
+            Some(input) => input,
+            empty => empty.insert(
+                bus.publisher_declared(ChatIn::TOPIC, &ChatIn::declaration(), SOURCE)
+                    .map_err(|_| crate::chat::NOBODY.to_owned())?,
+            ),
+        };
+        let published = input
+            .publish_json(lamp_ipc::monotonic_us(), text)
+            .map_err(|_| crate::chat::NOBODY.to_owned())?;
+        // Nobody listening: the app is told at once, not after a minute.
+        if published.delivered == 0 {
+            return Err(crate::chat::NOBODY.to_owned());
+        }
+        self.texts.stream.acked(text, now_ms);
+        Ok(())
+    }
+
+    fn chat_events(&mut self, now_ms: u64) -> Vec<Value> {
+        // Task news comes with no text asked first: listened for from the
+        // start.
+        if self.texts.output.is_none()
+            && let Some(bus) = self.bus.as_ref()
+        {
+            self.texts.output = bus
+                .subscribe_typed(ChatOut::TOPIC, SOURCE, ChatOut::TYPE)
+                .ok();
+        }
+        let mut sent = Vec::new();
+        if let Some(output) = self.texts.output.as_mut() {
+            while let Ok(Some(message)) = output.recv(Duration::ZERO) {
+                if let Ok(out) = message.parse::<ChatOut>()
+                    && out.check().is_ok()
+                {
+                    sent.extend(self.texts.stream.piece(&out, now_ms));
+                }
+            }
+        }
+        sent.extend(self.texts.stream.due(now_ms));
+        sent
+    }
 }
 
 #[cfg(test)]
@@ -561,6 +644,7 @@ mod tests {
             build: "812+460a1a1aa2b3".into(),
             wifi: Wifi::default(),
             ring: Ring::default(),
+            texts: Texts::default(),
         };
         let level = Volume {
             volume: 35,
@@ -668,6 +752,7 @@ mod tests {
             build: String::new(),
             wifi: Wifi::default(),
             ring: Ring::default(),
+            texts: Texts::default(),
         };
         let blue = Light::new(true, "blue", 3).unwrap();
         // No ring yet.
