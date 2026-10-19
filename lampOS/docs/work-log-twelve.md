@@ -420,3 +420,8 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   was wrong, counts only. #2074 fixes trials-test's flaky thread case: the
   timed proof line came before the trial's mark when a set-up ran long.
   #2049 rebased onto #1712's compiling head.
+- #2063's first fix arm on lamp-4ace: correction-kept 8/8, correction-first
+  5/9, earlier-today-said 4/8. Tightened at `74341122c`: a correction's
+  first call is forget, the room's never repeated or hinted at; line 5 right
+  answered from the talk. #2049 rebased onto `bebea8708` (lamp-voice
+  2290/0). #2074 rebased over #2042, one `after_mark` wait, Tests' P3; 495/0.
