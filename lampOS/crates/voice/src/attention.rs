@@ -345,7 +345,10 @@ pub fn addresses_someone_else(heard: &str) -> bool {
                 .iter()
                 .chain(NOT_NAMES_OPENING)
                 .any(|not| word.eq_ignore_ascii_case(not))
-            && !STAND_INS.iter().any(|not| word.eq_ignore_ascii_case(not))
+            && !STAND_INS
+                .iter()
+                .chain(STAND_ALONE_INS)
+                .any(|not| word.eq_ignore_ascii_case(not))
     };
     let words: Vec<&str> = heard.split_whitespace().collect();
     let opening = words
@@ -460,6 +463,18 @@ const STAND_INS: &[&str] = &[
     "lam", "lan", "milan", "man", "plan", "helen", "mom", "amen", "weiland",
 ];
 
+/// More words the service writes for the lamp's name, counted as its call
+/// only standing alone, set off as a name is ("Hey, Lynn. How are you
+/// today?", "Thank you, Lynn."), and never as someone else's name (#1712,
+/// 19 Oct on lamp-4ace: "Hey Lamp, how are you today?" and "Lamp, what
+/// time is it?" came back with "Lynn" and were held as said to someone
+/// else; "Len", "Palin" and "Palan" on lamp-52e6 on 15 Oct; "Land" and
+/// "Line" in the first builder's trials; "Lin" and "Lump" as the first
+/// builder asked). "Line up the meetings" is no call.
+const STAND_ALONE_INS: &[&str] = &[
+    "lynn", "len", "lin", "lump", "land", "line", "palin", "palan",
+];
+
 /// Greetings that may come before the name of a call ("Hey Lamp,").
 const GREETINGS: &[&str] = &["hey", "hi", "ok", "okay", "oh", "hello"];
 
@@ -503,7 +518,14 @@ pub fn called_by_name(heard: &str) -> bool {
         let Token::Word(word) = token else {
             return false;
         };
-        if !is(word, &["lamp", "lamb"]) {
+        // The name, or a word written for it set off as a name is: nothing
+        // after it but a comma, a stop or the line's end.
+        let standing_alone = is(word, STAND_ALONE_INS)
+            && matches!(
+                tokens.get(at + 1),
+                None | Some(Token::Comma) | Some(Token::Stop)
+            );
+        if !(is(word, &["lamp", "lamb"]) || standing_alone) {
             return false;
         }
         // What came before it, greetings passed over.
@@ -3325,6 +3347,26 @@ mod tests {
             "Karen, the budget is due.",
         ] {
             assert!(addresses_someone_else(calls), "{calls}");
+        }
+        // #1712: the words written for the lamp's name are not someone
+        // else's, and standing alone they call the lamp.
+        for heard in [
+            "Hey, Lynn. How are you today?",
+            "Hey Lynn, how are you today?",
+            "Lynn, what time is it?",
+            "Thank you, Lynn.",
+            "Thank you. Lynn.",
+            "Palin, set a timer for five minutes.",
+            "Len, what's the weather?",
+        ] {
+            assert!(!addresses_someone_else(heard), "{heard}");
+            assert!(called_by_name(heard), "{heard}");
+        }
+        for heard in [
+            "Line up the meetings for me.",
+            "We should land the plan soon.",
+        ] {
+            assert!(!called_by_name(heard), "{heard}");
         }
         for not in [
             "Lamp, what time is it?",

@@ -3306,6 +3306,33 @@ mod tests {
         assert_eq!(super::with_look(full).len(), lamp_gemini::MAX_TOOLS);
     }
 
+    /// #1712, lamp-4ace 19 Oct: "Hey Lamp, how are you today?" heard as
+    /// "Hey, Lynn. How are you today?", and "Lamp, what time is it?" as
+    /// "Lynn, what time is it?", were held as said to someone else. As the
+    /// lamp runs (the name in passing ignored, `--spoken-to`), they are its
+    /// calls; a question to a person by name is still held.
+    #[test]
+    fn the_lamps_name_heard_as_lynn_is_its_call_not_someone_elses() {
+        let signs = || super::Signs {
+            room: crate::room_told::Room::Quiet,
+            going_on: false,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_002_000_000);
+        let judged = |heard: &str| {
+            let mut heeding = super::Heeding::new(false, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.judge(9, line, heard, signs())
+        };
+        assert_eq!(judged("Hey, Lynn. How are you today?"), None);
+        assert_eq!(judged("Lynn, what time is it?"), None);
+        assert!(judged("Daniel, are you coming to the meeting?").is_some());
+    }
+
     /// #1712: the weather is told while fresh, never once stale.
     #[test]
     fn the_weather_is_told_while_fresh() {

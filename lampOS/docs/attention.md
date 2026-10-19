@@ -172,6 +172,17 @@ With the name heard in the sound it was one, and "Helen" is now among the
 words the text may show a call by (with "Mom", "Amen" and "Weiland", each
 written for the lamp's name at least once in its records).
 
+More words the service writes for the name ("Lynn", "Len", "Lin", "Lump",
+"Land", "Line", "Palin", "Palan", `attention::STAND_ALONE_INS`) are never
+taken for someone else's name, and call the lamp only standing alone, set
+off as a name is: "Hey, Lynn. How are you today?", "Lynn, what time is
+it?", "Thank you, Lynn." are its calls, "Line up the meetings" is not
+(`called_by_name`). On lamp-4ace on 19 Oct, on the second route, "Hey Lamp,
+how are you today?" and "Lamp, what time is it?" came back with "Lynn" and
+were held as said to someone it calls by name (#1712). The voice keeps no
+list of the known faces' names yet, so a known person called Lynn is not
+told from the lamp.
+
 Of the three rounds with no answer heard, the rule held one. In one the
 service sent the words of an answer ("Four. Easy one.") and no sound, the
 only time in the 800 and more answers in the lamp's records. In one it
