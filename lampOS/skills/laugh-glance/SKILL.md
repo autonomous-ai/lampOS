@@ -11,7 +11,7 @@ for a burst of laughter, again only after twenty seconds without laughing,
 and never more than once in five minutes, however merry the room.
 
 It never glances while it is speaking, listening or thinking, nor at a laugh
-with nobody in view, and keeps still at night (23:00 to 06:00, the lamp's
+with nobody in view or over a sound of its own, and keeps still at night (23:00 to 06:00, the lamp's
 local time).
 
 It hears laughter by the ears' room sound scores (`ears/classes`, with

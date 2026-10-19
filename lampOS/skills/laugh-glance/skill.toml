@@ -30,6 +30,11 @@ topic = "voice/state"
 field = "state"
 equals = "resting"
 
+[[while]]                 # not at the lamp's own sound: a clip it plays as it rests is no one laughing (Jarvis on #1929)
+topic = "ears/classes"
+field = "own_voice"
+not_equals = "present"    # "unknown" (no evidence yet) and "clear" pass
+
 [[while]]                 # someone to glance at: a laugh with nobody in view gets nothing
 topic = "humans/faces/tracked"
 present = true

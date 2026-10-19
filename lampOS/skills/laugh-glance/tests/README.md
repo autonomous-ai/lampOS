@@ -15,11 +15,14 @@ yes, replaces the written one.
 | Case | What it holds | Result (lamp-skills, #1669) |
 |---|---|---|
 | `glances-once-at-a-laugh` | A face in view; laughter from 10 to 13 s | Pass: one glance at about 11 s |
-| `once-a-burst-and-not-again-within-five-minutes` | Laughter at 10 s, 14 s and 60 s | Pass: one glance; 14 s is the same burst (`rearm`), 60 s is within the cooldown |
+| `once-a-burst-and-not-again-within-five-minutes` | Laughter at 10 s, 14 s and 60 s | Pass: one glance; 14 s and 60 s are within the cooldown |
 | `not-at-one-loud-syllable` | One laughter score | Pass: nothing (`for = "1s"`) |
 | `nobody-in-view` | Laughter, no face | Pass: nothing |
 | `never-while-the-lamp-speaks` | Laughter while the lamp speaks | Pass: nothing |
 | `never-at-night` | From 23:30, laughter | Pass: nothing |
+| `laughter-on-and-on-gets-one-glance` | Laughter without a lull from 10 s to 330 s | Pass: one glance; none at 311 s when the cooldown ends (`rearm`) |
+| `a-laugh-with-nobody-in-view-spends-nothing` | A laugh with nobody at 10 s; a face from 30 s, a laugh at 60 s | Pass: one glance about 61 s; the first spent no cooldown |
+| `never-over-its-own-sound` | Laughter while `own_voice` is `present` | Pass: nothing |
 
 The threshold (0.5) is provisional: no score is measured on a lamp yet
 (`docs/sound-events.md`). How the glance looks, and how it sits beside
