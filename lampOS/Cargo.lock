@@ -1977,6 +1977,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamp-near-call"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "lamp-observer"
 version = "0.1.0"
 dependencies = [
