@@ -620,6 +620,15 @@ mod tests {
         assert!(sent.iter().all(|(topic, _)| topic == "fd/d-42"));
         assert_eq!(sent[0].1["type"], "info");
         assert_eq!(sent[0].1["id"], "d-42");
+        // Which Lamp it is, beside V1's `device`, on every reply: the
+        // unasked `info`, which the backend keeps on the device's record,
+        // included (#1396).
+        assert_eq!(sent[0].1["device"], "lamp");
+        assert!(
+            sent.iter()
+                .all(|(_, reply)| reply["generation"] == crate::wire::GENERATION),
+            "{sent:?}"
+        );
         let volume = sent
             .iter()
             .find(|(_, reply)| reply["kind"] == "volume.get")

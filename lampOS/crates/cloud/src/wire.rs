@@ -42,7 +42,8 @@ pub fn parse(payload: &[u8]) -> Result<Command, String> {
 /// The fields every reply carries (V1's `MQTTInfoResponse`).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Identity {
-    /// V1 says `lamp`; whether V2 says `lamp-v2` is the backend's call.
+    /// `lamp`, as V1's: the backend routes a lamp's messages by it, so a V2
+    /// lamp says it too, with [`GENERATION`] beside it (#1396).
     pub device: String,
     /// The build `lamp-update` installed.
     pub version: String,
@@ -54,10 +55,18 @@ pub struct Identity {
     pub local_ip: String,
 }
 
+/// Which Lamp this is, on every reply beside V1's `device`: the backend keeps
+/// one device type, `lamp`, for both generations, and the Autonomous app and
+/// the backend's record tell them apart by this (#1396, the first builder and
+/// the backend, 19 Oct). Setup's status says the same
+/// (`lamp_setup::serve::GENERATION`); V1's lamps say none.
+pub const GENERATION: &str = "lamp-v2";
+
 impl Identity {
     fn base(&self, kind_of_reply: &str, now: &str) -> Map<String, Value> {
         let mut reply = Map::new();
         reply.insert("device".into(), json!(self.device));
+        reply.insert("generation".into(), json!(GENERATION));
         reply.insert("type".into(), json!(kind_of_reply));
         reply.insert("version".into(), json!(self.version));
         reply.insert("id".into(), json!(self.id));
@@ -159,10 +168,19 @@ mod tests {
         let info = me().info("2026-10-17T15:00:00Z");
         assert_eq!(
             info,
-            json!({"device":"lamp","type":"info","version":"0.1.0+abc","id":"d-42",
-                "mac":"lamp-7f72","time":"2026-10-17T15:00:00Z","wakeword_enabled":false,
-                "voice_input_mode":"automatic","timezone":"Asia/Ho_Chi_Minh"})
+            json!({"device":"lamp","generation":"lamp-v2","type":"info","version":"0.1.0+abc",
+                "id":"d-42","mac":"lamp-7f72","time":"2026-10-17T15:00:00Z",
+                "wakeword_enabled":false,"voice_input_mode":"automatic",
+                "timezone":"Asia/Ho_Chi_Minh"})
         );
+        // Which Lamp this is, on the other replies too (#1396).
+        for reply in [
+            me().data("t", "volume.get", &Ok(None)),
+            me().refused("t", "add_channel"),
+        ] {
+            assert_eq!(reply["generation"], GENERATION, "{reply}");
+            assert_eq!(reply["device"], "lamp", "{reply}");
+        }
         let done = me().data("t", "volume.get", &Ok(Some(json!({"volume": 60}))));
         assert_eq!(
             (&done["type"], &done["kind"], &done["status"], &done["data"]),
