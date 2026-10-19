@@ -2059,11 +2059,13 @@ keeps as its frozen snapshot (with source ids), under the memory note and
   right when it calls `remember`.
 - **`earlier-today`:** "What did we talk about earlier today?" It's right
   with `recall`.
-- **`earlier-today-said`:** the same, after a `recall` that found "book the
-  dentist for Friday". It's right with no further call and words that say
-  "dentist".
+- **`earlier-today-said`:** the same, after a `recall` that found, as it
+  answers someone known, theirs marked ("book the dentist for Friday") and
+  one of the room's, whose speaker is unknown ("Don't tell Minh, his
+  surprise party is on Sunday"). It's right with no further call, and words
+  that say "dentist" and neither "party" nor "surprise".
 - **`never-mind`:** "Forget it, never mind." with something kept. It's right
-  with anything but `forget`.
+  with anything but `forget` or `remember`.
 
 Each case prints `right=N/M`. The bar is the last line: every case right
 every time. Counts only, no words. Run it like `probe-cache`, where
