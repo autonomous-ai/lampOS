@@ -4878,6 +4878,20 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **#1993:** Jarvis's P2 and P3s. The quiet end is judged against the line's own loudest block (30 dB, floor −60 dBFS) to one block, and a stop word's stream keeps `CloseStream`. Three mutations each fail a test. It's gating at `9144b0bf2`.
 - **Disk:** my checkout's `target` had reached 79 GB (the first builder, 02:31). `cargo clean` removed 95.3 GiB, taking the Mac from 11 to 89 GiB free, and the gate script now cleans past 20 GB first.
 
+## 2026-10-20, 04:59 ICT: the second landing (#2041) merged; #2024 merged and run on lamp-4ace; #1993 approved; #2044 and #2046 up
+
+- **#2041, the second landing, is merged into `lamp-voice`.** #1712's `a3f0cb796` came in with #2026, #2032, #2036, #1920, #1929, #2021 and #2024, every switch off unless set.
+  - Four conflicts, each with both sides kept: the skills' `holds`, their tests, the held-out skills and a worker test.
+  - Gate: 3698 passed, 0 failed. The reviewer found nothing at 04:33.
+- **#2024 is merged, and was run on lamp-4ace** (the first builder, 04:13):
+  - the relay adds about 480 ms before its first byte, about 60 ms of it the network;
+  - about 130 ms grows with the request's size, part of that TCP slow start on the cold upload;
+  - it doesn't hold the stream back.
+  - **Five questions for the relay's owners are on #1934**, for the backend builder to ask: where it runs, connections kept to DeepSeek, its work before forwarding, its idle timeout, and gzip bodies.
+- **#2044, `--wire --kept`:** three requests on one kept connection (first, straight, after 5 s idle), so the cost of slow start restarting after idle shows. Gate: 2556 passed. It's for the first builder's run.
+- **#1993 is approved by Jarvis** (04:31), and is the first builder's to merge. **Its new P3, a lone loud block raising the bar, is #2046** (a draft until #1993 is in #1712): the peak is the median of three blocks. Gate: 2547 passed.
+- **Disk:** the gate script cleaned a 21 GB target before the `--kept` gate, as it now does.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
