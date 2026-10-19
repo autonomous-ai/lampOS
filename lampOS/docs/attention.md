@@ -52,6 +52,21 @@ are not kept as something the lamp said. The request ends when the service
 completes it. The service still believes it answered; whether that
 changes what it does next has not been looked at.
 
+A call for something to be done in a held request is answered and not run
+(row 6 below), with one exception: a call that withdraws the person's
+consent is done though its line is held (the first builder on #1722,
+16:44; #1683). The list is `DONE_THOUGH_HELD` in `attention.rs`, and today
+it holds only `reports_stop`. Such a call only reduces what leaves the lamp,
+never adds to it: done for a colleague's line, it costs one report not
+sent, while a person who asks to stop sharing and is held has to ask
+twice, the worse failure. The answer stays held: the model is told the
+call's result, and none of what it says after it is played. The room is
+told nothing of it, as of any held line. The journal says
+`request N: reports_stop done though the answer was held (consent
+withdrawn)`. Every other call, the light, the volume, the schedule, memory,
+skills, stays held as before. A call that adds to what leaves the lamp is
+never put on the list.
+
 ## Where it gives way
 
 The rule fails open. The answer is played when no text of what was heard

@@ -1003,7 +1003,7 @@ fn run_call_with_scope(
         Route::ReportsStop => (
             "the reports",
             crate::reports_stop::run(
-                &mut crate::reports_stop::Bus(lamp_bus::Bus::from_environment().ok()),
+                &mut crate::reports_stop::Bus::of_the_lamp(),
                 heard,
                 crate::reports_stop::ANSWER_WITHIN,
             ),

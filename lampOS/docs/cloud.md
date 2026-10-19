@@ -256,6 +256,13 @@ a week.
   and answers from `reports/state` within 2 s. **The bus can only turn
   reports off:** `lamp-cloud` takes no `share: true` from it, since
   anything on the lamp can write there. There is no voice "on".
+  **A held line's stop is done** (the first builder on #1722, 16:44):
+  when the busy-room rule holds the line's answer, `reports_stop` still
+  runs and the spoken answer stays held, since stopping only reduces what
+  leaves the lamp ([attention.md](attention.md), "What happens to an
+  answer that is held back"). The journal says `request N: reports_stop
+  done though the answer was held (consent withdrawn)`. #1796's spoken
+  stop on lamp-06c1 had shown the call dropped with the answer.
 - **A no deletes:** every queued report and its file goes at once, and one
   `stopped` takes their place. It is kept, on flash too, until it is sent,
   never dropped offline, and sent once more on the next connection: the

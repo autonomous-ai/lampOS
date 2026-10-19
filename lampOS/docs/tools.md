@@ -410,6 +410,10 @@ a skill cut for it is named on the setup line (#1706). The voice puts
 reports."}`, or "I'm not sending any reports." when they were off. With
 nobody taking the ask (`lamp-cloud` not running), or no answer in time, it
 says so and never claims a stop. Only a request a person said runs it.
+It runs in a request whose answer the attention rule holds too, its
+answer still held: the one call that does (`DONE_THOUGH_HELD`,
+[attention.md](attention.md), "What happens to an answer that is held
+back").
 There is no function to turn reports on: that is the person's own screen.
 
 ## `the_time`, the voice's own
