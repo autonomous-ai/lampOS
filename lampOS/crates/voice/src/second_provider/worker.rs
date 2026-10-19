@@ -1757,6 +1757,10 @@ pub(crate) fn facts(session: bool, room: Option<crate::room_told::Room>) -> Stri
 pub(crate) struct Heeding {
     attention: crate::attention::Attention,
     strict: bool,
+    /// Whether it is night here, read before each verdict with the day's
+    /// own bars (`LAMP_SPOKEN_TO=day-and-night`), as the Live worker reads
+    /// it: [`crate::local_time::night_here`], or a test's.
+    night: fn() -> bool,
     /// The bus, and the name's hearings on it since the last turn.
     bus: Option<(lamp_bus::Bus, lamp_bus::Subscriber)>,
     thread: Option<PathBuf>,
@@ -1975,6 +1979,7 @@ impl Heeding {
         Self {
             attention,
             strict,
+            night: crate::local_time::night_here,
             bus,
             thread,
             levels: None,
@@ -2277,6 +2282,13 @@ impl Heeding {
         attention.lamp_asked(signs.lamp_asked);
         let (busy, lamp_asked) = (signs.room == crate::room_told::Room::Busy, signs.lamp_asked);
         attention.set_near(signs.near);
+        // The night's bars, as the Live worker reads them before each
+        // verdict (`provider_worker.rs`): only with the day's own bars, and
+        // otherwise every hour was judged as day (Tests and the first
+        // builder on #1712, 20:22 and 20:29).
+        if attention.judges_by_day() {
+            attention.set_night((self.night)());
+        }
         let turned = signs.turned.filter(|_| self.strict);
         let mut verdict =
             attention.first_output_busy(request, signs.room, signs.going_on, self.strict, turned);
@@ -3905,6 +3917,38 @@ mod tests {
             .and_then(|ms| ms.parse::<u64>().ok());
         assert_eq!(counted, Some(0), "the battery's pattern reads it");
         assert!(super::run_after(&crate::tools::Route::Clock, "the_time", 7).is_none());
+    }
+
+    /// #1712 (Tests 20:22, the first builder 20:29):
+    /// `LAMP_SPOKEN_TO=day-and-night` on the second route as the only voice
+    /// reads the night as the Live worker does. With the day's own bars, a
+    /// name heard close to the lamp at 0.95 in a busy room, nobody turned to
+    /// it and no words calling it, is held by day (#829's eye drops) and
+    /// plays at night; with `on` alone it plays either way. Before, this
+    /// route never told its rule the night, and held it at night too.
+    #[test]
+    fn as_the_only_voice_the_day_and_the_night_bars_are_read_as_on_live() {
+        use crate::room_told::Room;
+        let signs = || super::Signs {
+            room: Room::Busy,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(false),
+            names: vec![(1_000_100_000, 0.95)],
+            near: true,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let judged = |by_day: bool, night: bool| {
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, by_day);
+            heeding.night = if night { || true } else { || false };
+            heeding.judge(9, line, "What time is it?", signs())
+        };
+        assert!(judged(true, false).is_some(), "by day, held");
+        assert_eq!(judged(true, true), None, "at night, played");
+        assert_eq!(judged(false, false), None, "with on alone, by day");
+        assert_eq!(judged(false, true), None, "with on alone, at night");
     }
 
     /// #1712, lamp-4ace's A/B: after a hand-over and 104 s, every line
