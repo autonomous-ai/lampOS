@@ -95,7 +95,7 @@ differs. Folders are what the unit makes or names.
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
 | update | `lamp-update serve` | root | `/var/lib/lampos-update/` (0700) | `/etc/lampOS/update/key.pub` | none |
 | keeper | `lamp-keeper serve` | root | its service data folder | none | `lampos.target.d/keeper.conf`; the bus root |
-| skills | `lamp-skills` | lampos (product unit, #811) | none | the skill folders, `/var/lib/lampOS/skills/` (every product skill from install) | its tools, `/run/lampos-actions/skills/` |
+| skills | `lamp-skills` | lampos (product unit, #811) | `/run/lampos-skills/` (0755) | the skill folders, `/var/lib/lampOS/skills/` (every product skill from install) | its tools for the voice, `tools.json` and `call.sock` in its folder |
 | surround | `lamp-surround serve` | `@SURROUND_USER@` | not read for this page | `/etc/lampos/surround.json` (lower case, unlike every other part) | not read |
 
 The bus root, `/run/lampos-bus`, is made by the keeper (root, the parts'

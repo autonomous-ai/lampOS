@@ -783,12 +783,16 @@ async fn a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_s
 /// (`check_my_work`'s look sends a still of the desk, `dance` moves the
 /// body; the first builder on #1474); and the volume when the lamp has
 /// said nothing lately, since then the turn follows no line of the lamp's,
-/// or when `follows_lamp` is under 0.6 (El on #1474).
+/// or when `follows_lamp` is under 0.6 (El on #1474). A skill's function
+/// named like the light's (`light_party`) is held too. Each row runs with
+/// the skills in the old folder in the executive's and in their own
+/// (`--skills-dir`, #1656), so a skill is known by its folder, not by the
+/// folder's name (the reviewer on #1656).
 #[tokio::test]
 async fn with_follows_run_a_reply_to_the_lamp_turns_the_volume_back_up() {
     let call =
         |name: &str| json!({"toolCall":{"functionCalls":[{"id":"c1","name":name,"args":{}}]}});
-    for (row, (follows_run, spoke, follows, name, runs)) in [
+    let rows = [
         (true, true, 0.89, "volume_up", true),
         (false, true, 0.89, "volume_up", false),
         (true, true, 0.89, "light_brighter", true),
@@ -797,33 +801,43 @@ async fn with_follows_run_a_reply_to_the_lamp_turns_the_volume_back_up() {
         (true, true, 0.89, "check_my_work", false),
         (true, true, 0.89, "dance", false),
         (true, true, 0.89, "use_skill", false),
+        (true, true, 0.89, "light_party", false),
         (true, false, 0.89, "volume_up", false),
         (true, true, 0.5, "volume_up", false),
-    ]
-    .into_iter()
-    .enumerate()
+    ];
+    for (row, (own, (follows_run, spoke, follows, name, runs))) in [false, true]
+        .into_iter()
+        .flat_map(|own| rows.into_iter().map(move |row| (own, row)))
+        .enumerate()
     {
         let mut desk = Desk::new(&format!("fr-{row}"));
-        // The built skills, as the executive lists them: their calls go to
+        let mut options = desk.options(true);
+        options.follows_run = follows_run;
+        // The built skills, as lamp-skills lists them: their calls go to
         // the skills' route.
-        let skills = desk.home.path.join(crate::tools::SKILLS_DIR);
+        let skills = if own {
+            let own = desk.home.path.join("own");
+            options.tools.skills = Some(own.clone());
+            own
+        } else {
+            desk.home.path.join(crate::tools::SKILLS_DIR)
+        };
         std::fs::create_dir_all(&skills).unwrap();
         std::fs::write(
             skills.join(crate::tools::CATALOG_FILE),
             json!({"tools":[{"name":"check_my_work","description":"Look at the desk"},
-                            {"name":"dance","description":"Dance"}]})
+                            {"name":"dance","description":"Dance"},
+                            {"name":"light_party","description":"Party lights"}]})
             .to_string(),
         )
         .unwrap();
-        let mut options = desk.options(true);
-        options.follows_run = follows_run;
         // A skill reached through `use_skill` is held as a skill is (#1668).
         options.tools.use_skill = name == crate::use_skill::NAME;
         let route = crate::tools::route(&options.tools, name);
         assert_eq!(
-            matches!(&route, crate::tools::Route::Executive(dir) if dir.ends_with(crate::tools::SKILLS_DIR))
+            crate::tools::is_skills(&options.tools, &route)
                 || matches!(&route, crate::tools::Route::UseSkill(_)),
-            ["check_my_work", "dance", "use_skill"].contains(&name),
+            ["check_my_work", "dance", "light_party", "use_skill"].contains(&name),
             "row {row}: {name} routes to {route:?}"
         );
         let mut rig = LiveRig::start_with(quick_policy(), options);

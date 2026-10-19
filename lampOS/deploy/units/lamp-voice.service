@@ -48,6 +48,7 @@ Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_MEMORY_SOCKET=@MEMORY_SOCKET@
 Environment=LAMP_ACTIONS_DIR=@ACTIONS_DIR@
+Environment=LAMP_SKILLS_DIR=/run/lampos-skills
 # The body's servo port: only the body opens it. Defence in depth only, not a mechanical stop.
 InaccessiblePaths=@SERVO_DEVICE@
 

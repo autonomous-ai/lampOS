@@ -52,6 +52,11 @@ pub const FLAG: &str = "--tools";
 pub const ACTIONS_ENVIRONMENT: &str = "LAMP_ACTIONS_DIR";
 /// The provider worker's flag for it, followed by the path.
 pub const ACTIONS_FLAG: &str = "--actions-dir";
+/// Where the coordinator reads the skills' own folder, `lamp-skills
+/// --tools-dir`: an absolute path.
+pub const SKILLS_ENVIRONMENT: &str = "LAMP_SKILLS_DIR";
+/// The provider worker's flag for it, followed by the path.
+pub const SKILLS_FLAG: &str = "--skills-dir";
 
 /// The function the model calls instead of speaking.
 pub const NOT_FOR_ME: &str = "not_for_me";
@@ -85,9 +90,13 @@ pub const SCHEDULE_NAMES: [&str; 6] = [
 pub const CATALOG_FILE: &str = "tools.json";
 /// The executive's socket, in its directory.
 pub const CALL_SOCKET: &str = "call.sock";
-/// The skills' folder in the executive's directory: `lamp-skills --tools-dir`
-/// keeps its own `tools.json` and `call.sock` there, read and called the
-/// same way, after the executive's.
+/// The skills' folder in the executive's directory, where `lamp-skills
+/// --tools-dir` kept its `tools.json` and `call.sock` before they had a
+/// folder of their own ([`Settings::skills`]): systemd removed it with the
+/// executive's at each of its restarts, and the skills, sandboxed, could
+/// not make it again (lamp-4ace, 19 Oct 04:33). Still read and called,
+/// after the skills' own, for one release, so a voice and skills from
+/// different builds still meet ([`skills_folders`]).
 pub const SKILLS_DIR: &str = "skills";
 /// The longest a call waits for the executive, connecting included. A
 /// person hears nothing while it waits.
@@ -103,6 +112,10 @@ pub struct Settings {
     pub decline: bool,
     /// The executive's directory.
     pub exec: Option<PathBuf>,
+    /// The skills' own folder (`lamp-skills --tools-dir`): their
+    /// `tools.json` and `call.sock`, read and called as the executive's
+    /// are, after it.
+    pub skills: Option<PathBuf>,
     /// The memory's socket ([`crate::remember`]).
     pub memory: Option<PathBuf>,
     /// The model may call [`THE_TIME`].
@@ -138,6 +151,7 @@ pub fn arguments_from_environment() -> Vec<String> {
     let mut flags = arguments(
         std::env::var(ENVIRONMENT).ok().as_deref(),
         std::env::var(ACTIONS_ENVIRONMENT).ok().as_deref(),
+        std::env::var(SKILLS_ENVIRONMENT).ok().as_deref(),
         std::env::var(crate::remember::ENVIRONMENT).ok().as_deref(),
         std::env::var(CLOCK_ENVIRONMENT).ok().as_deref(),
         std::env::var(PLACES_ENVIRONMENT).ok().as_deref(),
@@ -196,6 +210,7 @@ pub fn is_schedule_tool(name: &str) -> bool {
 fn arguments(
     decline: Option<&str>,
     exec: Option<&str>,
+    skills: Option<&str>,
     memory: Option<&str>,
     clock: Option<&str>,
     places: Option<&str>,
@@ -207,6 +222,10 @@ fn arguments(
     if let Some(directory) = exec.filter(|path| Path::new(path).is_absolute()) {
         arguments.push(ACTIONS_FLAG.to_owned());
         arguments.push(directory.to_owned());
+    }
+    if let Some(folder) = skills.filter(|path| Path::new(path).is_absolute()) {
+        arguments.push(SKILLS_FLAG.to_owned());
+        arguments.push(folder.to_owned());
     }
     if let Some(socket) = memory.filter(|path| Path::new(path).is_absolute()) {
         arguments.push(crate::remember::FLAG.to_owned());
@@ -221,8 +240,8 @@ fn arguments(
     arguments
 }
 
-/// Take a leading `--tools`, `--actions-dir PATH`, `--memory-socket PATH`
-/// and `--clock` off a worker's flags.
+/// Take a leading `--tools`, `--actions-dir PATH`, `--skills-dir PATH`,
+/// `--memory-socket PATH` and `--clock` off a worker's flags.
 pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
     let mut settings = Settings::default();
     let mut flags = flags;
@@ -242,6 +261,18 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
             return Err(std::io::Error::other("--actions-dir must be absolute"));
         }
         settings.exec = Some(PathBuf::from(directory));
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == SKILLS_FLAG
+    {
+        let [folder, rest @ ..] = rest else {
+            return Err(std::io::Error::other("--skills-dir needs a path"));
+        };
+        if !Path::new(folder).is_absolute() {
+            return Err(std::io::Error::other("--skills-dir must be absolute"));
+        }
+        settings.skills = Some(PathBuf::from(folder));
         flags = rest;
     }
     if let [flag, rest @ ..] = flags
@@ -453,18 +484,21 @@ pub fn skill_tools(settings: &Settings) -> Vec<Tool> {
 }
 
 fn skills_after(settings: &Settings, told: &[Tool]) -> Vec<Tool> {
-    let Some(directory) = &settings.exec else {
-        return Vec::new();
-    };
-    // The skills' after the executive's: a name already told stays its.
-    catalog(&directory.join(SKILLS_DIR).join(CATALOG_FILE))
-        .into_iter()
-        .filter(|tool| {
-            !voices_own(&tool.name)
+    // The skills' after the executive's: a name already told stays its, and
+    // a name the skills' own folder gives is its ([`skills_folders`]).
+    let mut skills: Vec<Tool> = Vec::new();
+    for folder in skills_folders(settings) {
+        for tool in catalog(&folder.join(CATALOG_FILE)) {
+            if !voices_own(&tool.name)
                 && !is_schedule_tool(&tool.name)
                 && !told.iter().any(|earlier| earlier.name == tool.name)
-        })
-        .collect()
+                && !skills.iter().any(|earlier| earlier.name == tool.name)
+            {
+                skills.push(tool);
+            }
+        }
+    }
+    skills
 }
 
 /// The voice's own functions and the executive's.
@@ -506,6 +540,43 @@ fn core_tools(settings: &Settings) -> Vec<Tool> {
     tools
 }
 
+/// Where the skills' functions are read and called, in order: their own
+/// folder ([`Settings::skills`]), then the old one in the executive's
+/// directory ([`SKILLS_DIR`]), for one release, and only while their own
+/// has no socket: after the update, until actions restarts, the old one
+/// keeps the old lamp-skills' catalog and a socket nobody answers (the
+/// reviewer on #1656). A name the first gives is its.
+pub fn skills_folders(settings: &Settings) -> Vec<PathBuf> {
+    let own_live = settings
+        .skills
+        .as_ref()
+        .is_some_and(|own| own.join(CALL_SOCKET).exists());
+    every_skills_folder(settings)
+        .into_iter()
+        .filter(|folder| !own_live || settings.skills.as_ref() == Some(folder))
+        .collect()
+}
+
+/// Both of the skills' folders, their own first, whether or not each is
+/// read now: what is looked at for a change, and what counts as a skills'
+/// route.
+pub fn every_skills_folder(settings: &Settings) -> Vec<PathBuf> {
+    let mut folders: Vec<PathBuf> = settings.skills.iter().cloned().collect();
+    if let Some(directory) = &settings.exec {
+        let old = directory.join(SKILLS_DIR);
+        if !folders.contains(&old) {
+            folders.push(old);
+        }
+    }
+    folders
+}
+
+/// Whether `route` asks the skills, in one of their folders
+/// ([`every_skills_folder`]), not the executive.
+pub fn is_skills(settings: &Settings, route: &Route) -> bool {
+    matches!(route, Route::Executive(folder) if every_skills_folder(settings).contains(folder))
+}
+
 /// A name the voice routes itself, whether or not it is switched on.
 fn voices_own(name: &str) -> bool {
     name == NOT_FOR_ME
@@ -518,10 +589,17 @@ fn voices_own(name: &str) -> bool {
         || name == crate::use_skill::NAME
 }
 
-/// Whether the skills run `name` and the executive does not.
-fn a_skills(directory: &Path, name: &str) -> bool {
+/// The skills' folder that runs `name`, when the executive does not.
+fn skills_for(settings: &Settings, name: &str) -> Option<PathBuf> {
     let has = |path: PathBuf| catalog(&path).iter().any(|tool| tool.name == name);
-    !has(directory.join(CATALOG_FILE)) && has(directory.join(SKILLS_DIR).join(CATALOG_FILE))
+    if let Some(directory) = &settings.exec
+        && has(directory.join(CATALOG_FILE))
+    {
+        return None;
+    }
+    skills_folders(settings)
+        .into_iter()
+        .find(|folder| has(folder.join(CATALOG_FILE)))
 }
 
 /// The executive's list, or nothing: a missing file, one too large, one
@@ -644,16 +722,15 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     match (&settings.exec, name) {
         (_, NOT_FOR_ME) if settings.decline => Route::Decline,
         (_, THE_TIME) if settings.clock => Route::Clock,
-        (Some(directory), name)
+        (exec, name)
             if name != NOT_FOR_ME
                 && name != THE_TIME
                 && !crate::remember::is_tool(name)
                 && !crate::agent_tasks::is_tool(name) =>
         {
-            if a_skills(directory, name) {
-                Route::Executive(directory.join(SKILLS_DIR))
-            } else {
-                Route::Executive(directory.clone())
+            match skills_for(settings, name) {
+                Some(folder) => Route::Executive(folder),
+                None => exec.clone().map_or(Route::Nobody, Route::Executive),
             }
         }
         _ => Route::Nobody,
@@ -747,9 +824,10 @@ pub fn run_call(
         Route::UseSkill(settings) => {
             let skills = skill_tools(settings);
             match crate::use_skill::translate(call, crate::use_skill::offered(&skills)) {
-                // Only ever the skills' socket (the reviewer on #1696).
+                // Only ever a skills' socket, in either folder (the reviewer
+                // on #1696, #1656).
                 Ok(skill) => match crate::tools::route(settings, &skill.name) {
-                    found @ Route::Executive(_) if matches!(&found, Route::Executive(dir) if dir.ends_with(SKILLS_DIR)) => {
+                    found @ Route::Executive(_) if is_skills(settings, &found) => {
                         run_call(&found, &skill, request, heard)
                     }
                     _ => ("nobody", (unavailable(), false)),
@@ -1019,6 +1097,7 @@ mod tests {
             decline: true,
             use_skill: false,
             exec: None,
+            skills: None,
             memory: Some("/run/lampos-memory/memory.sock".into()),
             clock: true,
             places: true,
@@ -1102,7 +1181,14 @@ mod tests {
 
     #[test]
     fn schedule_flags_are_exact_independent_opt_ins_and_leave_old_arguments_unchanged() {
-        let old = arguments(Some("on"), Some("/run/actions"), None, Some("on"), None);
+        let old = arguments(
+            Some("on"),
+            Some("/run/actions"),
+            None,
+            None,
+            Some("on"),
+            None,
+        );
         for value in [
             None,
             Some("off"),
@@ -1143,7 +1229,14 @@ mod tests {
     /// `on` and `skill`, as the parent reads them.
     #[test]
     fn schedule_speech_by_skill_gives_the_worker_its_flag() {
-        let old = arguments(Some("on"), Some("/run/actions"), None, Some("on"), None);
+        let old = arguments(
+            Some("on"),
+            Some("/run/actions"),
+            None,
+            None,
+            Some("on"),
+            None,
+        );
         for (speak, on) in [
             (Some("on"), true),
             (Some("skill"), true),
@@ -1163,7 +1256,7 @@ mod tests {
 
     #[test]
     fn without_the_onboarding_switch_nothing_changes() {
-        let old: Vec<String> = arguments(Some("on"), None, None, Some("on"), None);
+        let old: Vec<String> = arguments(Some("on"), None, None, None, Some("on"), None);
         let (off, rest) = take(&old).unwrap();
         assert!(rest.is_empty());
         assert_eq!(off.onboarding, None);
@@ -1219,6 +1312,7 @@ mod tests {
         let mut flags = arguments(
             Some("on"),
             Some(dir.to_str().unwrap()),
+            None,
             Some("/run/lampos-memory/memory.sock"),
             Some("on"),
             None,
@@ -1251,6 +1345,7 @@ mod tests {
                 decline: true,
                 use_skill: false,
                 exec: Some(dir.clone()),
+                skills: None,
                 memory: Some("/run/lampos-memory/memory.sock".into()),
                 clock: true,
                 places: false,
@@ -1548,11 +1643,12 @@ mod tests {
 
     #[test]
     fn only_on_and_an_absolute_path_become_flags_and_they_are_taken_from_the_front() {
-        assert!(arguments(None, None, None, None, None).is_empty());
+        assert!(arguments(None, None, None, None, None, None).is_empty());
         assert!(
             arguments(
                 Some("yes"),
                 Some("relative/dir"),
+                Some("relative/skills"),
                 Some("memory.sock"),
                 Some("yes"),
                 Some("on")
@@ -1562,6 +1658,7 @@ mod tests {
         let all = arguments(
             Some("on"),
             Some("/run/lampos-actions"),
+            Some("/run/lampos-skills"),
             Some("/run/lampos-memory/memory.sock"),
             None,
             Some("on"),
@@ -1573,6 +1670,8 @@ mod tests {
                 FLAG,
                 ACTIONS_FLAG,
                 "/run/lampos-actions",
+                SKILLS_FLAG,
+                "/run/lampos-skills",
                 memory,
                 "/run/lampos-memory/memory.sock"
             ]
@@ -1585,6 +1684,7 @@ mod tests {
             Settings {
                 decline: true,
                 exec: Some("/run/lampos-actions".into()),
+                skills: Some("/run/lampos-skills".into()),
                 memory: Some("/run/lampos-memory/memory.sock".into()),
                 clock: false,
                 ..Default::default()
@@ -1595,13 +1695,18 @@ mod tests {
         assert!(!settings.decline && settings.exec.is_some() && settings.memory.is_some());
         assert_eq!(rest, ["rest"]);
         let (settings, rest) = take(&flags[3..]).unwrap();
-        assert!(settings.exec.is_none() && settings.memory.is_some());
+        assert!(settings.exec.is_none() && settings.skills.is_some() && settings.memory.is_some());
         assert_eq!(rest, ["rest"]);
         let (settings, rest) = take(&flags[5..]).unwrap();
+        assert!(settings.skills.is_none() && settings.memory.is_some());
+        assert_eq!(rest, ["rest"]);
+        let (settings, rest) = take(&flags[7..]).unwrap();
         assert_eq!(settings, Settings::default());
         assert_eq!(rest, ["rest"]);
         assert!(take(&[ACTIONS_FLAG.to_owned()]).is_err());
         assert!(take(&[ACTIONS_FLAG.to_owned(), "relative".to_owned()]).is_err());
+        assert!(take(&[SKILLS_FLAG.to_owned()]).is_err());
+        assert!(take(&[SKILLS_FLAG.to_owned(), "relative".to_owned()]).is_err());
         assert!(take(&[memory.to_owned()]).is_err());
         assert!(take(&[memory.to_owned(), "relative".to_owned()]).is_err());
     }
@@ -1783,7 +1888,10 @@ mod tests {
 
     #[test]
     fn the_time_is_declared_and_answered_here_only_when_switched_on() {
-        assert_eq!(arguments(None, None, None, Some("on"), None), [CLOCK_FLAG]);
+        assert_eq!(
+            arguments(None, None, None, None, Some("on"), None),
+            [CLOCK_FLAG]
+        );
         let flags = [CLOCK_FLAG.to_owned(), "rest".to_owned()];
         let (settings, rest) = take(&flags).unwrap();
         assert!(settings.clock && !settings.decline && settings.exec.is_none());
@@ -1821,12 +1929,12 @@ mod tests {
     #[test]
     fn the_time_takes_a_place_only_with_its_switch() {
         assert_eq!(
-            arguments(None, None, None, Some("on"), Some("on")),
+            arguments(None, None, None, None, Some("on"), Some("on")),
             [CLOCK_FLAG, PLACES_FLAG]
         );
-        assert!(arguments(None, None, None, None, Some("on")).is_empty());
+        assert!(arguments(None, None, None, None, None, Some("on")).is_empty());
         assert_eq!(
-            arguments(None, None, None, Some("on"), Some("yes")),
+            arguments(None, None, None, None, Some("on"), Some("yes")),
             [CLOCK_FLAG]
         );
         let flags = [
@@ -2065,7 +2173,7 @@ mod tests {
         let (settings, rest) = take(&plain).unwrap();
         assert!(!settings.use_skill);
         assert_eq!(rest, ["rest"]);
-        let mut flags = arguments(Some("on"), None, None, None, None);
+        let mut flags = arguments(Some("on"), None, None, None, None, None);
         flags.extend(crate::use_skill::arguments(Some("on")));
         flags.push("rest".into());
         let (settings, rest) = take(&flags).unwrap();
@@ -2172,6 +2280,128 @@ mod tests {
         };
         let (a, b) = (median(&itself), median(&through));
         println!("use_skill_cost: itself {a:?}, through use_skill {b:?}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #1696 with #1656: a `use_skill` call to a skill in the skills' own
+    /// folder reaches that folder's socket, as one in the old folder does.
+    #[test]
+    fn a_use_skill_call_reaches_a_skill_in_the_own_folder() {
+        // Short names: a socket's whole path has to fit in 103 bytes.
+        let dir = directory("uo");
+        let own = dir.join("own");
+        std::fs::create_dir_all(&own).unwrap();
+        std::fs::write(
+            own.join(CATALOG_FILE),
+            r#"{"tools":[{"name":"dance","description":"Dance."}]}"#,
+        )
+        .unwrap();
+        let settings = Settings {
+            skills: Some(own.clone()),
+            use_skill: true,
+            ..Default::default()
+        };
+        let served = executive(
+            &own,
+            b"{\"ok\":true,\"result\":{\"next\":\"Dance.\"}}\n",
+            Duration::ZERO,
+        );
+        let call = ToolCall {
+            id: "c1".into(),
+            name: crate::use_skill::NAME.into(),
+            args: json!({"skill":"dance"}),
+        };
+        assert_eq!(answer(&settings, &call, 7, true), json!({"next":"Dance."}));
+        assert_eq!(
+            served.join().unwrap(),
+            json!({"op":"call","name":"dance","args":{}})
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// The skills' own folder (`--skills-dir`), outside the executive's,
+    /// which systemd removes with it (lamp-4ace, 19 Oct 04:33): read and
+    /// called after the executive's, before the old one inside it, which is
+    /// still read for one release; a name the own folder gives is its.
+    #[test]
+    fn the_skills_own_folder_is_read_and_called_before_the_old_one() {
+        // Short names: a socket's whole path has to fit in 103 bytes.
+        let dir = directory("own");
+        let own = dir.join("own");
+        let exec = dir.join("actions");
+        std::fs::create_dir_all(&own).unwrap();
+        std::fs::create_dir_all(exec.join(SKILLS_DIR)).unwrap();
+        std::fs::write(
+            exec.join(CATALOG_FILE),
+            r#"{"tools":[{"name":"light_on","description":"Turn the light on."}]}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            own.join(CATALOG_FILE),
+            r#"{"tools":[{"name":"dance","description":"Dance."},
+            {"name":"light_on","description":"A name the executive has."}]}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            exec.join(SKILLS_DIR).join(CATALOG_FILE),
+            r#"{"tools":[{"name":"dance","description":"An older skills' dance."},
+            {"name":"check_my_work","description":"Only in the old folder."}]}"#,
+        )
+        .unwrap();
+        let settings = Settings {
+            exec: Some(exec.clone()),
+            skills: Some(own.clone()),
+            ..Default::default()
+        };
+        let told: Vec<(String, String)> = declared(&settings)
+            .into_iter()
+            .map(|tool| (tool.name, tool.description))
+            .collect();
+        assert_eq!(
+            told,
+            [
+                ("light_on".into(), "Turn the light on.".into()),
+                ("dance".into(), "Dance.".into()),
+                ("check_my_work".into(), "Only in the old folder.".into()),
+            ]
+        );
+        assert_eq!(route(&settings, "dance"), Route::Executive(own.clone()));
+        assert_eq!(
+            route(&settings, "check_my_work"),
+            Route::Executive(exec.join(SKILLS_DIR))
+        );
+        assert_eq!(route(&settings, "light_on"), Route::Executive(exec.clone()));
+        assert!(is_skills(&settings, &route(&settings, "dance")));
+        assert!(is_skills(&settings, &route(&settings, "check_my_work")));
+        assert!(!is_skills(&settings, &route(&settings, "light_on")));
+        // Their own folder live (its socket there): the old one, with the
+        // catalog an older lamp-skills left and its dead socket, is not read
+        // (the reviewer on #1656); a call of a name only it gave goes to the
+        // executive, which refuses it.
+        let live = std::os::unix::net::UnixListener::bind(own.join(CALL_SOCKET)).unwrap();
+        let names: Vec<String> = declared(&settings)
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect();
+        assert_eq!(names, ["light_on", "dance"]);
+        assert_eq!(
+            route(&settings, "check_my_work"),
+            Route::Executive(exec.clone())
+        );
+        assert!(is_skills(
+            &settings,
+            &Route::Executive(exec.join(SKILLS_DIR))
+        ));
+        drop(live);
+        // The skills alone, with no executive: read and called all the same.
+        let alone = Settings {
+            skills: Some(own.clone()),
+            ..Default::default()
+        };
+        let names: Vec<String> = declared(&alone).into_iter().map(|tool| tool.name).collect();
+        assert_eq!(names, ["dance", "light_on"]);
+        assert_eq!(route(&alone, "dance"), Route::Executive(own.clone()));
+        assert_eq!(route(&alone, "volume_up"), Route::Nobody);
         std::fs::remove_dir_all(dir).unwrap();
     }
 

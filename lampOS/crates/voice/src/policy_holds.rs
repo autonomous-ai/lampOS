@@ -168,10 +168,16 @@ pub const REPLY_VOLUME: [&str; 3] = ["volume_up", "volume_down", "volume_unmute"
 /// Whether a held call, by its route and its name, runs on a reply to the
 /// lamp ([`Verdict::StayQuietFollowing`]): what the schedule [`sets`]; and
 /// with [`FOLLOWS_FLAG`] (`light_and_volume`), the light's tools and
-/// [`REPLY_VOLUME`] on the actions' own route too, never a skill's (#1465).
-pub fn runs_on_a_reply(route: &crate::tools::Route, name: &str, light_and_volume: bool) -> bool {
-    let actions = matches!(route, crate::tools::Route::Executive(directory)
-        if directory.file_name() != Some(std::ffi::OsStr::new(crate::tools::SKILLS_DIR)));
+/// [`REPLY_VOLUME`] on the actions' own route too, never a skill's (#1465),
+/// by the voice's `settings` ([`crate::tools::is_skills`]).
+pub fn runs_on_a_reply(
+    settings: &crate::tools::Settings,
+    route: &crate::tools::Route,
+    name: &str,
+    light_and_volume: bool,
+) -> bool {
+    let actions = matches!(route, crate::tools::Route::Executive(_))
+        && !crate::tools::is_skills(settings, route);
     sets(route, name)
         || light_and_volume
             && actions
@@ -549,7 +555,16 @@ mod tests {
     fn with_follows_run_a_reply_runs_the_light_and_the_volume_only() {
         use crate::tools::Route;
         let place = std::path::PathBuf::from("/run/lamp-actions");
-        let skills = Route::Executive(place.join(crate::tools::SKILLS_DIR));
+        let settings = crate::tools::Settings {
+            exec: Some(place.clone()),
+            skills: Some("/run/lamp-skills".into()),
+            ..Default::default()
+        };
+        // The skills' own folder, and the old one in the actions'.
+        let skills = [
+            Route::Executive("/run/lamp-skills".into()),
+            Route::Executive(place.join(crate::tools::SKILLS_DIR)),
+        ];
         for (name, runs) in [
             ("volume_up", true),
             ("volume_down", true),
@@ -563,12 +578,12 @@ mod tests {
             ("dance", false),
         ] {
             assert_eq!(
-                runs_on_a_reply(&Route::Executive(place.clone()), name, true),
+                runs_on_a_reply(&settings, &Route::Executive(place.clone()), name, true),
                 runs,
                 "{name}"
             );
             assert!(
-                !runs_on_a_reply(&Route::Executive(place.clone()), name, false),
+                !runs_on_a_reply(&settings, &Route::Executive(place.clone()), name, false),
                 "{name}"
             );
         }
@@ -579,12 +594,22 @@ mod tests {
             "light_on",
             "volume_up",
         ] {
-            assert!(!runs_on_a_reply(&skills, name, true), "the skill's {name}");
+            for skills in &skills {
+                assert!(
+                    !runs_on_a_reply(&settings, skills, name, true),
+                    "the skill's {name} at {skills:?}"
+                );
+            }
         }
         for name in crate::tools::SCHEDULE_NAMES {
             for light_and_volume in [true, false] {
                 assert_eq!(
-                    runs_on_a_reply(&Route::Schedule(place.clone()), name, light_and_volume),
+                    runs_on_a_reply(
+                        &settings,
+                        &Route::Schedule(place.clone()),
+                        name,
+                        light_and_volume
+                    ),
                     sets(&Route::Schedule(place.clone()), name),
                     "{name}"
                 );

@@ -3189,10 +3189,10 @@ impl ToolDesk {
         // a yes to a task cannot come in one.
         let heard =
             crate::attention::own_request().load(std::sync::atomic::Ordering::Acquire) != request;
-        // A skill's answer may ask for a look, called itself or through
-        // `use_skill` (#1668).
-        let skill = matches!(&route, Route::UseSkill(_))
-            || matches!(&route, Route::Executive(dir) if dir.ends_with(crate::tools::SKILLS_DIR));
+        // A skill's answer may ask for a look, called itself, in either of
+        // its folders, or through `use_skill` (#1668, #1656).
+        let skill =
+            matches!(&route, Route::UseSkill(_)) || crate::tools::is_skills(&self.settings, &route);
         let asked = self.asked.clone();
         let session = lineage.session;
         let work = call.clone();
@@ -3304,10 +3304,13 @@ impl ToolDesk {
             let route = crate::tools::route(&self.settings, &parked.call.name);
             // A reply in a busy room that names no timer or reminder sets
             // nothing on the schedule (#1522).
-            let on_a_reply =
-                crate::policy_holds::runs_on_a_reply(&route, &parked.call.name, self.follows_run)
-                    && !(parked.turn.busy_talk
-                        && crate::policy_holds::sets(&route, &parked.call.name));
+            let on_a_reply = crate::policy_holds::runs_on_a_reply(
+                &self.settings,
+                &route,
+                &parked.call.name,
+                self.follows_run,
+            ) && !(parked.turn.busy_talk
+                && crate::policy_holds::sets(&route, &parked.call.name));
             match crate::policy_holds::gate(verdict, parked.turn.name_heard, waited, on_a_reply) {
                 crate::policy_holds::Gate::Wait => self.parked.push(parked),
                 crate::policy_holds::Gate::Run => {
@@ -9647,67 +9650,79 @@ mod tests {
     /// #941, #1146: a skill's call answered with a look, through the
     /// worker's loop: once its answer has gone to the model, the
     /// coordinator is asked for the look, for the call's request and
-    /// session.
+    /// session. With the skills in the old folder in the executive's, and in
+    /// their own (`--skills-dir`, #1656), so a skill is known by its folder,
+    /// not by the folder's name: desk-tutor's picture hangs on it (the
+    /// reviewer on #1656).
     #[tokio::test]
     async fn a_skill_call_answered_with_a_look_asks_the_coordinator_for_it() {
         use std::io::{BufRead, Write};
-        let home = crate::process::SessionDirectory::create().unwrap();
-        let skills = home.path.join(crate::tools::SKILLS_DIR);
-        std::fs::create_dir(&skills).unwrap();
-        std::fs::write(
-            skills.join(crate::tools::CATALOG_FILE),
-            r#"{"tools":[{"name":"check_my_work","description":"A test."}]}"#,
-        )
-        .unwrap();
-        let listener =
-            std::os::unix::net::UnixListener::bind(skills.join(crate::tools::CALL_SOCKET)).unwrap();
-        let skill = std::thread::spawn(move || {
-            let (mut stream, _) = listener.accept().unwrap();
-            let mut line = String::new();
-            std::io::BufReader::new(stream.try_clone().unwrap())
-                .read_line(&mut line)
-                .unwrap();
-            stream
-                .write_all(b"{\"ok\":true,\"result\":{\"next\":\"Look.\",\"look\":true}}\n")
-                .unwrap();
-        });
-        let mut rig = LiveRig::start_with(
-            quick_policy(),
-            typed_with(crate::tools::Settings {
-                decline: false,
-                exec: Some(home.path.clone()),
-                memory: None,
-                clock: false,
-                ..Default::default()
-            }),
-        );
-        let mut dial = rig.ready().await;
-        let request = rig.speak(&mut dial, false, true).await;
-        dial.service
-            .send(function_call("c8", "check_my_work"))
-            .await;
-        dial.service.send(idle_complete()).await;
-        assert_eq!(
-            rig.service_message(&mut dial).await,
-            json!({"toolResponse":{"functionResponses":[
-                {"id":"c8","name":"check_my_work","response":{"next":"Look.","look":true}}
-            ]}})
-        );
-        skill.join().unwrap();
-        let asked = loop {
-            match rig.output().await {
-                ProviderOutput::LookAsked {
-                    request,
-                    session,
-                    dropped,
-                } => break (request, session, dropped),
-                _ => continue,
-            }
-        };
-        assert_eq!(asked.0, request);
-        assert!(asked.1 > 0);
-        assert_eq!(asked.2, None);
-        rig.stop().await;
+        for own in [false, true] {
+            let home = crate::process::SessionDirectory::create().unwrap();
+            let skills = if own {
+                home.path.join("own")
+            } else {
+                home.path.join(crate::tools::SKILLS_DIR)
+            };
+            std::fs::create_dir(&skills).unwrap();
+            std::fs::write(
+                skills.join(crate::tools::CATALOG_FILE),
+                r#"{"tools":[{"name":"check_my_work","description":"A test."}]}"#,
+            )
+            .unwrap();
+            let listener =
+                std::os::unix::net::UnixListener::bind(skills.join(crate::tools::CALL_SOCKET))
+                    .unwrap();
+            let skill = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                stream
+                    .write_all(b"{\"ok\":true,\"result\":{\"next\":\"Look.\",\"look\":true}}\n")
+                    .unwrap();
+            });
+            let mut rig = LiveRig::start_with(
+                quick_policy(),
+                typed_with(crate::tools::Settings {
+                    decline: false,
+                    exec: Some(home.path.clone()),
+                    skills: own.then(|| skills.clone()),
+                    memory: None,
+                    clock: false,
+                    ..Default::default()
+                }),
+            );
+            let mut dial = rig.ready().await;
+            let request = rig.speak(&mut dial, false, true).await;
+            dial.service
+                .send(function_call("c8", "check_my_work"))
+                .await;
+            dial.service.send(idle_complete()).await;
+            assert_eq!(
+                rig.service_message(&mut dial).await,
+                json!({"toolResponse":{"functionResponses":[
+                    {"id":"c8","name":"check_my_work","response":{"next":"Look.","look":true}}
+                ]}}),
+                "own folder: {own}"
+            );
+            skill.join().unwrap();
+            let asked = loop {
+                match rig.output().await {
+                    ProviderOutput::LookAsked {
+                        request,
+                        session,
+                        dropped,
+                    } => break (request, session, dropped),
+                    _ => continue,
+                }
+            };
+            assert_eq!(asked.0, request, "own folder: {own}");
+            assert!(asked.1 > 0);
+            assert_eq!(asked.2, None);
+            rig.stop().await;
+        }
     }
 
     /// #1668: the same through `use_skill`. The call is the skill's own

@@ -17,7 +17,7 @@
 //! functions is not tested on a person's lamp). At most once per
 //! [`RENEW_AT_MOST_EVERY`], so a catalog that comes and goes cannot churn
 //! sessions.
-use crate::tools::{CATALOG_FILE, SKILLS_DIR, Settings, declared};
+use crate::tools::{CATALOG_FILE, Settings, declared, every_skills_folder};
 use lamp_gemini::Tool;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -161,8 +161,8 @@ impl std::fmt::Display for Change {
 /// The catalogs looked at for a change.
 pub struct Watch {
     look_every: Duration,
-    files: [PathBuf; 2],
-    times: Option<[Option<SystemTime>; 2]>,
+    files: Vec<PathBuf>,
+    times: Option<Vec<Option<SystemTime>>>,
     now: BTreeSet<String>,
     looked_at: Option<Instant>,
     renewed_at: Option<Instant>,
@@ -176,15 +176,25 @@ pub struct Watch {
 }
 
 impl Watch {
-    /// With an executive only: without one there is no catalog to change.
+    /// With an executive or the skills' own folder only: without either
+    /// there is no catalog to change.
     pub fn new(settings: &Settings, look_every: Duration) -> Option<Self> {
-        let directory = settings.exec.as_ref()?;
+        let files: Vec<PathBuf> = settings
+            .exec
+            .iter()
+            .map(|directory| directory.join(CATALOG_FILE))
+            .chain(
+                every_skills_folder(settings)
+                    .into_iter()
+                    .map(|folder| folder.join(CATALOG_FILE)),
+            )
+            .collect();
+        if files.is_empty() {
+            return None;
+        }
         Some(Self {
             look_every,
-            files: [
-                directory.join(CATALOG_FILE),
-                directory.join(SKILLS_DIR).join(CATALOG_FILE),
-            ],
+            files,
             times: None,
             now: BTreeSet::new(),
             looked_at: None,
@@ -216,12 +226,16 @@ impl Watch {
         }
         self.looked_at = Some(now);
         self.checked_at = Some(now);
-        let times = self.files.clone().map(|file| {
-            std::fs::metadata(file)
-                .and_then(|meta| meta.modified())
-                .ok()
-        });
-        if self.times != Some(times) {
+        let times: Vec<Option<SystemTime>> = self
+            .files
+            .iter()
+            .map(|file| {
+                std::fs::metadata(file)
+                    .and_then(|meta| meta.modified())
+                    .ok()
+            })
+            .collect();
+        if self.times.as_ref() != Some(&times) {
             self.times = Some(times);
             self.now = names(&declared(settings));
         }
@@ -1112,6 +1126,31 @@ mod tests {
             .changed(&settings, &given, start + LOOK_EVERY)
             .unwrap();
         assert_eq!(change.added, ["use_skill:check_my_work"]);
+        assert!(change.removed.is_empty());
+    }
+
+    /// The skills' own folder (`--skills-dir`) is looked at too, with no
+    /// executive at all: a skill's function written there is a change at
+    /// the next look.
+    #[test]
+    fn the_skills_own_folder_is_looked_at_with_the_executives() {
+        let folder = Folder::new("skills-own");
+        let settings = Settings {
+            decline: true,
+            skills: Some(folder.0.clone()),
+            ..Default::default()
+        };
+        assert!(Watch::new(&Settings::default(), LOOK_EVERY).is_none());
+        let given = Given::default();
+        given.record(&declared(&settings));
+        let mut watch = Watch::new(&settings, LOOK_EVERY).unwrap();
+        let start = Instant::now();
+        assert_eq!(watch.changed(&settings, &given, start), None);
+        write(&folder, &["dance"], 1);
+        let change = watch
+            .changed(&settings, &given, start + LOOK_EVERY)
+            .unwrap();
+        assert_eq!(change.added, ["dance"]);
         assert!(change.removed.is_empty());
     }
 

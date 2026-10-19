@@ -550,13 +550,22 @@ session open, so a new skill reaches Gemini without a change to the voice.
 As built (#941, the first builder's decision of 09:51; not yet run on a
 lamp): `tool = "check_my_work"` in `skill.toml`, described to the model with
 `SKILL.md`'s description, which says when to call it. With `--tools-dir DIR`
-(the unit template gives `@ACTIONS_DIR@/skills`), `lamp-skills` keeps
-`DIR/tools.json`, written whole at each load and removed when no skill has
-a tool, and answers on `DIR/call.sock` the way the actions part does
-([tools.md](tools.md#the-skills)). With the voice's `LAMP_USE_SKILL=on`,
-the model is given one `use_skill` function for every skill instead, with
-each skill's description, choice and yes-or-no in its instruction, and the
-call reaches the skill as its own (#1668). A call runs the skill's steps without
+(the units give `/run/lampos-skills`, lamp-skills' own `RuntimeDirectory`),
+`lamp-skills` keeps `DIR/tools.json`, written whole at each load and
+removed when no skill has a tool, and answers on `DIR/call.sock` the way
+the actions part does ([tools.md](tools.md#the-skills)). It makes `DIR` and
+the socket at its start, and again, with the file, at a look (every 2 s)
+that finds the socket gone from a `DIR` still there, saying so. With `DIR`
+itself gone it ends, not zero, with a line: as its user, under its sandbox,
+it cannot make the folder again, and systemd does as it starts it once
+more (`Restart=on-failure`; the reviewer and the first builder on #1656).
+Until 19 Oct `DIR` was inside
+the actions part's folder, which systemd removes at each restart of
+actions, and the voice had no skill functions until lamp-skills restarted
+(lamp-4ace, 04:33). With the voice's `LAMP_USE_SKILL=on`, the model is
+given one `use_skill` function for every skill instead, with each skill's
+description, choice and yes-or-no in its instruction, and the call reaches
+the skill as its own (#1668). A call runs the skill's steps without
 asking the Policy, since a person asked: the body and the light are made
 as in any run, the light given back after its `for`, and the voice is
 answered with what the model is to do next: at once, before they are
