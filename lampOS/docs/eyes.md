@@ -221,8 +221,16 @@ Only while the voice service says so. `lamp-voice serve`, when
 a second while the microphone is permitted, and `{"camera":false}` once, at
 once, when it is not (`crates/voice/src/body_link.rs`, `EyesLink`). The eyes
 open the camera on the first yes and close it on a no or when no yes has come
-for 1.5 s, so a voice service that is muted, stopped or gone closes the
-lamp's eyes too. The rule is the same as for its ears: the camera may look
+for 1.5 s. A mute (the switch, the button or a head put to sleep) tells the
+eyes no at once, as the voice's conversation ends and before anything is
+written about it, and so does any other end of that conversation (a fault, a
+stop): the camera closes on the mute, not 1.0 to 1.5 s after it (#1802). The
+no is one datagram the voice never waits on, sent once; with no eyes
+listening it is nothing. The journal marks it with `lamp-voice: the eyes are
+told no at once: software mute` (or `head sleep`, `physical mute (privacy
+event)`, `physical mute (privacy gate)`), and the eyes' own `lamp-eyes:
+camera closed: not permitted` marks the camera shut. A voice service killed
+outright says nothing, and the eyes close on the 1.5 s. The rule is the same as for its ears: the camera may look
 exactly while the microphone may listen.
 
 This is a narrower arrangement than the camera worker described in
