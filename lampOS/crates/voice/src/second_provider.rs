@@ -1339,6 +1339,11 @@ async fn spoken(
             }
         }
     };
+    // Every early word sent before the words were final counts: a
+    // `TurnResumed` just before the end still takes them back.
+    while let Some(said) = early.as_mut().and_then(|early| early.try_recv().ok()) {
+        prepared = prepared_on(&shared, request, prepared, said);
+    }
     let text = match finished {
         Ok(text) => {
             reached(&times, |times| &mut times.words);
