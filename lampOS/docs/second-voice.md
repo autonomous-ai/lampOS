@@ -394,6 +394,30 @@ order is kept. A written turn is the same from the chat on.
   headers. A gap over the client's 90 s pool keep means a new connection
   (the first builder at 18:26: the first event came in 0.9 to 1.9 s on
   lamp-4ace, 0.7 s from the probe).
+  After the first request, the line also says whether its tools and its
+  first message are the last request's, hashed: `; its tools and first
+  message as the last request's`, or which of the two is not. A service's
+  prompt cache holds only a prefix that is the same as before.
+  Each answer is journaled when it ends: `chat answer: its first words or
+  call F ms and its end E ms after it was asked; P prompt tokens, H from the
+  cache, M not; C completion tokens`. H is DeepSeek's
+  `prompt_cache_hit_tokens`, or `prompt_tokens_details.cached_tokens` in
+  OpenAI's form. DeepSeek is asked for the count
+  (`stream_options.include_usage`), and other services' is told when they
+  send it, else `no usage given` (#1712, the first builder at 18:56: the
+  request was 31 KB with 31 tools, and its first event came in 976 to
+  1296 ms).
+- **With `LAMP_SECOND_STEADY_FIRST=on` a spoken turn's request begins with
+  what stays** (off unless set; #1712, the first builder at 18:56). The
+  system message keeps only the character and the skills. The memory note,
+  the time, the room's facts and the thread go in a second system message
+  after the exchanges, before the turn's notes and words (`Told::after`).
+  So the request's prefix, the character, the tools and the exchanges, is
+  the same from one turn to the next while the person goes on, and the time
+  changes it only after them. Off, it's all in the one system message, the
+  time right after the character. A text's request is unchanged. Each turn's
+  journal says how much the cache held (above): the A/B is the played check
+  both ways, by H and by the first event's time.
 - **The answer's first piece goes after a few words** if no clause or
   sentence ended sooner: 4 with the configured voice
   (`CONFIGURED_FIRST_WORDS`; the first builder at 18:26: a 9-word first

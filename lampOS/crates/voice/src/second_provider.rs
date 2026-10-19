@@ -190,6 +190,11 @@ pub type System = Arc<dyn Fn() -> Told + Send + Sync>;
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Told {
     pub text: String,
+    /// With `LAMP_SECOND_STEADY_FIRST=on` ([`STEADY_FIRST_ENVIRONMENT`]),
+    /// what changes from one turn to the next (the memory note, the time,
+    /// the room's facts and the thread), told as a system message after
+    /// the exchanges, so `text` keeps only what stays. `None`: all in `text`.
+    pub after: Option<String>,
     pub history: Vec<Message>,
 }
 impl From<String> for Told {
@@ -197,10 +202,30 @@ impl From<String> for Told {
     fn from(text: String) -> Self {
         Self {
             text,
+            after: None,
             history: Vec::new(),
         }
     }
 }
+impl Told {
+    /// The chat's messages before a turn's notes and words: the system
+    /// message, the exchanges, then [`Self::after`]. What stays from one
+    /// request to the next comes first, as a service's prompt cache holds
+    /// only a prefix that is the same as before (#1712, the first builder
+    /// at 18:56: DeepSeek's `prompt_cache_hit_tokens`).
+    pub fn messages(self) -> Vec<Message> {
+        let mut messages = vec![Message::system(self.text)];
+        messages.extend(self.history);
+        messages.extend(self.after.map(Message::system));
+        messages
+    }
+}
+
+/// Where the worker reads whether a spoken turn's system message keeps only
+/// what stays (the character and the skills) and tells the rest after the
+/// exchanges ([`Told::after`]): `on`, and nothing else (#1712, the first
+/// builder at 18:56).
+pub const STEADY_FIRST_ENVIRONMENT: &str = "LAMP_SECOND_STEADY_FIRST";
 /// Whether a spoken turn's words were said to the lamp, judged before they
 /// are answered: `(request, (began_us, ended_us), heard)` to why it is not
 /// answered, or nothing. The window is the microphone's read time of the
@@ -1720,9 +1745,7 @@ impl Prepared {
     /// The chat asked on `words`, as round 1 would be asked: the turn's
     /// system message and history, then the words.
     fn begin(shared: &Shared, words: String) -> Self {
-        let told = (shared.system)();
-        let mut messages = vec![Message::system(told.text)];
-        messages.extend(told.history);
+        let mut messages = (shared.system)().messages();
         messages.push(Message::user(words.clone()));
         let mut chat = shared.services.chat(messages.clone());
         let (kept, events) = mpsc::unbounded_channel();
@@ -1994,9 +2017,7 @@ async fn answer(
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
         }
-        let told = (shared.system)();
-        let mut messages = vec![Message::system(told.text)];
-        messages.extend(told.history);
+        let mut messages = (shared.system)().messages();
         // A chat begun on the early words stands for round 1 if it fits.
         let mut prepared = prepared_for.and_then(|(prepared, said)| {
             match prepared.misfit(&messages, &notes, &said) {
