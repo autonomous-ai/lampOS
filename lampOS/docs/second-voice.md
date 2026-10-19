@@ -311,11 +311,18 @@ order is kept. A written turn is the same from the chat on.
   journaled once, without words, when the words are in: "lamp-voice second: request N at the line's end:
   settled=<bool>, speech_final=<bool>, finals cover <ms|none> of <ms> ms
   sent, pending=<none|interim D ms after the last final|speech_started D
-  ms after the last final>, last final <T ms before End|none>, words
+  ms after the last final>, last final <T ms before End|none>[, finalize
+  answered in <A> ms to <E> ms|, finalize unanswered], words
   from=<settled|finalize|close_stream>", the last naming which path gave
   the words. D is audio time from the last final's end to the pending interim's end or
   `SpeechStarted`'s timestamp (negative: inside audio a final already
-  covers); T is wall time since that final arrived.
+  covers); T is wall time since that final arrived. A is how long
+  `Finalize`'s answer took, and E where in the audio it ends: short of the
+  ms sent, the rest came from `CloseStream` (not told when the words had
+  settled and no `Finalize` went). `CloseStream`'s words are taken once
+  they cover all the audio sent, without waiting for the socket's close
+  (#1712: on lamp-4ace on 19 Oct most lines took `close_stream`, 0.8 to
+  1.0 s after the line, against 275 ms for the one that took `finalize`).
 
 - **The first words go early.** Until some of the answer is on its way, a
   clause of at least four words ending in a comma, semicolon or colon is
