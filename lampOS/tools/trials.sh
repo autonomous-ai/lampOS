@@ -116,10 +116,9 @@ DROPIN=zz-trial.conf
 # (units a trial installs go there too, gone at a reboot), and @ETC@ is
 # TRIALS_ETC. CAUSE's keepfile takes them too.
 # ---------------------------------------------------------------------------
-ROWS="light-out scenes who-was-here activity forget thread reports nudges smoky dusty light-show settings look point"
+ROWS="light-out scenes who-was-here activity forget thread reports nudges smoky dusty light-show settings look point sip-of-water stand-up wind-down"
 # Rows not here, and why: printed by `list`.
 NOT_HERE="bedtime    Bedtime and Morning (#1732): a draft, not merged; three switches, --zone and its daily state, and it moves the body
-nudges     the other three nudges (#1957): sip-of-water, stand-up and wind-down are tried by hand, as rest-your-eyes is here
 mood       Mood on: lampOS/tools/mood-minute.sh --clap (#1956), its own minute with a clap played from the Mac
 updates    the update stack (#1680: #1788 to #1945, open): updates.md's rehearsal, a file channel and a test key, not a switch"
 
@@ -425,6 +424,73 @@ chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/point-light"
       EXAMPLE='lamp-skills: point-light Done: …'
       IN="lamp-skills.service"
       WAIT=240 ;;
+    sip-of-water)
+      # #1957 (on lamp-voice, installable): a slow blue breath of light and a look at the face after 90 minutes at the desk. The trial's copy waits
+      # 30 s in place of 90m and has no [active] and [quiet] hours, so it
+      # can be tried now. The face is said near the lamp by the trial. With
+      # the eyes' room/activity off its two conditions hold (unknown =
+      # "holds"). Its line: lamp-skills main.rs, the skill's Done.
+      ABOUT="the wellbeing nudges: the head looks at the face once and the light breathes blue for 6 s (#1957)"
+      NOTE="a build with #1957, the voice resting, nobody at the lamp (the trial says a face near the lamp itself), and the eyes' LAMP_ACTIVITY off. It MOVES: the head looks at the face once and the light breathes blue for 6 s; keep the arm clear"
+      SETASIDE="copy @SKILLS_DIR@/sip-of-water"
+      SETUP="rm -rf @SKILLS_DIR@/sip-of-water && cp -a @SRC@/sip-of-water @SKILLS_DIR@/sip-of-water
+sed -e 's/^for = \"90m\"/for = \"30s\"/' -e '/^\[active\]/,/^to = /d' -e '/^\[quiet\]/,/^to = /d' @SRC@/sip-of-water/skill.toml >@SKILLS_DIR@/sip-of-water/skill.toml
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/sip-of-water"
+      SWITCHES="lamp-skills.service|+--zone system"
+      CAUSE='keep humans/faces/tracked latest {"faces":[{"id":"trial","xmin":0.35,"ymin":0.2,"xmax":0.65,"ymax":0.6,"confidence":0.9}]} lamp_msgs/Faces'
+      AFTER='pub humans/faces/tracked latest {"faces":[]} lamp_msgs/Faces'
+      PROOF='sip-of-water Done'
+      # The why is its steps' own reports joined by "; " (lamp-skills
+      # main.rs): left out here rather than guessed.
+      EXAMPLE='lamp-skills: sip-of-water Done: …'
+      IN="lamp-skills.service"
+      WAIT=90 ;;
+    stand-up)
+      # #1957 (on lamp-voice, installable): a look at the face and a small tilt toward them after 100 minutes. The trial's copy waits
+      # 30 s in place of 100m and has no [active] and [quiet] hours, so it
+      # can be tried now. The face is said near the lamp by the trial. With
+      # the eyes' room/activity off its two conditions hold (unknown =
+      # "holds"). Its line: lamp-skills main.rs, the skill's Done.
+      ABOUT="the wellbeing nudges: the head looks at the face, then tilts toward them once (#1957)"
+      NOTE="a build with #1957, the voice resting, nobody at the lamp (the trial says a face near the lamp itself), and the eyes' LAMP_ACTIVITY off. It MOVES: the head looks at the face, then tilts toward them once; keep the arm clear"
+      SETASIDE="copy @SKILLS_DIR@/stand-up"
+      SETUP="rm -rf @SKILLS_DIR@/stand-up && cp -a @SRC@/stand-up @SKILLS_DIR@/stand-up
+sed -e 's/^for = \"100m\"/for = \"30s\"/' -e '/^\[active\]/,/^to = /d' -e '/^\[quiet\]/,/^to = /d' @SRC@/stand-up/skill.toml >@SKILLS_DIR@/stand-up/skill.toml
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/stand-up"
+      SWITCHES="lamp-skills.service|+--zone system"
+      CAUSE='keep humans/faces/tracked latest {"faces":[{"id":"trial","xmin":0.35,"ymin":0.2,"xmax":0.65,"ymax":0.6,"confidence":0.9}]} lamp_msgs/Faces'
+      AFTER='pub humans/faces/tracked latest {"faces":[]} lamp_msgs/Faces'
+      PROOF='stand-up Done'
+      # The why is its steps' own reports joined by "; " (lamp-skills
+      # main.rs): left out here rather than guessed.
+      EXAMPLE='lamp-skills: stand-up Done: …'
+      IN="lamp-skills.service"
+      WAIT=90 ;;
+    wind-down)
+      # #1957 (on lamp-voice, installable): one slow droop and the light a shade dimmer in the hour before bedtime, the dim held until they leave the desk, so it is done only when its trigger ends: FIRST is its Triggered, then the face goes and its gap (2 m, 10 s in the copy) runs out. The trial's copy waits
+      # 30 s in place of 20m and has no [active] and [quiet] hours, so it
+      # can be tried now. The face is said near the lamp by the trial. With
+      # the eyes' room/activity off its two conditions hold (unknown =
+      # "holds"). Its line: lamp-skills main.rs, the skill's Done.
+      ABOUT="the wellbeing nudges: one slow droop and the light a shade dimmer, given back once the trial says the face is gone (#1957)"
+      NOTE="a build with #1957, the voice resting, nobody at the lamp (the trial says a face near the lamp itself), and the eyes' LAMP_ACTIVITY off. It MOVES: one slow droop and the light a shade dimmer, given back once the trial says the face is gone; keep the arm clear"
+      SETASIDE="copy @SKILLS_DIR@/wind-down"
+      SETUP="rm -rf @SKILLS_DIR@/wind-down && cp -a @SRC@/wind-down @SKILLS_DIR@/wind-down
+sed -e 's/^for = \"20m\"/for = \"30s\"/' -e 's/^gap = \"2m\"/gap = \"10s\"/' -e '/^\[active\]/,/^to = /d' -e '/^\[quiet\]/,/^to = /d' @SRC@/wind-down/skill.toml >@SKILLS_DIR@/wind-down/skill.toml
+chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/wind-down"
+      SWITCHES="lamp-skills.service|+--zone system"
+      CAUSE='keep humans/faces/tracked latest {"faces":[{"id":"trial","xmin":0.35,"ymin":0.2,"xmax":0.65,"ymax":0.6,"confidence":0.9}]} lamp_msgs/Faces'
+      AFTER='pub humans/faces/tracked latest {"faces":[]} lamp_msgs/Faces'
+      FIRST='wind-down Triggered'
+      FIRSTEX='lamp-skills: wind-down Triggered: humans/faces/tracked has held for 30 s'
+      THEN='pub humans/faces/tracked latest {"faces":[]} lamp_msgs/Faces
+wait 15'
+      PROOF='wind-down Done'
+      # The why is its steps' own reports joined by "; " (lamp-skills
+      # main.rs): left out here rather than guessed.
+      EXAMPLE='lamp-skills: wind-down Done: …'
+      IN="lamp-skills.service"
+      WAIT=90 ;;
     *) return 1 ;;
   esac
 }
