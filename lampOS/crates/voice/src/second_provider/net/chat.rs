@@ -443,6 +443,17 @@ fn prefix_told(now: Prefix, before: Option<Prefix>) -> String {
     .to_owned()
 }
 
+/// A `usage`'s prompt tokens and those the service's cache held:
+/// DeepSeek's `prompt_cache_hit_tokens`, or OpenAI's form,
+/// `prompt_tokens_details.cached_tokens`.
+pub fn cache_counts(usage: Option<&Value>) -> (Option<u64>, Option<u64>) {
+    let count = |pointer: &str| usage?.pointer(pointer)?.as_u64();
+    (
+        count("/prompt_tokens"),
+        count("/prompt_cache_hit_tokens").or_else(|| count("/prompt_tokens_details/cached_tokens")),
+    )
+}
+
 /// An answer in the journal's words, when it has ended (#1712, the first
 /// builder at 18:56): when its first words or call came and when it ended,
 /// after the request went, and the service's count of its tokens, with how
@@ -461,9 +472,7 @@ fn answer_told(
         None => "no usage given".to_owned(),
         Some(usage) => {
             let count = |pointer: &str| usage.pointer(pointer).and_then(Value::as_u64);
-            let prompt = count("/prompt_tokens");
-            let cached = count("/prompt_cache_hit_tokens")
-                .or_else(|| count("/prompt_tokens_details/cached_tokens"));
+            let (prompt, cached) = cache_counts(Some(usage));
             let missed =
                 count("/prompt_cache_miss_tokens").or_else(|| prompt?.checked_sub(cached?));
             let said = |count: Option<u64>| count.map_or("?".to_owned(), |n| n.to_string());
@@ -502,6 +511,12 @@ pub struct ChatStream {
 }
 
 impl ChatStream {
+    /// The service's count of the answer's tokens, once the chunk that
+    /// carries it has come (the last, with DeepSeek's `include_usage`).
+    pub fn usage(&self) -> Option<&Value> {
+        self.deltas.usage.as_ref()
+    }
+
     /// The next event; `None` after `Done`. Each wait for the service is
     /// bounded by the client's stall limit.
     pub async fn next(&mut self) -> Result<Option<ChatEvent>> {

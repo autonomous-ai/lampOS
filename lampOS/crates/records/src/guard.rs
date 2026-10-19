@@ -639,7 +639,8 @@ mod implementation {
             | VoiceCommand::Marked
             | VoiceCommand::TurnTimes
             | VoiceCommand::Stalls
-            | VoiceCommand::ProbeCascade => None,
+            | VoiceCommand::ProbeCascade
+            | VoiceCommand::ProbeCache => None,
             // The reminders' consumer the voice starts beside itself when
             // LAMP_SCHEDULE_TOOLS is on: no output argument, its open files
             // still protected below. On lamp-4ace from 2026-10-15 02:05 to

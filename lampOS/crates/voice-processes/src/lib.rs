@@ -33,10 +33,13 @@ pub enum Command {
     /// The second route's candidate services timed from the lamp
     /// (`lamp-voice probe-cascade`): times only, run by hand.
     ProbeCascade,
+    /// How much of a chat request DeepSeek's prompt cache holds
+    /// (`lamp-voice probe-cache`, #1712): counts only, run by hand.
+    ProbeCache,
 }
 
 impl Command {
-    pub const ALL: [Command; 13] = [
+    pub const ALL: [Command; 14] = [
         Command::Serve,
         Command::Directed,
         Command::DirectedFixture,
@@ -50,6 +53,7 @@ impl Command {
         Command::TurnTimes,
         Command::Stalls,
         Command::ProbeCascade,
+        Command::ProbeCache,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -67,6 +71,7 @@ impl Command {
             Command::TurnTimes => "turn-times",
             Command::Stalls => "stalls",
             Command::ProbeCascade => "probe-cascade",
+            Command::ProbeCache => "probe-cache",
         }
     }
 
