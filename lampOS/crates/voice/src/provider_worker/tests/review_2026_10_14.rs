@@ -347,10 +347,10 @@ impl Drop for HeardAsOn {
 }
 
 /// A request heard as "Hey Mom, …" whose name lamp-name heard as it began:
-/// what the service is given as text beside it, up to its end.
+/// what the service is given as text beside it, up to its end. The caller
+/// holds the clock and the turn, so that the switches it sets are its own
+/// for all it asks (#1569 row 29).
 async fn told_beside_hey_mom() -> Vec<String> {
-    let _clock = logical_clock();
-    let _turn = one_at_a_time().await;
     let root = Root::new();
     let mut rig = LiveRig::start_with(quick_policy(), in_a_busy_room());
     let mut dial = rig.ready().await;
@@ -399,6 +399,13 @@ async fn told_beside_hey_mom() -> Vec<String> {
 /// is as before.
 #[tokio::test(start_paused = true)]
 async fn review_sound_with_the_heard_as_line_the_name_note_says_it_may_sound_like_another_word() {
+    // The turn first, for the whole test: `NAME_NOTE` and the heard-as line
+    // are the process's, and another test of this module sets or clears
+    // them in its turn. Set before it, or across two turns, they were turned
+    // on under the test holding the turn, or off under this one: in parallel
+    // this test failed 6 of 6 runs and the module 20 of 20 (#1569 row 29).
+    let _clock = logical_clock();
+    let _turn = one_at_a_time().await;
     let _note = NameNoteOn::set();
     {
         let _heard_as = HeardAsOn::set();
