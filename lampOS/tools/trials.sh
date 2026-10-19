@@ -125,7 +125,7 @@ chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/light-out"
 lamp-skills.service|+--zone system"
       CAUSE='keep room/presence latest {"someone":false,"nobody_s":600} lamp_msgs/RoomPresence'
       FIRST='light-out Triggered'
-      FIRSTEX='lamp-skills: light-out Triggered: room/presence nobody_s 600 is above 599'
+      FIRSTEX='lamp-skills: light-out Triggered: room/presence has held for 0 s'
       THEN='wait 35
 pub room/presence latest {"someone":true,"nobody_s":0} lamp_msgs/RoomPresence'
       AFTER='pub room/presence latest {"someone":true,"nobody_s":0} lamp_msgs/RoomPresence'
@@ -206,7 +206,9 @@ chown -R @SKILLS_USER@:@SKILLS_GROUP@ @SKILLS_DIR@/rest-your-eyes"
       CAUSE='keep humans/faces/tracked latest {"faces":[{"id":"trial","xmin":0.35,"ymin":0.2,"xmax":0.65,"ymax":0.6,"confidence":0.9}]} lamp_msgs/Faces'
       AFTER='pub humans/faces/tracked latest {"faces":[]} lamp_msgs/Faces'
       PROOF='rest-your-eyes Done'
-      EXAMPLE='lamp-skills: rest-your-eyes Done: gesture curious; light a shade softer'
+      # The why is its steps' own reports joined by "; " (lamp-skills
+      # main.rs): left out here rather than guessed.
+      EXAMPLE='lamp-skills: rest-your-eyes Done: …'
       IN="lamp-skills.service"
       WAIT=90 ;;
     *) return 1 ;;
