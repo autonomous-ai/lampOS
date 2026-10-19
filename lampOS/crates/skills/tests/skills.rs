@@ -637,6 +637,7 @@ fn the_permissions_refuse_every_call_and_action_they_do_not_give() {
                 lasting: None,
                 pattern: None,
                 keep: false,
+                until_ends: false,
             },
             "light",
         ),
@@ -1666,6 +1667,7 @@ fn a_light_files_pattern_is_loaded_and_held_to_its_bounds() {
                 low: 1,
             }),
             keep: false,
+            until_ends: false,
         }
     );
     let candle = with_light(
@@ -1738,6 +1740,7 @@ fn present_for_a_while_through_short_dropouts_once_a_sitting_and_only_while_rest
                 lasting: Some("4s".into()),
                 pattern: None,
                 keep: false,
+                until_ends: false,
             }
         ]
     );
@@ -4871,6 +4874,186 @@ fn a_dim_held_until_it_ends_is_given_back_when_its_skill_is_removed() {
         "{:?}",
         seen.lights
     );
+}
+
+/// #1681: a pale breath held while someone is in view (Not feeling well's
+/// light, on a trigger a test can hold), given back when they go.
+const BREATH_WHILE: &str = r#"
+[trigger]
+topic = "humans/faces/tracked"
+rearm = "leaves"
+[ask]
+policy = "nudge"
+[[do]]
+light = { colour = "white", level = 2, pattern = { kind = "breathe", period = "10s", low = 1 }, until = "ends" }
+"#;
+
+/// #1681: the pale breath is asked of the ring with its pattern, renewed
+/// while the trigger holds, and given back when it ends; the person's light
+/// is never touched.
+#[test]
+fn a_breath_until_it_ends_is_asked_of_the_ring_and_given_back_when_the_trigger_ends() {
+    let seen = the_program_timed(
+        BREATH_WHILE,
+        true,
+        &[],
+        3,
+        1,
+        4,
+        (Ring::Asked, After::Leaves(None)),
+        false,
+    );
+    assert!(seen.lights.is_empty(), "{:?}", seen.lights);
+    let done = &seen.events[3].why;
+    assert!(
+        done.contains(
+            "light white: asked of the ring at level 2, breathing every 10000 ms down to 1"
+        ) && done.contains("held until its trigger ended")
+            && done.contains("light given back"),
+        "{done}"
+    );
+    assert!(seen.requests.len() >= 2, "{:?}", seen.requests);
+    let (asked, back) = (&seen.requests[0], seen.requests.last().unwrap());
+    assert_eq!(asked.light, Light::new(true, "white", 2).unwrap());
+    assert_eq!(
+        asked.pattern,
+        Some(LightPattern {
+            kind: PatternKind::Breathe,
+            period_ms: 10_000,
+            low: 1,
+        })
+    );
+    assert!(asked.check().is_ok(), "{asked:?}");
+    assert_eq!(back.light, asked.light);
+    assert!(
+        !back.claim.holds_at("boot-test", lamp_ipc::monotonic_us()),
+        "{back:?}"
+    );
+}
+
+/// #1681: without the ring the breath is the actions part's steady pale
+/// light, held until the trigger ends and then given back.
+#[test]
+fn a_breath_until_it_ends_without_the_ring_is_held_steady_and_given_back() {
+    let seen = the_program_then(BREATH_WHILE, true, &[], 3, 1, 4, Some(None));
+    let done = &seen.events[3];
+    assert_eq!(done.stage, SkillStage::Done, "{:?}", seen.events);
+    assert!(
+        done.why.contains("steady: its pattern needs the ring's")
+            && done.why.contains("held until its trigger ended")
+            && done.why.contains("light given back to on blue at 3"),
+        "{}",
+        done.why
+    );
+    assert_eq!(seen.lights.len(), 4, "{:?}", seen.lights);
+    assert!(seen.lights[0].contains("\"white\""), "{:?}", seen.lights);
+    assert!(seen.lights[1].contains("light_dimmer"), "{:?}", seen.lights);
+    assert!(seen.lights[2].contains("\"blue\""), "{:?}", seen.lights);
+    assert!(
+        seen.lights[3].contains("light_brighter"),
+        "{:?}",
+        seen.lights
+    );
+}
+
+/// #1681: a light the person changed while the breath was held is theirs.
+#[test]
+fn a_light_changed_while_a_breath_was_held_is_left_as_it_is() {
+    let theirs = Light::new(true, "red", 5).unwrap();
+    let seen = the_program_then(BREATH_WHILE, true, &[], 3, 1, 4, Some(Some(theirs)));
+    let done = &seen.events[3];
+    assert!(
+        done.why
+            .contains("changed meanwhile or not known, so left as it is"),
+        "{}",
+        done.why
+    );
+    assert_eq!(seen.lights.len(), 2, "{:?}", seen.lights);
+}
+
+/// #1681: the breath held, its skill's folder removed while the trigger
+/// still holds: the reload gives the light back and the run is done.
+#[test]
+fn a_breath_held_until_it_ends_is_given_back_when_its_skill_is_removed() {
+    let seen = the_program_timed(
+        BREATH_WHILE,
+        true,
+        &[],
+        3,
+        1,
+        4,
+        (Ring::Off, After::Removed),
+        false,
+    );
+    let done = &seen.events[3];
+    assert_eq!(done.stage, SkillStage::Done, "{:?}", seen.events);
+    assert!(
+        done.why.contains("held until its trigger ended")
+            && done.why.contains("light given back to on blue at 3"),
+        "{}",
+        done.why
+    );
+    assert_eq!(seen.lights.len(), 4, "{:?}", seen.lights);
+    assert!(seen.lights[2].contains("\"blue\""), "{:?}", seen.lights);
+    assert!(
+        seen.lights[3].contains("light_brighter"),
+        "{:?}",
+        seen.lights
+    );
+}
+
+/// #1681: a colour takes `until = "ends"`, held and named so; never with a
+/// `for` of its own or `keep`.
+#[test]
+fn a_colour_until_it_ends_is_loaded_and_refused_with_a_for_or_keep() {
+    let dir = tempfile::tempdir().unwrap();
+    let line = r#"light = { colour = "white", level = 2, pattern = { kind = "breathe", period = "10s", low = 1 }, until = "ends" }"#;
+    let with = |name: &str, light: &str| {
+        skill_with(
+            dir.path(),
+            name,
+            &BREATH_WHILE.replace(line, &format!("light = {light}")),
+        )
+    };
+    let skill = load(&with(
+        "breath",
+        r#"{ colour = "white", level = 2, pattern = { kind = "breathe", period = "10s", low = 1 }, until = "ends" }"#,
+    ))
+    .unwrap();
+    assert_eq!(skill.triggers.len(), 1);
+    let held = Call::Light {
+        colour: "white".into(),
+        level: Some(2),
+        lasting: None,
+        pattern: None,
+        keep: false,
+        until_ends: true,
+    };
+    assert!(held.held_until_ends());
+    assert_eq!(
+        held.named(),
+        (
+            "light",
+            serde_json::json!({"colour": "white", "level": 2, "until": "ends"})
+        )
+    );
+    load(&with("steady", r#"{ colour = "white", until = "ends" }"#)).unwrap();
+    for (name, light) in [
+        (
+            "lasting",
+            r#"{ colour = "white", for = "4s", until = "ends" }"#,
+        ),
+        (
+            "kept",
+            r#"{ colour = "white", keep = true, until = "ends" }"#,
+        ),
+    ] {
+        let refused = load(&with(name, light)).unwrap_err();
+        assert!(
+            refused.contains("with a colour takes no for and no keep"),
+            "{name}: {refused}"
+        );
+    }
 }
 
 /// Stuffy air's trigger and quiet hours, as #1021 asks, with no condition.

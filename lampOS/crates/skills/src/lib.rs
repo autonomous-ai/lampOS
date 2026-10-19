@@ -1003,6 +1003,9 @@ pub enum Call {
         /// How it moves, asked of the ring with `LAMP_LIGHT_REQUESTS=on`.
         pattern: Option<LightPattern>,
         keep: bool,
+        /// Held until the trigger stops holding, then given back (#1681:
+        /// the pale breath of a lamp that is a little unwell).
+        until_ends: bool,
     },
     /// A light show (`shows/NAME.toml`): each frame's light in turn, held
     /// its while, then the light given back (#1679). Only in a skill its
@@ -1119,7 +1122,10 @@ impl Call {
     pub fn held_until_ends(&self) -> bool {
         matches!(
             self,
-            Self::Dim {
+            Self::Light {
+                until_ends: true,
+                ..
+            } | Self::Dim {
                 until_ends: true,
                 ..
             } | Self::Out {
@@ -1160,6 +1166,7 @@ impl Call {
                 lasting,
                 pattern,
                 keep,
+                until_ends,
             } => {
                 let mut args = json!({ "colour": colour });
                 if let Some(level) = level {
@@ -1173,6 +1180,9 @@ impl Call {
                 }
                 if *keep {
                     args["keep"] = json!(true);
+                }
+                if *until_ends {
+                    args["until"] = json!("ends");
                 }
                 ("light", args)
             }
@@ -2181,10 +2191,15 @@ fn light_call(file: LightFile) -> Result<Call, String> {
             if file.level.is_some_and(|level| !(1..=5).contains(&level)) {
                 return Err("level is 1 to 5".into());
             }
-            if until_ends {
-                return Err("until goes with dim or out".into());
-            }
             let keep = file.keep == Some(true);
+            // Held until the trigger ends, a light has no while of its own,
+            // and it is given back, so it is never the person's (#1681).
+            if until_ends && (file.lasting.is_some() || keep) {
+                return Err(
+                    "until = \"ends\" with a colour takes no for and no keep: it is held until the trigger ends, then given back"
+                        .into(),
+                );
+            }
             // A kept light is the person's own, steady and for good: it has
             // no while and no pattern, which are a skill's light's.
             if keep && (file.lasting.is_some() || file.pattern.is_some()) {
@@ -2202,6 +2217,7 @@ fn light_call(file: LightFile) -> Result<Call, String> {
                 lasting: file.lasting,
                 pattern,
                 keep,
+                until_ends,
             })
         }
         (None, Some(steps)) if (1..=4).contains(&steps) => {
