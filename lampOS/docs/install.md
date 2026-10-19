@@ -752,6 +752,32 @@ lamp-update check-units --cat units.txt --product lampOS/deploy/product
     it is copied there by hand, and journald reads it when it next starts,
     at the next boot. `journalctl --vacuum-size=20M` shrinks the journal at
     once, with no restart of anything.
+- The night's copy-back of the logs leaves the journal alone:
+  `robots/lamp/rootfs/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf`
+  runs `usr/local/libexec/lamp-ramlog-postrotate` in place of the base's
+  `orangepi-ramlog postrotate` (#1178).
+  - **Why:** at 00:00 the base's `logrotate.service` copies the `/var/log`
+    RAM disk to `/var/log.hdd` (`orangepi-ramlog write`), runs logrotate,
+    then writes every file of `/var/log.hdd` back over its `/var/log` twin
+    with `cat file > dest`. The journal is among them, so journald's open
+    `system.journal` was overwritten in place with the copy taken seconds
+    before. On lamp-4ace at 00:00 on 19 Oct, every read of it said
+    "truncated, ignoring file" until a `journalctl --rotate` at 00:11, and
+    the voice's lines in between were lost. That's read from the base's
+    scripts (on lamp-75c9), not yet reproduced.
+  - **What changes:** the same copy-back, with `/var/log.hdd/journal` left
+    out. The rotated text logs still come back to the RAM disk, and the
+    journal is still copied to the eMMC each night by `write`. Off when
+    `/etc/default/orangepi-ramlog` says `ENABLED` isn't `true`, as the base.
+    `orangepi-truncate-logs` (over 75% of `/var/log`) runs logrotate without
+    the service, so it never copies back.
+  - **Tests:** `lamp-update`'s `tests/image_ramlog.rs` runs the script on a
+    copy shaped as the lamp's (the journal kept, the text logs copied,
+    compressed and numbered ones left out); a copy-back that names the
+    journal fails it.
+  - **Existing lamps:** only a newly imaged lamp has it (#1369), as for the
+    journal's size above. On a lamp in use the two files are copied by hand,
+    then `sudo systemctl daemon-reload`.
 - Which group may read the GPIO chips and the I²C bus on the base image was
   not checked.
 - `lamp-surround` was not read beyond its unit, and `lamp-records` has two

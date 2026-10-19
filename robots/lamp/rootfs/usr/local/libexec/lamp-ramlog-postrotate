@@ -1,0 +1,21 @@
+# The base image's `orangepi-ramlog postrotate`, with the journal left out
+# (#1178; logrotate.service.d/zz-lamp-ramlog.conf runs it). After logrotate
+# has rotated the eMMC copy of the logs, each file there is written back
+# over its twin on the /var/log RAM disk, as the base does, except
+# journald's files: the one journald has open must never be overwritten
+# under it. Compressed, numbered and orangepi-ramlog's own files are left
+# out, as the base leaves them. Run with bash: the defaults file has arrays.
+# The paths may be given for tests only.
+defaults=${LAMP_RAMLOG_DEFAULTS:-/etc/default/orangepi-ramlog}
+hdd=${LAMP_RAMLOG_HDD:-/var/log.hdd}
+ram=${LAMP_RAMLOG_RAM:-/var/log}
+
+[ -f "$defaults" ] && . "$defaults"
+[ "$ENABLED" = true ] || exit 0
+cd "$hdd" || exit 0
+find . -path ./journal -prune -o -type f -print |
+    grep -E -v '(\.gz|\.xz|\.[0-9]|orangepi-ramlog)' |
+    while IFS= read -r file; do
+        cat "$file" >"$ram/$file"
+    done
+exit 0
