@@ -1034,6 +1034,7 @@ fn early_words_stand_only_for_the_same_line_asked_the_same_way() {
     drop(early);
     let prepared = Prepared {
         words: "lamp what time is it".to_owned(),
+        notes: Vec::new(),
         messages: vec![
             Message::system("SYSTEM".to_owned()),
             Message::user("lamp what time is it".to_owned()),
@@ -3597,4 +3598,239 @@ async fn a_wordless_piece_with_the_name_heard_lends_its_time_not_its_sound() {
         (3 * frame, Some(1_000), vec![1_000]),
         "no name heard: its sound goes again"
     );
+}
+
+/// A Start marked as the coordinator marks it: begun over the lamp's
+/// audible answer, the first after a stop, soon after the lamp spoke.
+fn start_marked(
+    request: u64,
+    over_the_voice: bool,
+    after_stop: bool,
+    follows_on: bool,
+) -> ProviderInput {
+    ProviderInput::Start {
+        request,
+        session: 1,
+        privacy_generation: 1,
+        continues: false,
+        continues_cut_off: false,
+        over_the_lamp: over_the_voice,
+        after_stop,
+        follows_on,
+        over_the_lamps_voice: over_the_voice,
+    }
+}
+
+/// One spoken line heard as `words` and its chat's messages, with `marks`
+/// sent as the coordinator sends them, before its audio and End.
+async fn asked_with(
+    words: &str,
+    engine: impl FnOnce(Engine) -> Engine,
+    start: ProviderInput,
+    called: bool,
+    sound: bool,
+) -> Vec<Vec<Message>> {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(words.to_owned())].into()),
+        chats: Mutex::new([vec![text("Yes?"), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let mut engine = engine(built);
+    engine.submit(start);
+    engine.submit(audio(1, 1));
+    if called {
+        engine.submit(ProviderInput::Called {
+            request: 1,
+            privacy_generation: 1,
+        });
+    }
+    engine.submit(ProviderInput::End {
+        request: 1,
+        privacy_generation: 1,
+        sound,
+        cut_in: false,
+    });
+    turn(&mut engine).await;
+    script.asked.lock().unwrap().clone()
+}
+
+/// #1712, item 4 of the first builder's 20:15 (`LAMP_CUT_IN_TOLD`): a line
+/// begun over the lamp's audible answer is told it cut in, beside its
+/// words, as the Live route tells it; not without the switch, and the
+/// first after a stop is told the stop instead.
+#[tokio::test]
+async fn a_line_begun_over_the_lamps_answer_is_told_it_cut_in() {
+    let cut_in = Message::system(crate::cut_in_told::NOTE);
+    let stopped = Message::system(crate::provider_worker::STOPPED_NOTE);
+    let told = asked_with(
+        "Okay, that is enough",
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert_eq!(told[0][told[0].len() - 2], cut_in, "{:?}", told[0]);
+    assert_eq!(told[0].last(), Some(&Message::user("Okay, that is enough")));
+    let off = asked_with(
+        "Okay, that is enough",
+        |engine| engine,
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert!(!off[0].contains(&cut_in), "{:?}", off[0]);
+    let quiet = asked_with(
+        "Okay, that is enough",
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, false, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert!(!quiet[0].contains(&cut_in), "{:?}", quiet[0]);
+    let after_stop = asked_with(
+        "Okay, that is enough",
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, true, true, false),
+        false,
+        false,
+    )
+    .await;
+    assert!(!after_stop[0].contains(&cut_in), "{:?}", after_stop[0]);
+    assert!(after_stop[0].contains(&stopped), "{:?}", after_stop[0]);
+}
+
+/// #1712, item 4 (`LAMP_FOLLOWS_ON`): a line begun soon after the lamp's
+/// words finished is told it may follow on from them, as the Live route
+/// tells it; not when its End marks a sound, nor when it was judged in a
+/// busy room.
+#[tokio::test]
+async fn a_line_soon_after_the_lamp_spoke_is_told_it_may_follow_on() {
+    let follows = Message::system(crate::follows_on::NOTE);
+    let told = asked_with(
+        "And what do you like about it",
+        |engine| engine,
+        start_marked(1, false, false, true),
+        false,
+        false,
+    )
+    .await;
+    assert_eq!(told[0][told[0].len() - 2], follows, "{:?}", told[0]);
+    let unmarked = asked_with(
+        "And what do you like about it",
+        |engine| engine,
+        start(1),
+        false,
+        false,
+    )
+    .await;
+    assert!(!unmarked[0].contains(&follows), "{:?}", unmarked[0]);
+    let sound = asked_with(
+        "And what do you like about it",
+        |engine| engine,
+        start_marked(1, false, false, true),
+        false,
+        true,
+    )
+    .await;
+    assert!(!sound[0].contains(&follows), "{:?}", sound[0]);
+    let busy = asked_with(
+        "And what do you like about it",
+        |engine| engine.judging_busy(Arc::new(|request| request == 1)),
+        start_marked(1, false, false, true),
+        false,
+        false,
+    )
+    .await;
+    assert!(!busy[0].contains(&follows), "{:?}", busy[0]);
+    let quiet = asked_with(
+        "And what do you like about it",
+        |engine| engine.judging_busy(Arc::new(|_| false)),
+        start_marked(1, false, false, true),
+        false,
+        false,
+    )
+    .await;
+    assert!(quiet[0].contains(&follows), "{:?}", quiet[0]);
+}
+
+/// #1712, item 4 (`ProviderInput::Called`, which this route dropped): a line
+/// that was only the lamp's name, its call's wait run out, is told so, as
+/// Gemini's model is; with no words of it back, as a lone name often has,
+/// it is asked as the name, not left as a sound. Without `Called`, no words
+/// are still no line.
+#[tokio::test]
+async fn only_the_lamps_name_is_told_so_and_asked_as_the_name_with_no_words() {
+    let called = Message::system(crate::provider_worker::CALLED_NOTE);
+    let told = asked_with("Lamp", |engine| engine, start(1), true, false).await;
+    assert_eq!(told[0][told[0].len() - 2], called, "{:?}", told[0]);
+    assert_eq!(told[0].last(), Some(&Message::user("Lamp")));
+    let wordless = asked_with("", |engine| engine, start(1), true, false).await;
+    assert_eq!(
+        wordless[0][wordless[0].len() - 2],
+        called,
+        "{:?}",
+        wordless[0]
+    );
+    assert_eq!(
+        wordless[0].last(),
+        Some(&Message::user(super::CALLED_WORDS))
+    );
+    let not_called = asked_with("Lamp", |engine| engine, start(1), false, false).await;
+    assert!(!not_called[0].contains(&called), "{:?}", not_called[0]);
+    assert!(
+        asked_with("", |engine| engine, start(1), false, false)
+            .await
+            .is_empty()
+    );
+}
+
+/// #1712, item 4, with `LAMP_SECOND_PREPARED`: a chat begun on a cut-in's
+/// early words is asked with its note, so it is kept, not dropped as "a
+/// note goes beside the words"; a note known only at the End (`Called`)
+/// still drops it.
+#[tokio::test(start_paused = true)]
+async fn a_chat_begun_on_a_cut_ins_early_words_carries_its_note() {
+    for (called, asked) in [(false, 1), (true, 2)] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Okay, that is enough".to_owned())].into()),
+            early: Mutex::new([vec![net::Early::Words("okay that is enough".to_owned())]].into()),
+            finish_after: Some(Duration::from_millis(400)),
+            first_event_after: Some(Duration::from_millis(600)),
+            chats: Mutex::new(
+                [
+                    vec![text("Of course."), Ok(ChatEvent::Done)],
+                    vec![text("Of course."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.preparing(true).telling_cut_ins(true);
+        engine.submit(start_marked(1, true, false, false));
+        engine.submit(audio(1, 1));
+        if called {
+            engine.submit(ProviderInput::Called {
+                request: 1,
+                privacy_generation: 1,
+            });
+        }
+        engine.submit(end(1));
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+                .await
+                .expect("the turn ends");
+            if matches!(event, ProviderOutput::TurnComplete { .. }) {
+                break;
+            }
+        }
+        let chats = script.asked.lock().unwrap();
+        assert_eq!(chats.len(), asked, "called {called}: {chats:?}");
+        let cut_in = Message::system(crate::cut_in_told::NOTE);
+        assert!(chats.iter().all(|chat| chat.contains(&cut_in)), "{chats:?}");
+    }
 }

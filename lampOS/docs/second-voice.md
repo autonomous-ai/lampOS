@@ -610,6 +610,31 @@ order is kept. A written turn is the same from the chat on.
   at every start, so none are kept for a later request. A request given up
   before its speech to text finished has no words to give: its successor is
   asked with its own words alone (the reviewer on #1168).
+- **A cut-in, a line that may follow on, and a bare call are told as on
+  the Live route** (#1712, item 4 of the first builder's 20:15), each as a
+  system message just before the person's words, after the stop's:
+  - **A cut-in** (`LAMP_CUT_IN_TOLD=on`, the worker's `--cut-in-told`): a
+    line begun over the lamp's audible answer (`over_the_lamps_voice`),
+    and not the first after a stop, which is told the stop instead, is
+    told `cut_in_told::NOTE`. It is known from the line's start, so a chat
+    begun on its early words (`LAMP_SECOND_PREPARED`) is asked with it
+    and kept; a note known only later (a stop's, a bare call's, a
+    follow-on's) still drops that chat.
+  - **A line that may follow on** (`LAMP_FOLLOWS_ON=on`, the Start's
+    `follows_on`): told `follows_on::NOTE`, unless its End marks a short
+    sound or the rule judged it in a busy room (`Heeding::judged_busy`;
+    with no rule, this process's room now).
+  - **A bare call** (`--call-wait-ms`, `ProviderInput::Called`, which this
+    route dropped before): told `CALLED_NOTE`, so the model answers as
+    someone who hears their name ("Yes?"). A lone name often comes back
+    with no words; such a line is asked as `Lamp.`, the name the
+    coordinator heard, rather than left as a sound. Without `Called`, no
+    words are still no line.
+  - The journal says each: "it began over the lamp's answer, and the
+    model is told so", "the model is told it may follow on from what the
+    lamp said" (or "… in a busy room; the model is not told …"), "only
+    the lamp's name was said, and the model is told so", and "… no words
+    of it came back: asked as the name".
 - **The first request after a stop is told of it.** With
   `LAMP_STOP_TOLD=on`, the first request after a hand or the head stopped
   the lamp carries `after_stop`. Gemini is told so with `STOPPED_NOTE`. This
@@ -1283,7 +1308,7 @@ after a take-over, but now for every turn:
   #1712: a phrase rule is easy to trip.
 - **Live route only, so not on this route:** the same-voice
   check,
-  `LAMP_CUT_IN_TOLD`, `LAMP_FOLLOWS_ON`, `LAMP_GOING_ON_ASKS`, the head tap
+  `LAMP_GOING_ON_ASKS`, the head tap
   and `--addressed` for whom it answers, sight, camera and air facts, and
   `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).
 - **`voice/link`** (`LAMP_VOICE_LINK`) is this route's link, Ready from its
