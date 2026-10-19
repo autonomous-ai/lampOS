@@ -1110,10 +1110,22 @@ fn run_policy_with_peers_held(
         require_real_process_clock();
     }
     let dir = SessionDirectory::create().unwrap();
-    let (capture, capture_peer_channels) = Worker::sleeping_fixture(&dir.path, "capture");
-    let (speaker, speaker_peer_channels) = Worker::sleeping_fixture(&dir.path, "speaker");
-    let (provider, provider_peer_channels) = Worker::sleeping_fixture(&dir.path, "provider");
-    let (privacy, privacy_peer_channels) = Worker::sleeping_fixture(&dir.path, "privacy");
+    // Children that end as their Stop is sent (their input closed), so the
+    // shutdown does not wait out its 300 ms grace to kill four that cannot
+    // stop, as `exec sleep 60` could not (#1806). The ready fixture's echo
+    // proves each child reads its input before a stepped clock moves.
+    let (mut capture, capture_peer_channels, capture_input) =
+        Worker::cooperative_ready_fixture(&dir.path, "capture");
+    let (mut speaker, speaker_peer_channels, speaker_input) =
+        Worker::cooperative_ready_fixture(&dir.path, "speaker");
+    let (mut provider, provider_peer_channels, provider_input) =
+        Worker::cooperative_ready_fixture(&dir.path, "provider");
+    let (mut privacy, privacy_peer_channels, privacy_input) =
+        Worker::cooperative_ready_fixture(&dir.path, "privacy");
+    capture.end_on_stop(capture_input);
+    speaker.end_on_stop(speaker_input);
+    provider.end_on_stop(provider_input);
+    privacy.end_on_stop(privacy_input);
     // Starting children is real OS work. Enter only after their startup barriers
     // and keep the scope through shutdown and collection of scenario timestamps.
     let mut scope = match mode {
@@ -1248,7 +1260,7 @@ fn run_policy_with_peers_held(
     let elapsed = started.elapsed();
     crate::session_lifetime::set_start_offline_for_test(None);
     crate::listen_gaps::set_for_test(None);
-    // Sleeping fixtures need forced reaping; only the endpoint record matters.
+    // Only the endpoint record matters here.
     let _ = rig.shutdown(&mut trace);
     stop.store(true, Ordering::SeqCst);
     for peer in peers {
