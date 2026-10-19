@@ -22,8 +22,8 @@ use crate::{
 };
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_msgs::{
-    Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, HumanSeems, Level, RoomActivity,
-    RoomPresence, Speech, StoodUp,
+    CameraClosed, Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, HumanSeems, Level,
+    RoomActivity, RoomPresence, Speech, StoodUp,
 };
 use std::{io, time::Duration};
 
@@ -209,6 +209,10 @@ pub fn health(camera: Camera, set_aside: usize) -> Diagnostic {
 pub struct BusOut {
     faces: Publisher,
     health: Publisher,
+    /// `eyes/camera_closed`: the receipt for a close the voice asked about
+    /// (#1802). Kept alive with the faces, so the voice can see that these
+    /// eyes give receipts before it asks for one.
+    closed: Publisher,
     ids: Ids,
     alive_at_us: u64,
     reported_at_us: Option<u64>,
@@ -286,9 +290,12 @@ impl BusOut {
         faces.expires_after(Some(LASTS));
         let health =
             bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), SOURCE)?;
+        let closed =
+            bus.publisher_declared(CameraClosed::TOPIC, &CameraClosed::declaration(), SOURCE)?;
         Ok(Self {
             faces,
             health,
+            closed,
             ids: Ids {
                 mouths: speaking::from_environment(),
                 ..Ids::default()
@@ -435,6 +442,7 @@ impl BusOut {
         if now_us.saturating_sub(self.alive_at_us) >= 1_000_000 {
             self.alive_at_us = now_us;
             let _ = self.faces.alive();
+            let _ = self.closed.alive();
         }
         if let Some(presence) = self.presence.as_mut() {
             // When the voice heard the words, by the host's monotonic clock,
@@ -463,6 +471,11 @@ impl BusOut {
                 eprintln!("lamp-eyes: {line}");
             }
         }
+    }
+
+    /// Say that the camera is shut for the close the voice asked about.
+    pub fn camera_closed(&mut self, receipt: CameraClosed, now_us: u64) {
+        let _ = self.closed.publish_json(now_us, &receipt);
     }
 
     /// Say how the eyes are. Call from the loop on every turn, whatever

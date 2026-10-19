@@ -148,3 +148,56 @@ setup onboarding tests: 5 passed, 0 failed across 26 summaries. Install: 52
 passed, 0 failed. Full lamp-voice: 2,331 passed, 0 failed, 12 ignored across
 32 summaries. Workspace build passed. The counts in earlier sections keep
 their stated bases; exact-head ARM64 and physical evidence remain outstanding.
+
+## Camera receipt (19 October 2026, follow-up to Third's P2-2, #1802)
+
+The gap: on a physical mute the voice cycle returned `PhysicalMute` from
+`conversation_with_gate` before reaching the per-loop `eyes.permit(...)`
+call, so the eyes were never told `{"camera":false}`; the camera closed only
+on the eyes' 1.5 s permit timeout (1.0 to 1.5 s after the mute, since the
+last yes was at most 500 ms earlier), and nothing tied a close to the step.
+
+The change: the voice tells the eyes no first at every physical or software
+mute exit (`EyesLink::close`), and on drop for any other end of a cycle. When
+a close is taken as evidence and the eyes' `eyes/camera_closed` publisher is
+alive on the bus, it then sends `{"close_receipt":N}` (fresh random N, kept
+with the close in the checkpoint). The eyes publish
+`lamp_msgs::CameraClosed {close:N, released}` only once the camera is shut,
+after the device's stop has returned; `released` is that stop's result. On
+reopening, Done needs the receipt from source `eyes`, for N, released, within
+2 s of the ask, and then says "microphones and the camera"; a receipt for
+another close, a faulted stop, a late one or none makes the step Failed.
+Without eyes or their publisher the camera is `not_available` and Done claims
+the microphones only, as before. Muting never waits on the eyes.
+
+Gates, from `lampOS/` with the environment above, in this order:
+
+```sh
+cargo +1.96.0 fmt --all --check
+cargo +1.96.0 clippy -j2 --workspace --all-targets -- -D warnings
+cargo-zigbuild clippy -j2 --target aarch64-unknown-linux-gnu -p lamp-eyes --all-targets -- -D warnings  # the eyes' loop is Linux-only
+cargo +1.96.0 test -j2 -p lamp-voice --lib -- --test-threads=1 onboarding privacy body_link
+cargo +1.96.0 test -j2 -p lamp-eyes -p lamp-msgs -- --test-threads=1
+cargo +1.96.0 test -j2 -p lamp-voice -- --test-threads=1
+cargo +1.96.0 build -j2 --workspace
+```
+
+All passed. Focused lamp-voice: 146 passed, 0 failed. lamp-eyes and
+lamp-msgs: 278 passed, 0 failed, 2 ignored across 17 summaries. Full
+lamp-voice: 2,408 passed, 0 failed, 12 ignored across 32 summaries. New
+tests: the voice says no at once and then asks the receipt, and a dropped
+cycle says no (`body_link`); a receipt is said once, only after the stop, with
+a faulted stop as `released: false` (`permit`); the receipt token is stored
+only with its close and survives a voice cycle (`onboarding::privacy`); Done
+with the matching receipt claims the camera, another close's, a faulted or
+no receipt fails, no eyes on the bus stays microphones-only, and a late or
+foreign receipt proves nothing (`privacy_flow_tests`).
+
+Not verified: anything on a lamp. The time from the switch to the camera
+released was not measured; on the host only the voice's side is bounded (no
+and the ask are sent within 50 ms in the test, with no wait on the eyes). On
+the lamp the eyes notice the no on their next loop turn, which can be behind
+a detector run or a blocking open (up to 2 s, `OPEN_BUDGET_US`), then stop
+the device within its teardown budget. A receipt proves the eyes' process
+stopped and closed the V4L2 device without a fault, not that the sensor or
+its light lost power.

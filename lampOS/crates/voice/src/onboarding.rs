@@ -285,6 +285,8 @@ struct PrivacyFlow {
     pending_result: Option<(Outcome, Option<BootId>)>,
     erase_pending: bool,
     last_open: Option<(String, String, u64)>,
+    /// The Done just decided also proved the camera closed (#1802).
+    camera_proven: bool,
 }
 
 fn fresh_token() -> io::Result<u64> {
@@ -297,9 +299,16 @@ fn fresh_token() -> io::Result<u64> {
     })
 }
 
-// Only the voice's own teardown is verified; the eyes close the camera on
-// their own permit timeout, which this step does not observe (#1802).
+// The voice's own teardown is verified for the microphones. The camera is
+// claimed only when the eyes' receipt for this close was read (#1802):
+// without eyes that give receipts, the microphones alone are claimed.
 const PRIVACY_DONE: &str = "(Their physical switch closed the microphones, and they opened it again. Briefly confirm that the switch works. Nothing more.)";
+const PRIVACY_DONE_CAMERA: &str = "(Their physical switch closed the microphones and the camera, and they opened it again. Briefly confirm that the switch works. Nothing more.)";
+/// The eyes' receipt for a close is said within this of the ask, or the
+/// camera is not proven: the eyes shut it within half a second when well.
+pub(crate) const CAMERA_RECEIPT_MS: u64 = 2_000;
+/// The eyes' name on the bus (`lamp_eyes::bus_out::SOURCE`).
+const EYES_SOURCE: &str = "eyes";
 const PRIVACY_FAILED: &str = "(The privacy-switch check was not completed. Briefly say they can try it again later by redoing setup. Do not claim the switch was tested.)";
 
 pub struct Onboarding {
@@ -899,6 +908,44 @@ impl Onboarding {
         }
     }
 
+    /// [`Onboarding::take_close_candidate`] for a cycle whose eyes have
+    /// just been told no: when eyes that give receipts are on the bus, the
+    /// close also waits for theirs, and they are asked for it (#1802).
+    pub(crate) fn take_close_candidate_telling(
+        &mut self,
+        receipt: &PrivacyReceipt,
+        now_us: u64,
+        eyes: Option<&mut crate::body_link::EyesLink>,
+    ) -> Option<privacy::Checkpoint> {
+        let checkpoint = self.take_close_candidate(receipt, now_us)?;
+        let Some(eyes) = eyes else {
+            return Some(checkpoint);
+        };
+        if checkpoint.is_discard() {
+            return Some(checkpoint);
+        }
+        if !eyes_give_receipts(self.eyes.as_ref()) {
+            self.records.push(
+                json!({"kind":"onboarding_privacy_camera","state":"not_available","at_us":now_us}),
+            );
+            return Some(checkpoint);
+        }
+        let Ok(token) = fresh_token() else {
+            return Some(checkpoint);
+        };
+        let camera = privacy::CameraClose {
+            token,
+            asked_unix_ms: unix_ms(),
+        };
+        checkpoint.expect_camera(camera);
+        if checkpoint.camera() == Some(camera) {
+            eyes.ask_close_receipt(token);
+            self.records
+                .push(json!({"kind":"onboarding_privacy_camera","state":"asked","at_us":now_us}));
+        }
+        Some(checkpoint)
+    }
+
     /// No I/O here: close, software mute and input faults must revoke first.
     pub(crate) fn invalidate_privacy(&mut self, why: privacy::Invalidation) {
         let work = self.privacy_flow.attempt.is_some()
@@ -1004,7 +1051,21 @@ impl Onboarding {
                 self.privacy_flow.last_open = Some(key);
                 match attempt.observe_open(receipt, now_us, true) {
                     Ok(privacy::OpenOutcome::Done) => {
-                        self.privacy_flow.pending_result = Some((Outcome::Done, Some(attempt.id())))
+                        let camera = attempt
+                            .camera()
+                            .map(|close| camera_receipt(self.eyes.as_ref(), close));
+                        if let Some(proof) = camera {
+                            self.records.push(json!({"kind":"onboarding_privacy_camera",
+                                "state": if proof.is_ok() { "proven" } else { "not_proven" },
+                                "why": proof.err(),"at_us":now_us}));
+                        }
+                        self.privacy_flow.camera_proven = camera == Some(Ok(()));
+                        self.privacy_flow.pending_result = Some(match camera {
+                            // The camera was to be proven and was not: the
+                            // check failed, whatever the microphones did.
+                            Some(Err(_)) => (Outcome::Failed, None),
+                            _ => (Outcome::Done, Some(attempt.id())),
+                        })
                     }
                     Ok(privacy::OpenOutcome::WaitingForReadiness) => {}
                     Ok(privacy::OpenOutcome::Expired) | Err(_) => {
@@ -1030,10 +1091,11 @@ impl Onboarding {
             self.pending_records.push(
                 json!({"kind":"onboarding_step","step":"privacy","outcome":outcome,"at_us":now_us}),
             );
-            self.owed = Some(if outcome == Outcome::Done {
-                PRIVACY_DONE
-            } else {
-                PRIVACY_FAILED
+            let camera = std::mem::take(&mut self.privacy_flow.camera_proven);
+            self.owed = Some(match outcome {
+                Outcome::Done if camera => PRIVACY_DONE_CAMERA,
+                Outcome::Done => PRIVACY_DONE,
+                _ => PRIVACY_FAILED,
             });
             self.erase_on_commit = true;
             self.save();
@@ -1524,6 +1586,45 @@ fn head_still(joints: &lamp_msgs::JointState, goals: &mut Option<[f64; 3]>) -> b
     let unchanged = goals.is_none_or(|before| before == now);
     *goals = Some(now);
     unchanged
+}
+
+/// Whether eyes that give close receipts are on the bus now: their
+/// `eyes/camera_closed` publisher shows itself alive (#1802).
+fn eyes_give_receipts(eyes: Option<&lamp_bus::Bus>) -> bool {
+    eyes.and_then(|bus| bus.publishers(lamp_msgs::CameraClosed::TOPIC).ok())
+        .is_some_and(|sources| sources.iter().any(|source| source.name == EYES_SOURCE))
+}
+
+/// The eyes' receipt for this close: theirs, for this close's token, the
+/// device released, and said within [`CAMERA_RECEIPT_MS`] of the ask. A
+/// receipt for another close, an older one or a late one proves nothing.
+fn camera_receipt(
+    eyes: Option<&lamp_bus::Bus>,
+    close: privacy::CameraClose,
+) -> Result<(), &'static str> {
+    let message = eyes
+        .ok_or("no_bus")?
+        .latest(lamp_msgs::CameraClosed::TOPIC)
+        .ok()
+        .flatten()
+        .ok_or("no_receipt")?;
+    if message.header.source != EYES_SOURCE {
+        return Err("not_the_eyes");
+    }
+    let receipt = message
+        .parse::<lamp_msgs::CameraClosed>()
+        .map_err(|_| "unreadable")?;
+    if receipt.close != close.token {
+        return Err("another_close");
+    }
+    if !receipt.released {
+        return Err("not_released");
+    }
+    let at = message.header.at_unix_ms;
+    if at < close.asked_unix_ms || at - close.asked_unix_ms > CAMERA_RECEIPT_MS {
+        return Err("late");
+    }
+    Ok(())
 }
 
 fn unix_ms() -> u64 {

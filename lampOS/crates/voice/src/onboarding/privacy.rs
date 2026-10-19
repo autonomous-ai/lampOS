@@ -43,6 +43,16 @@ pub(crate) struct Invitation {
     pub delivered_at_us: u64,
 }
 
+/// The eyes' receipt this close waits for (#1802): asked with `token` at
+/// `asked_unix_ms`, only when eyes that give receipts were there at the
+/// close. Absent: the step proves the microphones only.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CameraClose {
+    pub token: u64,
+    pub asked_unix_ms: u64,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Phase {
     Armed,
@@ -79,6 +89,9 @@ struct Stored {
     baseline: Acquisition,
     /// Present only after cleanup was verified; unverified close is never stored.
     closed: Option<Acquisition>,
+    /// Only with a close, and only when the eyes were asked for a receipt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    camera: Option<CameraClose>,
 }
 
 pub(crate) struct Attempt {
@@ -150,6 +163,25 @@ impl Checkpoint {
         Ok(Some(bytes))
     }
 
+    /// The receipt token the eyes are to be asked for, if this close waits
+    /// for one.
+    pub(crate) fn camera(&self) -> Option<CameraClose> {
+        self.attempt
+            .as_ref()?
+            .lock()
+            .ok()
+            .and_then(|attempt| attempt.camera())
+    }
+
+    /// This close also waits for the eyes' receipt (#1802).
+    pub(crate) fn expect_camera(&self, camera: CameraClose) {
+        if let Some(attempt) = &self.attempt
+            && let Ok(mut attempt) = attempt.lock()
+        {
+            attempt.expect_camera(camera);
+        }
+    }
+
     pub(crate) fn persist_after_cleanup(&self) -> io::Result<CheckpointOutcome> {
         match &self.attempt {
             Some(attempt) => {
@@ -216,6 +248,7 @@ impl Attempt {
                 invitation,
                 baseline,
                 closed: None,
+                camera: None,
             },
             phase: Phase::Armed,
             pending_close: None,
@@ -232,6 +265,17 @@ impl Attempt {
     }
     pub(crate) fn delivered_at_us(&self) -> u64 {
         self.stored.invitation.delivered_at_us
+    }
+    pub(crate) fn camera(&self) -> Option<CameraClose> {
+        self.stored.camera
+    }
+
+    /// The close just observed also waits for the eyes' receipt; written
+    /// with the close, never alone.
+    pub(crate) fn expect_camera(&mut self, camera: CameraClose) {
+        if self.phase == Phase::CloseObserved {
+            self.stored.camera = Some(camera);
+        }
     }
 
     /// Persisted acquisition watermark for recovery. The runner tracks any
@@ -393,6 +437,9 @@ impl Attempt {
             || stored.baseline.physical.stamp.at_us > now_us
         {
             return Err(invalid("privacy checkpoint epoch or invitation is invalid"));
+        }
+        if stored.camera.is_some() && stored.closed.is_none() {
+            return Err(invalid("privacy checkpoint camera receipt without a close"));
         }
         if let Some(close) = &stored.closed
             && (!identity(epoch, close)
@@ -618,6 +665,39 @@ mod tests {
                 .observe_open(sample(14, T + 95_000, false), T + 95_000, true)
                 .is_err()
         );
+    }
+
+    #[test]
+    fn a_camera_receipt_is_kept_only_with_its_close_and_survives_a_voice_cycle() {
+        let store = Store::new();
+        let mut attempt = armed();
+        let camera = CameraClose {
+            token: 42,
+            asked_unix_ms: 1_760_000_000_000,
+        };
+        // Before a close nothing is kept.
+        attempt.expect_camera(camera);
+        assert_eq!(attempt.camera(), None);
+        attempt
+            .observe_close(sample(11, T + 10_000, true), T + 10_000)
+            .unwrap();
+        attempt.expect_camera(camera);
+        attempt
+            .persist_closed_after_cleanup(&store.file(), true)
+            .unwrap();
+        let restored = Attempt::load(&store.file(), &epoch(), T + 20_000)
+            .unwrap()
+            .unwrap();
+        assert_eq!(restored.camera(), Some(camera));
+        // A record from before #1802 has none and still loads.
+        let old = closed(&Store::new());
+        assert_eq!(old.camera(), None);
+        // A receipt without a close is not a record this code writes.
+        let mut forged: serde_json::Value =
+            serde_json::from_slice(&fs::read(store.file()).unwrap()).unwrap();
+        forged["closed"] = serde_json::Value::Null;
+        fs::write(store.file(), serde_json::to_vec(&forged).unwrap()).unwrap();
+        assert!(Attempt::load(&store.file(), &epoch(), T + 20_000).is_err());
     }
 
     #[test]

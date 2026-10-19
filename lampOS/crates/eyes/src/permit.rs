@@ -1,7 +1,8 @@
 //! Whether the camera may be open: `{"camera":true}` on the permit socket
 //! at least every [`STALE`], and `{"camera":false}` closes it at once.
-//! Anything else on the socket (a full look's ask, `--full-look`) is kept
-//! for the eyes' loop to read ([`Permit::heard`]).
+//! Anything else on the socket (a full look's ask, `--full-look`; a close
+//! receipt's ask, [`receipt_asked`]) is kept for the eyes' loop to read
+//! ([`Permit::heard`]).
 
 use std::os::unix::net::UnixDatagram;
 use std::sync::{Arc, Mutex};
@@ -21,6 +22,61 @@ pub fn of(datagram: &[u8]) -> Option<bool> {
     serde_json::from_slice::<Message>(datagram)
         .ok()
         .map(|message| message.camera)
+}
+
+/// The close the voice asks a receipt for (`{"close_receipt":N}`, #1802),
+/// sent after its `{"camera":false}`. Anything else says nothing.
+pub fn receipt_asked(datagram: &[u8]) -> Option<u64> {
+    #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Ask {
+        close_receipt: u64,
+    }
+    serde_json::from_slice::<Ask>(datagram)
+        .ok()
+        .map(|ask| ask.close_receipt)
+}
+
+/// The receipt asked for, said only once the camera is shut (#1802).
+#[derive(Debug)]
+pub struct CloseReceipt {
+    asked: Option<u64>,
+    /// Whether the last stop of the device returned without a fault. True
+    /// before any open: nothing is held.
+    released: bool,
+}
+
+impl Default for CloseReceipt {
+    fn default() -> Self {
+        Self {
+            asked: None,
+            released: true,
+        }
+    }
+}
+
+impl CloseReceipt {
+    /// A receipt asked for; a newer ask replaces one not yet said.
+    pub fn asked(&mut self, close: u64) {
+        self.asked = Some(close);
+    }
+
+    /// Every stop of the device, with whether it returned without a fault.
+    pub fn stopped<E>(&mut self, result: Result<(), E>) {
+        self.released = result.is_ok();
+    }
+
+    /// The receipt to say now, once, if one is asked and the camera is
+    /// shut. With the camera open nothing is said and the ask waits.
+    pub fn due(&mut self, shut: bool) -> Option<lamp_msgs::CameraClosed> {
+        if !shut {
+            return None;
+        }
+        self.asked.take().map(|close| lamp_msgs::CameraClosed {
+            close,
+            released: self.released,
+        })
+    }
 }
 
 /// The newest permission heard, if it has not been taken back.
@@ -201,6 +257,52 @@ mod tests {
             heard[HEARD - 1],
             format!(r#"{{"look_full":{}}}"#, HEARD + 2).into_bytes()
         );
+    }
+
+    #[test]
+    fn a_receipt_is_said_once_only_after_the_camera_is_shut_and_says_a_failed_stop() {
+        let mut receipt = CloseReceipt::default();
+        assert_eq!(receipt.due(true), None, "nothing asked");
+        receipt.asked(7);
+        // Asked while the camera is still open: nothing yet, the ask waits.
+        assert_eq!(receipt.due(false), None);
+        receipt.stopped::<()>(Ok(()));
+        assert_eq!(
+            receipt.due(true),
+            Some(lamp_msgs::CameraClosed {
+                close: 7,
+                released: true
+            })
+        );
+        assert_eq!(receipt.due(true), None, "said once");
+        // A stop that faulted may leave the device held: said so.
+        receipt.stopped(Err("STREAMOFF"));
+        receipt.asked(8);
+        receipt.asked(9);
+        assert_eq!(
+            receipt.due(true),
+            Some(lamp_msgs::CameraClosed {
+                close: 9,
+                released: false
+            })
+        );
+    }
+
+    #[test]
+    fn a_receipt_is_asked_in_one_exact_object_and_is_not_a_permission() {
+        assert_eq!(receipt_asked(br#"{"close_receipt":7}"#), Some(7));
+        assert_eq!(of(br#"{"close_receipt":7}"#), None);
+        let largest = format!(r#"{{"close_receipt":{}}}"#, u64::MAX);
+        assert!(largest.len() < 64, "fits the permit thread's read");
+        assert_eq!(receipt_asked(largest.as_bytes()), Some(u64::MAX));
+        for ignored in [
+            &br#"{"close_receipt":-1}"#[..],
+            br#"{"close_receipt":7,"camera":false}"#,
+            br#"{"camera":false}"#,
+            b"",
+        ] {
+            assert_eq!(receipt_asked(ignored), None);
+        }
     }
 
     #[test]

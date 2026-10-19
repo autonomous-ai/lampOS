@@ -7,7 +7,7 @@
 
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-eyes --device ABSOLUTE_PATH --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --usb VENDOR:PRODUCT@TOPOLOGY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]] [--seems ABSOLUTE_PATH]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there. With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the journal says how open the largest\nface's mouth is each look, and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture; the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\n";
+const USAGE: &str = "lamp-eyes --device ABSOLUTE_PATH --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --usb VENDOR:PRODUCT@TOPOLOGY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]] [--seems ABSOLUTE_PATH]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once;\n{\"close_receipt\":N} after it asks for N on eyes/camera_closed (LAMP_BUS=on) once the\ncamera is shut, with whether its last stop released the device. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there. With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the journal says how open the largest\nface's mouth is each look, and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture; the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\n";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Usb {
@@ -607,6 +607,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     let mut epoch = 0u64;
     let mut port: Option<LinuxPort> = None;
     let permit = lamp_eyes::permit::Permit::listen(permits)?;
+    // The receipt the voice asked for a close, said once the camera is shut.
+    let mut receipt = lamp_eyes::permit::CloseReceipt::default();
     let mut retry_at = Instant::now();
     let mut frame = vec![0u8; MAX_FRAME_BYTES];
     // Bytes of a frame that has not been looked at yet.
@@ -835,6 +837,10 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             }
         }
         for datagram in permit.heard() {
+            if let Some(close) = lamp_eyes::permit::receipt_asked(&datagram) {
+                receipt.asked(close);
+                continue;
+            }
             if arguments.full_look.is_some()
                 && let Some(ask) = lamp_eyes::full_look::asked(&datagram)
             {
@@ -849,11 +855,21 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         }
         if !permit.holds() {
             if let Some(mut open) = port.take() {
-                let _ = open.stop(budget(STOP));
+                receipt.stopped(open.stop(budget(STOP)));
                 eprintln!("lamp-eyes: camera closed: not permitted");
                 tell(Seen { face: None });
             }
             camera = lamp_eyes::bus_out::Camera::Closed;
+            // After the stop has returned, never before (#1802).
+            if let Some(closed) = receipt.due(port.is_none()) {
+                eprintln!(
+                    "lamp-eyes: camera closed for the voice's asked close; released: {}",
+                    closed.released
+                );
+                if let Some(bus) = bus_out.as_mut() {
+                    bus.camera_closed(closed, lamp_ipc::monotonic_us());
+                }
+            }
             lamp_eyes::kept::forget_all(&mut kept, &mut still_kept);
             if let Some(bus) = bus_out.as_mut() {
                 bus.activity_forget_prints();
@@ -921,7 +937,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                     // The open may outlast the permission, or it may be taken
                     // back meanwhile: then no frame is read and it closes now.
                     let Some(opening) = permit.opened(opening, |mut opening| {
-                        let _ = opening.stop(budget(STOP));
+                        receipt.stopped(opening.stop(budget(STOP)));
                     }) else {
                         eprintln!(
                             "lamp-eyes: camera closed: not permitted after opening in {took_ms} ms"
@@ -945,7 +961,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         "lamp-eyes: camera did not open: {error:?} {:?} after {took_ms} ms",
                         opening.diagnostics().fault
                     );
-                    let _ = opening.stop(budget(STOP));
+                    receipt.stopped(opening.stop(budget(STOP)));
                     camera = lamp_eyes::bus_out::Camera::NotOpening;
                     // The full size first, then the two in turn.
                     failures = failures.saturating_add(1);
@@ -977,7 +993,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             eprintln!("lamp-eyes: camera failed: {error:?}; closing it");
             camera = lamp_eyes::bus_out::Camera::Failed;
             if let Some(mut open) = port.take() {
-                let _ = open.stop(budget(STOP));
+                receipt.stopped(open.stop(budget(STOP)));
             }
             tell(Seen { face: None });
             lamp_eyes::kept::forget_all(&mut kept, &mut still_kept);
@@ -1067,7 +1083,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             // stuck ioctl or a failed STREAMOFF can still hold the buffers
             // (docs/camera-runtime.md). The reopen at the full size comes
             // next, through the same `permit.opened` as any open.
-            let _ = open.stop(budget(STOP));
+            receipt.stopped(open.stop(budget(STOP)));
             camera = lamp_eyes::bus_out::Camera::Closed;
             lamp_eyes::kept::forget_all(&mut kept, &mut still_kept);
             if let Some(bus) = bus_out.as_mut() {

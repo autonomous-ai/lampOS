@@ -26,7 +26,7 @@ ready, not paused) and a face is in front of it.
 | 2 | `who_you_are` | asks what to call them; after a clear yes, `remember_my_face` ([eyes.md](eyes.md)) | the model calls `setup_step` | the face in the eyes' people file |
 | 3 | `how_you_sound` | placeholder | — | — |
 | 4 | `touch` | placeholder | — | — |
-| 5 | `privacy` | led first, before step 1, whenever it is available (see "Physical privacy step" below); the core onboarding skill requests a short invitation naming the verified switch location | a delivered invitation, fresh physical close, the voice's verified microphone cleanup, then a fresh same-source open and normal readiness; the camera's close is not checked | bounded attempt evidence and completion identity |
+| 5 | `privacy` | led first, before step 1, whenever it is available (see "Physical privacy step" below); the core onboarding skill requests a short invitation naming the verified switch location | a delivered invitation, fresh physical close, the voice's verified microphone cleanup, then a fresh same-source open and normal readiness; with eyes that give receipts on the bus, also their receipt that the camera closed for this close (#1802) | bounded attempt evidence and completion identity |
 | 6 | `giving_way` | placeholder | — | — |
 | 7 | `preferences` | asks about quiet hours and whether it may say hello, one at a time; keeps each as a rule with `keep_rule` (#813) when the provider worker has both `LAMP_MEMORY_DAYS=on` and `LAMP_MEMORY_RULES=on` ([memory.md](memory.md), "What a person teaches and corrects"); without either, or with the legacy memory, there is no `keep_rule` and the model keeps them with `remember` if it has a memory at all and says that is everything | the model calls `setup_step` | the rules, in memory |
 
@@ -149,10 +149,29 @@ Controls' existing fence provides the publisher, reader and acquisition
 identity through the same privacy worker channel. Close observation only
 captures bounded evidence in memory. The outer service persists a close only
 after the voice's own revocation and verified teardown. That proves the
-microphones closed, not the camera: the eyes are told nothing new on a mute
-(the permit link only stops saying yes) and close the camera on their own
-1.5 s permit timeout, which this step does not observe. Done's note to the
-model claims the microphones only. A close read just before the
+microphones closed. The camera (#1802): on every mute, before any record or
+onboarding work, the voice tells the eyes `{"camera":false}` (and a voice
+cycle that ends any other way says it as it goes, `EyesLink` on drop), so the
+camera no longer waits out the eyes' 1.5 s permit timeout. When a close is
+taken as evidence and the eyes' `eyes/camera_closed` publisher is alive on
+the bus, the voice also sends `{"close_receipt":N}` (N a fresh random token,
+kept with the close in `privacy-pending.json` as `camera`). The eyes answer
+on `eyes/camera_closed` (`lamp_msgs::CameraClosed`, `{"close":N,"released":
+bool}`, kept as the topic's latest) once the capture device's stop has
+returned with the camera shut, never while it is open. On reopening, Done
+needs that receipt: from the source `eyes`, for this N, `released: true`,
+and stamped within 2 s of the ask (`CAMERA_RECEIPT_MS`). Then Done's note
+claims the microphones and the camera. A receipt for another close, one
+that says the stop faulted, a late one or none makes the step Failed
+(`onboarding_privacy_camera`, `not_proven`, with why): the camera was to be
+proven and was not. Without eyes configured (`LAMP_EYES_PERMIT_SOCKET`
+unset), or without their receipt publisher on the bus (eyes without
+`LAMP_BUS=on`, or older eyes), the camera is `not_available` and Done claims
+the microphones only, as before. Muting never waits for the eyes; only the
+proof reads their receipt, and only when the switch opens again. What a
+receipt shows is that the eyes' process stopped and closed the V4L2 device
+without a fault (STREAMOFF, buffers freed, file closed), not that the
+sensor or its light lost power. A close read just before the
 invitation's end is processed is the person acting early: the attempt is
 offered again (within the two-try budget), not failed. The normal no-audio
 privacy wait is unchanged. A later voice cycle can complete the step only

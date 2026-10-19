@@ -219,10 +219,22 @@ sees" with what has and has not been shown of it.
 Only while the voice service says so. `lamp-voice serve`, when
 `LAMP_EYES_PERMIT_SOCKET` is set, sends `{"camera":true}` to that socket twice
 a second while the microphone is permitted, and `{"camera":false}` once, at
-once, when it is not (`crates/voice/src/body_link.rs`, `EyesLink`). The eyes
+once, when it is not (`crates/voice/src/body_link.rs`, `EyesLink`). A voice
+cycle that ends, on a mute or otherwise, says no as it goes (#1802). The eyes
 open the camera on the first yes and close it on a no or when no yes has come
 for 1.5 s, so a voice service that is muted, stopped or gone closes the
-lamp's eyes too. The rule is the same as for its ears: the camera may look
+lamp's eyes too.
+
+For the onboarding privacy step the voice may follow its no with
+`{"close_receipt":N}`. Once the camera is shut, after the device's stop has
+returned and never while it is open, the eyes say so on `eyes/camera_closed`
+(`lamp_msgs::CameraClosed`, `{"close":N,"released":true|false}`, with
+`LAMP_BUS=on`): `released` is whether that last stop (STREAMOFF, buffers
+freed, file closed) returned without a fault; a camera not opened since the
+eyes started is released. An ask that comes while the camera is open waits
+for the next close. The publisher is kept alive with the faces', which is
+how the voice knows these eyes give receipts
+([onboarding.md](onboarding.md#physical-privacy-step-841)). The rule is the same as for its ears: the camera may look
 exactly while the microphone may listen.
 
 This is a narrower arrangement than the camera worker described in

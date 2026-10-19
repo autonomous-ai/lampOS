@@ -4644,13 +4644,22 @@ fn conversation_with_gate(
                             }
                             PrivacyState::Muted => {
                                 let observed_at_us = monotonic_us();
+                                // The camera is told no first, before any
+                                // record or onboarding work (#1802).
+                                if let Some(eyes) = eyes_link.as_mut() {
+                                    eyes.close();
+                                }
                                 record(
                                     trace,
                                     json!({"kind":"physical_mute", "at_us":observed_at_us,"acquired_at_us":acquired_at_us,"fresh_observation":true}),
                                 )?;
                                 let onboarding = onboarding.as_mut().and_then(|walk| {
                                     onboarding_privacy_receipt.as_ref().and_then(|proof| {
-                                        walk.take_close_candidate(proof, observed_at_us)
+                                        walk.take_close_candidate_telling(
+                                            proof,
+                                            observed_at_us,
+                                            eyes_link.as_mut(),
+                                        )
                                     })
                                 });
                                 return Err(Box::new(PhysicalMute {
@@ -4673,14 +4682,17 @@ fn conversation_with_gate(
             match privacy_state {
                 PrivacyState::Muted => {
                     let at_us = monotonic_us();
+                    if let Some(eyes) = eyes_link.as_mut() {
+                        eyes.close();
+                    }
                     record(
                         trace,
                         json!({"kind":"physical_mute", "at_us":at_us,"fresh_observation":true}),
                     )?;
                     let onboarding = onboarding.as_mut().and_then(|walk| {
-                        onboarding_privacy_receipt
-                            .as_ref()
-                            .and_then(|proof| walk.take_close_candidate(proof, at_us))
+                        onboarding_privacy_receipt.as_ref().and_then(|proof| {
+                            walk.take_close_candidate_telling(proof, at_us, eyes_link.as_mut())
+                        })
                     });
                     return Err(Box::new(PhysicalMute {
                         observed_at_us: at_us,
@@ -4905,6 +4917,9 @@ fn conversation_with_gate(
                 }
                 publish?;
                 if muted {
+                    if let Some(eyes) = eyes_link.as_mut() {
+                        eyes.close();
+                    }
                     if let Some(walk) = onboarding.as_mut() {
                         walk.invalidate_privacy(
                             crate::onboarding::privacy::Invalidation::SoftwareMute,

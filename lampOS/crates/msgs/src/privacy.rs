@@ -119,6 +119,32 @@ impl MicrophonePrivacy {
     }
 }
 
+/// The eyes' receipt that the camera was closed for one close the voice
+/// asked about (`{"close_receipt":N}` on the permit socket, #1802): sent
+/// once the camera is shut, never while it is open. `released` says that
+/// the last stop of the capture device returned without a fault (STREAMOFF,
+/// buffers freed, file closed); a camera never opened since start is
+/// released. It is the process's own release, not the sensor's power.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CameraClosed {
+    /// The voice's token for the close, as asked.
+    pub close: u64,
+    pub released: bool,
+}
+
+impl CameraClosed {
+    pub const TYPE: &str = "lamp_msgs/CameraClosed";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "eyes/camera_closed";
+
+    /// Kept: the voice reads it when the switch opens again, after a wait
+    /// with no voice cycle running to listen.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+    }
+}
+
 /// Kept separate from the original topic catalogue so the disabled runtime
 /// creates no new topics or declarations.
 pub fn privacy_topics() -> Vec<(&'static str, Declaration)> {

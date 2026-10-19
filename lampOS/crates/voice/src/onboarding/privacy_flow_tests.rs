@@ -570,3 +570,171 @@ fn a_consumed_redo_mailbox_batch_is_not_replayed_by_the_next_voice_cycle() {
     second.drain_storage_for_test(3 * T);
     assert_eq!(second.kept().steps["who_you_are"].outcome, Outcome::Skipped);
 }
+
+/// How a close's camera receipt comes, for [`camera_flow`].
+enum Eyes {
+    /// No eyes publisher on the bus: the camera is not available.
+    Absent,
+    /// The eyes say a receipt for the asked close, offset by this.
+    Receipt { token_offset: u64, released: bool },
+    /// The eyes are there and say nothing.
+    Silent,
+}
+
+/// One verified close and reopen with eyes told; the step's outcome and
+/// the words owed for it.
+fn camera_flow(eyes: Eyes) -> (Outcome, &'static str) {
+    let (store, mut first) = walk();
+    let root = store.path.join("bus");
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut publisher = match eyes {
+        Eyes::Absent => None,
+        _ => Some(
+            bus.publisher_declared(
+                lamp_msgs::CameraClosed::TOPIC,
+                &lamp_msgs::CameraClosed::declaration(),
+                "eyes",
+            )
+            .unwrap(),
+        ),
+    };
+    first.eyes = Some(lamp_bus::Bus::new(&root).unwrap());
+    let token = offer(&mut first, T, 1);
+    deliver(&mut first, token, T);
+    // A socket path must be short: the store's directory may not be.
+    let socket = std::env::temp_dir().join(format!(
+        "lcr-{}-{}",
+        std::process::id(),
+        crate::process::boot_text(crate::process::new_boot().unwrap())
+            .get(..8)
+            .unwrap()
+    ));
+    let permit = std::os::unix::net::UnixDatagram::bind(&socket).unwrap();
+    permit.set_nonblocking(true).unwrap();
+    let mut link = crate::body_link::EyesLink::to(socket.clone()).unwrap();
+    link.close();
+    let started = Instant::now();
+    let checkpoint = first
+        .take_close_candidate_telling(&receipt(2, T + 10_000, true), T + 10_000, Some(&mut link))
+        .unwrap();
+    // Never waits on the eyes: the mute returns at once.
+    assert!(started.elapsed() < Duration::from_millis(100));
+    let mut datagram = [0u8; 64];
+    let mut told = Vec::new();
+    while let Ok(length) = permit.recv(&mut datagram) {
+        told.push(String::from_utf8_lossy(&datagram[..length]).into_owned());
+    }
+    assert_eq!(told[0], r#"{"camera":false}"#, "no comes first");
+    let asked = checkpoint.camera();
+    match (&eyes, asked) {
+        (Eyes::Absent, None) => assert_eq!(told.len(), 1),
+        (Eyes::Absent, Some(_)) => panic!("no eyes on the bus, yet a receipt asked"),
+        (_, None) => panic!("eyes on the bus, no receipt asked"),
+        (_, Some(close)) => {
+            assert_eq!(told[1], format!(r#"{{"close_receipt":{}}}"#, close.token));
+        }
+    }
+    assert!(matches!(
+        store.owner.client().persist_closed(checkpoint).unwrap(),
+        storage::Submit::Queued(_)
+    ));
+    if let (
+        Eyes::Receipt {
+            token_offset,
+            released,
+        },
+        Some(close),
+        Some(publisher),
+    ) = (&eyes, asked, publisher.as_mut())
+    {
+        publisher
+            .publish_json(
+                1,
+                &lamp_msgs::CameraClosed {
+                    close: close.token.wrapping_add(*token_offset),
+                    released: *released,
+                },
+            )
+            .unwrap();
+    }
+    let mut second = store.cycle(T + 20_000, 3);
+    second.eyes = Some(lamp_bus::Bus::new(&root).unwrap());
+    second.drain_storage_for_test(T + 20_000);
+    second.maintain_privacy(T + 20_000, true).unwrap();
+    let after_io = T + 20_000 + lamp_msgs::PRIVACY_SWITCH_TTL_US;
+    second.maintain_privacy(after_io, true).unwrap();
+    context(&mut second, after_io + 2, 5, false);
+    second.maintain_privacy(after_io + 2, true).unwrap();
+    let _ = std::fs::remove_file(&socket);
+    let outcome = second.desired.steps["privacy"].outcome;
+    let owed = second.owed.unwrap();
+    drop(publisher);
+    (outcome, owed)
+}
+
+#[test]
+fn with_eyes_that_give_receipts_done_needs_the_receipt_for_this_close() {
+    assert_eq!(
+        camera_flow(Eyes::Receipt {
+            token_offset: 0,
+            released: true
+        }),
+        (Outcome::Done, PRIVACY_DONE_CAMERA)
+    );
+    // A receipt for another close, one that says the device may be held,
+    // or none at all: the camera is not proven and the check has failed.
+    for eyes in [
+        Eyes::Receipt {
+            token_offset: 1,
+            released: true,
+        },
+        Eyes::Receipt {
+            token_offset: 0,
+            released: false,
+        },
+        Eyes::Silent,
+    ] {
+        assert_eq!(camera_flow(eyes), (Outcome::Failed, PRIVACY_FAILED));
+    }
+}
+
+#[test]
+fn without_eyes_on_the_bus_done_claims_the_microphones_only() {
+    assert_eq!(camera_flow(Eyes::Absent), (Outcome::Done, PRIVACY_DONE));
+}
+
+#[test]
+fn a_receipt_said_later_than_its_bound_or_by_another_source_proves_nothing() {
+    let root = std::env::temp_dir().join(format!(
+        "onboarding-camera-{}",
+        crate::process::boot_text(crate::process::new_boot().unwrap())
+    ));
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let close = privacy::CameraClose {
+        token: 9,
+        asked_unix_ms: unix_ms(),
+    };
+    let receipt = lamp_msgs::CameraClosed {
+        close: 9,
+        released: true,
+    };
+    let declaration = lamp_msgs::CameraClosed::declaration();
+    let mut other = bus
+        .publisher_declared(lamp_msgs::CameraClosed::TOPIC, &declaration, "body")
+        .unwrap();
+    other.publish_json(1, &receipt).unwrap();
+    assert_eq!(camera_receipt(Some(&bus), close), Err("not_the_eyes"));
+    let mut eyes = bus
+        .publisher_declared(lamp_msgs::CameraClosed::TOPIC, &declaration, "eyes")
+        .unwrap();
+    eyes.publish_json(1, &receipt).unwrap();
+    assert_eq!(camera_receipt(Some(&bus), close), Ok(()));
+    let asked_long_ago = privacy::CameraClose {
+        asked_unix_ms: close.asked_unix_ms - CAMERA_RECEIPT_MS - 1_000,
+        ..close
+    };
+    assert_eq!(camera_receipt(Some(&bus), asked_long_ago), Err("late"));
+    assert_eq!(camera_receipt(None, close), Err("no_bus"));
+    drop((other, eyes));
+    let _ = std::fs::remove_dir_all(&root);
+}
