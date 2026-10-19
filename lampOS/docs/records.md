@@ -259,8 +259,16 @@ put-back may leave one behind:
 - A greater `schema_version` is told apart before anything else is read.
   `check` prunes nothing, writes no result, says so in one line and
   succeeds, so the timer's run doesn't fail: what a bump means isn't this
-  build's to guess, and a cleanup deletes. The reporter says the
-  configuration is newer than this build.
+  build's to guess, and a cleanup deletes. The reporter keeps reporting,
+  at warn, on the bus the newer file names: lamp-health shows "records: a
+  newer schema, cleanup paused" (`report::paused`, with `config_schema`), so
+  a lamp left rolled back shows why its disk grows. It reports as before
+  once this build's schema is back
+  (`a_newer_schema_is_reported_as_the_cleanup_paused_until_this_builds_is_back`).
+  A newer file naming no bus it can take stops the reporter at start, with
+  nowhere to say it. Where the reporter isn't running (it is still a
+  template, not a product unit, below), the journal line is where this
+  shows.
 - Still refused: a file that doesn't parse, a known field's bad value (a
   `kind` it doesn't know), and a field named like a key's, by its name.
   serde's reason is told only as its category, line and column, never its

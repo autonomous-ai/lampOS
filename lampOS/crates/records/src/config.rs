@@ -43,8 +43,13 @@ pub enum Read {
     /// This build's schema: the configuration, and the journal's line
     /// naming the fields this build does not read, if any.
     Current(Config, Option<String>),
-    /// A newer schema, by its number: this build prunes nothing with it.
-    Newer(u64),
+    /// A newer schema: this build prunes nothing with it. Its number, and
+    /// its `bus_root` when that is still a bounded absolute path, so the
+    /// reporter can say on the bus that the cleanup is paused.
+    Newer {
+        schema: u64,
+        bus_root: Option<std::path::PathBuf>,
+    },
 }
 
 /// `bytes`, `records.json` at `path`. A newer `schema_version` is told
@@ -57,11 +62,22 @@ pub fn read(path: &Path, bytes: &[u8]) -> io::Result<Read> {
     #[derive(Deserialize)]
     struct Envelope {
         schema_version: u64,
+        #[serde(default)]
+        bus_root: Option<serde_json::Value>,
     }
     let envelope: Envelope =
         serde_json::from_slice(bytes).map_err(|error| crate::forward::unreadable(path, &error))?;
     if envelope.schema_version > u64::from(SCHEMA) {
-        return Ok(Read::Newer(envelope.schema_version));
+        let bus_root = envelope
+            .bus_root
+            .as_ref()
+            .and_then(serde_json::Value::as_str)
+            .map(std::path::PathBuf::from)
+            .filter(|root| absolute_path(root).is_ok());
+        return Ok(Read::Newer {
+            schema: envelope.schema_version,
+            bus_root,
+        });
     }
     let (config, unread) = crate::forward::read(path, bytes)?;
     Ok(Read::Current(config, unread))
@@ -273,9 +289,21 @@ mod tests {
         );
         newer["schema_version"] = 2.into();
         newer["roots"][0]["kind"] = "memory_days".into();
+        let Read::Newer { schema, bus_root } =
+            read(path(), &serde_json::to_vec(&newer).unwrap()).unwrap()
+        else {
+            panic!("a newer schema");
+        };
+        assert_eq!(schema, 2);
+        assert_eq!(bus_root.as_deref(), Some(Path::new("/run/lampos-bus")));
+        // A bus it can't take is none: the reporter has nowhere to say it.
+        newer["bus_root"] = "run/relative".into();
         assert!(matches!(
             read(path(), &serde_json::to_vec(&newer).unwrap()).unwrap(),
-            Read::Newer(2)
+            Read::Newer {
+                schema: 2,
+                bus_root: None
+            }
         ));
         let mut key = product;
         key["relay_token"] = "sk-not-shown".into();
