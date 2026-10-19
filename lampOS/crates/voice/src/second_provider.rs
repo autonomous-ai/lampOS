@@ -118,6 +118,26 @@ pub const LOOKING: &str = "Let me look.";
 /// ([`Engine::cutting_first_words`]; the first builder on #1712: "cut at the
 /// first clause, a comma or about 6 words").
 pub const FIRST_WORDS: usize = 6;
+/// With the configured voice (ElevenLabs on the lamps), the first piece
+/// goes once this many words have come (#1712, the first builder at 18:26:
+/// a 9-word first clause waited 2.8 s before it went to the voice).
+pub const CONFIGURED_FIRST_WORDS: usize = 4;
+/// Where the worker reads how many words the first piece waits for: a
+/// number from 0 (whole clauses and sentences only) to 20, for an A/B;
+/// unset, [`FIRST_WORDS`] for Gemini's voice and [`CONFIGURED_FIRST_WORDS`]
+/// for the configured one.
+pub const FIRST_WORDS_ENVIRONMENT: &str = "LAMP_SECOND_FIRST_WORDS";
+
+/// How many words the answer's first piece waits for, as `value` says
+/// ([`FIRST_WORDS_ENVIRONMENT`]); `None`: whole clauses and sentences only.
+pub fn first_words_for(value: Option<&str>, gemini_speech: bool) -> Option<usize> {
+    match value.map(str::parse::<usize>) {
+        Some(Ok(0)) => None,
+        Some(Ok(words)) if words <= 20 => Some(words),
+        _ if gemini_speech => Some(FIRST_WORDS),
+        _ => Some(CONFIGURED_FIRST_WORDS),
+    }
+}
 /// With `LAMP_SECOND_DOWN_LINE=on`: what the lamp says when a turn's first
 /// round has not begun within its bound, rather than nothing, at most once
 /// in [`DOWN_LINE_EVERY`] (the first builder, 2026-10-17 02:48: the relay's
