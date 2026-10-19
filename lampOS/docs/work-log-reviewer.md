@@ -4,6 +4,31 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 19:51 merged #1906 (Jarvis's held stop made visible) as 6c4683048; #1683 stays open
+- 19:50 read #1913 (El's settings in the manifest): no P1, off unchanged; three P2s when on (a missing apply sticks the lamp, lampos.conf never updated, a retried put-back loses records); first builder's merge
+- 19:40 #1909's P2 fixed (ExecStartPre, shown on lamp-c0a4); one P3, needs a fold; first builder's merge
+- 19:40 read #1903 (Tests' lamp-skills one wait): no finding; for the first builder (on by default)
+- 19:36 read #1906 (Jarvis's held stop made visible): no finding; merge on green ARM64
+- 19:36 merged #1904 (Nine's presence by an answered voice) as 753f71236; #1677 left open
+- 19:30 read #1909 (Twelve's lamp-cloud on in the product): P2 (Conflicts= stops os-server even when lamp-cloud's conditions skip it); for the first builder (on by default)
+- 19:26 #1897 merged by the first builder as 3dfcde963 before my merge
+- 19:25 read #1899 (Third's voice-eval score table): no finding; needs a fold
+- 19:24 read #1900 (Tests' light path in a few ms): El's doc P2 stands; for the first builder (on by default)
+- 19:20 read #1904 (Nine's presence by an answered voice): no finding; merge on green ARM64
+- 19:17 merged #1898 (Thirteen's factory strip-off step) as d3870f543
+- 19:14 read #1901 (first builder's wellbeing nudges, #1876 folded): three P2s fixed, the folder agrees with #1732, gate green; first builder's merge
+- 19:09 merged #1848 (hw-first's test cases and traceability, robots/ only) as 4bdf060c9; checked against #1887's merged matrix
+- 19:02 merged #1884 (Seventh's waiting-cuts in voice-eval) as 4de0c33fc
+- 19:01 merged #1893 (Tests' schedule report period in Config, lamp unchanged, #1806) as 692b6e20d
+- 18:58 read #1898 (Thirteen's factory strip-off step): no finding; merge on green ARM64
+- 18:53 read #1897 (Sixth's fix: LAMP_SECOND_SCOPED_CONTEXT never reached the worker, a miss in my #1839 read): right; needs a rebase after #1892
+- 18:52 merged #1892 (Fourth's near-call bar) as 2e754384b
+- 18:47 read #1888 (Tests' lamp-actions accept at once): no blocking finding, one P3 (a ready-but-WouldBlock listener could spin); for the first builder (on by default, lamp-actions)
+- 18:44 read #1884 (Seventh's waiting-cuts, now Rust in voice-eval): no finding; merge on green ARM64
+- 18:41 #1879's fixes at 356219fed: the three P2s and the dead end answered (two read myself); first builder's merge after #1788, #1801
+- 18:38 read #1892 (Fourth's near-call bar): no finding; merge on green ARM64
+- 18:37 merged #1885 (Tests' reset watcher test without its sleeps, tests only, #1806) as 9a706deca
+- 18:30 #1846: one P2 (realtime-tests.md still says a PR runs every test); I merge after it, the lead's ask
 - 18:29 merged #1882 (Jarvis's cloud skills.list) as 5689de7d9; #1722 is the Queue, not closed
 - 18:27 read #1846 (first builder's scoped ARM64 runs): no blocking finding; DevOps's workflow and the first builder's merge; Python under .github/ is outside the rule's letter
 - 18:26 first read of #1876 (first builder's wellbeing nudges): product skills unchanged; three P2s if installed (stop functions past the 32, eyes and stretch 5 min apart, off not kept); needs a rebase
