@@ -15,6 +15,7 @@
 //! absolute path: then nothing here runs, no function is declared and no
 //! file is read or written.
 pub(crate) mod hardware;
+pub(crate) mod near;
 pub(crate) mod privacy;
 pub(crate) mod storage;
 
@@ -99,9 +100,9 @@ impl Step {
     }
 
     /// PLACEHOLDER (#841): the steps whose parts other builders own. Each
-    /// is passed over until its part can be measured from here: hearing
-    /// (fourth, #753), head touch (third, #711), the privacy switch (third,
-    /// #795), and whether the body gives way (fifth, #780).
+    /// is passed over until its part can be measured from here: head touch
+    /// (third, #711) and whether the body gives way (fifth, #780). Privacy
+    /// and how they sound (#1803) have their own availability.
     fn available(self) -> bool {
         matches!(
             self,
@@ -113,7 +114,7 @@ impl Step {
     /// it was skipped.
     fn reportable(self, outcome: Outcome) -> bool {
         match self {
-            Step::WhereYouSit | Step::Privacy => outcome == Outcome::Skipped,
+            Step::WhereYouSit | Step::Privacy | Step::HowYouSound => outcome == Outcome::Skipped,
             _ => outcome != Outcome::NotAvailable,
         }
     }
@@ -215,6 +216,17 @@ pub struct Progress {
     /// Redo's durable tombstone precedes deletion of any old checkpoint.
     #[serde(default)]
     pub privacy_discard_pending: bool,
+    /// Near-call prompts committed this setup/redo, before each is published
+    /// (#1803): at most `lamp_near_call::MOST_PROMPTS`.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub near_call_prompts: u8,
+    /// The accepted near-call tries so far: numbers only, never sound.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub near_call_tries: Vec<lamp_near_call::Try>,
+}
+
+fn is_zero(value: &u8) -> bool {
+    *value == 0
 }
 
 impl Progress {
@@ -235,6 +247,19 @@ impl Progress {
             {
                 return Err(invalid());
             }
+        }
+        // Persisted samples are validated on every load and commit (#1803).
+        let tries = &self.near_call_tries;
+        if usize::from(self.near_call_prompts) > lamp_near_call::MOST_PROMPTS
+            || tries.len() > lamp_near_call::TRIES
+            || tries.len() > usize::from(self.near_call_prompts)
+            || !tries.iter().all(near::valid_try)
+            || self
+                .steps
+                .get(Step::HowYouSound.name())
+                .is_some_and(|kept| kept.outcome == Outcome::Done && !near::done_fits(tries))
+        {
+            return Err(invalid());
         }
         if self.privacy_done_attempt.is_some()
             && !self
@@ -342,6 +367,9 @@ pub struct Onboarding {
     /// The move asked of the body for a step just done, until taken.
     gesture: Option<&'static str>,
     privacy_flow: PrivacyFlow,
+    near: near::NearFlow,
+    /// Unix milliseconds, for evidence dated by the bus (tests set their own).
+    unix_clock: fn() -> u64,
 }
 
 /// What a read of a body topic found: nothing ever, a message
@@ -435,6 +463,8 @@ impl Onboarding {
             available: Step::available,
             gesture: None,
             privacy_flow: PrivacyFlow::default(),
+            near: near::NearFlow::default(),
+            unix_clock: unix_ms,
             looked: None,
             felt: None,
             goals: None,
@@ -449,6 +479,7 @@ impl Onboarding {
             progress: file.clone(),
             checkpoint: file.parent().unwrap().join("privacy-pending.json"),
             mailbox: mailbox_of(&file),
+            near_call: file.parent().unwrap().join("near-call.json"),
         })
         .unwrap();
         let mut walk = Self::with_storage(file, owner.client());
@@ -475,6 +506,7 @@ impl Onboarding {
         self.privacy_flow.offer = None;
         self.privacy_flow.attempt = None;
         self.privacy_flow.pending_result = None;
+        self.forget_near();
         self.owed = None;
         self.gesture = None;
     }
@@ -536,6 +568,7 @@ impl Onboarding {
             self.privacy_flow.attempt = None;
             self.privacy_flow.pending_result = None;
             self.privacy_flow.loaded = false;
+            self.forget_near();
             self.checkpoint_bytes = None;
         }
         if !snapshot.ready {
@@ -577,6 +610,7 @@ impl Onboarding {
                 self.erase_on_commit = false;
             }
         }
+        self.near_stored(snapshot.epoch, snapshot.revision, now_us);
         self.checkpoint_bytes = snapshot.checkpoint;
         if let Some((revision, lines)) = snapshot.mailbox {
             if self.mailbox_revision != Some((snapshot.epoch, revision)) {
@@ -716,6 +750,8 @@ impl Onboarding {
     fn step_available(&self, step: Step) -> bool {
         if step == Step::Privacy {
             self.privacy_available()
+        } else if step == Step::HowYouSound {
+            self.near_available()
         } else {
             (self.available)(step)
         }
@@ -1098,6 +1134,50 @@ impl Onboarding {
         );
     }
 
+    /// The one pending invitation, of whichever measured step is led.
+    pub(crate) fn pending(&self) -> lamp_msgs::OnboardingPending {
+        match self.near_pending() {
+            Some(near) => lamp_msgs::OnboardingPending {
+                invitations: vec![near],
+            },
+            None => self.privacy_pending(),
+        }
+    }
+
+    pub(crate) fn take_invitation(&mut self, token: u64, now_us: u64) -> Option<String> {
+        if self.near_pending().is_some() {
+            self.take_near_invitation(token, now_us)
+        } else {
+            self.take_privacy_invitation(token, now_us)
+        }
+    }
+
+    pub(crate) fn bind_invitation(&mut self, token: u64, voice_boot: BootId, turn: u64) -> bool {
+        self.bind_near_invitation(token, voice_boot, turn)
+            || self.bind_privacy_invitation(token, voice_boot, turn)
+    }
+
+    pub(crate) fn invitation_binding(&self) -> Option<(BootId, u64)> {
+        self.near_binding()
+            .or_else(|| self.privacy_invitation_binding())
+    }
+
+    pub(crate) fn invitation_refused(&mut self, token: u64, now_us: u64) {
+        self.near_invitation_refused(token, now_us);
+        self.privacy_invitation_refused(token, now_us);
+    }
+
+    pub(crate) fn invitation_finished(
+        &mut self,
+        voice_boot: BootId,
+        turn: u64,
+        delivered_whole: bool,
+        now_us: u64,
+    ) {
+        self.near_invitation_finished(voice_boot, turn, delivered_whole, now_us);
+        self.privacy_invitation_finished(voice_boot, turn, delivered_whole, now_us);
+    }
+
     pub fn kept(&self) -> &Progress {
         &self.committed
     }
@@ -1220,6 +1300,7 @@ impl Onboarding {
         }
         if paused {
             self.invalidate_privacy(privacy::Invalidation::FenceFailure);
+            self.invalidate_near();
             // The keeper's pause stops the walk; a step being led is asked
             // again afterwards.
             if self.led.take().is_some_and(|led| led.asked_us.is_some()) {
@@ -1228,6 +1309,8 @@ impl Onboarding {
             }
             return None;
         }
+        // A try is judged on its own evidence, whatever storage is doing.
+        self.near_judge(now_us);
         if !self.storage_idle() {
             return None;
         }
@@ -1267,6 +1350,10 @@ impl Onboarding {
                 return None;
             }
             self.privacy_tick(now_us, quiet_us, can_speak, face.is_some());
+            return None;
+        }
+        if step == Step::HowYouSound {
+            self.near_tick(now_us, quiet_us, can_speak, face.is_some());
             return None;
         }
         let gone = self
@@ -1433,6 +1520,8 @@ impl Onboarding {
             if told.get("redo").and_then(Value::as_bool) == Some(true) {
                 self.storage_failed = false;
                 self.invalidate_privacy(privacy::Invalidation::Redo);
+                self.forget_near();
+                self.near.generation = 0;
                 self.privacy_flow.loaded = true;
                 self.privacy_flow.maintenance_failed = false;
                 self.privacy_flow.failures = 0;
@@ -1469,6 +1558,11 @@ impl Onboarding {
                 if step == Step::Privacy {
                     self.invalidate_privacy(privacy::Invalidation::Redo);
                     self.privacy_flow.pending_result = Some((outcome, None));
+                } else if step == Step::HowYouSound {
+                    // A skip leaves any earlier bar as it is; late evidence
+                    // and a late write of this walk are dropped.
+                    self.invalidate_near();
+                    self.finish(step, outcome, None, now_us);
                 } else {
                     self.finish(step, outcome, None, now_us);
                 }
@@ -1559,7 +1653,7 @@ pub fn tools() -> Vec<Tool> {
                           to lead has ended: done, skipped because they asked to skip it, or failed. If \
                           they want to skip the rest, call it skipped for the step you are on. Then go on \
                           talking as the step asked. Only for the step you are leading now; \
-                          where_you_sit and privacy can only be skipped; the runner requires physical evidence."
+                          where_you_sit, how_you_sound and privacy can only be skipped; the runner requires physical evidence."
                 .into(),
             parameters: Some(json!({
                 "type": "object",
@@ -1601,6 +1695,12 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
                 (Some(Step::Privacy), Some(_)) => {
                     return (
                         json!({"error":"Privacy is completed only by the physical switch closing the microphones and reopening. You can only skip it if they ask."}),
+                        true,
+                    );
+                }
+                (Some(Step::HowYouSound), Some(_)) => {
+                    return (
+                        json!({"error":"How they call you is learned only from their calls heard from their seat. You can only skip it if they ask."}),
                         true,
                     );
                 }
@@ -1968,8 +2068,10 @@ mod tests {
             still: true,
             body_on_bus: false,
         };
+        // Hearing is measured by its own step (#1803); touch stands in here
+        // for a placeholder whose part arrives later.
         later.walk.available =
-            |step| step != Step::Touch && step != Step::Privacy && step != Step::GivingWay;
+            |step| step != Step::HowYouSound && step != Step::Privacy && step != Step::GivingWay;
         assert_eq!(later.wait(4 * S, Some(NEAR_MIDDLE)), [ONE_MORE_NOTE]);
         assert!(later.walk.leading());
         // Led to its end like any step, while it is being led.
@@ -1979,22 +2081,19 @@ mod tests {
         later.wait(31 * S, None);
         assert!(!later.walk.leading());
         assert_eq!(later.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
-        assert_eq!(
-            later.outcome(Step::HowYouSound),
-            Some(Outcome::NotAvailable)
-        );
+        assert_eq!(later.outcome(Step::Touch), Some(Outcome::NotAvailable));
         // A day later it is offered again, and done it is kept.
         later
             .walk
             .desired
             .steps
-            .get_mut("how_you_sound")
+            .get_mut("touch")
             .unwrap()
             .offered_at_unix_s = Some(unix_ms() / 1_000 - OFFER_EVERY_S);
         assert_eq!(later.wait(4 * S, Some(NEAR_MIDDLE)), [ONE_MORE_NOTE]);
-        report(&later.walk, "how_you_sound", "done");
+        report(&later.walk, "touch", "done");
         assert_eq!(later.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
-        assert_eq!(later.outcome(Step::HowYouSound), Some(Outcome::Done));
+        assert_eq!(later.outcome(Step::Touch), Some(Outcome::Done));
         assert_eq!(later.walk.take_gesture(), None);
     }
 
@@ -2216,5 +2315,7 @@ mod tests {
     }
 }
 
+#[cfg(test)]
+mod near_flow_tests;
 #[cfg(test)]
 mod privacy_flow_tests;

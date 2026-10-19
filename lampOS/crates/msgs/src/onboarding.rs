@@ -8,6 +8,9 @@ use std::time::Duration;
 #[serde(rename_all = "snake_case")]
 pub enum OnboardingStep {
     Privacy,
+    /// One prompt to call the lamp by name from the person's usual seat
+    /// (#1803). Only the prompt's identity travels here, never a measurement.
+    HowYouSound,
 }
 
 /// The runner owns these identities. A new invitation token is required after
@@ -99,5 +102,9 @@ mod tests {
             serde_json::from_str::<OnboardingPending>(&text.replace("privacy", "unrecognised"))
                 .is_err()
         );
+        let near: OnboardingPending =
+            serde_json::from_str(&text.replace("privacy", "how_you_sound")).unwrap();
+        assert_eq!(near.invitations[0].step, OnboardingStep::HowYouSound);
+        assert!(near.check().is_ok());
     }
 }
