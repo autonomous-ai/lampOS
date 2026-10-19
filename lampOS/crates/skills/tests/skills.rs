@@ -6738,3 +6738,96 @@ fn exact_words_reach_the_voice_unchanged_at_their_priority() {
     assert!(done.contains("say: spoken"), "{done}");
     assert!(done.contains("light given back to on blue at 3"), "{done}");
 }
+
+/// #1669, Jarvis on #1920: a dotted `rise` field and a dotted `each` list
+/// and `key` read inside objects, as a trigger's field does; an empty step
+/// is refused at load.
+#[test]
+fn a_rise_and_an_each_read_a_dotted_path_and_an_empty_step_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let rising = skill_with(
+        dir.path(),
+        "rising",
+        r#"
+[trigger]
+topic = "air/state"
+field = "levels.pm2_5"
+rise = { by = 100, within = "1m" }
+[ask]
+policy = "nudge"
+[[do]]
+body = { gesture = "nod" }
+"#,
+    );
+    let quiet = r#"{"levels":{"pm2_5":80}}"#;
+    let music = r#"{"levels":{"pm2_5":400}}"#;
+    let runs: Vec<u64> = runs_at(
+        &rising,
+        &[
+            (0, "air/state", quiet),
+            (5, "air/state", quiet),
+            (10, "air/state", music),
+        ],
+    )
+    .into_iter()
+    .map(|(at, _)| at)
+    .collect();
+    assert_eq!(runs, [10], "80 to 400 inside levels is a rise");
+    let items = skill_with(
+        dir.path(),
+        "items",
+        r#"
+[trigger]
+topic = "tasks/status"
+each = "status.tasks"
+key = "meta.task"
+field = "state"
+equals = "idle"
+when = "appears"
+[ask]
+policy = "news"
+[[do]]
+body = { gesture = "nod" }
+"#,
+    );
+    let list = |state: &str| {
+        format!(r#"{{"status":{{"tasks":[{{"meta":{{"task":1}},"state":"{state}"}}]}}}}"#)
+    };
+    let (working, idle) = (list("working"), list("idle"));
+    let runs: Vec<u64> = runs_at(
+        &items,
+        &[(0, "tasks/status", &working), (10, "tasks/status", &idle)],
+    )
+    .into_iter()
+    .map(|(at, _)| at)
+    .collect();
+    assert_eq!(runs, [10], "task 1 under status.tasks turned idle");
+    // With the Policy asked, its answer finds the item under the same path.
+    let mut engine = Engine::new(vec![load(&items).unwrap()], false).asking_the_policy();
+    assert!(
+        engine
+            .observe("tasks/status", 1, working.as_bytes(), None)
+            .is_empty()
+    );
+    let asked = engine.observe("tasks/status", 2, idle.as_bytes(), None);
+    assert_eq!(asked.len(), 1);
+    assert_eq!(
+        engine.still(&asked[0], 3),
+        Some(vec![Call::Gesture("nod".into())]),
+        "still idle under status.tasks"
+    );
+    for (number, field) in ["scores.", ".music", "scores..music"]
+        .into_iter()
+        .enumerate()
+    {
+        let error = load(&skill_with(
+            dir.path(),
+            &format!("typo{number}"),
+            &format!(
+                "[trigger]\ntopic = \"air/state\"\nfield = \"{field}\"\nabove = 0.5\n[ask]\npolicy = \"nudge\"\n[[do]]\nbody = {{ gesture = \"nod\" }}\n"
+            ),
+        ))
+        .unwrap_err();
+        assert!(error.contains("none of them empty"), "{field}: {error}");
+    }
+}
