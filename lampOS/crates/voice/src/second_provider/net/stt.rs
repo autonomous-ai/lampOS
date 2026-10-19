@@ -18,6 +18,8 @@ use tokio_tungstenite::{
     tungstenite::{Message, client::IntoClientRequest, http::HeaderValue},
 };
 
+mod flux;
+
 const MODEL: &str = "nova-3-general";
 const DEEPGRAM: &str = "wss://api.deepgram.com/v1/listen";
 /// Deepgram closes a socket that hears nothing for 10 s.
@@ -328,12 +330,15 @@ impl SttStream {
             Stt::Deepgram { key } => (None, key),
             Stt::Autonomous { base_url, key } => (Some(base_url.as_str()), key),
         };
+        let key_terms = super::key_terms::listening(&config.stt_key_terms);
+        // `LAMP_SECOND_FLUX=on`, straight to Deepgram, in English.
+        if flux::chosen(config) {
+            return Ok(Self::start_flux(
+                socket(flux::url(&key_terms)?, key.expose()).await?,
+            ));
+        }
         Self::open(
-            url(
-                proxy,
-                config.stt_language.as_deref(),
-                &super::key_terms::listening(&config.stt_key_terms),
-            )?,
+            url(proxy, config.stt_language.as_deref(), &key_terms)?,
             key.expose(),
         )
         .await
@@ -393,19 +398,45 @@ impl SttStream {
     where
         S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static,
     {
+        Self::start_on(socket, false)
+    }
+
+    /// A stream on Flux's socket ([`flux`]).
+    fn start_flux<S>(socket: tokio_tungstenite::WebSocketStream<S>) -> Self
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static,
+    {
+        Self::start_on(socket, true)
+    }
+
+    fn start_on<S>(socket: tokio_tungstenite::WebSocketStream<S>, on_flux: bool) -> Self
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static,
+    {
         let (audio, queued) = mpsc::channel(QUEUE);
         let words_at = Arc::new(OnceLock::new());
         let (said, words) = mpsc::unbounded_channel();
         let replies = Arc::new(Replies::default());
-        Self {
-            audio: Some(audio),
-            task: tokio::spawn(run(
+        let task = if on_flux {
+            tokio::spawn(flux::run(
                 socket,
                 queued,
                 Arc::clone(&words_at),
                 said,
                 Arc::clone(&replies),
-            )),
+            ))
+        } else {
+            tokio::spawn(run(
+                socket,
+                queued,
+                Arc::clone(&words_at),
+                said,
+                Arc::clone(&replies),
+            ))
+        };
+        Self {
+            audio: Some(audio),
+            task,
             words_at,
             words: Some(words),
             replies,
@@ -498,18 +529,27 @@ impl Drop for SttStream {
 /// after the last block, `Finalize`, and 2 s later `CloseStream`. Print
 /// everything the service sends back, by kind and when, from the first
 /// block sent. That shows whether results come at all, and if so only
-/// after `Finalize` or only at the close.
+/// after `Finalize` or only at the close. On Flux (`LAMP_SECOND_FLUX=on`),
+/// `ForceEndTurn` takes `Finalize`'s place.
 pub async fn check(config: &SecondConfig, samples: &[i16]) -> Result<()> {
     let (proxy, key) = match &config.stt {
         Stt::Deepgram { key } => (None, key),
         Stt::Autonomous { base_url, key } => (Some(base_url.as_str()), key),
     };
     let asked = Instant::now();
-    let address = url(
-        proxy,
-        config.stt_language.as_deref(),
-        &super::key_terms::listening(&config.stt_key_terms),
-    )?;
+    let key_terms = super::key_terms::listening(&config.stt_key_terms);
+    let on_flux = flux::chosen(config);
+    let (address, (asking, ask)) = if on_flux {
+        (
+            flux::url(&key_terms)?,
+            ("ForceEndTurn", flux::FORCE_END_TURN),
+        )
+    } else {
+        (
+            url(proxy, config.stt_language.as_deref(), &key_terms)?,
+            ("Finalize", r#"{"type":"Finalize"}"#),
+        )
+    };
     let (mut write, mut read) = socket(address, key.expose()).await?.split();
     println!(
         "connected in {} ms; sending {:.2} s of audio",
@@ -533,10 +573,10 @@ pub async fn check(config: &SecondConfig, samples: &[i16]) -> Result<()> {
         println!("{:>6} ms  the last block went", at());
         tokio::time::sleep(Duration::from_millis(1_500)).await;
         write
-            .send(Message::text(r#"{"type":"Finalize"}"#))
+            .send(Message::text(ask))
             .await
             .map_err(|_| Error::Transport("speech-to-text send"))?;
-        println!("{:>6} ms  Finalize went", at());
+        println!("{:>6} ms  {asking} went", at());
         tokio::time::sleep(Duration::from_secs(2)).await;
         write
             .send(Message::text(r#"{"type":"CloseStream"}"#))
@@ -566,6 +606,21 @@ pub async fn check(config: &SecondConfig, samples: &[i16]) -> Result<()> {
                             heard.from_finalize,
                             heard.end,
                             heard.transcript
+                        );
+                    } else if let Some(turn) = flux::turn_info(&text) {
+                        counts.count(if turn.transcript.is_empty() {
+                            &counts.without_words
+                        } else {
+                            &counts.with_words
+                        });
+                        println!(
+                            "{:>6} ms  TurnInfo {:?} turn={} trigger={} audio {:.2} s: {:?}",
+                            at(),
+                            turn.event,
+                            turn.turn_index,
+                            turn.trigger.as_deref().unwrap_or("none"),
+                            turn.audio_window_end,
+                            turn.transcript
                         );
                     } else {
                         let kind = serde_json::from_str::<serde_json::Value>(&text)

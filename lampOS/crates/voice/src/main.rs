@@ -110,7 +110,10 @@ fn run() -> Result<()> {
         // not a stop's latency. One line a round, with the words heard.
         [command, config, wav, rest @ ..] if command == "stt-check" && rest.len() <= 3 => {
             let (rounds, held_ms) = stt_check_options(rest)?;
-            let config = lamp_voice::second_config::load_from_path(Path::new(config))?;
+            // The unit's switches too: LAMP_SECOND_FLUX=on hears the line
+            // with Flux, LAMP_SECOND_KEY_TERMS adds its words.
+            let config = lamp_voice::second_config::load_from_path(Path::new(config))?
+                .with_environment(|name| std::env::var_os(name))?;
             let mut reader = hound::WavReader::open(wav)?;
             let spec = reader.spec();
             if spec.sample_rate != 16_000 || spec.channels != 1 || spec.bits_per_sample != 16 {

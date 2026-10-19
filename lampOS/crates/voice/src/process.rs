@@ -1066,6 +1066,7 @@ fn second_route_worker_environment(
         crate::second_config::SPEECH_MODEL_ENV,
         crate::second_config::KEY_TERMS_ENV,
         crate::local_time::PLACE_ENVIRONMENT,
+        crate::second_config::FLUX_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
     ]
     .into_iter()
@@ -1101,17 +1102,21 @@ mod tests {
     /// goes to its worker only.
     #[test]
     fn the_known_names_switch_reaches_only_the_second_route() {
-        let name = crate::second_provider::net::key_terms::ENVIRONMENT;
-        let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
-        assert_eq!(
-            second_route_worker_environment("second", var),
-            [(name, std::ffi::OsString::from("on"))]
-        );
-        for role in ["provider", "capture", "speaker"] {
-            assert!(
-                second_route_worker_environment(role, var).is_empty(),
-                "{role}"
+        for name in [
+            crate::second_provider::net::key_terms::ENVIRONMENT,
+            crate::second_config::FLUX_ENV,
+        ] {
+            let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
+            assert_eq!(
+                second_route_worker_environment("second", var),
+                [(name, std::ffi::OsString::from("on"))]
             );
+            for role in ["provider", "capture", "speaker"] {
+                assert!(
+                    second_route_worker_environment(role, var).is_empty(),
+                    "{role}"
+                );
+            }
         }
     }
 
@@ -1313,6 +1318,7 @@ mod tests {
                     crate::local_time::KERNEL_CLOCK_ENVIRONMENT,
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
                     crate::second_provider::net::key_terms::ENVIRONMENT,
+                    crate::second_config::FLUX_ENV,
                 ]
                 .contains(&name)
                 {
@@ -1386,6 +1392,7 @@ mod tests {
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PLACE=Hanoi, Vietnam",
+                    "LAMP_SECOND_FLUX=on",
                     "LAMP_SECOND_GEMINI_BASE_URL=https://relay.example.invalid/v1beta",
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_KNOWN_NAMES=on",
