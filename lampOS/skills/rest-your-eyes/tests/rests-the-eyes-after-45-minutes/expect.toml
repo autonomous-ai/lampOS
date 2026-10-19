@@ -1,0 +1,15 @@
+# 09:00, 50 minutes at the desk, moving now and then: at 45 minutes a small
+# curious tilt and its light a shade softer while it tilts.
+clock = "09:00"
+
+[[expect]]
+at = "45m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "45m"
+within = "1m"
+call = "light"
+args = { dim = 1 }

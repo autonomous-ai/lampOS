@@ -26,7 +26,9 @@ Environment=LAMP_SKILLS_ASK=skip
 Environment=LAMP_LIGHT_REQUESTS=on
 # --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), for a skill's
 # [quiet] hours, which without it never start themselves (docs/skills.md); across summer time (#1384).
-ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --zone system
+# --state-dir: the skills a person turned off with a skill's [stop], one name a line in off, kept
+# across a restart (#1685); nothing about a person or a time. The folder is #1732's daily journal's too.
+ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --state-dir /var/lib/lampos-skills-state --zone system
 Restart=on-failure
 RestartSec=5s
 StandardInput=null
@@ -39,6 +41,9 @@ NoNewPrivileges=yes
 # functions until this restarted (lamp-4ace, 19 Oct 04:33).
 RuntimeDirectory=lampos-skills
 RuntimeDirectoryMode=0755
+# Its own state, made by systemd for its user and writable under ProtectSystem=strict.
+StateDirectory=lampos-skills-state
+StateDirectoryMode=0700
 ProtectSystem=strict
 # The bus.
 ReadWritePaths=/run/lampos-bus

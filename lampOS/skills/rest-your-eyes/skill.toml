@@ -1,0 +1,69 @@
+# Rest your eyes: after long screen time at the desk, a small wordless cue
+# to look away for a moment (#1685, "a design, before code: habits and
+# wellbeing nudges"). The lamp's eyes see faces, not screens: long screen
+# time is a long sitting at the desk. Written to lamp-skills' schema
+# (docs/skills.md, "The schema, as lamp-skills reads it").
+needs = ["eyes", "body", "light"]
+# Its owner puts it on (`lamp-skills install`) and takes it off; not in the
+# product's install.
+kind = "installable"
+version = "1.0.0"
+# Four a day at most, counted from the local midnight.
+most_a_day = 4
+
+# What it may read and use, and nothing more: the faces, the voice's state,
+# one small gesture and a shade of its light. It never speaks.
+[permissions]
+topics = ["humans/faces/tracked", "voice/state", "room/activity"]
+body = true
+light = true
+
+[trigger]
+topic = "humans/faces/tracked"
+when = "present"          # a face there, continuously
+near = 0.14               # at the desk, not across the room
+for = "45m"
+gap = "2m"                # looking away or leaning out of view does not end the sitting
+cooldown = "60m"          # once an hour while they stay; talking when the time
+                          # comes, at the first face after the talk ends
+
+[[while]]                 # never in the middle of a conversation
+topic = "voice/state"
+field = "state"
+equals = "resting"
+
+[[while]]                 # not while they read or write, head down (#1678), as Stretch break:
+topic = "room/activity"   # it waits for them to look up. Without the eyes' room/activity
+field = "state"           # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
+not_equals = "head_down"
+unknown = "holds"
+
+[active]                  # in the day
+from = "09:00"
+to = "20:00"
+
+[quiet]                   # never at night
+from = "22:00"
+to = "08:00"
+
+# One nudge an hour between the wellbeing skills.
+[budget]
+group = "wellbeing"
+per_hour = 1
+
+# Two nudges nobody noticed in a row, and it rests until tomorrow morning.
+[rest]
+after_ignored = 2
+
+# One function for the four wellbeing skills, so a session counts it once
+# (#1685): it stops the one that came last, or with all, every one.
+[stop]
+tool = "wellbeing_nudges"
+about = "When someone asks you to stop a wellbeing nudge, the lamp's wordless hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
+
+[ask]
+policy = "nudge"
+
+[[do]]
+body = { gesture = "curious" }      # a small tilt (3 s), as if something across the room caught its eye
+light = { dim = 1 }                 # a shade softer while it tilts, then as it was
