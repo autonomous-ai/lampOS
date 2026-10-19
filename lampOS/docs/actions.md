@@ -46,6 +46,13 @@ the once-a-second health report's, on a clock its caller gives. The lamp
 runs on the host's clock; the light's test moves its own on
 (docs/realtime-tests.md).
 
+A caller is taken as soon as it connects. While nobody calls, the server
+waits on its socket for one, at most `server::IDLE` (50 ms), and then looks
+at the stop flag, its health report and the list (`lamp_ipc::readable`).
+Until 19 Oct it slept for that time instead, and each call waited for the
+rest of the sleep: on the Intel Mac, the median `list_reminders` took 64 to
+65 ms, for about 9 ms of work, and 11 to 12 ms after (#1806).
+
 ## Optional reminders and timers
 
 With the exact environment value `LAMP_SCHEDULE_TOOLS=on`, Actions appends
