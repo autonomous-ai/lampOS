@@ -822,6 +822,37 @@ async fn the_announcement_is_said_once_per_quiet_spell() {
     assert!(announced(&turn(&mut engine).await));
 }
 
+/// The lamp's only voice (`LAMP_VOICE_ROUTE=second`, `--only-voice`) never
+/// says its voice sounds different: the first answer after a quiet spell
+/// is the model's own first words.
+#[tokio::test]
+async fn the_only_voice_never_says_it_sounds_different() {
+    let script = Arc::new(Script {
+        chats: Mutex::new(
+            (0..2)
+                .map(|_| vec![text("Yes."), Ok(ChatEvent::Done)])
+                .collect(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, now) = scripted(script);
+    let mut engine = engine.announcing(false);
+    let expected = |request: u64| {
+        [
+            format!("started:{request}"),
+            "said:Yes.".into(),
+            "audio:4".into(),
+            "generated".into(),
+            "complete".into(),
+        ]
+    };
+    engine.submit(written(1, "One?"));
+    assert_eq!(turn(&mut engine).await, expected(1));
+    *now.lock().unwrap() += ANNOUNCE_AFTER;
+    engine.submit(written(2, "Two?"));
+    assert_eq!(turn(&mut engine).await, expected(2));
+}
+
 #[tokio::test]
 async fn a_turn_spoken_over_stops_its_chat_and_speech_and_sends_nothing_more() {
     let script = Arc::new(Script {

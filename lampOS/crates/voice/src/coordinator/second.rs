@@ -142,16 +142,123 @@ pub(super) fn configured(value: Option<OsString>) -> Option<PathBuf> {
     value.filter(|path| !path.is_empty()).map(PathBuf::from)
 }
 
+/// Which route is the lamp's voice, in the service's environment. Unset,
+/// empty or `gemini`: Gemini Live, with the second route standing by when
+/// it is configured, as before. `second`: the second route alone, from the
+/// first turn (the owner, 19 Oct: Gemini Live costs more; an A/B of the
+/// two on lamp-4ace). Anything else is refused at start.
+pub(super) const ROUTE_ENV: &str = "LAMP_VOICE_ROUTE";
+
+/// The voice routes a run starts.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum Routes {
+    /// Gemini's worker is `rig.provider`; the second route, when it is
+    /// configured, stands by in `Rig::second`.
+    Live { standby: Option<PathBuf> },
+    /// `LAMP_VOICE_ROUTE=second`, with the second route's configuration:
+    /// its worker is `rig.provider` from the start, as after a take-over,
+    /// and nothing stands by. No Gemini worker is started, so no Gemini
+    /// session is opened, and every path written for `rig.provider` runs
+    /// against the second route, `Rig::second` being `None`.
+    SecondOnly(PathBuf),
+}
+
+/// The worker a run starts in `rig.provider`, and the standby's arguments.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct Workers {
+    /// `provider` (Gemini Live) or `second`.
+    pub(super) role: &'static str,
+    pub(super) arguments: Vec<String>,
+    pub(super) standby: Option<Vec<String>>,
+}
+
+impl Routes {
+    /// Whether the second route stands by beside Gemini's.
+    pub(super) fn standing_by(&self) -> bool {
+        matches!(self, Self::Live { standby: Some(_) })
+    }
+
+    /// The workers, from the Live worker's arguments (`provider_arguments`).
+    pub(super) fn workers(
+        &self,
+        provider: Vec<String>,
+        wait_cue: bool,
+        down_line: bool,
+    ) -> io::Result<Workers> {
+        Ok(match self {
+            Self::Live { standby } => Workers {
+                role: "provider",
+                standby: standby
+                    .as_deref()
+                    .map(|config| arguments(&provider, config, wait_cue, down_line, false))
+                    .transpose()?,
+                arguments: provider,
+            },
+            Self::SecondOnly(config) => Workers {
+                role: "second",
+                arguments: arguments(&provider, config, wait_cue, down_line, true)?,
+                standby: None,
+            },
+        })
+    }
+}
+
+/// The routes [`ROUTE_ENV`] asks for, with the second route's
+/// configuration (`LAMP_VOICE_SECOND_CONFIG`), or why the voice does not
+/// start. Both are the service's (`serving`: continuous, with Gemini's
+/// configuration): a bounded run never has a second route, and refuses to
+/// be asked for one alone rather than run Gemini in its place.
+pub(super) fn routes(
+    route: Option<OsString>,
+    second_config: Option<OsString>,
+    serving: bool,
+) -> std::result::Result<Routes, String> {
+    let second_config = configured(second_config).filter(|_| serving);
+    let second_config_env = crate::second_config::SECOND_CONFIG_ENV;
+    match route.as_deref().map(std::ffi::OsStr::to_str) {
+        None | Some(Some("" | "gemini")) => Ok(Routes::Live {
+            standby: second_config,
+        }),
+        Some(Some("second")) if !serving => Err(format!(
+            "{ROUTE_ENV}=second is for the service (`lamp-voice serve`) only: this run does not start"
+        )),
+        Some(Some("second")) => second_config.map(Routes::SecondOnly).ok_or_else(|| {
+            format!(
+                "{ROUTE_ENV}=second needs {second_config_env}, the second route's configuration: the voice does not start, and does not fall back to Gemini Live"
+            )
+        }),
+        Some(_) => Err(format!(
+            "{ROUTE_ENV} is gemini or second, not {:?}: the voice does not start",
+            route.as_deref().unwrap_or_default()
+        )),
+    }
+}
+
+/// [`routes`], from this process's environment.
+pub(super) fn routes_from_environment(serving: bool) -> io::Result<Routes> {
+    routes(
+        std::env::var_os(ROUTE_ENV),
+        std::env::var_os(crate::second_config::SECOND_CONFIG_ENV),
+        serving,
+    )
+    .map_err(|why| io::Error::new(io::ErrorKind::InvalidInput, why))
+}
+
+/// What the journal says at the service's start, for the second route alone.
+pub(super) const SECOND_ONLY_LINE: &str = "lamp-voice: the voice route is second only (LAMP_VOICE_ROUTE=second): speech to text, a text model and speech answer every turn; Gemini Live is not used";
+
 /// The `worker second` arguments: the Live worker's, its configuration
 /// first, then the second route's, `--wait-cue` with `wait_cue`
 /// (`LAMP_SECOND_WAIT_CUE=on`), `--down-line` with `down_line`
-/// (`LAMP_SECOND_DOWN_LINE=on`), then its flags but `--keep-link` and
+/// (`LAMP_SECOND_DOWN_LINE=on`), `--only-voice` with `only_voice`
+/// (`LAMP_VOICE_ROUTE=second`), then its flags but `--keep-link` and
 /// `--wait-for-room`, which are for Gemini's link.
 pub(super) fn arguments(
     provider: &[String],
     second_config: &Path,
     wait_cue: bool,
     down_line: bool,
+    only_voice: bool,
 ) -> io::Result<Vec<String>> {
     let (config, flags) = provider
         .split_first()
@@ -165,6 +272,9 @@ pub(super) fn arguments(
     }
     if down_line {
         arguments.push(crate::second_provider::worker::DOWN_LINE_FLAG.to_owned());
+    }
+    if only_voice {
+        arguments.push(crate::second_provider::worker::ONLY_VOICE_FLAG.to_owned());
     }
     arguments.extend(
         flags
@@ -813,7 +923,14 @@ mod tests {
         .map(String::from)
         .to_vec();
         assert_eq!(
-            arguments(&provider, Path::new("/etc/second.json"), false, false).unwrap(),
+            arguments(
+                &provider,
+                Path::new("/etc/second.json"),
+                false,
+                false,
+                false
+            )
+            .unwrap(),
             [
                 "/etc/provider.json",
                 "/etc/second.json",
@@ -823,23 +940,153 @@ mod tests {
             ]
         );
         assert_eq!(
-            arguments(&provider, Path::new("/etc/second.json"), true, true).unwrap()[..4],
+            arguments(&provider, Path::new("/etc/second.json"), true, true, true).unwrap()[..5],
             [
                 "/etc/provider.json",
                 "/etc/second.json",
                 "--wait-cue",
-                "--down-line"
+                "--down-line",
+                "--only-voice"
             ]
         );
         assert_eq!(
-            arguments(&provider, Path::new("/etc/second.json"), false, true).unwrap()[..3],
+            arguments(&provider, Path::new("/etc/second.json"), false, true, false).unwrap()[..3],
             ["/etc/provider.json", "/etc/second.json", "--down-line"]
+        );
+        assert_eq!(
+            arguments(&provider, Path::new("/etc/second.json"), false, false, true).unwrap()[..4],
+            [
+                "/etc/provider.json",
+                "/etc/second.json",
+                "--only-voice",
+                "--thread-file"
+            ]
         );
         assert!(configured(None).is_none());
         assert!(configured(Some(OsString::new())).is_none());
         assert_eq!(
             configured(Some("/etc/second.json".into())),
             Some(PathBuf::from("/etc/second.json"))
+        );
+    }
+
+    /// `LAMP_VOICE_ROUTE` unset, empty or `gemini` is the voice as before:
+    /// Gemini's worker answers, the second route standing by only when it
+    /// is configured, and only in the service.
+    #[test]
+    fn unset_or_gemini_is_gemini_live_with_the_second_route_standing_by_as_before() {
+        let config = || Some(OsString::from("/etc/second.json"));
+        let standby = Routes::Live {
+            standby: Some(PathBuf::from("/etc/second.json")),
+        };
+        let alone = Routes::Live { standby: None };
+        for route in [None, Some(OsString::new()), Some("gemini".into())] {
+            assert_eq!(routes(route.clone(), config(), true), Ok(standby.clone()));
+            assert_eq!(routes(route.clone(), None, true), Ok(alone.clone()));
+            assert_eq!(
+                routes(route.clone(), Some(OsString::new()), true),
+                Ok(alone.clone())
+            );
+            // A bounded run never had a second route.
+            assert_eq!(routes(route, config(), false), Ok(alone.clone()));
+        }
+        assert!(standby.standing_by());
+        assert!(!alone.standing_by());
+    }
+
+    /// `second` with its configuration is the second route alone.
+    #[test]
+    fn second_with_its_configuration_is_the_second_route_alone() {
+        assert_eq!(
+            routes(Some("second".into()), Some("/etc/second.json".into()), true),
+            Ok(Routes::SecondOnly(PathBuf::from("/etc/second.json")))
+        );
+        assert!(!Routes::SecondOnly(PathBuf::from("/etc/second.json")).standing_by());
+    }
+
+    /// Without the second route's configuration, `second` is refused at
+    /// start, never Gemini in its place; so is anything but the two names,
+    /// and `second` in a bounded run.
+    #[test]
+    fn second_without_its_configuration_or_an_unknown_route_is_refused() {
+        for config in [None, Some(OsString::new())] {
+            let why = routes(Some("second".into()), config, true).unwrap_err();
+            assert!(
+                why.contains("LAMP_VOICE_ROUTE=second needs LAMP_VOICE_SECOND_CONFIG")
+                    && why.contains("does not fall back to Gemini Live"),
+                "{why}"
+            );
+        }
+        for route in ["Second", "gemini-live", "live", "on", " second"] {
+            let why =
+                routes(Some(route.into()), Some("/etc/second.json".into()), true).unwrap_err();
+            assert_eq!(
+                why,
+                format!(
+                    "LAMP_VOICE_ROUTE is gemini or second, not {route:?}: the voice does not start"
+                )
+            );
+        }
+        let why = routes(
+            Some("second".into()),
+            Some("/etc/second.json".into()),
+            false,
+        )
+        .unwrap_err();
+        assert!(why.contains("for the service"), "{why}");
+    }
+
+    /// Gemini's worker answers with the second route as its standby, or
+    /// the second route's worker answers alone, told it is the only voice,
+    /// with nothing standing by.
+    #[test]
+    fn the_workers_are_gemini_and_its_standby_or_the_second_route_alone() {
+        let provider: Vec<String> = ["/etc/provider.json", "--keep-link", "--tools"]
+            .map(String::from)
+            .to_vec();
+        let config = PathBuf::from("/etc/second.json");
+        assert_eq!(
+            Routes::Live { standby: None }
+                .workers(provider.clone(), true, true)
+                .unwrap(),
+            Workers {
+                role: "provider",
+                arguments: provider.clone(),
+                standby: None,
+            }
+        );
+        assert_eq!(
+            Routes::Live {
+                standby: Some(config.clone())
+            }
+            .workers(provider.clone(), false, true)
+            .unwrap(),
+            Workers {
+                role: "provider",
+                arguments: provider.clone(),
+                standby: Some(arguments(&provider, &config, false, true, false).unwrap()),
+            }
+        );
+        let alone = Routes::SecondOnly(config.clone())
+            .workers(provider.clone(), true, false)
+            .unwrap();
+        assert_eq!(
+            alone,
+            Workers {
+                role: "second",
+                arguments: arguments(&provider, &config, true, false, true).unwrap(),
+                standby: None,
+            }
+        );
+        assert_eq!(
+            alone.arguments,
+            [
+                "/etc/provider.json",
+                "/etc/second.json",
+                "--wait-cue",
+                "--only-voice",
+                "--tools"
+            ]
         );
     }
 
