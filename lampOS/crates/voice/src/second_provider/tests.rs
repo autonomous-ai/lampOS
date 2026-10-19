@@ -3328,6 +3328,55 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
     assert_eq!(ops, ["status", "prepare", "status", "confirm"]);
 }
 
+/// #1712's map, item 6 (`LAMP_AIR_FACTS` on the second route): a spoken
+/// request is asked with the air's note beside its words when the note is
+/// due; a written turn (the lamp's own) never asks for it.
+#[tokio::test]
+async fn a_spoken_request_is_told_the_air_and_a_written_turn_is_not() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What should I do?".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![text("Maybe open a window."), Ok(ChatEvent::Done)],
+                vec![text("Hello."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let asked_for = Arc::new(Mutex::new(Vec::new()));
+    let (engine, _, _) = scripted(script.clone());
+    let noted = asked_for.clone();
+    let mut engine = engine.noting_the_air(Arc::new(move |request| {
+        noted.lock().unwrap().push(request);
+        Some("AIR NOTE".to_owned())
+    }));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    engine.submit(written(2, "Say hello."));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    let told = |messages: &Vec<Message>| {
+        messages.iter().any(|message| {
+            message.role == "system"
+                && message
+                    .content
+                    .as_ref()
+                    .and_then(Value::as_str)
+                    .is_some_and(|note| note == "AIR NOTE")
+        })
+    };
+    let asked = script.asked.lock().unwrap();
+    assert!(told(&asked[0]), "{:?}", asked[0]);
+    assert!(!told(&asked[1]), "{:?}", asked[1]);
+    assert_eq!(
+        *asked_for.lock().unwrap(),
+        [1],
+        "asked of the spoken one only"
+    );
+}
+
 /// #1712: what the lamp did is told to the rule, as the Live worker tells its
 /// own: a task, timer or reminder asked of its parts is its work, and its
 /// own written turn heard is news someone may reply to. A lookup is
