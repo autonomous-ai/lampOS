@@ -422,24 +422,32 @@ rm -rf "$T/skills/rest-your-eyes"; echo lamp-body >"$T/active"
 preflight --only 1; check "--preflight, a trial not ready" 1 $?
 has "--preflight: the trial's skill" "$T/out" "skill rest-your-eyes not beside trials.sh"
 has "--preflight: the trial's unit" "$T/out" "lamp-skills.service not running"
-# The real table: a line for each of its 19 rows, and none of its steps run.
+# The real table: a line for each of its 22 rows, and none of its steps run.
 reset
 printf 'lamp-body\n' >"$T/active"
 ARM_ROWS_FILE= ARM_LAMP=$T/lamp-exec ARM_TRIALS=$T/tr/trials.sh PATH=$T/bin:$PATH "$SCRIPT" --preflight >"$T/out" 2>&1 </dev/null
-[[ $(grep -c '^row [0-9]*, ' "$T/out") == 19 ]] && ok || bad "the real table's preflight has $(grep -c '^row [0-9]*, ' "$T/out") row lines, not 19"
+[[ $(grep -c '^row [0-9a-z]*, ' "$T/out") == 22 ]] && ok || bad "the real table's preflight has $(grep -c '^row [0-9a-z]*, ' "$T/out") row lines, not 22"
 hasnt "the real table's preflight ran nothing it shouldn't" "$T/calls" "was not to run"
 hasnt "the real table's preflight installed nothing" "$T/calls" "install -D"
 hasnt "the real table's preflight restarted nothing" "$T/calls" "systemctl restart"
 
-# The real table, the morning's 19 rows: all there, in order, each with its
+# The real table, the morning's 19 rows and Nine's three nudges after row 12
+# (12b to 12d): all there, in order, each with its
 # two lines and its run sheet, and every row that moves asks for the hand.
 reset
 ARM_ROWS_FILE= ARM_LAMP= "$SCRIPT" --dry >"$T/out" 2>&1; check "the real table --dry" 0 $?
-[[ $(grep -c '^Row ' "$T/out") == 19 ]] && ok || bad "the real table has $(grep -c '^Row ' "$T/out") rows, not 19"
-[[ $(grep '^Row ' "$T/out" | sed 's/^Row \([0-9]*\):.*/\1/' | tr '\n' ' ') == "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 " ]] && ok || bad "the real table's rows out of order"
-[[ $(grep -c '^  Do:    .' "$T/out") == 19 && $(grep -c '^  Watch: .' "$T/out") == 19 && $(grep -c '^  Run sheet: ' "$T/out") == 19 ]] && ok ||
+[[ $(grep -c '^Row ' "$T/out") == 22 ]] && ok || bad "the real table has $(grep -c '^Row ' "$T/out") rows, not 22"
+[[ $(grep '^Row ' "$T/out" | sed 's/^Row \([0-9a-z]*\):.*/\1/' | tr '\n' ' ') == "1 2 3 4 5 6 7 8 9 10 11 12 12b 12c 12d 13 14 15 16 17 18 19 " ]] && ok || bad "the real table's rows out of order"
+[[ $(grep -c '^  Do:    .' "$T/out") == 22 && $(grep -c '^  Watch: .' "$T/out") == 22 && $(grep -c '^  Run sheet: ' "$T/out") == 22 ]] && ok ||
   bad "a real row without its two lines or run sheet"
 [[ $(grep -c 'ask: Hand near the arm' "$T/out") -ge 10 ]] && ok || bad "the moving rows don't all ask for the hand"
+# A row added after another (12b): --only takes it, --from counts it by its number.
+ARM_ROWS_FILE= ARM_LAMP= "$SCRIPT" --dry --only 12b >"$T/out" 2>&1
+[[ $(grep '^Row ' "$T/out") == "Row 12b: A sip of water (2 min)" ]] && ok || bad "--only 12b: $(grep '^Row ' "$T/out" | tr '\n' ',')"
+ARM_ROWS_FILE= ARM_LAMP= "$SCRIPT" --dry --from 13 >"$T/out" 2>&1
+[[ $(grep '^Row ' "$T/out" | head -1) == "Row 13: "* && $(grep -c '^Row 12' "$T/out") == 0 ]] && ok || bad "--from 13 took a 12 row"
+ARM_ROWS_FILE= ARM_LAMP= "$SCRIPT" --dry --from 12 >"$T/out" 2>&1
+[[ $(grep -c '^Row 12' "$T/out") == 4 ]] && ok || bad "--from 12 left out a 12 row"
 
 echo "arm-hour-test: $pass passed, $fail failed"
 [[ $fail == 0 ]]

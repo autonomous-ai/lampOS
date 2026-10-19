@@ -6,7 +6,7 @@
 #
 #   arm-hour.sh               # every row, in order
 #   arm-hour.sh --from N      # from row N
-#   arm-hour.sh --only N      # row N alone
+#   arm-hour.sh --only N      # row N alone (12b, for a row added after 12)
 #   arm-hour.sh --dry         # print every row's lines and steps, run nothing
 #   arm-hour.sh --preflight   # read-only, before the hour: is each row ready?
 #
@@ -215,7 +215,32 @@ row | 12 | The wellbeing nudges (rest your eyes) | moves | 3 min
 do | Nobody at the desk; hands clear of the head.
 watch | The head tilts once (3 s) and the light dims a shade.
 sheet | #1957, tools/trials.sh nudges
+need | the eyes' LAMP_ACTIVITY off (an empty room's sitting_s holds the nudges back) | ! sudo -n cat /proc/$(systemctl show -p MainPID --value lamp-eyes)/environ | tr '\0' '\n' | grep -qx 'LAMP_ACTIVITY=on'
 trial | nudges
+end
+row | 12b | A sip of water | moves | 2 min
+do | Hand near the arm, nobody at the lamp: the trial says a face near the lamp itself.
+watch | The head looks toward the middle of the desk once and the light breathes a slow blue for about 6 s, then is as it was.
+sheet | #2034, Nine, 20 Oct 05:14; tools/trials.sh sip-of-water (#2050)
+need | merged | 2050
+need | the eyes' LAMP_ACTIVITY off (an empty room's sitting_s holds the nudges back) | ! sudo -n cat /proc/$(systemctl show -p MainPID --value lamp-eyes)/environ | tr '\0' '\n' | grep -qx 'LAMP_ACTIVITY=on'
+trial | sip-of-water
+end
+row | 12c | Stand up | moves | 2 min
+do | Hand near the arm, nobody at the lamp: the trial says a face near the lamp itself.
+watch | The head looks toward the middle of the desk, then one small tilt (curious): shall we?
+sheet | #2034, Nine, 20 Oct 05:14; tools/trials.sh stand-up (#2050)
+need | merged | 2050
+need | the eyes' LAMP_ACTIVITY off (an empty room's sitting_s holds the nudges back) | ! sudo -n cat /proc/$(systemctl show -p MainPID --value lamp-eyes)/environ | tr '\0' '\n' | grep -qx 'LAMP_ACTIVITY=on'
+trial | stand-up
+end
+row | 12d | Wind down | moves | 2 min
+do | Hand near the arm, nobody at the lamp: the trial says a face near the lamp, then that it has gone.
+watch | One slow droop (sleepy) and the light a shade dimmer; about 10 s after the trial says the face has gone, the light is back as it was.
+sheet | #2034, Nine, 20 Oct 05:14; tools/trials.sh wind-down (#2050)
+need | merged | 2050
+need | the eyes' LAMP_ACTIVITY off (an empty room's sitting_s holds the nudges back) | ! sudo -n cat /proc/$(systemctl show -p MainPID --value lamp-eyes)/environ | tr '\0' '\n' | grep -qx 'LAMP_ACTIVITY=on'
+trial | wind-down
 end
 row | 13 | Giving way, the first five minutes' step 6 | moves | 5 min
 do | Shown in row 10: giving way is a step of its walk, and #1998 is in its build. Here only if row 10 was skipped, by hand.
@@ -299,8 +324,9 @@ ROWS
 say_() { printf '%s\n' "$*"; }
 log() { printf '%s\t%s\n' "$(date '+%H:%M:%S')" "$*" >>"$LOG"; }
 
-# The rows' numbers, in order.
-row_numbers() { printf '%s\n' "$ROWS_TABLE" | sed -n 's/^row *| *\([0-9]*\) *|.*/\1/p'; }
+# The rows' numbers, in order: a number, and a letter for a row added after
+# one (12b).
+row_numbers() { printf '%s\n' "$ROWS_TABLE" | sed -n 's/^row *| *\([0-9][0-9]*[a-z]*\) *|.*/\1/p'; }
 
 # Row N's lines, from its "row" line to its "end".
 row_lines() {
@@ -603,7 +629,7 @@ preflight() {
   # Not n: header sets that one.
   for row in $(row_numbers); do
     [[ -n $ONLY && $row != "$ONLY" ]] && continue
-    [[ $row -lt $FROM ]] && continue
+    [[ ${row%%[a-z]*} -lt $FROM ]] && continue
     header "$row"
     lines=$(row_lines "$row")
     needs=$(printf '%s\n' "$lines" | field need)
@@ -652,7 +678,7 @@ if [[ $DRY == 0 ]]; then
   trap 'say_ ""; stop' INT TERM
   for n in $(row_numbers); do
     [[ -n $ONLY && $n != "$ONLY" ]] && continue
-    [[ $n -lt $FROM ]] && continue
+    [[ ${n%%[a-z]*} -lt $FROM ]] && continue
     if row_lines "$n" | grep -q '^trial *|'; then
       if ! on_lamp "test -x $TRIALS" >/dev/null 2>&1; then
         echo "No trials.sh at $TRIALS on the lamp: copy the morning build's lampOS/tools/trials.sh (and lampOS/skills beside it) there, or set ARM_TRIALS to where it is." >&2
@@ -666,7 +692,7 @@ fi
 ROW=0
 for n in $(row_numbers); do
   [[ -n $ONLY && $n != "$ONLY" ]] && continue
-  [[ $n -lt $FROM ]] && continue
+  [[ ${n%%[a-z]*} -lt $FROM ]] && continue
   run_row "$n"
 done
 [[ $DRY == 1 ]] || { say_ ""; say_ "Done. The log: $LOG"; log "arm hour done"; }
