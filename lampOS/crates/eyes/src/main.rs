@@ -7,7 +7,7 @@
 
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-eyes --device ABSOLUTE_PATH --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --usb VENDOR:PRODUCT@TOPOLOGY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]] [--seems ABSOLUTE_PATH]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there. With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the journal says how open the largest\nface's mouth is each look, and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture; the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\n";
+const USAGE: &str = "lamp-eyes --device ABSOLUTE_PATH --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --usb VENDOR:PRODUCT@TOPOLOGY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]] [--seems ABSOLUTE_PATH] [--photo-dir ABSOLUTE_PATH]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there. With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the journal says how open the largest\nface's mouth is each look, and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\nWith --seems (the pinned FER+ expression model), how the near face seems is read at\nmost every 2 s, as positive, negative or unsure with a confidence, and with LAMP_BUS=on\nsaid on humans/seems, with no name and no picture; the journal says only how many reads\nthere were, how long one took and the longest, once a minute (off unless given; #1671).\nWith --photo-dir (the eyes' own folder, with --recogniser), {\"remember\":\"NAME\",\"photo\":\"FILE\"}\non the who socket takes the one face in that JPEG in the folder and removes the file once\nread (no picture is kept); the face is kept unconfirmed until its person says yes at the\nlamp, and deleted if not (off unless given).\n";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Usb {
@@ -53,6 +53,10 @@ struct Arguments {
     mouth_on_heard: bool,
     /// ONNX Runtime for the mesh, the voice's pinned library, instead of tract.
     mouth_runtime: Option<PathBuf>,
+    /// The eyes' photo folder: a face is remembered from a photo put there
+    /// (`{"remember":NAME,"photo":FILE}`), the file removed once read
+    /// (#1722, faces from a photo). Nothing without it.
+    photo_dir: Option<PathBuf>,
     /// The pinned FER+ model: how the near face seems is read at most every
     /// 2 s and, with LAMP_BUS=on, said on `humans/seems` (#1671). Nothing
     /// without it.
@@ -118,6 +122,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     let mut visits = None;
     let (mut mouth_model, mut mouth_on_heard, mut mouth_runtime) = (None, None, None);
     let mut seems = None;
+    let mut photo_dir = None;
     while let Some(key) = args.next() {
         if key == "--help" {
             let alone = device.is_none()
@@ -143,6 +148,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                 && mouth_on_heard.is_none()
                 && mouth_runtime.is_none()
                 && seems.is_none()
+                && photo_dir.is_none()
                 && args.next().is_none();
             return if alone {
                 Ok(None)
@@ -218,6 +224,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                 mouth_runtime = Some(PathBuf::from(value));
             }
             Some("--seems") if seems.is_none() => seems = Some(PathBuf::from(value)),
+            Some("--photo-dir") if photo_dir.is_none() => photo_dir = Some(PathBuf::from(value)),
             Some("--mouth-on-heard") if mouth_on_heard.is_none() => {
                 mouth_on_heard = Some(match value.to_str() {
                     Some("on") => true,
@@ -265,6 +272,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         mouth_on_heard: mouth_on_heard.unwrap_or(false),
         mouth_runtime,
         seems,
+        photo_dir,
     };
     if result.full_look.is_some() != result.full_look_file.is_some()
         || (result.full_look_file.is_some() && result.full_look_file == result.sight_file)
@@ -276,6 +284,9 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     }
     if result.visits && result.who.is_none() {
         return Err("--visits needs --recogniser, --people and --who-socket");
+    }
+    if result.photo_dir.is_some() && result.who.is_none() {
+        return Err("--photo-dir needs --recogniser, --people and --who-socket");
     }
     if result.mouth_on_heard && result.mouth_model.is_none() {
         return Err("--mouth-on-heard needs --mouth-model");
@@ -304,6 +315,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     .chain(&result.mouth_model)
     .chain(&result.mouth_runtime)
     .chain(&result.seems)
+    .chain(&result.photo_dir)
     {
         if !path.is_absolute()
             || path.as_os_str().len() > 200
@@ -412,6 +424,17 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         scored_looked: Option<Instant>,
         /// The lamp's zone, for the hour the day's visits are written.
         zone: Option<lamp_local_time::LocalTime>,
+        /// With `--photo-dir`: the faces added from photos, unconfirmed
+        /// until their person says yes, in their own file (#1968).
+        unconfirmed: Option<lamp_eyes::photo::Unconfirmeds>,
+        /// The unconfirmed face at the lamp now, and when it was last seen.
+        photo_here: Option<(String, Instant)>,
+        /// When each unconfirmed face was last seen, monotonic, for the end
+        /// of a meeting with no answer.
+        photo_seen: Vec<(String, u64)>,
+        /// When the faces from photos were last looked at for expiry and
+        /// meetings with no answer.
+        photos_looked: Option<Instant>,
     }
     /// Counts the remembered person recognised at the lamp, at most once in
     /// sixteen hours, and says how familiar they are (#1670). A count that
@@ -431,11 +454,66 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             lamp_eyes::who::Familiar::Close => lamp_msgs::FamiliarLevel::Close,
         })
     }
+    /// The name of the one known at the lamp, replaced whole, or no file.
+    fn keep_known(path: &std::path::Path, name: Option<&str>) {
+        use std::os::unix::fs::OpenOptionsExt;
+        let Some(name) = name else {
+            let _ = std::fs::remove_file(path);
+            return;
+        };
+        let mut temporary = path.as_os_str().to_owned();
+        temporary.push(".new");
+        let written = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&temporary)
+            .and_then(|mut file| writeln!(file, "{name}"));
+        if written.is_ok() {
+            let _ = std::fs::rename(&temporary, path);
+        }
+    }
+    // What a remembering answers, said in the journal with no name: the
+    // name kept, or why not.
+    fn kept_reply(
+        kept: std::result::Result<String, who::Refused>,
+        visits: bool,
+        known: usize,
+    ) -> serde_json::Value {
+        match kept {
+            Ok(name) => {
+                eprintln!("lamp-eyes: remembered a face; {known} people known");
+                // With visits counted, the voice tells them so in one line
+                // (the first builder on #1670, 12:19).
+                if visits {
+                    serde_json::json!({"remembered": name, "visits": true})
+                } else {
+                    serde_json::json!({"remembered": name})
+                }
+            }
+            // The face is known by another name: the voice asks the person
+            // before it is replaced.
+            Err(who::Refused::KnownAs(known)) => {
+                eprintln!("lamp-eyes: did not remember a face: it is known by another name");
+                serde_json::json!({"error": "known_as", "known_as": known})
+            }
+            Err(who::Refused::NotAName) => serde_json::json!({"error": "not_a_name"}),
+            Err(who::Refused::Store(error)) => {
+                eprintln!("lamp-eyes: could not remember a face: {error}");
+                serde_json::json!({"error": "full"})
+            }
+        }
+    }
     fn answer(stream: &mut UnixStream, value: serde_json::Value) {
         // A caller that is gone or slow changes nothing here.
         let _ = writeln!(stream, "{value}");
     }
 
+    // The photo folder, the eyes' own, before anything is asked of it.
+    if let Some(dir) = &arguments.photo_dir {
+        lamp_eyes::photo::ready(dir)?;
+    }
     let detector = Detector::load(&arguments.model)?;
     let mut mesh = match (&arguments.mouth_model, &arguments.mouth_runtime) {
         (Some(model), Some(runtime)) => {
@@ -514,6 +592,14 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         }
                     })
                     .flatten(),
+                unconfirmed: arguments.photo_dir.as_ref().map(|_| {
+                    lamp_eyes::photo::Unconfirmeds::open(
+                        lamp_eyes::photo::Unconfirmeds::beside(people_path),
+                    )
+                }),
+                photo_here: None,
+                photo_seen: Vec::new(),
+                photos_looked: None,
             })
         }
         None => None,
@@ -676,6 +762,40 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 eprintln!("lamp-eyes: the day's visits were not written: {error}");
             }
         }
+        // Faces from photos, once a second: one asked with no answer by the
+        // end of the meeting is let go, and one never confirmed in 30 days
+        // is deleted (#1968).
+        if let Some(who) = who.as_mut()
+            && who
+                .photos_looked
+                .is_none_or(|at| at.elapsed() >= Duration::from_secs(1))
+            && let Some(unconfirmed) = who.unconfirmed.as_mut()
+        {
+            who.photos_looked = Some(Instant::now());
+            let now_unix_s = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_secs());
+            match unconfirmed.expire(now_unix_s) {
+                Ok(0) => {}
+                Ok(gone) => eprintln!(
+                    "lamp-eyes: {gone} faces from photos were deleted: never confirmed in 30 days"
+                ),
+                Err(error) => eprintln!("lamp-eyes: faces from photos not expired: {error}"),
+            }
+            let unanswered = lamp_eyes::photo::unanswered(
+                &unconfirmed.asked_names(),
+                &who.photo_seen,
+                lamp_ipc::monotonic_us(),
+            );
+            for name in unanswered {
+                if unconfirmed.let_go(&name).unwrap_or(false) {
+                    eprintln!(
+                        "lamp-eyes: a face from a photo was let go: no answer in its meeting"
+                    );
+                }
+                who.photo_seen.retain(|(seen, _)| seen != &name);
+            }
+        }
         // What the voice service asks: one line. Remembering is answered
         // once the prints are taken.
         if let Some(who) = who.as_mut() {
@@ -705,24 +825,173 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         None => serde_json::json!({"who": null}),
                     },
                     Some(Ask::List) => serde_json::json!({"people": who.people.names()}),
-                    Some(Ask::Forget(name)) => match who.people.forget(&name) {
-                        // Set-aside files it could not search: said, with the
-                        // forget waiting for them (#1586).
-                        Ok(lamp_eyes::who::Forgot { forgot, unsearched }) if unsearched > 0 => {
-                            eprintln!(
-                                "lamp-eyes: asked to forget a face; forgotten: {forgot}; {unsearched} set-aside files could not be searched, and the forget waits for them"
-                            );
-                            who.known = None;
-                            serde_json::json!({"forgot": forgot, "unsearched": unsearched})
+                    Some(Ask::Forget(name)) => {
+                        // "Forget my face" takes a face from a photo too.
+                        if let Some(unconfirmed) = who.unconfirmed.as_mut() {
+                            let _ = unconfirmed.let_go(&name);
                         }
-                        Ok(lamp_eyes::who::Forgot { forgot, .. }) => {
-                            eprintln!("lamp-eyes: asked to forget a face; forgotten: {forgot}");
-                            who.known = None;
-                            serde_json::json!({"forgot": forgot})
+                        match who.people.forget(&name) {
+                            // Set-aside files it could not search: said, with the
+                            // forget waiting for them (#1586).
+                            Ok(lamp_eyes::who::Forgot { forgot, unsearched }) if unsearched > 0 => {
+                                eprintln!(
+                                    "lamp-eyes: asked to forget a face; forgotten: {forgot}; {unsearched} set-aside files could not be searched, and the forget waits for them"
+                                );
+                                who.known = None;
+                                serde_json::json!({"forgot": forgot, "unsearched": unsearched})
+                            }
+                            Ok(lamp_eyes::who::Forgot { forgot, .. }) => {
+                                eprintln!("lamp-eyes: asked to forget a face; forgotten: {forgot}");
+                                who.known = None;
+                                serde_json::json!({"forgot": forgot})
+                            }
+                            Err(error) => {
+                                eprintln!("lamp-eyes: could not forget a face: {error}");
+                                serde_json::json!({"error": "storage"})
+                            }
                         }
-                        Err(error) => {
-                            eprintln!("lamp-eyes: could not forget a face: {error}");
-                            serde_json::json!({"error": "storage"})
+                    }
+                    // A face from a photo (`--photo-dir`): the file read once and
+                    // removed, its one face printed and kept unconfirmed until its
+                    // person says yes at the lamp (#1968).
+                    Some(Ask::RememberPhoto { name, file }) => {
+                        match (&arguments.photo_dir, plain_name(&name)) {
+                            (None, _) => serde_json::json!({"error": "photos_off"}),
+                            (Some(dir), None) => {
+                                let _ = lamp_eyes::photo::take(dir, &file);
+                                serde_json::json!({"error": "not_a_name"})
+                            }
+                            (Some(dir), Some(name)) => {
+                                eprintln!("lamp-eyes: asked to add a face from a photo");
+                                match lamp_eyes::photo::take(dir, &file).and_then(|bytes| {
+                                    lamp_eyes::photo::print_of(&bytes, &detector, &who.recogniser)
+                                }) {
+                                    Err(why) => {
+                                        eprintln!(
+                                            "lamp-eyes: did not add a face from a photo: {}",
+                                            why.code()
+                                        );
+                                        serde_json::json!({"error": why.code()})
+                                    }
+                                    // Someone who asked already: theirs.
+                                    Ok(print) => match who.people.who(&print) {
+                                        Some((known, _)) if known == name => {
+                                            serde_json::json!({"remembered": known})
+                                        }
+                                        Some((known, _)) => {
+                                            eprintln!(
+                                                "lamp-eyes: did not add a face from a photo: it is known by another name"
+                                            );
+                                            serde_json::json!({"error": "known_as", "known_as": known})
+                                        }
+                                        None => {
+                                            let now_unix_s = std::time::SystemTime::now()
+                                                .duration_since(std::time::UNIX_EPOCH)
+                                                .map_or(0, |since| since.as_secs());
+                                            match who.unconfirmed.as_mut().map(|unconfirmed| {
+                                                unconfirmed.add(&name, print, now_unix_s)
+                                            }) {
+                                                Some(Ok(())) => {
+                                                    eprintln!(
+                                                        "lamp-eyes: added a face from a photo, unconfirmed until its person says yes"
+                                                    );
+                                                    serde_json::json!({"added": name, "unconfirmed": true})
+                                                }
+                                                _ => serde_json::json!({"error": "full"}),
+                                            }
+                                        }
+                                    },
+                                }
+                            }
+                        }
+                    }
+                    Some(Ask::PhotoHere) => match &who.unconfirmed {
+                        None => serde_json::json!({"error": "photos_off"}),
+                        Some(_) => serde_json::json!({"photo_here": who
+                            .photo_here
+                            .as_ref()
+                            .filter(|(_, at)| at.elapsed() < KNOWN_FOR)
+                            .map(|(name, _)| name.clone())}),
+                    },
+                    // Taken only for the face at the lamp now (the reviewer on
+                    // #1968, 22:28): never for a face elsewhere.
+                    Some(Ask::PhotoAsked(name)) => {
+                        let here = lamp_eyes::photo::is_here(
+                            who.photo_here
+                                .as_ref()
+                                .map(|(n, at)| (n.as_str(), at.elapsed())),
+                            &name,
+                            KNOWN_FOR,
+                        );
+                        match who.unconfirmed.as_mut() {
+                            None => serde_json::json!({"error": "photos_off"}),
+                            Some(_) if !here => serde_json::json!({"error": "not_here"}),
+                            Some(unconfirmed) => {
+                                let asked = unconfirmed.asked(&name).unwrap_or(false);
+                                if asked {
+                                    // The meeting counts from the asking.
+                                    who.photo_seen.retain(|(seen, _)| seen != &name);
+                                    who.photo_seen.push((name, lamp_ipc::monotonic_us()));
+                                }
+                                serde_json::json!({"asked": asked})
+                            }
+                        }
+                    }
+                    // A yes only from the face here, and only once it was asked.
+                    Some(Ask::PhotoYes(name)) => {
+                        let here = lamp_eyes::photo::is_here(
+                            who.photo_here
+                                .as_ref()
+                                .map(|(n, at)| (n.as_str(), at.elapsed())),
+                            &name,
+                            KNOWN_FOR,
+                        );
+                        match who.unconfirmed.as_mut() {
+                            None => serde_json::json!({"error": "photos_off"}),
+                            Some(_) if !here => serde_json::json!({"error": "not_here"}),
+                            Some(unconfirmed) if !unconfirmed.was_asked(&name) => {
+                                serde_json::json!({"error": "not_asked"})
+                            }
+                            Some(unconfirmed) => match unconfirmed.confirmed(&name) {
+                                Ok(Some(taken)) => {
+                                    let now_unix_s = std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .map_or(0, |since| since.as_secs());
+                                    let kept = who.people.remember_one(
+                                        taken.name(),
+                                        vec![taken.print()],
+                                        now_unix_s,
+                                        false,
+                                    );
+                                    if let Err(who::Refused::Store(_)) = &kept {
+                                        // Refused by the store: unconfirmed again.
+                                        let _ = unconfirmed.put_back(taken);
+                                    } else {
+                                        eprintln!(
+                                            "lamp-eyes: a face from a photo was confirmed by its person"
+                                        );
+                                        who.photo_here = None;
+                                        who.photo_seen.retain(|(seen, _)| seen != &name);
+                                    }
+                                    kept_reply(kept, who.visits, who.people.names().len())
+                                }
+                                Ok(None) => serde_json::json!({"error": "not_unconfirmed"}),
+                                Err(_) => serde_json::json!({"error": "storage"}),
+                            },
+                        }
+                    }
+                    Some(Ask::PhotoNo(name)) => match who.unconfirmed.as_mut() {
+                        None => serde_json::json!({"error": "photos_off"}),
+                        Some(unconfirmed) => {
+                            let gone = unconfirmed.let_go(&name).unwrap_or(false);
+                            if gone {
+                                eprintln!(
+                                    "lamp-eyes: a face from a photo was let go: its person said no"
+                                );
+                                who.photo_here = None;
+                                who.photo_seen.retain(|(seen, _)| seen != &name);
+                            }
+                            serde_json::json!({"let_go": gone})
                         }
                     },
                     Some(Ask::Remember(_) | Ask::RememberOne { .. }) if who.taking.is_some() => {
@@ -773,36 +1042,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 .remember_one(&taking.name, prints, now_unix_s, replace)
                         }
                     };
-                    let reply = match kept {
-                        Ok(name) => {
-                            eprintln!(
-                                "lamp-eyes: remembered a face; {} people known",
-                                who.people.names().len()
-                            );
-                            // With visits counted, the voice tells them so in
-                            // one line (the first builder on #1670, 12:19).
-                            if who.visits {
-                                serde_json::json!({"remembered": name, "visits": true})
-                            } else {
-                                serde_json::json!({"remembered": name})
-                            }
-                        }
-                        // The face is known by another name: the voice asks
-                        // the person before it is replaced.
-                        Err(who::Refused::KnownAs(known)) => {
-                            eprintln!(
-                                "lamp-eyes: did not remember a face: it is known by another name"
-                            );
-                            serde_json::json!({"error": "known_as", "known_as": known})
-                        }
-                        Err(who::Refused::NotAName) => {
-                            serde_json::json!({"error": "not_a_name"})
-                        }
-                        Err(who::Refused::Store(error)) => {
-                            eprintln!("lamp-eyes: could not remember a face: {error}");
-                            serde_json::json!({"error": "full"})
-                        }
-                    };
+                    let reply = kept_reply(kept, who.visits, who.people.names().len());
                     answer(&mut stream, reply);
                 } else if let Some(why) = taking.given_up(lamp_ipc::monotonic_us()) {
                     eprintln!("lamp-eyes: did not remember a face: {}", why.code());
@@ -1233,6 +1473,16 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     .people
                                     .who(&print)
                                     .map(|(name, likeness)| (name, likeness, Instant::now()));
+                                // Nobody who asked: a face from a photo, maybe,
+                                // never named, only noted so the voice can ask.
+                                if who.known.is_none()
+                                    && let Some(name) =
+                                        who.unconfirmed.as_ref().and_then(|u| u.here(&print))
+                                {
+                                    who.photo_seen.retain(|(seen, _)| seen != &name);
+                                    who.photo_seen.push((name.clone(), lamp_ipc::monotonic_us()));
+                                    who.photo_here = Some((name, Instant::now()));
+                                }
                                 if who.visits {
                                     let level = familiar(&mut who.people, who.known.as_ref());
                                     if let Some(bus) = bus_out.as_mut() {
@@ -1542,6 +1792,18 @@ mod tests {
         assert!(parse(args(&reading)).unwrap().unwrap().seems.is_some());
         assert!(parse(args(&[&FULL[..], &["--seems", "emotion.onnx"]].concat())).is_err());
         assert!(parse(args(&[&reading[..], &["--seems", "/x.onnx"]].concat())).is_err());
+        // Faces from a photo: off unless given, and only with the recogniser.
+        assert!(value.photo_dir.is_none());
+        let photos = [&FULL[..], &["--photo-dir", "/var/lib/lampos-eyes/photos"]].concat();
+        match parse(args(&photos)) {
+            Ok(Some(given)) => assert!(given.photo_dir.is_some() && given.who.is_some()),
+            Ok(None) => panic!("not help"),
+            Err(error) => assert_eq!(
+                error,
+                "--photo-dir needs --recogniser, --people and --who-socket"
+            ),
+        }
+        assert!(parse(args(&[&FULL[..], &["--photo-dir", "photos"]].concat())).is_err());
         // Every glance is detected unless looking on change is asked for.
         assert!(!value.look_on_change);
         let on = [&FULL[..], &["--look-on-change", "on"]].concat();

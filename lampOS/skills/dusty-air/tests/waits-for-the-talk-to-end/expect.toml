@@ -1,0 +1,10 @@
+# 140 from 10:00, a face in view; someone talks with the lamp from 3,500 s
+# (listening, then speaking) until it rests at 3,870 s. The hour comes
+# during the talk; the line comes at the first reading after it (3,900 s).
+clock = "10:00"
+
+[[expect]]
+at = "3900s"
+within = "60s"
+call = "say"
+args = { text = "The air here has been very dusty for about an hour. I can't tell where it's coming from.", priority = 5, expires_ms = 30000 }

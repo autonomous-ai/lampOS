@@ -69,6 +69,7 @@ pub mod messages;
 pub mod mic_holder;
 pub mod misheard_hum;
 pub mod person;
+pub mod photo_faces;
 pub mod scoped_session;
 pub use lamp_ipc::log_relay;
 pub mod head_cue;

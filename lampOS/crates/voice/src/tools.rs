@@ -135,6 +135,9 @@ pub struct Settings {
     /// A name is kept only if the person said it, and a face keeps one
     /// name (`LAMP_NAMES=checked`, [`crate::known_faces::said_by_them`]).
     pub names_checked: bool,
+    /// A face added from a photo is asked about, and its person's yes or
+    /// no told to the eyes (`LAMP_PHOTO_FACES=on`, [`crate::photo_faces`]).
+    pub photo_faces: bool,
     /// The serving session's folder, for marking a bad moment
     /// ([`crate::marked`]).
     pub mark: Option<PathBuf>,
@@ -175,6 +178,9 @@ pub fn arguments_from_environment() -> Vec<String> {
                 .ok()
                 .as_deref(),
         ));
+        if crate::photo_faces::on() {
+            flags.push(crate::photo_faces::FLAG.to_owned());
+        }
     }
     flags.extend(crate::marked::arguments_from_environment());
     if let Some(file) = crate::onboarding::switched_on(
@@ -336,6 +342,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
             && flag == crate::known_faces::NAMES_FLAG
         {
             settings.names_checked = true;
+            flags = rest;
+        }
+        if let [flag, rest @ ..] = flags
+            && flag == crate::photo_faces::FLAG
+        {
+            settings.photo_faces = true;
             flags = rest;
         }
     }
@@ -532,6 +544,10 @@ fn core_tools(settings: &Settings) -> Vec<Tool> {
     }
     if settings.who.is_some() {
         tools.extend(crate::known_faces::tools_checked(settings.names_checked));
+        // A face added from a photo, asked about at the lamp (#1968).
+        if settings.photo_faces {
+            tools.extend(crate::photo_faces::tools());
+        }
     }
     if settings.mark.is_some() {
         tools.push(crate::marked::tool());
@@ -605,6 +621,7 @@ fn voices_own(name: &str) -> bool {
         || crate::remember::is_tool(name)
         || crate::agent_tasks::is_tool(name)
         || crate::known_faces::is_tool(name)
+        || crate::photo_faces::is_tool(name)
         || crate::marked::is_tool(name)
         || crate::onboarding::is_tool(name)
         || name == crate::use_skill::NAME
@@ -735,7 +752,7 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     if crate::agent_tasks::is_tool(name) {
         return settings.tasks.clone().map_or(Route::Nobody, Route::Tasks);
     }
-    if crate::known_faces::is_tool(name) {
+    if crate::known_faces::is_tool(name) || crate::photo_faces::is_tool(name) {
         return settings.who.clone().map_or(Route::Nobody, |socket| {
             Route::Faces(socket, settings.names_checked)
         });
@@ -1028,6 +1045,9 @@ fn run_call_with_scope(
         // may keep or forget one, never a request the lamp wrote or a text
         // from the app (the reviewer on #1713), as for marks.
         Route::Faces(..) if !heard => ("the eyes", (json!({"error": FACES_IN_PERSON}), false)),
+        Route::Faces(socket, _) if crate::photo_faces::is_tool(&call.name) => {
+            ("the eyes", crate::photo_faces::run(socket, call))
+        }
         Route::Faces(socket, checked) => {
             ("the eyes", crate::known_faces::run(socket, call, *checked))
         }
@@ -1423,6 +1443,7 @@ mod tests {
             who: Some("/run/lampos-eyes/request.sock".into()),
             // The checked `remember_my_face`, with `replace` (#1057).
             names_checked: true,
+            photo_faces: false,
             mark: Some("/var/lib/lampos-voice/session".into()),
             onboarding: Some("/var/lib/lampos-voice/onboarding.json".into()),
             reports_stop: true,
@@ -1665,6 +1686,7 @@ mod tests {
                 schedule_speak: true,
                 who: Some("/run/lampos-eyes/who.sock".into()),
                 names_checked: false,
+                photo_faces: false,
                 mark: None,
                 onboarding: None,
                 reports_stop: false,
@@ -2591,6 +2613,37 @@ mod tests {
         assert_eq!(kept.len(), 32);
         assert_eq!(left_out, ["use_skill (past 32)"]);
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #1880 on the second route (`LAMP_VOICE_ROUTE=second`), whose runner
+    /// is [`answer`]: `reports_state` is answered there at once, from the
+    /// bus's state, as on the Live route, and only for its own call; off,
+    /// it is nobody's. Asked by a text, it is answered the same.
+    #[test]
+    fn reports_state_is_answered_on_the_second_route_only_when_called() {
+        let call = ToolCall {
+            id: "c".into(),
+            name: crate::reports_stop::STATE_NAME.into(),
+            args: json!({}),
+        };
+        assert_eq!(answer(&Settings::default(), &call, 7, true), unavailable());
+        let on = Settings {
+            reports_stop: true,
+            ..Default::default()
+        };
+        // Whatever the bus says now (a test of the Live worker may have put
+        // its own state there): one of the state's answers, never "not
+        // running" as a call nobody here runs is told.
+        let told = answer(&on, &call, 7, true);
+        assert_ne!(told, unavailable());
+        assert!(
+            told.get("say").is_some()
+                || told
+                    == json!({"error": "The part of me that sends reports is not running, so nothing is being sent now."}),
+            "{told}"
+        );
+        let texted = answer_typed(&on, &call, crate::messages::REQUESTS_FROM + 1);
+        assert_ne!(texted, unavailable());
     }
 
     /// The reviewer on #1706: the setup line's two notes with `use_skill`,

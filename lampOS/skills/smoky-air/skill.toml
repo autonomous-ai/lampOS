@@ -1,0 +1,46 @@
+# Smoky air (#1684, the design approved by the first builder on 12:56): the
+# air at the desk suddenly smoky or very dusty. One exact line, a small lift
+# and a soft amber breath, once a spell. Written to lamp-skills' schema
+# (docs/skills.md, "The schema, as lamp-skills reads it"). Held out of the
+# product's install (`install::NOT_PRODUCT_SKILLS`) until the four real
+# traces (kettle steam, toast, a candle blown out, a match) are recorded and
+# its numbers are decided from them.
+needs = ["air", "voice", "body", "light"]
+# Comes with the lamp once measured (docs/skills.md, "Core and installable
+# skills"): on a lamp whose sensor doesn't answer it does nothing.
+kind = "core"
+version = "1.0.0"
+
+# What it may read and use, and nothing more: the air, one line, one lift and
+# one breath of light. No `voice/state`: it waits for a pause, which the say
+# service's own gates give (priority 8), not for the end of a talk.
+[permissions]
+topics = ["air/state"]
+speak = true
+light = true
+body = true
+
+[trigger]
+topic = "air/state"
+field = "pm2_5"
+above = 149.95                          # at least 150 ug/m3 (the sensor reads tenths): inside the EPA's "Very Unhealthy"
+rise = { by = 100, within = "3m" }      # at least 100 above the lowest of the 3 minutes before: a sudden rise, not haze
+for = "30s"                             # held 30 s: a match blown out beside the base, or one puff, does nothing
+gap = "10s"                             # one missed reading (every 5 s) does not end it
+rearm = { below = 150, for = "10m" }    # once a spell; again only after 10 minutes under 150
+cooldown = "30m"
+# No [quiet]: smoke at night matters most (the first builder's decision,
+# #1684 12:56). It speaks once at its normal volume and does not wake a
+# sleeping lamp: the say service is not there while the voice is muted
+# (docs/skills.md, "A say's priority, the voice's turns, and sleep").
+
+[ask]
+# The design's own act (§4). The Policy has no `warning` yet, so with
+# `LAMP_SKILLS_ASK=policy` it is asked as `unprompted`; the product skips
+# the ask.
+policy = "warning"
+
+[[do]]
+body = { gesture = "curious" }          # a small lift as the words begin: orient, then speak
+light = { colour = "warm", level = 2, pattern = { kind = "breathe", period = "6s" } }   # warm is the lamp's amber; no red, no flash; given back when the line ends
+say = { text = "The air reads like smoke. If something's burning, please check it.", priority = 8, expires = "2m" }   # exact words; the first pause of a second, as a reminder; spent if none comes in 2 minutes

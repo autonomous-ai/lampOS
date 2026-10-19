@@ -5,6 +5,7 @@
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
     "/var/lib/lampos-eyes/set-aside",
+    "/var/lib/lampos-eyes/people.json.from-photos",
     "/var/lib/lampos-tasks/store",
     "/var/lib/lampos-tasks/targets.json",
     "/var/lib/lampos-tasks/.harness/auth",
@@ -28,6 +29,7 @@
     "/etc/lampOS/policy/jev.key",
     "/etc/lampOS/setup/backend.json",
     "/etc/lampOS/setup/reports.json",
+    "/etc/lampOS/setup/display-name",
     "/etc/lampOS/person/name",
     "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
   ],

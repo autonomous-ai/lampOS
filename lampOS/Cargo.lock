@@ -1772,6 +1772,7 @@ dependencies = [
 name = "lamp-cloud"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "bytes",
  "lamp-bus",
  "lamp-ipc",
@@ -2113,6 +2114,7 @@ dependencies = [
  "lamp-local-time",
  "lamp-msgs",
  "lamp-ring",
+ "lamp-update",
  "rustix",
  "rustls",
  "serde",

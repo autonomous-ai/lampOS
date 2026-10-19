@@ -95,7 +95,7 @@ What lamp-4ace's units read today (`deploy/lamp-4ace/`):
 | Update trust | `/etc/lampOS/update/key.pub` | Nothing: a trust root belongs in the image, not on a page anyone near the lamp can open. |
 | Time zone | Schedule takes `--zone Asia/Ho_Chi_Minh`; Memory, Expression and the policy take `--utc-offset-minutes 420` | `/etc/localtime` and `/etc/timezone`, and `/etc/lampOS/zone.env` again (#820). The product's memory and Expression take `--zone system`, which follows `/etc/localtime` across daylight saving and without a restart; schedule (`LAMP_ZONE`) and skills (`LAMP_UTC_OFFSET_MINUTES`) read `zone.env`. A zone the parts' own zone data lacks leaves `zone.env` as install wrote it, since schedule would not start on it. The voice reads `/etc/localtime` itself. |
 | The person's name | Read by the voice with `LAMP_PERSON_NAME` (the product unit sets it, #806): told to the model after its character, and the hello's name when no face is known (`crates/voice/src/person.rs`) | A private file, one line: `/etc/lampOS/person/name`. |
-| The backend's link | `lamp-cloud`, when it is on (`LAMP_CLOUD=on`, #1418) | `/etc/lampOS/setup/backend.json` (`backend` in the settings), root's, 0600, written after the zone and before the key. It holds the fields above when the request carries a whole link: an endpoint, a port (a number, or digits), both channels, each field at most 512 bytes with no space or control character (the password may hold spaces). A missing or broken link writes nothing; when the request named one (an `mqtt_endpoint`) the journal gets one line naming the fields that were missing or not valid, never their values. The device's id, the endpoint, the port and both channels are needed; the base, the username and the password may be empty. Neither a broken link nor one that cannot be written fails setup: the lamp joins the Wi-Fi and talks, and only its place in the app waits. The password never appears in a debug line, and a crashed write's temporary file is removed at start. |
+| The backend's link | `lamp-cloud`, on in the product (`LAMP_CLOUD=on` in its unit, #1418, #1815) | `/etc/lampOS/setup/backend.json` (`backend` in the settings), root's, 0600, written after the zone and before the key. It holds the fields above when the request carries a whole link: an endpoint, a port (a number, or digits), both channels, each field at most 512 bytes with no space or control character (the password may hold spaces). A missing or broken link writes nothing; when the request named one (an `mqtt_endpoint`) the journal gets one line naming the fields that were missing or not valid, never their values. The device's id, the endpoint, the port and both channels are needed; the base, the username and the password may be empty. Neither a broken link nor one that cannot be written fails setup: the lamp joins the Wi-Fi and talks, and only its place in the app waits. The password never appears in a debug line, and a crashed write's temporary file is removed at start. |
 | The person's answer on health and crash reports | `lamp-cloud`, with `LAMP_REPORTS=on` (#1683, `cloud.md`, "Health and crash reports") | `/etc/lampOS/setup/reports.json` (`reports` in the settings), root's, **0644** so `lamp-cloud` (as `lampos`) reads it where it is: `{"share": bool, "asked": 1, "at": "<RFC 3339 UTC>"}`, written after the backend's link and before the key, at every setup, a no included. `share` is true only for the JSON `true` in the request's `share_reports`; absent, `false`, `null`, `"true"`, `1` or anything else is no, so V1's page, this crate's own page and an app that doesn't ask all mean no. `asked` is the question's wording, so a later wording asking for more starts at no. Best effort: a write that fails is a no and never a failed setup. |
 
 ## The person's data, which reset wipes
@@ -120,7 +120,7 @@ and `logs`: the sign-in, the pairings and what they left; not `.harness`
 whole, which is Harness itself, its CLI and its own Node, and not the
 Harness service `install` set up, #934; Nine on #1016), the user's key
 (`/etc/lampOS/voice/credential` and `/etc/lampOS/policy/jev.key`, #806,
-16:13), the name, the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration and the setup marker. Kept: the
+16:13), the name, the lamp's name in the app given after setup (`/etc/lampOS/setup/display-name`, #1959), the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration and the setup marker. Kept: the
 software, its releases, the update key, the touch calibration and other
 per-lamp facts, and physical privacy.
 
@@ -414,6 +414,43 @@ during the fade out not opened after the marker (the reviewer's probe on
 never dark; and with the switch off no ring opened. Not shown on a lamp: the colours, the
 brightness in a room and the timing on the ring itself are a lamp check.
 
+## Changed after setup (#1959, built, off unless set)
+
+The person changes their name, the lamp's name in the app or the time zone
+from the app, without a reset. The app's side is `lamp-cloud`'s
+(`LAMP_SETTINGS_CHANGE=on`, `cloud.md`, "Changed after setup"); the writing is
+here, in root's helper `lamp-setup change` (`src/change.rs`), so the files are
+left as a setup with the new value leaves them. Wi-Fi is #1959's second piece.
+
+**The helper.** systemd holds `/run/lampos-setup-change/change.sock`
+(`deploy/product/lamp-setup-change.socket`) and starts
+`lamp-setup change --config /etc/lampOS/setup/serve.json --enable` as root for
+each connection (`lamp-setup-change@.service`), with the connection as its
+standard input and output. It reads one line (at most 4 KiB), answers
+`{"done": …}` or `{"refused": why}` on one line, and exits, unless a zone
+changed (below). It checks every request itself, whoever connects: exactly
+one of `{"person_name": s}`, `{"display_name": s}` or `{"timezone": s}`.
+Without `--enable` every request is refused, "changes after setup are off",
+and nothing is written. A refusal never holds the value asked, and the
+journal says what changed, never a name ("the person's name was changed (8
+characters)"); a zone is said.
+
+| Change | Checked | Written | Who follows, and how |
+|---|---|---|---|
+| The person's name | trimmed, at most 64 characters, no control character, line or paragraph separator or direction mark (the voice's own rule); `""` removes it | `/etc/lampOS/person/name`, 600 root, as setup writes it; removed for `""` | the voice reads it again at each hello and each new session: nothing restarts. A session already open keeps the old name until it ends |
+| The lamp's name in the app | the same, and not empty | `/etc/lampOS/setup/display-name`, 644 root (`display_name` in the settings), one line | `lamp-cloud` reads it at each `system.info` as `host.device_name`. **It never changes what the lamp answers to: the wake word stays "Lamp"** |
+| The time zone | an IANA name the lamp's zone data has (`zone_known`, as setup) **and** the parts' bundled zone data has, else refused, so `zone.env` and `/etc/localtime` never disagree | `/etc/localtime`, `/etc/timezone` and `/etc/lampOS/zone.env`, as setup writes them | the voice, memory, Expression and skills follow `/etc/localtime` at each reading. `lamp-schedule` takes `LAMP_ZONE` at start, so after a zone that changed `zone.env` the helper waits for the lamp to be quiet, as an update does before it restarts the voice (`lamp_update::quiet`: resting, nobody heard and nothing said for 45 s), and runs `systemctl try-restart lamp-schedule.service`. It waits at most 30 minutes; then schedule keeps the old zone until it next starts, and the journal says so. Reminders already set keep the zone they were set in (`schedule.md`) |
+
+Tests (`crates/setup/tests/change.rs`): each change's files, modes and reply;
+a name removed; a rename to nothing refused; a zone either zone data lacks,
+or a path, refused with nothing changed; the same zone again restarting
+nothing; the switch off, nothing written; requests that are not exactly one
+change, refused without echoing them; the quiet wait (45 s resting, 45 s after
+a turn, a conversation that never ends and a voice that says nothing given up
+at the bound); the binary on standard input and output with a journal line
+holding no name; the product's reset wiping the lamp's name and the units
+running the helper. Not run on a lamp.
+
 ## On a lamp
 
 For a builder with a lamp other than lamp-4ace (#806 asks for one), from #817's
@@ -512,6 +549,7 @@ readlink /etc/localtime
 | `/etc/lampOS/zone.env` | `LAMP_ZONE` and today's offset, 644, on the same condition and only for a zone the parts' own zone data has too; else as install wrote it | kept |
 | `/etc/lampOS/setup/backend.json` (the app's link) | 600 root, **only when the app's request carried a whole link** | wiped |
 | `/etc/lampOS/setup/reports.json` (the answer on reports, #1683) | 644 root, at every setup, a no included, unless the write failed | wiped |
+| `/etc/lampOS/setup/display-name` (the lamp's name in the app, #1959) | not written by setup; 644 root after a `device.rename` from the app | wiped |
 | `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf` | 600 root | wiped |
 
 Setup saves them in this order: the name, the zone, the backend's link, the
@@ -537,15 +575,15 @@ systemctl is-active lamp-setup        # active for up to 10 minutes after setup,
 systemctl status lamp-cloud --no-pager -n 3
 ```
 
-**`lamp-cloud` stays off unless its drop-in is there.** It is enabled and
-starts with the target only when the marker, `backend.json`, the voice's
-credential and `/var/lib/lampos-update/state.json` all exist, and without
-`LAMP_CLOUD=on` it says so and exits 0 (`Restart=on-failure`, so it isn't
-started again). So on a lamp set up from the app but not turned on, expect
-`lamp-cloud` inactive, with the journal line `off: LAMP_CLOUD is not on`.
-Turned on, the drop-in carries both lines (the unit's own header; on
-lamp-4ace, `deploy/lamp-4ace/cloud-on.sh`), and the journal then says
-`online on the broker …`. Don't paste the address. A failing 15 s ping says
+**`lamp-cloud` is on in the product (#1815).** It is enabled and starts
+with the target once the marker, `backend.json`, the voice's credential and
+`/var/lib/lampos-update/state.json` all exist. Its unit carries
+`LAMP_CLOUD=on` and stops V1's `os-server` as it starts, so on a lamp set up
+from the app the journal says `online on the broker …` straight after
+setup, and again after a reboot. A lamp masked to keep it off
+(`systemctl mask lamp-cloud`) shows it masked. A lamp set up under V1, with no
+`backend.json`, shows it skipped by its conditions, and its `os-server` is
+left running. Don't paste the address. A failing 15 s ping says
 `the backend's ping fails: …`, once for each new reason, and `the backend's
 ping answers again` when it comes back.
 

@@ -91,7 +91,7 @@ differs. Folders are what the unit makes or names.
 | air's bus clock | `lamp-air limit-clock --bus-number 0` (a oneshot, before air and controls) | root | none | none | I2C bus 0's `device/freq` |
 | tasks | `lamp-tasks serve` | orangepi | `/var/lib/lampos-tasks/` (0700); `/run/lampos-tasks/` (0700) | `targets.json` in its state folder; the Harness program in the user's home | `request.sock`, `voice.sock` |
 | mood | `lamp-mood serve --zone system` (off unless `LAMP_MOOD=on`, `mood.md`) | lampos | none | the lamp's zone, `/etc/localtime` | the bus (`mood/state`) |
-| cloud | `lamp-cloud --bus-root /run/lampos-bus` (off unless `LAMP_CLOUD=on`, `cloud.md`) | lampos | `/var/lib/lampos-cloud/` (0700, its `StateDirectory`) | setup's `backend.json`, the voice's key and update's `state.json`, through `LoadCredential=` | the company broker and the backend's ping; reads the bus |
+| cloud | `lamp-cloud --bus-root /run/lampos-bus` (on in the product, `LAMP_CLOUD=on` in its unit since #1815, `cloud.md`) | lampos | `/var/lib/lampos-cloud/` (0700, its `StateDirectory`) | setup's `backend.json`, the voice's key and update's `state.json`, through `LoadCredential=` | the company broker and the backend's ping; reads the bus |
 | records | `lamp-records check` (a timer, hourly) | root | `/run/lamp-records/` | `/etc/lampOS/records.json`, which install places (`deploy/product/settings/records.json`; it does nothing without it) | `last.json` |
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
 | update | `lamp-update serve` | root | `/var/lib/lampos-update/` (0700) | `/etc/lampOS/update/key.pub` | none |
@@ -223,7 +223,9 @@ the product doesn't run, and its marks, called only after its look; and
 Light out when you leave (#1677, [presence.md](presence.md)), which reads
 the eyes' `room/presence`, off in the product (`LAMP_PRESENCE`) until its
 lamp check; and Not feeling well (#1681), the droop and dim on
-`lamp/health`'s `error`, until its lamp check. A test
+`lamp/health`'s `error`, until its lamp check; and Smoky air and Dusty air
+(#1684), the air's sudden smoke and an hour of dust, until they are
+measured for false alarms on real traces. A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
 product lamp tells each session 31 functions of the 32 a session takes
 (`lamp_gemini::MAX_TOOLS`): the voice's own 13, the actions part's 17 and
@@ -422,10 +424,17 @@ units stopped:
 2. **The touch pads**, `/etc/lampOS/controls/controls-pins.json`, with a
    person at the lamp. GPIO head pads differ by unit: the hardware team's test
    reads four candidate lines (37, 96, 97, 98), and lamp-52e6's pads were on
-   97 and 98, driven high while touched (#1362). So `lamp-controls
-   discover-head --seconds 30`, with each pad touched twice, finds this unit's
-   pair and polarity, and they go into `head_pads`; the product's 37 and 96,
-   active-high, are only a default. On an MPR121 strip it is
+   97 and 98, driven high while touched (#1362). Each unit's pads also rest
+   and read differently (#1764): lamp-cb94's line 97 flipped at rest and read
+   touched for 77 s with no hand on it, and lamp-c0a4's pulsed under a hand.
+   So `lamp-controls discover-head --seconds 40 --rest-seconds 10`, hands
+   away for its first 11 s and then each pad touched twice, finds this
+   unit's pair and polarity, which go into `head_pads`, and each pad's own
+   baseline, which goes into `head_rest` (its rest, and whether a touch holds
+   its level or pulses; controls.md, "Each lamp's own head pads"). A pad
+   whose line changed with hands away is refused and nothing is written. The
+   product's 37 and 96, active-high, with no `head_rest`, are only a
+   default. On an MPR121 strip it is
    `lamp-controls calibrate-touch` (controls.md, "Run without a lamp, then
    qualify on one": First's on-lamp sequence), its output installed there,
    but **that half is skipped while the base strip is off**: V2 doesn't use

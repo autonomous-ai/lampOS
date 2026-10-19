@@ -1,0 +1,23 @@
+# The sharp rise (the line at 360 s), 80 again from 1,000 s for 12 minutes
+# (rearmed), then a second sharp rise from 1,700 s, held to 2,600: it would
+# speak at 1,760 s, 23 minutes after the first, within the 30-minute
+# cooldown, and the rise is over before the cooldown ends. Once.
+clock = "10:00"
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "light"
+args = { colour = "warm", level = 2 }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "say"
+args = { text = "The air reads like smoke. If something's burning, please check it.", priority = 8, expires_ms = 120000 }

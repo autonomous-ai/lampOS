@@ -1429,6 +1429,184 @@ fn a_linked_part_keeps_its_build_and_the_one_before() {
     assert!(lamp.exists(&folder("eyes 1")));
 }
 
+/// A lamp-skills from before #1698: no `list`, and no `[permissions]`
+/// checks, so every folder loads. Any other command is a wrong option.
+const SKILLS_BEFORE_CHECKS: &str =
+    "#!/bin/sh\n# lamp-skills 1, before the permission checks\nexit 2\n";
+
+/// A lamp-skills with #1698's checks, as `lamp-skills list --dir DIR`
+/// prints them: a folder whose skill.toml gives no `[permissions]` is not
+/// loaded. `refuses` names a folder it refuses whatever it says.
+fn skills_with_checks(build: &str, refuses: &str) -> String {
+    format!(
+        "#!/bin/sh\n# lamp-skills {build}, with the permission checks\n\
+         [ \"$1\" = list ] && [ \"$2\" = --dir ] || exit 2\n\
+         echo 'NAME  KIND  VERSION  MAY USE'\n\
+         for folder in \"$3\"/*/; do\n\
+         name=$(basename \"$folder\")\n\
+         if [ \"$name\" != '{refuses}' ] && grep -q '^\\[permissions\\]' \"$folder/skill.toml\" 2>/dev/null; then\n\
+         echo \"$name  core  -  topics: voice/heard\"\n\
+         else\n\
+         echo \"$name  core  -  not loaded: voice/heard is not in [permissions] topics\"\n\
+         fi\n\
+         done\n"
+    )
+}
+
+fn skills_unit() -> String {
+    "[Unit]\nDescription=lampOS skills (lamp-skills)\n\n[Service]\nExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus\nRestart=on-failure\n".into()
+}
+
+impl Lamp {
+    /// A product lamp's skills part, running `binary` through its link,
+    /// and these skill folders, each a skill.toml.
+    fn with_skills(mut self, binary: &str, folders: &[(&str, &str)]) -> Self {
+        use std::os::unix::fs::PermissionsExt;
+        let build = sha(binary);
+        let folder = self.root.join(format!("opt/lampOS/skills/{build}"));
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(folder.join("lamp-skills"), binary).unwrap();
+        fs::set_permissions(
+            folder.join("lamp-skills"),
+            fs::Permissions::from_mode(0o755),
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(&build, self.root.join("opt/lampOS/skills/current")).unwrap();
+        fs::write(
+            self.root.join("etc/systemd/system/lamp-skills.service"),
+            skills_unit(),
+        )
+        .unwrap();
+        for (name, toml) in folders {
+            self.write_skill(name, toml);
+        }
+        self.systemd.start("lamp-skills.service");
+        self
+    }
+
+    fn write_skill(&self, name: &str, toml: &str) {
+        let folder = self.root.join(format!("var/lib/lampOS/skills/{name}"));
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(folder.join("skill.toml"), toml).unwrap();
+    }
+
+    fn skills_link(&self) -> String {
+        fs::read_link(self.root.join("opt/lampOS/skills/current"))
+            .unwrap()
+            .display()
+            .to_string()
+    }
+}
+
+fn build_with_skills(lamp: &mut Lamp, sequence: u64, skills: &str) -> Manifest {
+    lamp.publish(
+        sequence,
+        &[
+            ("lamp-voice", "voice 1"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+            ("lamp-skills", skills),
+        ],
+        &[],
+    )
+}
+
+/// A skill folder from before #1698 declares no `[permissions]`.
+const OLD_SKILL: &str = "name = \"dance\"\n[[watch]]\ntopic = \"voice/heard\"\n";
+/// The same skill as the build's own declares what it reads.
+const NEW_SKILL: &str = "name = \"dance\"\n[permissions]\ntopics = [\"voice/heard\"]\n[[watch]]\ntopic = \"voice/heard\"\n";
+
+/// The first builder on #1722 (00:28): a round moves lamp-skills onto a
+/// build with #1698's checks while the lamp's folders are from before
+/// them, and every skill is refused, with lamp-skills up and well. The
+/// round runs the build's own lamp-skills on the folders first: a skill
+/// that loads now and would not under the build keeps lamp-skills, and
+/// every part, where it is. Once the folders are the build's, it switches,
+/// and they load.
+#[test]
+fn a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail() {
+    let mut lamp = Lamp::new().with_skills(
+        SKILLS_BEFORE_CHECKS,
+        &[("dance", OLD_SKILL), ("reminders", OLD_SKILL)],
+    );
+    let old = sha(SKILLS_BEFORE_CHECKS);
+    let checks = skills_with_checks("2", "");
+    build_with_skills(&mut lamp, 2, &checks);
+    let units_before: BTreeMap<String, Vec<u8>> = lamp
+        .lamp_files()
+        .into_iter()
+        .filter(|(name, _)| name.starts_with("etc/"))
+        .collect();
+
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Refused(why)
+            if why.contains("dance (voice/heard is not in [permissions] topics)")
+                && why.contains("reminders")
+                && why.contains("/var/lib/lampOS/skills")),
+        "{outcome:?}"
+    );
+    // Nothing switched: no unit written, no link moved, nothing restarted,
+    // no journal, and the lamp still runs build 1.
+    assert_eq!(lamp.skills_link(), old);
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+    let units_after: BTreeMap<String, Vec<u8>> = lamp
+        .lamp_files()
+        .into_iter()
+        .filter(|(name, _)| name.starts_with("etc/"))
+        .collect();
+    assert_eq!(units_after, units_before);
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+    assert!(lamp.state()["installed"].is_null());
+
+    // The build's skills placed (as `lamp-update install` does): the next
+    // round switches, and under the new lamp-skills both load.
+    lamp.write_skill("dance", NEW_SKILL);
+    lamp.write_skill("reminders", NEW_SKILL);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skills_link(), sha(&checks));
+    assert_eq!(lamp.calls(), ["reload", "restart lamp-skills.service"]);
+    let listed =
+        std::process::Command::new(lamp.root.join("opt/lampOS/skills/current/lamp-skills"))
+            .args(["list", "--dir"])
+            .arg(lamp.root.join("var/lib/lampOS/skills"))
+            .output()
+            .unwrap();
+    let listed = String::from_utf8(listed.stdout).unwrap();
+    assert!(!listed.contains("not loaded"), "{listed}");
+    assert!(
+        listed.contains("dance") && listed.contains("reminders"),
+        "{listed}"
+    );
+}
+
+/// A folder the running lamp-skills already refuses (a lamp's own, broken
+/// before the round) is no reason to keep the old build: only a skill that
+/// loads now and would not after holds the switch back. The build's
+/// lamp-skills that cannot list the folder at all switches nothing.
+#[test]
+fn only_a_skill_that_would_stop_loading_holds_lamp_skills_back() {
+    let mut lamp = Lamp::new().with_skills(
+        &skills_with_checks("1", "mine"),
+        &[("dance", NEW_SKILL), ("mine", NEW_SKILL)],
+    );
+    let checks = skills_with_checks("2", "mine");
+    build_with_skills(&mut lamp, 2, &checks);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skills_link(), sha(&checks));
+
+    let broken = "#!/bin/sh\n# lamp-skills 3, which cannot read the folder\necho 'no such folder' >&2\nexit 1\n";
+    build_with_skills(&mut lamp, 3, broken);
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::Failed(why) if why.contains("no such folder")),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.skills_link(), sha(&checks));
+    assert_eq!(lamp.calls(), ["reload", "restart lamp-skills.service"]);
+}
+
 /// The machine as `lamp-update install` asks it, for a lamp made of files:
 /// users go into the root's /etc/passwd, and nothing else is done.
 struct InstallHost(PathBuf);
@@ -1474,14 +1652,19 @@ impl lamp_update::install::Host for InstallHost {
 }
 
 /// Every binary the product starts, and the voice's worker, each the line
-/// `<name> <sequence>`.
+/// `<name> <sequence>`; lamp-skills a script that lists the folders, since
+/// a round runs it before a switch.
 fn product_build(lamp: &mut Lamp, sequence: u64) -> Manifest {
     let texts: Vec<(String, String)> = lamp_update::install::parts()
         .into_iter()
         .map(|part| part.binary)
         .chain(["lamp-turn-end".to_owned()])
         .map(|name| {
-            let text = format!("{name} {sequence}");
+            let text = if name == "lamp-skills" {
+                skills_with_checks(&sequence.to_string(), "")
+            } else {
+                format!("{name} {sequence}")
+            };
             (name, text)
         })
         .collect();

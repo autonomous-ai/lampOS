@@ -351,7 +351,7 @@ pub fn plain_name(name: &str) -> Option<String> {
     fine.then_some(name)
 }
 
-fn same_name(a: &str, b: &str) -> bool {
+pub(crate) fn same_name(a: &str, b: &str) -> bool {
     a.to_lowercase() == b.to_lowercase()
 }
 
@@ -782,13 +782,70 @@ impl People {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
     Remember(String),
-    RememberOne { name: String, replace: bool },
+    RememberOne {
+        name: String,
+        replace: bool,
+    },
+    /// Add the one face in a photo in the eyes' photo folder (`--photo-dir`,
+    /// [`crate::photo`]), unconfirmed until its person says yes: its file
+    /// name.
+    RememberPhoto {
+        name: String,
+        file: String,
+    },
+    /// Whether a face from a photo, unconfirmed, is at the lamp now, and
+    /// under which name: so the voice can ask them.
+    PhotoHere,
+    /// The voice has asked them, in this meeting.
+    PhotoAsked(String),
+    /// Their yes: kept as an ordinary print.
+    PhotoYes(String),
+    /// Their no: deleted.
+    PhotoNo(String),
     Forget(String),
     List,
     Who,
 }
 
 pub fn ask_of(line: &[u8]) -> Option<Ask> {
+    // A face from a photo's consent (`--photo-dir`): one of these alone.
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Consent {
+        photo_here: Option<bool>,
+        photo_asked: Option<String>,
+        photo_yes: Option<String>,
+        photo_no: Option<String>,
+    }
+    if let Ok(consent) = serde_json::from_slice::<Consent>(line) {
+        return match consent {
+            Consent {
+                photo_here: Some(true),
+                photo_asked: None,
+                photo_yes: None,
+                photo_no: None,
+            } => Some(Ask::PhotoHere),
+            Consent {
+                photo_here: None,
+                photo_asked: Some(name),
+                photo_yes: None,
+                photo_no: None,
+            } => Some(Ask::PhotoAsked(name)),
+            Consent {
+                photo_here: None,
+                photo_asked: None,
+                photo_yes: Some(name),
+                photo_no: None,
+            } => Some(Ask::PhotoYes(name)),
+            Consent {
+                photo_here: None,
+                photo_asked: None,
+                photo_yes: None,
+                photo_no: Some(name),
+            } => Some(Ask::PhotoNo(name)),
+            _ => None,
+        };
+    }
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
     struct Line {
@@ -798,6 +855,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
         who: Option<bool>,
         one_face: Option<bool>,
         replace: Option<bool>,
+        photo: Option<String>,
     }
     let line: Line = serde_json::from_slice(line).ok()?;
     match line {
@@ -808,6 +866,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            photo: None,
         } => Some(Ask::Remember(name)),
         Line {
             remember: Some(name),
@@ -816,6 +875,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: Some(true),
             replace,
+            photo: None,
         } => Some(Ask::RememberOne {
             name,
             replace: replace.unwrap_or(false),
@@ -827,6 +887,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            photo: None,
         } => Some(Ask::Forget(name)),
         Line {
             remember: None,
@@ -835,6 +896,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            photo: None,
         } => Some(Ask::List),
         Line {
             remember: None,
@@ -843,7 +905,17 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: Some(true),
             one_face: None,
             replace: None,
+            photo: None,
         } => Some(Ask::Who),
+        Line {
+            remember: Some(name),
+            forget: None,
+            list: None,
+            who: None,
+            one_face: None,
+            replace: None,
+            photo: Some(file),
+        } => Some(Ask::RememberPhoto { name, file }),
         _ => None,
     }
 }
@@ -1591,6 +1663,41 @@ mod tests {
         );
         assert_eq!(ask_of(br#"{"remember":"A","replace":true}"#), None);
         assert_eq!(ask_of(br#"{"forget":"A","one_face":true}"#), None);
+        // From a photo (`--photo-dir`): a name and the photo's file.
+        assert_eq!(
+            ask_of(br#"{"remember":"A","photo":"a.jpg"}"#),
+            Some(Ask::RememberPhoto {
+                name: "A".into(),
+                file: "a.jpg".into(),
+            })
+        );
+        // A photo never replaces anyone: it has no say for them.
+        assert_eq!(
+            ask_of(br#"{"remember":"A","photo":"a.jpg","replace":true}"#),
+            None
+        );
+        // Its person's consent, one ask at a time.
+        assert_eq!(ask_of(br#"{"photo_here":true}"#), Some(Ask::PhotoHere));
+        assert_eq!(
+            ask_of(br#"{"photo_asked":"A"}"#),
+            Some(Ask::PhotoAsked("A".into()))
+        );
+        assert_eq!(
+            ask_of(br#"{"photo_yes":"A"}"#),
+            Some(Ask::PhotoYes("A".into()))
+        );
+        assert_eq!(
+            ask_of(br#"{"photo_no":"A"}"#),
+            Some(Ask::PhotoNo("A".into()))
+        );
+        assert_eq!(ask_of(br#"{"photo_yes":"A","photo_no":"A"}"#), None);
+        assert_eq!(ask_of(br#"{"photo_here":false}"#), None);
+        assert_eq!(ask_of(br#"{"photo":"a.jpg"}"#), None);
+        assert_eq!(
+            ask_of(br#"{"remember":"A","photo":"a.jpg","one_face":true}"#),
+            None
+        );
+        assert_eq!(ask_of(br#"{"forget":"A","photo":"a.jpg"}"#), None);
         assert_eq!(ask_of(br#"{"list":true}"#), Some(Ask::List));
         assert_eq!(ask_of(br#"{"who":true}"#), Some(Ask::Who));
         for nothing in [

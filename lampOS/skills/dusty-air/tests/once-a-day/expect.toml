@@ -1,0 +1,17 @@
+# Day one from 10:00: 140 for two hours (the line at 11:00), 80 for an
+# hour, 140 again from 13:00 to 15:00: within 24 hours, nothing. Then 80
+# until 10:30 the next day, and 140 from 10:30: the line again at 11:30,
+# 24.5 hours after the first (91,800 s from the start).
+clock = "10:00"
+
+[[expect]]
+at = "3600s"
+within = "60s"
+call = "say"
+args = { text = "The air here has been very dusty for about an hour. I can't tell where it's coming from.", priority = 5, expires_ms = 30000 }
+
+[[expect]]
+at = "91800s"
+within = "60s"
+call = "say"
+args = { text = "The air here has been very dusty for about an hour. I can't tell where it's coming from.", priority = 5, expires_ms = 30000 }

@@ -312,15 +312,18 @@ fn every_skill_folder_says_its_kind_and_version() {
         named(SkillKind::Core),
         [
             "dance",
+            "dusty-air",
             "light-out",
             "light-scenes",
             "light-show",
             "not-feeling-well",
             "point-light",
             "reminders",
+            "smoky-air",
             "stretch-break",
             "stuffy-air",
             "task-news",
+            "watch-you-leave",
             "welcome-back"
         ]
     );
@@ -330,7 +333,12 @@ fn every_skill_folder_says_its_kind_and_version() {
             "desk-tutor",
             "desk-tutor-marks",
             "guard-mode",
-            "look-for-things"
+            "look-for-things",
+            "rest-your-eyes",
+            "sip-of-water",
+            "stand-up",
+            "who-was-here",
+            "wind-down"
         ]
     );
     for skill in &skills {
@@ -6538,6 +6546,16 @@ fn the_loader_holds_kept_lights_shows_turns_and_choices_to_their_rules() {
             "tool = \"t\"\n[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\ndefault = \"z\"\n[[do]]\nsay = \"Hi.\"\n".into(),
             "its default",
         ),
+        // #1669 (e): a choice read from the trigger's field is a trigger's
+        // alone, with no tool and no default.
+        (
+            "tool = \"t\"\n[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\nfield = \"side\"\n[[do]]\nsay = \"Hi.\"\n".into(),
+            "a trigger's",
+        ),
+        (
+            format!("{TRIGGERED}[choice]\nname = \"c\"\nabout = \"C.\"\none_of = [\"a\"]\nfield = \"side\"\ndefault = \"a\"\n[[do]]\nif_choice = [\"a\"]\nlight = {{ colour = \"warm\" }}\n"),
+            "no default",
+        ),
     ]
     .into_iter()
     .enumerate()
@@ -8366,12 +8384,43 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
 
 /// The eyes' `room/activity`, as they say it while someone sits at the desk.
 fn activity(engine: &mut Engine, at_ms: u64, state: &str) {
+    activity_with(engine, at_ms, state, true);
+}
+
+/// The same, with or without the sitting's baseline in.
+fn activity_with(engine: &mut Engine, at_ms: u64, state: &str, baseline: bool) {
     engine.observe(
         "room/activity",
         at_ms * 1_000,
-        format!(r#"{{"state":"{state}","for_s":0,"sitting_s":600,"baseline":true}}"#).as_bytes(),
+        format!(r#"{{"state":"{state}","for_s":0,"sitting_s":600,"baseline":{baseline}}}"#)
+            .as_bytes(),
         Some(3_000),
     );
+}
+
+/// The reviewer's P3 on #1938: a run begun before the sitting's baseline
+/// was in (`at_desk`, `baseline` false) is not noticed by the baseline
+/// coming in and saying `head_down`: the person did nothing. Standing up
+/// still notices it.
+#[test]
+fn a_baseline_coming_in_mid_run_is_no_noticing() {
+    let dir = tempfile::tempdir().unwrap();
+    for (stood, noticed) in [(false, false), (true, true)] {
+        let mut engine = Engine::new(vec![resting_skill(dir.path(), 1)], true);
+        faces(&mut engine, 0, &seated(false));
+        activity_with(&mut engine, 0, "at_desk", false);
+        assert_eq!(stuffy(&mut engine, 0).len(), 1);
+        activity_with(&mut engine, 3_000, "head_down", true);
+        if stood {
+            engine.observe("room/stood_up", 5_000_000, br#"{"sitting_s":600}"#, None);
+        }
+        engine.tick(10_001_000);
+        assert_eq!(
+            engine.resting_until("sip", 11_000_000).is_none(),
+            noticed,
+            "stood up: {stood}"
+        );
+    }
 }
 
 /// #1685, the eyes' word (#1678): a run is noticed by the person standing up
@@ -8413,5 +8462,343 @@ fn a_run_is_noticed_by_the_eyes_activity_changing_or_a_stand_up() {
             noticed,
             "{how}"
         );
+    }
+}
+
+/// A haze at the desk, for the other member of a group: `air/state`'s
+/// PM2.5 above 100.
+fn hazy_skill(dir: &Path, name: &str, top: &str) -> lamp_skills::Skill {
+    load(&skill_with(
+        dir,
+        name,
+        &format!(
+            "{top}\n[trigger]\ntopic = \"air/state\"\nfield = \"pm2_5\"\nabove = 100\ncooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n[[do]]\nlight = {{ colour = \"warm\", for = \"5s\" }}\n"
+        ),
+    ))
+    .unwrap()
+}
+
+/// The skills a hazy reading at `at_ms` starts.
+fn hazy(engine: &mut Engine, at_ms: u64) -> Vec<String> {
+    engine
+        .observe("air/state", at_ms * 1_000, br#"{"pm2_5":150}"#, None)
+        .into_iter()
+        .filter(|run| !run.calls.is_empty())
+        .map(|run| run.skill)
+        .collect()
+}
+
+/// #1685: a group's hour goes first to the member that has waited for it
+/// longest and still waits, not to the first in folder order; one that has
+/// stopped waiting (held back for it no more within
+/// `BUDGET_WAIT_LIVE_US`) holds nobody back.
+#[test]
+fn a_groups_hour_goes_to_the_member_waiting_longest_while_it_waits() {
+    let dir = tempfile::tempdir().unwrap();
+    let group = "[budget]\ngroup = \"g\"\nper_hour = 1";
+    let skills = || {
+        vec![
+            nudge_skill(dir.path(), "a", group, "cooldown = \"1h\""),
+            hazy_skill(dir.path(), "b", group),
+        ]
+    };
+    let minute = 60_000;
+    let mut engine = Engine::new(skills(), true);
+    assert_eq!(stuffy(&mut engine, 0), ["a"]);
+    // B waits from minute 10, and still at 59.
+    assert!(hazy(&mut engine, 10 * minute).is_empty());
+    assert!(hazy(&mut engine, 59 * minute).is_empty());
+    // At 60 the hour is free and A is due again, first in order: B goes.
+    assert!(stuffy(&mut engine, 60 * minute).is_empty());
+    assert_eq!(hazy(&mut engine, 60 * minute), ["b"]);
+    // A waited from 60: its at 120.
+    assert_eq!(stuffy(&mut engine, 120 * minute), ["a"]);
+    // B held back at 10, then its air cleared: nothing waits at 60.
+    let mut engine = Engine::new(skills(), true);
+    assert_eq!(stuffy(&mut engine, 0), ["a"]);
+    assert!(hazy(&mut engine, 10 * minute).is_empty());
+    assert_eq!(stuffy(&mut engine, 60 * minute), ["a"]);
+}
+
+/// #1685: the four wellbeing skills and Stretch break as they are in
+/// `lampOS/skills/`, on one engine, through a five-hour sitting from 10:00
+/// with someone moving now and then (each nudge noticed): one nudge an hour
+/// between them, each in the order it came due, and none of them a word.
+/// Rest your eyes at 45 minutes; Stretch break due at 50, waiting to 105; A
+/// sip of water due at 90, to 165; Stand up due at 100, to 225; then Rest
+/// your eyes again. Wind down is outside its hours. The four share one
+/// `[stop]`, `wellbeing_nudges`: one function in the tools file, which
+/// stops the one that came last, or with `all` every one of them.
+#[test]
+fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
+    let names = [
+        "rest-your-eyes",
+        "sip-of-water",
+        "stand-up",
+        "stretch-break",
+        "wind-down",
+    ];
+    let skills: Vec<lamp_skills::Skill> = names
+        .iter()
+        .map(|name| load(&skills_root().join(name)).unwrap())
+        .collect();
+    for skill in &skills {
+        assert_eq!(
+            skill.budget,
+            Some(("wellbeing".to_owned(), 1)),
+            "{}",
+            skill.name
+        );
+        assert!(!skill.permissions.speak, "{}", skill.name);
+        if skill.name != "stretch-break" {
+            assert!(skill.most_a_day.is_some() && skill.rest.is_some());
+            assert_eq!(skill.stop.as_ref().unwrap().tool, "wellbeing_nudges");
+        }
+    }
+    let tools = tools_file(&skills);
+    let functions: Vec<&str> = tools["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|tool| tool["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(functions, ["wellbeing_nudges"], "{tools}");
+    assert_eq!(
+        tools["tools"][0]["parameters"]["properties"]["all"]["type"],
+        "boolean"
+    );
+    let mut engine = Engine::new(skills, true);
+    // 10:00 local at 0 s.
+    engine.clock(0, 0, 36_000_000);
+    engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+    let mut nudged = Vec::new();
+    for half in 0..=600u64 {
+        let left = if half % 2 == 0 { 0.3 } else { 0.5 };
+        let faces = format!(
+            r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
+            left + 0.3
+        );
+        for run in engine.observe(
+            "humans/faces/tracked",
+            half * 30_000_000,
+            faces.as_bytes(),
+            None,
+        ) {
+            if !run.calls.is_empty() {
+                assert!(
+                    !run.calls.iter().any(|call| matches!(call, Call::Say(_))),
+                    "{run:?}"
+                );
+                nudged.push((half / 2, run.skill));
+            }
+        }
+    }
+    let nudged: Vec<(u64, &str)> = nudged
+        .iter()
+        .map(|(minute, skill)| (*minute, skill.as_str()))
+        .collect();
+    assert_eq!(
+        nudged,
+        [
+            (45, "rest-your-eyes"),
+            (105, "stretch-break"),
+            (165, "sip-of-water"),
+            (225, "stand-up"),
+            (285, "rest-your-eyes")
+        ]
+    );
+    // "Not today": the one that came last of the four, by its name.
+    let told = |run: lamp_skills::Run| {
+        lamp_skills::told(&run.calls)["next"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let at = 301 * 60_000_000;
+    let snoozed = engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "snooze"}),
+            at,
+        )
+        .unwrap();
+    assert!(told(snoozed).contains("none of the rest your eyes nudges until tomorrow morning"));
+    assert!(engine.stopped("rest-your-eyes", at) && !engine.stopped("sip-of-water", at));
+    // All of them, and on again.
+    let all = engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "snooze", "all": true}),
+            at,
+        )
+        .unwrap();
+    assert!(told(all).contains("none of the wellbeing nudges"));
+    assert!(
+        ["rest-your-eyes", "sip-of-water", "stand-up", "wind-down"]
+            .iter()
+            .all(|skill| engine.stopped(skill, at))
+    );
+    assert!(!engine.stopped("stretch-break", at));
+    for args in [
+        serde_json::json!({"how": "on", "all": "yes"}),
+        serde_json::json!({"how": "on", "which": "stand-up"}),
+    ] {
+        assert!(
+            engine.tool("wellbeing_nudges", &args, at).is_err(),
+            "{args}"
+        );
+    }
+    engine
+        .tool(
+            "wellbeing_nudges",
+            &serde_json::json!({"how": "on", "all": true}),
+            at,
+        )
+        .unwrap();
+    assert!(!engine.stopped("sip-of-water", at));
+}
+
+/// #1685: a `[stop]` may be shared only by skills of one `[budget]` group;
+/// one of another group, or a skill's own `tool` by the name, is refused as
+/// any taken name is.
+#[test]
+fn a_shared_stop_is_one_groups_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let stopped = |name: &str, group: &str| {
+        skill_with(
+            dir.path(),
+            name,
+            &format!(
+                "[budget]\ngroup = \"{group}\"\nper_hour = 1\n[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n[stop]\ntool = \"nudges\"\nabout = \"When.\"\n[[do]]\nlight = {{ colour = \"warm\" }}\n"
+            ),
+        );
+    };
+    stopped("a", "g");
+    stopped("b", "g");
+    stopped("c", "other");
+    let (loaded, errors) = load_all(dir.path());
+    let names: Vec<&str> = loaded.iter().map(|skill| skill.name.as_str()).collect();
+    assert_eq!(names, ["a", "b"]);
+    assert!(
+        errors.iter().any(|error| error
+            .contains("a `[stop]` is shared only by the skills of one `[budget]` group")),
+        "{errors:?}"
+    );
+    // Alone, a [stop] takes no `all`.
+    let mut engine = Engine::new(vec![loaded[0].clone()], true);
+    assert!(
+        engine
+            .tool("nudges", &serde_json::json!({"how": "off", "all": true}), 0)
+            .is_err()
+    );
+    // Shared, none of them yet: every one.
+    let mut engine = Engine::new(loaded, true);
+    engine
+        .tool("nudges", &serde_json::json!({"how": "off"}), 0)
+        .unwrap();
+    assert!(engine.stopped("a", 0) && engine.stopped("b", 0));
+}
+
+/// Who was here (#1685), with its record of the last hour.
+const WHO: &str = r#"
+tool = "who_was_here"
+[permissions]
+topics = ["room/presence"]
+speak = true
+[history]
+topic = "room/presence"
+within = "1h"
+[[do]]
+say = "Say who was here."
+"#;
+
+/// #1685: a `[history]` skill listens to `room/presence`, and its call's
+/// note is followed by the record of the room: a visit with its length and
+/// how long ago, and with the local time known, its time of day too. Not in
+/// a triggered skill, of another topic, past a day, or without the topic in
+/// its permissions.
+#[test]
+fn a_history_is_told_to_the_call_from_room_presence_and_held_to_its_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    let who = load(&skill_with(dir.path(), "who", WHO)).unwrap();
+    let mut engine = Engine::new(vec![who], true);
+    assert_eq!(engine.topics(), ["room/presence"]);
+    let presence = |engine: &mut Engine, at_s: u64, someone: bool, nobody_s: u32| {
+        engine.observe(
+            "room/presence",
+            at_s * 1_000_000,
+            format!(r#"{{"someone":{someone},"nobody_s":{nobody_s}}}"#).as_bytes(),
+            Some(3_000),
+        );
+    };
+    // A visit from 60 s, its last face at 179 s, said gone at 200 s; then
+    // someone again from 600 s.
+    for at in (0..=620).step_by(2) {
+        let (someone, nobody_s) = match at {
+            60..=198 => (true, 0),
+            600.. => (true, 0),
+            _ if at < 60 => (false, at as u32),
+            _ => (false, at as u32 - 179),
+        };
+        presence(&mut engine, at, someone, nobody_s);
+    }
+    let note = |engine: &mut Engine| -> String {
+        let calls = engine
+            .tool("who_was_here", &serde_json::json!({}), 620_000_000)
+            .unwrap()
+            .calls;
+        match &calls[..] {
+            [Call::Say(note)] => note.clone(),
+            other => panic!("{other:?}"),
+        }
+    };
+    assert_eq!(
+        note(&mut engine),
+        "Say who was here.\n\nThe lamp's record of the room over the last 1 h, times only, from \
+         its eyes and ears: it never knows who anyone was, and keeps no picture.\
+         \n- someone was at the lamp for 1 min, 9 min ago\
+         \n- someone has been at the lamp for under a minute, since under a minute ago, and still is"
+    );
+    // At 12:00:00 local when the clock read 620 s: the visit began at 11:50.
+    engine.clock(60, 620_000_000, 1_792_407_600_000);
+    assert!(
+        note(&mut engine).contains("\n- someone was at the lamp for 1 min, at 11:50, 9 min ago"),
+        "{}",
+        note(&mut engine)
+    );
+    // Then nothing for half a minute: the spell going on ends where it was
+    // last known, and the stretch unseen is said.
+    presence(&mut engine, 650, false, 30);
+    let calls = engine
+        .tool("who_was_here", &serde_json::json!({}), 650_000_000)
+        .unwrap()
+        .calls;
+    let [Call::Say(after)] = &calls[..] else {
+        panic!("{calls:?}");
+    };
+    assert!(
+        after.contains("\n- someone was at the lamp for under a minute, at 11:59")
+            && after.contains("\n- it could not see or hear the room for under a minute, at 12:00")
+            && !after.contains("still is"),
+        "{after}"
+    );
+    for (number, (from, to, why)) in [
+        (
+            "tool = \"who_was_here\"",
+            "tool = \"who_was_here\"\n[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true\n[ask]\npolicy = \"hello\"",
+            "started by its tool alone",
+        ),
+        ("topic = \"room/presence\"\nwithin", "topic = \"voice/heard\"\nwithin", "times only"),
+        ("within = \"1h\"", "within = \"25h\"", "1m to 24h"),
+        ("within = \"1h\"", "within = \"30s\"", "1m to 24h"),
+        ("topics = [\"room/presence\"]", "topics = []", "not permitted"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let toml = WHO.replace(from, to);
+        assert_ne!(toml, WHO, "{from}");
+        let error = load(&skill_with(dir.path(), &format!("bad{number}"), &toml)).unwrap_err();
+        assert!(error.contains(why), "{to}: {error}");
     }
 }

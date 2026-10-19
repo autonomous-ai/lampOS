@@ -68,9 +68,10 @@ routes are not served. Each kind is carried out by the part that owns it.
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Read only. Without the switch, V1's "not on this lamp" |
+| `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
-| `device.rename` | refused for now; step 2, through setup's record |
+| `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
 | anything else (`add_channel`, the other `skills.*`, `face.*`, `tts.*`, the other `led.*`, `system.reboot`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
 ### The light: V1's colours on this lamp's
@@ -103,17 +104,82 @@ is the same light. Two differences from V1 the page should know:
 - **The unit** (`deploy/product/lamp-cloud.service`) runs it as `lampos` and
   hands it those two files and `lamp-update`'s `state.json` (for the build)
   through `LoadCredential=`, so no file is widened. It starts only once all
-  three are there and setup is done. The drop-in that turns it on carries
-  both `Environment=LAMP_CLOUD=on` and `Conflicts=os-server.service`
-  (V1's `os-server` holds the same client id), so an off `lamp-cloud`
-  never stops `os-server` (the reviewer on #1418; the unit's header has
-  the drop-in).
+  three are there and setup is done.
+- **On in the product (#1815).** The unit itself carries
+  `Environment=LAMP_CLOUD=on`. V1's `os-server` holds the same client id,
+  so the unit stops it as `lamp-cloud` really starts:
+  `ExecStartPre=-+/usr/bin/systemctl stop os-server.service`, as root, and
+  going on where there is none.
+  - **Not `Conflicts=`:** systemd queues that stop with the start job, before
+    any condition is checked. So a `lamp-cloud` skipped for want of setup's
+    account (a lamp set up under V1, or put back to it) would still stop
+    `os-server`, and the app would see the lamp offline. That breaks the
+    #1418 rule that an off `lamp-cloud` never stops it (the reviewer on
+    #1909).
+  - **Shown on lamp-c0a4** (systemd 252) with stand-in units:
+    - `Conflicts=` with a condition that fails stopped the stand-in;
+    - `ExecStartPre=-+` with the condition failing left it running;
+    - with the condition met, it stopped the stand-in and started;
+    - with no such unit, it started.
+  - **What it leaves open:** with no `Conflicts=`, an `os-server` started
+    later, by hand or by a V1 timer, is not stopped, and holds the same
+    client id beside `lamp-cloud`. Each then pushes the other off the broker
+    in turn. That only happens on a lamp put back to V1 with lampOS's units
+    still enabled, which should be masked there (the reviewer's P3 on
+    #1909).
+  Install enables it with the lamp, and `lampos.target` starts it once
+  setup's marker is there (`lampos-setup-done.path`). Setup writes
+  `backend.json` before the marker. So a Lamp 2 set up from the app shows
+  online straight away, and again after a reboot, with no `cloud-on.sh`.
+  To keep it off on a lamp, mask it (`systemctl mask lamp-cloud`).
+- **The lamp's name in the app**, `/etc/lampOS/setup/display-name`, root's,
+  0644, one line, written only by root's helper after a `device.rename`
+  (#1959). `system.info`'s `host.device_name` is it, else the host's name as
+  before. The reset removes it.
 - **Never printed:** the broker's password and the key appear in no journal
   line and on no bus topic; the account's debug form hides them.
 - **The reset** empties `/var/lib/lampos-cloud` (with the reports' queue and
   the person's later choice on them) and removes
   `/etc/lampOS/setup/backend.json` and `/etc/lampOS/setup/reports.json`
   with the rest of the person's data.
+
+## A face from the app's photo (#1968, `faces.add_photo`)
+
+Off unless `LAMP_PHOTO_FACES=on`, with the eyes' photo folder
+(`LAMP_EYES_PHOTO_DIR`, the folder given to `lamp-eyes --photo-dir`, for
+example `/run/lampos-eyes/photos`) and their request socket
+(`LAMP_EYES_WHO_SOCKET`). lamp-cloud's unit is `ProtectSystem=strict`, so a
+lamp switching it on also adds the folder to the unit's `ReadWritePaths` in
+the same drop-in. lamp-cloud and the eyes are both `lampos`; the eyes make
+the folder theirs at 0700 when they start and refuse one open to others
+(`photo::ready`).
+
+- **Only the lamp's own account:** the kind comes over the lamp's `fa_channel`
+  like every other, which only its signed-in account may publish to
+  (`crate::online`).
+- **The photo** is checked: a name of 1 to 40 characters, and base64 that
+  decodes to a JPEG (`FF D8`) of at most 8 MiB (`photos::asked`). Then it's
+  written as a **new** file, `app-<ms>.jpg`, at mode 0600 in the folder.
+  The eyes are asked `{"remember":NAME,"photo":FILE}` with a 2 s deadline,
+  kept short because it's waited for on the runtime that keeps the broker's
+  connection alive.
+- **Never kept:** the eyes read it once and remove it. lamp-cloud removes it
+  too afterwards, answered or not, so a photo the eyes never took doesn't
+  stay (`photos::add`).
+- **The answer** is the eyes': `added` (unconfirmed) or `remembered`.
+  Otherwise their reason in the person's words: no face, more than one
+  person, the face too small, not readable, known by another name, a name
+  that can't be kept, no room, photos not taken. `the lamp's eyes did not
+  answer` when they didn't.
+- **Then at the lamp** the voice asks the person once (`LAMP_PHOTO_FACES=on`
+  in the voice, `docs/eyes.md`, "A face from a photo"). No answer or no
+  deletes the face, and so do 30 days unconfirmed.
+
+Tests (`photos.rs`): the switch needs both absolute places; the name and
+the JPEG checked, too long, empty, not base64, not a JPEG and too large
+refused; the photo written 0600 as a new file, the eyes asked for it by
+name, and gone afterwards, also when nobody answers; the eyes' reasons said
+plainly.
 
 ## The skills page (#1722, `skills.list`)
 
@@ -178,11 +244,11 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   core. Nothing writes `made: here` yet: the lamp skill creator will, when
   it makes one.
 - **`can_remove`**: false for a core skill, true for the others.
-- **`can_turn_off`**: the skill has a `[stop]` (#1837, in review) and loads;
-  the app's switch on a core row. Until #1837 is on `lamp-voice` a skill with
-  a `[stop]` does not load, so it is false for every skill.
+- **`can_turn_off`**: the skill has a `[stop]` (#1886) and loads; the
+  app's switch on a core row. No product skill has one, so it is false for
+  every product skill; the wellbeing skills (#1685, installable) share one.
 - **`off`**: with a `[stop]`, true when the skill is turned off, as
-  `lamp-skills --state-dir` keeps it (#1837, `/var/lib/lampos-skills/off`,
+  `lamp-skills --state-dir` keeps it (#1886, `/var/lib/lampos-skills-state/off`,
   a name a line), false when it is not; it may be snoozed until the morning
   then, which `lamp-skills` keeps only in memory. Null without a `[stop]`,
   or when the off file can't be read.
@@ -478,6 +544,39 @@ updates this section in the same pull request.
   while the backend restarts can be lost after the broker has taken it;
   that is why `stopped` is sent once more on the next connection.
 
+## Changed after setup (#1959)
+
+The person changes a name or the lamp's time zone from the app, without a
+reset. Off unless `LAMP_SETTINGS_CHANGE=on`, with `LAMP_CLOUD=on`.
+
+- **The kinds:** `timezone.set {"timezone"}` (V1's own kind and shapes),
+  `person.name.set {"name"}` (the person's name setup asks for; `""` removes
+  it) and `device.rename {"name"}` (the lamp's name in the app).
+  - **The lamp's name in the app never changes what the lamp answers to.**
+    The wake word stays "Lamp"; only `host.device_name` reads it.
+- **The ack at once, the result after:** the reply is `starting` as soon as
+  the request is read, before anything is written. The result goes out as a
+  second reply of the same kind, looked for every 50 ms on the loop texts use,
+  once root's helper has answered (10 s at most, else `failure`, "the lamp's
+  settings did not answer in time").
+- **Who writes: root's helper, never `lamp-cloud`.** `lamp-cloud` stays
+  `lampos` and `ProtectSystem=strict`, with no new writable path. It sends one
+  line (`{"timezone": …}`, `{"person_name": …}` or `{"display_name": …}`) to
+  `/run/lampos-setup-change/change.sock` and reads one back, on a thread of its
+  own so the broker's loop never waits. The socket is systemd's
+  (`lamp-setup-change.socket`: root's, group `lampos`, 0660, `Accept=yes`, 4
+  connections at most), and each connection starts `lamp-setup change` as root
+  (`lamp-setup-change@.service`). The helper checks every request itself
+  (`setup.md`, "Changed after setup").
+- **Refusals** are the helper's words, never the value asked: `name must be at
+  most 64 characters on one line`, `name must be 1 to 64 characters` (a rename
+  to nothing), `timezone must be a zone the lamp knows, such as
+  Asia/Ho_Chi_Minh`, and `the lamp's settings are not running` when the
+  socket is not there.
+- **Not yet:** the helper's two units are in `deploy/product/` but not in
+  `lamp-update`'s install list, so no lamp has them until their lamp check.
+  Wi-Fi (`wifi.set`) is #1959's second piece.
+
 ## Not yet known, for the backend (#1396)
 
 - Whether the backend's `connected` comes from MQTT, the ping, or both, and
@@ -524,6 +623,13 @@ permission's line and the privacy switch's; a skill that does not load, with
 why; `[stop]` and the off file; the bounds; a folder that can't be read; the
 switch's two gates and the refusal's exact words. `tests/skills_contract.rs`
 pins the fields as sent.
+
+Changes after setup (#1959): the switch's two words; each kind refused as
+one this lamp lacks without it, `device.rename` included; each kind's line for
+the helper; the ack `starting` within 100 ms while a stand-in helper takes
+300 ms, then its result; a refusal, a helper not running and one that never
+answers; through the test broker, `starting` then `success` on `fd_channel`;
+and `host.device_name` from the helper's file, the host's name without one.
 
 `tests/app_contract.rs` holds the fields the Autonomous app's device page
 reads, by name and type (Fourth on #1396): `versions.firmware`,

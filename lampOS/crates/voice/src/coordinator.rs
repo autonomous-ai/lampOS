@@ -1303,6 +1303,10 @@ impl Rig {
         ];
         let mut receipts: [Option<DiagnosticFinished>; 2] = [None, None];
         let mut ring_blank_confirmed = self.ring.blank_confirmed();
+        // A ring that ended mid-session was disabled then; its cached exit is
+        // seen again here, at once. Say so, or it reads as the stop ending it
+        // (lamp-52e6, 19 Oct 21:47, #1620). It still fails the stop below.
+        let ring_exited_before_stop = self.ring.exit_observed();
         // On the Controls route the privacy worker ends itself, cleanly, on a
         // switch it cannot read, saying so first: that is why the cycle ended,
         // not a failed shutdown, and its exit status is still checked below
@@ -1456,7 +1460,8 @@ impl Rig {
                                 let _ = record(
                                     trace,
                                     json!({"kind":"worker_exit_failed", "worker":worker.role,
-                                    "at_us":monotonic_us(), "error":error.to_string()}),
+                                    "at_us":monotonic_us(), "error":error.to_string(),
+                                    "exited_before_stop":worker.role == "ring" && ring_exited_before_stop}),
                                 );
                                 failure.push(CleanupStage::WorkerExit, &worker.role, error);
                             }
@@ -4087,6 +4092,13 @@ fn conversation_with_gate(
     // Saying hello first to someone who comes and sits down, when the eyes
     // keep a presence file for it; and when anything was last said to the
     // lamp or by it.
+    // A face added from a photo, asked about once at the lamp
+    // (`LAMP_PHOTO_FACES=on`, #1968): the eyes' socket, and when they were
+    // last asked whether one is here.
+    let photo_faces = (lifetime.continuous() && crate::photo_faces::on())
+        .then(|| std::env::var_os(crate::known_faces::ENVIRONMENT))
+        .flatten()
+        .map(|socket| crate::photo_faces::Watch::start(PathBuf::from(socket)));
     let mut arrival = if lifetime.continuous() {
         crate::speak_up::Arrival::from_environment(monotonic_us())
     } else {
@@ -8071,6 +8083,39 @@ fn conversation_with_gate(
                     trace,
                     json!({"kind":"hello_due","at_us":clock,"said":false,"provider_session":provider_session}),
                 )?;
+            }
+        }
+        // A face added from a photo at the lamp, unconfirmed: asked once,
+        // gently, as the lamp's own written turn, while it is quiet (#1968).
+        // The person's spoken yes or no is theirs to give; no answer in the
+        // meeting is the eyes' to let go.
+        if let Some(watch) = photo_faces.as_ref()
+            && reply.is_none()
+            && provider_queue.is_empty()
+            && !admission.owns_stream()
+            && !submission_draining
+            && snapshot.listening_ready(now())
+            && clock.saturating_sub(last_turn_us) >= 3_000_000
+            && let Some(provider_session) = unasked_session(&cloud, paused)
+        {
+            // The eyes took it as asked: say it now. Else ask them to.
+            if let Some(name) = watch.asked() {
+                eprintln!("lamp-voice: a face added from a photo is at the lamp; asking them once");
+                snapshot = commit_written_turn(
+                    owner,
+                    reply,
+                    &mut provider_queue,
+                    &crate::photo_faces::note(&name),
+                    false,
+                    "photo_face_ask",
+                    provider_session,
+                    rig.playout_start,
+                    trace,
+                    |state| rig.publish(state),
+                )?;
+                last_publish = monotonic_us();
+            } else if let Some(name) = watch.to_ask() {
+                watch.ask(name);
             }
         }
         // News from an agent, told the way a chief of staff would: when

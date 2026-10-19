@@ -209,6 +209,12 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          down at the desk must never lose their light",
     ),
     (
+        "watch-you-leave",
+        "not yet tried on a lamp (#1669 (e)): it turns the base when the sitter leaves \
+         (`room/stood_up`, `LAMP_ACTIVITY=on`), so it is tried at the arm hour with someone at the \
+         arm, and whether the small turn reads as watching someone go is for that check",
+    ),
+    (
         "not-feeling-well",
         "not yet tried on a lamp (#1681): whether its droop and dim on `lamp/health`'s `error` \
          read as a lamp a little unwell, not a status light, is for the lamp check",
@@ -238,6 +244,53 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "an installable skill, not yet tried on a lamp (#1685): its turns need a lamp-body with \
          `toward` and the lamp's `--gaze`, and its function would put a product session past its \
          32 without `LAMP_USE_SKILL=on`",
+    ),
+    // #1685's four wellbeing nudges: installable skills their owner puts on,
+    // off until each has been seen on a lamp with a person. The four share
+    // one function, `wellbeing_nudges` (their `[stop]`), so with all four a
+    // product session declares 32 of its 32 without `LAMP_USE_SKILL=on`.
+    (
+        "rest-your-eyes",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its tilt and \
+         softer light read as a cue to look away, not a fault, is for the lamp check; with the \
+         other three it adds one function, `wellbeing_nudges`, a product session's 32nd",
+    ),
+    (
+        "sip-of-water",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its slow blue \
+         breath reads as a hint to drink, never a status light, is for the lamp check",
+    ),
+    (
+        "stand-up",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its turn and \
+         tilt after a long sitting read as an invitation, never a nag, is for the lamp check",
+    ),
+    (
+        "wind-down",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): its hours are the \
+         owner's own bedtime, and its hand-over to Bedtime and Morning (#1732) is for the lamp \
+         check",
+    ),
+    // #1684's two core skills, merged off (the first builder, #1722): a
+    // trial puts them on by hand. Each comes with the product once the four
+    // real traces are recorded on a lamp with an air sensor and its
+    // provisional numbers are set again from them.
+    (
+        "smoky-air",
+        "not measured for false alarms yet (#1684): its numbers wait for real traces of kettle \
+         steam, toast, a candle blown out and a match, recorded on a lamp with an air sensor and \
+         replayed",
+    ),
+    (
+        "dusty-air",
+        "not measured for false alarms yet (#1684): its hour at 125 ug/m3 waits for the same \
+         traces and an office's own days, replayed",
+    ),
+    (
+        "who-was-here",
+        "an installable skill, not yet tried on a lamp (#1685): it reads `room/presence`, which the \
+         eyes say only with `LAMP_PRESENCE=on`, and its function would put a product session past \
+         its 32 without `LAMP_USE_SKILL=on`",
     ),
 ];
 
@@ -1835,6 +1888,19 @@ mod tests {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");
         }
+    }
+
+    /// #1815: the cloud is enabled with the lamp, so a Lamp 2 set up from
+    /// the app is online at the next power-up too, not only after
+    /// `cloud-on.sh`.
+    #[test]
+    fn the_cloud_is_enabled_with_the_lamp() {
+        assert!(enabled().iter().any(|name| name == "lamp-cloud.service"));
+        assert!(
+            enabled()
+                .iter()
+                .any(|name| name == "lampos-setup-done.path")
+        );
     }
 
     /// #812: the passive self-test is started by its timer alone, which the

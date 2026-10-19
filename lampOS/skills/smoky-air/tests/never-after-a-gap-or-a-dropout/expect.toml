@@ -1,0 +1,6 @@
+# 80 until 300 s; no message for 5 minutes; then 400 from 600 to 900 s:
+# with no reading in the 3 minutes before, nothing rose. Then 80, 5 minutes
+# of null readings (1,200 to 1,500 s), and 400 again: the nulls are passed
+# over, so again nothing to compare with. Nothing.
+clock = "10:00"
+none = true

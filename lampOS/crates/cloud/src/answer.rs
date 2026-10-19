@@ -81,6 +81,17 @@ pub trait Lamp {
     fn skills(&self) -> Option<crate::skills::Places> {
         None
     }
+    /// Names and the time zone changed after setup (#1959,
+    /// `crate::settings`): there only with `LAMP_CLOUD=on` and
+    /// `LAMP_SETTINGS_CHANGE=on`.
+    fn changes(&self) -> Option<std::sync::Arc<crate::settings::Changes>> {
+        None
+    }
+    /// Where a face from the app's photo goes, and the eyes to ask (#1968,
+    /// `crate::photos`): there only with `LAMP_PHOTO_FACES=on`.
+    fn photos(&self) -> Option<crate::photos::Place> {
+        None
+    }
 }
 
 /// How long a preview is shown after the last one, as V1's: an abandoned
@@ -167,6 +178,22 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             let places = lamp.skills().ok_or_else(|| not_here(kind))?;
             crate::skills::list(&places).map(Some)
         }
+        // Names and the time zone after setup (#1959): handed to root's
+        // helper, answered `starting` now and its result later.
+        kind if crate::settings::KINDS.contains(&kind) && lamp.changes().is_some() => {
+            let changes = lamp.changes().ok_or_else(|| not_here(kind))?;
+            let line = crate::settings::line(kind, data)?;
+            changes.start(kind, line);
+            Ok(None)
+        }
+        // A face from a photo the app sends (#1968): handed to the eyes,
+        // which keep it unconfirmed until its person says yes at the lamp.
+        // It comes over the lamp's own account channel only.
+        "faces.add_photo" if lamp.photos().is_some() => {
+            let place = lamp.photos().ok_or_else(|| not_here(kind))?;
+            let (name, photo) = crate::photos::asked(data)?;
+            crate::photos::add(&place, &name, &photo, crate::chat::now_ms()).map(Some)
+        }
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -197,6 +224,8 @@ pub mod tests {
         pub reports: Option<std::sync::Arc<crate::reports::Shared>>,
         /// The skills page (#1722), with its switch.
         pub skills: Option<crate::skills::Places>,
+        /// Changes after setup (#1959), with their switch.
+        pub changes: Option<std::sync::Arc<crate::settings::Changes>>,
     }
 
     impl Lamp for Fake {
@@ -253,6 +282,9 @@ pub mod tests {
         }
         fn skills(&self) -> Option<crate::skills::Places> {
             self.skills.clone()
+        }
+        fn changes(&self) -> Option<std::sync::Arc<crate::settings::Changes>> {
+            self.changes.clone()
         }
         fn send_text(&mut self, text: &lamp_msgs::ChatIn, _now_ms: u64) -> Result<(), String> {
             self.texts.push(text.clone());

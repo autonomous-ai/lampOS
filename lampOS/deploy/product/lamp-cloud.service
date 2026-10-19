@@ -1,12 +1,13 @@
 # lampOS cloud: the lamp on the company broker, so the Autonomous app sees it online and its
-# page can ask it things (lampOS/docs/cloud.md, #1396). Off unless set: a drop-in turns it on,
-#   [Unit]
-#   Conflicts=os-server.service
-#   [Service]
-#   Environment=LAMP_CLOUD=on
+# page can ask it things (lampOS/docs/cloud.md, #1396). On in the product (#1815): a Lamp 2
+# set up from the app shows online at once, and again after a reboot, since lampos.target
+# starts it once setup's marker is there (lampos-setup-done.path), and install enables it.
 # V1's os-server connects with the same client id (os-server-{device_id}), so only one of them
-# may run. The conflict is in that drop-in, not here: an off lamp-cloud must never stop
-# os-server, on a lamp put back to V1 with lampOS's units still enabled (the reviewer on #1418).
+# may run. lamp-cloud stops it as it really starts (ExecStartPre=, run as root, after the
+# conditions below have held), never through Conflicts=: that stop is queued with the start
+# job, before any condition is checked, so a lamp-cloud skipped for want of setup's account
+# would still stop os-server (the reviewer on #1909; and on #1418, an off lamp-cloud must
+# never stop it). To keep it off on a lamp, mask it (`systemctl mask lamp-cloud`).
 [Unit]
 Description=lampOS cloud (lamp-cloud)
 PartOf=lampos.target
@@ -23,6 +24,9 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
+Environment=LAMP_CLOUD=on
+# `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
+ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos
 Group=lampos
 Slice=lampos-parts.slice

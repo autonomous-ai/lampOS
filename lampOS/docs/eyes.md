@@ -881,7 +881,12 @@ service writes a name said once right.
 With `LAMP_BUS=on` in its unit the eyes also publish every face the
 detector finds, not only the one the body is told to look at, on
 `humans/faces/tracked` ([bus.md](bus.md), "On the lamp";
-`crates/eyes/src/bus_out.rs`). For each face:
+`crates/eyes/src/bus_out.rs`). At start the journal says what this process
+says on the bus, and which of `room/presence` and `room/activity` it
+doesn't with the switch that would, as `said on the bus: humans/faces/tracked,
+diagnostics; not said: room/presence (LAMP_PRESENCE), room/activity
+(LAMP_ACTIVITY)`: a build without a part, or a switch that didn't reach the
+process, shows there before any trial waits for it. For each face:
 
 - **a passing id** (`f1`, `f2`, ...): the same from one look to the next
   for as long as its box overlaps where it was within the last 1.5 s,
@@ -921,6 +926,109 @@ camera is doing, and the sign that the eyes are there is now given the
 same way: before 2026-10-14 it was not given while the camera was not
 permitted, so the eyes read as gone from the bus whenever they were not
 looking.
+
+### A face from a photo (`--photo-dir`, faces from a photo)
+
+Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given, which needs the
+recogniser (`--recogniser`, `--people`, `--who-socket`). The folder is the
+eyes' own (0700); whatever receives a photo from the app on the lamp puts
+it there. That part, lamp-cloud's, isn't built yet. Then it asks on the
+`who` socket, as the voice does: `{"remember":"NAME","photo":"FILE"}`.
+`FILE` is a plain file name in the folder: letters, digits, `-`, `_` and
+`.`, not hidden, at most 128 bytes (`photo::plain_file`).
+
+**Only the prints of people who asked are kept, and a photo isn't their
+asking** (the first builder on #1968, 22:12). So a face from a photo is
+kept **unconfirmed**, until its person says yes at the lamp:
+
+- **Read once, then gone:** the file is read (a regular file, not a link,
+  checked to be the entry it opened; at most 8 MiB) and **removed whatever
+  follows**: a refusal, a bad name, a picture with no face. A link is
+  removed, not what it names. No picture is kept, only the print
+  (`photo::take`).
+- **Its one face:** decoded at the detector's size as a camera frame is,
+  its faces found, and the largest taken. It must be at least `NEAR_ENOUGH`
+  (0.10) of the picture's height, with no other face half its size or more
+  (`photo::one_face`). Then it's cut out upright and printed as recognition
+  does (`photo::print_of`).
+- **Kept apart, unconfirmed:** in its own file beside the people's,
+  `<people>.from-photos` (mode 0600, `photo::Unconfirmeds`), never in
+  `people.json`. An older build never reads it, so never takes it for
+  someone who asked. At most 20. It's **never named, counted, greeted or
+  used for "who is this?"**: recognition, the known file, `humans/familiar`
+  and the hello read the people's file only. The answer is
+  `{"added":NAME,"unconfirmed":true}`. A face already someone's who asked is
+  theirs: `{"remembered":NAME}` for the same name, `known_as` for another.
+- **When it's at the lamp:** recognition finds nobody who asked, but an
+  unconfirmed face matches. The eyes then note that face as here, and say
+  only that when asked: `{"photo_here":true}` gives `{"photo_here":NAME}` or
+  `null`, so the voice can ask the person once (`{"photo_asked":NAME}`).
+- **Their answer, taken only for the face at the lamp now** (seen within
+  `KNOWN_FOR`, `photo::is_here`), so nothing elsewhere can say yes for
+  someone (the reviewer on #1968, 22:28): `photo_asked` for a face not here
+  is `not_here`, and `photo_yes` is `not_here` or, if it wasn't asked,
+  `not_asked`.
+  - `{"photo_yes":NAME}` makes it an ordinary print (`People::remember_one`),
+    with the remembering's own answers. A yes the store refuses (`full`)
+    leaves it unconfirmed as it was.
+  - `{"photo_no":NAME}` deletes it (`{"let_go":true}`).
+  - **No answer:** once asked, a face not seen for 20 s, the meeting over,
+    is let go (`photo::unanswered`, `MEETING_GAP_US`).
+  - **"Forget my face"** deletes it too.
+- **Never confirmed:** deleted 30 days after it was added
+  (`UNCONFIRMED_FOR_S`), looked at once a second. A `.from-photos` file that
+  can't be read is removed, so no print sits out of that reach.
+- **The product reset** wipes `<people>.from-photos` with `people.json`
+  (`reset-plan-product.json`).
+- **The answers** are the voice's: `photos_off`, `not_a_name`, `unreadable`
+  (no file, a link, too large, not a JPEG), `no_face`, `too_far`,
+  `two_faces`, `known_as`, `full`, `not_here`, `not_asked`, `not_unconfirmed` or
+  `storage`. The
+  journal says only which, never the name or the file.
+
+**The voice's asking** (`LAMP_PHOTO_FACES=on` in the voice, with the eyes'
+socket; `crates/voice/src/photo_faces.rs`):
+- A thread asks the eyes `photo_here` every 2 s, off the voice's loop, so
+  the loop never waits on them (`photo_faces::Watch`).
+- When an unconfirmed face is here and wasn't asked about yet, and the lamp
+  is quiet (no turn under way, nothing queued, nothing said for 3 s, input
+  ready, a session open), the thread tells the eyes `photo_asked`. The
+  voice then says, once, as its own written turn (`photo_face_ask`): "Someone
+  added your face from a photo, as NAME. Shall I remember you?" It doesn't
+  use the name as theirs unless they agree.
+- **Their spoken answer** calls `photo_face_yes` or `photo_face_no`. These
+  run in the provider's worker, a process apart from the coordinator that
+  asked, so they take the face from the eyes, the unconfirmed one
+  `photo_here` names now, and tell the eyes `photo_yes` or `photo_no` for it.
+  The eyes take a yes only for that face once it was asked (`not_asked`
+  otherwise), so no name has to cross processes (the reviewer on #1977,
+  22:50). Like the other
+  face functions, these are taken only from words heard at the lamp, never
+  a written or typed request. A yes for a face that has gone is
+  `not_here`, and the model is told nothing changed.
+- No answer is the eyes' to let go, at the meeting's end.
+
+**From the app:** lamp-cloud's `faces.add_photo` writes the app's photo into
+`--photo-dir` as a new 0600 file and sends the ask, only over the lamp's own
+account channel, and removes the file afterwards ([cloud.md](cloud.md), "A
+face from the app's photo"). The eyes make the folder theirs at 0700 when
+they start, and refuse one open to others (`photo::ready`).
+
+Tests (`photo.rs`):
+- the file read once and removed, a second ask finding nothing; one too
+  large refused and removed; a link refused and removed, and what it names
+  kept; a folder left; only plain file names;
+- the one face, or `no_face`, `two_faces` or `too_far`, on made-up faces;
+- the unconfirmed store: its own file, 0600, the people's untouched; found
+  only by likeness; read back; yes takes it out; no deletes it; asked and
+  unseen for 20 s, let go; 30 days, deleted;
+- with the pinned models (`LAMP_EYES_MODELS`): a grey picture is `no_face`,
+  bytes that are no JPEG `unreadable`, and with `LAMP_FACE_PHOTO` a print of
+  length one. That was run here with the two pinned models and NASA's
+  public-domain astronaut portrait (scikit-image's sample, never committed).
+
+The asks' parsing is in `who.rs`, `--photo-dir` in `main.rs`, and the reset's
+wipe in `crates/setup/tests/reset.rs`. Not run on a lamp.
 
 ### How familiar a remembered person is (`--visits on`, #1670)
 
@@ -1040,7 +1148,12 @@ With `LAMP_ACTIVITY=on` beside `LAMP_BUS=on`, the eyes also say on
 `room/activity` (`lamp_msgs::RoomActivity`) what the face at the desk shows,
 and on `room/stood_up` (`lamp_msgs::StoodUp`, an event) when someone rose
 out of the chair and left (`crates/eyes/src/activity.rs`, from
-`bus_out.rs`). The eyes see a face, not a body, so each state is read from
+`bus_out.rs`). It says the side of the picture they left by (`side`, `left`
+or `right`) when their face was last seen less than 0.35 of the picture's
+width from that edge as they rose, and no side nearer the middle: for
+watching them go (#1669), a turn toward it is the one the gaze would make
+to a face seen there (body.md, `toward`). 0.35 is provisional, until the
+arm hour sets it. The eyes see a face, not a body, so each state is read from
 the sitter's face against this person's own sitting: the median of its
 first two minutes of looks at the desk (a face at least 0.14 of the picture
 tall, Stretch break's `near`). The sitter is the largest near face when a

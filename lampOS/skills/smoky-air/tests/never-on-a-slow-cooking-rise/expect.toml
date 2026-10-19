@@ -1,0 +1,4 @@
+# From 80 up to 300 over 30 minutes (300 to 2,100 s), as a pan heating,
+# then 10 minutes at 300: about 22 in any 3 minutes, never 100. Nothing.
+clock = "10:00"
+none = true

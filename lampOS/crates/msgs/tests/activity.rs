@@ -1,7 +1,9 @@
 //! `room/activity` and `room/stood_up` (#1678): what the face at the desk
 //! shows, and someone standing up to leave.
 use lamp_bus::Kind;
-use lamp_msgs::{Activity, RoomActivity, StoodUp, activity_topics, declaration_of, first_topics};
+use lamp_msgs::{
+    Activity, RoomActivity, Side, StoodUp, activity_topics, declaration_of, first_topics,
+};
 use std::time::Duration;
 
 #[test]
@@ -78,6 +80,7 @@ fn activity_is_kept_and_standing_up_is_an_event_apart_from_the_first_topics() {
     assert_eq!(kept.lifespan_ms, Some(3_000));
     assert_eq!(RoomActivity::LASTS, Duration::from_secs(3));
     assert_eq!(StoodUp::declaration().kind, Kind::Event);
+    assert_eq!(StoodUp::declaration().lifespan_ms, Some(5_000));
     let names: Vec<&str> = activity_topics().iter().map(|(name, _)| *name).collect();
     assert_eq!(names, ["room/activity", "room/stood_up"]);
     for name in names {
@@ -87,8 +90,29 @@ fn activity_is_kept_and_standing_up_is_an_event_apart_from_the_first_topics() {
             "{name}"
         );
     }
+    // No side, near the middle: not written, so a reader before it sees the
+    // message as it was; one written before it reads as no side.
     assert_eq!(
-        serde_json::to_string(&StoodUp { sitting_s: 3000 }).unwrap(),
+        serde_json::to_string(&StoodUp {
+            sitting_s: 3000,
+            side: None
+        })
+        .unwrap(),
         r#"{"sitting_s":3000}"#
+    );
+    assert_eq!(
+        serde_json::from_str::<StoodUp>(r#"{"sitting_s":3000}"#).unwrap(),
+        StoodUp {
+            sitting_s: 3000,
+            side: None
+        }
+    );
+    assert_eq!(
+        serde_json::to_string(&StoodUp {
+            sitting_s: 60,
+            side: Some(Side::Left)
+        })
+        .unwrap(),
+        r#"{"sitting_s":60,"side":"left"}"#
     );
 }

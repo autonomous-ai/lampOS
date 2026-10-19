@@ -67,11 +67,11 @@ cat >"$T/bin/controls" <<'EOF'
 echo "controls $*" >>"$FAKE_LOG"
 if [[ $1 == discover-head ]]; then
   [[ -n ${FAKE_DISCOVERY_SLEEP:-} ]] && sleep "$FAKE_DISCOVERY_SLEEP"
-  line() { printf '{"line":%s,"high_with_pull_down":%s,"high_with_pull_up":true,"idle_high":%s,"completed_pulses":%s,"longest_pulse_us":%s,"active_low_candidate":%s}' "$@"; }
+  line() { printf '{"line":%s,"high_with_pull_down":%s,"high_with_pull_up":true,"idle_high":%s,"completed_pulses":%s,"longest_pulse_us":%s,"active_low_candidate":%s,"rest_changes":%s,"reads":%s}' "$@"; }
   if [[ -n ${FAKE_DISCOVERY:-} ]]; then
     echo "$FAKE_DISCOVERY"
   else
-    echo "{\"lines\":[$(line 37 false null 0 0 null),$(line 96 false null 0 0 null),$(line 97 false false 2 3256546 false),$(line 98 false false 2 3256884 false)],\"observations\":5000,\"gaps\":0,\"started_us\":1,\"last_us\":2,\"hardware_mapping_installed\":false}"
+    echo "{\"lines\":[$(line 37 false null 0 0 null 0 null),$(line 96 false null 0 0 null 0 null),$(line 97 false false 2 3256546 false 0 '"level"'),$(line 98 false false 2 84000 false 0 '"pulses"')],\"observations\":5000,\"gaps\":0,\"started_us\":1,\"last_us\":2,\"hardware_mapping_installed\":false,\"rest_us\":10000000}"
   fi
   exit "${FAKE_DISCOVERY_EXIT:-0}"
 fi
@@ -108,7 +108,7 @@ check "a dry run writes no lamp.env" '[[ ! -e $T/root/$ENV ]]'
 check "a dry run places no key" '[[ ! -e $T/root/etc/lampOS/update/key.pub ]]'
 check "a dry run reads the body at rest only, into /tmp" 'grep -q "^measure --device /dev/ttyACM0 --unit-id lamp-test --lock-directory /run/lampos-locks/motor --write $T/root/tmp/" "$T/log" && ! grep -q "^body" "$T/log"'
 check "a dry run never runs the self-test" '! grep -q "^selftest" "$T/log"'
-check "GPIO pads, dry: says how it would find them and reads nothing" 'grep -q "would stop lamp-controls, run .*discover-head --seconds 30" "$T/out" && ! grep -q "^controls" "$T/log" && ! grep -q "systemctl stop" "$T/log"'
+check "GPIO pads, dry: says how it would find them and reads nothing" 'grep -q "would stop lamp-controls, run .*discover-head --seconds 40 --rest-seconds 10" "$T/out" && ! grep -q "^controls" "$T/log" && ! grep -q "systemctl stop" "$T/log"'
 
 # Without a person to say yes, a written run moves nothing and writes nothing.
 lamp; run --write --update-key "$KEYFILE"; status=$?
@@ -195,13 +195,27 @@ check "LAMP_CONTROLS_STRIP=off is off" 'grep -q "the base strip is off" "$T/out"
 # polarity this unit showed go into its pins file, the rest of it kept.
 PINSF=etc/lampOS/controls/controls-pins.json
 lamp; ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
-check "the head pads found are written with their polarity, the rest kept" '[[ $status == 0 ]] && [[ $(jq -c .head_pads "$T/root/$PINSF") == "[{\"name\":\"head-1\",\"line\":97,\"active_low\":false,\"pull\":\"down\"},{\"name\":\"head-2\",\"line\":98,\"active_low\":false,\"pull\":\"down\"}]" ]] && [[ $(jq -r .chip "$T/root/$PINSF") == /dev/gpiochip0 ]] && ls "$T/root/etc/lampOS/controls/" | grep -q "controls-pins.json.before-factory-"'
-check "lamp-controls is stopped for the read, started again, then restarted on the new pins" '[[ $(grep "lamp-controls" "$T/log" | tr "\n" "|") == "systemctl stop lamp-controls|systemctl start lamp-controls|systemctl restart lamp-controls|" ]] && grep -q "^controls discover-head --seconds 30$" "$T/log"'
+check "the head pads found are written with their polarity and baseline, the rest kept" '[[ $status == 0 ]] && [[ $(jq -c .head_pads "$T/root/$PINSF") == "[{\"name\":\"head-1\",\"line\":97,\"active_low\":false,\"pull\":\"down\"},{\"name\":\"head-2\",\"line\":98,\"active_low\":false,\"pull\":\"down\"}]" ]] && [[ $(jq -c .head_rest "$T/root/$PINSF") == "[{\"name\":\"head-1\",\"rest\":\"low\",\"reads\":\"level\"},{\"name\":\"head-2\",\"rest\":\"low\",\"reads\":\"pulses\"}]" ]] && [[ $(jq -r .chip "$T/root/$PINSF") == /dev/gpiochip0 ]] && ls "$T/root/etc/lampOS/controls/" | grep -q "controls-pins.json.before-factory-"'
+check "lamp-controls is stopped for the read, started again, then restarted on the new pins" '[[ $(grep "lamp-controls" "$T/log" | tr "\n" "|") == "systemctl stop lamp-controls|systemctl start lamp-controls|systemctl restart lamp-controls|" ]] && grep -q "^controls discover-head --seconds 40 --rest-seconds 10$" "$T/log"'
 pulled() { printf '{"line":%s,"high_with_pull_down":%s,"high_with_pull_up":%s,"idle_high":%s,"completed_pulses":%s,"longest_pulse_us":1,"active_low_candidate":%s}' "$@"; }
 lamp; before=$(cat "$T/root/$PINSF")
 FAKE_DISCOVERY="{\"lines\":[$(pulled 37 true true true 2 true),$(pulled 96 true true true 1 null),$(pulled 97 false false false 0 null),$(pulled 98 false true null 0 null)],\"hardware_mapping_installed\":false}" \
   ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
 check "one pad touched twice is not a pair: nothing written, controls started again" '[[ $status == 1 ]] && grep -q "head pads found on \[37\] lines, not two" "$T/out" && [[ $(cat "$T/root/$PINSF") == "$before" ]] && grep -q "systemctl start lamp-controls" "$T/log" && ! grep -q "systemctl restart" "$T/log"'
+# A pad whose line changed with hands away (lamp-cb94's 97, #1764) is
+# refused; a report from an older discover-head writes no baseline.
+lamp; before=$(cat "$T/root/$PINSF")
+FAKE_DISCOVERY="{\"lines\":[$(pulled 97 false false false 2 false | sed 's/}$/,"rest_changes":3,"reads":"level"}/'),$(pulled 98 false false false 2 false | sed 's/}$/,"rest_changes":0,"reads":"pulses"}/')],\"hardware_mapping_installed\":false}" \
+  ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
+check "a pad whose rest changed with hands away: nothing written, controls started again" '[[ $status == 1 ]] && grep -q "head pad lines \[97\] changed with hands away" "$T/out" && [[ $(cat "$T/root/$PINSF") == "$before" ]] && grep -q "systemctl start lamp-controls" "$T/log" && ! grep -q "systemctl restart" "$T/log"'
+lamp; before=$(cat "$T/root/$PINSF")
+FAKE_DISCOVERY="{\"lines\":[$(pulled 97 false false false 2 false | sed 's/}$/,"rest_changes":0,"reads":null}/'),$(pulled 98 false false false 2 false | sed 's/}$/,"rest_changes":0,"reads":"pulses"}/')],\"hardware_mapping_installed\":false}" \
+  ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
+check "a pad touched too quickly to tell how it reads: nothing written, asked again" '[[ $status == 1 ]] && grep -q "head pad lines \[97\] were neither held half a second nor pulsing" "$T/out" && [[ $(cat "$T/root/$PINSF") == "$before" ]] && ! grep -q "systemctl restart" "$T/log"'
+lamp
+FAKE_DISCOVERY="{\"lines\":[$(pulled 97 false false false 2 false),$(pulled 98 false false false 2 false)],\"hardware_mapping_installed\":false}" \
+  ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
+check "an older report without the rest: the pads are written, no baseline" '[[ $status == 0 ]] && [[ $(jq -c "[.head_pads[].line]" "$T/root/$PINSF") == "[97,98]" ]] && [[ $(jq -c .head_rest "$T/root/$PINSF") == null ]] && grep -q "rest: \"not measured\"" "$T/out"'
 lamp; JQ=/nonexistent/jq ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
 check "no jq: the head pads step says so, before stopping anything" '[[ $status == 1 ]] && grep -q "/nonexistent/jq is not installed" "$T/out" && ! grep -q "systemctl stop" "$T/log"'
 lamp; FAKE_DISCOVERY_EXIT=1 ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
