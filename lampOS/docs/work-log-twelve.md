@@ -369,3 +369,9 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
 - The owner's rule (19:38): voice tests on the second route. twelve-P2 is
   #1930 into #1712's head: forget-all and threads reach the second worker.
   #1693 (4)'s run sheet is rewritten for the second route.
+- #1930 merged into #1712. #1909 rebased again after #1919; waits on ARM64.
+- "Remembers what matters" (#1693 (2)) is #1974 onto #1712: the second
+  route's DeepSeek proposes at a conversation's end, and the memory checks
+  through `tidy_apply`. An empty apply now closes a job (memory). Behind
+  `LAMP_MEMORY_OBSERVE`, off. ARM64 39279149488 dispatched. Next: the dry
+  run against the bar.
