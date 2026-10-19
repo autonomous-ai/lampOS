@@ -228,11 +228,20 @@ pub fn translate(call: &ToolCall, skills: &[Tool]) -> Result<ToolCall, Value> {
         .as_object()
         .and_then(|args| args.keys().find(|key| !known(key)))
     {
-        return Err(json!({
-            "error": format!(
-                "use_skill takes skill, choice and flag, not {stray}: give {}'s choice as choice and its yes-or-no as flag.",
+        // Only what the skill takes, so the model is not sent after a
+        // choice it then is told the skill has none of (the reviewer on
+        // #1706).
+        let takes = match (choice_of.is_some(), flag_of.is_some()) {
+            (true, true) => format!(
+                "give {}'s choice as choice and its yes-or-no as flag",
                 skill.name
-            )
+            ),
+            (true, false) => format!("give {}'s choice as choice", skill.name),
+            (false, true) => format!("give {}'s yes-or-no as flag", skill.name),
+            (false, false) => format!("{} takes only its name", skill.name),
+        };
+        return Err(json!({
+            "error": format!("use_skill takes skill, choice and flag, not {stray}: {takes}.")
         }));
     }
     let given_choice = call.args.get("choice").or_else(|| {
@@ -453,6 +462,18 @@ mod tests {
         assert_eq!(
             stray["error"],
             "use_skill takes skill, choice and flag, not mood: give dance's choice as choice and its yes-or-no as flag."
+        );
+        let bare =
+            translate(&call(json!({"skill":"check_my_work","page":1})), &skills).unwrap_err();
+        assert_eq!(
+            bare["error"],
+            "use_skill takes skill, choice and flag, not page: check_my_work takes only its name."
+        );
+        let word =
+            translate(&call(json!({"skill":"show_verdict","mood":"x"})), &skills).unwrap_err();
+        assert_eq!(
+            word["error"],
+            "use_skill takes skill, choice and flag, not mood: give show_verdict's choice as choice."
         );
         let no_choice = translate(
             &call(json!({"skill":"check_my_work","choice":"jazz"})),
