@@ -799,7 +799,7 @@ impl Heeding {
                 .and_then(|levels| levels.lock().ok())
                 .is_some_and(|levels| {
                     levels.iter().any(|(at, rise)| {
-                        (began..=ended).contains(at) && *rise >= crate::attention::NEAR_RISE_DB
+                        (began..=ended).contains(at) && *rise >= crate::attention::near_rise_db()
                     })
                 }),
             continues_from: None,

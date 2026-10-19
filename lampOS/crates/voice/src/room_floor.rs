@@ -167,12 +167,13 @@ impl Rise {
         }
     }
 
-    /// Whether the room microphone rose [`crate::attention::NEAR_RISE_DB`]
-    /// or more since `from_us`.
+    /// Whether the room microphone rose the near rule's bar
+    /// ([`crate::attention::near_rise_db`]) or more since `from_us`.
     pub fn close_since(&self, from_us: u64) -> bool {
+        let bar = crate::attention::near_rise_db();
         self.rises
             .iter()
-            .any(|(at, rise)| *at >= from_us && *rise >= crate::attention::NEAR_RISE_DB)
+            .any(|(at, rise)| *at >= from_us && *rise >= bar)
     }
 }
 

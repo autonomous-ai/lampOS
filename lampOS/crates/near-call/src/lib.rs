@@ -207,10 +207,15 @@ impl Calibrated {
         })
     }
 
-    /// Whether its bar is the one its tries make: a file written by hand,
-    /// or by an older rule, is not used.
+    /// Whether its bar is the one its tries make, from tries that could have
+    /// been accepted: each name heard at [`SCORE`] to 1. A file written by
+    /// hand, or by an older rule, is not used (Seventh on #1803: a score of
+    /// 7 or not a number was).
     pub fn fits(&self) -> bool {
-        near_rise(&self.tries).is_some_and(|bar| (bar - self.near_rise_db).abs() < 0.05)
+        self.tries
+            .iter()
+            .all(|done| (SCORE..=1.0).contains(&done.score))
+            && near_rise(&self.tries).is_some_and(|bar| (bar - self.near_rise_db).abs() < 0.05)
     }
 }
 
@@ -437,5 +442,18 @@ mod tests {
         assert_eq!(read(&path), None);
         std::fs::write(&path, b"{}").expect("written");
         assert_eq!(read(&path), None);
+        // Tries no step could have accepted: a score over 1, not a number,
+        // or under the rule's bar.
+        for score in [7.0, f32::NAN, 0.9] {
+            let mut odd = tries(&[22.4, 25.0, 23.1]);
+            odd[1].score = score;
+            let odd = Calibrated {
+                near_rise_db: 19.4,
+                tries: odd,
+                at_unix_s: 1,
+            };
+            write(&path, &odd).expect("written");
+            assert_eq!(read(&path), None, "{score}");
+        }
     }
 }

@@ -891,6 +891,10 @@ fn worker_command(
             role,
             var(crate::local_time::KERNEL_CLOCK_ENVIRONMENT).as_deref(),
         ))
+        .envs(near_calibrated_worker_environment(
+            role,
+            var(crate::attention::NEAR_CALIBRATED_ENVIRONMENT).as_deref(),
+        ))
         .envs(quiet_evidence_worker_environment(
             role,
             var(crate::quiet_pace::EVIDENCE_ENVIRONMENT).as_deref(),
@@ -974,6 +978,16 @@ fn kernel_clock_worker_environment(
         .then_some((crate::local_time::KERNEL_CLOCK_ENVIRONMENT, "on"))
 }
 
+// This home's near bar (#753), to the two routes' workers, which judge a
+// call with it: the exact `on`.
+fn near_calibrated_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::attention::NEAR_CALIBRATED_ENVIRONMENT, "on"))
+}
+
 // The echo evidence's skip (#705), to the one worker that runs it: capture.
 fn quiet_evidence_worker_environment(
     role: &str,
@@ -1039,6 +1053,30 @@ fn person_name_worker_environment(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #753: this home's near bar reaches the two routes' workers, which
+    /// judge a call with it, and only as the exact `on`.
+    #[test]
+    fn the_near_bars_switch_reaches_the_two_routes_only() {
+        let on = Some(std::ffi::OsStr::new("on"));
+        for role in ["provider", "second"] {
+            assert_eq!(
+                near_calibrated_worker_environment(role, on),
+                Some((crate::attention::NEAR_CALIBRATED_ENVIRONMENT, "on")),
+                "{role}"
+            );
+        }
+        for role in ["capture", "speaker"] {
+            assert_eq!(near_calibrated_worker_environment(role, on), None, "{role}");
+        }
+        for off in [
+            None,
+            Some(std::ffi::OsStr::new("ON")),
+            Some(std::ffi::OsStr::new("")),
+        ] {
+            assert_eq!(near_calibrated_worker_environment("provider", off), None);
+        }
+    }
 
     #[test]
     fn cleared_worker_environment_passes_only_the_exact_voice_route_opt_in() {
@@ -1212,6 +1250,7 @@ mod tests {
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::local_time::KERNEL_CLOCK_ENVIRONMENT,
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
+                    crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
                 ]
                 .contains(&name)
                 {
@@ -1259,6 +1298,7 @@ mod tests {
             (
                 "provider",
                 vec![
+                    "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
@@ -1270,6 +1310,7 @@ mod tests {
             (
                 "second",
                 vec![
+                    "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",

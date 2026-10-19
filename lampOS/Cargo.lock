@@ -2272,6 +2272,7 @@ dependencies = [
  "lamp-ipc",
  "lamp-local-time",
  "lamp-msgs",
+ "lamp-near-call",
  "lamp-policy",
  "lamp-ring",
  "lamp-schedule",
