@@ -23,6 +23,7 @@ cat >"$T/bin/systemctl" <<'EOF'
 #!/usr/bin/env bash
 echo "systemctl $*" >>"$FAKE_LOG"
 [[ $1 == is-active ]] && { echo "${FAKE_BODY_STATE:-inactive}"; [[ ${FAKE_BODY_STATE:-inactive} == active ]]; exit; }
+[[ $1 == show ]] && { echo "Environment=${FAKE_CONTROLS_ENV:-}"; exit 0; }
 exit 0
 EOF
 cat >"$T/bin/measure" <<'EOF'
@@ -176,12 +177,19 @@ mpr121() {
   printf '{"chip":"/dev/gpiochip0","base":{"bus":0,"address":90,"pads":[0,1]}}\n' \
     >"$T/root/etc/lampOS/controls/controls-pins.json"
 }
-lamp; mpr121; run --update-key "$KEYFILE"; status=$?
+lamp; mpr121; FAKE_CONTROLS_ENV="LAMP_BUS=on LAMP_CONTROLS_STRIP=on" run --update-key "$KEYFILE"; status=$?
 check "an MPR121 lamp's dry touch step stops and runs nothing" '[[ $status == 0 ]] && grep -q "would stop lamp-controls, run" "$T/out" && ! grep -q "^controls" "$T/log" && ! grep -q "systemctl stop" "$T/log"'
-lamp; mpr121; run --write --from 2 --update-key "$KEYFILE"; status=$?
+lamp; mpr121; FAKE_CONTROLS_ENV="LAMP_CONTROLS_STRIP=on" run --write --from 2 --update-key "$KEYFILE"; status=$?
 check "an MPR121 lamp's written touch step needs a console" '[[ $status == 1 ]] && grep -q "step 2 (the touch pads) failed" "$T/out" && ! grep -q "^controls" "$T/log" && ! grep -q "systemctl stop" "$T/log"'
-lamp; mpr121; ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
+lamp; mpr121; FAKE_CONTROLS_ENV="LAMP_CONTROLS_STRIP=on" ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
 check "an MPR121 lamp's written touch step calibrates and starts controls again" '[[ $status == 0 ]] && grep -q "^controls calibrate-touch --pins $T/root/etc/lampOS/controls/controls-pins.json --output" "$T/log" && grep -q "systemctl start lamp-controls" "$T/log" && ls "$T/root/etc/lampOS/controls/" | grep -q "controls-pins.json.before-factory-"'
+
+# An MPR121 lamp with the strip off (#1891): no calibration, the head pads
+# found instead; the switch named anywhere but on its own is not on.
+lamp; mpr121; ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
+check "the strip off: no calibration, the head pads are found instead" '[[ $status == 0 ]] && grep -q "the base strip is off" "$T/out" && ! grep -q "^controls calibrate-touch" "$T/log" && grep -q "^controls discover-head" "$T/log" && [[ $(jq -c "[.head_pads[].line]" "$T/root/etc/lampOS/controls/controls-pins.json") == "[97,98]" ]]'
+lamp; mpr121; FAKE_CONTROLS_ENV="LAMP_CONTROLS_STRIP=off" run --update-key "$KEYFILE"; status=$?
+check "LAMP_CONTROLS_STRIP=off is off" 'grep -q "the base strip is off" "$T/out" && ! grep -q "calibrate-touch --pins" "$T/out"'
 
 # GPIO head pads, written (the first builder on #1362, 12:54): the pair and
 # polarity this unit showed go into its pins file, the rest of it kept.

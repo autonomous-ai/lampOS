@@ -6,6 +6,7 @@
 #   2. the touch pads: on GPIO head pads, which lines this unit's pads are on
 #      and which way they read (lamp-controls discover-head, a person touching
 #      each pad twice), into the pins file; on an MPR121, calibrate-touch
+#      only while lamp-controls runs with LAMP_CONTROLS_STRIP=on
 #   3. the update key's public half: /etc/lampOS/update/key.pub
 #   4. the self-test: lamp-selftest --occasion factory
 # Run on the lamp, as root. Every step is dry unless --write: it reads and
@@ -28,7 +29,7 @@
 # STAND_WAIT is the seconds a stand is given (34).
 set -uo pipefail
 
-usage() { sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'; }
 
 ROOT=${ETC_ROOT:-}
 MEASURE_BIN=${MEASURE_BIN:-/opt/lampOS/body/current/lamp-body-measure}
@@ -275,6 +276,14 @@ step_touch() {
   [[ -r $PINS ]] || { fail "no pins file at $PINS"; return 1; }
   # An MPR121 pins file names its chip in a top-level "base" (controls.md).
   if ! grep -q '"base"' "$PINS"; then
+    step_head_pads
+    return
+  fi
+  # The base strip is off unless lamp-controls runs with LAMP_CONTROLS_STRIP=on
+  # (#1891, controls.md "The base strip is off"): nothing would read its
+  # calibration, so only the head pads are found.
+  if ! "$SYSTEMCTL" show -p Environment lamp-controls 2>/dev/null | grep -qw "LAMP_CONTROLS_STRIP=on"; then
+    say "the base strip is off (LAMP_CONTROLS_STRIP, controls.md): its calibration is skipped; the head pads are found as on any lamp"
     step_head_pads
     return
   fi
