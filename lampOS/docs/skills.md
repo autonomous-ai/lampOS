@@ -140,7 +140,8 @@ must not leave a step silently undone)*.
 | `needs` | no | The parts it uses (`eyes`, `ears`, `air`, `voice`, `body`, `light`, ...): which bodies it suits, as V1's capabilities. Kept, not checked yet; what it may do is `[permissions]`, which is checked |
 | `kind` | no | `core` (comes with the lamp, always there, never removed) or `installable` (its owner puts it on and takes it off), `installable` without it (below, "Core and installable skills") |
 | `version` | no, but a package needs it | The skill's own version, `MAJOR.MINOR.PATCH`, three whole numbers without leading zeros (`"1.0.0"`) |
-| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, each `true` or left out. A key not listed refuses the skill, and so does a read or a step it does not give |
+| `[permissions]` | no, but without it a skill may do nothing | What it may read and use, and nothing else (below, "Permissions"): `topics`, the topics it reads; `actions`, the actions part's functions it may call by name beyond the light's own; and `speak`, `light`, `body`, `look`, `messages`, `known_faces`, each `true` or left out. A key not listed refuses the skill, and so does a read or a step it does not give |
+| `[watch]` | no | The skill is a watch (below, "A watch"): `every`, `asked_within` and `mark`. Then it has a `tool` whose `[choice]` is exactly `on` and `off` with no default, and no trigger, `[[do]]`, `[flag]`, `[again]`, `still`, `[quiet]`, `[[while]]` or `[ask]` |
 | `[trigger]` or `[[trigger]]` | yes, unless it has a `tool` | When the skill runs: one table, or several, each checked on its own |
 | `tool` | no | A function the model may call, which runs the steps (below, "Tools for the model"). A lowercase letter, then at most 47 lowercase letters, digits and `_`. It is described to the model with `SKILL.md`'s description, which is then at most 1,024 bytes and says when to call it |
 | `[choice]` | no | The tool's one argument the model picks from named values: `name` (a lowercase letter, then at most 31 lowercase letters, digits and `_`), `about` (what it means, told to the model, at most 256 bytes) and `one_of` (1 to 16 different plain names), with an optional `default`, one of them: a call that gives none is made as that value (#1679: Light show's party, Point the light's ahead). The model may leave it out. Only with a `tool` |
@@ -205,7 +206,7 @@ runs it yet.
     [[expect]]
     at = "600s"                # optional: when, from the case's first message
     within = "1s"              # optional; without it, exactly
-    call = "body.gaze"         # body.gaze, body.gesture, body.move, body.mood, light, show, say, sound, look or ends
+    call = "body.gaze"         # body.gaze, body.gesture, body.move, body.mood, light, show, say, sound, look, text or ends
     args = { look_at = "face" }
 
 A call matches when its name is the same and each argument named in `args`
@@ -224,6 +225,7 @@ runtime gives are:
 - `say`: `note`, or `from` for what the voice keeps (`say = { from = … }`), and `task` when an item's run names its task (#1237); from a say table (#1684), `text` for exact words or `note`, with `priority` and `expires_ms`
 - `sound`: `sound`, the name in `sounds/`
 - `look`: none
+- `text`: `text`, a watch's line on `messages/out` (below, "A watch")
 - `ends`: none; the trigger of a run with `until = "ends"` stopped holding,
   or its topic's newest value expired or went silent, or a reload found its
   skill or trigger gone, so what it held is given back. In a replay, an expiry or a silence is seen at the first
@@ -279,7 +281,7 @@ Its own process, its own owner, like every part
 
 As built on 2026-10-16 (#938, `crates/skills`, not yet run on a lamp):
 
-    lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] [--tools-dir DIR] [--clock-control PATH] [--zone system|NAME | --utc-offset-minutes N]
+    lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] [--tools-dir DIR] [--clock-control PATH] [--known-file PATH] [--zone system|NAME | --utc-offset-minutes N]
     lamp-skills test SKILL_DIR...
     lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar
     lamp-skills remove [--dir DIR] NAME
@@ -728,6 +730,51 @@ the model's answer begins with those words. A `tools.json` left by a `lamp-skill
 killed stays until it starts again; a call then is answered as not
 running. The test uses a folder of Desk tutor's shape.
 
+### A watch
+
+Guard mode's kind (#1685, [guard-mode.md](guard-mode.md),
+`crates/skills/src/watch.rs`): a skill that is on only while a person has
+asked for it, and tells them by text who came to the desk while they were
+out. It has no trigger and no steps; its `[watch]` says what it does:
+
+```toml
+[watch]
+every = "10m"                           # at most one text this often (1m to 24h)
+asked_within = "30s"                    # on only when someone spoke this lately (5s to 2m)
+mark = { colour = "blue", level = 1 }   # a faint light while on: level 1 or 2, steady
+```
+
+- **Turned by its tool.** A call with `turn = "on"` turns it on only if
+  something was heard on `voice/heard` within `asked_within` of the call (a
+  typed request is not heard) and the ring takes `light/request` for its
+  mark; else the model is told why. `off` always turns it off. Nothing else
+  turns it on: not a message, not a load, a reload or a restart, which
+  leave it off. A reload that changes its `[watch]`, or removes it, turns it
+  off and gives its mark back.
+- **The mark** is asked of the ring while it is on, as any skill's light
+  with `LAMP_LIGHT_REQUESTS=on`, and given back when it goes off.
+- **Visits** count once `room/presence` has said nobody since it was asked.
+  A visit runs from someone there (or a face at least 0.10 of the picture's
+  height) until `room/presence` says nobody; its end is one line on
+  `messages/out` (`lamp_msgs::MessageOut`, `from` `skill:<name>`, stamped by
+  the program), at most one each `every`.
+- **Known faces** come from the eyes' known file, `--known-file PATH`
+  (`lamp-eyes --known-file`, renewed every 2 s while a known person is at
+  the lamp, older than 5 s read as nobody known). A watch says only known or
+  not; the name stays in the program, to tell the person who asked, whose
+  face back after they left ends the watch, from anyone else.
+- **The privacy switch**, `voice/privacy`'s `physical_muted`, is looked at
+  with the known file on each pass of the program's loop while a watch is
+  on: closed, one line, once while it is on.
+- **Its permissions:** `light` (the mark), `messages` (the text) and
+  `known_faces`, and `room/presence`, `humans/faces/tracked`, `voice/heard`
+  and `voice/privacy` in `topics`; without any of them it is not loaded.
+  Each text and the mark are checked again as they leave the program.
+- **Its cases** are replayed through the watch: the mark is `light`, the
+  mark given back `ends`, a text `text`. The known file is not on the bus, so
+  a case says it as `[[known]]`, `at` and an optional `name` (none: nobody
+  known), in `expect.toml`; only a watch's case may.
+
 ### Core and installable skills
 
 The owner, 19 Oct 2026, 07:1x to 07:2x: "think in terms of skills all the
@@ -750,6 +797,7 @@ and a skill that says neither is installable.
 | Welcome back, Reminders, Task news, Stretch break, Stuffy air, Dance | core | What every lamp does: the hello, a reminder said when due, the news of work handed over, a wordless stretch, a droop in stuffy air, a dance when asked. Each costs nothing until its moment (Dance's function is one of a session's 32), and each is in the product's install (#1667) |
 | Light out when you leave (#1677) | core | The owner's: the light going out when nobody is there is something every lamp does. It does nothing without the eyes' `room/presence` (`LAMP_PRESENCE=on`), and until its lamp check it is not in the product's install (`install::NOT_PRODUCT_SKILLS`), so turning presence on for Messages (#1673) does not turn it on too ([presence.md](presence.md)) |
 | Light scenes, Point the light, Light show | core | Asked for by a person, never on their own (#1679): a scene's light, kept, with the head over the desk for reading and focus; the head over the desk and turned toward what the model's look saw there ("light my book"); a show of slow-changing colours under a minute. Not in the product's install yet (`NOT_PRODUCT_SKILLS`): not yet tried on a lamp, and three more functions would put a product session past its 32 without `LAMP_USE_SKILL=on` |
+| Guard mode (#1685) | installable | Turned on by voice while the person is out; texts them about visits to the desk ([guard-mode.md](guard-mode.md)). Not in the product's install until it has been tried on a lamp (`NOT_PRODUCT_SKILLS`), and its texts reach no phone until `lamp-cloud` and the app's relay take `messages/out` |
 | Desk tutor, Desk tutor's marks | installable | Desk tutor reads handwriting from the full look's still (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`), which a product lamp does not take: its working frame, 320 across, cannot read a page. With its marks, its two functions would also take a product session past its 32 (#1667's count). Its marks are called only after its look. Both become core once the full look is in the product and a session can take their functions (#1668) |
 
 Which of the skills to come are core and which installable is the owner's
@@ -850,6 +898,8 @@ speak = true    # a note or the voice's own words (say), or a sound
 light = true    # the light steps
 body = true     # a look at a face, a gesture, a move, a pose
 look = true     # the full look's picture for the model (do.look)
+messages = true # a short text for the person's phone, unasked (a watch's)
+known_faces = true  # whether a face at the lamp is known, never whose (a watch's)
 actions = []    # the actions part's functions it may call by name
 ```
 
@@ -1059,6 +1109,7 @@ library as skills.
 | Dance (#999) | "Lamp, dance", "show me a dance", "dance to this": its tool, `dance(style, long)` | One short playful line, then, when the line ends, one of V1's five dances (#979) picked by the mood asked for (calm: chill or waltz; upbeat: groove or hype; jazz), played twice for a long one, with a low warm glow given back at its end. Never on its own: the ears cannot yet tell music from talk | New: written by jarvis; its tool's arguments, the body's clips by name and the steps after the say were added to `lamp-skills` for it. Its cases are replays; it has not run on a lamp |
 | Desk tutor (the owner, 09:45) | "Lamp, check my work" or "I'm stuck" | Tips its head over the page and brightens it, takes one full-resolution still, tutors by voice (a hint or a question, never the answer), a small nod where a step is right, a curious tilt where it is wrong, then faces the person again when the page's 2-minute light ends | Built: `skills/desk-tutor` (#1002, the look #1125, the reading pose #1011/#1098) and its marks, `skills/desk-tutor-marks` (the nod or the tilt, by the model's `show_verdict`, #941); the camera stays at 1280×960 (#987) |
 | Light out when you leave (#1677, the owner, 19 Oct 07:2x, a core skill) | `room/presence` says nobody for 10 minutes (`nobody_s` above 599), while the voice rests | The light shown goes out over 30 s, as falling asleep, asked of the ring with a fade; given back the moment someone is seen or heard, or the eyes stop looking. Once each time the desk is left; never from 23:00 to 06:00; never speaks of it ([presence.md](presence.md)) | New: the presence topic, the `out` step and the ring's fade were added for it. Not in the product yet (`install::NOT_PRODUCT_SKILLS`, off with the eyes' `LAMP_PRESENCE` until its lamp check). Its cases are written by a script; it has not run on a lamp |
+| Guard mode (#1685, the first builder's design, 19 Oct 12:08; installable) | Its tool, `keep_watch(turn)`, when the person asks out loud ("keep an eye on things while I'm out") | A faint blue mark on the ring while on; once the desk is empty, one text on `messages/out` when a visit ends, at most one in 10 minutes ("Someone was at your desk at 14:31, for about 2 minutes."), known or not and never a name; ends on "stop" or the asker's own face back; with the privacy switch closed, one line and quiet ([guard-mode.md](guard-mode.md)) | New: the watch (`[watch]`), the `messages` and `known_faces` permissions, `--known-file` and `messages/out` were added for it. Not in the product (`NOT_PRODUCT_SKILLS`). Its cases are written by a script; it has not run on a lamp |
 
 The first three prove that built-in behaviour moves onto the framework; the
 last two that a new skill needs no new code.

@@ -186,6 +186,12 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "it is called only after Desk tutor's look, and Desk tutor isn't in the product",
     ),
     (
+        "guard-mode",
+        "an installable skill (#1685), not yet tried on a lamp: it needs `room/presence` \
+         (`LAMP_PRESENCE=on`), and its texts reach no phone until `lamp-cloud` and the app's push \
+         relay take `messages/out`",
+    ),
+    (
         "light-out",
         "it reads `room/presence`, which the eyes say only with `LAMP_PRESENCE=on` (#1677), off \
          until the light going out and coming back has been seen on a lamp: someone reading face \

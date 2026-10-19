@@ -1,0 +1,32 @@
+# Minh asks and leaves; Sam, whom the lamp also knows, sits at the desk for
+# three minutes: the text says someone known, never a name, and the watch
+# goes on.
+clock = "14:20"
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }
+
+[[known]]
+at = "0s"
+name = "Minh"
+
+[[known]]
+at = "32s"
+
+[[known]]
+at = "662s"
+name = "Sam"
+
+[[known]]
+at = "842s"
+
+[[expect]]
+at = "4s"
+call = "light"
+
+[[expect]]
+at = "859s"
+call = "text"
+args = { text = "Someone you've introduced me to was at your desk at 14:31, for about 3 minutes." }

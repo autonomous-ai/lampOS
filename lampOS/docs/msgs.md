@@ -465,6 +465,7 @@ and are re-exported at the crate root; `chat_topics()` and
 |---|---|---|---|---|
 | `ChatIn` | `chat/in` | event | none / 60 s | A text the person sent from the Autonomous app ([messages.md](messages.md)): the `run_id` `lamp-cloud` acked it with, the app's `session_id` if it gave one, the text, and `speak` (say the reply aloud too; off unless asked) |
 | `ChatOut` | `chat/out` | event | none / none | A piece of the lamp's answer: the `run_id` it answers (none only for task news), the `session_id`, the `ChatPart` (`delta`, `final`, `error`, `task_news`) and its text |
+| `MessageOut` | `messages/out` | event | none / 10 min | A short text the lamp sends unasked, for the person's phone: `from` (`skill:<name>`) and `text`, one line of at most 280 bytes; guard mode's news ([messages.md](messages.md), "Unasked texts"). Published by `lamp-skills`; nothing carries it off the lamp yet |
 
 Published by `lamp-cloud` (`chat/in`) and the voice (`chat/out`). `check()`
 holds a run or session name to 1 to 64 letters, digits, `-`, `_`, `.` or
