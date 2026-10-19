@@ -52,7 +52,6 @@ const STRESS_CEILING: f32 = 0.9;
 const RECENT_US: f64 = 250_000.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Speaking {
     /// The nod on a stressed word at its deepest, how long the whole nod
     /// takes, and the least time from one nod's start to the next.
