@@ -1024,8 +1024,12 @@ after a take-over, but now for every turn:
     lines were let out as the conversation going on, and about 10 of the 15
     answers went to office talk: DeepSeek declines far less than Gemini.
     So in a busy room:
-    - a conversation goes on only 15 s from the lamp's own last words
-      (`BUSY_GOING_ON_FOR`) or the person's call;
+    - a conversation goes on only 15 s from the end of the lamp's own last
+      words (`BUSY_GOING_ON_FOR`) or the person's call. The end is when the
+      words' audio, sent packet by packet, will have played, each packet
+      after the one before (`Did::Said`); the thread keeps only when the
+      answer began (the first builder at 19:21: "And what about tomorrow?"
+      came 18 s after the weather line, after a long answer, and was held);
     - a line let out only as it going on must be a question, three words or
       more, or an answer to the lamp's own question, such as the hand-over's
       "yes" (`BUSY_SHORT`);
@@ -1035,7 +1039,8 @@ after a take-over, but now for every turn:
       a line out as before.
 
     In a quiet room it is as on Live. The journal's "no conversation going
-    on" line adds ", in a busy room, where it goes on 15 s".
+    on" line says when the lamp was "last heard saying words, to their end,"
+    and adds ", in a busy room, where it goes on 15 s".
   - **the journal names the sign that let a line out** (#1712, the first
     builder at 17:49). With `--spoken-to`, the rule's first reason can be
     one that lets nothing out by itself, the session trusted or the room

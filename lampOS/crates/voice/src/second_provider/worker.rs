@@ -1681,6 +1681,9 @@ pub(crate) struct Heeding {
     /// for [`CALL_CARRIES_FOR`], whether or not its answer was said before
     /// the person spoke again.
     called_at: Option<Instant>,
+    /// When the lamp's words sent will have been played
+    /// ([`crate::second_provider::Did::Said`]), on the monotonic clock.
+    said_until_us: Option<u64>,
 }
 
 /// What let a line out, as the journal says it: the sign itself where the
@@ -1729,8 +1732,17 @@ fn busy_bar(why: &str, heard: &str, lamp_asked: bool) -> Option<&'static str> {
     }
 }
 
+/// How long ago the lamp last said words, counted to their end: the
+/// thread's `said_ago` is from when its answer began, `ended_ago` from when
+/// the words it sent were played to their end, if it sent any. Nothing
+/// when the thread has no words of it, as after it forgot them.
+fn to_the_end(said_ago: Option<Duration>, ended_ago: Option<Duration>) -> Option<Duration> {
+    said_ago.map(|ago| ended_ago.map_or(ago, |ended| ended.min(ago)))
+}
+
 /// `signs` as the turn is judged with them: in a busy room a conversation
-/// goes on only [`BUSY_GOING_ON_FOR`] from the lamp's last words (`said_ago`)
+/// goes on only [`BUSY_GOING_ON_FOR`] from the end of the lamp's last words
+/// (`said_ago`)
 /// or [`CALL_CARRIES_FOR`] from the person's call (`called_ago`). When none
 /// is going on, the journal says why, without words (#1712, the first
 /// builder at 16:16: which of these had held the owner's lines was not
@@ -1755,7 +1767,7 @@ fn went_on_told(
         };
         eprintln!(
             "lamp-voice second: request {request}: no conversation going on: {}, {}{}{}",
-            ago(said_ago, "heard saying words"),
+            ago(said_ago, "heard saying words, to their end,"),
             ago(called_ago, "called"),
             left_alone.map_or(String::new(), |left| format!(
                 ", {left} lines left alone since it last spoke"
@@ -1862,6 +1874,7 @@ impl Heeding {
             held_run: 0,
             renewed_at: None,
             called_at: None,
+            said_until_us: None,
         }
     }
 
@@ -1881,7 +1894,17 @@ impl Heeding {
         match did {
             crate::second_provider::Did::Worked(at_us) => self.attention.worked(at_us),
             crate::second_provider::Did::Spoke(at_us) => self.attention.news_told(at_us),
+            crate::second_provider::Did::Said(until_us) => {
+                self.said_until_us = self.said_until_us.max(Some(until_us));
+            }
         }
+    }
+
+    /// How long ago the lamp's words sent were played to their end
+    /// ([`crate::second_provider::Did::Said`]), zero while they still play.
+    fn said_ended_ago(&self, now_us: u64) -> Option<Duration> {
+        self.said_until_us
+            .map(|until| Duration::from_micros(now_us.saturating_sub(until)))
     }
 
     /// The note `request` earned when it was judged, if any.
@@ -2032,6 +2055,11 @@ impl Heeding {
         // conversation).
         let called_ago = self.called_at.map(|at| now.saturating_duration_since(at));
         let going_on = said_going_on || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR);
+        // From the end of what the lamp said, not from when its answer began,
+        // which the thread keeps (#1712, the first builder at 19:21: "And what
+        // about tomorrow?" 18 s after the weather line, a long answer, was
+        // held in a busy room).
+        let said_ago = to_the_end(said_ago, self.said_ended_ago(monotonic_us()));
         let mut left_alone = None;
         let mut signs = Signs {
             room: crate::room_told::Room::Unknown,
@@ -2646,6 +2674,40 @@ mod tests {
 
     /// #1712, the first builder at 18:57: in a busy room a conversation goes
     /// on 15 s from the lamp's last words; in a quiet one, Live's 45 s.
+    /// #1712, the first builder at 19:21: "And what about tomorrow?" came
+    /// 18 s after the weather line, after a long answer, and was held in a
+    /// busy room. The 15 s count from the end of the lamp's words.
+    #[test]
+    fn a_busy_rooms_fifteen_seconds_count_from_the_end_of_the_lamps_words() {
+        let s = Duration::from_secs;
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        assert_eq!(heeding.said_ended_ago(100_000_000), None);
+        heeding.lamp_did(crate::second_provider::Did::Said(105_000_000));
+        // Still playing, then over.
+        assert_eq!(heeding.said_ended_ago(100_000_000), Some(Duration::ZERO));
+        assert_eq!(heeding.said_ended_ago(114_000_000), Some(s(9)));
+        // An earlier end told late moves nothing back.
+        heeding.lamp_did(crate::second_provider::Did::Said(101_000_000));
+        assert_eq!(heeding.said_ended_ago(114_000_000), Some(s(9)));
+        // The answer began 18 s ago and ended 9 s ago: it goes on.
+        let said_ago = to_the_end(Some(s(18)), heeding.said_ended_ago(114_000_000));
+        assert_eq!(said_ago, Some(s(9)));
+        let busy = || Signs {
+            room: crate::room_told::Room::Busy,
+            going_on: true,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        assert!(went_on_told(5, busy(), said_ago, None, None).going_on);
+        assert!(!went_on_told(5, busy(), Some(s(18)), None, None).going_on);
+        // No words in the thread: none, whatever was played.
+        assert_eq!(to_the_end(None, Some(s(1))), None);
+        assert_eq!(to_the_end(Some(s(30)), None), Some(s(30)));
+    }
+
     #[test]
     fn a_busy_rooms_conversation_goes_on_fifteen_seconds() {
         use crate::room_told::Room;

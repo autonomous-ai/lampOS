@@ -2585,6 +2585,8 @@ async fn the_lamps_work_and_its_own_turns_are_told_to_the_rule() {
         seen.lock().unwrap().push(match did {
             Did::Worked(_) => "worked",
             Did::Spoke(_) => "spoke",
+            // The words' end, told with each packet: tested on its own.
+            Did::Said(_) => return,
         })
     }));
     for request in 1..=2 {
@@ -2601,6 +2603,42 @@ async fn the_lamps_work_and_its_own_turns_are_told_to_the_rule() {
     engine.submit(written(3, "Tell the person their task is done."));
     assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
     assert_eq!(*did.lock().unwrap(), ["worked", "spoke"]);
+}
+
+/// #1712, the first builder at 19:21: the engine tells when the lamp's
+/// words sent will have been played, each packet after the one before, so
+/// a conversation goes on from their end, not from when the answer began.
+#[tokio::test]
+async fn the_end_of_the_lamps_words_is_told_as_they_are_sent() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What time is it?".to_owned())].into()),
+        chats: Mutex::new([vec![text("Noon. It is sunny."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let said: Arc<Mutex<Vec<u64>>> = Arc::default();
+    let seen = said.clone();
+    let mut engine = engine.telling_what_it_did(Arc::new(move |did| {
+        if let Did::Said(until_us) = did {
+            seen.lock().unwrap().push(until_us);
+        }
+    }));
+    let before = lamp_ipc::monotonic_us();
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    let after = lamp_ipc::monotonic_us();
+    let said = said.lock().unwrap().clone();
+    // Each of the script's packets is 1,500 samples: 62.5 ms at 24 kHz,
+    // played after the one before, though all are sent at once.
+    assert!(!said.is_empty());
+    for pair in said.windows(2) {
+        assert!(pair[1] >= pair[0] + 62_500, "{said:?}");
+    }
+    let last = *said.last().unwrap();
+    assert!(last >= before + 62_500 * said.len() as u64, "{said:?}");
+    assert!(last <= after + 62_500 * said.len() as u64, "{said:?}");
 }
 
 /// #1712: a line the rule let out only as the conversation going on is
