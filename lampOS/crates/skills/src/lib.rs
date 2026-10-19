@@ -20,6 +20,7 @@ use std::{
 pub mod clock;
 pub mod glow;
 pub mod package;
+pub mod watch;
 
 /// Whether the body plays `name` on its mood socket: one of the clips in its
 /// own table (`lamp_body::clips::ALL`), but `idle`, which is the body's own.
@@ -148,7 +149,9 @@ struct SkillFile {
     still: Option<String>,
     /// Local hours when the skill never starts itself.
     quiet: Option<QuietFile>,
-    #[serde(rename = "do")]
+    /// A watch, turned on and off by the skill's tool ([`watch`]).
+    watch: Option<watch::WatchFile>,
+    #[serde(rename = "do", default)]
     steps: Vec<StepFile>,
 }
 
@@ -495,6 +498,15 @@ pub struct Permissions {
     /// what is in front of the lamp (`look`).
     #[serde(default)]
     pub look: bool,
+    /// It may send a short text for the person's phone, unasked
+    /// (`messages/out`, a watch's news: [`watch`]).
+    #[serde(default)]
+    pub messages: bool,
+    /// It may know whether a face at the lamp is one the eyes know, and
+    /// whether it is the person who asked it, never whose (a watch's: the
+    /// eyes' known file, read by the program).
+    #[serde(default)]
+    pub known_faces: bool,
 }
 
 impl Permissions {
@@ -509,6 +521,7 @@ impl Permissions {
             }
             Call::Say(_) | Call::SayFrom(..) | Call::Sound { .. } => ("speak", self.speak),
             Call::Look => ("look", self.look),
+            Call::Text(_) => ("messages", self.messages),
             Call::AfterSay | Call::Ends => return None,
         };
         (!given).then(|| {
@@ -549,6 +562,8 @@ impl Permissions {
             ("light", self.light),
             ("body", self.body),
             ("look", self.look),
+            ("messages", self.messages),
+            ("known faces", self.known_faces),
         ]
         .into_iter()
         .filter_map(|(name, given)| given.then_some(name))
@@ -660,6 +675,8 @@ pub struct Skill {
     /// Each step, and the runs it is made in when not every one: one
     /// trigger's, or a call's that chose one of its values.
     steps: Vec<(Option<Only>, Step)>,
+    /// A watch, on only while a person asked for it ([`watch`]).
+    pub watch: Option<watch::Spec>,
 }
 
 impl Skill {
@@ -673,6 +690,11 @@ impl Skill {
     /// hand, the pause) is its own, not the skill's.
     pub fn reads(&self) -> Vec<(String, &'static str)> {
         let mut reads = self.listens();
+        // The privacy switch, looked at as it goes, never listened to: the
+        // voice says it a hundred times a second.
+        if self.watch.is_some() {
+            reads.push((watch::PRIVACY.to_owned(), "a watch"));
+        }
         for (_, step) in &self.steps {
             if let Step::Call(Call::SayFrom(source, _)) = step
                 && !reads.iter().any(|(topic, _)| topic == source.topic())
@@ -711,6 +733,12 @@ impl Skill {
                 self.again
                     .is_some()
                     .then(|| (Speech::TOPICS[0].to_owned(), "[again]")),
+            )
+            .chain(
+                self.watch
+                    .iter()
+                    .flat_map(|_| watch::LISTENS)
+                    .map(|topic| (topic.to_owned(), "a watch")),
             )
             .collect();
         let mut seen = Vec::new();
@@ -895,6 +923,9 @@ pub enum Call {
     /// The calls after this wait for the say to end: the skill's own say, or
     /// in a skill its tool starts, the line the model says after the call.
     AfterSay,
+    /// A short text for the person's phone, on `messages/out`: only a
+    /// watch's ([`watch`]), never a step.
+    Text(String),
     /// The trigger of a run that holds something until it ends stopped
     /// holding: what it held is given back. Alone in its run.
     Ends,
@@ -1034,6 +1065,7 @@ impl Call {
             Self::Look => ("look", json!({})),
             Self::Sound { name, .. } => ("sound", json!({ "sound": name })),
             Self::AfterSay => ("after_say", json!({})),
+            Self::Text(text) => ("text", json!({ "text": text })),
             Self::Ends => ("ends", json!({})),
         }
     }
@@ -1256,9 +1288,50 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
-    if (triggers.is_empty() && file.tool.is_none()) || file.steps.is_empty() {
+    // A watch is turned on and off by its tool alone, and does what its
+    // `[watch]` says: no trigger and no steps ([`watch`]).
+    if file.watch.is_some() {
+        if !triggers.is_empty() {
+            return Err(
+                "a watch is turned on only by its tool, when a person asks: never on its own, so no trigger"
+                    .into(),
+            );
+        }
+        if file.tool.is_none() {
+            return Err("a watch is turned on and off by its tool: it needs one".into());
+        }
+        if !file.steps.is_empty() {
+            return Err("a watch has no [[do]]: what it does is its [watch]".into());
+        }
+        if file.flag.is_some()
+            || file.again.is_some()
+            || file.still.is_some()
+            || file.quiet.is_some()
+            || !file.conditions.is_empty()
+            || file.ask.is_some()
+        {
+            return Err(
+                "a watch takes no [flag], [again], still, [quiet], [[while]] or [ask]".into(),
+            );
+        }
+        match &file.choice {
+            Some(choice)
+                if choice.default.is_none() && {
+                    let mut values = choice.one_of.clone();
+                    values.sort();
+                    values == ["off", "on"]
+                } => {}
+            _ => {
+                return Err(
+                    "a watch's tool has one [choice] of exactly \"on\" and \"off\", with no default"
+                        .into(),
+                );
+            }
+        }
+    } else if (triggers.is_empty() && file.tool.is_none()) || file.steps.is_empty() {
         return Err("skill.toml needs a trigger or a tool, and at least one [[do]]".into());
     }
+    let watch = file.watch.map(watch::spec).transpose()?;
     let policy = file.ask.map(|ask| ask.policy).unwrap_or_default();
     if !triggers.is_empty() && policy.is_empty() {
         return Err("[ask] names the Policy's question".into());
@@ -1780,7 +1853,33 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         still,
         quiet,
         steps,
+        watch,
     };
+    // A watch shows a faint mark while it is on, texts the person, and
+    // tells a known face from one it does not know: each needs its key.
+    if let Some(watch) = &skill.watch {
+        for (given, why) in [
+            (
+                skill.permissions.light,
+                "a watch shows its mark while on, which needs light = true",
+            ),
+            (
+                skill.permissions.messages,
+                "a watch texts the person, which needs messages = true",
+            ),
+            (
+                skill.permissions.known_faces,
+                "a watch tells a known face from one it does not know, which needs known_faces = true",
+            ),
+        ] {
+            if !given {
+                return Err(format!("not permitted: {why} in [permissions]"));
+            }
+        }
+        if let Some(why) = skill.permissions.refuses(&watch.mark) {
+            return Err(format!("not permitted: {why}"));
+        }
+    }
     // Least privilege: every read and every step within what it declares,
     // or it is not loaded, and the journal says what it lacks.
     for (topic, by) in skill.reads() {
@@ -3271,6 +3370,114 @@ pub fn replay_with(
     Ok(made)
 }
 
+/// In a watch's case, the eyes' known file from `at` on: the name of the
+/// known person at the lamp, or with no `name`, nobody known there.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KnownAt {
+    pub at: String,
+    pub name: Option<String>,
+}
+
+/// What a watch skill does in one case ([`watch`]): its recordings, the
+/// model's calls of its tool and the known faces, each in the order of its
+/// time (at one time, the messages first, then what the eyes know, then the
+/// call), the eyes' known file looked at after each, as the program looks at
+/// it as it goes. Its mark is `light`, the mark given back `ends`, a text
+/// `text`. With `clock`, the case's first message is at that local time.
+pub fn replay_watch(
+    dir: &Path,
+    recording: &Path,
+    tools: &[ToolCall],
+    clock: Option<&str>,
+    known: &[KnownAt],
+) -> Result<Vec<Made>, String> {
+    let skill = load(dir)?;
+    if skill.watch.is_none() {
+        return Err("[[known]] is a watch's: this skill has no [watch]".into());
+    }
+    let mut watches = watch::Watches::default();
+    watches.replace(std::slice::from_ref(&skill));
+    let messages = read_recordings(recording)?;
+    let first_us = messages.first().map_or(0, |message| message.header.at_us);
+    let start = clock.map(minute_of_day).transpose()?;
+    let minute =
+        |at_us: u64| start.map(|start| ((u64::from(start) + at_us / 60_000_000) % 1_440) as u16);
+    // Each event at its time from the first message, in the order above.
+    enum Event<'a> {
+        Message(&'a Recorded),
+        Known(Option<&'a str>),
+        Call(&'a ToolCall),
+    }
+    let mut events: Vec<(u64, u8, Event)> = Vec::new();
+    for message in &messages {
+        events.push((message.header.at_us - first_us, 0, Event::Message(message)));
+    }
+    for entry in known {
+        events.push((
+            duration_us(&entry.at)?,
+            1,
+            Event::Known(entry.name.as_deref()),
+        ));
+    }
+    for tool in tools {
+        if skill.tool.as_deref() != Some(tool.name.as_str()) {
+            return Err(format!(
+                "call_tool {:?}: this skill's tool is {:?}",
+                tool.name,
+                skill.tool.as_deref().unwrap_or("none")
+            ));
+        }
+        events.push((duration_us(&tool.at)?, 2, Event::Call(tool)));
+    }
+    events.sort_by_key(|(at, rank, _)| (*at, *rank));
+    let mut made = Vec::new();
+    let keep = |made: &mut Vec<Made>, outs: Vec<watch::Out>, at_us: u64| {
+        for out in outs {
+            let call = match out {
+                watch::Out::Mark(call) => call,
+                watch::Out::Unmark => Call::Ends,
+                watch::Out::Text(text) => Call::Text(text),
+                watch::Out::Said(_) => continue,
+            };
+            made.push(Made { at_us, call });
+        }
+    };
+    let mut known_now: Option<&str> = None;
+    for (at, _, event) in events {
+        let outs = match event {
+            Event::Message(message) => watches
+                .observe(&message.header.topic, &message.payload, at, minute(at))
+                .into_iter()
+                .map(|(_, out)| out)
+                .collect(),
+            Event::Known(name) => {
+                known_now = name;
+                Vec::new()
+            }
+            Event::Call(tool) => {
+                let args = if tool.args.is_empty() {
+                    Value::Null
+                } else {
+                    serde_json::to_value(&tool.args).map_err(|error| error.to_string())?
+                };
+                match watches.tool(&tool.name, &args, at, known_now, true) {
+                    Some(Ok((_, _, outs))) => outs,
+                    _ => Vec::new(),
+                }
+            }
+        };
+        keep(&mut made, outs, at);
+        let looked = watches.known(known_now, at, minute(at));
+        keep(
+            &mut made,
+            looked.into_iter().map(|(_, out)| out).collect(),
+            at,
+        );
+    }
+    Ok(made)
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ExpectFile {
@@ -3283,6 +3490,9 @@ struct ExpectFile {
     /// The model calling the skill's tool, for a skill a person starts.
     #[serde(default)]
     call_tool: Vec<ToolCall>,
+    /// A watch's: the face the eyes know at the lamp, as time goes.
+    #[serde(default)]
+    known: Vec<KnownAt>,
 }
 
 #[derive(Deserialize)]
@@ -3333,7 +3543,7 @@ fn matches(expected: &ExpectedCall, made: &Made) -> Result<bool, String> {
 /// says `none = true`. How many passed and how many have no recording yet,
 /// or the first that did not pass.
 pub fn run_tests(dir: &Path) -> Result<(usize, usize), String> {
-    load(dir)?;
+    let watches = load(dir)?.watch.is_some();
     let mut cases: Vec<PathBuf> = fs::read_dir(dir.join("tests"))
         .map_err(|error| format!("tests/: {error}"))?
         .flatten()
@@ -3359,7 +3569,21 @@ pub fn run_tests(dir: &Path) -> Result<(usize, usize), String> {
             unrecorded += 1;
             continue;
         }
-        let made = replay_with(dir, case, &expect.call_tool, expect.clock.as_deref())?;
+        let made = if watches {
+            replay_watch(
+                dir,
+                case,
+                &expect.call_tool,
+                expect.clock.as_deref(),
+                &expect.known,
+            )?
+        } else if !expect.known.is_empty() {
+            return Err(wrong(
+                "[[known]] is a watch's: this skill has no [watch]".into(),
+            ));
+        } else {
+            replay_with(dir, case, &expect.call_tool, expect.clock.as_deref())?
+        };
         let names: Vec<_> = made
             .iter()
             .map(|made| (made.at_us, made.call.named()))

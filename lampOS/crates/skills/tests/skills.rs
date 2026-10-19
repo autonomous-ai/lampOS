@@ -325,7 +325,7 @@ fn every_skill_folder_says_its_kind_and_version() {
     );
     assert_eq!(
         named(SkillKind::Installable),
-        ["desk-tutor", "desk-tutor-marks"]
+        ["desk-tutor", "desk-tutor-marks", "guard-mode"]
     );
     for skill in &skills {
         assert_eq!(skill.version.as_deref(), Some("1.0.0"), "{}", skill.name);
@@ -6272,4 +6272,268 @@ fn a_step_for_some_choices_is_made_only_for_them_and_the_default_stands_in() {
         );
         assert_eq!(relax[1].1["colour"], "warm");
     }
+}
+
+/// Guard mode is a watch (#1685): turned on only by its tool, never by a
+/// trigger; its tool's choice is on and off; its mark is faint and steady;
+/// and it may text, know a face from one it does not know and show its
+/// mark only as its permissions say.
+#[test]
+fn a_watch_is_turned_only_by_its_tool_and_holds_to_its_permissions() {
+    let dir = tempfile::tempdir().unwrap();
+    let loaded = load(&skills_root().join("guard-mode")).unwrap();
+    let watch = loaded.watch.as_ref().unwrap();
+    assert_eq!(watch.every_us, 600_000_000);
+    assert_eq!(watch.asked_within_us, 30_000_000);
+    assert_eq!(loaded.tool.as_deref(), Some("keep_watch"));
+    assert!(loaded.triggers.is_empty());
+    for (from, to, why) in [
+        (
+            "tool = \"keep_watch\"",
+            "tool = \"keep_watch\"\n[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true",
+            "never on its own",
+        ),
+        (
+            "one_of = [\"on\", \"off\"]",
+            "one_of = [\"on\", \"off\", \"later\"]",
+            "exactly \"on\" and \"off\"",
+        ),
+        (
+            "one_of = [\"on\", \"off\"]",
+            "one_of = [\"on\", \"off\"]\ndefault = \"on\"",
+            "with no default",
+        ),
+        ("messages = true\n", "", "needs messages = true"),
+        ("known_faces = true\n", "", "needs known_faces = true"),
+        ("light = true\n", "", "needs light = true"),
+        (
+            "\"voice/heard\", ",
+            "",
+            "a watch reads voice/heard, and voice/heard is not in [permissions] topics",
+        ),
+        (
+            "\"voice/privacy\"",
+            "\"lamp/pause\"",
+            "a watch reads voice/privacy",
+        ),
+        ("level = 1 }", "level = 3 }", "a faint light"),
+        (
+            "level = 1 }",
+            "level = 2, pattern = { kind = \"breathe\" } }",
+            "a faint light",
+        ),
+        ("every = \"10m\"", "every = \"10s\"", "every is 1m to 24h"),
+        (
+            "asked_within = \"30s\"",
+            "asked_within = \"10m\"",
+            "asked_within is 5s to 2m",
+        ),
+        (
+            "every = \"10m\"",
+            "every = \"10m\"\npicture = true",
+            "unknown field `picture`",
+        ),
+        (
+            "[watch]\nevery",
+            "[[do]]\nlight = { colour = \"blue\" }\n\n[watch]\nevery",
+            "a watch has no [[do]]",
+        ),
+    ] {
+        let folder: String = why
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+            .collect();
+        let skill = repo_skill_with(&dir.path().join(folder), "guard-mode", from, to);
+        let error = load(&skill).unwrap_err();
+        assert!(error.contains(why), "{to}: {error}");
+    }
+    // What it may do, in words.
+    assert_eq!(
+        loaded.permissions.said(),
+        "reads room/presence, humans/faces/tracked, voice/heard, voice/privacy; light, messages, known faces"
+    );
+    // Its tool, with its choice, for the model.
+    let file = tools_file(std::slice::from_ref(&loaded));
+    assert_eq!(file["tools"][0]["name"], "keep_watch");
+    assert_eq!(
+        file["tools"][0]["parameters"]["properties"]["turn"]["enum"],
+        serde_json::json!(["on", "off"])
+    );
+}
+
+/// Guard mode through the program, on a bus of its own (#1685): a call
+/// with nothing heard at the lamp is refused; asked out loud, its faint mark
+/// is asked of the ring, a visit gives one text on `messages/out`, and the
+/// face of the person who asked, back in the eyes' known file, ends it and
+/// gives the mark back, with no text.
+#[test]
+fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
+    use lamp_msgs::{MessageOut, RoomPresence};
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("gm")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    copy(
+        &skills_root().join("guard-mode"),
+        &root.join("skills/guard-mode"),
+    );
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut requests = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
+    let mut texts = bus.subscribe(MessageOut::TOPIC, "phone").unwrap();
+    let mut presence = bus
+        .publisher_declared(RoomPresence::TOPIC, &RoomPresence::declaration(), "eyes")
+        .unwrap();
+    let mut heard = bus
+        .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+        .unwrap();
+    let known = root.join("known");
+    let tools = root.join("tools");
+    let clock = Clock::at(root);
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                root.join("skills").as_os_str(),
+                "--bus-root".as_ref(),
+                root.join("bus").as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--known-file".as_ref(),
+                known.as_os_str(),
+                "--boot-id".as_ref(),
+                OsStr::new("boot-test"),
+            ])
+            .args(clock.args())
+            .env("LAMP_LIGHT_REQUESTS", "on")
+            .env_remove("LAMP_SKILLS_ASK")
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !tools.join("call.sock").exists()
+        || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+    {
+        assert!(Instant::now() < deadline, "guard mode was never loaded");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let call = |turn: &str| {
+        let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
+        writeln!(
+            &stream,
+            r#"{{"op":"call","name":"keep_watch","args":{{"turn":"{turn}"}}}}"#
+        )
+        .unwrap();
+        let mut line = String::new();
+        BufReader::new(&stream).read_line(&mut line).unwrap();
+        serde_json::from_str::<serde_json::Value>(&line).unwrap()
+    };
+    let say = |presence: &mut lamp_bus::Publisher, someone: bool| {
+        presence
+            .publish_json(
+                1,
+                &RoomPresence {
+                    someone,
+                    nobody_s: if someone { 0 } else { 20 },
+                },
+            )
+            .unwrap();
+        // Taken in before the clock moves on.
+        clock.skip(Duration::ZERO);
+    };
+    let next = |subscriber: &mut lamp_bus::Subscriber, within: Duration| {
+        let until = Instant::now() + within;
+        loop {
+            if let Some(message) = subscriber.recv(Duration::from_millis(50)).unwrap() {
+                break Some(message);
+            }
+            if Instant::now() >= until {
+                break None;
+            }
+        }
+    };
+    // Asked by a text: nothing heard at the lamp, refused, no mark.
+    let refused = call("on");
+    assert_eq!(refused["ok"], false, "{refused}");
+    assert!(
+        refused["error"].as_str().unwrap().contains("out loud"),
+        "{refused}"
+    );
+    assert!(next(&mut requests, Duration::from_millis(300)).is_none());
+    // Minh, whose face the eyes know, asks out loud.
+    fs::write(&known, "Minh\n").unwrap();
+    heard
+        .publish_json(
+            1,
+            &Speech {
+                text: "Lamp, keep an eye on things while I'm out".into(),
+                finished: true,
+                locale: None,
+                request: None,
+            },
+        )
+        .unwrap();
+    let on = call("on");
+    assert_eq!(on["ok"], true, "{on}");
+    assert!(
+        on["result"]["next"]
+            .as_str()
+            .unwrap()
+            .contains("keep an eye on things"),
+        "{on}"
+    );
+    let mark: LightRequest = next(&mut requests, Duration::from_secs(5))
+        .expect("the mark")
+        .parse()
+        .unwrap();
+    assert_eq!(mark.light, Light::new(true, "blue", 1).unwrap());
+    assert_eq!(
+        (mark.claim.source.as_str(), mark.claim.priority),
+        ("skill:guard-mode", Priority::Skill)
+    );
+    // Minh leaves; someone comes and stays two minutes, then goes.
+    fs::remove_file(&known).unwrap();
+    say(&mut presence, true);
+    say(&mut presence, false);
+    say(&mut presence, true);
+    clock.skip(Duration::from_secs(120));
+    say(&mut presence, true);
+    say(&mut presence, false);
+    let text: MessageOut = next(&mut texts, Duration::from_secs(5))
+        .expect("a text")
+        .parse()
+        .unwrap();
+    assert_eq!(text.from, "skill:guard-mode");
+    assert!(
+        text.text.ends_with(", for about 2 minutes.")
+            && text.text.starts_with("Someone was at your desk"),
+        "{text:?}"
+    );
+    assert!(!text.text.contains("Minh"));
+    // Minh back, known again: the watch ends, its mark given back.
+    say(&mut presence, true);
+    fs::write(&known, "Minh\n").unwrap();
+    let mut back = None;
+    let until = Instant::now() + Duration::from_secs(10);
+    while back.is_none() && Instant::now() < until {
+        let Some(message) = next(&mut requests, Duration::from_secs(1)) else {
+            continue;
+        };
+        let asked: LightRequest = message.parse().unwrap();
+        if !asked.claim.holds_at("boot-test", lamp_ipc::monotonic_us()) {
+            back = Some(asked);
+        }
+    }
+    assert!(back.is_some(), "the mark was not given back");
+    // No text for the person who asked coming back.
+    say(&mut presence, false);
+    assert!(next(&mut texts, Duration::from_millis(500)).is_none());
+    // A call to stop now says it wasn't on.
+    let off = call("off");
+    assert_eq!(off["ok"], true, "{off}");
+    assert!(
+        off["result"]["next"].as_str().unwrap().contains("weren't"),
+        "{off}"
+    );
 }
