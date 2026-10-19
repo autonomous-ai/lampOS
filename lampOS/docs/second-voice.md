@@ -394,6 +394,16 @@ order is kept. A written turn is the same from the chat on.
   headers. A gap over the client's 90 s pool keep means a new connection
   (the first builder at 18:26: the first event came in 0.9 to 1.9 s on
   lamp-4ace, 0.7 s from the probe).
+- **With `LAMP_SECOND_CHAT_WARM=on` the chat's connection is opened as a
+  line begins** (off unless set), as Gemini's voice is, when no request went
+  in the last 60 s (`chat::WARM_AFTER`). It's a GET of the service's
+  `models`, read whole, so the line's chat goes on a connection already
+  made rather than making one after the words. The journal says `the
+  chat's connection opened ahead in T ms (HTTP S)`. The client's pool keeps
+  an idle connection 90 s, so the lamp's first line after a quiet minute
+  paid for the handshake (the first builder at 18:26: the chat's first
+  event 0.9 to 1.9 s on lamp-4ace, 0.7 s from the probe). A warming that
+  fails changes nothing; the chat connects as before.
 - **The answer's first piece goes after a few words** if no clause or
   sentence ended sooner: 4 with the configured voice
   (`CONFIGURED_FIRST_WORDS`; the first builder at 18:26: a 9-word first

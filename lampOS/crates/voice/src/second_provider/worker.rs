@@ -611,7 +611,17 @@ pub fn services(
             provider.voice()
         );
     }
-    Ok(net)
+    // The chat's connection opened as a line begins (#1712).
+    let warm = std::env::var(super::services::CHAT_WARM_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if warm {
+        eprintln!(
+            "lamp-voice second: the chat's connection is opened as a line begins (LAMP_SECOND_CHAT_WARM)"
+        );
+    }
+    Ok(net.warming_the_chat(warm))
 }
 
 /// The web search the model may call as its own functions, as `route` sets
