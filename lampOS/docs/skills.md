@@ -300,7 +300,8 @@ As built on 2026-10-16 (#938, `crates/skills`, not yet run on a lamp):
     lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar
     lamp-skills remove [--dir DIR] NAME
     lamp-skills list [--dir DIR]
-    lamp-skills pack [--out DIR] SKILL_DIR
+    lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR
+    lamp-skills asked [--dir DIR] [--key-file PATH]
 
 (`install`, `remove`, `list` and `pack`: below, "Core and installable
 skills".)
@@ -910,7 +911,8 @@ product's skills folder is root's; the part itself only reads it, under
     lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar
     lamp-skills remove [--dir DIR] NAME
     lamp-skills list [--dir DIR]
-    lamp-skills pack [--out DIR] SKILL_DIR
+    lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR
+    lamp-skills asked [--dir DIR] [--key-file PATH]
 
 `--dir` is `/var/lib/lampOS/skills` without it, the product unit's own
 `--dir` (`deploy/product/lamp-skills.service`): installable skills live
@@ -957,36 +959,62 @@ it does not know).
 
 **The manage helper** (#1722, the first builder's 18:33). The one way a
 part that is not root changes the skills folder. `lamp-cloud`'s
-`skills.remove`, for the app's skills page ([cloud.md](cloud.md),
-"Removing a skill"), asks it instead of writing the folder: `lamp-cloud`
-talks to the network, and with `install` coming, write access there would
-let a network message put code on the lamp. So the folder stays root's,
+`skills.remove` and `skills.install`, for the app's skills page
+([cloud.md](cloud.md), "Removing a skill" and "Installing from the Skills
+Store"), ask it instead of writing the folder: `lamp-cloud` talks to the
+network, and write access there would let a network message put code on
+the lamp. So the folder stays root's,
 0755, and `lamp-cloud` stays `ProtectSystem=strict` with no writable path
 for it.
 
 - **What it is.** systemd holds a socket,
   `/run/lampos-skills-manage/manage.sock` (`deploy/product/lamp-skills-manage.socket`:
   root's, 0660, group `lampos`, `Accept=yes`, at most 4 connections), and for
-  each connection starts `lamp-skills asked --dir /var/lib/lampOS/skills`
-  as root (`lamp-skills-manage@.service`), the connection its standard
-  input and output. It reads one line of at most 4 KiB, answers one line,
+  each connection starts `lamp-skills asked --dir /var/lib/lampOS/skills
+  --key-file /etc/lampOS/update/key.pub` as root
+  (`lamp-skills-manage@.service`), the connection its standard input and
+  output. It reads one line of at most 4 KiB, answers one line,
   `{"done": WHAT}` or `{"refused": WHY}`, and exits. Its unit has only the
-  skills folder writable, no network (`PrivateNetwork=yes`, Unix sockets
-  only), no capabilities, `NoNewPrivileges` and 60 s at most.
-- **It checks each request itself,** whoever connected: the only request
-  taken is `{"remove": NAME}`, exactly that one key with a string, and it
-  runs `remove` above, which refuses a name that is not a skill's (1 to 64
-  lowercase letters, digits and hyphens: no `/`, `..`, NUL, hidden name or
-  more) and a core skill, under the folder's lock. It waits at most 4 s
-  for that lock (`ASKED_LOCK_WAIT`, under `lamp-cloud`'s 5 s wait for its
-  answer), then refuses, `the lamp's skills can't be changed now`, with
-  nothing done. A skill renamed aside whose `.removed-NAME-PID` was not then
-  deleted is answered done (the next install deletes it); that folder's
-  path is in the journal only. Anything else is
-  refused, `a request is one line, {"remove": NAME}`. `install` is refused
-  (`install is not taken here yet: …`): it will be taken only for a package
-  from the update channel under its key's signature, once the channel
-  carries skills.
+  skills folder writable (`/etc`, the key with it, read-only), no
+  capabilities, `NoNewPrivileges` and 60 s at most.
+- **The Store's switch, in the helper too.** `LAMP_SKILLS_STORE=on`
+  (`package::STORE_SWITCH`), off unless set, as `lamp-cloud`'s is. The
+  helper reads it in its own environment, so a process that reaches the
+  socket past `lamp-cloud` installs nothing while the Store is off: an
+  install is refused with `lamp-cloud`'s own words, `not on this lamp:
+  skills.install` (`package::STORE_OFF`), and nothing is fetched. A remove
+  runs either way. Off, the unit has no network (`PrivateNetwork=yes`, Unix
+  sockets only). A drop-in turns the Store on,
+  `/etc/systemd/system/lamp-skills-manage@.service.d/store.conf`:
+  `Environment=LAMP_SKILLS_STORE=on`, `PrivateNetwork=no`, and
+  `RestrictAddressFamilies=` reset to `AF_UNIX AF_INET AF_INET6`, for the
+  fetch the helper makes itself (`lamp-cloud` passes the URL and fetches
+  nothing). systemd can't open the network for one request and not
+  another in one template unit, so with the Store on a remove runs with
+  the network too; the network for installs alone would need a unit and
+  socket of their own, not built.
+- **It checks each request itself,** whoever connected. Two are taken,
+  each exactly one key:
+  - `{"remove": NAME}`, a string: it runs `remove` above, which refuses a
+    name that is not a skill's (1 to 64 lowercase letters, digits and
+    hyphens: no `/`, `..`, NUL, hidden name or more) and a core skill,
+    under the folder's lock. A skill renamed aside whose
+    `.removed-NAME-PID` was not then deleted is answered done (the next
+    install deletes it); that folder's path is in the journal only.
+  - `{"install": {"url", "sha256", "name", "version"}}`, strings, all but
+    `url` optional (a Skills Store catalogue entry's fields): a package
+    fetched and installed only signed with the update channel's key, and
+    only with the Store's switch on ("From the Skills Store", below).
+
+  Anything else is refused, `a request is one line, {"remove": NAME} or
+  {"install": {"url": URL, "sha256": HASH, "name": NAME, "version":
+  VERSION}}, all but url optional`.
+
+  Either waits at most 4 s for the folder's lock (`ASKED_LOCK_WAIT`, under
+  `lamp-cloud`'s 5 s wait for a remove's answer; an install waits for it
+  only after its fetch, at most 25 s, and its checks, under the 40 s
+  `lamp-cloud` waits for an install), then refuses, `the lamp's skills
+  can't be changed now`, with nothing done.
 - **Why this and not the others** (the least new surface):
   - **Not the running `lamp-skills`.** It runs as `lampos`, the same user
     as `lamp-cloud`, reading the folder under `ProtectSystem=strict`.
@@ -1007,9 +1035,13 @@ for it.
   make the group, and is not done here.
 - **Not on a lamp yet.** The two units are in `deploy/product/` but not in
   `lamp-update`'s install list (`install::PRODUCT`); they go there after
-  their lamp check. Tested on a Mac only: `tests/package.rs` runs the real
-  program on a Unix socket and refuses a core skill and bad names on its
-  own; `lamp-cloud`'s tests go through the helper's code on a real socket.
+  their lamp check. Tested on a Mac only: `tests/package.rs` and
+  `tests/store.rs` run the real program on a Unix socket and refuse a core
+  skill, bad names, a URL that is not https, a Store that speaks no TLS,
+  and any install with the Store's switch off (unset, `off`, `ON`, empty;
+  nothing fetched, and a remove still runs) on its own; `tests/store.rs` sends the helper's own code every bad
+  package with nobody before it; `lamp-cloud`'s tests go through the
+  helper's code on a real socket.
 - **The voice can't remove a skill:** no function does, and whether one
   should is a separate decision.
 
@@ -1030,7 +1062,9 @@ for it.
   which gives every skill through one function, `use_skill`
   ([tools.md](tools.md), "Many skills").
 
-- **`pack`** makes a package of an installable skill folder, below.
+- **`pack`** makes a package of an installable skill folder, below; with
+  `--key-file`, the update channel's private key (as `lamp-update sign`
+  takes it), signed for the Skills Store.
 
 Nothing else is restarted. The running `lamp-skills` looks at its folder
 every 2 s, loads every skill again when one changed (cooldowns kept), and
@@ -1126,17 +1160,98 @@ digits, `-`, `_` and `.`, none beginning with a dot (no `..`, no
 `._NAME`); at most 512 files and 16 MiB. Then the skill is loaded and moved
 in as from a folder.
 
-**The signature: a place, not checked.** `lamp-skill.sig`, beside the
-manifest, is reserved for the Store's signature over the manifest's exact
-bytes, which name every file's SHA-256. Signing is in the backlog: a
-package may carry the file, nothing checks it, and every install says so
-(`its signature not checked: signing is not built yet`, or `it carries no
-signature, and none is checked yet`). There is no fetch from a network:
-`install` takes a local file.
+**The signature.** `lamp-skill.sig`, beside the manifest, is one line of
+JSON, `{"key": FINGERPRINT, "signature": BASE64}`: Ed25519 over the
+manifest's exact bytes, which name every file's size and SHA-256, so it
+covers every byte of the skill. `key` is the fingerprint of the key that
+signed it as `lamp-update` gives one (the first 16 hex of its SHA-256), so
+a package signed with another key is told apart from a changed one.
+`lamp-skills pack --key-file PRIVATE` writes it. An install by hand
+(`lamp-skills install PACKAGE.tar`, root at the lamp) is not held to it
+and says so (`its signature not checked: a package installed by hand from
+a file`, or `it carries no signature: …`); a package from the Skills Store
+is installed only with it.
 
-Not built yet: the Store itself (a catalogue, review, publishing, a
-download); the signature's check and the key it would be checked with; the
-app's "My skills" page (`list` is text for a person); turning a skill off
+**From the Skills Store** (#1722, the first builder's 21:51, 18:33 and
+22:23). The app sends `skills.install` with a catalogue entry,
+`{"name", "version", "sha256", "url"}` ([cloud.md](cloud.md), "Installing
+from the Skills Store"); `lamp-cloud` passes it to the manage helper,
+which runs `lamp_skills::package::install_from_url`. In order, with
+nothing written before the last step:
+
+1. **The request.** `url` is `https://`, a host, at most 2048 bytes of
+   printable ASCII with no space and no user; `sha256` 64 lowercase hex;
+   `name` a skill's name; `version` `MAJOR.MINOR.PATCH`. `http://`,
+   `file://` and anything else is refused unfetched.
+2. **The key.** The update channel's public key, `/etc/lampOS/update/key.pub`
+   (`package::STORE_KEY`, the unit's `--key-file`), read as `lamp-update`
+   reads it. With none, nothing is fetched. **Pending:** whether the Store
+   signs with the update channel's own key or a key of its own is the
+   first builder's to say (asked at 21:5x on #1722). The update channel's
+   is the default, as "only signed packages from the update channel" says;
+   the path is one constant and one unit line.
+3. **The fetch.** By `lamp-update`'s own HTTPS client (rustls, the web's
+   roots): one GET, at most 5 redirects, each only to https (a redirect to
+   `http://` or `file://` is refused), into memory, at most 18 MiB (a
+   larger `Content-Length` is refused unread, a body without one is cut at
+   the bound), within 25 s (10 s to connect, 10 s for any read to make
+   progress).
+4. **The hash.** With `sha256`, the bytes must have it: checked before the
+   tar is read.
+5. **The signature,** once the tar is read in memory (its entries, with the
+   bounds below) and before the manifest is parsed or a file compared with
+   it: `lamp-skill.sig` must be there, name the channel's key, and be its
+   signature over `lamp-skill.json`'s exact bytes. Unsigned, signed with
+   another key, a signature that is not one, or a manifest changed by a
+   byte: refused.
+6. **The package,** as any install checks it (above): plain files only (a
+   link, hard or symbolic, a device or a fifo refuses it), one folder, no
+   `..`, no absolute path, no hidden name, at most 4 parts a path, 512
+   files and 16 MiB, every file's size and SHA-256 as the manifest says.
+   With `name` and `version`, the manifest must say the same.
+7. **The install,** under the folder's lock, as `install` does (waited
+   for at most 4 s, `ASKED_LOCK_WAIT`, then `the lamp's skills can't be
+   changed now` with nothing written): put
+   together in `.install-NAME-PID`, where the running program does not
+   look, loaded with every check a load makes, refused if it says `kind =
+   "core"`, if a core skill on the lamp has its name, or another skill its
+   function, or if it is **older than the installed one** (below); then
+   renamed into place (an installed one of the same name is replaced
+   whole, the old renamed aside first). The running `lamp-skills` loads it
+   within 2 s.
+
+**Never an older version.** A Store package replaces an installed skill
+only at the same version (a reinstall) or a newer one, so an old package
+the channel once signed can't be replayed onto a lamp. Versions are
+`MAJOR.MINOR.PATCH` (the loader and the manifest take nothing else, and
+every skill in `lampOS/skills/` says `1.0.0`), compared as three numbers,
+part by part: `1.10.0` is newer than `1.9.0`. An older one is refused under
+the folder's lock with the folder as it was: `not installed: desk-tutor
+1.10.0 is on this lamp, and this package is the older 1.2.3: a skill is
+never put back to an older version`. An installed one whose version can't
+be ordered (none, or not `MAJOR.MINOR.PATCH`, a folder changed by hand) is
+refused too, since the package might be older: `… its version can't be
+compared with 2.0.0: remove it first, then install this one`. Refusing is
+the safe side; allowing would let any signed package over it. An install
+by hand from a file (root at the lamp) is not held to this, as it is not
+held to the signature, so root can still put an older one back.
+
+The answer is `install`'s line (`installed desk-tutor 1.0.0 (installable)
+from its package, N files, …; signed with the update channel's key
+FINGERPRINT. It may use: …`), and `lamp-cloud` replies with `skills.list`
+read after it. The helper journals each request and its answer.
+
+**What the Store's catalogue is expected to be** (for the backend, which
+posts its endpoint layout on #1722): a list of entries, each `name`,
+`version`, `sha256` (of the package's bytes) and `url` (https, a plain
+GET, redirects to https allowed); the list signed with the same key as
+the packages, Ed25519 over its exact bytes, as `lamp-update`'s envelope
+signs a build's manifest. `skills.catalog`, which fetches and checks the
+list, is not built: an entry from it goes to `skills.install` as it is.
+
+Not built yet: the Store's server (a catalogue, review, publishing) and
+`skills.catalog`; the app's "My skills" page (`list` is text for a
+person); turning a skill off
 without removing it, core ones among them; a test that #1667's
 `PRODUCT_SKILLS` are exactly the core skills, once both are on `lamp-voice`.
 A skill's functions past a session's 32 are #1668's (`LAMP_USE_SKILL=on`,
@@ -1421,6 +1536,7 @@ five by 2026-10-19.
 ## Later
 
 Permissions are built (above, "Core and installable skills"): each skill
-declares what it reads and uses, and the program holds it to that. Signing
-and its check, review and the store: before anything is published. The
-package has the signature's place already (`lamp-skill.sig`), unchecked.
+declares what it reads and uses, and the program holds it to that. A
+package's signature and the Store's install are built ("From the Skills
+Store"); the catalogue, review and the Store's server: before anything is
+published.
