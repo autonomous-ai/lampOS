@@ -26,9 +26,9 @@ RuntimeDirectory=lampos-body
 # --wake on (2026-10-14, task 23): a head or base found off where it may start, within 400 counts of home, is brought home slowly
 # before anything else instead of refused; a lamp found where it may start writes exactly what it wrote without it (lampOS/docs/body.md, "Waking").
 RuntimeDirectoryMode=0755
-# --rest-glance on --look-at-name on (2026-10-14 18:41, task 32, #718): a lamp at rest takes Expression's head pitch and roll only, at most 50 and 25 counts,
+# --rest-glance on --look-at-name on --torque on --give-way return (2026-10-14 18:41, task 32, #718): a lamp at rest takes Expression's head pitch and roll only, at most 50 and 25 counts,
 # and comes back to rest when it runs out; never the base or the arm (lampOS/docs/body.md, "A glance from rest").
-ExecStart=/opt/lampOS/body/e5d292442cb407bf5bcc65b808ffec3f166d5abc4d957eb1216251b1925a19ae/lamp-body --device /dev/ttyACM0 --unit-id lamp-4ace --lock-directory /home/orangepi/.local/share/lampOS-voice/motor-locks --mood-socket /run/lampos-body/mood.sock --reach 150,15,1,250 --speed 120 --servo-speed 1000 --servo-acceleration 60 --gaze-socket /run/lampos-body/gaze.sock --gaze 727,553 --gaze-reach 480,120 --stand 1772,2043,2015,2657,2602 --folded-arm 2048,2047 --stand-share 100 --stand-seconds 6 --awake-seconds 90 --idle on --force-limit 600 --wake on --rest-glance on --look-at-name on --home 1950,2043,2015
+ExecStart=/opt/lampOS/body/874ee83c1d55d6442aeb759270e665da87add4a354c95bdce528833916f166e6/lamp-body --device /dev/ttyACM0 --unit-id lamp-4ace --lock-directory /home/orangepi/.local/share/lampOS-voice/motor-locks --mood-socket /run/lampos-body/mood.sock --reach 150,15,1,250 --speed 120 --servo-speed 1000 --servo-acceleration 60 --gaze-socket /run/lampos-body/gaze.sock --gaze 727,553 --gaze-reach 480,120 --stand 1772,2043,2015,2657,2602 --folded-arm 2048,2047 --stand-share 100 --stand-seconds 6 --awake-seconds 90 --idle on --force-limit 600 --wake on --rest-glance on --look-at-name on --torque on --give-way return --home 1950,2043,2015
 Restart=on-failure
 RestartSec=15s
 KillMode=mixed
