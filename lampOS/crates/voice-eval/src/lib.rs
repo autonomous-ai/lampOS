@@ -24,6 +24,7 @@ mod playback;
 pub mod record;
 pub mod report;
 pub mod runner;
+pub mod score;
 pub mod stats;
 pub mod stimulus;
 pub mod target_audio;
