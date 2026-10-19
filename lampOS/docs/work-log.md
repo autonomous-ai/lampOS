@@ -15,7 +15,7 @@ log and nothing a lamp runs ([joining.md](joining.md),
 
 ## Current checkpoint: 2026-10-19
 
-Ready for integration: no (#1996 output caps is published; automatic ARM64 pending and inherited host motion failure disclosed)
+Ready for integration: yes (#1996 output caps passed automatic ARM64; inherited host motion failure remains disclosed; reviewer merge pending)
 
 Ready for integration: no (#1732 ARM64 is green; the authored skill is being split from shared foundations)
 
@@ -31,9 +31,9 @@ lamp qualification and merging.
 
 The [14:30 UTC checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6269677751)
 acknowledges the missed checkpoint and the new second-route requirement.
-The full Queue and own PR reviews were reread at 16:55 UTC. The current
-integration tip is `1b98d6de32`; #1925, the separate #1976 stress-bar fix
-and #1966 Tasks fix are merged. Foundation preparation starts at `df722db2d0`. The
+The full Queue and own PR reviews were reread at 17:22 UTC. The current
+integration tip is `3a66c1263b`; #1925, the separate #1976 stress-bar fix,
+#1966 Tasks fix and #1990 motion fixture amendment are merged. Foundation preparation starts at `df722db2d0`. The
 Bedtime publication is based on #1712's `b919291458`: Deepgram, DeepSeek and
 ElevenLabs. No provider session or device is started by these host tests.
 
@@ -196,11 +196,19 @@ now pass: remaining Voice **243/0/0**, **53.55 s**; Voice-eval **546/0/0**,
 source hash matches in both the checkout and source-only copy. These
 results preserve the original failure. First's 16:57 UTC direction is to
 publish the four parts with that inherited failure disclosed. The motion
-owner's test-only #1990 is open; its native gate and actual landing remain
-pending. Caps is now [#1996](https://github.com/autonomous-ai/lampOS/pull/1996),
-head `e1fdc20374`, draft into `first/voice-cascade-gemini`. Its automatic
+owner's test-only #1990 merged at 17:16 UTC as `3a66c1263b`. Its latest
+revision `fb70cdad27` adds separate topic recorders; the earlier native green
+qualified `7537ae2162`, so integration ARM64 must qualify the amendment.
+Caps is now [#1996](https://github.com/autonomous-ai/lampOS/pull/1996),
+head `e1fdc20374`, into `first/voice-cascade-gemini`. Its automatic
 [ARM64 run 39290958460](https://github.com/autonomous-ai/lampOS/actions/runs/39290958460)
-is in progress. The other three split heads remain local and unpushed.
+completed successfully: **7,684 nextest passed (1 leaky), 48 skipped**, plus
+**4 doc and 12 separate harness tests**. [The exact native record](verification/second-integration-checkpoint-20261019/caps-foundation-arm64.json)
+identifies GitHub merge checkout `2fe03a67f4d7b7268d1e77663e267438a2868e31`
+against `1b98d6de325592a04c2fb1d56f1c7da10f5402a1`. Release, relay signals,
+binary hashes and upload passed. Four inherited example filename-collision
+warnings remain recorded. The other three split heads remain local and
+unpushed; reviewer merge of each predecessor comes before the next PR.
 
 The four-part composition at `7f4cc5c267` passed formatting **3.87 s**,
 strict workspace/all-target Clippy **59.56 s**, all five foundation crates
@@ -218,16 +226,30 @@ none filtered, **107.68 s**, and source-only workspace build **143.71 s**.
 All **1,593** frozen source hashes match. The failed cache attempt stays
 recorded. Subsequent per-head gates use fresh, separate checkout and
 source-only targets. Rest/Say's full 27-crate gate and scheduled Skills'
-13-crate gate are running on their own frozen commits.
+13-crate gate are running on their own frozen commits. Authored Bedtime's
+remaining nine non-Update consumers are also running; its complete Update
+and build results above qualify the same unchanged source.
 
-Music is committed privately as `c82c04d6df` above the four split commits, preserving
-ScopedSystem, notes-aware preparation, bounded TTS and shutdown. Independent
-review of the other 47 changed files found no P1/P2; the two documentation
-links it identified are corrected. Additional cross-cases cover scoped
-identity, revocation after preparation, empty speech and Stop through the
-real worker with the Music runner. Their focused preflight is running in a fresh isolated target; no passing
-runtime result is claimed yet. The final three-file review also found no P1/P2 and verified
-all parent tests remain. Music remains queued behind actual Bedtime landing.
+Music is committed privately as `c44d66557b` above the four split commits,
+preserving ScopedSystem, notes-aware preparation, bounded TTS and shutdown.
+Independent review of the other 47 changed files found no P1/P2; the two
+documentation links it identified are corrected. Additional cross-cases
+cover scoped identity, revocation after preparation, empty speech and Stop
+through the real worker with the Music runner. The final three-file review
+also found no P1/P2 and verified all parent tests remain.
+
+The [first foundation preflight](verification/second-integration-checkpoint-20261019/music-foundations-teardown-failure.json)
+on `c82c04d6df` passed formatting **4.12 s** and strict workspace/all-target
+Clippy **130.92 s**, then reported **258 passed, 1 failed, 0 ignored; 2,083
+filtered**, **7.42 s** test time. The new held-RPC Stop fixture had passed
+its scope-revocation, no-second-chat and **300 ms** shutdown assertions,
+then failed its final receive on macOS's closed-peer `ConnectionReset`.
+The fixture now follows the existing terminal-notice contract: check every
+queued event, accept only that closed-peer error, and restore global thread
+state even during unwinding. No production code or bounds changed. A fresh
+preflight starts with that exact Stop test, then the remaining selected
+suites. No passing replacement runtime result is claimed yet. Music remains
+queued behind actual Bedtime landing.
 
 Bedtime and Tasks have only their original automatic PR ARM64 run,
 following First's no-duplicate-dispatch direction. GitHub's [Actions incident](https://www.githubstatus.com/incidents/8tzbpcnl75jp)
