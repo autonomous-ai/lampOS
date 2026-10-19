@@ -877,6 +877,7 @@ async fn reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn
             who: false,
             lead_in: false,
             asked: false,
+            accounts: false,
             needs: None,
             staff_note: false,
         }),

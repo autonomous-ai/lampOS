@@ -1109,6 +1109,7 @@ mod tests {
                 who: true,
                 lead_in: true,
                 asked: true,
+                accounts: false,
                 needs: None,
                 staff_note: false,
             }),
@@ -1338,6 +1339,7 @@ mod tests {
             who: false,
             lead_in: false,
             asked: false,
+            accounts: false,
             needs: None,
             staff_note: false,
         };
@@ -1861,6 +1863,7 @@ mod tests {
             who: false,
             lead_in: false,
             asked: false,
+            accounts: false,
             needs: None,
             staff_note: false,
         };
