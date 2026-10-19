@@ -373,6 +373,9 @@ impl Run<'_, '_> {
         if let Err(outcome) = self.install(&mut state, &manifest, &changes) {
             return outcome;
         }
+        if let Err(outcome) = self.skills_still_load(&manifest, &changes) {
+            return outcome;
+        }
         self.switch(&mut state, build, changes)
     }
 
@@ -593,6 +596,65 @@ impl Run<'_, '_> {
             }
         }
         sync_folder(folder).map_err(failed)
+    }
+
+    /// Step 6b: the skills the lamp's folder holds still load under the
+    /// build's lamp-skills (the first builder on #1722). A round places no
+    /// skill, so a lamp-skills with checks its folders fail (#1698's
+    /// `[permissions]`, on folders from before them) would run with every
+    /// skill refused, up and well. The build's own `lamp-skills list` and
+    /// the running one's are read on the unit's `--dir`: a skill that loads
+    /// now and would not under the build refuses the build, naming each,
+    /// with nothing switched. One both refuse holds nothing back.
+    fn skills_still_load(
+        &mut self,
+        manifest: &Manifest,
+        changes: &[Change],
+    ) -> Result<(), Outcome> {
+        let Some(change) = changes
+            .iter()
+            .find(|change| change.part == SKILLS_PART && change.new_folder != change.old_folder)
+        else {
+            return Ok(());
+        };
+        let dir = skills_dir(&change.after);
+        let folder = self.config.on(&dir);
+        if !folder.is_dir() {
+            return Ok(());
+        }
+        let binary = |build: &str| self.config.on(build).join(SKILLS_BINARY);
+        let after = match list_skills(&binary(&change.new_folder), &folder) {
+            Ok(Some(refused)) => refused,
+            // Older than `list`, so older than its checks (both came with
+            // #1698): it refuses nothing for its permissions.
+            Ok(None) => return Ok(()),
+            Err(why) => {
+                return Err(Outcome::Failed(format!(
+                    "build {}'s lamp-skills cannot list {dir}: {why}; nothing is switched",
+                    manifest.sequence
+                )));
+            }
+        };
+        // The running one's: one that cannot say (older than `list`, or
+        // gone) loaded every folder.
+        let before = list_skills(&binary(&change.old_folder), &folder)
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        let stopping: Vec<String> = after
+            .iter()
+            .filter(|(name, _)| !before.contains_key(*name))
+            .map(|(name, why)| format!("{name} ({why})"))
+            .collect();
+        if stopping.is_empty() {
+            return Ok(());
+        }
+        Err(Outcome::Refused(format!(
+            "build {}'s lamp-skills would not load these skills of {dir}, which load now: {}; \
+             nothing is switched until they load under it (`lamp-update install` places the build's own)",
+            manifest.sequence,
+            stopping.join("; ")
+        )))
     }
 
     /// Feeds what the voice says in the next `wait` to the quiet gate.
@@ -1338,6 +1400,95 @@ fn plan(
     }
     changes.sort_by(|a, b| order(&a.unit).cmp(&order(&b.unit)));
     Ok(changes)
+}
+
+/// The skills part, and its binary.
+const SKILLS_PART: &str = "skills";
+const SKILLS_BINARY: &str = "lamp-skills";
+/// Where lamp-skills reads its skills when its unit gives no `--dir`.
+const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
+/// How long `lamp-skills list` may take: killed after, and then it cannot say.
+const LIST_WITHIN: Duration = Duration::from_secs(30);
+
+/// The folder a lamp-skills unit reads: its `ExecStart=`'s `--dir`.
+fn skills_dir(unit: &str) -> String {
+    unit.lines()
+        .find_map(|line| line.trim().strip_prefix("ExecStart="))
+        .and_then(|exec| {
+            let mut words = exec.split_whitespace();
+            words.find(|word| *word == "--dir")?;
+            words.next().map(str::to_owned)
+        })
+        .unwrap_or_else(|| SKILLS_DIR.to_owned())
+}
+
+/// The skills `binary list --dir folder` says are not loaded, by name, with
+/// why; `None` for a lamp-skills with no `list` (a wrong option, status 2).
+fn list_skills(binary: &Path, folder: &Path) -> Result<Option<BTreeMap<String, String>>, String> {
+    let mut child = std::process::Command::new(binary)
+        .arg("list")
+        .arg("--dir")
+        .arg(folder)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("{}: {error}", binary.display()))?;
+    let read = |pipe: Option<Box<dyn Read + Send>>| {
+        std::thread::spawn(move || {
+            let mut text = Vec::new();
+            if let Some(mut pipe) = pipe {
+                let _ = pipe.read_to_end(&mut text);
+            }
+            String::from_utf8_lossy(&text).into_owned()
+        })
+    };
+    let out = read(child.stdout.take().map(|pipe| Box::new(pipe) as _));
+    let err = read(child.stderr.take().map(|pipe| Box::new(pipe) as _));
+    let started = std::time::Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if started.elapsed() < LIST_WITHIN => {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("it did not end within {} s", LIST_WITHIN.as_secs()));
+            }
+            Err(error) => return Err(error.to_string()),
+        }
+    };
+    let (out, err) = (
+        out.join().unwrap_or_default(),
+        err.join().unwrap_or_default(),
+    );
+    match status.code() {
+        Some(0) => Ok(Some(not_loaded(&out))),
+        Some(2) => Ok(None),
+        _ => Err(err
+            .lines()
+            .rev()
+            .find(|line| !line.trim().is_empty())
+            .map_or_else(|| status.to_string(), |line| line.trim().to_owned())),
+    }
+}
+
+/// The rows of `lamp-skills list` whose last column is `not loaded: WHY`.
+fn not_loaded(listed: &str) -> BTreeMap<String, String> {
+    const NOT_LOADED: &str = "not loaded: ";
+    listed
+        .lines()
+        .filter_map(|line| {
+            let at = line.find(NOT_LOADED)?;
+            let name = line.split_whitespace().next()?;
+            Some((
+                name.to_owned(),
+                line[at + NOT_LOADED.len()..].trim().to_owned(),
+            ))
+        })
+        .collect()
 }
 
 /// What is written into a file being fetched, hashed on the way.
