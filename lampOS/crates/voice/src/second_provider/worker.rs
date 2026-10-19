@@ -3488,16 +3488,22 @@ mod tests {
     /// its file at the worker's tick, and the next worker in the same boot
     /// starts from it: a busy room is still busy. The room is kept under the
     /// machine's boot (`room_told::MACHINE_BOOT_FILE`), which only Linux has,
-    /// so elsewhere this says so and checks nothing. In tests the room is
+    /// so elsewhere this says so and checks nothing; on Linux the file must be
+    /// there. In tests the room is
     /// the thread's own, so each worker is a thread of its own.
     #[test]
     fn as_the_only_voice_the_room_goes_to_its_file_and_the_next_worker_starts_from_it() {
-        if !Path::new(crate::room_told::MACHINE_BOOT_FILE).exists() {
-            eprintln!(
-                "no machine boot file here (not Linux): the room is not kept, nothing checked"
-            );
+        // Skipped by the system, not by the file: on Linux a missing boot
+        // file fails here, so a pass there means this ran.
+        if !cfg!(target_os = "linux") {
+            eprintln!("not Linux: no machine boot file, the room is not kept, nothing checked");
             return;
         }
+        assert!(
+            Path::new(crate::room_told::MACHINE_BOOT_FILE).exists(),
+            "Linux has {}",
+            crate::room_told::MACHINE_BOOT_FILE
+        );
         let dir = std::env::temp_dir().join(format!(
             "lamp-second-room-file-{}-{:?}",
             std::process::id(),
