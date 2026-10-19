@@ -239,34 +239,52 @@ step_body() {
 # with both pulls and counts complete pulses; a line driven at idle that gave
 # two or more is a pad, and its idle level gives its polarity. Exactly two such
 # lines, or nothing is written. The pull follows the polarity, so a line with
-# nothing on it reads as not touched.
+# nothing on it reads as not touched. Each unit's pads also rest and read
+# differently (#1764): lamp-cb94's line 97 flipped at rest and read touched
+# for 77 s, lamp-c0a4's pulsed under a hand. So the read begins with 10 s of
+# hands away, a pad whose line changed then is refused, and each pad's own
+# baseline is written beside it (head_rest: its rest, and whether a touch
+# holds its level or pulses), which lamp-controls reads it by (#711).
 step_head_pads() {
   if [[ $WRITE != 1 ]]; then
-    say "would stop lamp-controls, run $CONTROLS_BIN discover-head --seconds 30 with a person touching each head pad twice, write the two pads' lines and polarity into $PINS and start lamp-controls again (dry)"
+    say "would stop lamp-controls, run $CONTROLS_BIN discover-head --seconds 40 --rest-seconds 10 with a person's hands away for 11 s, then touching each head pad twice, write the two pads' lines, polarity and rest into $PINS and start lamp-controls again (dry)"
     return 0
   fi
   command -v "$JQ" >/dev/null || { fail "$JQ is not installed: the head pads step reads discover-head's report with it"; return 1; }
-  ask "the head pads: for 30 s, hands away for the first second, then touch and release head pad 1 twice, then head pad 2 twice, about a second each (the button is off meanwhile)." || return 1
+  ask "the head pads: for 40 s, hands away from the lamp for the first 11 s (count them), then touch and release head pad 1 twice, then head pad 2 twice, about a second each (the button is off meanwhile)." || return 1
   local report=$ROOT/var/tmp/factory-head-pads-$STAMP.json out=$PINS.factory-$STAMP pads
   mkdir -p "$(dirname "$report")"
   "$SYSTEMCTL" stop lamp-controls || { fail "could not stop lamp-controls"; return 1; }
   CONTROLS_STOPPED=1
-  "$CONTROLS_BIN" discover-head --seconds 30 >"$report"
+  "$CONTROLS_BIN" discover-head --seconds 40 --rest-seconds 10 >"$report"
   local status=$?
   controls_back
   [[ $status == 0 ]] || { fail "discover-head could not read the head lines (report: $report)"; return 1; }
   say "the head pads report: $report"
   pads=$("$JQ" -c '[.lines[] | select(.active_low_candidate != null)
-    | {line, active_low: .active_low_candidate, pull: (if .active_low_candidate then "up" else "down" end)}]' "$report") \
+    | {line, active_low: .active_low_candidate, pull: (if .active_low_candidate then "up" else "down" end),
+       rest_changes, reads}]' "$report") \
     || { fail "the head pads report could not be read"; return 1; }
+  local restless
+  restless=$("$JQ" -c '[.[] | select((.rest_changes // 0) > 0) | .line]' <<<"$pads")
+  if [[ $restless != "[]" ]]; then
+    fail "head pad lines $restless changed with hands away, so their rest does not hold and a touch can't be told on them (#1764): the pins are not changed (report: $report)"
+    return 1
+  fi
   if [[ $("$JQ" length <<<"$pads") != 2 ]]; then
     fail "head pads found on $("$JQ" -c '[.[].line]' <<<"$pads") lines, not two, each touched twice: the pins are not changed (report: $report)"
     return 1
   fi
+  # The baseline only from a discover-head that measured it (rest and reads),
+  # so an older lamp-controls is never given a key it refuses.
   "$JQ" --argjson pads "$pads" \
-    '.head_pads = [$pads | to_entries[] | {name: "head-\(.key + 1)"} + .value]' "$PINS" >"$out" \
+    '.head_pads = [$pads | to_entries[] | {name: "head-\(.key + 1)"} + (.value | {line, active_low, pull})]
+     | if all($pads[]; .reads != null and .rest_changes != null)
+       then .head_rest = [$pads | to_entries[] | {name: "head-\(.key + 1)",
+         rest: (if .value.active_low then "high" else "low" end), reads: .value.reads}]
+       else del(.head_rest) end' "$PINS" >"$out" \
     || { fail "could not write the head pads into $out"; return 1; }
-  say "head pads: $("$JQ" -c '[.head_pads[] | {line, active_low}]' "$out")"
+  say "head pads: $("$JQ" -c '[.head_pads[] | {line, active_low}]' "$out"), rest: $("$JQ" -c '.head_rest // "not measured"' "$out")"
   mv "$PINS" "$PINS.before-factory-$STAMP" && mv "$out" "$PINS" || { fail "could not put the head pads in place"; return 1; }
   say "head pads in $PINS; the profile's kept as $PINS.before-factory-$STAMP"
   "$SYSTEMCTL" restart lamp-controls || { fail "lamp-controls did not restart with the head pads"; return 1; }

@@ -1,13 +1,20 @@
 //! Bounded bench evidence for the four possible head inputs. A driven idle
 //! level plus pulses is a candidate, not proof of a physical pad or permission
 //! to install a mapping. Nothing here changes live Controls configuration.
-use crate::touch_pins::HEAD_CANDIDATES;
+//! With a hands-away phase first, each line's changes at rest are counted, so
+//! the factory step can refuse a line whose rest does not hold, and each
+//! candidate says how a touch shows on it (#711, #1764).
+use crate::touch_pins::{HEAD_CANDIDATES, Reads};
 use serde::Serialize;
 use std::io;
 
 pub const SETTLE_US: u64 = 500_000;
 pub const EDGE_US: u64 = 20_000;
 pub const FRESH_US: u64 = 100_000;
+/// A candidate whose longest pulse is at least this held its level under a
+/// hand; one whose pulses were all shorter pulsed under it (a TTP223's
+/// pulsing mode, 50-100 ms). The touch's own longest tap.
+pub const HELD_US: u64 = 500_000;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct LineEvidence {
@@ -18,6 +25,11 @@ pub struct LineEvidence {
     pub completed_pulses: u64,
     pub longest_pulse_us: u64,
     pub active_low_candidate: Option<bool>,
+    /// How many times the line changed in the hands-away phase; none
+    /// without one.
+    pub rest_changes: Option<u64>,
+    /// How a touch showed on a candidate: its level held, or pulses.
+    pub reads: Option<Reads>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -28,6 +40,8 @@ pub struct Report {
     pub started_us: u64,
     pub last_us: Option<u64>,
     pub hardware_mapping_installed: bool,
+    /// The hands-away phase, after the settle.
+    pub rest_us: u64,
 }
 
 #[derive(Default)]
@@ -41,11 +55,18 @@ struct Contact {
 pub struct Discovery {
     report: Report,
     contacts: [Contact; 4],
+    /// Each line's last level read in the hands-away phase.
+    resting: [Option<bool>; 4],
 }
 
 impl Discovery {
     pub fn new(started_us: u64, probes: [(bool, bool); 4]) -> io::Result<Self> {
-        if started_us > u64::MAX - 60_000_000 {
+        Self::with_rest(started_us, probes, 0)
+    }
+
+    /// As [`Discovery::new`], with `rest_us` of hands away after the settle.
+    pub fn with_rest(started_us: u64, probes: [(bool, bool); 4], rest_us: u64) -> io::Result<Self> {
+        if started_us > u64::MAX - 60_000_000 || rest_us > 30_000_000 {
             return Err(io::Error::other("discovery clock out of range"));
         }
         Ok(Self {
@@ -61,6 +82,8 @@ impl Discovery {
                         completed_pulses: 0,
                         longest_pulse_us: 0,
                         active_low_candidate: None,
+                        rest_changes: (rest_us > 0).then_some(0),
+                        reads: None,
                     })
                     .collect(),
                 observations: 0,
@@ -68,8 +91,10 @@ impl Discovery {
                 started_us,
                 last_us: None,
                 hardware_mapping_installed: false,
+                rest_us,
             },
             contacts: std::array::from_fn(|_| Contact::default()),
+            resting: [None; 4],
         })
     }
 
@@ -93,18 +118,31 @@ impl Discovery {
         }
         self.report.last_us = Some(at_us);
         self.report.observations += 1;
-        for (index, (line, contact)) in self
+        let rest_us = self.report.rest_us;
+        for (index, ((line, contact), resting)) in self
             .report
             .lines
             .iter_mut()
             .zip(&mut self.contacts)
+            .zip(&mut self.resting)
             .enumerate()
         {
             let Some(idle) = line.idle_high else {
                 continue;
             };
-            let active = (high_mask & (1 << index) != 0) != idle;
-            if at_us - self.report.started_us < SETTLE_US {
+            let high = high_mask & (1 << index) != 0;
+            let active = high != idle;
+            let since = at_us - self.report.started_us;
+            if since < SETTLE_US {
+                *contact = Contact::default();
+                continue;
+            }
+            if since < SETTLE_US + rest_us {
+                // Hands away: any change from its probed rest, or since, is
+                // a rest that does not hold.
+                if resting.replace(high).unwrap_or(idle) != high {
+                    line.rest_changes = line.rest_changes.map(|n| n + 1);
+                }
                 *contact = Contact::default();
                 continue;
             }
@@ -140,6 +178,11 @@ impl Discovery {
                     line.longest_pulse_us = line.longest_pulse_us.max(duration);
                     if line.completed_pulses >= 2 {
                         line.active_low_candidate = Some(idle);
+                        line.reads = Some(if line.longest_pulse_us >= HELD_US {
+                            Reads::Level
+                        } else {
+                            Reads::Pulses
+                        });
                     }
                 }
                 contact.pressed_since = None;
@@ -155,11 +198,13 @@ impl Discovery {
 }
 
 #[cfg(target_os = "linux")]
-pub fn run(seconds: u64) -> io::Result<Report> {
+pub fn run(seconds: u64, rest_seconds: u64) -> io::Result<Report> {
     use crate::pins::{GpioLines, Lines, Pin, PinsConfig, Pull};
     use std::{thread, time::Duration};
-    if !(2..=60).contains(&seconds) {
-        return Err(io::Error::other("head discovery lasts 2..60 seconds"));
+    if !(2..=60).contains(&seconds) || rest_seconds >= seconds {
+        return Err(io::Error::other(
+            "head discovery lasts 2..60 seconds, its rest less",
+        ));
     }
     let chip = "/dev/gpiochip0";
     let mut probes = [(false, false); 4];
@@ -183,7 +228,7 @@ pub fn run(seconds: u64) -> io::Result<Report> {
     };
     let mut lines = GpioLines::open(&wiring)?;
     let started = lamp_ipc::monotonic_us();
-    let mut discovery = Discovery::new(started, probes)?;
+    let mut discovery = Discovery::with_rest(started, probes, rest_seconds * 1_000_000)?;
     while lamp_ipc::monotonic_us() - started < seconds * 1_000_000 {
         let before = lamp_ipc::monotonic_us();
         let mut mask = 0;
@@ -204,6 +249,6 @@ pub fn run(seconds: u64) -> io::Result<Report> {
 }
 
 #[cfg(not(target_os = "linux"))]
-pub fn run(_: u64) -> io::Result<Report> {
+pub fn run(_: u64, _: u64) -> io::Result<Report> {
     Err(io::Error::other("head discovery requires Linux GPIO"))
 }

@@ -17,6 +17,35 @@ use std::{
 
 pub const HEAD_CANDIDATES: [u32; 4] = [37, 96, 97, 98];
 
+/// A head pad's line at rest, as this lamp's factory step measured it with
+/// hands away.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Rest {
+    High,
+    Low,
+}
+
+/// How a touch shows on a head pad's line: held away from its rest while
+/// the hand is there, or pulsing while it rests (a TTP223 in its pulsing
+/// mode).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Reads {
+    Level,
+    Pulses,
+}
+
+/// One head pad's own baseline (#711): each unit's pads rest and read
+/// differently (#1764), so each lamp's factory step writes its own.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HeadRest {
+    pub name: String,
+    pub rest: Rest,
+    pub reads: Reads,
+}
+
 /// The switch that turns the base strip (MPR121) back on: `on`. Without it
 /// the strip is off: V2 doesn't use it (the project lead's decision, 19 Oct;
 /// V1 had it off too). Its code and tuning are kept: a pins file's `base`
@@ -59,6 +88,11 @@ pub struct TouchPinsConfig {
     pub head_tap_min_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub head_gap_ms: Option<u64>,
+    /// Each head pad's baseline, in `head_pads`' order, from the factory
+    /// step; without it each pad reads its level by its `active_low`, as
+    /// before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_rest: Option<Vec<HeadRest>>,
     /// Also give the head pads to the old engine, whose `Pet` on
     /// `controls/gesture` wakes a lamp asleep at night: for a lamp whose
     /// voice and Expression do not read `controls/touch` yet, the product's
@@ -150,6 +184,24 @@ impl TouchPinsConfig {
                 "touch pins must name configured primary/head inputs in the same order".into(),
             );
         }
+        if let Some(rests) = &self.head_rest {
+            if rests
+                .iter()
+                .map(|rest| &rest.name)
+                .ne(self.head_pads.iter().map(|pin| &pin.name))
+            {
+                return Err("head_rest must name the head pads in the same order".into());
+            }
+            if rests
+                .iter()
+                .zip(&self.head_pads)
+                .any(|(rest, pin)| pin.active_low != (rest.rest == Rest::High))
+            {
+                return Err(
+                    "a head pad resting high is active-low, and one resting low is not".into(),
+                );
+            }
+        }
         if let Some(base) = &self.base {
             base.check()?;
         }
@@ -169,6 +221,13 @@ impl TouchPinsConfig {
             head_qualify_ms: self.head_qualify_ms,
             head_tap_min_ms: self.head_tap_min_ms,
             head_gap_ms: self.head_gap_ms,
+            head_pulse_pads: self
+                .head_rest
+                .iter()
+                .flatten()
+                .filter(|rest| rest.reads == Reads::Pulses)
+                .map(|rest| rest.name.clone())
+                .collect(),
         };
         touch.check().map_err(|e| e.to_string())?;
         Ok(touch)

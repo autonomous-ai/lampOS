@@ -422,10 +422,17 @@ units stopped:
 2. **The touch pads**, `/etc/lampOS/controls/controls-pins.json`, with a
    person at the lamp. GPIO head pads differ by unit: the hardware team's test
    reads four candidate lines (37, 96, 97, 98), and lamp-52e6's pads were on
-   97 and 98, driven high while touched (#1362). So `lamp-controls
-   discover-head --seconds 30`, with each pad touched twice, finds this unit's
-   pair and polarity, and they go into `head_pads`; the product's 37 and 96,
-   active-high, are only a default. On an MPR121 strip it is
+   97 and 98, driven high while touched (#1362). Each unit's pads also rest
+   and read differently (#1764): lamp-cb94's line 97 flipped at rest and read
+   touched for 77 s with no hand on it, and lamp-c0a4's pulsed under a hand.
+   So `lamp-controls discover-head --seconds 40 --rest-seconds 10`, hands
+   away for its first 11 s and then each pad touched twice, finds this
+   unit's pair and polarity, which go into `head_pads`, and each pad's own
+   baseline, which goes into `head_rest` (its rest, and whether a touch holds
+   its level or pulses; controls.md, "Each lamp's own head pads"). A pad
+   whose line changed with hands away is refused and nothing is written. The
+   product's 37 and 96, active-high, with no `head_rest`, are only a
+   default. On an MPR121 strip it is
    `lamp-controls calibrate-touch` (controls.md, "Run without a lamp, then
    qualify on one": First's on-lamp sequence), its output installed there,
    but **that half is skipped while the base strip is off**: V2 doesn't use
