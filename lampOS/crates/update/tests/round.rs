@@ -43,10 +43,13 @@ fn throwaway() -> Ed25519KeyPair {
 struct FakeChannel {
     files: HashMap<String, Vec<u8>>,
     offline: bool,
+    /// Every URL asked for, in order.
+    fetched: Vec<String>,
 }
 
 impl Channel for FakeChannel {
     fn fetch(&mut self, url: &str, most: u64, out: &mut dyn Write) -> Result<u64, Fetch> {
+        self.fetched.push(url.to_owned());
         if self.offline {
             return Err(Fetch::Unreachable("no network".into()));
         }
@@ -404,6 +407,7 @@ impl Lamp {
             keep_free: 256_000_000,
             self_switch: false,
             running: None,
+            updater: manifest::UPDATER,
         };
         Self {
             _folder: folder,
@@ -477,6 +481,7 @@ impl Lamp {
             files_url,
             files,
             units: carried,
+            min_updater: None,
         }
     }
 
@@ -1119,6 +1124,61 @@ fn without_apply_nothing_is_written_and_what_would_change_is_said() {
     assert_eq!(lamp.files(), before);
     assert!(!lamp.exists("/var/lib/lampos-update"));
     assert!(lamp.calls().is_empty());
+}
+
+/// #1680: a build for a newer updater is refused whole, with nothing
+/// fetched, written or restarted, and it is said why. Nothing is held
+/// against the build: once the lamp's updater can apply it, it is taken.
+#[test]
+fn a_build_for_a_newer_updater_is_refused_and_taken_once_the_updater_can() {
+    let mut lamp = Lamp::new();
+    let before = lamp.lamp_files();
+    let mut needing = build_two(&mut lamp);
+    needing.min_updater = Some(manifest::UPDATER + 1);
+    let bytes = serde_json::to_vec(&needing).unwrap();
+    lamp.channel.files.insert(
+        format!("{CHANNEL}{}", manifest::ENVELOPE),
+        manifest::seal(&bytes, &lamp.key).unwrap(),
+    );
+    let fetched = lamp.channel.fetched.len();
+    let outcome = lamp.round();
+    let why = format!(
+        "build 2 needs updater {} or newer, and this is updater {}; \
+         it carries no lamp-update, so waiting for a build that does",
+        manifest::UPDATER + 1,
+        manifest::UPDATER
+    );
+    assert_eq!(outcome, Outcome::Refused(why.clone()));
+    assert_eq!(
+        outcome.to_string(),
+        format!("refused, nothing switched: {why}")
+    );
+    // Only the envelope was read: no unit, no binary.
+    assert_eq!(
+        lamp.channel.fetched[fetched..],
+        [format!("{CHANNEL}{}", manifest::ENVELOPE)]
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert!(lamp.calls().is_empty());
+    assert!(!lamp.exists("/var/lib/lampos-update/state.json"));
+    let log = lamp.read("/var/lib/lampos-update/log.jsonl");
+    assert!(log.contains("\"event\":\"refused\""), "{log}");
+    assert!(
+        log.contains(&format!("needs updater {}", manifest::UPDATER + 1)),
+        "{log}"
+    );
+    // Said again the next round, and still nothing changed.
+    assert!(matches!(lamp.round(), Outcome::Refused(_)));
+    assert_eq!(lamp.lamp_files(), before);
+
+    // The same build for this updater: taken.
+    needing.min_updater = Some(manifest::UPDATER);
+    let bytes = serde_json::to_vec(&needing).unwrap();
+    lamp.channel.files.insert(
+        format!("{CHANNEL}{}", manifest::ENVELOPE),
+        manifest::seal(&bytes, &lamp.key).unwrap(),
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(2));
 }
 
 #[test]
@@ -2626,4 +2686,219 @@ fn a_round_after_its_own_switch_keeps_the_old_binarys_folder() {
     product_build_with_updater(&mut lamp, 3, "lamp-update 2");
     assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
     assert!(lamp.exists(&format!("{old}lamp-update")), "{:?}", lamp.said);
+}
+
+/// The build `manifest` again, signed with `min_updater` set to `needed`.
+fn needing(lamp: &mut Lamp, mut manifest: Manifest, needed: u64) -> Manifest {
+    manifest.min_updater = Some(needed);
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    lamp.channel.files.insert(
+        format!("{CHANNEL}{}", manifest::ENVELOPE),
+        manifest::seal(&bytes, &lamp.key).unwrap(),
+    );
+    manifest
+}
+
+/// Every file of the lamp but lamp-update's own folders and link and its
+/// records: the parts, their units and links.
+fn parts_files(lamp: &Lamp) -> BTreeMap<String, Vec<u8>> {
+    lamp.lamp_files()
+        .into_iter()
+        .filter(|(name, _)| !name.starts_with("opt/lampOS/update/"))
+        .collect()
+}
+
+/// #1680, the first builder's rule: an updater too old for a build takes
+/// the newer lamp-update it carries and nothing else; that one confirms
+/// itself, reads the same build again and takes the rest.
+#[test]
+fn an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest() {
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = 1;
+    let old = lamp.own_build();
+    let parts = parts_files(&lamp);
+    let build = product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    needing(&mut lamp, build, 2);
+    let new = sha("lamp-update 2");
+
+    // `check` says what it would take first.
+    lamp.config.apply = false;
+    let would = lamp.round();
+    assert!(
+        matches!(&would, Outcome::Would(lines) if lines[0].contains("lamp-update first")),
+        "{would:?}"
+    );
+    lamp.config.apply = true;
+
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 2,
+            needed: 2,
+            from: old.clone(),
+            to: new.clone()
+        },
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.own_build(), new);
+    assert_eq!(
+        lamp.read("/opt/lampOS/update/current/lamp-update"),
+        "lamp-update 2"
+    );
+    // Nothing else of the build: no part's file, unit or link, no restart.
+    assert_eq!(parts_files(&lamp), parts);
+    assert!(lamp.calls().is_empty(), "{:?}", lamp.calls());
+    assert!(lamp.pending().is_some());
+
+    // The new updater, of level 2, confirms itself and takes the rest.
+    lamp.config.updater = 2;
+    assert_eq!(lamp.confirm(&new), own::Confirm::Confirmed);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_ne!(parts_files(&lamp), parts);
+    assert_eq!(lamp.own_build(), new);
+}
+
+/// #1680: a build too new for this updater that carries no lamp-update is
+/// refused, said clearly, with nothing fetched or written.
+#[test]
+fn an_updater_too_old_for_a_build_without_an_updater_is_refused_with_nothing_written() {
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = 1;
+    let old = lamp.own_build();
+    let mut build = product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    build.files.retain(|file| file.name != "lamp-update");
+    needing(&mut lamp, build, 2);
+    let before = lamp.lamp_files();
+    let fetched = lamp.channel.fetched.len();
+    assert_eq!(
+        lamp.round(),
+        Outcome::Refused(
+            "build 2 needs updater 2 or newer, and this is updater 1; \
+             it carries no lamp-update, so waiting for a build that does"
+                .into()
+        )
+    );
+    assert_eq!(
+        lamp.channel.fetched[fetched..],
+        [format!("{CHANNEL}{}", manifest::ENVELOPE)]
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert!(lamp.calls().is_empty());
+    assert!(lamp.pending().is_none());
+    assert_eq!(lamp.own_build(), old);
+}
+
+/// #1680: one lamp-update per round, however old the lamp: 1 to 2, which
+/// confirms on a channel that has meanwhile moved to a build for updater
+/// 3, then 2 to 3, which takes the build.
+#[test]
+fn an_old_updater_climbs_one_updater_a_round() {
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = 1;
+    let first = lamp.own_build();
+    let parts = parts_files(&lamp);
+    let build = product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    needing(&mut lamp, build, 2);
+    let two = sha("lamp-update 2");
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 2,
+            needed: 2,
+            from: first,
+            to: two.clone()
+        },
+        "{:?}",
+        lamp.said
+    );
+
+    let build = product_build_with_updater(&mut lamp, 3, "lamp-update 3");
+    needing(&mut lamp, build, 3);
+    let three = sha("lamp-update 3");
+    lamp.config.updater = 2;
+    // Its dry round reads build 3 and finds the updater it would take: it
+    // can still update, so it is confirmed.
+    assert_eq!(lamp.confirm(&two), own::Confirm::Confirmed);
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 3,
+            needed: 3,
+            from: two,
+            to: three.clone()
+        },
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(parts_files(&lamp), parts);
+
+    lamp.config.updater = 3;
+    assert_eq!(lamp.confirm(&three), own::Confirm::Confirmed);
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    assert_eq!(lamp.own_build(), three);
+}
+
+/// #1680: with `LAMP_UPDATE_SELF` off, a build too new for this updater is
+/// refused even when it carries a newer lamp-update: that one is not taken,
+/// and nothing but the envelope is fetched or written.
+#[test]
+fn with_the_switch_off_an_updater_too_old_for_a_build_takes_nothing_it_carries() {
+    let mut lamp = Lamp::installed();
+    assert!(!lamp.config.self_switch);
+    lamp.config.updater = 1;
+    let old = lamp.own_build();
+    let build = product_build_with_updater(&mut lamp, 2, "lamp-update 2");
+    needing(&mut lamp, build, 2);
+    let before = lamp.lamp_files();
+    let fetched = lamp.channel.fetched.len();
+    assert_eq!(
+        lamp.round(),
+        Outcome::Refused(
+            "build 2 needs updater 2 or newer, and this is updater 1; \
+             waiting for a newer updater"
+                .into()
+        ),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(
+        lamp.channel.fetched[fetched..],
+        [format!("{CHANNEL}{}", manifest::ENVELOPE)]
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert!(lamp.calls().is_empty());
+    assert!(lamp.pending().is_none());
+    assert_eq!(lamp.own_build(), old);
+}
+
+/// #1680: a build too new for this updater, no newer than the build the
+/// lamp runs, is refused: the newer lamp-update it carries is not taken.
+#[test]
+fn an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carries() {
+    let mut lamp = Lamp::installed_switching_itself();
+    lamp.config.updater = 1;
+    let old = lamp.own_build();
+    let build = product_build_with_updater(&mut lamp, 1, "lamp-update 2");
+    needing(&mut lamp, build, 2);
+    let before = lamp.lamp_files();
+    let fetched = lamp.channel.fetched.len();
+    assert_eq!(
+        lamp.round(),
+        Outcome::Refused(
+            "build 1 needs updater 2 or newer, and this is updater 1; \
+             waiting for a newer updater"
+                .into()
+        ),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(
+        lamp.channel.fetched[fetched..],
+        [format!("{CHANNEL}{}", manifest::ENVELOPE)]
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert!(lamp.calls().is_empty());
+    assert!(lamp.pending().is_none());
+    assert_eq!(lamp.own_build(), old);
 }

@@ -29,6 +29,7 @@ lamp-update harness-on
 lamp-update back
 lamp-update check-units --cat FILE [--product DIR]
 lamp-update manifest --binaries DIR --deploy DIR --skills DIR --channel NAME --sequence N --commit SHA --files-url URL
+                     [--min-updater N]
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
 lamp-update public-key --key-file PRIVATE
 lamp-update --help
@@ -86,6 +87,8 @@ manifest  writes DIR/manifest.json for the binaries in --binaries, the units of
           each lamp folder (one with a LAMP.md) in --deploy, copied beside them, and
           the product skills of --skills (lampOS/skills), written beside them as
           lamp-product-skills.
+          --min-updater N: the oldest updater that can apply the build (left out:
+          any). It must carry lamp-update, and N is at most this program's updater.
 sign      writes the signed envelope (lampos-manifest.json) for a manifest, with a
           private key: an unencrypted PKCS#8 Ed25519 key in base64.
 public-key prints the public key of a private key, in base64: what a lamp is given.
@@ -205,8 +208,19 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
             "sequence",
             "commit",
             "files-url",
+            "min-updater",
         ],
     )?;
+    let min_updater = match options.get("min-updater") {
+        None => None,
+        Some(value) => Some(
+            value
+                .parse::<u64>()
+                .ok()
+                .filter(|level| *level >= 1)
+                .ok_or("--min-updater is a whole number from 1")?,
+        ),
+    };
     let sequence = wanted(options, "sequence")?
         .parse()
         .map_err(|_| "--sequence is a whole number".to_owned())?;
@@ -218,6 +232,7 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
         sequence,
         wanted(options, "commit")?,
         wanted(options, "files-url")?,
+        min_updater,
     )
     .map_err(|error| error.to_string())?;
     println!(
@@ -481,6 +496,7 @@ fn config(
         keep_free: keep_free_mb * 1_000_000,
         self_switch: own::on(std::env::var(own::SWITCH).ok().as_deref()),
         running,
+        updater: manifest::UPDATER,
     };
     Ok((
         config,
@@ -503,6 +519,7 @@ fn status(outcome: &Outcome) -> u8 {
         Outcome::UpToDate(_)
         | Outcome::Switched(_)
         | Outcome::SelfSwitched { .. }
+        | Outcome::Climbs { .. }
         | Outcome::Would(_)
         | Outcome::NothingPublished => 0,
         Outcome::Unreachable(_) => 3,
@@ -598,7 +615,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             round(&config, &mut world)
         };
         let text = outcome.to_string();
-        if let Outcome::SelfSwitched { .. } = outcome {
+        if let Outcome::SelfSwitched { .. } | Outcome::Climbs { .. } = outcome {
             // Phase 1 done: the new build runs in this program's place,
             // with the same options. An exec that fails returns here.
             eprintln!("lamp-update: {text}");

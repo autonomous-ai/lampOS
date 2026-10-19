@@ -26,6 +26,10 @@ use std::fmt::Write as _;
 pub const FORMAT: &str = "lampos-update/1";
 /// The manifest's schema: what this program reads.
 pub const SCHEMA: u32 = 1;
+/// This updater's own level: raised whenever the updater learns to apply
+/// something an older one cannot. A manifest whose `min_updater` is above
+/// it is refused whole, before anything is fetched or written.
+pub const UPDATER: u64 = 1;
 /// The envelope's name in a channel's folder.
 pub const ENVELOPE: &str = "lampos-manifest.json";
 /// The largest envelope read: a manifest of every binary and every lamp's
@@ -87,6 +91,90 @@ pub struct Manifest {
     pub files_url: String,
     pub files: Vec<File>,
     pub units: Vec<Unit>,
+    /// The oldest updater ([`UPDATER`]) that can apply this build. Left
+    /// out, any can, and it is not written: the manifest is then byte for
+    /// byte what an updater before the field reads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_updater: Option<u64>,
+}
+
+/// The little of a manifest read before the rest, leniently: what a newer
+/// manifest must keep readable to an older updater, so that it says why it
+/// refuses and can find the updater the build carries.
+#[derive(Deserialize)]
+struct Needs {
+    #[serde(default)]
+    channel: Option<String>,
+    #[serde(default)]
+    sequence: Option<u64>,
+    #[serde(default)]
+    min_updater: Option<u64>,
+    #[serde(default)]
+    files_url: Option<String>,
+    #[serde(default)]
+    files: Vec<serde_json::Value>,
+}
+
+/// A signed build that needs a newer updater than this one.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TooOld {
+    /// Its channel, when it is a plain name, and its sequence.
+    pub channel: Option<String>,
+    pub sequence: Option<u64>,
+    /// Its `min_updater`.
+    pub needed: u64,
+    /// This updater's level.
+    pub updater: u64,
+    /// Where its files are, and the `lamp-update` it carries, if it names
+    /// one plainly.
+    pub files_url: Option<String>,
+    pub carried: Option<File>,
+}
+
+impl TooOld {
+    /// Why the build is refused, for a person.
+    pub fn why(&self) -> String {
+        let build = self
+            .sequence
+            .map_or_else(|| "the build".to_owned(), |n| format!("build {n}"));
+        let wait = if self.carried.is_some() {
+            "waiting for a newer updater"
+        } else {
+            "it carries no lamp-update, so waiting for a build that does"
+        };
+        format!(
+            "{build} needs updater {} or newer, and this is updater {}; {wait}",
+            self.needed, self.updater
+        )
+    }
+}
+
+/// The manifest bytes' need for a newer updater than `updater`, read before
+/// anything else of them, so a build for a newer updater is refused for
+/// that reason whatever else it carries.
+pub fn too_old(manifest: &[u8], updater: u64) -> Option<TooOld> {
+    let needs: Needs = serde_json::from_slice(manifest).ok()?;
+    let needed = needs.min_updater?;
+    if needed <= updater {
+        return None;
+    }
+    let carried = needs
+        .files
+        .into_iter()
+        .filter_map(|file| serde_json::from_value::<File>(file).ok())
+        .find(|file| {
+            file.name == "lamp-update"
+                && check_hash_and_size(&file.name, &file.sha256, file.size, MOST_FILE_BYTES).is_ok()
+        });
+    let files_url = needs.files_url.filter(|url| is_folder_url(url));
+    Some(TooOld {
+        channel: needs.channel.filter(|channel| is_token(channel)),
+        sequence: needs.sequence.filter(|sequence| *sequence > 0),
+        needed,
+        updater,
+        carried: carried.filter(|_| files_url.is_some()),
+        files_url,
+    })
 }
 
 /// What is wrong with an envelope or a manifest. Said to a person.
@@ -186,6 +274,35 @@ pub fn seal(manifest: &[u8], key: &Ed25519KeyPair) -> Result<Vec<u8>, Refused> {
 /// manifest this program can install from. The manifest's own bytes are
 /// returned beside it: they are what is kept.
 pub fn open(envelope: &[u8], key: &[u8; 32]) -> Result<(Manifest, Vec<u8>), Refused> {
+    open_as(envelope, key, UPDATER)
+}
+
+/// [`open`], by an updater of level `updater`. Its `min_updater` is read
+/// after the signature and before anything else, so a build for a newer
+/// updater, whatever else it carries, is refused for that reason.
+pub fn open_as(
+    envelope: &[u8],
+    key: &[u8; 32],
+    updater: u64,
+) -> Result<(Manifest, Vec<u8>), Refused> {
+    match open_or_too_old(envelope, key, updater)? {
+        Opened::Manifest(manifest, bytes) => Ok((manifest, bytes)),
+        Opened::TooOld(too_old) => Err(refused(too_old.why())),
+    }
+}
+
+/// A signed envelope, opened by an updater of level `updater`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Opened {
+    /// A manifest it can apply, and its bytes.
+    Manifest(Manifest, Vec<u8>),
+    /// Signed, and for a newer updater: what of it could be read.
+    TooOld(TooOld),
+}
+
+/// [`open_as`], with a build for a newer updater told apart: a round may
+/// still take the newer `lamp-update` it carries, and only that (#1680).
+pub fn open_or_too_old(envelope: &[u8], key: &[u8; 32], updater: u64) -> Result<Opened, Refused> {
     if envelope.len() as u64 > MOST_ENVELOPE_BYTES {
         return Err(refused("the envelope is too large"));
     }
@@ -213,8 +330,11 @@ pub fn open(envelope: &[u8], key: &[u8; 32]) -> Result<(Manifest, Vec<u8>), Refu
     UnparsedPublicKey::new(&ED25519, key)
         .verify(&manifest, &signature)
         .map_err(|_| refused("the signature does not match the manifest"))?;
+    if let Some(too_old) = too_old(&manifest, updater) {
+        return Ok(Opened::TooOld(too_old));
+    }
     let parsed = parse(&manifest)?;
-    Ok((parsed, manifest))
+    Ok(Opened::Manifest(parsed, manifest))
 }
 
 /// A manifest from its bytes, checked: every name plain, every hash a hash,
@@ -241,6 +361,9 @@ fn check(manifest: &Manifest) -> Result<(), Refused> {
     }
     if manifest.sequence == 0 {
         return Err(refused("the sequence is 0"));
+    }
+    if manifest.min_updater == Some(0) {
+        return Err(refused("min_updater is 0: leave it out instead"));
     }
     if manifest.commit.len() != 40 || !is_lower_hex(&manifest.commit) {
         return Err(refused("the commit is not 40 hex characters"));
@@ -375,6 +498,7 @@ mod tests {
                 sha256: sha256_hex(b"[Service]\n"),
                 size: 10,
             }],
+            min_updater: None,
         }
     }
 
@@ -447,6 +571,7 @@ mod tests {
         let cases: Vec<(&str, Wrong)> = vec![
             ("schema", Box::new(|m| m.schema = 2)),
             ("sequence", Box::new(|m| m.sequence = 0)),
+            ("min_updater", Box::new(|m| m.min_updater = Some(0))),
             ("commit", Box::new(|m| m.commit = "main".into())),
             (
                 "folder",
@@ -490,6 +615,168 @@ mod tests {
         let mut value = serde_json::to_value(manifest()).unwrap();
         value["requires"] = "something".into();
         assert!(parse(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+
+    #[test]
+    fn a_build_for_a_newer_updater_is_refused_by_an_older_one_only() {
+        let key = throwaway();
+        let mut needing = manifest();
+        needing.min_updater = Some(3);
+        let bytes = serde_json::to_vec(&needing).unwrap();
+        let envelope = seal(&bytes, &key).unwrap();
+        let why = open_as(&envelope, &public(&key), 2).unwrap_err().0;
+        assert_eq!(
+            why,
+            "build 145 needs updater 3 or newer, and this is updater 2; \
+             it carries no lamp-update, so waiting for a build that does"
+        );
+        // One that carries an updater says so, and names it.
+        let mut carrying = needing.clone();
+        let updater = File {
+            name: "lamp-update".into(),
+            sha256: sha256_hex(b"update 3"),
+            size: 8,
+        };
+        carrying.files.push(updater.clone());
+        let bytes_carrying = serde_json::to_vec(&carrying).unwrap();
+        let found = too_old(&bytes_carrying, 2).unwrap();
+        assert_eq!(found.carried, Some(updater));
+        assert_eq!(
+            found.files_url.as_deref(),
+            Some(carrying.files_url.as_str())
+        );
+        assert!(
+            found.why().ends_with("; waiting for a newer updater"),
+            "{}",
+            found.why()
+        );
+        assert_eq!(too_old(&bytes_carrying, 3), None);
+        // An updater as new or newer takes it, as it is.
+        for updater in [3, 4] {
+            let (opened, kept) = open_as(&envelope, &public(&key), updater).unwrap();
+            assert_eq!(opened, needing);
+            assert_eq!(kept, bytes);
+        }
+        // Without the field, any updater takes it.
+        let envelope = seal(&serde_json::to_vec(&manifest()).unwrap(), &key).unwrap();
+        assert!(open_as(&envelope, &public(&key), 1).is_ok());
+        assert!(open(&envelope, &public(&key)).is_ok());
+    }
+
+    #[test]
+    fn a_newer_manifest_this_updater_cannot_read_is_refused_for_its_updater() {
+        // What a later schema may carry: refused for the updater it needs,
+        // not for its schema or its new fields. Signed by hand, since seal
+        // checks it is a manifest this program reads.
+        let key = throwaway();
+        let mut value = serde_json::to_value(manifest()).unwrap();
+        value["schema"] = 2.into();
+        value["product_units"] = serde_json::json!([]);
+        value["min_updater"] = (UPDATER + 1).into();
+        let bytes = serde_json::to_vec(&value).unwrap();
+        let envelope = serde_json::json!({
+            "format": FORMAT,
+            "key": fingerprint(&public(&key)),
+            "manifest": STANDARD.encode(&bytes),
+            "signature": STANDARD.encode(key.sign(&bytes).as_ref()),
+        });
+        let why = open(&serde_json::to_vec(&envelope).unwrap(), &public(&key))
+            .unwrap_err()
+            .0;
+        assert!(
+            why.contains(&format!("needs updater {}", UPDATER + 1)),
+            "{why}"
+        );
+    }
+
+    #[test]
+    fn min_updater_is_signed_with_the_rest() {
+        let key = throwaway();
+        let mut needing = manifest();
+        needing.min_updater = Some(UPDATER + 1);
+        let bytes = serde_json::to_vec(&needing).unwrap();
+        let envelope = seal(&bytes, &key).unwrap();
+        // Lowered on the way, under the same signature: refused, and not
+        // as a build this updater could apply.
+        let lowered = String::from_utf8(bytes)
+            .unwrap()
+            .replace(
+                &format!("\"min_updater\":{}", UPDATER + 1),
+                &format!("\"min_updater\":{UPDATER}"),
+            )
+            .into_bytes();
+        let mut parsed: serde_json::Value = serde_json::from_slice(&envelope).unwrap();
+        parsed["manifest"] = STANDARD.encode(&lowered).into();
+        let why = open(&serde_json::to_vec(&parsed).unwrap(), &public(&key))
+            .unwrap_err()
+            .0;
+        assert_eq!(why, "the signature does not match the manifest");
+        // Taken out, likewise.
+        let mut value: serde_json::Value = serde_json::from_slice(&lowered).unwrap();
+        value.as_object_mut().unwrap().remove("min_updater");
+        parsed["manifest"] = STANDARD.encode(serde_json::to_vec(&value).unwrap()).into();
+        let why = open(&serde_json::to_vec(&parsed).unwrap(), &public(&key))
+            .unwrap_err()
+            .0;
+        assert_eq!(why, "the signature does not match the manifest");
+    }
+
+    #[test]
+    fn min_updater_raised_under_the_same_signature_is_a_bad_signature() {
+        // The case that matters: a build signed for this updater, then
+        // marked for a newer one on the way. The field is read only after
+        // the signature, so it is refused as tampered, not climbed.
+        let key = throwaway();
+        let signed_without = serde_json::to_vec(&manifest()).unwrap();
+        let mut at_this = manifest();
+        at_this.min_updater = Some(UPDATER);
+        let signed_at_this = serde_json::to_vec(&at_this).unwrap();
+        for signed in [signed_without, signed_at_this] {
+            let envelope = seal(&signed, &key).unwrap();
+            let mut raised: serde_json::Value = serde_json::from_slice(&signed).unwrap();
+            raised["min_updater"] = (UPDATER + 1).into();
+            let raised = serde_json::to_vec(&raised).unwrap();
+            assert!(too_old(&raised, UPDATER).is_some());
+            let mut parsed: serde_json::Value = serde_json::from_slice(&envelope).unwrap();
+            parsed["manifest"] = STANDARD.encode(&raised).into();
+            let tampered = serde_json::to_vec(&parsed).unwrap();
+            assert_eq!(
+                open_or_too_old(&tampered, &public(&key), UPDATER)
+                    .unwrap_err()
+                    .0,
+                "the signature does not match the manifest"
+            );
+            assert_eq!(
+                open(&tampered, &public(&key)).unwrap_err().0,
+                "the signature does not match the manifest"
+            );
+        }
+    }
+
+    #[test]
+    fn a_manifest_without_min_updater_is_written_and_read_as_before() {
+        let bytes = serde_json::to_vec(&manifest()).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("min_updater"));
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let keys: Vec<&str> = value
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                "channel",
+                "commit",
+                "files",
+                "files_url",
+                "schema",
+                "sequence",
+                "units"
+            ]
+        );
+        assert_eq!(parse(&bytes).unwrap().min_updater, None);
     }
 
     #[test]

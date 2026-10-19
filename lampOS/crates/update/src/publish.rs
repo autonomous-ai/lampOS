@@ -19,6 +19,12 @@ fn invalid(why: String) -> io::Error {
 
 /// The manifest, written as `manifest.json` into `binaries`, with the units
 /// copied there and the product skills of `skills` written there.
+///
+/// `min_updater`, when given, is the oldest updater that can apply it. It
+/// must not be above the updater the build carries, or a lamp could never
+/// climb to it: so the build must carry `lamp-update`, and the level is
+/// this program's own ([`manifest::UPDATER`]), which is the carried one's
+/// when the manifest is made by the build's own `lamp-update`, as it is.
 pub fn make(
     binaries: &Path,
     deploy: &Path,
@@ -27,6 +33,7 @@ pub fn make(
     sequence: u64,
     commit: &str,
     files_url: &str,
+    min_updater: Option<u64>,
 ) -> io::Result<Manifest> {
     let mut files = Vec::new();
     let sums = fs::read_to_string(binaries.join("SHA256SUMS")).ok();
@@ -66,6 +73,19 @@ pub fn make(
         size: bytes.len() as u64,
     });
     files.sort_by(|a, b| a.name.cmp(&b.name));
+    if let Some(needed) = min_updater {
+        if !files.iter().any(|file| file.name == "lamp-update") {
+            return Err(invalid(format!(
+                "min_updater {needed}: the build carries no lamp-update, so no lamp could climb to it"
+            )));
+        }
+        if needed > manifest::UPDATER {
+            return Err(invalid(format!(
+                "min_updater {needed} is above the updater the build carries, updater {}",
+                manifest::UPDATER
+            )));
+        }
+    }
     let mut units = Vec::new();
     for lamp in fs::read_dir(deploy)? {
         let lamp = lamp?;
@@ -103,6 +123,7 @@ pub fn make(
         files_url: files_url.to_owned(),
         files,
         units,
+        min_updater,
     };
     let mut bytes = serde_json::to_vec_pretty(&made).map_err(io::Error::other)?;
     bytes.push(b'\n');
@@ -158,6 +179,7 @@ mod tests {
             7,
             &"c".repeat(40),
             url,
+            None,
         )
         .unwrap();
         let names: Vec<&str> = made.files.iter().map(|file| file.name.as_str()).collect();
@@ -182,6 +204,7 @@ mod tests {
             7,
             &"c".repeat(40),
             url,
+            None,
         )
         .unwrap();
         assert_eq!(again, made);
@@ -190,6 +213,7 @@ mod tests {
         assert!(out.join("lamp-4ace.lamp-voice.service").is_file());
         let written = fs::read(out.join("manifest.json")).unwrap();
         assert_eq!(manifest::parse(&written).unwrap(), made);
+        assert!(!String::from_utf8_lossy(&written).contains("min_updater"));
 
         // A binary that SHA256SUMS does not know as it is: refused.
         fs::write(out.join("lamp-body"), b"changed").unwrap();
@@ -201,7 +225,71 @@ mod tests {
                 "lamp-voice",
                 7,
                 &"c".repeat(40),
-                url
+                url,
+                None
+            )
+            .is_err()
+        );
+
+        // Asked for, without a lamp-update in the build: refused, since no
+        // lamp could climb to it.
+        fs::write(out.join("lamp-body"), b"body").unwrap();
+        let level = manifest::UPDATER;
+        let commit = "c".repeat(40);
+        let why = make(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            7,
+            &commit,
+            url,
+            Some(level),
+        )
+        .unwrap_err();
+        assert!(why.to_string().contains("carries no lamp-update"), "{why}");
+        // With one: the oldest updater that can apply it is written in.
+        fs::write(out.join("lamp-update"), b"update").unwrap();
+        fs::remove_file(out.join("SHA256SUMS")).unwrap();
+        let made = make(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            7,
+            &commit,
+            url,
+            Some(level),
+        )
+        .unwrap();
+        assert_eq!(made.min_updater, Some(level));
+        let written = fs::read(out.join("manifest.json")).unwrap();
+        assert_eq!(manifest::parse(&written).unwrap().min_updater, Some(level));
+        // Above the updater it carries: refused, nothing written over.
+        let why = make(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            7,
+            &commit,
+            url,
+            Some(level + 1),
+        )
+        .unwrap_err();
+        assert!(why.to_string().contains("above the updater"), "{why}");
+        assert_eq!(fs::read(out.join("manifest.json")).unwrap(), written);
+        // Never 0: left out instead.
+        assert!(
+            make(
+                &out,
+                &deploy,
+                &skills,
+                "lamp-voice",
+                7,
+                &commit,
+                url,
+                Some(0)
             )
             .is_err()
         );

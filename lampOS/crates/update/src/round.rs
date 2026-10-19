@@ -30,7 +30,7 @@
 use crate::{
     fetch::{Channel, Fetch},
     judge::{Before, UnitState, Watch, part_of},
-    manifest::{self, Manifest},
+    manifest::{self, Manifest, Opened, TooOld},
     own,
     product_skills::{self, Bundle},
     quiet::{BETWEEN_TURNS, QUIET, Quiet},
@@ -91,6 +91,10 @@ pub struct Config {
     /// The folder this program runs from, as the lamp names it
     /// (`/opt/lampOS/update/<sha256>/`), when it is one: never pruned.
     pub running: Option<String>,
+    /// This program's own level (`manifest::UPDATER`): a build whose
+    /// `min_updater` is above it is refused, all but the newer lamp-update
+    /// it carries (#1680).
+    pub updater: u64,
 }
 
 impl Config {
@@ -133,6 +137,16 @@ pub enum Outcome {
     /// place, it must confirm itself (crate::own).
     SelfSwitched {
         sequence: u64,
+        from: String,
+        to: String,
+    },
+    /// Build `sequence` needs updater `needed`, newer than this one: only
+    /// the lamp-update it carries is taken, `update/current` now naming it
+    /// (`to`) instead of `from`. Started in this program's place, it must
+    /// confirm itself (crate::own), and then reads the build again.
+    Climbs {
+        sequence: u64,
+        needed: u64,
         from: String,
         to: String,
     },
@@ -193,7 +207,7 @@ impl Outcome {
             Self::Would(_) => "would",
             Self::NotQuiet(_) => "not-quiet",
             Self::Switched(_) => "switched",
-            Self::SelfSwitched { .. } => "self-switched",
+            Self::SelfSwitched { .. } | Self::Climbs { .. } => "self-switched",
             Self::RolledBack { .. } => "rolled-back",
             Self::Failed(_) => "failed",
         }
@@ -220,6 +234,17 @@ impl std::fmt::Display for Outcome {
             Self::SelfSwitched { sequence, from, to } => write!(
                 f,
                 "build {sequence} runs; lamp-update switches from its build {} to {}, which must confirm itself",
+                &from[..from.len().min(12)],
+                &to[..to.len().min(12)]
+            ),
+            Self::Climbs {
+                sequence,
+                needed,
+                from,
+                to,
+            } => write!(
+                f,
+                "build {sequence} needs updater {needed}; lamp-update switches from its build {} to {}, which the build carries, and takes nothing else of it until that one has confirmed itself",
                 &from[..from.len().min(12)],
                 &to[..to.len().min(12)]
             ),
@@ -330,6 +355,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         quiet,
         skills_back: Vec::new(),
         seen: None,
+        climb: None,
     };
     if !config.apply {
         let state = run.records.peek_state();
@@ -361,6 +387,11 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         return outcome;
     }
     let mut outcome = run.acting();
+    if let Some(too_old) = run.climb.take()
+        && let Some(climbed) = run.climb(&too_old)
+    {
+        outcome = climbed;
+    }
     if config.self_switch
         && let Outcome::Switched(sequence) | Outcome::UpToDate(sequence) = outcome
         && let Some(switched) = run.own(sequence)
@@ -381,6 +412,8 @@ struct Run<'r, 'w> {
     skills_back: Vec<SkillBack>,
     /// The manifest the round read, checked.
     seen: Option<Manifest>,
+    /// A build for a newer updater whose lamp-update this round may take.
+    climb: Option<TooOld>,
 }
 
 /// A unit as it is to be put back.
@@ -548,8 +581,13 @@ impl Run<'_, '_> {
             Err(Fetch::Missing) => return Err(Outcome::NothingPublished),
             Err(error) => return Err(Outcome::Unreachable(error.to_string())),
         }
-        let (manifest, _) = manifest::open(&envelope, &self.config.key)
-            .map_err(|why| Outcome::Refused(why.to_string()))?;
+        let manifest =
+            match manifest::open_or_too_old(&envelope, &self.config.key, self.config.updater)
+                .map_err(|why| Outcome::Refused(why.to_string()))?
+            {
+                Opened::Manifest(manifest, _) => manifest,
+                Opened::TooOld(too_old) => return Err(self.too_old(state, too_old)),
+            };
         if manifest.channel != self.config.channel {
             return Err(Outcome::Refused(format!(
                 "the build is of channel {}, and this lamp follows {}",
@@ -1450,6 +1488,79 @@ impl Run<'_, '_> {
             Err(error) => return Outcome::Failed(format!("the state cannot be read: {error}")),
         };
         self.put_back(&mut state, &journal.build, &backs, None, why, String::new())
+    }
+
+    /// A signed build for a newer updater than this one: refused, with
+    /// nothing fetched or written. With `LAMP_UPDATE_SELF=on`, when it
+    /// carries a lamp-update of this channel's, newer than the build the
+    /// lamp runs and not put back before, that one alone is taken: then
+    /// `check` says so and a round with `--apply on` switches to it.
+    fn too_old(&mut self, state: &State, too_old: TooOld) -> Outcome {
+        let why = too_old.why();
+        let Some(carried) = too_old.carried.as_ref() else {
+            return Outcome::Refused(why);
+        };
+        let ours = too_old.channel.as_deref() == Some(self.config.channel.as_str());
+        let newer = too_old.sequence.is_some_and(|sequence| {
+            state
+                .installed
+                .as_ref()
+                .is_none_or(|installed| sequence > installed.sequence)
+        });
+        if !self.config.self_switch
+            || !ours
+            || !newer
+            || own::refused(self.records.folder()).contains(&carried.sha256)
+        {
+            return Outcome::Refused(why);
+        }
+        if !self.config.apply {
+            return Outcome::Would(vec![format!(
+                "{}: lamp-update first, its build {}, which the build carries",
+                why.split(';').next().unwrap_or_default(),
+                &carried.sha256[..12]
+            )]);
+        }
+        self.climb = Some(too_old);
+        Outcome::Refused(why)
+    }
+
+    /// Phase 1 of lamp-update's own switch for a build that needs a newer
+    /// updater: the lamp-update it carries and nothing else. None when it
+    /// is not switched (said), and the refusal stands.
+    fn climb(&mut self, too_old: &TooOld) -> Option<Outcome> {
+        let (Some(sequence), Some(files_url), Some(carried)) = (
+            too_old.sequence,
+            too_old.files_url.clone(),
+            too_old.carried.clone(),
+        ) else {
+            return None;
+        };
+        // Only what own_switch reads of a build: its sequence, where its
+        // files are, and the lamp-update it carries.
+        let only_the_updater = Manifest {
+            schema: manifest::SCHEMA,
+            channel: self.config.channel.clone(),
+            sequence,
+            commit: "0".repeat(40),
+            files_url,
+            files: vec![carried],
+            units: Vec::new(),
+            min_updater: None,
+        };
+        match self.own_switch(&only_the_updater) {
+            Ok(Some(Outcome::SelfSwitched { from, to, .. })) => Some(Outcome::Climbs {
+                sequence,
+                needed: too_old.needed,
+                from,
+                to,
+            }),
+            Ok(_) => None,
+            Err(why) => {
+                self.say(&format!("lamp-update's own build is not switched: {why}"));
+                None
+            }
+        }
     }
 
     /// Phase 1 of lamp-update's own switch (crate::own), once the parts run

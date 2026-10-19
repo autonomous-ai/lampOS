@@ -102,6 +102,17 @@ that is the channel's head.**
   lamp may find nothing, and nothing changes.
 - The sequence is the workflow's run number, which only goes up. A lamp
   takes a build only if its sequence is greater than the one it runs.
+- `min_updater` (#1680), when set, is the oldest updater that can apply the
+  build. It's a level, `manifest::UPDATER` in `lamp-update` (1 now), raised
+  whenever the updater learns to apply something an older one can't. It
+  isn't the sequence, because a binary doesn't know its CI run number. It
+  sits in the manifest's signed bytes like every other field. Left out
+  (`lamp-update manifest` without `--min-updater`), it isn't written, and
+  the manifest is byte for byte what an updater before the field reads.
+  `lamp-update manifest --min-updater N` refuses a build that carries no
+  `lamp-update`, and an `N` above its own `UPDATER`, which is the carried
+  updater's level because the build's own `lamp-update` makes the manifest.
+  So a channel never names an updater no lamp could reach.
 - The signature: Ed25519 over the manifest's exact bytes, with `ring`
   0.17.14, which the workspace already has through rustls (no new crate
   is fetched; `base64` 0.22.1 is already there through lamp-gemini and
@@ -214,8 +225,22 @@ and the job fails without moving the head.
    "the channel cannot be reached", not a round held for good (#830). One
    lookup runs at a time: while one that ran over has not ended, a round
    starts none and says "an earlier name lookup has not ended".
-3. **The build.** The envelope's key fingerprint must be the lamp's, its
-   signature must match the manifest's bytes, the manifest must be schema 1
+3. **The build.** The envelope's key fingerprint must be the lamp's and
+   its signature must match the manifest's bytes. Then, before anything
+   else of the manifest is read, its `min_updater`: one above this
+   updater's `UPDATER` refuses the whole build with nothing fetched or
+   written, as `refused, nothing switched: build N needs updater M or
+   newer, and this is updater U; ...` (in `log.jsonl` as `refused`). This
+   happens in a round, in `check` and in `install` alike. Nothing is held
+   against the build, so the next round asks again. With
+   `LAMP_UPDATE_SELF=on`, a refused build that carries a `lamp-update`
+   still gives the lamp that one, and only that one (below, "An updater too
+   old for a build"). Because this comes
+   before the schema check, a later schema's manifest that sets
+   `min_updater` is refused for its updater, not for its schema. An
+   updater from before the field refuses any manifest that carries it as
+   an unknown field, also before anything changes, only less clearly.
+   The manifest must be schema 1
    of the channel followed, every name plain (`lamp-<name>`, never a path),
    every hash 64 hex, every size within 256 MiB, and no field unknown. Its
    sequence must be greater than the one the lamp runs (equal: up to date;
@@ -419,6 +444,7 @@ lamp-update harness-off
 lamp-update harness-on
 lamp-update check-units --cat FILE [--product DIR]
 lamp-update manifest --binaries DIR --deploy DIR --skills DIR --channel NAME --sequence N --commit SHA --files-url URL
+                     [--min-updater N]
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
 lamp-update public-key --key-file PRIVATE
 ```
@@ -561,6 +587,22 @@ the lamp switches to that one as to any other. A later build with a
 byte-for-byte identical `lamp-update` stays refused, so a lamp seen with
 `self-refused` after an outage is waiting for a release that changes
 lamp-update, not broken.
+
+**An updater too old for a build** (#1680). When a signed build's
+`min_updater` is above this updater's `UPDATER`, the build names a
+`lamp-update` (read leniently, before the schema check), and the build is
+of the channel followed, newer than the one the lamp runs, and its updater
+hasn't been refused before, phase 1 runs for that binary alone. No part's
+file, unit or link is fetched or changed. The outcome is `Climbs` ("build N
+needs updater M; lamp-update switches from its build ... to ..., which the
+build carries, and takes nothing else of it until that one has confirmed
+itself", `self-switched` in `log.jsonl`). `check` says `lamp-update first`.
+The new binary confirms itself as in phase 2, and a dry round that finds
+an updater it would take this way counts as proof that it can still
+update. Then it reads the same build again and takes the rest. So a lamp
+climbs one updater a round, however old it is. Without a carried
+`lamp-update`, or with the switch off, the build is refused whole and
+nothing is written.
 
 **One lock.** There is no lamp-update timer: `serve` runs its rounds in one
 process. Every round, `install`, the confirmation and lamp-update-back take
