@@ -5,6 +5,45 @@ list and the answers belong to the first builder (Queue #705). Sixth has no
 lamp of its own; a lamp it uses is lent through that lamp's `LAMP.md`, and
 every result on a lamp below names it. Newest first.
 
+
+## 2026-10-19 — voice identity measurement and shared lamp access
+
+Ready for lamp-voice: no (#1694 is a draft; real-office measurement remains).
+
+- Took #1675. Branch `sixth/voice-person`, head `350d0b232`, draft #1694:
+  consented face-and-voice enrollment in the first-meeting name step,
+  request-bound transient samples on both voice routes, a voice print in
+  the face record, and shadow-only matching. No candidate selects memory,
+  changes a session or triggers a greeting. Forgetting cancels pending
+  enrollment and removes attached prints. The pinned CAM++ child verifies
+  the exact bytes parsed on every restart; the real model returns 512
+  values. See `docs/voice-person.md` on the task branch for remaining work.
+- Host gates: fmt and clippy (voice, eyes, same-voice), workspace build;
+  voice lib 1937/0/11 plus the four old name-note tests serially 4/0;
+  final onboarding group 14/0; eyes lib 112/0/2, binary 6/0 and full-look
+  replay 1/0; same-voice lib 4/0; switch census 2/0; voice process/config/
+  first-control integrations 12/0. Linux-only worker/privacy/priority
+  checks are left to ARM64. After rebasing onto `a47052429`, second-route
+  tests 80/0 and switch tests 2/0, fmt/clippy and workspace build pass.
+- The parallel name-note test group failed three tests on both this branch
+  and unchanged base `6275fcc8c`. Its flag guards precede its shared lock.
+  Reported to First/Fourth/Tests on #705, comment 6257345423; its source was
+  left unchanged, and the complete group was run serially instead.
+- ARM64 run 39183891203 for `350d0b232` is pending at this checkpoint.
+  No lamp changed. A synthetic-clip smoke of the new debug `serve-pinned`
+  produced 512 values (13141 ms load, 1420 ms inference); host shape proof,
+  not office accuracy or lamp latency.
+- #1695, docs only (`sixth/lamp-access`): correct Sixth's role from "no
+  lamp" to shared lamp-52e6 access through Fifth, with hostname, loan,
+  restore and test-assignment scope. First may assign real-lamp tests;
+  this is no live availability claim or reservation.
+- #828: posted the scorer workspace/stderr fix (comment 6257071711), with
+  local contract tests and the mic2 table check. The first builder owns
+  the name-anchored overnight matcher. Real-voice data remains needed.
+- At the owner's request, audited old open PRs and reported the actual
+  review/merge prerequisites to First on #705 (comment 6257226292).
+
+
 ## 2026-10-18 — overnight: #1416 merged, the replay's held steps
 
 - #1416 merged at 06:35: `LAMP_VAD_INPUT=linear` lets the speech detector
