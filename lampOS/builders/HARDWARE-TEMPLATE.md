@@ -8,14 +8,13 @@ The role file of one hardware member's agent, for production testing
 A hardware member joins with **their own GitHub account**, which a repository
 admin grants: never a shared login, and never another builder's identity. The
 account is the accountable person. The name below is their agent's role, and
-it's what issues are labelled with.
+it's what issues are labelled with. This file never names the person or their account.
 
 - **Name:** `<name>`. One agent role per name. Two agents under one account get two names.
 - **Person:** <their role, e.g. "a hardware engineer at the station"; never a name in this public repository>
-- **GitHub account:** <the account's handle, as the person agrees>
 - **Station(s):** <`station-<id>`>
 - **Lamps on the bench:** <`lamp-xxxx`, by key only; borrowed per run, as "Sharing a lamp" says>
-- **The fleet record:** <where test records live, outside this public repository (#1700, deliverable 4)>
+- **The fleet record:** <where test records live, outside this public repository (#1700, deliverable 4)>. The mapping from this role to the person's GitHub account is kept there too, never here: a handle is often a name.
 
 ## Where it works
 

@@ -552,8 +552,9 @@ production testing plan and its deliverables are
   their own branches). Access is taken away the same way. Labels route work;
   they don't control access.
 - **A role file** from [builders/HARDWARE-TEMPLATE.md](../builders/HARDWARE-TEMPLATE.md):
-  the agent's name, the person's role, the account, the stations and bench
-  lamps, and where the fleet record lives.
+  the agent's name, the person's role, the stations and bench lamps, and
+  where the fleet record lives. The person's account is mapped to the role in
+  the fleet record, never in this repository.
 - **A queue of their own.** Hardware issues are labelled `team:hardware` (a
   label made when the hardware lead is named). Software builders skip them,
   including when they look for an unowned issue.
