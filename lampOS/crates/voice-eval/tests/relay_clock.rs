@@ -26,20 +26,24 @@ const EPOCH_US: u64 = 1_000_000;
 const SESSION_US: u64 = 6_000_000; // One second plus the minimum five-second allowance.
 const WATCHDOG: Duration = Duration::from_secs(10);
 
-// No workers or audio. The FIFO keeps the shell blocked without elapsed-time
+// No workers or audio. The FIFO keeps the child blocked without elapsed-time
 // synchronization. SIGTERM is acknowledged but intentionally does not exit.
+// Perl, not /bin/sh: on macOS /bin/sh is Bash 3.2, whose `read` drops bytes
+// of the next line once a TERM trap has run during it ("probe" read as
+// "prob", in 11 to 21 of 1000 rounds of this exchange alone; #1569 row 31).
+// Perl runs its handler between operations and its read keeps what it has.
 const CHILD: &str = r#"
-trap 'printf "%s\n" signal' TERM
-exec 3< "$1"
-printf '%s\n' ready
-while :; do
-    if IFS= read -r command <&3; then
-        case "$command" in
-            exit) exit 0 ;;
-            probe) printf '%s\n' probe ;;
-        esac
-    fi
-done
+$| = 1;
+$SIG{TERM} = sub { print "signal\n" };
+open(my $control, '<', $ARGV[0]) or die "control: $!";
+print "ready\n";
+while (1) {
+    my $command = <$control>;
+    next unless defined $command;
+    chomp $command;
+    exit 0 if $command eq 'exit';
+    print "probe\n" if $command eq 'probe';
+}
 "#;
 
 struct Lines {
@@ -97,8 +101,8 @@ impl Relay {
             .write(true)
             .open(&fifo)
             .unwrap();
-        let mut args = vec!["--runtime".into(), "/bin/sh".into()];
-        for arg in ["-c", CHILD, "relay-clock-child", fifo.to_str().unwrap()] {
+        let mut args = vec!["--runtime".into(), "/usr/bin/perl".into()];
+        for arg in ["-e", CHILD, fifo.to_str().unwrap()] {
             args.extend(["--runtime-prefix-arg".into(), arg.into()]);
         }
         args.extend([
