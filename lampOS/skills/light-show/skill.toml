@@ -1,0 +1,42 @@
+# Light show (#1679): a person asks, the lamp says one short line and plays
+# a show of slow-changing colours (shows/NAME.toml), then gives the light
+# back. Started by its tool alone: no trigger and no [ask], since a person
+# asked; never on its own, not even to music, which the ears cannot yet
+# tell from talk (#999). It stops when the voice takes a turn.
+needs = ["voice", "light"]
+# Comes with the lamp (docs/skills.md, "Core and installable skills").
+kind = "core"
+version = "1.0.0"
+tool = "light_show"
+# A call while the show plays: nothing more is made.
+still = "The light show is still playing."
+
+# What it may use, and nothing more: its line and the light.
+[permissions]
+speak = true
+light = true
+
+[choice]
+name = "show"
+about = "The show they asked for: party (bright, quick), music (to play beside a song) or calm. Leave it out when they gave no hint."
+one_of = ["party", "music", "calm"]
+# Asked with no hint, a party.
+default = "party"
+
+# The model's line first.
+[[do]]
+say = "Say one short, happy line that the light show is starting, then stop talking while it plays."
+
+# When the line ends, the show asked for.
+[[do]]
+after = "say"
+if_choice = ["party"]
+show = "party"
+
+[[do]]
+if_choice = ["music"]
+show = "music"
+
+[[do]]
+if_choice = ["calm"]
+show = "calm"

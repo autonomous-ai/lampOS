@@ -177,6 +177,18 @@ impl Gaze {
     fn forget(&mut self) {
         self.sights = 0;
     }
+
+    /// The base's turn toward a place `toward` across the picture (-1 its
+    /// left edge, 1 its right), in counts of yaw: what a face there would be
+    /// turned by, the same share of it and inside the same reach (#1679: a
+    /// reading lamp turned toward the book it was asked to light).
+    pub fn toward(&self, toward: f32) -> f32 {
+        if !toward.is_finite() {
+            return 0.0;
+        }
+        (self.looking.turn[0] * toward.clamp(-1.0, 1.0) * SHARE)
+            .clamp(-self.looking.reach[0], self.looking.reach[0])
+    }
 }
 
 #[cfg(test)]
@@ -448,5 +460,41 @@ mod stray {
             "{offset:?}"
         );
         assert_eq!(offset[1], 0.0);
+    }
+
+    /// #1679 (the review on #1730): a turn toward a place across the picture
+    /// is the turn the gaze makes to a face seen there, the same way and as
+    /// far, so "left" in the picture never turns the lamp right.
+    #[test]
+    fn a_turn_toward_a_place_is_the_turn_to_a_face_seen_there() {
+        let face = |x: f32| {
+            Some(Seen {
+                face: Some(Sight {
+                    x,
+                    y: 0.0,
+                    size: 0.2,
+                    turned: 0.0,
+                }),
+            })
+        };
+        for x in [-0.6f32, 0.6] {
+            let mut gaze = Gaze::new(Looking {
+                turn: [342.0, 200.0],
+                reach: [300.0, 150.0],
+            });
+            let mut now = 1_000_000;
+            let mut offset = [0.0; 2];
+            for _ in 0..3 {
+                now += 150_000;
+                offset = gaze.step(face(x), Mood::Speaking, true, 5_000_000, now);
+            }
+            assert!(offset[0] != 0.0, "the gaze turned to the face at {x}");
+            assert!(
+                (gaze.toward(x) - offset[0]).abs() < 0.01,
+                "toward({x}) = {} against the face's {}",
+                gaze.toward(x),
+                offset[0]
+            );
+        }
     }
 }

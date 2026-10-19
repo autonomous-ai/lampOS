@@ -338,6 +338,11 @@ pub struct Asked {
     /// Paused by the keeper (`lamp/pause`): a gesture asked is dropped and
     /// said, and nothing else is taken.
     pub paused: bool,
+    /// With the reading pose a skill holds: the place across the camera's
+    /// picture (-1 its left edge, 1 its right) the base turns toward, as it
+    /// would to a face seen there (#1679, "light my book"). Only with a
+    /// gaze (`--gaze`), which says how far a place in the picture is.
+    pub toward: Option<f32>,
 }
 
 impl Asked {
@@ -352,6 +357,7 @@ impl Asked {
         called: false,
         still: true,
         paused: true,
+        toward: None,
     };
 }
 
@@ -2771,6 +2777,7 @@ pub(crate) fn run_looking(
         called: false,
         still: false,
         paused: false,
+        toward: None,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -4561,10 +4568,17 @@ fn run_on<P: PortIo, R: Runtime>(
                 + look[1]
                 + extra[0]
         };
+        // Reading toward a place a skill names (#1679): the base turned as
+        // it would be to a face there, within the gaze's reach. Nothing
+        // without a gaze, which alone knows how far a place in the picture is.
+        let aim = match (mood, asked_now.toward, gaze.as_ref()) {
+            (Mood::Reading, Some(toward), Some(gaze)) if !asked_now.paused => gaze.toward(toward),
+            _ => 0.0,
+        };
         let offsets = [
             head_pitch,
             roll * roll_reach + extra[1],
-            yaw * limits.yaw + look[0] + extra[2],
+            yaw * limits.yaw + look[0] + extra[2] + aim,
         ];
         // A joint that met resistance is asked nothing for now, at rest or not.
         let held = easing.map(|left| left > 0);

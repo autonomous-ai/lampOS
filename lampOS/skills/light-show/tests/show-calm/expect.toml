@@ -1,0 +1,12 @@
+# "Something calm and colourful": the calm show, five frames.
+[[call_tool]]
+name = "light_show"
+at = "0s"
+args = { show = "calm" }
+
+[[expect]]
+call = "say"
+
+[[expect]]
+call = "show"
+args = { show = "calm", frames = 5 }

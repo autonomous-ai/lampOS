@@ -1,0 +1,12 @@
+# "A light show for this song": the music show, eight breathing frames.
+[[call_tool]]
+name = "light_show"
+at = "0s"
+args = { show = "music" }
+
+[[expect]]
+call = "say"
+
+[[expect]]
+call = "show"
+args = { show = "music", frames = 8 }

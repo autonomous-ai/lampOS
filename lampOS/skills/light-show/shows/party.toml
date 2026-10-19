@@ -1,0 +1,51 @@
+# Party: bright colours, a new one every 3 s, 30 s in all. Steady: a
+# change of colour is the show, never a blink or a flash.
+[[light]]
+colour = "purple"
+level = 5
+for = "3s"
+
+[[light]]
+colour = "pink"
+level = 5
+for = "3s"
+
+[[light]]
+colour = "blue"
+level = 5
+for = "3s"
+
+[[light]]
+colour = "cyan"
+level = 5
+for = "3s"
+
+[[light]]
+colour = "green"
+level = 5
+for = "3s"
+
+[[light]]
+colour = "yellow"
+level = 5
+for = "3s"
+
+[[light]]
+colour = "orange"
+level = 5
+for = "3s"
+
+[[light]]
+colour = "red"
+level = 5
+for = "3s"
+
+[[light]]
+colour = "pink"
+level = 5
+for = "3s"
+
+[[light]]
+colour = "purple"
+level = 5
+for = "3s"

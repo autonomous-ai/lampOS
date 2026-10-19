@@ -1,0 +1,20 @@
+# "Light my book": the first call, ahead (its default): the look, the head
+# down over the desk for two minutes, white at 4 kept, and the note.
+[[call_tool]]
+name = "point_light"
+at = "0s"
+
+[[expect]]
+call = "look"
+
+[[expect]]
+call = "body.mood"
+args = { mood = "reading", for_ms = 120000 }
+
+[[expect]]
+call = "light"
+args = { colour = "white", level = 4, keep = true }
+
+[[expect]]
+call = "say"
+args = { note = "Say in a few words whether you can see what they asked you to light, and stop. If it is off to the left or the right of the picture, call point_light once more with toward left or right, and only once. If it is not in the picture, say so and ask them to move it in front of you; never search for it." }

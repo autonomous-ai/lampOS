@@ -1,0 +1,31 @@
+# Calm: cool to warm, each colour breathing slowly for 10 s, 50 s in all,
+# ending on the amber the lamp rests in.
+[[light]]
+colour = "blue"
+level = 3
+for = "10s"
+pattern = { kind = "breathe", period = "10s", low = 1 }
+
+[[light]]
+colour = "cyan"
+level = 3
+for = "10s"
+pattern = { kind = "breathe", period = "10s", low = 1 }
+
+[[light]]
+colour = "green"
+level = 3
+for = "10s"
+pattern = { kind = "breathe", period = "10s", low = 1 }
+
+[[light]]
+colour = "purple"
+level = 3
+for = "10s"
+pattern = { kind = "breathe", period = "10s", low = 1 }
+
+[[light]]
+colour = "warm"
+level = 3
+for = "10s"
+pattern = { kind = "breathe", period = "10s", low = 1 }

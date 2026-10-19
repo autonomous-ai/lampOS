@@ -1,0 +1,51 @@
+# Music: rich colours that breathe slowly beside a song, a new one every
+# 6 s, 48 s in all. The lamp cannot hear the beat: it does not pretend to
+# keep time. The breaths move with the ring's light requests
+# (LAMP_LIGHT_REQUESTS=on); through the actions part each is steady.
+[[light]]
+colour = "purple"
+level = 4
+for = "6s"
+pattern = { kind = "breathe", period = "6s", low = 2 }
+
+[[light]]
+colour = "blue"
+level = 4
+for = "6s"
+pattern = { kind = "breathe", period = "6s", low = 2 }
+
+[[light]]
+colour = "pink"
+level = 4
+for = "6s"
+pattern = { kind = "breathe", period = "6s", low = 2 }
+
+[[light]]
+colour = "orange"
+level = 4
+for = "6s"
+pattern = { kind = "breathe", period = "6s", low = 2 }
+
+[[light]]
+colour = "cyan"
+level = 4
+for = "6s"
+pattern = { kind = "breathe", period = "6s", low = 2 }
+
+[[light]]
+colour = "purple"
+level = 4
+for = "6s"
+pattern = { kind = "breathe", period = "6s", low = 2 }
+
+[[light]]
+colour = "red"
+level = 4
+for = "6s"
+pattern = { kind = "breathe", period = "6s", low = 2 }
+
+[[light]]
+colour = "warm"
+level = 4
+for = "6s"
+pattern = { kind = "breathe", period = "6s", low = 2 }

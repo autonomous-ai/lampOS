@@ -1,0 +1,46 @@
+# Point the light (#1679): "light my book", "look at my keyboard". Started
+# by its tool alone: no trigger and no [ask], since a person asked. The head
+# comes down over the desk (#1011's reading pose) and the lamp takes a look;
+# the model sees the desk and, only if the thing is off to one side, calls
+# once more to turn toward it (toward, in lamp-body's reading pose). The
+# eyes find faces only, so the aim is the model's look, never a search.
+needs = ["eyes", "voice", "light", "body"]
+# Comes with the lamp (docs/skills.md, "Core and installable skills").
+kind = "core"
+version = "1.0.0"
+tool = "point_light"
+
+# What it may use, and nothing more: its line, the light, the reading pose,
+# and the look's picture for the model. It reads no topic.
+[permissions]
+speak = true
+light = true
+body = true
+look = true
+
+[choice]
+name = "toward"
+about = "Where the thing is in the lamp's view: ahead the first time; left or right only after the look showed it off to that side."
+one_of = ["ahead", "left", "right"]
+# A call with none is a first look: ahead.
+default = "ahead"
+
+# Every call: the desk lit a clear white, the person's light, kept; the head
+# down over the desk, held two minutes (a call again holds it again); one
+# look for the model.
+[[do]]
+body = { mood = "reading", for = "2m" }
+light = { colour = "white", level = 4, keep = true }
+look = true
+say = "Say in a few words whether you can see what they asked you to light, and stop. If it is off to the left or the right of the picture, call point_light once more with toward left or right, and only once. If it is not in the picture, say so and ask them to move it in front of you; never search for it."
+
+# Off to one side: the same pose, its base turned toward that side, a
+# quarter of the picture across (lamp-body turns 70% of it, as to a face
+# there). The later pose takes the place of the one above.
+[[do]]
+if_choice = ["left"]
+body = { mood = "reading", for = "2m", toward = -0.5 }
+
+[[do]]
+if_choice = ["right"]
+body = { mood = "reading", for = "2m", toward = 0.5 }

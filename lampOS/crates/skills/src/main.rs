@@ -56,6 +56,37 @@ const TOOL_TIMEOUT: Duration = Duration::from_secs(1);
 const MADE_BEFORE_ANSWER: Duration = Duration::from_millis(800);
 /// How often a held pose is said again: the body lets one go after 1.5 s.
 const MOOD_EVERY: Duration = Duration::from_secs(1);
+
+/// Each skill's pose held now, by the number of its hold: a skill's newer
+/// pose takes the place of its older one, and a call again with no pose
+/// ends it ([`end_hold`]), so two holds of one skill never take turns at
+/// the head (#1679: a scene changed, or the light turned to another place).
+static HOLDS: Mutex<std::collections::BTreeMap<String, u64>> =
+    Mutex::new(std::collections::BTreeMap::new());
+
+/// A new hold of `skill`'s pose: its number, which ends every older one.
+fn new_hold(skill: &str) -> u64 {
+    let mut holds = HOLDS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let number = holds.get(skill).map_or(1, |last| last + 1);
+    holds.insert(skill.to_owned(), number);
+    number
+}
+
+/// Whether `skill`'s hold `number` is still its newest.
+fn holding(skill: &str, number: u64) -> bool {
+    HOLDS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get(skill)
+        == Some(&number)
+}
+
+/// Ends `skill`'s hold: the body comes back 1.5 s after the pose was last said.
+fn end_hold(skill: &str) {
+    new_hold(skill);
+}
 /// How long an ask waits for the Policy: its own 2 s from the receipt
 /// (#958), and a little for the bus each way.
 const ASK_WAIT: Duration = Duration::from_millis(2_500);
@@ -1171,8 +1202,17 @@ fn tool_call(
     }
     if under_way {
         // Each look comes with the head down over the page again: only the
-        // run's poses are made again, never its light (#1051, Ten's P2).
-        for call in made.iter().filter(|call| matches!(call, Call::Mood { .. })) {
+        // run's poses are made again, and a light the person keeps, never a
+        // light given back at the run's end (#1051, Ten's P2). The call's
+        // pose takes the place of the one held, and a call with none ends
+        // it: a scene changed, or the light turned elsewhere (#1679).
+        if !made.iter().any(|call| matches!(call, Call::Mood { .. })) {
+            end_hold(&run.skill);
+        }
+        for call in made
+            .iter()
+            .filter(|call| matches!(call, Call::Mood { .. } | Call::Light { keep: true, .. }))
+        {
             if sockets.may.refuses(call).is_none() {
                 make(call, &sockets, &runner.bus, None);
             }
@@ -1194,6 +1234,13 @@ fn tool_call(
             },
         );
     } else {
+        // A fresh run with no pose ends a hold that outlived the run that
+        // held it again (a call again under way holds its pose its own
+        // `for`): "relax" after "reading" brings the head up even then (the
+        // review on #1730).
+        if !made.iter().any(|call| matches!(call, Call::Mood { .. })) {
+            end_hold(&run.skill);
+        }
         let made = start(run.skill, made, busy, out, runner);
         if looks {
             // Bounded: the caller waits at most `TOOL_TIMEOUT` once more.
@@ -1418,10 +1465,14 @@ fn perform(
     // its trigger ends, told that end.
     (made, end): (mpsc::Sender<()>, Option<mpsc::Receiver<()>>),
 ) -> String {
+    // A light the run gives back. One the person keeps is theirs (#1679).
     let is_light = |call: &Call| {
         matches!(
             call,
-            Call::Light { .. } | Call::Dim { .. } | Call::Out { .. }
+            Call::Light { keep: false, .. }
+                | Call::Dim { .. }
+                | Call::Out { .. }
+                | Call::Show { .. }
         )
     };
     let mut said = Vec::new();
@@ -1635,6 +1686,15 @@ fn act(
             continue;
         }
         match call {
+            // The person's light, set as they asked: nothing to give back,
+            // and through the actions part, never the ring's skill light.
+            Call::Light { keep: true, .. } => {}
+            // Each frame in turn, then given back as any light the run made.
+            Call::Show { name, frames } => {
+                changed.coloured = true;
+                said.push(show(name, frames, sockets, bus, glow));
+                continue;
+            }
             Call::Light { lasting, .. } => {
                 changed.coloured = true;
                 changed.lasting_us = changed.lasting_us.max(
@@ -1691,7 +1751,7 @@ fn act(
             Some(glow)
                 if matches!(
                     call,
-                    Call::Light { .. } | Call::Dim { .. } | Call::Out { .. }
+                    Call::Light { keep: false, .. } | Call::Dim { .. } | Call::Out { .. }
                 ) =>
             {
                 glow.ask(call)
@@ -1699,6 +1759,84 @@ fn act(
             _ => make(call, sockets, bus, asker),
         });
     }
+}
+
+/// A light show (#1679): each frame's light in turn, asked of the ring with
+/// `LAMP_LIGHT_REQUESTS=on` or set through the actions part, held its while.
+/// It stops before a frame once the body was pushed, the lamp paused, or the
+/// voice took a turn (someone spoke: the lamp stops and listens); what it
+/// showed is given back with the run's light.
+fn show(
+    name: &str,
+    frames: &[lamp_skills::Frame],
+    sockets: &Sockets,
+    bus: &Bus,
+    glow: &mut Option<Glow>,
+) -> String {
+    let mut shown = 0;
+    for frame in frames {
+        if let Some(why) = show_stopped(bus) {
+            return format!(
+                "show {name}: stopped after {shown} of {} frames, {why}",
+                frames.len()
+            );
+        }
+        let light = Call::Light {
+            colour: frame.colour.clone(),
+            level: Some(frame.level),
+            lasting: None,
+            pattern: frame.pattern,
+            keep: false,
+        };
+        let made = match glow {
+            Some(glow) => glow.ask(&light),
+            None => make(&light, sockets, bus, None),
+        };
+        if shown == 0 {
+            eprintln!(
+                "lamp-skills: skill:{}: show {name}: {made}",
+                sockets.may.skill
+            );
+        }
+        shown += 1;
+        // Held its while, looked at every fifth of a second: someone who
+        // speaks stops the show within that, not at the frame's end.
+        let until = clock::now() + Duration::from_micros(frame.lasting_us);
+        while clock::now() < until {
+            if let Some(why) = show_stopped(bus) {
+                return format!(
+                    "show {name}: stopped in frame {shown} of {}, {why}",
+                    frames.len()
+                );
+            }
+            clock::sleep(SHOW_LOOKS.min(until.saturating_duration_since(clock::now())));
+        }
+    }
+    format!("show {name}: {shown} frames shown")
+}
+
+/// How often a show looks whether it should stop.
+const SHOW_LOOKS: Duration = Duration::from_millis(200);
+
+/// Why a show goes no further, if it should not: the body pushed, the lamp
+/// paused, or the voice listening to someone.
+fn show_stopped(bus: &Bus) -> Option<String> {
+    let latest = |topic: &str| bus.latest(topic).ok().flatten();
+    if latest(Hand::TOPIC)
+        .and_then(|message| message.parse::<Hand>().ok())
+        .is_some_and(|hand| hand.pushed)
+    {
+        return Some("the body was pushed".into());
+    }
+    if latest(Pause::TOPIC)
+        .and_then(|message| message.parse::<Pause>().ok())
+        .is_some_and(|pause| pause.paused)
+    {
+        return Some("the lamp was paused".into());
+    }
+    (said_lately::<VoiceState>(bus, VoiceState::TOPIC).map(|now| now.state)
+        == Some(Voice::Listening))
+    .then(|| "the voice is listening to someone".into())
 }
 
 /// Waits while the clip `sent` plays, until the body says on `body/gesture`
@@ -1959,13 +2097,15 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             colour,
             level,
             pattern,
+            keep,
             ..
         } => {
-            let mut said = actions(
-                &format!("light {colour}"),
-                "light_colour",
-                json!({ "colour": colour }),
-            );
+            let what = if *keep {
+                format!("light {colour}, the person's, kept")
+            } else {
+                format!("light {colour}")
+            };
+            let mut said = actions(&what, "light_colour", json!({ "colour": colour }));
             // No call sets a level: it is stepped to, from the level shown.
             if let Some(level) = level {
                 match light_now(bus) {
@@ -1997,24 +2137,40 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Out { .. } => format!(
             "light out: left alone, since only the ring puts it out ({REQUESTS_ENVIRONMENT}=on)"
         ),
-        Call::Mood { mood, lasting_us } => {
+        Call::Mood {
+            mood,
+            lasting_us,
+            toward,
+        } => {
             // Said again every second, as the body needs it at least every
             // 1.5 s (#1011); when it stops being said, the body comes back.
-            let (path, text) = (
-                sockets.mood.clone(),
-                json!({ "mood": mood, "level": 0 }).to_string(),
-            );
-            let first = tell(&format!("mood {mood}"), text.clone(), &path);
+            // A newer pose of the same skill ends this hold (#1679).
+            let mut ask = json!({ "mood": mood, "level": 0 });
+            if let Some(toward) = toward {
+                ask["toward"] = json!(toward);
+            }
+            let (path, text) = (sockets.mood.clone(), ask.to_string());
+            let skill = sockets.may.skill.clone();
+            let number = new_hold(&skill);
+            let what = match toward {
+                Some(toward) => format!("mood {mood} toward {toward}"),
+                None => format!("mood {mood}"),
+            };
+            let first = tell(&what, text.clone(), &path);
             let until = clock::now() + Duration::from_micros(*lasting_us);
             std::thread::spawn(move || {
                 while clock::now() + MOOD_EVERY < until {
                     clock::sleep(MOOD_EVERY);
+                    if !holding(&skill, number) {
+                        break;
+                    }
                     let _ = UnixDatagram::unbound()
                         .and_then(|body| body.send_to(text.as_bytes(), &path));
                 }
             });
             format!("{first}, held {} s", lasting_us / 1_000_000)
         }
+        Call::Show { name, .. } => format!("show {name}: made by its own step"),
         Call::Say(_) | Call::SayFrom(..) => "say: made by its own step".into(),
         Call::Sound { .. } => "sound: made by its own step".into(),
         Call::Look => "look: the voice's, asked in the call's answer".into(),
@@ -2071,6 +2227,7 @@ mod tests {
             level: None,
             lasting: Some("4s".into()),
             pattern: None,
+            keep: false,
         }
     }
 
@@ -2114,6 +2271,7 @@ mod tests {
             Call::Mood {
                 mood: "reading".into(),
                 lasting_us: 3_000_000,
+                toward: None,
             },
         ];
         let (mut changed, mut played, mut glow, mut said) =

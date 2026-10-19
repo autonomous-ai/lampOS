@@ -1,0 +1,8 @@
+# "Set a scene": no scene named, so nothing is set; the model is told to ask
+# which.
+[[call_tool]]
+name = "light_scene"
+at = "0s"
+
+[[expect]]
+call = "say"
