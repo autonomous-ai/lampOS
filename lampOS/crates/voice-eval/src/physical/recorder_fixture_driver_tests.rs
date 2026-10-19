@@ -167,6 +167,17 @@ fn spawn_serve(
     relay_terminal_round: Option<u64>,
     observations: &Observations,
 ) -> [JoinHandle<()>; 2] {
+    spawn_serve_with(fixture, relay_terminal_round, observations, |_| 0)
+}
+
+/// As [`spawn_serve`], the runtime saying it has written `frames(round)`
+/// lines by each poll.
+fn spawn_serve_with(
+    fixture: &ClockedServeFixture,
+    relay_terminal_round: Option<u64>,
+    observations: &Observations,
+    frames: fn(u64) -> u64,
+) -> [JoinHandle<()>; 2] {
     let relay_path = fixture.control_path.clone();
     let runtime_path = fixture.control_path.clone();
     let relay_observations = Arc::clone(observations);
@@ -206,7 +217,7 @@ fn spawn_serve(
             let step = observe(&participant, Role::ServeRuntime, &runtime_observations);
             let progress = Progress::ServeRuntime {
                 poll_seq: step.round,
-                stdout_frames: 0,
+                stdout_frames: frames(step.round),
                 room_consumed: 0,
                 room_injected: 0,
                 cycle: 1,
@@ -298,7 +309,8 @@ fn recorder_due_before_or_on_a_poll_preserves_the_pending_runtime_deadline() {
             times(&observations, Role::Recorder),
             [EPOCH_US, BOOTSTRAP_US, exit_due_us]
         );
-        assert_eq!(fixture.next_poll_us, later);
+        // That poll changed nothing, so the next is the idle tick (#1806).
+        assert_eq!(fixture.next_poll_us, BOOTSTRAP_US + POLL_US + IDLE_POLL_US);
         assert!(!fixture.recorder_exit_pending());
         assert!(fixture.recorder_exit_observed().is_err());
         close_and_join(&mut fixture, [recorder].into_iter().chain(serve));
@@ -515,4 +527,39 @@ fn expired_recorder_startup_watchdog_closes_the_listener_without_advancing_time(
     }
     assert!(fixture.start_recorder(Instant::now() + WATCHDOG).is_err());
     assert_eq!(fixture.clock().now().as_micros(), EPOCH_US);
+}
+
+/// #1806: a poll that changes something is followed by the next at the
+/// lamp's 2 ms; one that changes nothing waits the runtime's own tick.
+#[test]
+fn a_poll_that_changed_something_is_followed_at_two_ms_and_an_idle_one_at_the_tick() {
+    let directory = Private::new();
+    let mut fixture = configured(&directory);
+    let observations = Observations::default();
+    // A recorder due long after the polls looked at here.
+    let recorder = spawn_recorder(&fixture, BOOTSTRAP_US + 1_000_000, &observations);
+    fixture.start_recorder(Instant::now() + WATCHDOG).unwrap();
+    // The runtime writes a line at each of its first three polls, then none.
+    let serve = spawn_serve_with(&fixture, None, &observations, |round| round.min(3));
+    let until = BOOTSTRAP_US + 40_000;
+    while fixture.clock().now().as_micros() < until {
+        advance(&mut fixture, until);
+    }
+    // Its first poll is the bootstrap's. Its second and third wrote, so
+    // each was followed at 2 ms; its fourth wrote nothing, and so did every
+    // one after, each followed at the tick.
+    let last_written = BOOTSTRAP_US + 3 * POLL_US;
+    assert_eq!(
+        times(&observations, Role::ServeRuntime),
+        [
+            BOOTSTRAP_US,
+            BOOTSTRAP_US + POLL_US,
+            BOOTSTRAP_US + 2 * POLL_US,
+            last_written,
+            last_written + IDLE_POLL_US,
+            last_written + 2 * IDLE_POLL_US,
+            last_written + 3 * IDLE_POLL_US,
+        ]
+    );
+    close_and_join(&mut fixture, [recorder].into_iter().chain(serve));
 }
