@@ -72,7 +72,11 @@ order is the issue's own list.
    speaker, the five joints, ring, camera, touch, sensors, board, storage.
 3. The operator does the manual steps the coverage matrix lists: looking
    at the ring, listening to the speaker, touching every pad, pressing the
-   buttons.
+   buttons. The head's touch pads are wired per unit (lamp-52e6's are on
+   lines 97 and 98, not 37 and 96; #1362), so before the touch checks the
+   station finds this unit's pair and polarity with a person touching and
+   releasing each pad in turn, and writes them into the unit's pins file
+   (#1744's `steps.sh`).
 4. `lamp-station` turns the self-test report and the manual steps into one
    run record against the matrix
    ([#1741](https://github.com/autonomous-ai/lampOS/pull/1741),
@@ -104,7 +108,7 @@ at once and records `stopped`, never a pass.
 | Servo endurance | the arm's normal moves in a loop, 30 min, within the joint limits | stops at the body's own bounds (`docs/body.md`): a joint's temperature at 62 °C, or load over pitch 240, roll 150 or yaw 220 for six steps in a row; passes under 58 °C with no temperature or load stop in the 30 minutes, set from a known-good unit's run first | `servo_endurance` |
 | Give way | a person pushes the arm while it holds and while it moves, 20 times | lets go every time | `servo_give_way` |
 | Power under peak | all servos at peak together, speaker loud, ring full | supply never below the board's brown-out level (the hardware lead names it) | `power_servo_peak` |
-| Power cut | cut and back, 20 times, at idle and mid-move | back by itself every time, nothing left muted, arm safe | `recovery_power_cut` |
+| Power cut | cut and back, 20 times, at idle and mid-move | back by itself every time, nothing left muted, arm safe; the self-test's storage check after every cut, stopping on the first SD-card I/O or ext4 error, since repeated cuts can corrupt a card | `recovery_power_cut` |
 | Board heat | fixed 10-minute CPU load, both fans | under 85 °C | `board_load_temperature` |
 | Memory and storage | a RAM test over the memory it can take, and an SD write and read | no error | `storage_write_read`, and a new id for memory |
 | Audio duplex | speech on the speaker while both microphones listen, 10 min; servos moving while mic2 listens | no dropped blocks; noise under a limit the hardware lead sets | `interference_speaker_room_mic`, `interference_servos_mic` |
