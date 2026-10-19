@@ -43,6 +43,10 @@ pub struct Utterance {
     /// When its first piece came, and its last.
     pub began: Instant,
     pub ended: Instant,
+    /// The same by the stamps the pieces were sent with
+    /// ([`crate::outcome::sent_at`]): for the outcome only, never for when
+    /// the utterance is over (#1652).
+    pub sent: (Instant, Instant),
     /// What was known of the lamp when the first piece came.
     pub lamp: LampThen,
     /// It was ended by its length and not by a pause.
@@ -66,6 +70,8 @@ struct Open {
     request: Option<u64>,
     began: Instant,
     last: Instant,
+    /// When its first and newest pieces were sent, by their stamps.
+    sent: (Instant, Instant),
     lamp: LampThen,
     /// The person had stopped speaking when its newest piece came.
     stopped: bool,
@@ -120,6 +126,20 @@ impl Gather {
         lamp: &Lamp,
         now: Instant,
     ) {
+        self.piece_sent(text, finished, request, lamp, now, now);
+    }
+
+    /// [`Self::piece`], for a piece its stamp says was sent at `sent`: the
+    /// utterance's `sent` times are these (#1652).
+    pub fn piece_sent(
+        &mut self,
+        text: &str,
+        finished: bool,
+        request: Option<u64>,
+        lamp: &Lamp,
+        now: Instant,
+        sent: Instant,
+    ) {
         // A pause nobody noticed in time still ended what came before it.
         self.tick(now);
         // A piece of another of the voice's turns ends what is open: a
@@ -138,6 +158,7 @@ impl Gather {
                 request: None,
                 began: now,
                 last: now,
+                sent: (sent, sent),
                 lamp: lamp.then(now),
                 stopped: false,
             });
@@ -149,6 +170,7 @@ impl Gather {
             open.pieces += 1;
             open.request = request.or(open.request);
             open.last = now;
+            open.sent.1 = sent;
             open.stopped = self.stopped;
             rest = &rest[fits..];
             if rest.is_empty() {
@@ -194,6 +216,7 @@ impl Gather {
             request: open.request,
             began: open.began,
             ended: open.last,
+            sent: open.sent,
             lamp: open.lamp,
             cut,
         });

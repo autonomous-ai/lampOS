@@ -61,12 +61,36 @@ impl Begun {
     }
 }
 
+/// When a message was sent, on the clock `now` is read on, by the stamp its
+/// publisher gave it (`at_us`, on the monotonic clock `now_us` is read on).
+/// The outcome times the lamp's sound, its words and what was heard by
+/// these, so that a loop held up while they came still has them in the
+/// order they happened (#1652): each turn it takes what the lamp is doing
+/// before what is heard. A message with no stamp (0), one stamped after
+/// `now_us`, and one stamped more than [`WINDOW`] before it count from
+/// `now`, when it was taken up, as before. The last is a recorded session
+/// played again (`lamp-bus replay` sends each message with its recorded
+/// stamp): every message of it then counts from its taking up, so its order
+/// holds and nothing is minutes off (the reviewer on #1657).
+pub fn sent_at(at_us: u64, now: Instant, now_us: u64) -> Instant {
+    if at_us == 0 || at_us > now_us {
+        return now;
+    }
+    let age = Duration::from_micros(now_us - at_us);
+    if age > WINDOW {
+        return now;
+    }
+    now.checked_sub(age).unwrap_or(now)
+}
+
 /// A decision whose outcome is waited for.
 #[derive(Clone, Copy, Debug)]
 pub struct Watch {
     decision_at_unix_ms: u64,
     choice: Choice,
     decided: Instant,
+    /// When the utterance's first piece came, and its last.
+    began: Instant,
     ended: Instant,
     spoke: Option<Instant>,
     said: Option<(Instant, Option<u64>)>,
@@ -118,20 +142,28 @@ impl Watch {
             decision_at_unix_ms,
             choice,
             decided,
+            began,
             ended,
             spoke: begun.spoke.filter(|at| *at >= began),
             said: begun.said.filter(|(at, _)| *at >= began),
         }
     }
 
-    /// The lamp began to speak.
-    pub fn spoke(&mut self, now: Instant) {
-        self.spoke.get_or_insert(now);
+    /// The lamp began to speak at `at`. Not before the utterance began: a
+    /// message stamped earlier than it, though taken up after, is no answer
+    /// to it, as one taken up earlier is not (#1652).
+    pub fn spoke(&mut self, at: Instant) {
+        if at >= self.began {
+            self.spoke.get_or_insert(at);
+        }
     }
 
-    /// The lamp began to say something new, in answer to `request`.
-    pub fn said(&mut self, request: Option<u64>, now: Instant) {
-        self.said.get_or_insert((now, request));
+    /// The lamp began to say something new at `at`, in answer to
+    /// `request`. Not before the utterance began, as [`Self::spoke`].
+    pub fn said(&mut self, request: Option<u64>, at: Instant) {
+        if at >= self.began {
+            self.said.get_or_insert((at, request));
+        }
     }
 
     /// Nothing more is waited for: the lamp spoke and has had time to
@@ -163,6 +195,58 @@ mod tests {
 
     fn ms(n: u64) -> Duration {
         Duration::from_millis(n)
+    }
+
+    /// #1652: a stamp is turned into a time on the loop's own clock; none
+    /// (0), or one ahead of the clock, is when it was taken up.
+    #[test]
+    fn a_message_is_timed_by_its_stamp_and_an_unstamped_one_by_its_taking_up() {
+        let now = Instant::now() + ms(10_000);
+        let now_us = 50_000_000;
+        assert_eq!(sent_at(now_us - 150_000, now, now_us), now - ms(150));
+        assert_eq!(sent_at(now_us, now, now_us), now);
+        assert_eq!(sent_at(0, now, now_us), now);
+        assert_eq!(sent_at(now_us + 1, now, now_us), now);
+        // Within the window by its stamp; older than it, by its taking up.
+        assert_eq!(sent_at(now_us - 6_000_000, now, now_us), now - WINDOW);
+        assert_eq!(sent_at(now_us - 6_000_001, now, now_us), now);
+        assert_eq!(sent_at(now_us - 40_000_000, now, now_us), now);
+    }
+
+    /// #1652: the lamp's sound stamped before the utterance began is no
+    /// answer to it, though it was taken up after: dropped as one taken up
+    /// before is.
+    #[test]
+    fn a_sound_stamped_before_the_utterance_is_no_answer_to_it() {
+        let start = Instant::now() + ms(10_000);
+        let at = |n| start + ms(n);
+        let now_us = 50_000_000;
+        let mut begun = Begun::default();
+        // Taken up at 1,300, stamped 2 s before: before the utterance.
+        let sent = sent_at(now_us - 2_000_000, at(1_300), now_us);
+        assert!(sent < at(1_000));
+        assert!(begun.state(true, sent));
+        let watch = Watch::new(9, Choice::LookUp, at(1_500), (at(1_000), at(1_200)), &begun);
+        assert!(!watch.outcome(false).spoke);
+        // Nor is one that comes after the decision, stamped as long ago.
+        let mut watch = Watch::new(
+            9,
+            Choice::LookUp,
+            at(1_500),
+            (at(1_000), at(1_200)),
+            &Begun::default(),
+        );
+        watch.spoke(sent);
+        watch.said(Some(4), sent);
+        let outcome = watch.outcome(false);
+        assert!(!outcome.spoke && outcome.said_after_ms.is_none());
+        // Stamped 150 ms after the utterance's last piece, it is.
+        let mut begun = Begun::default();
+        assert!(begun.state(true, sent_at(now_us - 100_000, at(1_450), now_us)));
+        let watch = Watch::new(9, Choice::LookUp, at(1_500), (at(1_000), at(1_200)), &begun);
+        let outcome = watch.outcome(false);
+        assert!(outcome.spoke);
+        assert_eq!(outcome.heard_to_sound_ms, Some(150));
     }
 
     #[test]
