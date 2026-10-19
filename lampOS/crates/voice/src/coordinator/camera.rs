@@ -616,6 +616,7 @@ mod tests {
         let mut camera = OptionalCamera::new(worker, source);
         camera.pending_failure = Some("simulated absent camera before first frame");
         let mut rig = Rig {
+            expression_out: None,
             second: None,
             microphone: crate::options::Microphone::Mic2,
             end_silence_blocks: None,

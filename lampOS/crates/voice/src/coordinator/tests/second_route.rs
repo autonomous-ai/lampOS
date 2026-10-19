@@ -947,6 +947,7 @@ fn run(script: Script) -> Run {
         )
         .unwrap();
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         call_wait_blocks: None,
         cut_keeps_name: false,

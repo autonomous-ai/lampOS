@@ -837,6 +837,10 @@ struct Rig {
     paused: KeeperPause,
     /// The standby voice route, when one is configured (`second.rs`).
     second: Option<second::Route>,
+    /// What the voice says of its timing for Expression, given rather than
+    /// taken from the environment (`LAMP_EXPRESSION_OUT`): a test's own bus.
+    /// `None` makes it from the environment, as the lamp does.
+    expression_out: Option<crate::expression_out::ExpressionOut>,
 }
 
 /// Whether the keeper has paused the lamp, asked once a loop.
@@ -3222,6 +3226,7 @@ fn spawn_rig(
         }
     }
     Ok(Rig {
+        expression_out: None,
         provider,
         capture,
         speaker,
@@ -4141,7 +4146,10 @@ fn conversation_with_gate(
     let mut bus_out = crate::bus_out::BusOut::from_environment();
     // The voice's own timing, for the part that plans what the lamp shows
     // (docs/expression.md). Only if that is switched on.
-    let mut expression_out = crate::expression_out::ExpressionOut::from_environment();
+    let mut expression_out = rig
+        .expression_out
+        .take()
+        .or_else(crate::expression_out::ExpressionOut::from_environment);
     // And, only if someone switched it on, what the microphone hears, for
     // a part of the lamp that listens for itself.
     let mut mic_out = crate::bus_out::MicOut::from_environment(rig.microphone.as_str());
@@ -10890,6 +10898,7 @@ mod tests {
         let (privacy, _privacy_peer) = Worker::sleeping_fixture(&directory.path, "privacy");
         let (ring, _ring_peer) = Worker::sleeping_fixture(&directory.path, "ring");
         let mut rig = Rig {
+            expression_out: None,
             second: None,
             end_silence_blocks: None,
             early_end_blocks: None,

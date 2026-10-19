@@ -1421,6 +1421,7 @@ fn run_in(script: Script, trace: &mut SessionState) -> Run {
     });
     let paused = Arc::new(AtomicBool::new(script.paused));
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,
