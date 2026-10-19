@@ -11,7 +11,11 @@ person, as someone at the next desk does before saying "your call's in
 five minutes", and says it. Nothing more: no gesture, no light.
 
 - **Trigger:** `schedule/due` shows a reminder due where none was, while
-  Schedule is on and ready.
+  Schedule is on and ready and the voice rests (`voice/state`): one due
+  while someone talks with the lamp is kept until the talk ends, and asked
+  for then, at Schedule's next second, when the voice can say it too
+  (`wait`). Asked for during the talk, the ask would be gone 20 s later,
+  and the voice would say the reminder 10 s after the talk with no look.
 - **Ask:** the Policy's `reminder` question. The person asked for this, so
   it should hold only while someone is talking to the lamp.
 - **Do:** look at the face, if one is in view, and ask the voice to say the

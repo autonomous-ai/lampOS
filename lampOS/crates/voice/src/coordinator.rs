@@ -8500,7 +8500,8 @@ fn reminder_waits(held: &Option<(String, u64)>, offered: Option<&crate::reminder
 }
 
 /// [`for_skill`] for the news first in line. Progress is the Policy's to
-/// time already, and is told as it was.
+/// time already, and is told as it was. News waits for its skill from when
+/// the voice had it ([`hold_from`]).
 fn news_for_skill(
     news: &mut crate::task_news::TaskNews,
     says: Option<&mut crate::say::Says>,
@@ -8510,6 +8511,11 @@ fn news_for_skill(
     let (key, progress, task) = news
         .waiting()
         .map(|front| (front.key.clone(), front.progress.is_some(), front.task()))?;
+    let now_us = monotonic_us();
+    let found_us = news.found_at(&key).map(|found| {
+        now_us.saturating_sub(u64::try_from(found.elapsed().as_micros()).unwrap_or(u64::MAX))
+    });
+    hold_from(held, &key, found_us);
     for_skill(
         says,
         crate::say::Source::Tasks,
@@ -8517,8 +8523,25 @@ fn news_for_skill(
         &key,
         task,
         held,
-        monotonic_us(),
+        now_us,
     )
+}
+
+/// `key`'s wait for its skill's ask counted from `found_us`, when the voice
+/// had it, and not from when it could first be said, unless it is held
+/// already (the reviewer's P2 on #1667). The Task news skill asks the
+/// moment work settles, and an ask lives `say::FROM_LIVES_US`: news held
+/// back past that by nobody there or by a talk would otherwise wait 10 s
+/// more, in silence, for an ask that never comes again. So it is told as
+/// soon as it can be, by the voice; within those 10 s, with the skill's
+/// ask, as before. A reminder is held from when it can be said, since
+/// Reminders asks only then (`skills/reminders`, `voice/state` resting).
+fn hold_from(held: &mut Option<(String, u64)>, key: &str, found_us: Option<u64>) {
+    if let Some(found_us) = found_us
+        && held.as_ref().is_none_or(|(held_key, _)| held_key != key)
+    {
+        *held = Some((key.to_owned(), found_us));
+    }
 }
 
 /// The news this turn tells, its own key and those told with it, put on the

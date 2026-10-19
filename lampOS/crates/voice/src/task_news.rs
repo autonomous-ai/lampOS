@@ -244,6 +244,8 @@ pub struct TaskNews {
     offered: Receiver<News>,
     told: Sender<Wake>,
     waiting: VecDeque<News>,
+    /// When each piece waiting came in, by key ([`Self::found_at`]).
+    found: BTreeMap<String, Instant>,
     /// What the file says was told, as the reading thread last found it:
     /// news the person asked for and heard ([`crate::agent_tasks`]) is not
     /// told again.
@@ -555,6 +557,7 @@ impl TaskNews {
             offered,
             told,
             waiting: VecDeque::new(),
+            found: BTreeMap::new(),
             told_already,
             stopping,
             status,
@@ -577,6 +580,9 @@ impl TaskNews {
     pub fn waiting(&mut self) -> Option<&News> {
         while let Ok(news) = self.offered.try_recv() {
             if !self.waiting.iter().any(|waiting| waiting.key == news.key) {
+                self.found
+                    .entry(news.key.clone())
+                    .or_insert_with(Instant::now);
                 self.waiting.push_back(news);
             }
         }
@@ -598,7 +604,39 @@ impl TaskNews {
                     .is_none_or(|of| still_current(status.as_ref(), of))
             });
         }
+        // Only what still waits keeps when it came in.
+        let waiting = &self.waiting;
+        self.found
+            .retain(|key, _| waiting.iter().any(|news| news.key == *key));
         self.waiting.front()
+    }
+
+    /// When the piece of news `key` came in, while it waits: about when its
+    /// work settled, as the voice knows it ([`Self::waiting`] is called at
+    /// each tick of the voice's loop but while a reminder is held for its
+    /// skill). The Task news skill asks for it then, so the voice's wait
+    /// for that ask is counted from here (`coordinator`, the reviewer's P2
+    /// on #1667).
+    pub fn found_at(&self, key: &str) -> Option<Instant> {
+        self.found.get(key).copied()
+    }
+
+    /// For a test of the voice's turn: `news` waiting, come in `ago`.
+    #[cfg(test)]
+    pub(crate) fn waiting_for_test(news: News, ago: Duration) -> Self {
+        let came = Instant::now()
+            .checked_sub(ago)
+            .expect("a clock that has run that long");
+        Self {
+            offered: mpsc::channel().1,
+            told: mpsc::channel().0,
+            found: BTreeMap::from([(news.key.clone(), came)]),
+            waiting: VecDeque::from([news]),
+            told_already: Arc::new(Mutex::new(BTreeSet::new())),
+            stopping: Arc::new(AtomicBool::new(false)),
+            status: Arc::new(Mutex::new(None)),
+            heard: mpsc::channel().0,
+        }
     }
 
     /// Take the news waiting, as it is being told: it is not offered again.
@@ -2218,6 +2256,7 @@ mod tests {
             offered,
             told,
             waiting: VecDeque::new(),
+            found: BTreeMap::new(),
             told_already: Arc::new(Mutex::new(BTreeSet::new())),
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),
@@ -2246,6 +2285,7 @@ mod tests {
             offered,
             told,
             waiting: VecDeque::new(),
+            found: BTreeMap::new(),
             told_already: told_already.clone(),
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),
@@ -2281,6 +2321,35 @@ mod tests {
         assert!(news.waiting().is_none());
     }
 
+    /// The reviewer's P2 on #1667: each piece keeps when it came in while it
+    /// waits, the first time only, however often it is offered again, and
+    /// lets it go once told.
+    #[test]
+    fn news_keeps_when_it_came_in_while_it_waits() {
+        let (mut news, offer, _heard) = waiting_news();
+        let one = News {
+            key: "s:1:1".into(),
+            note: "(…)".into(),
+            until: None,
+            progress: None,
+            finished: None,
+            also: Vec::new(),
+        };
+        let before = Instant::now();
+        offer.send(one.clone()).unwrap();
+        assert_eq!(news.waiting(), Some(&one));
+        let came = news.found_at("s:1:1").expect("when it came in");
+        assert!(came >= before && came <= Instant::now());
+        std::thread::sleep(Duration::from_millis(5));
+        offer.send(one.clone()).unwrap();
+        assert_eq!(news.waiting(), Some(&one));
+        assert_eq!(news.found_at("s:1:1"), Some(came));
+        assert_eq!(news.found_at("s:2:1"), None);
+        assert_eq!(news.tell(), Some(one));
+        assert!(news.waiting().is_none());
+        assert_eq!(news.found_at("s:1:1"), None);
+    }
+
     /// The task a piece of news is of, from its key, as each kind is made:
     /// a settled observation, a failed hand-over, and progress; a store
     /// with a colon in it is read from the right.
@@ -2313,6 +2382,7 @@ mod tests {
             offered,
             told,
             waiting: VecDeque::new(),
+            found: BTreeMap::new(),
             told_already: Arc::new(Mutex::new(BTreeSet::new())),
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),

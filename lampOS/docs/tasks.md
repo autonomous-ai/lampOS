@@ -1067,8 +1067,11 @@ going?" now serves a page of over 9,000 bytes.
 The Task news skill (Jarvis, #1021) triggers on `tasks/status` and moves and
 lights with the news; the voice keeps the words and tells each piece once,
 as above. With `LAMP_TASK_NEWS=skill`, news of work finished, stopped or
-asking waits for the skill's `from: tasks` ask on the say service, at most
-10 s, and is then told with that ask's ticket, or by the voice itself
+asking waits for the skill's `from: tasks` ask on the say service until
+10 s after the voice had it, and is then told with that ask's ticket, or by
+the voice itself (news that settled while nobody was there is told when
+someone is, at once and without the skill's sway: its ask, made as the work
+settled, is gone 20 s later; the reviewer's P2 on #1667)
 ([speaking-first.md](speaking-first.md#asked-by-another-part-the-say-service-939)).
 An ask that names its task (`"task":10`) is given that task's news only,
 so the skill's look and light go with its own task (the reviewer on #1042).

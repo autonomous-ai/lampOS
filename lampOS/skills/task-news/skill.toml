@@ -4,9 +4,9 @@
 # (docs/skills.md, "The schema, as lamp-skills reads it").
 #
 # On every product lamp (lamp-update's install), with the voice's
-# LAMP_TASK_NEWS=skill: the voice keeps the news and waits up to 10 s for
-# this skill's ask, then tells it itself, so each task is told once whether
-# the skill asks or not. 5 of 5 on lamp-4ace come before the voice's own
+# LAMP_TASK_NEWS=skill: the voice keeps the news and waits for this skill's
+# ask until 10 s after it had the news, then tells it itself, so each task
+# is told once whether the skill asks or not. 5 of 5 on lamp-4ace come before the voice's own
 # timing of it (crates/voice/src/task_news.rs) is taken out.
 needs = ["eyes", "voice", "body", "light"]
 

@@ -418,8 +418,12 @@ for `say = { from = "schedule" | "tasks" }` ([skills.md](skills.md)).
   before. `task` goes only with `from: tasks`. Without it, task 9 done and
   task 10 failed in one message, asked for in the order 10, 9, drooped
   and dimmed the lamp while it said 9 was done (the reviewer on #1042).
-  With `LAMP_TASK_NEWS=skill`, news waits its 10 s for an ask for its own
-  task, then is said by the voice. With `LAMP_TASK_NEWS_AT_PAUSE=on`, news
+  With `LAMP_TASK_NEWS=skill`, news waits for an ask for its own task
+  until 10 s after the voice had it (`TaskNews::found_at`), then is said
+  by the voice: the Task news skill asks the moment the work settles, and
+  its ask is gone 20 s later, so news held back longer (nobody there, a
+  talk) is said at once when it can be, not 10 s later still (the
+  reviewer's P2 on #1667). With `LAMP_TASK_NEWS_AT_PAUSE=on`, news
   told with a skill's ask, or while another such ask waits, is told one
   at a time, not together (the reviewer on #1223): each run takes its own
   task's news.
@@ -433,7 +437,7 @@ for `say = { from = "schedule" | "tasks" }` ([skills.md](skills.md)).
   it got that only for `on`, refused every reminder under `skill`, and
   none was said (the reviewer on #1038). With
   **`LAMP_TASK_NEWS=skill`** news of work finished, stopped or asking waits
-  the same way; progress is the Policy's to time already and is told as it
+  the same way, but from when the voice had it (above); progress is the Policy's to time already and is told as it
   was. Without them nothing waits, and a `from` ask that is waiting is
   taken whenever its source next says one, so the skill still moves with
   the words. With the switch but no say service (`LAMP_SAY` off), nothing

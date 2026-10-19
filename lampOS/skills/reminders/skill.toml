@@ -9,6 +9,13 @@ topic = "schedule/due"
 field = "pending"
 above = 0.5
 when = "appears"            # a reminder due where none was
+# Due while someone talks with the lamp: asked for once the talk ends, at
+# Schedule's next second, while it is still due. The voice says a reminder
+# only then too, and waits 10 s for this ask, which is gone 20 s after it is
+# made: asked during the talk, it would be gone by then, and the voice would
+# wait its 10 s in silence and say it with no look (the reviewer's P2 on
+# #1667).
+wait = "1h"
 
 [[while]]                   # Schedule on and able to serve it
 topic = "schedule/due"
@@ -19,6 +26,11 @@ equals = true
 topic = "schedule/due"
 field = "enabled"
 equals = true
+
+[[while]]                   # nobody talking with the lamp, nor the lamp speaking
+topic = "voice/state"
+field = "state"
+equals = "resting"
 
 [ask]
 policy = "reminder"

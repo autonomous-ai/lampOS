@@ -202,8 +202,20 @@ way in the product's `lamp-voice.service`: its hello stays off
 to 10 s for the skill's ask (`from = "schedule"`, `from = "tasks"`). The
 voice still keeps the words: it says each once, with the skill's ticket
 when the skill asked, so the lamp looks up, sways or droops with them, or
-by itself after the 10 s when no ask came (`lamp-skills` down, or news of
-work that stopped or asks something, which no skill takes). Left out, with
+by itself when no ask came. Each skill asks once, and an ask is gone 20 s
+later (`say::FROM_LIVES_US`), so the two are timed to meet (the reviewer's
+P2 on #1667). Reminders asks only while the voice rests (`voice/state`),
+keeping a reminder due during a talk until the talk ends (`wait`), when
+the voice can say it too: said then, with the look. Task news asks the
+moment the work settles (its per-task trigger cannot wait), so the voice
+counts its 10 s from when it had the news, not from when it can first tell
+it: news that settled while nobody was there, or more than 20 s before a
+talk ended, is told at once when it can be, by the voice, without the sway.
+The voice says a reminder itself 10 s after it can when `lamp-skills` is
+down, or when the ask came too early: at a pause after which the talk went
+on for over 20 s, or while the voice rested but could not say it (paused
+or muted: what `voice/state` says then was not checked). It says news that
+stopped or asks something, which no skill takes, 10 s after it came in. Left out, with
 why (`install::NOT_PRODUCT_SKILLS`): Desk tutor, which reads handwriting
 from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`) that
 the product doesn't run, and its marks, called only after its look. A test
@@ -215,6 +227,11 @@ or the count changes). The voice leaves out by order, without a word, what
 is past 32, so Desk tutor's two would push its marks' `show_verdict` out. lamp-4ace's
 own unit keeps `LAMP_SCHEDULE_SPEAK=on` and the voice's own news until the
 skills have run there; the voice's own code for them is removed after.
+Install only writes skills, never removes one: a skill later moved out of
+`PRODUCT_SKILLS`, or a file dropped from a skill's folder, stays on every
+lamp installed before and keeps running. Taking a skill out is the removal
+work's (`lamp-skills remove` and the core and installable kinds, on
+`first/skills-core-installable`), not install's.
 
 **17 October: lamp-4ace's switches of that day became the product's** (joining.md's rule), taken from lamp-4ace's unit as it ran that day; most were switched on there on 16 or 17 October, several only as part of the groups of #1238's census, so their lamp record is that day's running, not a run of their own. They're the switch groups (lead-in to a tool, a waited answer kept, the stop told, the asker first only recorded, names checked, the staff note, task news at a pause, memory rules), the light requests (the voice's ring and the skills' half, `lamp-skills.service`), the quiet pace, starting offline, the asleep ring, a sorry in another language, the lamp's name in passing ignored, first words kept, tasks asked and who asked, a cut keeping the name, the self-test's speaker, the stall recorder, the strong ring eye, and short sounds judged in a quiet room after a check. Not taken: those that need the second voice's configuration (stop words, its down-line and wait cue, the voice link), which a product lamp doesn't have; the office's own (its Harness target, its say group); head touch, which needs Controls' and Expression's flags as well (#711); those that need another part's flag the product doesn't pass (the Policy holding actions needs `lamp-policy --act attention`, its hello and progress news need `--hello` and `--progress`, the full look needs the eyes' `--full-look`, a restored mute needs `--controls-mute`); and "that was weird", a builder's review tool whose marks (`/var/lib/lampOS/voice/marked/`) the reset doesn't wipe. Expression's catalogue differs too (`expression-alive-name-speech` on
 lamp-4ace, `expression-alive` on lamp-52e6): the product takes lamp-4ace's.
