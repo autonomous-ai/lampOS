@@ -1,0 +1,41 @@
+# The sharp rise (the line at 360 s), held at 400 until 1,500 s, 80 again by
+# 1,600 s, then a second sharp rise from 2,240 s: the air was under 150 for
+# 11.5 minutes (1,578 to 2,270 s) and the 30-minute cooldown has passed, so
+# it speaks again at 2,300 s.
+clock = "10:00"
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "light"
+args = { colour = "warm", level = 2 }
+
+[[expect]]
+at = "360s"
+within = "5s"
+call = "say"
+args = { text = "The air reads like smoke. If something's burning, please check it.", priority = 8, expires_ms = 120000 }
+
+[[expect]]
+at = "2300s"
+within = "5s"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+[[expect]]
+at = "2300s"
+within = "5s"
+call = "light"
+args = { colour = "warm", level = 2 }
+
+[[expect]]
+at = "2300s"
+within = "5s"
+call = "say"
+args = { text = "The air reads like smoke. If something's burning, please check it.", priority = 8, expires_ms = 120000 }

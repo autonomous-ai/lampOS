@@ -1,0 +1,5 @@
+# Two puffs over a baseline of 80: 300 for 15 s (three readings) at 300 s,
+# and 320 for 25 s (six readings) at 900 s. Each is a rise over 150, but
+# neither is held 30 s. Nothing.
+clock = "10:00"
+none = true

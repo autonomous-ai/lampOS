@@ -265,6 +265,21 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          owner's own bedtime, and its hand-over to Bedtime and Morning (#1732) is for the lamp \
          check",
     ),
+    // #1684's two core skills, merged off (the first builder, #1722): a
+    // trial puts them on by hand. Each comes with the product once the four
+    // real traces are recorded on a lamp with an air sensor and its
+    // provisional numbers are set again from them.
+    (
+        "smoky-air",
+        "not measured for false alarms yet (#1684): its numbers wait for real traces of kettle \
+         steam, toast, a candle blown out and a match, recorded on a lamp with an air sensor and \
+         replayed",
+    ),
+    (
+        "dusty-air",
+        "not measured for false alarms yet (#1684): its hour at 125 ug/m3 waits for the same \
+         traces and an office's own days, replayed",
+    ),
 ];
 
 /// One file of a product skill, `lampOS/skills/SKILL/FILE`, and where
