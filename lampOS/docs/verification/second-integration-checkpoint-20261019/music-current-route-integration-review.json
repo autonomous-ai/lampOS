@@ -1,0 +1,21 @@
+{
+  "head": "6d57d9c131d1ca0ded0e0f18661c4b22be8259a7",
+  "parent": "b48f7660c7b82e5dd4a162dc616d512fb93415b5",
+  "integration_tip": "74ea4d028b02e3122e20eb1dc5a66b7a0c3120e8",
+  "prior_music_preparation": "253baed5dacc105c43f102bc2d8a5dd817d8bdd5",
+  "review": "No actionable P1/P2 found in independent read-only review of the combined Engine and tests. Both parent behaviors are retained; runtime gates remain separate.",
+  "sha256": {
+    "lampOS/crates/voice/src/second_provider.rs": "35c8e25dfc9151fcb80c70cdbf00a47308d15f3fa98b793ec6521194f8a983b7",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "bbf59db0ccf0e91396ebd61cf5eee4ac7af2da4b3dd5830bf00434a531cd62cc"
+  },
+  "checks": [
+    "Fresh retained PCM and nonempty raw final speech words establish Music authority before carried text or synthetic Called fallback.",
+    "Marks, Busy, Called and notes-aware Prepared reuse remain intact.",
+    "Known cut-in notes permit reuse after final admission; late Called notes invalidate the prepared call.",
+    "Held/carried answers retain ordinary scoped tools without new Music authority, and fresh later words remain eligible.",
+    "Original call, scope and deadline checks, private news extraction and narrow accepted-offer acted accounting remain intact.",
+    "All prior Music test functions remain; no current-parent test lines were removed.",
+    "Worker and switches auto-merge retain the exact added/removed payloads of both deltas."
+  ],
+  "limits": "Static review and source comparisons only; local fake-peer tests, full workspace tests and native ARM64 are recorded separately."
+}

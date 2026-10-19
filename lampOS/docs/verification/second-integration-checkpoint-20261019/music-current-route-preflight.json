@@ -1,0 +1,149 @@
+{
+  "head": "6d57d9c131d1ca0ded0e0f18661c4b22be8259a7",
+  "integration_base": "b48f7660c7b82e5dd4a162dc616d512fb93415b5",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "source_only": true,
+  "source_file_count": 1609,
+  "source_tree_sha256": "a482c604f3946907e0255f959f12df80efa7835b426c75145e449a8df399a3cf",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.91,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 25.17,
+      "log_sha256": "bbb4feb1aa155a2acb0a36fd76eebf7b8c584d8b448330ebccdc6abe7f4bf155",
+      "summaries": []
+    },
+    {
+      "stage": "second_provider",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 36.4,
+      "log_sha256": "8d30622f3622d53a52fd0dbffdd77b394397fade36880b0eec15e043a95ad175",
+      "summaries": [
+        "test result: ok. 253 passed; 0 failed; 0 ignored; 0 measured; 2075 filtered out; finished in 7.48s"
+      ]
+    },
+    {
+      "stage": "requested_audio",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "requested_audio",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 1.58,
+      "log_sha256": "f2ebe2f50170260ba4f53d4e85033341ad75eeb0cecea17d83cd5d65a9ff38f1",
+      "summaries": [
+        "test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 2282 filtered out; finished in 1.41s"
+      ]
+    },
+    {
+      "stage": "accepted_decline",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "accepted_decline",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.43,
+      "log_sha256": "cff3efdab1b0e23192199b7d1c35d4aa1f2142c797ab54043e67ad2ba86fe0cb",
+      "summaries": [
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 2325 filtered out; finished in 0.26s"
+      ]
+    },
+    {
+      "stage": "prior_action",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "a_music_action_before_decline",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 0.21,
+      "log_sha256": "2f756a11ca61c151fb758328ca21f7a6945ec2d1df1bc72b540bd0c9851f9ea4",
+      "summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2327 filtered out; finished in 0.04s"
+      ]
+    },
+    {
+      "stage": "skills",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-skills",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 81.43,
+      "log_sha256": "d55fa3bba3254ad44ba6ab25da30686b8f006f303ca55e693a2d7a2ea028bc64",
+      "summaries": [
+        "test result: ok. 67 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.83s",
+        "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.82s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.02s",
+        "test result: ok. 107 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 46.05s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    }
+  ],
+  "scope": "Focused combined integration preflight; filters overlap and are not a complete workspace gate.",
+  "all_source_hashes_still_match": true,
+  "source_hash_manifest_sha256": "a482c604f3946907e0255f959f12df80efa7835b426c75145e449a8df399a3cf",
+  "source_hashes_note": "All 1,609 frozen non-document source hashes were compared at completion; the full manifest is represented by its canonical digest."
+}

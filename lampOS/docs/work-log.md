@@ -17,7 +17,7 @@ log and nothing a lamp runs ([joining.md](joining.md),
 
 Ready for integration: no (#1732 published on #1712; ARM64 39277565437 pending)
 
-Ready for integration: no (#1757 follows Bedtime; published-Bedtime preparation under the full gate)
+Ready for integration: no (#1757 follows Bedtime; newer notes-aware preparation in validation)
 
 The active work is #1672, Bedtime and Morning, followed by the allocated
 requested-music slice of #1685. Queue updates go to
@@ -79,7 +79,7 @@ passed, 1 failed**. Neither partial run is counted as a passing full gate.
 The [Tasks-runtime preflight](verification/second-integration-checkpoint-20261019/bedtime-second-route-race-fixed-preflight.json)
 was preparation only and does not qualify the final split publication.
 
-Queued behind #1732: Music's current-route preparation is `4a0d423270` on
+Queued behind #1732: Music's preceding current-route preparation is `4a0d423270` on
 `f21d697ce6`; it will follow Bedtime's actual landing. A regression reproduced
 MORE/decline room accounting with audio both off and on. New acted bookkeeping
 now applies only to emitted, valid private recording offers, preserving
@@ -98,23 +98,53 @@ matched. The overlapping filters are not a complete workspace gate. Old full/nat
 results below qualify only their stated revisions. No provider session,
 playback or device access.
 
-The next preparation is `253baed5dacc105c43f102bc2d8a5dd817d8bdd5`, one
-Music commit above published Bedtime `22c9c730bd`. [The integration review](verification/second-integration-checkpoint-20261019/music-publication-integration-review.json)
-records exact preservation of both deltas in six shared files. The worker's
-only conflict combines audio off/on with clock off/on in the typed-isolation
-fixture. Bedtime's coordinator tests and the parent's Tasks test are unchanged.
-Formatting **3.63 s** and strict workspace/all-target Clippy **56.66 s** pass;
-the complete 42-crate test/build gate is running on 1,609 frozen source files.
-The current native Bedtime/Tasks runs remain pending. Their final checkout
-identity and counts will be recorded only after terminal success.
+The published-Bedtime preparation is `253baed5dacc105c43f102bc2d8a5dd817d8bdd5`,
+one Music commit above `22c9c730bd`. [Its integration review](verification/second-integration-checkpoint-20261019/music-publication-integration-review.json)
+records preservation of both deltas in six shared files and the worker's
+combined audio/clock typed-isolation fixture. Formatting **3.63 s** and strict
+workspace/all-target Clippy **56.66 s** passed. The [full host attempt](verification/second-integration-checkpoint-20261019/music-publication-motion-failure.json)
+stopped after **1,209.72 s** at the second-route motion fixture's **1 nods**
+assertion, already reported on the same base and addressed by #1976. Completed
+summaries total **6,891 passed, 1 failed, 43 ignored**, no filters; Voice's
+own summary is **2,309/1/12**. Update and build were not reached. The failing
+function and Expression speaking implementation match the integration base;
+all **1,609** source hashes still match. This remains a failed gate, separate
+from the replacement work; Music does not import the unmerged motion fix.
 
-The current-tip audit against `74ea4d028` identified the new name-note and
-prepared-chat overlap before landing. A separate local preparation combines
-those changes while the frozen full gate continues. Its regressions require
-raw current speech eligibility before carried words or the synthetic name
-fallback; the note itself cannot grant Music authority. The worker and
-switches auto-merge preserve both exact deltas. Both owned PRs have only
-their automatic ARM64 run, following First's 22:45 queue direction.
+The newer local preparation is `6d57d9c131d1ca0ded0e0f18661c4b22be8259a7`,
+one Music commit above Bedtime preparation `b48f7660c7` on `74ea4d028b`.
+[Independent source review](verification/second-integration-checkpoint-20261019/music-current-route-integration-review.json)
+found no actionable P1/P2 and verified both parents' behavior. New cross-cases
+require raw current speech before carried words or the synthetic name fallback,
+retain real speech with the Called note, reuse matching cut-in preparation,
+and invalidate it when a later note changes context. The scan covers five
+changed crates, the 27-crate consumer closure and 142 files; all 198 changed
+document links resolve.
+
+The [first new preflight](verification/second-integration-checkpoint-20261019/music-current-route-sandbox-failure.json)
+passed formatting **3.86 s** and strict workspace/all-target Clippy **59.05 s**.
+All three new or extended cross-case tests passed, but local fake-peer socket
+binds were denied by the host sandbox: the outer second-provider summary is
+**224 passed, 29 failed, 0 ignored; 2,075 filtered**. Child-process failure
+summaries are not added to that total. [The unchanged-source rerun](verification/second-integration-checkpoint-20261019/music-current-route-preflight.json)
+with local Unix and loopback sockets passed: formatting **3.91 s**, strict
+workspace/all-target Clippy **25.17 s**, **253 second-provider tests**
+(2,075 filtered), **46 requested-audio tests** (2,282 filtered), **3
+accepted-decline tests** (2,325 filtered) and **1 prior-action test**
+(2,327 filtered), all with zero failures or ignores. The complete Skills
+suite passed **239/0/0**, none filtered, in **81.43 s**. All **1,609**
+source hashes matched. These Voice filters overlap and are not summed into
+a full-suite total. The complete replacement workspace test/build gate is
+now running on that same frozen source; it reuses only the identical-source
+formatting and Clippy results.
+
+Bedtime and Tasks still have only their original automatic PR ARM64 run,
+following First's no-duplicate-dispatch direction. All Tasks job steps report
+success, including full tests, docs/harness tests and artifact upload, but
+GitHub still reports the run and check as in progress. Bedtime's release
+build passed and full tests are running. Both PRs remain draft until their
+run has a terminal successful conclusion. Exact checkout identity and counts
+will be recorded from the completed run logs.
 
 The full Bedtime read returned four P2s and a topic-registration gap. This
 PR was returned to draft. Matching binary/unit installation is now documented;
