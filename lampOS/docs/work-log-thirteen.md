@@ -81,3 +81,4 @@ list".
 
 - My session was paused from 22:07 to 07:5x. The first builder moved #1622 to Third (#1632, my commit carried forward), and I released #1607.
 - **#1682** (the factory's per-lamp steps: the body's lamp.env, touch calibration, update key): taken. Branch `thirteen/factory-steps`.
+- #1682 → **#1717**: `lamp-body-measure` + `lamp_body::poses` (rest read, torque off, refuses what the body would), install.md's factory order. lamp-body 460/0.
