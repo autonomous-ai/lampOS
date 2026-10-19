@@ -4,6 +4,40 @@
 
 Newest first. Times from `date` (+07).
 
+- 05:12 #2049 read (Twelve: Days session leak): no finding; first builder's
+- 05:11 #2048 read (Third: 20 s forgiveness of a fruitless yield): no finding; note row 3 rule 8
+- 05:11 #2047: corrected my P3 (clock from the yield's start, margin ~4 s, fine)
+- 05:10 #2047 read (Nine: late cut-in voice-eval plan): no finding; P3 25 s gap margin ~2 s
+- 05:09 #1792 fcb355202: 21:10 read holds (only store count, a None field, test move)
+- 05:08 #2004 read (Seventh: privacy waits 60 s for a receipt): no finding; goes with #1792
+- 05:07 #2030 re-read 625fe3c62 (nod rate rule, catalogue keys, settle test): no finding; fold 4 commits; first builder's
+- 05:07 #1941: 21:15 read stands, head unchanged, clean; first builder's (row 17)
+- 05:05 #1944 read (Jarvis: second-route route checks, tests only): no finding; passes merged onto 1712's head
+- 05:05 #2043 read (whose words a line has, journal counts): no finding
+- 05:04 #1960 read (Nine: air facts on the second route): no finding; P3 told before said; first builder's after #1954
+- 05:02 told the first builder on #1722 I missed #1712-branch PRs; reading #1927 #1944 #1960 #1996 #2043
+- 05:01 #1984 read (the first builder's agent: Policy holds on the second route): no P1/P2; P3; on at lamp-4ace's next install; fold 3 commits
+- 04:59 #2044 read (Fourth: --wire --kept): no P1/P2; three P3s; first builder's
+- 04:59 #1954 read (Nine: STT stream lost mid-line test, onto #1712): no finding; missed for hours (watcher lamp-voice only)
+- 04:54 #2045 read (Nine: trials guard row): no finding; merge on green
+- 04:54 update stack #1788-#1945 merged by the first builder at 04:49 (merge commit), on my reads and the 04:47 gate correction
+- 04:48 #2042 read (Nine: trials mood row): three P2s (clap too early by day; put-back compares bus headers so always fails; mapfile breaks the test on macOS)
+- 04:47 #1788 stack: corrected my 04:37 (missed #1879/#1913 place_alone gate, output cut); gate read and right
+- 04:41 #2041 (second landing) merged by the first builder as 63dd3d8cb, on my 04:35 read
+- 04:39 #2037 read (Twelve: memory quality probe): no finding; two commits to fold; first builder's
+- 04:38 #2040 merged as 63f46ddf3 (trials look/point rows); no issue
+- 04:37 update stack rebase glanced: clean, reads stand; #1913 now leaves product skills out of settings (right, with #2027)
+- 04:33 #2041 read (Fourth: second landing): merge keeps both sides (harness_as removal correct); first builder's
+- 04:32 first look #2042 (Nine: trials mood row + Mood journal lines): mine; full read running
+- 04:32 #2033 ed0a5e70b: P2 (Python) and P3s fixed; recording only from root peer (Linux-only path, ARM64 is its check); goes with #1995
+- 04:31 #2040 read (Nine: trials look/point rows): no finding; merge on green; noted #2029's thread row flaked once
+- 04:10 #2038 merged as 991c4fc73 (trials settings row, no name printed, no Python); no issue
+- 03:59 #2035 read (Eighth: probe-tools sayings): no finding; first builder's before #2037
+- 03:58 #2039 691d7499c: P3s fixed; new --with-privacy-controls flag is the privacy path -> first builder's; two commits to fold
+- 03:49 #2038 22589840c: both P2s fixed (no name printed, no Python); merge on green
+- 03:49 #2039 read (Sixth: joys-scores.sh): no finding; P3 OUT rm -rf, old lamp-skills counts 0 silently; merge on green
+- 03:43 posted on #1722 the 14 ready PRs that conflict after #1973
+- 03:42 #1973 (the second route lands on lamp-voice) merged by the first builder at 03:41 as b45645957, on my 03:25 read
 - 03:38 #2029 merged as 90bc03ee7 (trials thread row); no issue
 - 03:38 #2024 6bb608669: P2 and P3s fixed; two commits to fold; first builder's
 - 03:37 #2038 read (Nine: trials settings row): P2 put-back prints the person's real name (sent line and reply); P2 python3 on the lamp
