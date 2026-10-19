@@ -92,8 +92,12 @@
 use lamp_gemini::{Tool, ToolCall};
 use serde_json::{Value, json};
 use std::{
+    collections::BTreeMap,
     path::{Path, PathBuf},
-    sync::{Mutex, OnceLock},
+    sync::{
+        Mutex, OnceLock,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -113,6 +117,10 @@ pub const ASKED_ENVIRONMENT: &str = "LAMP_TASKS_ASKED";
 /// asked of the computer's agent, and the computer is not called the
 /// office's (#1676). `on` only, and only with [`ASKED_ENVIRONMENT`].
 pub const ACCOUNTS_ENVIRONMENT: &str = "LAMP_TASKS_ACCOUNTS";
+/// Where it reads whether the person's computers are called by their own
+/// names ("your MacBook Air"), from the tasks part's `targets.names.json`
+/// (#1676). `on` only.
+pub const NAMES_ENVIRONMENT: &str = "LAMP_TASKS_MACHINE_NAMES";
 /// The provider worker's flags for them.
 pub const FLAG: &str = "--tasks-dir";
 pub const TARGET_FLAG: &str = "--tasks-target";
@@ -120,6 +128,7 @@ pub const WHO_FLAG: &str = "--tasks-who";
 pub const LEAD_IN_FLAG: &str = "--tasks-lead-in";
 pub const ASKED_FLAG: &str = "--tasks-asked";
 pub const ACCOUNTS_FLAG: &str = "--tasks-accounts";
+pub const NAMES_FLAG: &str = "--tasks-machine-names";
 /// The file the tasks part needs to run at all (#811: on a home lamp, the
 /// Harness program its unit's condition names). While it is missing, a call
 /// that cannot reach the part is told it isn't set up; otherwise as a part
@@ -784,6 +793,11 @@ fn missing_target(
     .as_ref()
     .and_then(|answer| {
         // Kept as the staff only where the staff are used ([`WHO_FLAG`]).
+        if place.machine_names
+            && let Some(names) = names_from(answer)
+        {
+            keep_names(names);
+        }
         if place.who
             && let Some(staff) = staff_from(answer)
         {
@@ -822,6 +836,68 @@ fn not_set_up(who: &str) -> Value {
         "{who} isn't set up for the lamp yet, so this can't be handed over. \
          Say so plainly in a few words: it needs setting up on the computer first."
     )})
+}
+
+/// The computers' own names by target alias, as last read from the tasks
+/// part ([`NAMES_FLAG`], #1676); said only while [`NAMES_ON`].
+static NAMES: Mutex<BTreeMap<String, String>> = Mutex::new(BTreeMap::new());
+static NAMES_ON: AtomicBool = AtomicBool::new(false);
+
+/// The names in the tasks part's answer to `targets`: each target's `name`,
+/// where it has one that is a plain label of at most 64 bytes with no
+/// control characters; others are left out, and said as today.
+fn names_from(answer: &Value) -> Option<BTreeMap<String, String>> {
+    if answer.get("ok") != Some(&json!(true)) {
+        return None;
+    }
+    Some(
+        answer
+            .get("targets")?
+            .as_array()?
+            .iter()
+            .filter_map(|target| {
+                let (alias_, name) = (target["alias"].as_str()?, target["name"].as_str()?);
+                let plain = !name.is_empty()
+                    && name.len() <= 64
+                    && name.trim() == name
+                    && !name.chars().any(char::is_control);
+                (alias(alias_) && plain).then(|| (alias_.to_owned(), name.to_owned()))
+            })
+            .collect(),
+    )
+}
+
+/// The names as read now, kept. The journal says how many, never which: a
+/// computer's name may be its person's.
+fn keep_names(read: BTreeMap<String, String>) {
+    if let Ok(mut known) = NAMES.lock()
+        && *known != read
+    {
+        eprintln!(
+            "lamp-voice provider: {} computers known by name",
+            read.len()
+        );
+        *known = read;
+    }
+}
+
+/// The computer `alias` names, by its own name, with [`NAMES_FLAG`] and a
+/// name read for it; none otherwise.
+pub(crate) fn machine_name(alias: &str) -> Option<String> {
+    if !NAMES_ON.load(Ordering::Relaxed) {
+        return None;
+    }
+    NAMES.lock().ok()?.get(alias).cloned()
+}
+
+/// Where the read-back says the work goes: "your MacBook Air" for a
+/// computer known by name ([`NAMES_FLAG`]), else "the office computer" (or
+/// "the computer"), as without it.
+fn where_done(place: &Place, alias: &str) -> String {
+    match place.machine_names.then(|| machine_name(alias)).flatten() {
+        Some(name) => format!("your {name}"),
+        None => format!("the {}", computer(place)),
+    }
 }
 
 /// The staff as read now, kept, with a journal line when it changed.
@@ -871,21 +947,23 @@ static TARGETS_SEEN: Mutex<Option<Vec<(String, String)>>> = Mutex::new(None);
 
 /// Read the staff from the tasks part: once now, briefly, and then every
 /// 30 s on a thread of its own, so that opening a session waits for
-/// nobody. Only with [`WHO_FLAG`], once per process. A read that fails
-/// keeps what was known.
+/// nobody. Only with [`WHO_FLAG`] or [`NAMES_FLAG`], once per process. A
+/// read that fails keeps what was known.
 pub fn start(place: &Place) {
-    if !place.who || READING.set(()).is_err() {
+    if !(place.who || place.machine_names) || READING.set(()).is_err() {
         return;
     }
+    NAMES_ON.store(place.machine_names, Ordering::Relaxed);
     let socket = place.directory.join("request.sock");
     let target = place.target.clone();
-    read_staff(&socket, &target, FIRST_READ);
+    let who = place.who;
+    read_staff(&socket, &target, FIRST_READ, who);
     let spawned = std::thread::Builder::new()
         .name("lamp-voice-staff".into())
         .spawn(move || {
             loop {
                 std::thread::sleep(READ_AGAIN);
-                read_staff(&socket, &target, crate::tools::ASK_DEADLINE);
+                read_staff(&socket, &target, crate::tools::ASK_DEADLINE, who);
             }
         });
     if spawned.is_err() {
@@ -893,7 +971,7 @@ pub fn start(place: &Place) {
     }
 }
 
-fn read_staff(socket: &Path, target: &str, deadline: Duration) {
+fn read_staff(socket: &Path, target: &str, deadline: Duration, who: bool) {
     let Some(answer) = crate::tools::exchange_up_to(
         socket,
         &json!({"op":"targets"}),
@@ -905,6 +983,12 @@ fn read_staff(socket: &Path, target: &str, deadline: Duration) {
     let Some(read) = staff_from(&answer) else {
         return;
     };
+    if let Some(names) = names_from(&answer) {
+        keep_names(names);
+    }
+    if !who {
+        return;
+    }
     keep_staff(read);
     // The target the voice was set to, missing from the tasks part: said
     // once per change of its targets, before anyone asks (#1390).
@@ -935,6 +1019,9 @@ pub struct Place {
     /// The person's own accounts are asked of the computer's agent, and the
     /// computer is not called the office's ([`ACCOUNTS_FLAG`], #1676).
     pub accounts: bool,
+    /// The computers are called by their own names where the tasks part
+    /// has one ([`NAMES_FLAG`], #1676).
+    pub machine_names: bool,
     /// The file the tasks part needs ([`NEEDS_FLAG`]).
     pub needs: Option<PathBuf>,
     /// A request whose words name one of the staff is told so
@@ -952,10 +1039,13 @@ pub fn arguments_from_environment() -> Vec<String> {
         std::env::var(LEAD_IN_ENVIRONMENT).ok().as_deref(),
         std::env::var(ASKED_ENVIRONMENT).ok().as_deref(),
         std::env::var(ACCOUNTS_ENVIRONMENT).ok().as_deref(),
+        std::env::var(NAMES_ENVIRONMENT).ok().as_deref(),
         std::env::var(NEEDS_ENVIRONMENT).ok().as_deref(),
     )
 }
 
+// One value a switch, as the environment gives them, in their flags' order.
+#[allow(clippy::too_many_arguments)]
 fn arguments(
     directory: Option<&str>,
     target: Option<&str>,
@@ -963,6 +1053,7 @@ fn arguments(
     lead_in: Option<&str>,
     asked: Option<&str>,
     accounts: Option<&str>,
+    names: Option<&str>,
     needs: Option<&str>,
 ) -> Vec<String> {
     let Some(directory) = directory.filter(|path| Path::new(path).is_absolute()) else {
@@ -986,6 +1077,9 @@ fn arguments(
             arguments.push(ACCOUNTS_FLAG.to_owned());
         }
     }
+    if names == Some("on") {
+        arguments.push(NAMES_FLAG.to_owned());
+    }
     if let Some(needs) = needs.filter(|path| Path::new(path).is_absolute()) {
         arguments.push(NEEDS_FLAG.to_owned());
         arguments.push(needs.to_owned());
@@ -1001,7 +1095,8 @@ fn alias(text: &str) -> bool {
 }
 
 /// Take a leading `--tasks-dir DIR [--tasks-target ALIAS] [--tasks-who]
-/// [--tasks-lead-in] [--tasks-asked [--tasks-accounts]] [--tasks-needs PATH]`
+/// [--tasks-lead-in] [--tasks-asked [--tasks-accounts]] [--tasks-machine-names]
+/// [--tasks-needs PATH]`
 /// off the flags.
 pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
     let [flag, rest @ ..] = flags else {
@@ -1041,6 +1136,10 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
         [flag, rest @ ..] if flag == ACCOUNTS_FLAG && asked => (true, rest),
         _ => (false, rest),
     };
+    let (machine_names, rest) = match rest {
+        [flag, rest @ ..] if flag == NAMES_FLAG => (true, rest),
+        _ => (false, rest),
+    };
     let (needs, rest) = match rest {
         [flag, path, rest @ ..] if flag == NEEDS_FLAG => {
             if !Path::new(path).is_absolute() {
@@ -1058,6 +1157,7 @@ pub fn take(flags: &[String]) -> std::io::Result<(Option<Place>, &[String])> {
             lead_in,
             asked,
             accounts,
+            machine_names,
             needs,
             staff_note: false,
         }),
@@ -1178,6 +1278,8 @@ fn run_for(
                 &json!({"op":"prepare","guard":guard,"text":task,"target":target}),
                 left,
             );
+            // The target the work was prepared for, for the read-back.
+            let mut sent_to = target.to_owned();
             // The tasks part has no such target (#1390): its targets changed
             // under the voice, or the voice was set to a name it lacks.
             if prepared
@@ -1197,6 +1299,7 @@ fn run_for(
                             &json!({"op":"prepare","guard":again,"text":task,"target":other}),
                             left,
                         );
+                        sent_to = other;
                     }
                     Missing::NotSetUp => return (not_set_up(who), true),
                     Missing::Unread => {}
@@ -1224,7 +1327,7 @@ fn run_for(
                         json!({
                             "prepared": true,
                             "task": task,
-                            "where": format!("{who} on the {}", computer(place)),
+                            "where": format!("{who} on {}", where_done(place, &sent_to)),
                             "next": next
                         }),
                         true,
@@ -1484,7 +1587,7 @@ fn next(
         "idle" if settled => {
             "Give them the gist of what it came back with in one or two plain spoken sentences; no code, lists, paths or links. If there is more, say the rest is on their computer."
         }
-        "needs-input" => return crate::task_news::waiting(who, answer),
+        "needs-input" => return crate::task_news::waiting(who, "their computer", answer),
         "stopped" | "failed" => {
             "Tell them in one plain sentence that it stopped without finishing."
         }
@@ -1568,6 +1671,7 @@ pub(crate) mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: needs.map(PathBuf::from),
             staff_note: false,
         };
@@ -1679,20 +1783,30 @@ pub(crate) mod tests {
 
     #[test]
     fn the_switch_is_an_absolute_directory_and_an_alias_and_is_taken_from_the_front() {
-        assert!(arguments(None, None, None, None, None, None, None).is_empty());
-        assert!(arguments(Some("relative"), None, None, None, None, None, None).is_empty());
+        assert!(arguments(None, None, None, None, None, None, None, None).is_empty());
+        assert!(arguments(Some("relative"), None, None, None, None, None, None, None).is_empty());
         assert_eq!(
-            arguments(Some("/run/t"), None, None, None, None, None, None),
+            arguments(Some("/run/t"), None, None, None, None, None, None, None),
             [FLAG, "/run/t"]
         );
         assert_eq!(
-            arguments(Some("/run/t"), Some("m2"), None, None, None, None, None),
+            arguments(
+                Some("/run/t"),
+                Some("m2"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None
+            ),
             [FLAG, "/run/t", TARGET_FLAG, "m2"]
         );
         assert_eq!(
             arguments(
                 Some("/run/t"),
                 Some("no spaces"),
+                None,
                 None,
                 None,
                 None,
@@ -1709,6 +1823,7 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 Some("/usr/local/bin/harness")
             ),
             [FLAG, "/run/t", NEEDS_FLAG, "/usr/local/bin/harness"]
@@ -1716,6 +1831,7 @@ pub(crate) mod tests {
         assert_eq!(
             arguments(
                 Some("/run/t"),
+                None,
                 None,
                 None,
                 None,
@@ -1752,6 +1868,7 @@ pub(crate) mod tests {
                 lead_in: false,
                 asked: false,
                 accounts: false,
+                machine_names: false,
                 needs: None,
                 staff_note: false,
             })
@@ -1897,6 +2014,7 @@ pub(crate) mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         };
@@ -2080,6 +2198,7 @@ pub(crate) mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         };
@@ -2157,6 +2276,7 @@ pub(crate) mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         };
@@ -2242,6 +2362,7 @@ pub(crate) mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         };
@@ -2292,6 +2413,7 @@ pub(crate) mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         };
@@ -2344,6 +2466,7 @@ pub(crate) mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         };
@@ -2418,6 +2541,7 @@ pub(crate) mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         };
@@ -2464,7 +2588,7 @@ pub(crate) mod tests {
     }
 
     /// Seventh's peer review on #1427: through the real routes. The Live worker's
-    /// asking thread (`provider_worker::answered`) takes the key out of what
+    /// asking thread (`provider_worker::answered_scoped`) takes the key out of what
     /// its model is told and keeps it; the second voice (`tools::answer`)
     /// takes it out too, and keeps nothing.
     #[test]
@@ -2480,7 +2604,16 @@ pub(crate) mod tests {
         };
         let (place, _seen) = serving(&directory, "idle", "Lumi, Sunny and Archie.", false);
         let route = crate::tools::Route::Tasks(place);
-        let (_, told, answered, news) = crate::provider_worker::answered(&route, &call, 1, true);
+        let scope = crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+                session: 1,
+                request: 1,
+            },
+            crate::memory_scope::ScopeSnapshot::room(),
+        );
+        let (_, told, answered, news) =
+            crate::provider_worker::answered_scoped(&route, &call, 1, true, &scope.lease());
         assert!(answered, "{told}");
         assert_eq!(news.as_deref(), Some("s1:2:4"));
         assert!(told.get(NEWS_KEY).is_none(), "{told}");
@@ -2727,6 +2860,7 @@ pub(crate) mod tests {
             lead_in: false,
             asked: false,
             accounts: false,
+            machine_names: false,
             needs: None,
             staff_note: false,
         }
@@ -2790,6 +2924,142 @@ pub(crate) mod tests {
         (sent, told)
     }
 
+    /// One task prepared at `place` through a fake tasks part: what the model
+    /// was told of it.
+    fn prepared_at(tag: &str, place: &Place) -> Value {
+        let directory =
+            std::env::temp_dir().join(format!("agent-names-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let _seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1}),
+                ),
+            ],
+        );
+        let place = Place {
+            directory: directory.clone(),
+            ..place.clone()
+        };
+        let call = ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({"task":"Write hello.txt"}),
+        };
+        let told = run_for(&place, &[], &call, 3, true, PEER_WAIT).0;
+        std::fs::remove_dir_all(directory).unwrap();
+        told
+    }
+
+    /// #1676: with `LAMP_TASKS_MACHINE_NAMES`, the read-back names the
+    /// computer the work goes to by its own name, each of two by its own;
+    /// one with no name, or the switch off, reads as today; and task news
+    /// says where the rest is the same way.
+    #[test]
+    fn with_machine_names_each_computer_is_said_by_its_own_name() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let answer = json!({"ok":true,"targets":[
+            {"alias":"office","engine":"claude","name":"Office iMac"},
+            {"alias":"macbook-air","engine":"claude","name":"MacBook Air"},
+            {"alias":"desk","engine":"claude"},
+            {"alias":"long","engine":"claude","name":"x".repeat(65)},
+            {"alias":"bell","engine":"claude","name":"Ring\u{7}"},
+            {"alias":"space","engine":"claude","name":" Pad"}]});
+        let names = names_from(&answer).unwrap();
+        assert_eq!(names.len(), 2, "{names:?}");
+        keep_names(names);
+        NAMES_ON.store(true, Ordering::Relaxed);
+        let mut on = place(Path::new("/run/t"), false);
+        on.machine_names = true;
+        for (target, said) in [
+            ("office", "Claude Code on your Office iMac"),
+            ("macbook-air", "Claude Code on your MacBook Air"),
+            ("desk", "Claude Code on the office computer"),
+        ] {
+            on.target = target.into();
+            assert_eq!(prepared_at(target, &on)["where"], said, "{target}");
+        }
+        let task =
+            |alias: &str| json!({"text":"x","target":{"engine":"claude"},"target_alias":alias});
+        assert_eq!(
+            crate::task_news::their_computer(&task("macbook-air")),
+            "their MacBook Air"
+        );
+        assert_eq!(
+            crate::task_news::their_computer(&task("desk")),
+            "their computer"
+        );
+        let mut off = on.clone();
+        off.machine_names = false;
+        off.target = "macbook-air".into();
+        NAMES_ON.store(false, Ordering::Relaxed);
+        assert_eq!(
+            prepared_at("off", &off)["where"],
+            "Claude Code on the office computer"
+        );
+        assert_eq!(
+            crate::task_news::their_computer(&task("macbook-air")),
+            "their computer"
+        );
+        keep_names(BTreeMap::new());
+    }
+
+    /// The switch is its own: taken with or without the others, and off
+    /// unless `on`.
+    #[test]
+    fn the_machine_names_switch_is_taken_on_its_own() {
+        let flags =
+            |list: &[&str]| -> Vec<String> { list.iter().map(|flag| (*flag).to_owned()).collect() };
+        assert_eq!(
+            arguments(
+                Some("/run/t"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some("on"),
+                None
+            ),
+            flags(&[FLAG, "/run/t", NAMES_FLAG])
+        );
+        assert_eq!(
+            arguments(
+                Some("/run/t"),
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some("yes"),
+                None
+            ),
+            flags(&[FLAG, "/run/t"])
+        );
+        let given = flags(&[
+            FLAG,
+            "/run/t",
+            ASKED_FLAG,
+            ACCOUNTS_FLAG,
+            NAMES_FLAG,
+            "rest",
+        ]);
+        let (place, rest) = take(&given).unwrap();
+        let place = place.unwrap();
+        assert!(place.asked && place.accounts && place.machine_names);
+        assert_eq!(rest, ["rest"]);
+        let (place, _) = take(&flags(&[FLAG, "/run/t"])).unwrap();
+        assert!(!place.unwrap().machine_names);
+    }
+
     #[test]
     fn without_the_switch_or_anyone_else_to_name_the_functions_are_exactly_as_before() {
         let off = place(Path::new("/run/t"), false);
@@ -2820,7 +3090,16 @@ pub(crate) mod tests {
             "Tell them in a few natural words that you are handing it to Claude Code now and will let them know when it is done, the way a chief of staff would (\"Sure, I'm giving that to Claude Code. I'll tell you when it's done.\"). It has not been taken up yet: do not say it has."
         );
         assert_eq!(
-            arguments(Some("/run/t"), None, None, Some("on"), None, None, None),
+            arguments(
+                Some("/run/t"),
+                None,
+                None,
+                Some("on"),
+                None,
+                None,
+                None,
+                None
+            ),
             [FLAG, "/run/t", LEAD_IN_FLAG]
         );
         assert_eq!(
@@ -2831,17 +3110,18 @@ pub(crate) mod tests {
                 Some("on"),
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t", TARGET_FLAG, "m2", WHO_FLAG, LEAD_IN_FLAG]
         );
         for not_on in [None, Some("yes"), Some("ON"), Some("1")] {
             assert_eq!(
-                arguments(Some("/run/t"), None, None, not_on, None, None, None),
+                arguments(Some("/run/t"), None, None, not_on, None, None, None, None),
                 [FLAG, "/run/t"]
             );
         }
-        assert!(arguments(None, None, None, Some("on"), None, None, None).is_empty());
+        assert!(arguments(None, None, None, Some("on"), None, None, None, None).is_empty());
         let flags: Vec<String> = [FLAG, "/run/t", WHO_FLAG, LEAD_IN_FLAG, "--other"]
             .map(String::from)
             .into();
@@ -2971,6 +3251,7 @@ pub(crate) mod tests {
                 None,
                 Some("on"),
                 Some("on"),
+                None,
                 None
             ),
             flags(&[FLAG, "/run/t", ASKED_FLAG, ACCOUNTS_FLAG])
@@ -2984,6 +3265,7 @@ pub(crate) mod tests {
                     None,
                     not_asked,
                     Some("on"),
+                    None,
                     None
                 ),
                 flags(&[FLAG, "/run/t"])
@@ -2997,6 +3279,7 @@ pub(crate) mod tests {
                 None,
                 Some("on"),
                 Some("yes"),
+                None,
                 None
             ),
             flags(&[FLAG, "/run/t", ASKED_FLAG])
@@ -3272,19 +3555,38 @@ pub(crate) mod tests {
                 None,
                 None,
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t", TARGET_FLAG, "office-claude", WHO_FLAG]
         );
         assert_eq!(
-            arguments(Some("/run/t"), None, Some("on"), None, None, None, None),
+            arguments(
+                Some("/run/t"),
+                None,
+                Some("on"),
+                None,
+                None,
+                None,
+                None,
+                None
+            ),
             [FLAG, "/run/t", WHO_FLAG]
         );
         assert_eq!(
-            arguments(Some("/run/t"), None, Some("yes"), None, None, None, None),
+            arguments(
+                Some("/run/t"),
+                None,
+                Some("yes"),
+                None,
+                None,
+                None,
+                None,
+                None
+            ),
             [FLAG, "/run/t"]
         );
-        assert!(arguments(None, None, Some("on"), None, None, None, None).is_empty());
+        assert!(arguments(None, None, Some("on"), None, None, None, None, None).is_empty());
         let flags: Vec<String> = [
             FLAG,
             "/run/t",
@@ -3305,6 +3607,7 @@ pub(crate) mod tests {
                 lead_in: false,
                 asked: false,
                 accounts: false,
+                machine_names: false,
                 needs: None,
                 staff_note: false,
             })
@@ -3385,9 +3688,9 @@ pub(crate) mod tests {
             ],
         );
         let socket = directory.join("request.sock");
-        read_staff(&socket, DEFAULT_TARGET, PEER_WAIT);
+        read_staff(&socket, DEFAULT_TARGET, PEER_WAIT, true);
         assert_eq!(seen.recv().unwrap(), json!({"op":"targets"}));
-        read_staff(&socket, DEFAULT_TARGET, PEER_WAIT);
+        read_staff(&socket, DEFAULT_TARGET, PEER_WAIT, true);
         assert_eq!(seen.recv().unwrap(), json!({"op":"targets"}));
         let on = place(&directory, true);
         let told = tools(&on);
@@ -3505,13 +3808,14 @@ pub(crate) mod tests {
                 Some("on"),
                 Some("on"),
                 None,
+                None,
                 None
             ),
             [FLAG, "/run/t", WHO_FLAG, LEAD_IN_FLAG, ASKED_FLAG]
         );
         for not_on in [None, Some("yes"), Some("ON"), Some("1")] {
             assert_eq!(
-                arguments(Some("/run/t"), None, None, None, not_on, None, None),
+                arguments(Some("/run/t"), None, None, None, not_on, None, None, None),
                 [FLAG, "/run/t"]
             );
         }

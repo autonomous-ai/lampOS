@@ -403,6 +403,7 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
         needs: None,
         staff_note: true,
         accounts: false,
+        machine_names: false,
     };
     let settings = crate::tools::Settings {
         tasks: Some(place.clone()),
@@ -2077,6 +2078,7 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
         needs: None,
         staff_note: false,
         accounts: false,
+        machine_names: false,
     };
     let settings = crate::tools::Settings {
         tasks: Some(place),
@@ -2487,4 +2489,172 @@ async fn a_look_asked_by_its_call_goes_to_the_coordinator_and_ends_the_turn() {
         dropped.as_deref(),
         Some("the turn is one the lamp wrote itself")
     );
+}
+
+#[tokio::test]
+async fn memory_scope_is_bound_before_answer_and_revoked_with_the_turn() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    let path = std::env::temp_dir().join(format!(
+        "sixth-scope-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    std::fs::write(&path, "A").unwrap();
+    let cache = Arc::new(FaceCache::default());
+    cache.replace(
+        cache.begin_refresh(),
+        crate::known_faces::FaceObservation::read(&path),
+    );
+    let (engine, _, _) = scripted(Arc::new(Script::default()));
+    let runner: ScopedToolRunner =
+        Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+    let mut engine = engine.with_memory_scope(
+        lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+        cache.clone(),
+        runner,
+    );
+    engine.memory_camera(true, 1);
+    cache.replace(
+        cache.begin_refresh(),
+        crate::known_faces::FaceObservation::read(&path),
+    );
+    engine.submit(start(1));
+    let lease = engine
+        .turn
+        .as_ref()
+        .unwrap()
+        .memory_scope
+        .as_ref()
+        .unwrap()
+        .lease();
+    assert_eq!(
+        lease.scope().unwrap().person(),
+        Some(crate::remember::person_id("A").as_str())
+    );
+    // No answer or tool has run yet. A later observation cannot rename this turn.
+    std::fs::write(&path, "B").unwrap();
+    cache.replace(
+        cache.begin_refresh(),
+        crate::known_faces::FaceObservation::read(&path),
+    );
+    engine.submit(end(1));
+    assert!(lease.is_current(), "End closes input, not tool authority");
+    assert_eq!(
+        lease.scope().unwrap().person(),
+        Some(crate::remember::person_id("A").as_str())
+    );
+    engine.submit(start(2));
+    assert!(
+        !lease.is_current(),
+        "replacement revokes detached tool leases"
+    );
+    let next = engine
+        .turn
+        .as_ref()
+        .unwrap()
+        .memory_scope
+        .as_ref()
+        .unwrap()
+        .lease();
+    assert_eq!(
+        next.scope().unwrap().person(),
+        Some(crate::remember::person_id("B").as_str())
+    );
+    engine.memory_camera(true, 3);
+    assert!(
+        !next.is_current(),
+        "coalesced camera close/reopen revokes identity"
+    );
+    assert_eq!(cache.snapshot(std::time::Instant::now()).person(), None);
+    engine.retire_through(2);
+    assert!(!next.is_current());
+    std::fs::remove_file(path).unwrap();
+}
+
+#[tokio::test]
+async fn dropping_engine_revokes_memory_scope_even_when_task_holds_a_lease() {
+    let (engine, _, _) = scripted(Arc::new(Script::default()));
+    let runner: ScopedToolRunner = Arc::new(|_, _, _, _, _| Box::pin(async { json!({"ok":true}) }));
+    let mut engine = engine.with_memory_scope(
+        lamp_turn_owner::BootId::new([10; 16]).unwrap(),
+        Arc::default(),
+        runner,
+    );
+    engine.submit(start(1));
+    let lease = engine
+        .turn
+        .as_ref()
+        .unwrap()
+        .memory_scope
+        .as_ref()
+        .unwrap()
+        .lease();
+    assert_eq!(lease.scope().unwrap().person(), None);
+    drop(engine);
+    assert!(!lease.is_current());
+}
+
+#[tokio::test]
+async fn revoked_tool_result_is_not_sent_to_another_chat_round() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Recall my note".to_owned())].into()),
+        chats: Mutex::new(
+            [vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "private",
+                    "recall",
+                    json!({}),
+                )])),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    let runner: ScopedToolRunner = {
+        let entered = entered.clone();
+        let release = release.clone();
+        Arc::new(move |_, _, _, _, _| {
+            let entered = entered.clone();
+            let release = release.clone();
+            Box::pin(async move {
+                entered.notify_one();
+                release.notified().await;
+                json!({"private":"must never reach next chat"})
+            })
+        })
+    };
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([11; 16]).unwrap(),
+            Arc::default(),
+            runner,
+        )
+        .announcing(false);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    tokio::time::timeout(Duration::from_secs(2), entered.notified())
+        .await
+        .unwrap();
+    engine
+        .turn
+        .as_ref()
+        .unwrap()
+        .memory_scope
+        .as_ref()
+        .unwrap()
+        .revoke();
+    release.notify_one();
+    tokio::time::timeout(
+        Duration::from_secs(2),
+        &mut engine.turn.as_mut().unwrap().task,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(script.asked.lock().unwrap().len(), 1);
 }

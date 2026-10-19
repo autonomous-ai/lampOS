@@ -221,7 +221,8 @@ from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`) that
 the product doesn't run, and its marks, called only after its look; and
 Light out when you leave (#1677, [presence.md](presence.md)), which reads
 the eyes' `room/presence`, off in the product (`LAMP_PRESENCE`) until its
-lamp check. A test
+lamp check; and Not feeling well (#1681), the droop and dim on
+`lamp/health`'s `error`, until its lamp check. A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
 product lamp tells each session 31 functions of the 32 a session takes
 (`lamp_gemini::MAX_TOOLS`): the voice's own 13, the actions part's 17 and
@@ -586,6 +587,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      so Harness's own updates change `cli.js` and never the launcher that
      `lamp-tasks` checks (its executable identity). With `SHELL=/bin/sh` its
      one PATH line goes into `~/.profile` in that home.
+   - **What it trusts** (the reviewer on #1777): a script fetched from
+     `cdn.autonomous.ai` runs as `lampos`, the user every lampOS part runs
+     as, and its sha256 checks come from the same CDN, so they guard against
+     a bad download, not a bad CDN. That's the installer the first builder
+     and the lead chose (19 Oct 10:41), as Harness's team publishes it.
    - **Then:** Harness at boot as above, with its record, unless already
      recorded; then `systemctl restart lamp-tasks.service`, only when
      something changed.

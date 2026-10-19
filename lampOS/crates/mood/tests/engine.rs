@@ -930,3 +930,49 @@ fn metadata_event_round_trip_carries_no_speech_or_face_history() {
     assert!(!json.contains("text"));
     assert!(!json.contains("history"));
 }
+
+/// #1670: Mood holds the familiar level the eyes said only for its lease,
+/// says it in its state, drops it when the eyes say nobody remembered, and
+/// a change of level is a change worth saying.
+#[test]
+fn the_familiar_level_is_held_only_for_its_lease() {
+    use lamp_msgs::FamiliarLevel;
+    let mut mood = engine(DAY);
+    assert_eq!(state(&mood).familiar, None);
+    let at = 10 * SECOND_US;
+    let changed = mood
+        .apply(
+            at,
+            leased(
+                at,
+                5 * SECOND_US,
+                EventKind::Familiar(Some(FamiliarLevel::Regular)),
+            ),
+        )
+        .unwrap();
+    assert!(changed);
+    assert_eq!(state(&mood).familiar, Some(FamiliarLevel::Regular));
+    // Gone at the end of its lease, with nothing newer.
+    mood.advance(at + 5 * SECOND_US - 1, DAY).unwrap();
+    assert_eq!(state(&mood).familiar, Some(FamiliarLevel::Regular));
+    assert!(mood.advance(at + 5 * SECOND_US, DAY).unwrap());
+    assert_eq!(state(&mood).familiar, None);
+    // Said again, then nobody remembered: dropped at once.
+    let again = at + 6 * SECOND_US;
+    mood.apply(
+        again,
+        leased(
+            again,
+            5 * SECOND_US,
+            EventKind::Familiar(Some(FamiliarLevel::Close)),
+        ),
+    )
+    .unwrap();
+    assert_eq!(state(&mood).familiar, Some(FamiliarLevel::Close));
+    let gone = again + SECOND_US;
+    assert!(
+        mood.apply(gone, leased(gone, 5 * SECOND_US, EventKind::Familiar(None)))
+            .unwrap()
+    );
+    assert_eq!(state(&mood).familiar, None);
+}

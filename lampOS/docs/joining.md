@@ -466,6 +466,12 @@ was busy. Since then:
    the moment it opens, so a builder's open work can be listed. A builder
    whose account cannot add labels (read access only) asks the first
    builder, who adds it.
+6. **A docs-only pull request skips the ARM64 run** (the project lead, 19
+   Oct 2026): one that changes only the docs' or the role files' Markdown
+   merges once the reviewer has read it. The docs that code or tests read,
+   listed in `.github/workflows/lampos-arm64.yml`, and every skill's
+   `SKILL.md` still run, and every push to `lamp-voice` still builds the
+   binaries lamps install.
 
 **Moved on 2026-10-14.** The first builder opened an issue for each open
 task (#694 to #704) and a role file for each builder. work-split.md keeps

@@ -1,9 +1,11 @@
 //! What the room microphone hears, reduced to how loud: the room's level
 //! against its own quiet, and sounds that rise suddenly out of it. Nothing
-//! of the sound itself is kept. See `docs/ears.md`.
+//! of the sound itself is kept by default. Explicit privacy-gated
+//! `LAMP_BUS_AUDIO=on` can export bounded raw mic1 blocks. See `docs/ears.md`.
 use lamp_msgs::{EARS_SILENCE_DB, RoomSound, SuddenSound};
 use std::collections::VecDeque;
 
+pub mod pcm;
 pub mod privacy;
 
 /// Samples a second.

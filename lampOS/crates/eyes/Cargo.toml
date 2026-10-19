@@ -18,6 +18,7 @@ serde.workspace = true
 serde_json.workspace = true
 lamp-bus = { path = "../bus" }
 lamp-msgs = { path = "../msgs" }
+lamp-local-time = { path = "../local-time" }
 sha2.workspace = true
 # The same pure Rust ONNX runtime as the endpoint worker.
 tract-onnx = { version = "=0.23.8", default-features = false }

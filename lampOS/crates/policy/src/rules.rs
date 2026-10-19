@@ -122,6 +122,7 @@ mod tests {
             rules: 1,
             hello: Unprompted::default(),
             news: Unprompted::default(),
+            keep_light_on: false,
         }
     }
 

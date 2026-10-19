@@ -98,6 +98,10 @@ impl Gate {
             );
             self.skipped_expired = 0;
         }
+        engine.memory_camera(
+            state.camera_allowed(MonoTime::from_micros(now_us)),
+            state.camera_generation(),
+        );
         self.last_control_us = now_us;
         if let Some(owner) = state.owner() {
             if owner.turn() <= self.retired_through || owner.turn() < self.highest_seen {
@@ -891,6 +895,9 @@ pub fn serve(
         .as_deref()
         .map(crate::known_faces::known_file_of)
         .filter(|_| socket.is_some());
+    let scope_file = who.clone();
+    let face_cache = Arc::new(crate::memory_scope::FaceCache::default());
+    let scoped_settings = tools.clone();
     let days = crate::remember::days_from_environment();
     // Told after the character with `LAMP_TASKS_ASKED=on`, as the Live route is (#854).
     let tasks = tools.tasks.clone();
@@ -959,6 +966,8 @@ pub fn serve(
     // (#1712).
     let early = search.as_ref().map(|_| Arc::new(Early::default()));
     let runner = tool_runner(tools, search.clone(), early.clone());
+    // The same calls with the admitted request's memory authority (#1794).
+    let scoped_runner = scoped_tool_runner(scoped_settings, search.clone(), early.clone());
     let system: crate::second_provider::System = Arc::new(system);
     let mut engine = Engine::new(
         Arc::new(net),
@@ -968,6 +977,7 @@ pub fn serve(
         },
         runner.clone(),
     )
+    .with_memory_scope(boot, face_cache.clone(), scoped_runner)
     .checking_sounds(checked)
     .waiting_with_a_sound(route.wait_cue)
     .saying_when_down(route.down_line)
@@ -1119,7 +1129,33 @@ pub fn serve(
         let (character, tools) = texts_from;
         runtime.spawn(texts_task(chat, character, tools, root));
     }
-    runtime.block_on(run(channels, boot, engine, thread))
+    runtime.block_on(async move {
+        // At most one filesystem read is outstanding; admission only reads the
+        // nonblocking cache. Aborting the refresh prevents any later poll.
+        let refresh = scope_file.map(|path| {
+            tokio::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_millis(200));
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                loop {
+                    interval.tick().await;
+                    let token = face_cache.begin_refresh();
+                    let path = path.clone();
+                    let observation = tokio::task::spawn_blocking(move || {
+                        crate::known_faces::FaceObservation::read(&path)
+                    })
+                    .await
+                    .ok()
+                    .flatten();
+                    face_cache.replace(token, observation);
+                }
+            })
+        });
+        let result = run(channels, boot, engine, thread).await;
+        if let Some(refresh) = refresh {
+            refresh.abort();
+        }
+        result
+    })
 }
 
 /// The second route's tool calls: a web search's functions answered by the
@@ -1133,64 +1169,104 @@ pub(crate) fn tool_runner(
     early: Option<Arc<Early>>,
 ) -> ToolRunner {
     Arc::new(move |request, heard, name, args| {
-        let settings = tools.clone();
-        let search = search.clone();
-        let early = early.clone();
-        Box::pin(async move {
-            if let Some(search) = search.filter(|search| search.answers(&name)) {
-                // The request's first search takes the one begun from its
-                // words, if any (#1712).
-                if name == crate::second_provider::net::search::NAME
-                    && let Some((begun, answer)) = early.and_then(|early| early.take(request))
-                {
-                    eprintln!(
-                        "lamp-voice second: request {request} web_search answered by the search begun {} ms before the call",
-                        begun.elapsed().as_millis()
-                    );
-                    return answer.await;
-                }
-                return search.answer(&name, &args).await;
-            }
-            let call = lamp_gemini::ToolCall {
-                id: String::new(),
-                name,
-                args,
-            };
-            tokio::task::spawn_blocking(move || {
-                use crate::tools::Route;
-                let route = crate::tools::route(&settings, &call.name);
-                // The Live route's line for a call the Policy held and then
-                // let run, which the battery counts (`followups.sh`'s "; run
-                // after N ms"): said for each call that route would hold, at
-                // 0 ms, since this route holds none (#1712: 0 tool calls were
-                // counted on it at 09:00).
-                if let Some(line) = run_after(&route, &call.name, request) {
-                    eprintln!("{line}");
-                }
-                // Something done is the lamp answering, words or none, as the
-                // Live worker counts it for the room (#829): not a lookup, and
-                // only for a line heard in the room, never a text from the
-                // app or the lamp's own turn.
-                if heard
-                    && matches!(
-                        route,
-                        Route::Executive(_)
-                            | Route::UseSkill(_)
-                            | Route::Schedule(_)
-                            | Route::Tasks(_)
-                            | Route::Faces(..)
-                            | Route::Mark(_)
-                    )
-                    && let Ok(mut room) = crate::room_told::room().lock()
-                {
-                    room.answered_by_a_call(request, monotonic_us());
-                }
-                crate::tools::answer(&settings, &call, request, heard)
-            })
-            .await
-            .unwrap_or_else(|_| crate::tools::unavailable())
-        })
+        Box::pin(run_call(
+            tools.clone(),
+            search.clone(),
+            early.clone(),
+            (request, heard),
+            name,
+            args,
+            None,
+        ))
     })
+}
+
+/// [`tool_runner`] with the admitted request's memory authority (#1794):
+/// the same search and journal lines, and the lamp's own call answered
+/// within that request's person or room (`crate::tools::answer_scoped`).
+pub(crate) fn scoped_tool_runner(
+    tools: crate::tools::Settings,
+    search: Option<Arc<Search>>,
+    early: Option<Arc<Early>>,
+) -> crate::second_provider::ScopedToolRunner {
+    Arc::new(move |request, heard, name, args, scope| {
+        Box::pin(run_call(
+            tools.clone(),
+            search.clone(),
+            early.clone(),
+            (request, heard),
+            name,
+            args,
+            Some(scope),
+        ))
+    })
+}
+
+/// One call of the model's, as both runners run it.
+async fn run_call(
+    settings: crate::tools::Settings,
+    search: Option<Arc<Search>>,
+    early: Option<Arc<Early>>,
+    (request, heard): (u64, bool),
+    name: String,
+    args: serde_json::Value,
+    scope: Option<crate::memory_scope::ScopeLease>,
+) -> serde_json::Value {
+    if let Some(search) = search.filter(|search| search.answers(&name)) {
+        // The request's first search takes the one begun from its
+        // words, if any (#1712).
+        if name == crate::second_provider::net::search::NAME
+            && let Some((begun, answer)) = early.and_then(|early| early.take(request))
+        {
+            eprintln!(
+                "lamp-voice second: request {request} web_search answered by the search begun {} ms before the call",
+                begun.elapsed().as_millis()
+            );
+            return answer.await;
+        }
+        return search.answer(&name, &args).await;
+    }
+    let call = lamp_gemini::ToolCall {
+        id: String::new(),
+        name,
+        args,
+    };
+    tokio::task::spawn_blocking(move || {
+        use crate::tools::Route;
+        let route = crate::tools::route(&settings, &call.name);
+        // The Live route's line for a call the Policy held and then
+        // let run, which the battery counts (`followups.sh`'s "; run
+        // after N ms"): said for each call that route would hold, at
+        // 0 ms, since this route holds none (#1712: 0 tool calls were
+        // counted on it at 09:00).
+        if let Some(line) = run_after(&route, &call.name, request) {
+            eprintln!("{line}");
+        }
+        // Something done is the lamp answering, words or none, as the
+        // Live worker counts it for the room (#829): not a lookup, and
+        // only for a line heard in the room, never a text from the
+        // app or the lamp's own turn.
+        if heard
+            && matches!(
+                route,
+                Route::Executive(_)
+                    | Route::UseSkill(_)
+                    | Route::Schedule(_)
+                    | Route::Tasks(_)
+                    | Route::Faces(..)
+                    | Route::Mark(_)
+            )
+            && let Ok(mut room) = crate::room_told::room().lock()
+        {
+            room.answered_by_a_call(request, monotonic_us());
+        }
+        match &scope {
+            Some(scope) => crate::tools::answer_scoped(&settings, &call, request, heard, scope),
+            None => crate::tools::answer(&settings, &call, request, heard),
+        }
+    })
+    .await
+    .unwrap_or_else(|_| crate::tools::unavailable())
 }
 
 /// The journal's line for a call the Live route would hold for the Policy

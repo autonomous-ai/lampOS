@@ -7,7 +7,8 @@ ring, working light or speakers, change a microphone's state, or select a
 voice reply. Existing actuator and Voice consumers are unchanged.
 
 The component is off unless explicitly enabled. There is no model, transcript
-classification, word storage, face history, familiarity learning or private
+classification, word storage, face history, familiarity learning (the eyes keep how often a
+remembered person comes, #1670) or private
 restart record. A restart starts from the current local time, with calm
 energy and warmth and no attention. Privacy and input/output readiness remain
 the existing owners' responsibility.
@@ -35,7 +36,10 @@ No source is treated as biological calibration.
 All scalar values are finite and bounded from 0 to 1. Awake describes the
 lamp's authored wakefulness, energy its short-lived level of activation, and
 warmth its friendly baseline. They are not estimates of a person's emotions.
-Familiarity is always `unknown`, an explicitly unavailable future slot.
+Familiarity is always `unknown`, an explicitly unavailable slot kept for v1
+readers. How familiar a remembered person at the lamp is comes from the eyes
+(`familiar`, below, #1670): Mood holds the level only for its lease and keeps
+no history of anyone.
 
 | Quantity | Rule |
 |---|---|
@@ -118,7 +122,10 @@ actuator owner still checks privacy, freshness, cancellation and safety.
 `mood`, with a one-second promised period and a 2.5-second lifespan. It carries
 `stamp` (clock identity, monotonic microseconds and positive sequence), the
 publisher's `session_id`, `awake`, `energy`, `warmth`, `asleep`, optional
-`attention`, and `familiarity: unknown`. Face attention carries only the
+`attention`, `familiarity: unknown`, and optional `familiar` (#1670): the level
+(`new`, `regular`, `close`) of the remembered person the eyes recognise at the
+lamp, from `humans/familiar`, held only for that message's five-second lease and
+dropped when the eyes say nobody remembered. No name. Face attention carries only the
 publisher's 16-character lowercase-hex boot token and a passing ID bounded
 to 128 bytes; sound and touch add no invented geometry.
 
@@ -143,7 +150,7 @@ observation. Both report whether the state changed meaningfully.
 `snapshot(now_us, sequence, session_id)` returns the checked wire state only
 at the engine's current time; it does not advance the clock. Event leases are
 half-open (`observed_us <= now_us < valid_until_us`), positive and no longer
-than 15 seconds. Each of the eleven event kinds has a strictly increasing
+than 15 seconds. Each of the twelve event kinds has a strictly increasing
 observation watermark. Future, expired, duplicate, out-of-order and pre-sleep
 observations are rejected atomically.
 
@@ -182,6 +189,7 @@ shape, age and ordering checks before the pure engine accepts an event.
 | `ears/sudden` / `SuddenSound` | `ears` | 1 s | A qualified sudden sound, with onset age included, not a known direction or a wake request. |
 | `air/state` / `AirState` | `air` | 15 s | Fresh CO2 metadata for the sustained air offset. |
 | `schedule/due` / `ScheduleDue` | `schedule` | 3 s | A user-created due-item token, not reminder text, delivery acknowledgement or speech permission. |
+| `humans/familiar` / `HumanFamiliar` | `eyes` | 5 s | The level of the remembered person recognised at the lamp, or none; no name (#1670, `lamp-eyes --visits on`). Held for its lease, never kept. |
 
 Legacy headers use a wall-clock timestamp without future grace. Typed
 `ClockStamp` values must match the host boot/clock and the current monotonic

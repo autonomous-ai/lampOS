@@ -315,6 +315,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "light-out",
             "light-scenes",
             "light-show",
+            "not-feeling-well",
             "point-light",
             "reminders",
             "stretch-break",
@@ -1544,7 +1545,7 @@ fn the_program_does_nothing_without_the_skip() {
 /// Everything the tests' own skills read and use, for the tests of other
 /// things than permissions: a skill without `[permissions]` may do nothing.
 const GRANTED: &str = "\n[permissions]\n\
-                       topics = [\"air/indoor\", \"air/state\", \"humans/faces/tracked\", \"schedule/due\", \
+                       topics = [\"air/indoor\", \"memory/rules\", \"air/state\", \"humans/faces/tracked\", \"schedule/due\", \
                        \"tasks/status\", \"voice/heard\", \"voice/state\"]\n\
                        speak = true\nlight = true\nbody = true\nlook = true\n";
 
@@ -2009,6 +2010,61 @@ fn a_not_equals_condition_holds_while_the_field_is_anything_else_for_its_time() 
          [ask]\npolicy = \"nudge\"\n[[do]]\nlight = { dim = 1 }\n",
     );
     assert!(load(&both).unwrap_err().contains("not_equals"));
+}
+
+/// #1677: `unknown = "holds"` holds while its topic has said nothing yet
+/// (a lamp without the rules), never on a value that says otherwise, and
+/// not on one that has run out; left out, a silent topic holds nothing.
+#[test]
+fn an_unknown_holds_condition_holds_only_while_its_topic_has_said_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = |unknown: &str| {
+        format!(
+            "[trigger]\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\n\
+             [[while]]\ntopic = \"memory/rules\"\nfield = \"keep_light_on\"\nnot_equals = true\n{unknown}\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nlight = {{ dim = 1 }}\n"
+        )
+    };
+    let holds = skill_with(dir.path(), "holds", &toml("unknown = \"holds\"\n"));
+    let plain = skill_with(dir.path(), "plain", &toml(""));
+    let high = r#"{"co2_ppm":1300,"feel":"stuffy"}"#;
+    // Nothing on memory/rules: only the skill asked to hold runs.
+    assert_eq!(runs_at(&holds, &[(1, "air/state", high)]).len(), 1);
+    assert!(runs_at(&plain, &[(1, "air/state", high)]).is_empty());
+    // Asked to keep the light on: neither runs; not asked: both do.
+    for (rules, runs) in [
+        (r#"{"keep_light_on":true}"#, 0),
+        (r#"{"keep_light_on":false}"#, 1),
+    ] {
+        for skill in [&holds, &plain] {
+            let messages = [(0, "memory/rules", rules), (1, "air/state", high)];
+            assert_eq!(runs_at(skill, &messages).len(), runs, "{rules}");
+        }
+    }
+    // A value that has run out is not "said nothing": it holds no more.
+    let mut engine = Engine::new(vec![load(&holds).unwrap()], true);
+    engine.observe(
+        "memory/rules",
+        0,
+        br#"{"keep_light_on":false}"#,
+        Some(1_000),
+    );
+    assert!(
+        engine
+            .observe("air/state", 5_000_000, high.as_bytes(), None)
+            .is_empty()
+    );
+    // With for or present it is refused, and anything but "holds" is.
+    for (extra, why) in [
+        (
+            "unknown = \"holds\"\nfor = \"10s\"\n",
+            "without for or present",
+        ),
+        ("unknown = \"always\"\n", "unknown is \"holds\""),
+    ] {
+        let bad = skill_with(dir.path(), "bad", &toml(extra));
+        assert!(load(&bad).unwrap_err().contains(why), "{extra}");
+    }
 }
 
 #[test]
