@@ -515,6 +515,29 @@ pub fn gemini_key(
     }
 }
 
+/// DeepSeek's key for its chat and search: the relay's credential
+/// (`llm_credential_file`) when they go through the relay
+/// (`deepseek_base_url`, #1934), else the voice unit's `deepseek.key`.
+pub fn deepseek_key(
+    config: &crate::second_config::SecondConfig,
+    credentials: Option<&std::ffi::OsStr>,
+) -> io::Result<crate::second_config::Key> {
+    use crate::second_config::{DEEPSEEK_CREDENTIAL, unit_credential};
+    match config.hosted.deepseek_base_url {
+        Some(_) => Ok(config.llm_key.clone()),
+        None => unit_credential(credentials, DEEPSEEK_CREDENTIAL),
+    }
+}
+
+/// How the journal names where DeepSeek is asked: never a URL.
+fn deepseek_where(hosted: &crate::second_config::Hosted) -> &'static str {
+    if hosted.deepseek_base_url.is_some() {
+        "through the relay with its credential (deepseek_base_url, LAMP_SECOND_DEEPSEEK_BASE_URL)"
+    } else {
+        "on DeepSeek's own API"
+    }
+}
+
 /// The real services as `route` sets them: the configured chat and voice,
 /// or Gemini's, OpenRouter's or DeepSeek's in their place, each saying so in
 /// the journal once. OpenRouter's and DeepSeek's keys are the voice unit's
@@ -526,8 +549,11 @@ pub fn services(
     credentials: Option<&std::ffi::OsStr>,
     declare: super::net::Declare,
 ) -> io::Result<Net> {
-    use crate::second_config::{DEEPSEEK_CREDENTIAL, OPENROUTER_CREDENTIAL, unit_credential};
+    use crate::second_config::{OPENROUTER_CREDENTIAL, unit_credential};
     let gemini = config.gemini.clone();
+    let deepseek = (route.chat == Some(ChatRoute::DeepSeek))
+        .then(|| deepseek_key(&config, credentials))
+        .transpose()?;
     let hosted = config.hosted.clone();
     // The lamp's one voice (#1712). A provider chosen over the configured
     // one takes its own default voice: a configured voice's name is that
@@ -584,13 +610,15 @@ pub fn services(
             );
         }
         Some(ChatRoute::DeepSeek) => {
-            let key = unit_credential(credentials, DEEPSEEK_CREDENTIAL)?;
-            net = net
-                .chatting_with_deepseek(key.expose())
-                .map_err(io::Error::other)?;
+            if let Some(key) = &deepseek {
+                net = net
+                    .chatting_with_deepseek(key.expose())
+                    .map_err(io::Error::other)?;
+            }
             eprintln!(
-                "lamp-voice second: the text model is DeepSeek's {} on DeepSeek's own API, thinking off (LAMP_SECOND_CHAT=deepseek)",
-                hosted.deepseek_model
+                "lamp-voice second: the text model is DeepSeek's {} {}, thinking off (LAMP_SECOND_CHAT=deepseek)",
+                hosted.deepseek_model,
+                deepseek_where(&hosted)
             );
         }
     }
@@ -642,12 +670,20 @@ pub fn search_for(
     route: RouteFlags,
     credentials: Option<&std::ffi::OsStr>,
 ) -> io::Result<Option<Search>> {
-    use crate::second_config::{DEEPSEEK_CREDENTIAL, unit_credential};
     let search = match route.search {
         None | Some(SearchRoute::OpenRouter) => return Ok(None),
         Some(SearchRoute::DeepSeek) => {
-            let key = unit_credential(credentials, DEEPSEEK_CREDENTIAL)?;
-            Search::deepseek(key.expose())
+            let key = deepseek_key(config, credentials)?;
+            let base = config
+                .hosted
+                .deepseek_base_url
+                .as_deref()
+                .unwrap_or(crate::second_config::DEEPSEEK_BASE_URL);
+            eprintln!(
+                "lamp-voice second: DeepSeek's search {}",
+                deepseek_where(&config.hosted)
+            );
+            Search::deepseek_at(base, key.expose())
         }
         Some(SearchRoute::Exa) => {
             let service = config.search.as_ref().ok_or_else(|| {
@@ -4868,6 +4904,138 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #1934: with `deepseek_base_url`, DeepSeek's chat and search go to the
+    /// relay with the relay's credential (`llm_credential_file`), and a lamp
+    /// with no `deepseek.key`, nor any unit credential at all, runs. The
+    /// chat's request is DeepSeek's (`/chat/completions`, thinking off),
+    /// the search's DeepSeek's (`/v1/tools/search`), each with the relay
+    /// key as its bearer.
+    #[tokio::test]
+    async fn through_the_relay_deepseek_takes_the_relay_key_and_needs_no_deepseek_key() {
+        use super::super::services::Services;
+        use super::{ChatRoute, RouteFlags, SearchRoute};
+        use futures_util::StreamExt;
+        use std::os::unix::fs::PermissionsExt;
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-second-relay-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let private = |path: std::path::PathBuf, text: &str| {
+            std::fs::write(&path, text).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            path
+        };
+        let llm = private(dir.join("llm.key"), "relay-key");
+        let second = private(
+            dir.join("second.json"),
+            &format!(
+                r#"{{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"{}","deepseek_base_url":"https://relay.example.invalid/deepseek"}}"#,
+                llm.display()
+            ),
+        );
+        let loaded = crate::second_config::load_from_path(&second).unwrap();
+        assert_eq!(
+            loaded.hosted.deepseek_base_url.as_deref(),
+            Some("https://relay.example.invalid/deepseek")
+        );
+        assert_eq!(
+            super::deepseek_key(&loaded, None).unwrap().expose(),
+            "relay-key"
+        );
+        // A local server stands in for the relay: each request's first line,
+        // its bearer and its body.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let mut seen = Vec::new();
+            for answer in [
+                "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\ndata: {\"choices\":[{\"delta\":{\"content\":\"Hi.\"}}]}\n\ndata: [DONE]\n\n",
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\nconnection: close\r\ncontent-length: 14\r\n\r\n{\"results\":[]}",
+            ] {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut request = Vec::new();
+                let mut buffer = [0; 65_536];
+                loop {
+                    let n = socket.read(&mut buffer).await.unwrap();
+                    request.extend_from_slice(&buffer[..n]);
+                    let text = String::from_utf8_lossy(&request).to_string();
+                    if let Some((head, body)) = text.split_once("\r\n\r\n") {
+                        let length: usize = head
+                            .lines()
+                            .find_map(|line| {
+                                line.to_lowercase()
+                                    .strip_prefix("content-length: ")
+                                    .map(|n| n.trim().parse().unwrap())
+                            })
+                            .unwrap_or(0);
+                        if body.len() >= length {
+                            break;
+                        }
+                    }
+                }
+                seen.push(String::from_utf8(request).unwrap());
+                socket.write_all(answer.as_bytes()).await.unwrap();
+            }
+            seen
+        });
+        let mut config = loaded;
+        config.hosted.deepseek_base_url = Some(format!("http://{address}/deepseek"));
+        let provider: crate::config::ProviderConfig = serde_json::from_str(&format!(
+            r#"{{"endpoint":"wss://relay.example.invalid/ws","model":"m","voice":"Kore","credential_file":"{}"}}"#,
+            llm.display()
+        ))
+        .unwrap();
+        let none: super::super::net::Declare = std::sync::Arc::new(Vec::new);
+        let chat_route = RouteFlags {
+            chat: Some(ChatRoute::DeepSeek),
+            ..RouteFlags::default()
+        };
+        // No unit credentials at all: no deepseek.key is asked for.
+        let net = super::services(config.clone(), &provider, chat_route, None, none).unwrap();
+        let events: Vec<_> = net
+            .chat(vec![super::super::net::Message::user("hello")])
+            .collect()
+            .await;
+        assert!(events.iter().all(Result::is_ok), "{events:?}");
+        let search_route = RouteFlags {
+            search: Some(SearchRoute::DeepSeek),
+            ..RouteFlags::default()
+        };
+        let search = super::search_for(&config, search_route, None)
+            .unwrap()
+            .unwrap();
+        search
+            .answer(
+                super::super::net::search::NAME,
+                &serde_json::json!({"query": "rain in Hanoi"}),
+            )
+            .await;
+        let seen = server.await.unwrap();
+        let chat = seen[0].to_lowercase();
+        assert!(
+            chat.starts_with("post /deepseek/chat/completions http/1.1"),
+            "{chat}"
+        );
+        assert!(chat.contains("authorization: bearer relay-key"));
+        assert!(chat.contains(r#""thinking":{"type":"disabled"}"#));
+        let searched = seen[1].to_lowercase();
+        assert!(
+            searched.starts_with("post /deepseek/v1/tools/search http/1.1"),
+            "{searched}"
+        );
+        assert!(searched.contains("authorization: bearer relay-key"));
+        // Without a base URL, DeepSeek's own API still needs deepseek.key.
+        let mut own = config;
+        own.hosted.deepseek_base_url = None;
+        let error = super::deepseek_key(&own, None).err().unwrap().to_string();
+        assert!(error.contains("CREDENTIALS_DIRECTORY"), "{error}");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
