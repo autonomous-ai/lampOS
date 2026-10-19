@@ -12,9 +12,28 @@ trap 'rm -rf "$T"' EXIT
 cat >"$T/lamp" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' "$1" >>"$FAKE/calls"
+echo $$ >"$FAKE/ssh.pid"
 [[ $1 == *FAILME* ]] && exit 1
 [[ $1 == *PROOF* ]] && echo "PROOF-OUT"
 [[ $1 == *SLOW* ]] && sleep 5
+# trials.sh's check at the start: there unless $FAKE/no-trials.
+[[ $1 == "test -x "* ]] && { [[ -e $FAKE/no-trials ]] && exit 1; exit 0; }
+# A trial that keeps running on the lamp after its ssh is killed, as on
+# lamp-4ace at 03:29 (#2034): a process of its own, ended only by TERM, its
+# trap putting back.
+if [[ $1 == "sudo "*trials.sh* && -e $FAKE/trial-hangs ]]; then
+  ( trap 'echo "trial put back" >>"$FAKE/calls"; rm -f "$FAKE/trial.pid"; exit 130' TERM
+    while :; do sleep 0.1; done ) &
+  echo $! >"$FAKE/trial.pid"
+  wait
+  exit 130
+fi
+# The tool's end of a trial: TERM to it, then wait for it to be gone.
+if [[ $1 == *"pkill -TERM -f"* ]]; then
+  [[ -e $FAKE/trial.pid ]] && kill -TERM "$(cat "$FAKE/trial.pid")" 2>/dev/null
+  for _ in $(seq 1 50); do [[ -e $FAKE/trial.pid ]] || exit 0; sleep 0.1; done
+  exit 1
+fi
 exit 0
 EOF
 chmod +x "$T/lamp"
@@ -227,6 +246,37 @@ EOF
 reset
 printf '\n\ny\n' | ARM_ROWS_FILE=$T/rows5 "$SCRIPT" >"$T/out" 2>&1; check "a Mac put-back" 0 $?
 [[ $(cat "$T/calls" | tr '\n' ',') == "mac-step,mac-back,lamp back," ]] && ok || bad "a Mac put-back: $(cat "$T/calls" | tr '\n' ',')"
+
+# trials.sh missing on the lamp: said at the start, before any row.
+reset
+touch "$T/no-trials"
+run "\n" --only 5; check "no trials.sh on the lamp" 2 $?
+rm -f "$T/no-trials"
+has "how to get it there said" "$T/out" "copy the morning build's lampOS/tools/trials.sh"
+hasnt "no row started" "$T/out" "Row 5: "
+# A row without a trial needs none: no check.
+reset
+touch "$T/no-trials"
+run "s\n" --only 1; check "a row without a trial, no trials.sh" 0 $?
+rm -f "$T/no-trials"
+
+# ^C in a trial (#2034's P2): the trial is ended on the lamp, its own trap
+# puts back, and only then "Stopped".
+reset
+touch "$T/trial-hangs"
+( printf '\n'; sleep 30 ) | "$SCRIPT" --only 5 >"$T/out" 2>&1 &
+pid=$!
+for _ in $(seq 1 100); do [[ -e $T/trial.pid ]] && break; sleep 0.1; done
+# ^C reaches the whole foreground group: the tool and its ssh.
+kill -TERM $pid "$(cat "$T/ssh.pid")" 2>/dev/null
+for _ in $(seq 1 100); do grep -q "Stopped at row" "$T/out" 2>/dev/null && break; sleep 0.1; done
+kill $pid 2>/dev/null; wait $pid 2>/dev/null
+rm -f "$T/trial-hangs"
+has "the tool ended the trial on the lamp" "$T/calls" "pkill -TERM -f '[t]rials\.sh '"
+has "the trial's own put-back ran" "$T/calls" "trial put back"
+has "the trial's end said" "$T/out" "the trial has ended"
+order "$T/out" "the trial has ended" "Stopped at row 5" && ok || bad "Stopped said before the trial had ended"
+[[ ! -e $T/trial.pid ]] && ok || { bad "the trial still runs"; kill "$(cat "$T/trial.pid")" 2>/dev/null; }
 
 # Stopped (TERM) in the middle of a step: put back.
 reset

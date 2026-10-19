@@ -18,14 +18,20 @@
 #     line for the person to say, a wait;
 #  5. shows its proof, and asks whether it passed (y, n, or a few words);
 #  6. puts the lamp back before the next row starts: on a pass, a fail, a
-#     failed step, q or ^C.
+#     failed step, q or ^C. A trials.sh row that is stopped is ended on the
+#     lamp itself (TERM to trials.sh, whose own trap puts it back), and the
+#     tool waits for it to be gone before it says "Stopped": a killed ssh
+#     alone leaves it running there (the first builder, #2034, 03:29).
 # What was asked and answered goes to a log, one line a row, to post from.
 #
 # Settings:
 #   ARM_LAMP    a command that runs its one argument, a shell string, on the
 #               lamp (the builder's own lamp.sh); needed unless --dry. This
 #               script holds no address and no credential.
-#   ARM_TRIALS  trials.sh's path on the lamp (/home/orangepi/lampos-tools/trials.sh)
+#   ARM_TRIALS  trials.sh's path on the lamp (/home/orangepi/lampos-tools/trials.sh):
+#               the morning build's lampOS/tools/trials.sh, with its lampOS/skills
+#               beside it, copied there before the hour. Checked at the start
+#               when a row to run has a trial.
 #   ARM_LOG     where the log goes (./arm-hour-YYYYmmdd-HHMM.log)
 #   ARM_LAMP_HOST  the lamp for a file copied from the Mac, as scp takes it
 #               (orangepi@lamp-4ace.local)
@@ -105,8 +111,8 @@ row | 9 | Faces from a photo, confirmed at the lamp | still | 5 min
 do | A consenting person's photo is added while they are out of view; then they sit facing the lamp and answer "Yes, remember me."
 watch | The lamp asks once, by the name chosen, and keeps them.
 sheet | #1968, Ten, 19 Oct 20:04Z (the photo is copied from the Mac: by hand)
-proof | printf '{"list":true}\n' | nc -UN /run/lampos-eyes/who.sock
-proof | printf '{"who":true}\n' | nc -UN /run/lampos-eyes/who.sock
+proof | python3 -c 'import socket;s=socket.socket(socket.AF_UNIX);s.settimeout(10);s.connect("/run/lampos-eyes/who.sock");s.sendall(b"{\"list\":true}\n");print(s.makefile().readline().strip())'
+proof | python3 -c 'import socket;s=socket.socket(socket.AF_UNIX);s.settimeout(10);s.connect("/run/lampos-eyes/who.sock");s.sendall(b"{\"who\":true}\n");print(s.makefile().readline().strip())'
 end
 row | 10 | The first five minutes | moves | 10 min
 do | A fresh setup: a new person meets the lamp for its first five minutes.
@@ -258,7 +264,26 @@ EOF
   return 0
 }
 
+# A trial still running on the lamp: ended there (TERM, so its trap puts the
+# lamp back), and waited for, up to 60 s. The pattern's [t] keeps it from
+# matching the shell that runs it.
+TRIAL_RUNNING=0
+end_trial() {
+  [[ $TRIAL_RUNNING == 1 ]] || return 0
+  say_ "  ending the trial on the lamp (its own put-back runs)"
+  if on_lamp "sudo pkill -TERM -f '[t]rials\.sh ' ; for i in \$(seq 1 60); do pgrep -f '[t]rials\.sh ' >/dev/null || exit 0; sleep 1; done; exit 1"; then
+    say_ "  the trial has ended"
+    log "row $ROW trial ended on the lamp"
+  else
+    say_ "  THE TRIAL IS STILL RUNNING ON THE LAMP: keep hands clear and end it there"
+    log "row $ROW trial still running after 60 s"
+  fi
+  TRIAL_RUNNING=0
+}
+
 stop() {
+  trap '' INT TERM
+  end_trial
   put_back
   say_ ""
   say_ "Stopped at row $ROW. The log: $LOG"
@@ -316,7 +341,12 @@ run_row() { # N
     case $kind in
       lamp) say_ "  lamp: $value"; on_lamp "$value" || failed=1 ;;
       mac) say_ "  mac: $value"; bash -c "$value" </dev/null || failed=1 ;;
-      trial) say_ "  trial: trials.sh $value"; on_lamp "sudo $TRIALS $value" || failed=1 ;;
+      trial)
+        say_ "  trial: trials.sh $value"
+        TRIAL_RUNNING=1
+        on_lamp "sudo $TRIALS $value" || failed=1
+        TRIAL_RUNNING=0
+        ;;
       say)
         answer=$(ask "  SAY: \"$value\"  (Enter once said, q to stop)")
         [[ $answer == q ]] && stop
@@ -367,6 +397,17 @@ done
 if [[ $DRY == 0 ]]; then
   [[ -n ${ARM_LAMP:-} ]] || { echo "ARM_LAMP: the command that runs a shell string on the lamp" >&2; exit 2; }
   trap 'say_ ""; stop' INT TERM
+  for n in $(row_numbers); do
+    [[ -n $ONLY && $n != "$ONLY" ]] && continue
+    [[ $n -lt $FROM ]] && continue
+    if row_lines "$n" | grep -q '^trial *|'; then
+      if ! on_lamp "test -x $TRIALS" >/dev/null 2>&1; then
+        echo "No trials.sh at $TRIALS on the lamp: copy the morning build's lampOS/tools/trials.sh (and lampOS/skills beside it) there, or set ARM_TRIALS to where it is." >&2
+        exit 2
+      fi
+      break
+    fi
+  done
   log "arm hour began, ARM_LAMP=$ARM_LAMP"
 fi
 ROW=0
