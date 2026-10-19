@@ -22,8 +22,8 @@ use crate::{
 };
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_msgs::{
-    Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, Level, RoomActivity, RoomPresence,
-    Speech, StoodUp,
+    Diagnostic, Face, Faces, FamiliarLevel, HumanFamiliar, HumanSeems, Level, RoomActivity,
+    RoomPresence, Speech, StoodUp,
 };
 use std::{io, time::Duration};
 
@@ -217,6 +217,9 @@ pub struct BusOut {
     /// With `lamp-eyes --visits on`: how familiar the remembered person at
     /// the lamp is (#1670).
     familiar: Option<Publisher>,
+    /// With `lamp-eyes --seems`: how the person at the lamp seems from
+    /// their face (#1671).
+    seems: Option<Publisher>,
     /// With `LAMP_ACTIVITY=on`: what the person at the desk is doing.
     activity: Option<ActivityOut>,
 }
@@ -241,8 +244,9 @@ impl BusOut {
     /// The publisher, if the environment says `on` and the bus can be used.
     /// A bus that cannot is said once and the eyes go on without. With
     /// `familiar` (`--visits on`), how familiar the remembered person at the
-    /// lamp is is said too (#1670).
-    pub fn from_environment(familiar: bool) -> Option<Self> {
+    /// lamp is is said too (#1670), and with `seems` (`--seems`), how the
+    /// person at the lamp seems from their face (#1671).
+    pub fn from_environment(familiar: bool, seems: bool) -> Option<Self> {
         if std::env::var(ENVIRONMENT).ok().as_deref() != Some("on") {
             return None;
         }
@@ -271,6 +275,9 @@ impl BusOut {
         {
             eprintln!("lamp-eyes: what the person at the desk is doing is not said: {error}");
         }
+        if seems && let Err(error) = out.say_seems(&bus) {
+            eprintln!("lamp-eyes: how the person at the lamp seems is not said: {error}");
+        }
         Some(out)
     }
 
@@ -291,6 +298,7 @@ impl BusOut {
             presence: None,
             familiar: None,
             activity: None,
+            seems: None,
         })
     }
 
@@ -341,6 +349,24 @@ impl BusOut {
     pub fn familiar(&mut self, level: Option<FamiliarLevel>, now_us: u64) {
         if let Some(out) = self.familiar.as_mut() {
             let _ = out.publish_json(now_us, &HumanFamiliar { level });
+        }
+    }
+
+    /// Also say how the person at the lamp seems from their face, on
+    /// `humans/seems` (#1671).
+    pub fn say_seems(&mut self, bus: &Bus) -> io::Result<()> {
+        let mut out =
+            bus.publisher_declared(HumanSeems::TOPIC, &HumanSeems::declaration(), SOURCE)?;
+        out.expires_after(Some(HumanSeems::LASTS));
+        self.seems = Some(out);
+        Ok(())
+    }
+
+    /// At each read of the near face: how it seems, as a kind and a
+    /// confidence only. Nothing without [`Self::say_seems`].
+    pub fn seems(&mut self, read: HumanSeems, now_us: u64) {
+        if let Some(out) = self.seems.as_mut() {
+            let _ = out.publish_json(now_us, &read);
         }
     }
 
@@ -426,6 +452,7 @@ impl BusOut {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lamp_msgs::SeemsKind;
 
     /// A face of this box in a 640 by 480 picture, its nose `nose` eye
     /// distances to the right of the point between its eyes.
@@ -759,7 +786,7 @@ mod tests {
     /// size once clamped counts for nothing.
     #[test]
     fn the_journals_height_is_the_published_faces() {
-        let root = std::path::PathBuf::from(format!("/tmp/leh-{}", std::process::id()));
+        let root = std::path::PathBuf::from(format!("/tmp/lej-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         let bus = Bus::new(&root).unwrap();
@@ -896,6 +923,40 @@ mod tests {
             said.push(message.parse::<HumanFamiliar>().unwrap().level);
         }
         assert_eq!(said, [Some(FamiliarLevel::Regular), None]);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// #1671: with the face read on, each read says a kind and a
+    /// confidence, from the eyes, good for five seconds; without it,
+    /// nothing is said.
+    #[test]
+    fn how_the_person_at_the_lamp_seems_is_said_only_when_switched_on() {
+        let root = std::path::PathBuf::from(format!("/tmp/les-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut hears = bus
+            .subscribe_typed(HumanSeems::TOPIC, "test", HumanSeems::TYPE)
+            .unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        let read = |kind, confidence| HumanSeems { kind, confidence };
+        out.seems(read(SeemsKind::Positive, 0.9), 1_000_000);
+        assert!(hears.recv(Duration::ZERO).unwrap().is_none());
+        out.say_seems(&bus).unwrap();
+        out.seems(read(SeemsKind::Negative, 0.7), 2_000_000);
+        out.seems(read(SeemsKind::Unsure, 0.3), 4_000_000);
+        let mut said = Vec::new();
+        while let Some(message) = hears.recv(Duration::ZERO).unwrap() {
+            assert_eq!(message.header.source, "eyes");
+            assert_eq!(message.header.expires_ms, Some(5_000));
+            let text = String::from_utf8_lossy(&message.payload).into_owned();
+            assert_eq!(text.matches(':').count(), 2, "{text}");
+            said.push(message.parse::<HumanSeems>().unwrap());
+        }
+        assert_eq!(
+            said,
+            [read(SeemsKind::Negative, 0.7), read(SeemsKind::Unsure, 0.3)]
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 }

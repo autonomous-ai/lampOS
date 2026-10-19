@@ -31,6 +31,7 @@ pub mod kept;
 pub mod mesh;
 pub mod permit;
 pub mod picture;
+pub mod seems;
 pub mod sight;
 pub mod speaking;
 pub mod steady;
