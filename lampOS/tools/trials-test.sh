@@ -375,7 +375,9 @@ reset
 rm -rf "$T/memory"; mkdir -p "$T/memory/private"
 echo "theirs" >"$T/memory/private/days.json"
 chmod 0500 "$T/memory/private"
-(sleep 1; for d in "$T/run"/lampos-trial-*; do stat -f '%Lp' "$d" 2>/dev/null || stat -c '%a' "$d"; done >"$T/aside-mode") &
+# The folder's mode, read once it is there, whatever the setup took.
+(for _ in $(seq 1 100); do ls -d "$T/run"/lampos-trial-* >/dev/null 2>&1 && break; sleep 0.05; done
+ for d in "$T/run"/lampos-trial-*; do stat -f '%Lp' "$d" 2>/dev/null || stat -c '%a' "$d"; done >"$T/aside-mode") &
 TRIALS_SUDO=$T/bin/fake-sudo TRIALS_WAIT=2 "$SCRIPT" forget >"$T/out" 2>&1; check "forget with a folder the runner can't write" 1 $?
 wait
 [[ $(cat "$T/aside-mode" 2>/dev/null) == 700 ]] && ok || bad "the set-aside folder wasn't 0700: $(cat "$T/aside-mode" 2>/dev/null)"
