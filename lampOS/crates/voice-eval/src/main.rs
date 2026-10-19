@@ -50,9 +50,74 @@ const USAGE: &str = "usage:
   lamp-voice-eval export --since HH:MM:SS --until HH:MM:SS --out NEW_DIR [--sessions DIR]
       [--journal JOURNAL_JSON] [--bus LAMP_BUS_RECORD]... [--date YYYY-MM-DD] [--zone system|ZONE]
       [--wall-offset-us N]
+  lamp-voice-eval cost JOURNAL --prices FILE --arm NAME FROM TO... [--voice-estimate VOICE N]
+      (what each arm of a played test cost, from `journalctl -u lamp-voice`; FROM and TO are
+      HH:MM or HH:MM:SS by the lamp's clock; the prices are dollars, in a JSON file;
+      --voice-estimate prices answered lines with no voice line at N chars a completion token)
   lamp-voice-eval lamp-session --runtime LAMP_LIVE --work NEW_ABS_DIR --seconds N
       (--fixture-reply WAV --fixture-sha256 SHA | --provider-config FILE | --serve-config FILE)
       [--noise-suppression on|off] [--diagnostics] [--allowance-seconds N]";
+
+/// `cost JOURNAL --prices FILE --arm NAME FROM TO ... [--voice-estimate
+/// VOICE N]`: what each arm cost, printed (the first builder on #1722, 19
+/// Oct 21:18).
+fn cost(all: &[String]) -> Result<i32> {
+    let (journal, mut rest) = all.split_first().ok_or_else(|| invalid(USAGE))?;
+    let mut arms = Vec::new();
+    let mut prices = None;
+    let mut estimate = None;
+    loop {
+        match rest {
+            [flag, voice, per_token, more @ ..] if flag == "--voice-estimate" => {
+                let chars_per_token = per_token
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|n| n.is_finite() && *n > 0.0)
+                    .ok_or_else(|| {
+                        invalid(&format!("--voice-estimate {voice} {per_token:?}: no number of characters above 0"))
+                    })?;
+                estimate = Some(lamp_voice_eval::cost::VoiceEstimate {
+                    voice: voice.clone(),
+                    chars_per_token,
+                });
+                rest = more;
+            }
+            [flag, name, from, to, more @ ..] if flag == "--arm" => {
+                arms.push(
+                    lamp_voice_eval::cost::Arm::parse(name, from, to)
+                        .map_err(|why| invalid(&why))?,
+                );
+                rest = more;
+            }
+            [flag, file, more @ ..] if flag == "--prices" => {
+                let text =
+                    std::fs::read(file).map_err(|error| invalid(&format!("{file}: {error}")))?;
+                prices = Some(
+                    serde_json::from_slice::<lamp_voice_eval::cost::Prices>(&text)
+                        .map_err(|error| invalid(&format!("{file}: {error}")))?,
+                );
+                rest = more;
+            }
+            [] => break,
+            _ => return Err(invalid(USAGE)),
+        }
+    }
+    let prices =
+        prices.ok_or_else(|| invalid("cost needs --prices FILE: no price is in the code"))?;
+    if arms.is_empty() {
+        return Err(invalid(USAGE));
+    }
+    let text = std::fs::read(journal).map_err(|error| invalid(&format!("{journal}: {error}")))?;
+    let table = lamp_voice_eval::cost::cost(
+        &String::from_utf8_lossy(&text),
+        &arms,
+        &prices,
+        estimate.as_ref(),
+    )
+    .map_err(|why| invalid(&why))?;
+    print!("{table}");
+    Ok(0)
+}
 
 fn main() {
     match run() {
@@ -199,6 +264,7 @@ fn run() -> Result<i32> {
         "fake-clock-slow-transport" => return fixture_commands::slow_transport(all),
         "fake-room-recorder" => return fake_lamp::room_recorder(&all),
         "fake-slow-transport" => return fake_lamp::slow_transport(&all),
+        "cost" => return cost(&all),
         _ => {}
     }
     let mut args = Args { values: all };
