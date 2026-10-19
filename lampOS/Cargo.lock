@@ -1772,6 +1772,7 @@ dependencies = [
 name = "lamp-cloud"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "bytes",
  "lamp-bus",
  "lamp-ipc",
@@ -1869,6 +1870,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "tokio-tungstenite",
 ]
@@ -2113,6 +2115,7 @@ dependencies = [
  "lamp-local-time",
  "lamp-msgs",
  "lamp-ring",
+ "lamp-update",
  "rustix",
  "rustls",
  "serde",
@@ -2273,6 +2276,7 @@ dependencies = [
  "futures-util",
  "gpiocdev",
  "hound",
+ "hyper-util",
  "lamp-actions",
  "lamp-audio",
  "lamp-body",
@@ -2308,6 +2312,7 @@ dependencies = [
  "thread-priority",
  "tokio",
  "tokio-tungstenite",
+ "toml",
  "webpki-roots 1.0.9",
 ]
 
@@ -2320,6 +2325,7 @@ dependencies = [
  "lamp-expression",
  "lamp-ipc",
  "lamp-local-time",
+ "lamp-memory",
  "lamp-msgs",
  "lamp-observer",
  "lamp-policy",

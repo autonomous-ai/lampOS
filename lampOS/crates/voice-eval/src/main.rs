@@ -13,7 +13,7 @@ use lamp_voice_eval::{
             FakePlayerFault, FakePreparedRoomPlayer, HumanPrompter, LampMode, ObserverPlayer,
             PhysicalBackend, PhysicalConfig, Player,
         },
-        session::{self, RuntimeFlags, SessionOptions},
+        session::{self, RuntimeFlags, SessionOptions, VoiceRoute},
     },
     plan::{LoadedPlan, SERVE_PLAN},
     record::{AttemptRecord, StimulusSource},
@@ -22,6 +22,8 @@ use lamp_voice_eval::{
     stimulus::{AssetIndex, StimulusCatalog},
 };
 use serde::Deserialize;
+
+mod observe_dry;
 use serde_json::{Value, json};
 use std::{
     collections::BTreeSet,
@@ -31,6 +33,8 @@ use std::{
 };
 
 const USAGE: &str = "usage:
+  lamp-voice-eval observe-dry --store FILE --out NEW_DIR --key-file FILE [--base URL] [--model NAME]
+      [--gap-seconds N] [--limit N]
   lamp-voice-eval list | validate | self-test [--plan FILE]
   lamp-voice-eval fake-run --out NEW_DIR [--profile ID] [--scenario ID]... [--repetitions N]
       [--seed N] [--no-shuffle] [--attempt-seed N] [--cache DIR --manifest FILE...] [--plan FILE]
@@ -53,9 +57,81 @@ const USAGE: &str = "usage:
   lamp-voice-eval waiting-cuts [--since 'YYYY-MM-DD HH:MM[:SS]'] [--until ...] [--sessions DIR] [--json]
       < journal (`journalctl -u lamp-voice -o short-iso`); --since/--until filter its own stamps;
       the counts need the session records too (DIR, default /var/lib/lampOS/voice/sessions, root's)
+  lamp-voice-eval cost JOURNAL --prices FILE --arm NAME FROM TO... [--voice-estimate VOICE N]
+      (what each arm of a played test cost, from `journalctl -u lamp-voice`; FROM and TO are
+      HH:MM or HH:MM:SS by the lamp's clock; the prices are dollars, in a JSON file;
+      --voice-estimate prices answered lines with no voice line at N chars a completion token)
   lamp-voice-eval lamp-session --runtime LAMP_LIVE --work NEW_ABS_DIR --seconds N
       (--fixture-reply WAV --fixture-sha256 SHA | --provider-config FILE | --serve-config FILE)
-      [--noise-suppression on|off] [--diagnostics] [--allowance-seconds N]";
+      [--noise-suppression on|off] [--diagnostics] [--allowance-seconds N]
+  lamp-voice-eval score JOURNAL --arm NAME FROM TO [--arm NAME FROM TO]...
+      [--scenes DIR --date YYYY-MM-DD --utc-offset +HH:MM]
+      (JOURNAL is `journalctl -u lamp-voice` text of the run alone; FROM and TO are
+      HH:MM or HH:MM:SS by the lamp's clock; DIR holds the played test's scene files
+      and battery summaries; YYYY-MM-DD is the day the first arm begins)
+  lamp-voice-eval mood-minute DIR
+      the numbers of Mood's lamp minute from the taps tools/mood-minute.sh wrote in DIR";
+
+/// `cost JOURNAL --prices FILE --arm NAME FROM TO ... [--voice-estimate
+/// VOICE N]`: what each arm cost, printed (the first builder on #1722, 19
+/// Oct 21:18).
+fn cost(all: &[String]) -> Result<i32> {
+    let (journal, mut rest) = all.split_first().ok_or_else(|| invalid(USAGE))?;
+    let mut arms = Vec::new();
+    let mut prices = None;
+    let mut estimate = None;
+    loop {
+        match rest {
+            [flag, voice, per_token, more @ ..] if flag == "--voice-estimate" => {
+                let chars_per_token = per_token
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|n| n.is_finite() && *n > 0.0)
+                    .ok_or_else(|| {
+                        invalid(&format!("--voice-estimate {voice} {per_token:?}: no number of characters above 0"))
+                    })?;
+                estimate = Some(lamp_voice_eval::cost::VoiceEstimate {
+                    voice: voice.clone(),
+                    chars_per_token,
+                });
+                rest = more;
+            }
+            [flag, name, from, to, more @ ..] if flag == "--arm" => {
+                arms.push(
+                    lamp_voice_eval::cost::Arm::parse(name, from, to)
+                        .map_err(|why| invalid(&why))?,
+                );
+                rest = more;
+            }
+            [flag, file, more @ ..] if flag == "--prices" => {
+                let text =
+                    std::fs::read(file).map_err(|error| invalid(&format!("{file}: {error}")))?;
+                prices = Some(
+                    serde_json::from_slice::<lamp_voice_eval::cost::Prices>(&text)
+                        .map_err(|error| invalid(&format!("{file}: {error}")))?,
+                );
+                rest = more;
+            }
+            [] => break,
+            _ => return Err(invalid(USAGE)),
+        }
+    }
+    let prices =
+        prices.ok_or_else(|| invalid("cost needs --prices FILE: no price is in the code"))?;
+    if arms.is_empty() {
+        return Err(invalid(USAGE));
+    }
+    let text = std::fs::read(journal).map_err(|error| invalid(&format!("{journal}: {error}")))?;
+    let table = lamp_voice_eval::cost::cost(
+        &String::from_utf8_lossy(&text),
+        &arms,
+        &prices,
+        estimate.as_ref(),
+    )
+    .map_err(|why| invalid(&why))?;
+    print!("{table}");
+    Ok(0)
+}
 
 fn main() {
     match run() {
@@ -181,6 +257,113 @@ fn assets(args: &mut Args, catalog: &StimulusCatalog) -> Result<Option<AssetInde
     }
 }
 
+/// `+HH:MM` or `-HH:MM` as seconds east of UTC.
+fn utc_offset(value: &str) -> Option<i32> {
+    let (sign, rest) = match value.as_bytes().first()? {
+        b'+' => (1, &value[1..]),
+        b'-' => (-1, &value[1..]),
+        _ => return None,
+    };
+    let (hours, minutes) = rest.split_once(':')?;
+    let hours: i32 = hours.parse().ok().filter(|h| (0..=14).contains(h))?;
+    let minutes: i32 = minutes.parse().ok().filter(|m| (0..60).contains(m))?;
+    Some(sign * (hours * 3600 + minutes * 60))
+}
+
+/// An I/O error naming the path it was about (Jarvis on #1899).
+fn named(path: &Path) -> impl FnOnce(std::io::Error) -> Box<dyn std::error::Error + Send + Sync> {
+    let path = path.display().to_string();
+    move |error| invalid(&format!("{path}: {error}"))
+}
+
+/// `score JOURNAL --arm NAME FROM TO ...`: the routes' table, printed.
+fn score(all: &[String]) -> Result<i32> {
+    let (journal, rest) = all.split_first().ok_or_else(|| invalid(USAGE))?;
+    let mut arms = Vec::new();
+    let mut scenes = None;
+    let mut offset = None;
+    let mut day = None;
+    let mut rest = rest;
+    loop {
+        match rest {
+            [flag, name, from, to, more @ ..] if flag == "--arm" => {
+                arms.push(
+                    lamp_voice_eval::score::Arm::parse(name, from, to)
+                        .map_err(|why| invalid(&why))?,
+                );
+                rest = more;
+            }
+            [flag, dir, more @ ..] if flag == "--scenes" => {
+                scenes = Some(PathBuf::from(dir));
+                rest = more;
+            }
+            [flag, value, more @ ..] if flag == "--date" => {
+                day = Some(
+                    lamp_voice_eval::score::day(value)
+                        .ok_or_else(|| invalid("--date is YYYY-MM-DD"))?,
+                );
+                rest = more;
+            }
+            [flag, value, more @ ..] if flag == "--utc-offset" => {
+                offset = Some(
+                    utc_offset(value).ok_or_else(|| invalid("--utc-offset is +HH:MM or -HH:MM"))?,
+                );
+                rest = more;
+            }
+            [] => break,
+            _ => return Err(invalid(USAGE)),
+        }
+    }
+    if arms.is_empty() {
+        return Err(invalid(USAGE));
+    }
+    // Every scene folder holds earlier days' files (Jarvis on #1899).
+    if scenes.is_some() && day.is_none() {
+        return Err(invalid(
+            "--scenes needs --date YYYY-MM-DD, the day the first arm begins by the lamp's clock",
+        ));
+    }
+    // A scene's start is UTC and a battery's day is its file's: with no
+    // offset both fall on the wrong day, and none in an arm.
+    if scenes.is_some() && offset.is_none() {
+        return Err(invalid(
+            "--scenes needs --utc-offset +HH:MM, the lamp's zone (+07:00 for lamp-4ace)",
+        ));
+    }
+    let offset = offset.unwrap_or(0);
+    let mut files = lamp_voice_eval::score::Files {
+        offset,
+        day,
+        ..Default::default()
+    };
+    if let Some(dir) = scenes {
+        for entry in std::fs::read_dir(&dir).map_err(named(&dir))? {
+            let path = entry.map_err(named(&dir))?.path();
+            if path.extension().is_none_or(|extension| extension != "txt") {
+                continue;
+            }
+            let text =
+                String::from_utf8_lossy(&std::fs::read(&path).map_err(named(&path))?).into_owned();
+            if text.starts_with("scenario ") {
+                files.scenes.push(text);
+            } else if text.starts_with("battery ") {
+                let written = std::fs::metadata(&path)
+                    .and_then(|metadata| metadata.modified())
+                    .ok()
+                    .and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok())
+                    .and_then(|at| i64::try_from(at.as_secs()).ok());
+                files.batteries.push((text, written));
+            }
+        }
+    }
+    let text = std::fs::read(journal).map_err(named(Path::new(journal)))?;
+    print!(
+        "{}",
+        lamp_voice_eval::score::score_with(&String::from_utf8_lossy(&text), &arms, &files)
+    );
+    Ok(0)
+}
+
 fn run() -> Result<i32> {
     let mut all: Vec<String> = std::env::args().skip(1).collect();
     if all.is_empty() {
@@ -193,6 +376,7 @@ fn run() -> Result<i32> {
             let stdout = std::io::stdout();
             return session::run(&options, std::io::stdin(), &mut stdout.lock());
         }
+        "observe-dry" => return observe_dry::run(&all),
         "fake-lamp-voice" => return fake_lamp::run(&all),
         "fake-clock-lamp-voice" => return fixture_commands::runtime(all),
         "fake-clock-session" => return fixture_commands::relay(all),
@@ -202,10 +386,18 @@ fn run() -> Result<i32> {
         "fake-clock-slow-transport" => return fixture_commands::slow_transport(all),
         "fake-room-recorder" => return fake_lamp::room_recorder(&all),
         "fake-slow-transport" => return fake_lamp::slow_transport(&all),
+        "cost" => return cost(&all),
+        "score" => return score(&all),
         _ => {}
     }
     let mut args = Args { values: all };
     match command.as_str() {
+        "mood-minute" => {
+            let dir = PathBuf::from(args.positional()?);
+            args.done()?;
+            lamp_voice_eval::mood_minute::run(&dir)?;
+            return Ok(0);
+        }
         "export" => {
             let options = lamp_voice_eval::export::ExportOptions {
                 since: args.take("--since")?.ok_or_else(|| invalid(USAGE))?,
@@ -772,6 +964,16 @@ struct PhysicalFile {
     /// Opt-in end-of-turn experiment (`smart-turn`); absent is the default.
     #[serde(default)]
     endpoint: Option<String>,
+    /// The voice route of a `directed` or `serve` run: "second" (the
+    /// default, the owner's 19 Oct 19:3x rule) or "live", only for a
+    /// comparison the first builder names on #1712.
+    #[serde(default)]
+    voice_route: Option<String>,
+    /// `LAMP_*` settings for the runtime's environment, copied from the
+    /// lamp's voice unit: the second route needs `LAMP_VOICE_SECOND_CONFIG`
+    /// and takes its `LAMP_SECOND_` switches from here.
+    #[serde(default)]
+    runtime_env: std::collections::BTreeMap<String, String>,
 }
 fn default_source() -> StimulusSource {
     StimulusSource::LoudspeakerSynthetic
@@ -811,6 +1013,25 @@ impl PhysicalFile {
                 self.diagnostics && self.serve_config.is_none(),
             )?;
         }
+        if self.fixture_reply.is_some() {
+            if self.voice_route.is_some() || !self.runtime_env.is_empty() {
+                return Err(invalid(
+                    "voice_route and runtime_env need provider_config or serve_config",
+                ));
+            }
+            return Ok(flags);
+        }
+        // Named in every directed or serve run, so its record says which.
+        flags.take(
+            VoiceRoute::FLAG,
+            self.voice_route
+                .as_deref()
+                .unwrap_or(VoiceRoute::Second.as_str()),
+        )?;
+        for (name, value) in &self.runtime_env {
+            flags.take("--runtime-env", &format!("{name}={value}"))?;
+        }
+        flags.validate_route()?;
         Ok(flags)
     }
     fn into_config(self) -> Result<(PhysicalConfig, Box<dyn Player>)> {

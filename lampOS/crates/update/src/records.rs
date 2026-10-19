@@ -7,7 +7,8 @@
 //!   lamp's own and is kept).
 //! - `journal.json`: a switch under way. Written before any unit is
 //!   changed and removed once the switch is over, so a switch cut short by
-//!   a stop or a power cut is put back at the next start.
+//!   a stop or a power cut is put back at the next start: the units, the
+//!   links, and the product skills' files as they were.
 //! - `previous/`: the units as they were before the last switch.
 //! - `log.jsonl`: one line for each thing done or refused.
 //! - `lock`: one lamp-update at a time.
@@ -71,6 +72,13 @@ pub struct State {
     /// tells it, though nothing else has changed.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub systemd_owed: bool,
+    /// Each model path a round linked into the store, and the SHA-256 it
+    /// names now; and as they were before the last switch. A store entry
+    /// either names is kept (#1680). Absent from a state written before.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub models: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub models_before: BTreeMap<String, String>,
 }
 
 impl State {
@@ -122,6 +130,36 @@ pub const LINK_SUFFIX: &str = ".link";
 pub struct Journal {
     pub build: Build,
     pub units: Vec<Switching>,
+    /// Each model path the switch moves, as it was (#1680): put back in
+    /// the reverse order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<crate::models::ModelBack>,
+    /// `lamp-update-apply` was asked to write the build's settings (#1680):
+    /// they are put back with the rest.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub settings: bool,
+    /// The product skills' files the switch writes, as they were before
+    /// (#2014's P2): put back with the units. Absent from a journal written
+    /// before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<SkillBack>,
+}
+
+/// A product skill's file as it was before a round wrote it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkillBack {
+    /// As the lamp names it: `/var/lib/lampOS/skills/dance/skill.toml`.
+    pub path: String,
+    /// Its text, or none: it was not there.
+    #[serde(default)]
+    pub before: Option<String>,
+    /// The SHA-256 of what the round writes: a file that no longer holds
+    /// it was changed on the lamp since, and is left.
+    pub wrote: String,
+    /// The folders made for it, the deepest first: removed again, if still
+    /// empty, when it is put back as never there.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub made: Vec<String>,
 }
 
 pub fn unix_ms() -> u64 {
@@ -137,15 +175,21 @@ pub fn write_whole(path: &Path, bytes: &[u8], mode: u32) -> io::Result<()> {
         .ok_or_else(|| io::Error::other("no file name"))?
         .to_string_lossy();
     let beside = path.with_file_name(format!(".{name}.lamp-update"));
+    // One left beside by a run cut off is removed, a link as a link, and
+    // the new one made afresh: never opened through a link or reused.
+    match fs::remove_file(&beside) {
+        Err(error) if error.kind() != io::ErrorKind::NotFound => return Err(error),
+        _ => {}
+    }
     {
         let mut file = OpenOptions::new()
             .write(true)
-            .create(true)
-            .truncate(true)
+            .create_new(true)
+            .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
             .mode(mode)
             .open(&beside)?;
-        // A file left beside by a run cut off keeps its old mode when opened
-        // again: the mode is set, not only asked for at creation.
+        // The mode is set, not only asked for at creation: the umask
+        // narrows that.
         file.set_permissions(fs::Permissions::from_mode(mode))?;
         file.write_all(bytes)?;
         file.sync_all()?;
@@ -360,6 +404,26 @@ impl Records {
 
 #[cfg(test)]
 mod tests {
+    /// The temp file beside is never opened through a link left there.
+    #[test]
+    fn a_link_left_beside_is_replaced_and_never_written_through() {
+        let folder = tempfile::tempdir().unwrap();
+        let outside = folder.path().join("outside");
+        fs::write(&outside, "untouched").unwrap();
+        let path = folder.path().join("state.json");
+        std::os::unix::fs::symlink(&outside, folder.path().join(".state.json.lamp-update"))
+            .unwrap();
+        write_whole(&path, b"new", 0o600).unwrap();
+        assert_eq!(fs::read_to_string(&outside).unwrap(), "untouched");
+        assert_eq!(fs::read_to_string(&path).unwrap(), "new");
+        assert!(
+            !fs::symlink_metadata(&path)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+    }
+
     use super::*;
 
     /// A state written before `settings` was kept reads as one with none,
@@ -424,6 +488,14 @@ mod tests {
                     }),
                 },
             ],
+            skills: vec![SkillBack {
+                path: "/var/lib/lampOS/skills/dance/skill.toml".into(),
+                before: None,
+                wrote: "c".repeat(64),
+                made: vec!["/var/lib/lampOS/skills/dance".into()],
+            }],
+            models: Vec::new(),
+            settings: false,
         };
         records.save_journal(&journal).unwrap();
         assert_eq!(records.journal().unwrap(), Some(journal));

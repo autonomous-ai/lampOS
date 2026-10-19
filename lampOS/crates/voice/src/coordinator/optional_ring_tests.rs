@@ -20,6 +20,7 @@ fn fixture_with_command(directory: &SessionDirectory, command: &str) -> (Rig, Pe
     let (ring, ring_peer) = Worker::command_fixture(&directory.path, "ring", command);
     (
         Rig {
+            expression_out: None,
             second: None,
             microphone: crate::options::Microphone::Mic2,
             end_silence_blocks: None,
@@ -750,4 +751,57 @@ fn failed_optional_ring_does_not_hide_mandatory_privacy_startup_failure() {
     );
     assert!(!ring.is_active());
     fixture.assert_reaped();
+}
+
+/// lamp-52e6, 19 Oct 21:47 (#1620): a ring that had already ended on its own
+/// mid-session (degraded, its exit observed) is seen again by the service
+/// stop's first pass, a millisecond after `service_stop_requested`. The stop
+/// still fails: nothing confirms the strip went black. Its record says the
+/// exit came before the stop, so it is not read as the stop killing the ring.
+#[test]
+fn a_ring_that_ended_mid_session_fails_the_stop_and_its_exit_is_dated_before_it() {
+    let directory = SessionDirectory::create().unwrap();
+    let (mut rig, _peers) = fixture_with_command(&directory, "exit 0");
+    let ring_directory = SessionDirectory::create().unwrap();
+    let (mut ring, _ring_peer) = Worker::command_fixture(&ring_directory.path, "ring", "exit 1");
+    crate::process::ring_startup_tests::await_exit(&mut ring);
+    rig.ring = Some(ring).into();
+    // The loop's own check finds it gone and disables it; audio goes on.
+    rig.ring.check_running();
+    assert!(!rig.ring.is_active());
+    let mut trace = SessionState::default();
+    rig.ring.poll_cleanup(&mut trace).unwrap();
+    assert!(
+        trace
+            .iter()
+            .any(|e| e["kind"] == "ring_degraded_exit" && e["success"] == false)
+    );
+    let error = rig.shutdown(&mut trace).unwrap_err().to_string();
+    assert!(error.contains("no verified black-write receipt"), "{error}");
+    assert!(error.contains("exited abnormally"), "{error}");
+    let exits: Vec<_> = trace
+        .iter()
+        .filter(|e| e["kind"] == "worker_exit_failed" && e["worker"] == "ring")
+        .collect();
+    assert_eq!(exits.len(), 1);
+    assert_eq!(exits[0]["exited_before_stop"], true, "{}", exits[0]);
+}
+
+/// The other side of the same check: a ring the voice still held live at
+/// the stop is not dated before it, however it ends.
+#[test]
+fn a_ring_live_at_the_stop_is_not_dated_before_it() {
+    let directory = SessionDirectory::create().unwrap();
+    let (mut rig, _peers) = fixture_with_command(&directory, "exit 0");
+    let ring_directory = SessionDirectory::create().unwrap();
+    let (ring, _ring_peer) = Worker::command_fixture(&ring_directory.path, "ring", "exit 1");
+    rig.ring = Some(ring).into();
+    let mut trace = SessionState::default();
+    let error = rig.shutdown(&mut trace).unwrap_err().to_string();
+    assert!(error.contains("no verified black-write receipt"), "{error}");
+    let exit = trace
+        .iter()
+        .find(|e| e["kind"] == "worker_exit_failed" && e["worker"] == "ring")
+        .expect("ring exit recorded");
+    assert_eq!(exit["exited_before_stop"], false, "{exit}");
 }

@@ -148,10 +148,14 @@ const PARTS: &[&str] = &[
     "lamp-schedule",
     "lamp-selftest",
     "lamp-setup",
+    "lamp-setup-change",
     "lamp-setup-reset",
+    "lamp-setup-wifi",
     "lamp-skills",
     "lamp-tasks",
     "lamp-update",
+    "lamp-update-apply",
+    "lamp-update-back",
     "lamp-voice",
     "lamp-waking",
 ];
@@ -1795,7 +1799,10 @@ mod tests {
             .unwrap()
             .filter_map(|entry| {
                 let name = entry.unwrap().file_name().to_string_lossy().into_owned();
-                name.strip_suffix(".service").map(str::to_owned)
+                // A template's journal tag is its name without the `@`
+                // (`lamp-setup-change@.service` says `lamp-setup-change`).
+                name.strip_suffix(".service")
+                    .map(|unit| unit.trim_end_matches('@').to_owned())
             })
             .collect();
         units.sort();

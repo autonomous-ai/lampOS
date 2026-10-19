@@ -115,6 +115,7 @@ fn wiring() -> TouchPinsConfig {
         head_qualify_ms: None,
         head_tap_min_ms: None,
         head_gap_ms: None,
+        head_rest: None,
         legacy_head: false,
     }
 }

@@ -76,6 +76,16 @@ who came and went while the eyes were shut is not known. A gap of under 5 s
 
 **Readers.**
 - Light out when you leave: `nobody_s` above 599, below.
+- Who was here (`skills/who-was-here`, #1685), an installable skill: when
+  a person asks "was anyone here while I was out?", the model is told the
+  spells someone was at the lamp over the last 12 hours, and when the lamp
+  could not tell (a gap past a value's 3 s), each with its length and how
+  long ago (`crates/skills/src/visits.rs`, `[history]` in
+  [skills.md](skills.md)). Times only, in `lamp-skills`' memory, a day at
+  most, lost at a restart; a spell ends where `nobody_s` says the last face
+  or voice was. A spell in which no value's `by` said a face, only a voice,
+  is told as someone heard near the lamp, not seen (a passer-by, or someone
+  out of view); a value with no `by` (an older eyes') counts as a face.
 - Messages (#1673): "nobody for 5 minutes" is `someone` false and
   `nobody_s` at least 300, on a value that has not run out.
 

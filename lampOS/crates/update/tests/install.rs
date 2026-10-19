@@ -262,6 +262,10 @@ impl Lamp {
             files_url: CHANNEL.into(),
             files,
             units: Vec::new(),
+            min_updater: None,
+            models: Vec::new(),
+            settings: Vec::new(),
+            image: Vec::new(),
         };
         let bytes = serde_json::to_vec(&manifest).unwrap();
         channel.files.insert(
@@ -795,6 +799,44 @@ fn the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config() {
     assert!(bare.said.iter().any(|line| line.starts_with("no key")));
 }
 
+/// #1712 (the first builder at 21:08): the second route is the lamps' voice,
+/// so a fresh install places its services, private, on the relay with the
+/// voice's one key; a lamp's own file (lamp-4ace's) is kept, and said.
+#[test]
+fn the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept() {
+    use std::os::unix::fs::PermissionsExt;
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    assert_eq!(
+        fs::read_to_string(lamp.on(install::SECOND_PATH)).unwrap(),
+        install::SECOND
+    );
+    assert_eq!(
+        fs::metadata(lamp.on(install::SECOND_PATH))
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o600
+    );
+    let second: serde_json::Value = serde_json::from_str(install::SECOND).unwrap();
+    assert_eq!(second["llm_credential_file"], install::CREDENTIAL_PATH);
+    // A lamp's own is the lamp's: kept on the next install.
+    let own = r#"{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"/etc/lampOS/voice/second-llm.key"}"#;
+    fs::write(lamp.on(install::SECOND_PATH), own).unwrap();
+    lamp.said.clear();
+    lamp.install().unwrap();
+    assert_eq!(
+        fs::read_to_string(lamp.on(install::SECOND_PATH)).unwrap(),
+        own
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with(&format!("kept {}", install::SECOND_PATH)))
+    );
+}
+
 /// The owner's decision on #806 (16:13): the voice's key is the user's, and
 /// a reset wipes it with the person's data. V1's config on a lamp that ran
 /// V1 may still hold the previous owner's key, so install, run again after
@@ -1070,6 +1112,10 @@ fn the_skills_tools_are_in_their_own_folder_which_the_voice_reads() {
     };
     let skills = unit("lamp-skills.service");
     assert!(skills.contains("\nRuntimeDirectory=lampos-skills\n"));
+    // The skills a person turned off are kept across a restart in its own
+    // state folder (#1685), the one #1732's daily journal shares.
+    assert!(skills.contains(" --state-dir /var/lib/lampos-skills-state "));
+    assert!(skills.contains("\nStateDirectory=lampos-skills-state\nStateDirectoryMode=0700\n"));
     assert!(skills.contains(" --tools-dir /run/lampos-skills "));
     assert!(!skills.contains("/run/lampos-actions/skills"));
     assert!(
@@ -1553,6 +1599,18 @@ fn tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder() 
         .unwrap()
         .1;
     assert!(voice.contains("/var/lib/lampOS/voice/sessions/${INVOCATION_ID}"));
+}
+
+/// The reviewer on #1913, 19:50: the tmpfiles install writes are recorded,
+/// so a build's newer tmpfiles reach the lamp.
+#[test]
+fn install_records_the_tmpfiles_it_writes() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    assert_eq!(
+        lamp.state().settings[install::TMPFILES_PATH],
+        sha256_hex(install::TMPFILES.as_bytes())
+    );
 }
 
 /// A newer build's default reaches a setting nobody changed; a setting
@@ -2893,4 +2951,27 @@ fn a_refused_service_install_records_nothing_and_keeps_the_drop_in() {
     lamp.host.harness_refuses = false;
     lamp.install().unwrap();
     assert!(lamp.on("var/lib/lampos-update/harness-at-boot").exists());
+}
+
+/// The reviewer on #1788: a lamp that has not run `install` since #1680 has
+/// no lamp-update-back at its fixed path. Its unit's condition then skips
+/// it, from the timer or from lamp-update's `OnFailure=`, rather than
+/// failing every 2 min with a missing `ExecStart`.
+#[test]
+fn lamp_update_back_waits_for_its_binary_rather_than_failing() {
+    let back = PRODUCT
+        .iter()
+        .find(|(name, _)| *name == "lamp-update-back.service")
+        .unwrap()
+        .1;
+    let unit = section(back, "Unit");
+    assert!(
+        unit.contains(&format!("ConditionPathExists={}", lamp_update::own::BACK).as_str()),
+        "{unit:?}"
+    );
+    let exec = section(back, "Service")
+        .into_iter()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    assert!(exec.starts_with(&format!("ExecStart={} ", lamp_update::own::BACK)));
 }

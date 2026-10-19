@@ -134,6 +134,22 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-update.service",
         include_str!("../../../deploy/product/lamp-update.service"),
     ),
+    // lamp-update's fallback, from its fixed path: started by lamp-update's
+    // failure and by its timer (#1680, crate::own).
+    (
+        "lamp-update-back.service",
+        include_str!("../../../deploy/product/lamp-update-back.service"),
+    ),
+    (
+        "lamp-update-back.timer",
+        include_str!("../../../deploy/product/lamp-update-back.timer"),
+    ),
+    // The build's settings and tmpfiles, written at a round's switch from
+    // the same fixed path, and started only by a round (#1680, crate::apply).
+    (
+        "lamp-update-apply.service",
+        include_str!("../../../deploy/product/lamp-update-apply.service"),
+    ),
     // The passive self-test, five minutes after the lamp starts and every
     // six hours (#812). Its service is started by its timer alone.
     (
@@ -209,6 +225,18 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          down at the desk must never lose their light",
     ),
     (
+        "watch-you-leave",
+        "not yet tried on a lamp (#1669 (e)): it turns the base when the sitter leaves \
+         (`room/stood_up`, `LAMP_ACTIVITY=on`), so it is tried at the arm hour with someone at the \
+         arm, and whether the small turn reads as watching someone go is for that check",
+    ),
+    (
+        "laugh-glance",
+        "it reads `ears/classes`, which lamp-ears says only with `LAMP_EARS_CLASSES=on` (#1669), off \
+         until its scores are measured in an empty room and a busy one: a glance at every loud \
+         voice would read as a machine",
+    ),
+    (
         "not-feeling-well",
         "not yet tried on a lamp (#1681): whether its droop and dim on `lamp/health`'s `error` \
          read as a lamp a little unwell, not a status light, is for the lamp check",
@@ -238,6 +266,53 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "an installable skill, not yet tried on a lamp (#1685): its turns need a lamp-body with \
          `toward` and the lamp's `--gaze`, and its function would put a product session past its \
          32 without `LAMP_USE_SKILL=on`",
+    ),
+    // #1685's four wellbeing nudges: installable skills their owner puts on,
+    // off until each has been seen on a lamp with a person. The four share
+    // one function, `wellbeing_nudges` (their `[stop]`), so with all four a
+    // product session declares 32 of its 32 without `LAMP_USE_SKILL=on`.
+    (
+        "rest-your-eyes",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its tilt and \
+         softer light read as a cue to look away, not a fault, is for the lamp check; with the \
+         other three it adds one function, `wellbeing_nudges`, a product session's 32nd",
+    ),
+    (
+        "sip-of-water",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its slow blue \
+         breath reads as a hint to drink, never a status light, is for the lamp check",
+    ),
+    (
+        "stand-up",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its turn and \
+         tilt after a long sitting read as an invitation, never a nag, is for the lamp check",
+    ),
+    (
+        "wind-down",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): its hours are the \
+         owner's own bedtime, and its hand-over to Bedtime and Morning (#1732) is for the lamp \
+         check",
+    ),
+    // #1684's two core skills, merged off (the first builder, #1722): a
+    // trial puts them on by hand. Each comes with the product once the four
+    // real traces are recorded on a lamp with an air sensor and its
+    // provisional numbers are set again from them.
+    (
+        "smoky-air",
+        "not measured for false alarms yet (#1684): its numbers wait for real traces of kettle \
+         steam, toast, a candle blown out and a match, recorded on a lamp with an air sensor and \
+         replayed",
+    ),
+    (
+        "dusty-air",
+        "not measured for false alarms yet (#1684): its hour at 125 ug/m3 waits for the same \
+         traces and an office's own days, replayed",
+    ),
+    (
+        "who-was-here",
+        "an installable skill, not yet tried on a lamp (#1685): it reads `room/presence`, which the \
+         eyes say only with `LAMP_PRESENCE=on`, and its function would put a product session past \
+         its 32 without `LAMP_USE_SKILL=on`",
     ),
 ];
 
@@ -317,32 +392,34 @@ struct Models {
     models: Vec<Model>,
 }
 
-/// One model of [`MODELS`].
-#[derive(Clone, Debug, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Model {
-    pub path: String,
-    pub url: String,
-    pub bytes: u64,
-    pub sha256: String,
-    /// The file is one member of a gzipped tar at `url`, itself pinned.
-    #[serde(default)]
-    pub archive: Option<Archive>,
-}
-
-#[derive(Clone, Debug, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Archive {
-    pub bytes: u64,
-    pub sha256: String,
-    pub member: String,
-}
+/// One model of [`MODELS`]: the manifest's own, which a build may carry.
+pub use crate::manifest::{Archive, Model};
 
 /// The models of [`MODELS`].
 pub fn models() -> Result<Vec<Model>, String> {
-    serde_json::from_str::<Models>(MODELS)
+    models_from(MODELS).map_err(|error| format!("deploy/product/models.json: {error}"))
+}
+
+/// The models of a file in `models.json`'s form.
+pub fn models_from(text: &str) -> Result<Vec<Model>, String> {
+    serde_json::from_str::<Models>(text)
         .map(|list| list.models)
-        .map_err(|error| format!("deploy/product/models.json: {error}"))
+        .map_err(|error| error.to_string())
+}
+
+/// The product's settings as a build carries them (#1680, crate::apply):
+/// every one of [`SETTINGS`] and the tmpfiles, 0644. Never setup's, the
+/// voice's service, the keys or the zone, which are the lamp's; nor the
+/// product skills' files, which a round places from the build's
+/// `lamp-product-skills` (crate::product_skills) and the skills guard judges.
+pub fn product_settings() -> Vec<manifest::Setting> {
+    let skills = format!("{}/", crate::product_skills::FOLDER);
+    SETTINGS
+        .iter()
+        .filter(|(path, _)| !path.starts_with(&skills))
+        .chain([&(TMPFILES_PATH, TMPFILES)])
+        .map(|(path, text)| manifest::Setting::new(path, text))
+        .collect()
 }
 
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
@@ -355,6 +432,15 @@ pub const ZONE_PATH: &str = "/etc/lampOS/zone.env";
 /// 0600), kept up to date while it is install's own.
 pub const PROVIDER_PATH: &str = "/etc/lampOS/voice/provider.json";
 pub const PROVIDER: &str = include_str!("../../../deploy/product/settings/voice-provider.json");
+/// The second route's services, the lamps' voice since 19 Oct (#1712): the
+/// relay, every service on the same key as `provider.json`'s
+/// ([`CREDENTIAL_PATH`]). Private and kept as `provider.json` is: up to date
+/// while it is install's own, and a lamp's own (lamp-4ace's) kept.
+pub const SECOND_PATH: &str = "/etc/lampOS/voice/second.json";
+/// Where the voice's unit names it: the round places it when the build's
+/// voice unit does (`round::Round::place_second`).
+pub const SECOND_CONFIG_ENV: &str = "LAMP_VOICE_SECOND_CONFIG";
+pub const SECOND: &str = include_str!("../../../deploy/product/settings/second.json");
 /// The voice's key, as `provider.json` names it. It is the user's (the owner on
 /// #806, 2026-10-16 16:13): setup takes it from the account page or the app,
 /// and a reset wipes it. On a lamp that ran V1, install copies V1's
@@ -425,18 +511,30 @@ const HARNESS_DONE: &str = "harness-at-boot";
 const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
 
 /// Services started by a timer of their own, and never enabled themselves.
-const TIMED: &[&str] = &["lamp-records.service", "lamp-selftest.service"];
+const TIMED: &[&str] = &[
+    "lamp-records.service",
+    "lamp-selftest.service",
+    "lamp-update-back.service",
+];
+
+/// Services a round starts, and never enabled.
+const STARTED_BY_A_ROUND: &[&str] = &[crate::apply::UNIT];
 
 /// The units enabled: the target, and what starts outside it.
 fn enabled() -> Vec<String> {
     PRODUCT
         .iter()
         .map(|(name, _)| *name)
-        .filter(|name| name.ends_with(".service") && !TIMED.contains(name))
+        .filter(|name| {
+            name.ends_with(".service")
+                && !TIMED.contains(name)
+                && !STARTED_BY_A_ROUND.contains(name)
+        })
         .chain([
             "lampos.target",
             "lamp-records.timer",
             "lamp-selftest.timer",
+            "lamp-update-back.timer",
             "lampos-setup-done.path",
         ])
         .map(str::to_owned)
@@ -874,6 +972,20 @@ pub fn install(
     for ((part, _), build) in wanted.iter().zip(&builds) {
         link(config, part, build, &mut changed)?;
     }
+    // lamp-update-back, a copy of this build's lamp-update at a fixed path:
+    // written here alone, never by a round, which cannot even write it, so
+    // a lamp-update that cannot start is still put back (#1680).
+    if let Some(((part, _), build)) = wanted
+        .iter()
+        .zip(&builds)
+        .find(|((part, _), _)| part.binary == crate::own::BINARY)
+    {
+        let from = config
+            .on(&unit::folder(&part.folder, build))
+            .join(&part.binary);
+        let bytes = fs::read(&from).map_err(|error| format!("{}: {error}", from.display()))?;
+        put(config, crate::own::BACK, &bytes, 0o755, &mut changed)?;
+    }
 
     // The units and the tmpfiles. systemd must be told of any of them
     // written, so that is recorded before the first is: a run stopped
@@ -895,6 +1007,12 @@ pub fn install(
     for (path, bytes) in &for_systemd {
         put(config, path, bytes, 0o644, &mut changed)?;
     }
+    // The tmpfiles are install's, recorded as the settings are, so a
+    // build's newer tmpfiles reach this lamp (#1680, crate::apply).
+    state.settings.insert(
+        TMPFILES_PATH.to_owned(),
+        manifest::sha256_hex(TMPFILES.as_bytes()),
+    );
     let mut defaults = SETTINGS.to_vec();
     if config.setup {
         defaults.extend_from_slice(SETUP_SETTINGS);
@@ -924,7 +1042,7 @@ pub fn install(
     // removed on purpose (a reset wipes it with the person's data), and V1's
     // config, which may still hold the previous owner's, never puts it back.
     let key = device_key(config);
-    let mut private: Vec<(&str, &str)> = vec![(PROVIDER_PATH, PROVIDER)];
+    let mut private: Vec<(&str, &str)> = vec![(PROVIDER_PATH, PROVIDER), (SECOND_PATH, SECOND)];
     let mut marked = false;
     for (path, part) in [(CREDENTIAL_PATH, "the voice"), (JEV_KEY_PATH, "the Policy")] {
         let there = config.on(path).exists();
@@ -1564,14 +1682,25 @@ fn place_models(
     Ok(())
 }
 
-fn fetch_model(channel: &mut dyn Channel, model: &Model, at: &Path) -> Result<(), String> {
-    let parent = at.parent().ok_or("no folder")?;
+/// A model fetched and checked to `at`, whole or not at all. A channel out
+/// of reach is said as [`Fetch::Unreachable`], so a round tries again; any
+/// other failure is [`Fetch::Failed`].
+pub(crate) fn fetch_model(
+    channel: &mut dyn Channel,
+    model: &Model,
+    at: &Path,
+) -> Result<(), Fetch> {
+    let failed = |why: String| Fetch::Failed(why);
+    let parent = at.parent().ok_or_else(|| failed("no folder".into()))?;
     fs::DirBuilder::new()
         .recursive(true)
         .mode(0o755)
         .create(parent)
-        .map_err(|error| error.to_string())?;
-    let name = at.file_name().ok_or("no name")?.to_string_lossy();
+        .map_err(|error| failed(error.to_string()))?;
+    let name = at
+        .file_name()
+        .ok_or_else(|| failed("no name".into()))?
+        .to_string_lossy();
     let temporary = parent.join(format!(".{name}.fetching"));
     let archive = parent.join(format!(".{name}.archive"));
     let result = (|| {
@@ -1579,23 +1708,27 @@ fn fetch_model(channel: &mut dyn Channel, model: &Model, at: &Path) -> Result<()
             None => fetch_checked(channel, &model.url, model.bytes, &model.sha256, &temporary)?,
             Some(pinned) => {
                 fetch_checked(channel, &model.url, pinned.bytes, &pinned.sha256, &archive)?;
-                let out = fs::File::create(&temporary).map_err(|error| error.to_string())?;
+                let out =
+                    fs::File::create(&temporary).map_err(|error| failed(error.to_string()))?;
                 let status = Command::new("tar")
                     .arg("-xzOf")
                     .arg(&archive)
                     .arg(&pinned.member)
                     .stdout(out)
                     .status()
-                    .map_err(|error| format!("tar: {error}"))?;
+                    .map_err(|error| failed(format!("tar: {error}")))?;
                 if !status.success() {
-                    return Err(format!("tar could not take {} out", pinned.member));
+                    return Err(failed(format!("tar could not take {} out", pinned.member)));
                 }
-                let sha = file_sha256(&temporary).map_err(|error| error.to_string())?;
+                let sha = file_sha256(&temporary).map_err(|error| failed(error.to_string()))?;
                 let size = fs::metadata(&temporary)
-                    .map_err(|error| error.to_string())?
+                    .map_err(|error| failed(error.to_string()))?
                     .len();
                 if size != model.bytes || sha != model.sha256 {
-                    return Err(format!("{} does not match its SHA-256", pinned.member));
+                    return Err(failed(format!(
+                        "{} does not match its SHA-256",
+                        pinned.member
+                    )));
                 }
             }
         }
@@ -1603,7 +1736,7 @@ fn fetch_model(channel: &mut dyn Channel, model: &Model, at: &Path) -> Result<()
             .and_then(|()| fs::File::open(&temporary)?.sync_all())
             .and_then(|()| fs::rename(&temporary, at))
             .and_then(|()| sync_parent(at))
-            .map_err(|error| error.to_string())
+            .map_err(|error| failed(error.to_string()))
     })();
     let _ = fs::remove_file(&archive);
     if result.is_err() {
@@ -1619,8 +1752,8 @@ fn fetch_checked(
     bytes: u64,
     sha256: &str,
     to: &Path,
-) -> Result<(), String> {
-    let mut out = fs::File::create(to).map_err(|error| error.to_string())?;
+) -> Result<(), Fetch> {
+    let mut out = fs::File::create(to).map_err(|error| Fetch::Failed(error.to_string()))?;
     let mut hashing = Hashing {
         file: &mut out,
         context: digest::Context::new(&digest::SHA256),
@@ -1629,9 +1762,10 @@ fn fetch_checked(
     let sha = manifest::hex(hashing.context.finish().as_ref());
     match fetched {
         Ok(size) if size == bytes && sha == sha256 => Ok(()),
-        Ok(_) => Err("it does not match its SHA-256".into()),
-        Err(Fetch::Missing) => Err(format!("{url} is not there")),
-        Err(error) => Err(format!("{error:?}")),
+        Ok(_) => Err(Fetch::Failed("it does not match its SHA-256".into())),
+        Err(Fetch::Missing) => Err(Fetch::Failed(format!("{url} is not there"))),
+        Err(Fetch::Unreachable(why)) => Err(Fetch::Unreachable(why)),
+        Err(error) => Err(Fetch::Failed(format!("{error:?}"))),
     }
 }
 
@@ -1809,23 +1943,37 @@ mod tests {
     #[test]
     fn every_product_part_starts_through_its_current_link() {
         let parts = parts();
-        for (name, text) in PRODUCT
-            .iter()
-            .filter(|(name, _)| name.ends_with(".service"))
-        {
+        // lamp-update-back starts from its fixed path, which no round
+        // switches (#1680).
+        let linked = |name: &&str| {
+            name.ends_with(".service")
+                && *name != "lamp-update-back.service"
+                && *name != crate::apply::UNIT
+        };
+        for (name, text) in PRODUCT.iter().filter(|(name, _)| linked(name)) {
             assert!(part(text).is_some(), "{name} starts through a current link");
         }
         // Setup, its reset and the waking face share one binary, and so do
         // the air and its bus clock; every other service is a part.
-        let services = PRODUCT
-            .iter()
-            .filter(|(name, _)| name.ends_with(".service"))
-            .count();
+        let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
         assert_eq!(parts.len(), services - 3, "every product service is a part");
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");
         }
+    }
+
+    /// #1815: the cloud is enabled with the lamp, so a Lamp 2 set up from
+    /// the app is online at the next power-up too, not only after
+    /// `cloud-on.sh`.
+    #[test]
+    fn the_cloud_is_enabled_with_the_lamp() {
+        assert!(enabled().iter().any(|name| name == "lamp-cloud.service"));
+        assert!(
+            enabled()
+                .iter()
+                .any(|name| name == "lampos-setup-done.path")
+        );
     }
 
     /// #812: the passive self-test is started by its timer alone, which the

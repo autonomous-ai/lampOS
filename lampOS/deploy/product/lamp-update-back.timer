@@ -1,0 +1,14 @@
+# The deadline of lamp-update's own switch (lampOS/docs/updates.md, #1680): lamp-update-back every two minutes, so
+# that a new lamp-update that runs but has not confirmed itself ten minutes after its switch is put back. With no
+# such switch under way (LAMP_UPDATE_SELF off, or a switch confirmed) it finds nothing and ends.
+[Unit]
+Description=lampOS updates, the deadline of lamp-update's own switch
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=30s
+Unit=lamp-update-back.service
+
+[Install]
+WantedBy=timers.target

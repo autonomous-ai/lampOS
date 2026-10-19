@@ -13,6 +13,7 @@
 //! - [`head`]: the head's small move, at rest, through `expression/body`.
 //! - [`report`]: where a run is kept, and what a person reads.
 //! - [`quiet`]: a passive run waits for the voice to be out of a turn.
+//! - [`voice_route`]: the files the voice needs on the second route.
 
 // Nothing in this library prints; the program prints what it is given.
 #![deny(clippy::print_stderr, clippy::print_stdout, clippy::dbg_macro)]
@@ -29,6 +30,7 @@ pub mod quiet;
 pub mod report;
 pub mod ring;
 pub mod speaker;
+pub mod voice_route;
 
 /// The whole self-test has two minutes (#812).
 pub const BUDGET: Duration = Duration::from_secs(120);

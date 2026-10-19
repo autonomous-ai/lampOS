@@ -896,6 +896,17 @@ malformed cleanup, forced termination, abnormal exit, or missing black-write
 proof still fails final cleanup. A clean degraded shutdown may complete the
 voice run; its trace still records that ring qualification failed.
 
+The final shared shutdown looks at every child's exit once more, the disabled
+ring's included. A ring that had already ended mid-session (its
+`ring_degraded_exit` recorded then) is seen ended again in the stop's first
+pass, a millisecond or so after `service_stop_requested`; that
+`worker_exit_failed` carries `exited_before_stop: true`, so it is not read as
+the stop ending the ring (lamp-52e6, 19 Oct 2026, #1620). The stop still fails
+on the missing black-write receipt: a ring that ended on its own never said
+the strip went black. The ring's shutdown path is the same with or without the
+eye (`LAMP_RING_EYE=on` or `strong`), host-tested in
+`every_eye_mode_writes_and_says_the_shutdown_black_at_a_service_stop`.
+
 SPI I/O remains in the child. Linux cannot promise a userspace deadline for a
 stalled kernel SPI write; the existing 10 ms write budget is checked on return.
 A crashed/killed writer cannot itself blank a latched physical ring. Software

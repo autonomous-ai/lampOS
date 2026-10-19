@@ -94,6 +94,7 @@ fn run_with_notice_policy(
         worker
     };
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,

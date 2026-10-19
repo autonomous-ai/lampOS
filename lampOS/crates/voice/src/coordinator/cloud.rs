@@ -850,6 +850,32 @@ mod tests {
         }
     }
 
+    /// #1844: the second route as the lamp's only voice says its link down
+    /// and back in an order this register takes, so the offline line, the
+    /// breath and "I'm back online" follow it as they follow Gemini's.
+    #[test]
+    fn the_second_routes_link_down_and_back_is_taken() {
+        use crate::second_provider::link::Link;
+        let s = 1_000_000u64;
+        let mut cloud = CloudAvailability::default();
+        let (mut link, ready) = Link::initial(s, s + 10);
+        cloud.observe(ready, 2 * s).unwrap();
+        assert!(cloud.available());
+        assert!(link.failed(10 * s, Fault::Transport));
+        let down = link.probed(10 * s, 12 * s, false).unwrap();
+        cloud.observe(down, 12 * s).unwrap();
+        assert!(!cloud.available());
+        let back = link.probed(42 * s, 43 * s, true).unwrap();
+        cloud.observe(back, 43 * s).unwrap();
+        assert_eq!(cloud.ready_session(), Some(2));
+        // And down again, in the new session.
+        assert!(link.failed(50 * s, Fault::ConnectTimeout));
+        cloud
+            .observe(link.probed(50 * s, 52 * s, false).unwrap(), 52 * s)
+            .unwrap();
+        assert!(!cloud.available());
+    }
+
     #[test]
     fn readiness_requires_a_priority_source_observation() {
         let mut cloud = CloudAvailability::default();

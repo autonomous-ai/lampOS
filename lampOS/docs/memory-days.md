@@ -288,10 +288,13 @@ can still be wrong; structural validation cannot prove meaning.
 
 `forget {id}` removes that record, its replacement chain in both
 directions, and all linked descendants. When the target is an observation,
-its source ancestors are removed too, preventing the same raw evidence
-from immediately recreating the forgotten observation. This can delete a
-whole exchange containing unrelated subjects. When the target is a raw
-exchange, unrelated ancestors are retained. No historical version is
+or a kept thing remembered with its conversation (#1693), the exchanges it
+was taken from are removed too, preventing the same raw evidence from
+immediately recreating the forgotten observation. This can delete a whole
+exchange containing unrelated subjects. It is one step back, the person's
+own exchanges only (#2003): an exchange's own sources are what its session
+was shown, so they, and the kept things and facts among them, are retained.
+When the target is a raw exchange, unrelated ancestors are retained. No historical version is
 reactivated after deletion.
 
 In the same transaction, deletion clears the affected person's stored
@@ -429,9 +432,11 @@ as quoted data rather than instructions:
 
 Output is `{"observations":[{"text":"...","category":"preference",
 "source_ids":[1],"supersedes":null}]}`. One to eight observations, each
-at most 300 UTF-8 bytes, are allowed. Empty output makes no change and is
-reported as empty; the caller need not retry a conversation with nothing
-useful to extract. Unknown fields, invalid categories, missing/foreign
+at most 300 UTF-8 bytes, are allowed. An empty list given to `tidy_apply`
+closes the job with nothing kept (`{"ok":true,"ids":[]}`, #1693 (2)): a
+conversation with nothing useful, or a pass that failed, never waits out its
+day or counts towards `busy`. The voice's adapter is `LAMP_MEMORY_OBSERVE`
+on the second route ([memory.md](memory.md)). Unknown fields, invalid categories, missing/foreign
 sources, duplicate replacements and newer facts overwritten by old evidence
 are refused. Apply rechecks generation, current sources and corrections
 inside its transaction. Ordinary appends do not invalidate useful work.
@@ -439,8 +444,9 @@ inside its transaction. Ordinary appends do not invalidate useful work.
 With a remote adapter, at most 32 KiB of serialized input per submitted
 job would leave the lamp: selected exchange text, timestamps, IDs,
 caller-supplied person scope and prior observations. Repeated attempts would
-send it again. No audio, image or whole store is required. This build sends
-zero model requests; daily traffic and real-model accuracy are unmeasured.
+send it again. No audio, image or whole store is required. With
+`LAMP_MEMORY_OBSERVE` off this build sends zero model requests; with it on,
+one per conversation. Daily traffic and real-model accuracy are unmeasured.
 
 ## Native build and first lamp checks
 

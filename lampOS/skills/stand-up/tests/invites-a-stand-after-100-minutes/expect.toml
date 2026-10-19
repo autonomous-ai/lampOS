@@ -1,0 +1,15 @@
+# 10:00, 110 minutes at the desk: at 100 minutes it turns to them with a
+# small curious tilt, once.
+clock = "10:00"
+
+[[expect]]
+at = "100m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "100m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }

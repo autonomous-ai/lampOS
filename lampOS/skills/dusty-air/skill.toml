@@ -1,0 +1,46 @@
+# Dusty air (#1684, the design approved by the first builder on 12:56): the
+# air at the desk very dusty for an hour. One exact line, at most once a
+# day, in the daytime, with someone at the desk. Written to lamp-skills'
+# schema (docs/skills.md, "The schema, as lamp-skills reads it"). Held out of
+# the product's install (`install::NOT_PRODUCT_SKILLS`) until it is measured
+# with Smoky air's traces and an office's own days.
+needs = ["air", "eyes", "voice"]
+# Comes with the lamp once measured (docs/skills.md, "Core and installable
+# skills"): on a lamp whose sensor doesn't answer it does nothing.
+kind = "core"
+version = "1.0.0"
+
+# What it may read and use, and nothing more: the air, the voice's state,
+# whether a face is in view, and one line. No light, no move.
+[permissions]
+topics = ["air/state", "voice/state", "humans/faces/tracked"]
+speak = true
+
+[trigger]
+topic = "air/state"
+field = "pm2_5"
+above = 124.95            # at least 125 ug/m3 (the sensor reads tenths): the lower edge of the EPA's "Very Unhealthy"
+for = "60m"               # for an hour: lamp-4ace's office at about 100 never sets it off
+gap = "2m"                # a missed reading or two does not end the hour
+rearm = "ends"            # once a spell; again only after the air has come under 125
+cooldown = "24h"          # at most one line a day
+wait = "1h"               # nobody at the desk, or someone talking, when the hour comes: kept for an hour, then spent
+
+[[while]]                 # never while someone is talking to the lamp
+topic = "voice/state"
+field = "state"
+equals = "resting"
+
+[[while]]                 # only with someone at the desk to hear it
+topic = "humans/faces/tracked"
+present = true
+
+[quiet]                   # daytime only, by the lamp's local time
+from = "22:00"
+to = "08:00"
+
+[ask]
+policy = "nudge"
+
+[[do]]
+say = { text = "The air here has been very dusty for about an hour. I can't tell where it's coming from." }   # exact words; no window advice: the dust may come from outside

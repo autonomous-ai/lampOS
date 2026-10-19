@@ -206,6 +206,65 @@ fn a_trace_without_run_records_is_unscored_not_passed() {
     );
 }
 
+/// The reviewer on #1686: a session the second route answered alone
+/// (`LAMP_VOICE_ROUTE=second`) says so on its `run_start`, and the imported
+/// attempt keeps it, so the A/B tells the two routes apart. A Gemini
+/// session's attempt is as before, and an unknown route is refused.
+#[test]
+fn an_imported_attempt_says_when_the_second_route_answered_alone() {
+    let dir = common::Private::new("route");
+    let with_route = |route: Option<&str>| {
+        let mut lines: Vec<Value> = trace("gemini", &[])
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        if let Some(route) = route {
+            lines[0]["voice_route"] = json!(route);
+        }
+        lines
+            .iter()
+            .map(Value::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let alone = import(
+        &dir.path,
+        "alone",
+        "quick-chat",
+        &with_route(Some("second")),
+        None,
+    );
+    assert_eq!(alone.evidence["voice_route"], "second");
+    assert!(alone.events.iter().any(|e| matches!(
+        &e.kind,
+        lamp_voice_eval::events::EventKind::RunStart { voice_route: Some(route), .. } if route == "second"
+    )));
+    let gemini = import(&dir.path, "gemini", "quick-chat", &with_route(None), None);
+    assert!(gemini.evidence.get("voice_route").is_none());
+    let catalog = StimulusCatalog::load().unwrap();
+    let plan = LoadedPlan::default_plan(&catalog).unwrap();
+    let events = dir.join("other.jsonl");
+    fs::write(&events, with_route(Some("deepseek"))).unwrap();
+    let out = dir.join("o-other");
+    lamp_voice_eval::ledger::create_run_directory(&out).unwrap();
+    let refused = import_trace(
+        &plan,
+        &catalog,
+        &ImportOptions {
+            run_id: "other".into(),
+            events_path: &events,
+            scenario: "quick-chat".into(),
+            turn_map: Vec::new(),
+            room_metadata: None,
+            room_receipt: None,
+            room_independent: false,
+            source: lamp_voice_eval::record::StimulusSource::Unknown,
+        },
+        &out,
+    );
+    assert!(refused.is_err());
+}
+
 #[test]
 fn provider_mismatch_and_unknown_turns_are_rejected_on_import() {
     let dir = common::Private::new("bad");

@@ -664,6 +664,18 @@ have taken time while a later child exited on its own. An observed normal exit
 does not erase an earlier cleanup failure; a nonzero exit still fails cleanup
 and is recorded as `worker_exit_failed`, not `worker_forced_shutdown`. The exit
 check does not extend the deadline or bypass the worker's resource cleanup.
+For the ring, a `worker_exit_failed` at the stop says `exited_before_stop`:
+true when the ring had already ended and been disabled mid-session, so its
+cached exit is not mistaken for one the stop caused
+([ring-choreography.md](ring-choreography.md), #1620).
+
+With `LAMP_VOICE_ROUTE=second` the second route's worker is `rig.provider`
+under the role `second`, and goes through this same stop: Stop, deadline,
+recheck, kill, reap, and its causes under `second`. Its speech to text, chat
+and voice are tasks in that one process. Its runtime is ended without waiting
+for a blocking tool call or DNS lookup (`worker::finish`), which a plain drop
+waited for, up to 1.5 s for the executive, past this deadline
+([second-voice.md](second-voice.md), "Second only").
 
 Serve waits with only its GPIO privacy worker while physically muted. A fresh
 active mute closes the full runtime and returns to that wait only after verified

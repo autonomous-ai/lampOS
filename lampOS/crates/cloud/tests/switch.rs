@@ -1,8 +1,8 @@
 //! `lamp-cloud` is off unless `LAMP_CLOUD=on` (the reviewer on #1418): the
 //! binary itself, with a complete account aimed at a local listener, says
 //! it is off and connects nowhere without the switch, and connects with it.
-//! And its unit touches V1's `os-server` only through the drop-in that turns
-//! it on.
+//! The product's unit turns it on (#1815), and stops V1's `os-server` only as
+//! it really starts, never through `Conflicts=` (#1909).
 use std::io::{ErrorKind, Read};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
@@ -122,26 +122,40 @@ fn with_the_switch_on_it_connects_to_the_accounts_broker() {
 }
 
 #[test]
-fn the_unit_stops_v1s_os_server_only_from_the_drop_in_that_turns_it_on() {
-    // Every line that is not a comment: no Conflicts= of the unit's own.
+fn the_product_unit_is_on_and_stops_v1s_os_server_only_as_it_really_starts() {
+    // #1815: on in the product, so a Lamp 2 set up from the app shows online
+    // at once and after a reboot, starting with the lamp once setup is done.
     let lines: Vec<&str> = UNIT
         .lines()
         .map(str::trim)
         .filter(|line| !line.starts_with('#'))
         .collect();
+    for line in [
+        "Environment=LAMP_CLOUD=on",
+        "PartOf=lampos.target",
+        "WantedBy=lampos.target",
+        "ConditionPathExists=/var/lib/lampos-setup/done",
+        "ConditionPathExists=/etc/lampOS/setup/backend.json",
+        // V1's os-server holds the same client id: stopped as root, only
+        // once the conditions have held, and a lamp without it goes on.
+        "ExecStartPre=-+/usr/bin/systemctl stop os-server.service",
+    ] {
+        assert!(lines.contains(&line), "{line}");
+    }
+    // Never Conflicts=: its stop is queued before the conditions are
+    // checked, so a lamp-cloud skipped for want of setup's account would
+    // still stop os-server (the reviewer on #1909; the rule of #1418).
     assert!(
         !lines.iter().any(|line| line.starts_with("Conflicts=")),
-        "an off lamp-cloud would stop os-server"
+        "a skipped lamp-cloud would stop os-server"
     );
-    // The header gives the drop-in: the switch and the conflict together.
-    assert!(UNIT.contains("#   Conflicts=os-server.service\n"));
-    assert!(UNIT.contains("#   Environment=LAMP_CLOUD=on\n"));
+    assert!(UNIT.contains("systemctl mask lamp-cloud"));
 }
 
 #[test]
 fn lamp_4aces_cloud_on_writes_the_units_whole_drop_in() {
-    // lamp-4ace's own installer (#1420) writes the same drop-in the unit's
-    // header gives, the conflict with it, so the two can't drift.
+    // lamp-4ace's own installer (#1420) writes its drop-in whole: the switch
+    // and the conflict, as it did before the product's unit was on (#1815).
     const CLOUD_ON: &str = include_str!("../../../deploy/lamp-4ace/cloud-on.sh");
     let line = CLOUD_ON
         .lines()

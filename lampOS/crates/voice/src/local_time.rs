@@ -99,6 +99,18 @@ pub fn told_with_clock(file: &[u8], now: i64) -> Option<String> {
     ))
 }
 
+/// The same for a request built as it is asked (the second route, #1712):
+/// the time then, exactly and in the words a person says it in
+/// ([`said`]), to answer from. On lamp-4ace on 2026-10-19 the second
+/// route, told [`told_with_clock`]'s "call the_time first", spent a round
+/// on "what time is it?" whose first event came 2100 ms later.
+pub fn told_asked(file: &[u8], now: i64) -> Option<String> {
+    Some(format!(
+        "\n\nThe time\n{} Your clock read this as you were asked: when someone asks the time or the date, or how long until something, answer from it.",
+        said(file, now)?
+    ))
+}
+
 /// The time at `now`, exactly, for the model that asked
 /// ([`crate::tools::THE_TIME`]), with the words a person would say it in:
 /// on lamp-4ace on 2026-10-14 the model, given "6:23 in the evening", said
@@ -183,6 +195,60 @@ pub fn zone_file(zones: &std::path::Path, place: &str) -> Option<(String, Vec<u8
     read(&place)
 }
 
+/// The lamp's own place as the unit names it (`LAMP_PLACE`, "Hanoi,
+/// Vietnam"), over its zone's: a zone names one city for a whole country or
+/// region, and lamp-4ace, in Hanoi, keeps `Asia/Ho_Chi_Minh`, so "the
+/// weather" was asked about the wrong city (#1712). Passed to the second
+/// route's worker alone (`process.rs`).
+pub const PLACE_ENVIRONMENT: &str = "LAMP_PLACE";
+/// The most of it taken.
+const PLACE_BYTES: usize = 60;
+
+/// [`PLACE_ENVIRONMENT`] as `value` gives it: trimmed, at most
+/// [`PLACE_BYTES`] of letters (any script), digits, spaces, `,`, `-`, `.`
+/// and `'`; anything else is no place.
+pub fn place_from(value: Option<&str>) -> Option<String> {
+    let place = value?.trim();
+    (!place.is_empty()
+        && place.len() <= PLACE_BYTES
+        && place
+            .chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, ' ' | ',' | '-' | '.' | '\'')))
+    .then(|| place.to_owned())
+}
+
+/// The lamp's own place from its environment ([`place_from`]).
+pub fn place_here() -> Option<String> {
+    place_from(std::env::var(PLACE_ENVIRONMENT).ok().as_deref())
+}
+
+/// Told beside the time when the lamp's place is set ([`place_here`]):
+/// where it is, and that what is asked about without a place is there.
+pub fn place_told(place: Option<&str>) -> Option<String> {
+    place.map(|place| {
+        format!(
+            " You are in {place}. When someone asks about the weather, the news or anything nearby without naming a place, they mean {place}."
+        )
+    })
+}
+
+/// The place the lamp's own zone names ("Ho Chi Minh"), or `None` when it
+/// names none ([`own_place`]).
+pub fn zone_place_here() -> Option<String> {
+    zone_here().as_deref().and_then(own_place)
+}
+
+/// The month and year where the lamp stands ("October 2026"), for a search
+/// of what is new (#1712); `None` when the clock is not set or not known.
+pub fn month_and_year_here() -> Option<String> {
+    if unset_here() {
+        return None;
+    }
+    let (file, now) = here()?;
+    let (_, _, month, year, ..) = words(&file, now)?;
+    Some(format!("{month} {year}"))
+}
+
 /// A zone's place as people say it: its last part, underscores as spaces
 /// (`America/New_York` is "New York").
 pub fn place_name(zone: &str) -> String {
@@ -224,9 +290,16 @@ fn own_place(zone: &str) -> Option<String> {
 }
 
 /// How the lamp's own time is led in, from its zone: "Here in Ho Chi
-/// Minh", or "Here" when the zone names no place ([`own_place`]).
+/// Minh", or "Here" when the zone names no place ([`own_place`]). The
+/// unit's own place goes over the zone's ([`place_here`]).
 fn here_in(zone: &str) -> String {
-    own_place(zone).map_or_else(|| "Here".to_owned(), |place| format!("Here in {place}"))
+    here_in_at(place_here().as_deref(), zone)
+}
+
+fn here_in_at(set: Option<&str>, zone: &str) -> String {
+    set.map(str::to_owned)
+        .or_else(|| own_place(zone))
+        .map_or_else(|| "Here".to_owned(), |place| format!("Here in {place}"))
 }
 
 /// The time at `now` in the place of `zone` (its file `there`), for the
@@ -311,10 +384,18 @@ pub fn now_in(place: &str) -> Result<Option<String>, &'static str> {
 /// What the opening note adds with `LAMP_TIME_PLACES`: whose time it gives,
 /// and to ask the function for anywhere else.
 pub fn told_place(home: Option<&str>) -> String {
-    let here = home.and_then(own_place).map_or_else(
-        || "the time where you are".to_owned(),
-        |place| format!("the time where you are, in {place}"),
-    );
+    told_place_at(place_here().as_deref(), home)
+}
+
+/// [`told_place`] with the unit's place `set` over the zone's.
+fn told_place_at(set: Option<&str>, home: Option<&str>) -> String {
+    let here = set
+        .map(str::to_owned)
+        .or_else(|| home.and_then(own_place))
+        .map_or_else(
+            || "the time where you are".to_owned(),
+            |place| format!("the time where you are, in {place}"),
+        );
     format!(
         " This is {here}. For the time anywhere else, call the_time with that place, never this time."
     )
@@ -466,6 +547,27 @@ pub fn told_here(clock: bool, places: bool) -> Option<String> {
     } else {
         told(&file, now)
     }
+}
+
+/// [`told_asked`] for this machine, now, with `clock` (`LAMP_CLOCK`);
+/// with `places` (`LAMP_TIME_PLACES`), whose time it is and to ask
+/// [`crate::tools::THE_TIME`] for anywhere else ([`told_place`]). Without
+/// `clock`, what a session without it is told ([`told_here`]), as before
+/// (the first builder on #1921).
+pub fn told_asked_here(clock: bool, places: bool) -> Option<String> {
+    if !clock {
+        return told_here(false, false);
+    }
+    if unset_here() {
+        return Some(TOLD_UNSET.to_owned());
+    }
+    let (file, now) = here()?;
+    let told = told_asked(&file, now)?;
+    Some(if places {
+        told + &told_place(zone_here().as_deref())
+    } else {
+        told
+    })
 }
 
 /// The time now where the lamp stands, exactly, in words; `Err` with what
@@ -746,6 +848,42 @@ mod tests {
 
     /// A place is looked for under the zone folder only, by its zone name
     /// or its name alone in the usual areas, and must be a zone file.
+    /// #1712: the unit's place goes over the zone's in what the model is
+    /// told and in "here"'s time: lamp-4ace in Hanoi keeps
+    /// `Asia/Ho_Chi_Minh`. A strange value is no place.
+    #[test]
+    fn the_units_place_goes_over_the_zones() {
+        assert_eq!(
+            place_from(Some(" Hanoi, Vietnam ")).as_deref(),
+            Some("Hanoi, Vietnam")
+        );
+        assert_eq!(place_from(Some("Đà Nẵng")).as_deref(), Some("Đà Nẵng"));
+        for odd in [
+            None,
+            Some(""),
+            Some("  "),
+            Some("Hanoi; rm -rf"),
+            Some("x\ny"),
+        ] {
+            assert_eq!(place_from(odd), None, "{odd:?}");
+        }
+        assert_eq!(place_from(Some(&"a".repeat(61))), None);
+        let zone = Some("Asia/Ho_Chi_Minh");
+        assert!(told_place_at(None, zone).contains("in Ho Chi Minh."));
+        assert!(told_place_at(Some("Hanoi"), zone).contains("in Hanoi."));
+        assert_eq!(
+            here_in_at(Some("Hanoi"), "Asia/Ho_Chi_Minh"),
+            "Here in Hanoi"
+        );
+        assert_eq!(here_in_at(None, "Asia/Ho_Chi_Minh"), "Here in Ho Chi Minh");
+        assert_eq!(here_in_at(None, "Etc/GMT-7"), "Here");
+        assert_eq!(place_told(None), None);
+        assert_eq!(
+            place_told(Some("Hanoi")).unwrap(),
+            " You are in Hanoi. When someone asks about the weather, the news or anything nearby without naming a place, they mean Hanoi."
+        );
+    }
+
     #[test]
     fn a_place_is_found_by_its_zone_or_its_name_and_never_outside_the_zones() {
         let dir = std::env::temp_dir().join(format!("lamp-zones-{}", std::process::id()));
@@ -931,6 +1069,24 @@ mod tests {
             opening.contains("You woke on Tuesday 13 October 2026, around 11:14 in the morning")
         );
         assert!(opening.contains("call the_time first") && !opening.contains("roughly"));
+    }
+
+    /// #1712: a request built as it is asked (the second route) is told
+    /// the time then, exactly and said aloud, to answer from, never to
+    /// call the_time for it nor that it may be old.
+    #[test]
+    fn a_request_built_as_it_is_asked_is_told_the_time_to_answer_from() {
+        let saigon = zone(b'2', &[], &[25_200], "<+07>-7");
+        assert_eq!(
+            told_asked(&saigon, NOW).unwrap(),
+            "\n\nThe time\nIt is 11:14 in the morning, Tuesday 13 October 2026. Said aloud: eleven fourteen in the morning. Your clock read this as you were asked: when someone asks the time or the date, or how long until something, answer from it."
+        );
+        assert!(
+            told_asked(&saigon, NOW + 33 * 60)
+                .unwrap()
+                .contains("11:47")
+        );
+        assert_eq!(told_asked(b"TZif", NOW), None);
     }
 
     #[test]

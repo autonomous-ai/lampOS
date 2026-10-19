@@ -144,7 +144,11 @@ fn private_write(path: &std::path::Path, bytes: &[u8]) {
 }
 
 #[test]
-fn forgetting_an_observation_removes_its_raw_ancestors_and_all_linked_descendants() {
+// #2003 (the first builder's 00:27 and 00:56): an observation's evidence is
+// one step back, its cited exchanges only. This test used to expect every
+// ancestor gone, but an exchange's sources are what its session was shown:
+// climbing them removed other facts that were only shown there.
+fn forgetting_an_observation_removes_its_cited_exchanges_and_linked_descendants_only() {
     let scratch = Scratch::new("transitive");
     let mut store = scratch.open(30, NOW);
     let room = Person::everyone();
@@ -185,17 +189,26 @@ fn forgetting_an_observation_removes_its_raw_ancestors_and_all_linked_descendant
         store.record(&room, later).unwrap().unwrap().source_ids,
         [fact]
     );
-    assert_eq!(store.forget(&room, descendant).unwrap(), 5);
-    for id in [first, linked, fact, later, descendant] {
+    // The observation and the exchange it was taken from go; the fact that
+    // exchange was only shown, and that fact's own evidence, stay.
+    assert_eq!(store.forget(&room, descendant).unwrap(), 2);
+    for id in [later, descendant] {
         assert!(store.record(&room, id).unwrap().is_none());
     }
-    assert!(found(&mut store, &room, "coffee").is_empty());
+    for id in [first, linked, fact] {
+        assert!(store.record(&room, id).unwrap().is_some(), "{id}");
+    }
+    // Forgetting that fact in its turn takes its own cited exchange; the
+    // exchange that was only shown before it stays.
+    assert_eq!(store.forget(&room, fact).unwrap(), 2);
+    assert!(store.record(&room, linked).unwrap().is_none());
+    assert!(store.record(&room, first).unwrap().is_some());
     assert!(store.record(&room, unrelated).unwrap().is_some());
     assert!(store.record(&other, theirs).unwrap().is_some());
     assert_eq!(store.forget(&room, descendant).unwrap(), 0);
     drop(store);
     let mut reopened = scratch.open(30, NOW);
-    assert!(found(&mut reopened, &room, "coffee").is_empty());
+    assert_eq!(found(&mut reopened, &room, "coffee"), [first].into());
     assert!(found(&mut reopened, &other, "coffee").contains(&theirs));
 }
 
@@ -1295,10 +1308,18 @@ fn protocol_round_trip_records_links_prepares_and_applies_a_job_then_verifies_fo
         NOW,
     );
     assert_eq!(opened["snapshot"]["invalidated"], false);
+    // The fact and the exchange it was taken from go; the earlier exchange
+    // that one was only shown stays (one step back, #2003).
     let (forgotten, _) = request(&mut store, json!({"op":"forget","id":fact}), NOW);
-    assert_eq!(forgotten, json!({"ok":true,"removed":3}));
+    assert_eq!(forgotten, json!({"ok":true,"removed":2}));
     let (search, _) = request(&mut store, json!({"op":"search","query":"coffee"}), NOW);
-    assert_eq!(search, json!({"ok":true,"entries":[]}));
+    let found: Vec<u64> = search["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["id"].as_u64().unwrap())
+        .collect();
+    assert_eq!(found, [first]);
     let (invalidated, _) = request(
         &mut store,
         json!({"op":"session_open","session":"active"}),
@@ -1536,4 +1557,150 @@ fn the_follow_up_request_answers_for_a_person_and_refuses_the_room() {
     assert_eq!(answer, json!({"ok":true,"follow_up":null}));
     let (answer, _) = request(&mut store, json!({"op":"follow_up"}), NOW + 3 * DAY);
     assert_eq!(answer["ok"], false, "{answer}");
+}
+
+/// #1693 (2): a pass that found nothing worth keeping, or failed, closes its
+/// job with nothing kept, so jobs never wait out their day and fill the
+/// bounded queue (`busy` at `MAX_PENDING`).
+#[test]
+fn an_empty_result_closes_the_job_with_nothing_kept_and_frees_its_place() {
+    let scratch = Scratch::new("empty-result");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    let mut sources = vec![];
+    for n in 0..lamp_memory::days::MAX_PENDING {
+        let source = store
+            .append(&room, NOW, &format!("Hello {n}"), "Hi", &[])
+            .unwrap();
+        sources.push(source);
+        store
+            .conversation_end(&room, &format!("c{n}"), &[source])
+            .unwrap();
+    }
+    let extra = store.append(&room, NOW, "One more", "Hi", &[]).unwrap();
+    assert_eq!(
+        store
+            .conversation_end(&room, "full", &[extra])
+            .unwrap_err()
+            .code,
+        "busy"
+    );
+    let first = store.conversation_end(&room, "c0", &[sources[0]]).unwrap();
+    let empty = Output {
+        observations: vec![],
+    };
+    assert_eq!(
+        store.tidy_apply(&room, &first.job, &empty).unwrap(),
+        Vec::<u64>::new()
+    );
+    assert!(
+        store
+            .tidy_apply(&room, &first.job, &empty)
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        store
+            .conversation_end(&room, "c0", &[sources[0]])
+            .unwrap_err()
+            .code,
+        "done"
+    );
+    // Its place is free again, and nothing was written.
+    store.conversation_end(&room, "full", &[extra]).unwrap();
+    for id in found(&mut store, &room, "Hello") {
+        assert_ne!(
+            store.record(&room, id).unwrap().unwrap().kind,
+            "observation"
+        );
+    }
+}
+
+/// #1693: a kept thing remembered with the conversation it came up in goes
+/// with that conversation's exchanges, one step back and the person's own
+/// only: an unrelated conversation, a thing only shown in it, and another
+/// person's stay. Without `from` it is as before.
+#[test]
+fn a_kept_thing_goes_with_the_conversation_it_came_up_in_and_nothing_else() {
+    let scratch = Scratch::new("kept-origins");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    let kettle = store.remember(&room, NOW, "the kettle is orange").unwrap();
+    let earlier = store
+        .append(&room, NOW, "what's the weather", "Sunny", &[])
+        .unwrap();
+    let said = store
+        .append(
+            &room,
+            NOW,
+            "my violet umbrella is in the car",
+            "Good to know",
+            &[kettle],
+        )
+        .unwrap();
+    let umbrella = store
+        .remember_from(&room, NOW, "the violet umbrella is in the car", &[said])
+        .unwrap();
+    let echo = store
+        .append(&room, NOW, "where's my umbrella", "In the car", &[umbrella])
+        .unwrap();
+    let mai = person("mai");
+    let theirs = store
+        .append(&mai, NOW, "my bike is blue", "Noted", &[])
+        .unwrap();
+    // Only the person's own exchanges may be where it came from.
+    assert!(store.remember_from(&room, NOW, "x", &[theirs]).is_err());
+    assert!(store.remember_from(&room, NOW, "x", &[kettle]).is_err());
+
+    store.forget(&room, umbrella).unwrap();
+    for gone in [umbrella, said, echo] {
+        assert!(store.record(&room, gone).unwrap().is_none(), "{gone}");
+    }
+    for kept in [kettle, earlier] {
+        assert!(store.record(&room, kept).unwrap().is_some(), "{kept}");
+    }
+    assert!(store.record(&mai, theirs).unwrap().is_some());
+
+    // Kept without its conversation, it is as before: that stays.
+    let plain_said = store
+        .append(&room, NOW, "the bins go out Friday", "OK", &[])
+        .unwrap();
+    let bins = store
+        .remember(&room, NOW, "the bins go out on Friday")
+        .unwrap();
+    store.forget(&room, bins).unwrap();
+    assert!(store.record(&room, plain_said).unwrap().is_some());
+}
+
+/// #2003: forgetting an observation removes the exchange it was taken from,
+/// never a kept thing that exchange's session was only shown.
+#[test]
+fn forgetting_an_observation_never_reaches_a_kept_thing_its_evidence_was_only_shown() {
+    let scratch = Scratch::new("observation-shown");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    let kettle = store.remember(&room, NOW, "the kettle is orange").unwrap();
+    // An exchange in a session that was shown the kettle: linked to it.
+    let said = store
+        .append(
+            &room,
+            NOW,
+            "I take my tea with no sugar",
+            "Noted",
+            &[kettle],
+        )
+        .unwrap();
+    let job = store.conversation_end(&room, "c", &[said]).unwrap();
+    let ids = store
+        .tidy_apply(&room, &job.job, &output("Tea with no sugar", &[said], None))
+        .unwrap();
+    store.forget(&room, ids[0]).unwrap();
+    assert!(
+        store.record(&room, said).unwrap().is_none(),
+        "its evidence goes"
+    );
+    assert!(
+        store.record(&room, kettle).unwrap().is_some(),
+        "the kettle was only shown, never evidence"
+    );
 }

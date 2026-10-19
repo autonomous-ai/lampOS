@@ -1,0 +1,8 @@
+# PLACEHOLDER, to be replaced by the real recording (#1684): no trace
+# has been recorded yet, so this case has no .jsonl and is counted, not run.
+# The event: A match struck and blown out 30 cm and 1 m from the base.
+# Should it speak? No: a short spike.
+# To make it: record `air/state` on a lamp with an air sensor (lamp-4ace or
+# lamp-52e6) while the event happens, put the recording here beside this
+# file, and set `clock` and the `at` of each call from it.
+none = true

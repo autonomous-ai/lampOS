@@ -91,7 +91,7 @@ differs. Folders are what the unit makes or names.
 | air's bus clock | `lamp-air limit-clock --bus-number 0` (a oneshot, before air and controls) | root | none | none | I2C bus 0's `device/freq` |
 | tasks | `lamp-tasks serve` | orangepi | `/var/lib/lampos-tasks/` (0700); `/run/lampos-tasks/` (0700) | `targets.json` in its state folder; the Harness program in the user's home | `request.sock`, `voice.sock` |
 | mood | `lamp-mood serve --zone system` (off unless `LAMP_MOOD=on`, `mood.md`) | lampos | none | the lamp's zone, `/etc/localtime` | the bus (`mood/state`) |
-| cloud | `lamp-cloud --bus-root /run/lampos-bus` (off unless `LAMP_CLOUD=on`, `cloud.md`) | lampos | `/var/lib/lampos-cloud/` (0700, its `StateDirectory`) | setup's `backend.json`, the voice's key and update's `state.json`, through `LoadCredential=` | the company broker and the backend's ping; reads the bus |
+| cloud | `lamp-cloud --bus-root /run/lampos-bus` (on in the product, `LAMP_CLOUD=on` in its unit since #1815, `cloud.md`) | lampos | `/var/lib/lampos-cloud/` (0700, its `StateDirectory`) | setup's `backend.json`, the voice's key and update's `state.json`, through `LoadCredential=` | the company broker and the backend's ping; reads the bus |
 | records | `lamp-records check` (a timer, hourly) | root | `/run/lamp-records/` | `/etc/lampOS/records.json`, which install places (`deploy/product/settings/records.json`; it does nothing without it) | `last.json` |
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
 | update | `lamp-update serve` | root | `/var/lib/lampos-update/` (0700) | `/etc/lampOS/update/key.pub` | none |
@@ -223,7 +223,9 @@ the product doesn't run, and its marks, called only after its look; and
 Light out when you leave (#1677, [presence.md](presence.md)), which reads
 the eyes' `room/presence`, off in the product (`LAMP_PRESENCE`) until its
 lamp check; and Not feeling well (#1681), the droop and dim on
-`lamp/health`'s `error`, until its lamp check. A test
+`lamp/health`'s `error`, until its lamp check; and Smoky air and Dusty air
+(#1684), the air's sudden smoke and an hour of dust, until they are
+measured for false alarms on real traces. A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
 product lamp tells each session 31 functions of the 32 a session takes
 (`lamp_gemini::MAX_TOOLS`): the voice's own 13, the actions part's 17 and
@@ -422,10 +424,17 @@ units stopped:
 2. **The touch pads**, `/etc/lampOS/controls/controls-pins.json`, with a
    person at the lamp. GPIO head pads differ by unit: the hardware team's test
    reads four candidate lines (37, 96, 97, 98), and lamp-52e6's pads were on
-   97 and 98, driven high while touched (#1362). So `lamp-controls
-   discover-head --seconds 30`, with each pad touched twice, finds this unit's
-   pair and polarity, and they go into `head_pads`; the product's 37 and 96,
-   active-high, are only a default. On an MPR121 strip it is
+   97 and 98, driven high while touched (#1362). Each unit's pads also rest
+   and read differently (#1764): lamp-cb94's line 97 flipped at rest and read
+   touched for 77 s with no hand on it, and lamp-c0a4's pulsed under a hand.
+   So `lamp-controls discover-head --seconds 40 --rest-seconds 10`, hands
+   away for its first 11 s and then each pad touched twice, finds this
+   unit's pair and polarity, which go into `head_pads`, and each pad's own
+   baseline, which goes into `head_rest` (its rest, and whether a touch holds
+   its level or pulses; controls.md, "Each lamp's own head pads"). A pad
+   whose line changed with hands away is refused and nothing is written. The
+   product's 37 and 96, active-high, with no `head_rest`, are only a
+   default. On an MPR121 strip it is
    `lamp-controls calibrate-touch` (controls.md, "Run without a lamp, then
    qualify on one": First's on-lamp sequence), its output installed there,
    but **that half is skipped while the base strip is off**: V2 doesn't use
@@ -506,7 +515,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    manifest; renamed only when whole. A folder already there and holding
    exactly the build's files is kept. Only when every folder is whole does
    any `current` link move, each replaced whole by a new link renamed over
-   it.
+   it. Then it copies the build's `lamp-update` to
+   `/usr/local/lib/lampos/lamp-update-back` (0755) if that file isn't already
+   the same: lamp-update's fallback, which only install writes and no round
+   can (updates.md, "lamp-update switching itself", #1680).
 5. Writes each product unit and `lampos.conf`, each only if it is not
    already exactly that. A unit, `lampos.conf` or setting found already
    holding install's exact bytes is given install's mode (0644; the voice's
@@ -555,7 +567,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    from `/root/config/config.json`, but only into a lamp that never had one
    from install: a key install wrote that is now gone was removed on purpose
    (a reset), and V1's config, which may still hold the previous owner's, is
-   never used to put it back (said instead). Both files root's and 0600, as
+   never used to put it back (said instead). It writes the second route's
+   services too, `/etc/lampOS/voice/second.json`
+   (`deploy/product/settings/second.json`: the relay, every service on that
+   same key; the lamps' voice since 19 Oct, #1712). It's kept and replaced as
+   `provider.json` is, and a lamp's own (lamp-4ace's) is kept. All three files root's and 0600, as
    the voice requires, and kept up to date as the settings are: while each is
    still what an install wrote (its SHA-256 in `state.json`), a newer
    provider, or a key V1 rotated in its config, replaces it; one setup wrote,
@@ -588,8 +604,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    `lampos.conf` is written (step 5), and after anything else changed.
 8. If systemd is owed: `systemd-tmpfiles --create`, `systemctl
    daemon-reload`, and `systemctl enable` of every part, `lampos.target`,
-   `lamp-update.service`, `lamp-records.timer` and `lamp-selftest.timer`
-   (its service is started by the timer alone, as the records' check is);
+   `lamp-update.service`, `lamp-records.timer`, `lamp-selftest.timer` and
+   `lamp-update-back.timer` (each timer's service is started by the timer
+   alone; lamp-update-back's also by lamp-update's `OnFailure=`, #1680;
+   `lamp-update-apply.service` is never enabled: only a round starts it,
+   updates.md, "Settings and tmpfiles");
    then records the debt
    paid. It starts nothing and never writes setup's marker. A run whose
    enable fails, or that is stopped anywhere after its first unit is
@@ -737,6 +756,8 @@ sudo systemctl cat 'lamp-*.service' 'lamp-*.timer' 'lampos*' > units.txt
 lamp-update check-units --cat units.txt
 # or against a checkout's deploy/product/ at another commit:
 lamp-update check-units --cat units.txt --product lampOS/deploy/product
+# with the image's own units compared too, for a pro lamp:
+lamp-update check-units --cat units.txt --image robots/lamp --variant pro
 ```
 
 - **Each product unit** is `same`, `missing on the lamp`, or `differs` with
@@ -751,6 +772,12 @@ lamp-update check-units --cat units.txt --product lampOS/deploy/product
 - **Every lamp unit the product has no file for** is said (`not in the
   product`), and a product unit read from anywhere but
   `/etc/systemd/system/` (`not where install puts it`).
+- **The image's own units** that updates carry (`lamp-cmedia-speaker.service`,
+  `respeaker-lite-softvol.service`, #1369) are said as `the image's`, not
+  `not in the product`. With `--image robots/lamp [--variant NAME]`
+  (standard unless named, as the lamp's `/etc/autonomous/hardware-profile`
+  says) each is compared with that variant's, and one that differs is a
+  finding; without it, each is only said.
 - **A masked unit** (`# Unit NAME is masked.`) is a finding too.
 - It ends with **0** when everything is `same` and nothing else is found,
   **1** when not, and **2** for a wrong option or a file it cannot read, so a
@@ -865,10 +892,12 @@ lamp-update check-units --cat units.txt --product lampOS/deploy/product
     against the disk. Where `systemd-analyze` exists, it checks that systemd
     reads them last beside a 100M `persistent.conf`. lamp-75c9's systemd 252
     reads it last after its own `journald.conf` too.
-  - **Existing lamps:** only a newly imaged lamp has it. `install` and
-    updates don't place the image's files (#1369). On a lamp already in use
-    it is copied there by hand, and journald reads it when it next starts,
-    at the next boot. `journalctl --vacuum-size=20M` shrinks the journal at
+  - **Existing lamps:** only a newly imaged lamp has it, unless a build
+    carries the image's files and `LAMP_UPDATE_IMAGE=on` (#1369,
+    updates.md "The image's own files"); `install` doesn't place them. On a
+    lamp already in use it is otherwise copied there by hand, and journald
+    reads it when it next starts, at the next boot (an update never
+    restarts journald either). `journalctl --vacuum-size=20M` shrinks the journal at
     once, with no restart of anything.
 - The night's copy-back of the logs leaves the journal alone:
   `robots/lamp/rootfs/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf`

@@ -345,8 +345,15 @@ started once its answer is told:
       told unasked, on the same proof. Told before or not: a telling unasked
       may have been cut short. Only the tasks part's own answer can carry a
       key.
-      The second voice's model isn't given the key either, but it puts no
-      news on its turns, so news asked about there leaves its harness open.
+      The second voice does the same (the first builder's 20:15 on #1722):
+      its spoken turn's runner leaves the key in the answer
+      (`tools::answer_keeping_news`), and the turn takes it out before its
+      model reads the answer and sends `NewsAnswered` for that request
+      (`second_provider`'s
+      `news_asked_about_rides_on_its_turn_and_its_key_is_never_the_models`).
+      Before this it put no news on its turns, so news asked about there left
+      its harness open. A text from the app (`tools::answer_typed`) still
+      takes the key out and keeps nothing.
     - Before this, on lamp-4ace on 18 Oct, task 147 was told and never
       closed: the news path never said so.
   - **Or by a speech claim:** its telling played, or isn't known to have
@@ -1346,6 +1353,30 @@ an ask over (the owner, 19 Oct 07:1x, "via hand-overs").
 
 Tests: `agent_tasks::tests::with_accounts_the_persons_calendar_and_email_are_handed_over_and_no_office_is_named`,
 `agent_tasks::tests::the_accounts_switch_is_on_only_with_asked_and_taken_after_it`.
+
+### A skill made by voice (#1685, off unless `LAMP_MAKE_SKILL=on`)
+
+The worker's `--tasks-make-skill`, after `--tasks-needs`, gives the model
+`make_skill(request)` ([skills.md](skills.md#made-by-voice-1685-off-unless-lamp_make_skillon)).
+- **The prepare.** It goes as `start_agent_task`'s does: `prepare`, then
+  `confirm_agent_task` on the person's yes, within 120 s, as the same
+  pending work. Its `text` is the brief and the request (at most 180 bytes)
+  within the tasks part's 1,000 bytes. The brief begins "Write one lamp
+  skill (lampOS lamp-skills)", which is how the voice knows the task again.
+- **The model's answer.** It is told `"skill": <the request>`, never the
+  brief, and `next` asks it to say the request back.
+- **When it settles.** Task news (`task_news::read_once_with`) quotes the
+  request as such a task's words, in every state. Settled `idle` with an
+  answer, the answer is taken as the skill's two files, kept as skills.md
+  says, and told alone (never with other news, never read out).
+- **Without the switch,** such a task's news is any task's, the request
+  quoted.
+- **The journal** says `a skill made by voice is kept, version VERSION,
+  sha256 …` or why not, with `lamp-skills`' exit code only: never the files,
+  the name or `lamp-skills`' words, which can quote the agent's.
+- **The reset** wipes `/var/lib/lampOS/voice/made-skills` with the person's
+  other stores ([setup.md](setup.md)).
+- **Without the switch** a `make_skill` call does nothing.
 
 ### Asked of the staff, done by the lamp (#854, off unless `LAMP_TASKS_ASKED=on`)
 

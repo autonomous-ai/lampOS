@@ -1194,6 +1194,7 @@ fn run_policy_with_peers_held(
             .collect()
     };
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: lamp.end_silence_blocks,
@@ -1749,6 +1750,7 @@ fn mute_with_endpoint(endpoint: EndpointRig) -> (Result<()>, SessionState) {
         })
     });
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,

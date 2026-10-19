@@ -1,0 +1,9 @@
+# Someone at the lamp for two minutes, gone, back at 400 s, and asks at
+# 500 s: their own two spells and nothing between.
+[[call_tool]]
+name = "who_was_here"
+at = "500s"
+
+[[expect]]
+call = "say"
+args = { note = "Answer from the lamp's record below whether anyone was at the lamp while they were away, in a few words: when, and about how long, as \"someone was here for a few minutes around two\". It cannot tell who: never guess who it was, and where the record says someone the lamp knows, say just that, never a name. The time going on now is theirs. If it could not see the room for a while, say so. If there is no record, say you can't tell.\n\nThe lamp's record of the room over the last 12 h, times only, from its eyes and ears: it never knows who anyone was, and keeps no picture.\n- someone was at the lamp for 1 min, 8 min ago\n- someone has been at the lamp for 1 min, since 1 min ago, and still is" }

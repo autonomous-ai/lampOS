@@ -245,3 +245,84 @@ fn forget_everything_removes_all_of_someone_known_and_never_the_room_s() {
     let (told, ok) = run(FORGET_EVERYTHING, json!({}));
     assert!(ok && told["forgotten"] == false, "{told}");
 }
+
+/// #1693: something remembered goes with the conversation it came up in.
+/// The earlier turn where it was said is kept with it (the voice sends the
+/// conversation's journalled exchanges with `remember`), so "forget that"
+/// removes it too; an earlier conversation about something else stays.
+#[test]
+fn forget_that_removes_the_conversation_a_kept_thing_came_up_in() {
+    assert!(switch_forget_all(true));
+    let fixture = Fixture::new(|_, _| {}, None);
+    let client = fixture.client();
+    // An earlier conversation, about something else.
+    assert!(client.finished_exchange(fixture.now, "synthetic: what's the weather", "Sunny"));
+    let (_, weather) = fixture.next("append_linked");
+    assert!(client.end_conversation());
+    fixture.next("conversation_end");
+    // This conversation: said, then asked to be kept.
+    assert!(client.finished_exchange(
+        fixture.now,
+        "synthetic: my violet umbrella is in the car",
+        "Good to know"
+    ));
+    let (_, said) = fixture.next("append_linked");
+    // The writer takes the store's answer a moment after the store gives
+    // it; on a lamp the next turn is seconds later.
+    std::thread::sleep(Duration::from_millis(200));
+    remember(&client, "synthetic violet umbrella in the car");
+    let (keep, _) = fixture.next("remember");
+    assert_eq!(keep["source_ids"], json!([said["id"]]));
+    let violet = recalled(&client, "violet").expect("recall finds it");
+    let (told, ok) = client.run(&call(FORGET, json!({"source_id": violet})), BUDGET);
+    assert!(ok && told["forgotten"] == true, "{told}");
+    // The kept thing and the turn it came from are gone; the weather stays.
+    assert_eq!(fixture.count("entries"), 1);
+    assert_eq!(recalled(&client, "umbrella"), None);
+    assert!(recalled(&client, "weather").is_some(), "{weather}");
+}
+
+/// Second's P2 on #2003: after "forget that" removed a kept thing with its
+/// conversation, the next "remember …" in that conversation is kept, not
+/// refused for the forgotten turns' ids; the same after "forget everything"
+/// for someone known.
+#[test]
+fn after_forgetting_the_next_thing_remembered_is_kept() {
+    assert!(switch_forget_all(true));
+    let fixture = Fixture::new(|_, _| {}, None);
+    let client = fixture.client();
+    assert!(client.finished_exchange(
+        fixture.now,
+        "synthetic: my violet umbrella is in the car",
+        "Good to know"
+    ));
+    fixture.next("append_linked");
+    // The writer takes the store's answer a moment after it is given.
+    std::thread::sleep(Duration::from_millis(200));
+    remember(&client, "synthetic violet umbrella in the car");
+    let violet = recalled(&client, "violet").expect("recall finds it");
+    let (told, ok) = client.run(&call(FORGET, json!({"source_id": violet})), BUDGET);
+    assert!(ok && told["forgotten"] == true, "{told}");
+    // Something else, in the same conversation: kept.
+    remember(&client, "synthetic orange kettle");
+    assert!(recalled(&client, "kettle").is_some());
+
+    // Someone known: their turn, a thing kept with it, then everything.
+    const ANA: &str = "p-0123456789abcdef";
+    let fresh = fixture.client();
+    assert!(fresh.finished_exchange_for(
+        fixture.now,
+        "synthetic: my bike is the blue one",
+        "Noted",
+        Some(ANA)
+    ));
+    fixture.next("append_linked");
+    std::thread::sleep(Duration::from_millis(200));
+    let run_fresh = |name, args| fresh.run_for(&call(name, args), BUDGET, Some(ANA));
+    let (told, ok) = run_fresh(REMEMBER, json!({"text":"synthetic blue bike"}));
+    assert!(ok && told["remembered"] == true, "{told}");
+    let (told, ok) = run_fresh(FORGET_EVERYTHING, json!({}));
+    assert!(ok && told["everything"] == true, "{told}");
+    let (told, ok) = run_fresh(REMEMBER, json!({"text":"synthetic green scarf"}));
+    assert!(ok && told["remembered"] == true, "{told}");
+}

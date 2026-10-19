@@ -560,6 +560,23 @@ fn serve(
     };
     let (finished, done) = mpsc::channel::<SkillEvent>();
     let mut engine = Engine::new(Vec::new(), skip_ask);
+    // Who was here's mark of someone the lamp knows, never a name, only
+    // with LAMP_WHO_WAS_HERE_KNOWN=on and the eyes' known file (#1685).
+    if lamp_skills::known::marking() {
+        match &options.known_file {
+            Some(path) => {
+                eprintln!(
+                    "lamp-skills: Who was here may say someone the lamp knows was here, never who ({})",
+                    lamp_skills::known::ENVIRONMENT
+                );
+                engine = engine.marking_known(path.clone());
+            }
+            None => eprintln!(
+                "lamp-skills: {} is on without --known-file, so Who was here marks nobody",
+                lamp_skills::known::ENVIRONMENT
+            ),
+        }
+    }
     if let Some(state) = &options.state {
         match engine.keep_off_in(state) {
             Ok(off) => eprintln!(
@@ -995,16 +1012,7 @@ const KNOWN_FRESH: Duration = Duration::from_secs(5);
 /// only, to tell a known face from one it does not know and the person who
 /// asked from anyone else; never in a text, an event or the journal.
 fn known_now(path: &Path) -> Option<String> {
-    let age = std::fs::metadata(path)
-        .and_then(|meta| meta.modified())
-        .ok()
-        .and_then(|modified| SystemTime::now().duration_since(modified).ok())?;
-    if age > KNOWN_FRESH {
-        return None;
-    }
-    let name = std::fs::read_to_string(path).ok()?;
-    let name = name.trim();
-    (!name.is_empty() && name.len() <= 160 && !name.contains('\n')).then(|| name.to_owned())
+    lamp_skills::known::name_in(path, KNOWN_FRESH)
 }
 
 /// The lamp's local minute of the day, if its time is known.

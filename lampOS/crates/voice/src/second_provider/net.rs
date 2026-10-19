@@ -6,20 +6,27 @@
 use std::{fmt, sync::Arc, time::Duration};
 
 mod chat;
+mod gemini_tts;
+pub mod key_terms;
+pub mod search;
 mod sentences;
 mod stt;
 mod tts;
+pub mod weather;
 
-pub use chat::{Chat, ChatEvent, ChatStream, Declare, Message, ToolCall};
+pub use chat::{
+    Chat, ChatEvent, ChatStream, Declare, GEMINI_REASONING, Message, Narrow, ToolCall, cache_counts,
+};
+pub use gemini_tts::{GeminiSpeech, GeminiTts};
 pub use sentences::Sentences;
-pub use stt::{Replies, SttStream, check as stt_check};
-pub use tts::{PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream};
+pub use stt::{Early, Replies, SttStream, check as stt_check};
+pub use tts::{PACKET_SAMPLES, TTS_SAMPLE_RATE, Tts, TtsStream, Turn, default_model};
 
 /// To open a connection, TLS included.
-const CONNECT: Duration = Duration::from_secs(10);
+pub(crate) const CONNECT: Duration = Duration::from_secs(10);
 /// For a streamed response to say anything more. A chat model thinking
 /// before its first word is the slowest case seen in V1 (6-19 s).
-const STALL: Duration = Duration::from_secs(30);
+pub(crate) const STALL: Duration = Duration::from_secs(30);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
@@ -64,7 +71,7 @@ pub(crate) fn openai_base(url: &str) -> String {
 
 /// TLS 1.2 and 1.3 with the `ring` provider and the webpki roots, as the
 /// other lampOS clients have it.
-fn tls() -> Result<rustls::ClientConfig> {
+pub(crate) fn tls() -> Result<rustls::ClientConfig> {
     let roots = rustls::RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };
@@ -115,6 +122,88 @@ async fn post(
         return Err(Error::Status(response.status().as_u16()));
     }
     Ok(response)
+}
+
+/// A JSON `GET` with the key in `authorization` (a service's model list),
+/// bounded as a request and at 1 MiB.
+pub async fn get_json(url: &str, authorization: &str) -> Result<serde_json::Value> {
+    fetch_json(url, Some(authorization)).await
+}
+
+/// A JSON `GET` of a service that takes no key (Open-Meteo), bounded as
+/// [`get_json`] is.
+pub(crate) async fn get_public_json(url: &str) -> Result<serde_json::Value> {
+    fetch_json(url, None).await
+}
+
+async fn fetch_json(url: &str, authorization: Option<&str>) -> Result<serde_json::Value> {
+    let client = http_client()?;
+    let mut request = client.get(url);
+    if let Some(authorization) = authorization {
+        request = request.header("authorization", authorization);
+    }
+    let mut response = tokio::time::timeout(CONNECT + STALL, request.send())
+        .await
+        .map_err(|_| Error::Timeout("request"))?
+        .map_err(|_| Error::Transport("request"))?;
+    if !response.status().is_success() {
+        return Err(Error::Status(response.status().as_u16()));
+    }
+    let mut bytes = Vec::new();
+    while let Some(piece) = chunk(&mut response).await? {
+        bytes.extend(piece);
+        if bytes.len() > 1 << 20 {
+            return Err(Error::Protocol("answer length"));
+        }
+    }
+    serde_json::from_slice(&bytes).map_err(|_| Error::Protocol("answer"))
+}
+
+/// The local socket a response came on: the same one again means the
+/// connection was reused from the client's pool. HTTP/1.1 only here (no
+/// `http2` feature), so one connection carries one request at a time.
+pub(crate) fn local_socket(response: &reqwest::Response) -> Option<std::net::SocketAddr> {
+    response
+        .extensions()
+        .get::<hyper_util::client::legacy::connect::HttpInfo>()
+        .map(hyper_util::client::legacy::connect::HttpInfo::local_addr)
+}
+
+/// A connection opened ahead with a `GET` of `url` (#1712), unless `used`
+/// says one went within `after`: at most `max` bytes of the answer are read,
+/// so the connection goes back to the pool. The status, how long it took and
+/// the connection's local socket; `None` when not due, or when it failed.
+pub(crate) async fn warm_get(
+    client: &reqwest::Client,
+    used: &std::sync::Mutex<Option<std::time::Instant>>,
+    after: Duration,
+    url: &str,
+    auth: (&'static str, &str),
+    max: usize,
+) -> Option<(u16, Duration, Option<std::net::SocketAddr>)> {
+    let began = std::time::Instant::now();
+    {
+        let mut used = used.lock().ok()?;
+        if used.is_some_and(|at| began.duration_since(at) < after) {
+            return None;
+        }
+        *used = Some(began);
+    }
+    let request = client.get(url).header(auth.0, auth.1);
+    let mut response = tokio::time::timeout(CONNECT + STALL, request.send())
+        .await
+        .ok()?
+        .ok()?;
+    let status = response.status().as_u16();
+    let socket = local_socket(&response);
+    let mut read = 0;
+    while read <= max {
+        match tokio::time::timeout(STALL, response.chunk()).await {
+            Ok(Ok(Some(bytes))) => read += bytes.len(),
+            _ => break,
+        }
+    }
+    Some((status, began.elapsed(), socket))
 }
 
 /// The next piece of a streamed body; `None` at its end.

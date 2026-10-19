@@ -17,10 +17,36 @@ use crate::catalogue::{add, ease};
 use lamp_msgs::BodyOffsets;
 use serde::{Deserialize, Serialize};
 
-/// Under this the lamp is silent between words or sentences.
+/// Under this the lamp is silent between words or sentences, for a voice at
+/// `REFERENCE`; it scales with the voice's own level (below).
 const QUIET_LEVEL: f32 = 0.06;
-/// A sentence has begun again once the level is back over this.
+/// A sentence has begun again once the level is back over this, for a voice
+/// at `REFERENCE`; it scales the same way.
 const SPEAKING_LEVEL: f32 = 0.12;
+/// The voice's running level these bars and `stress_level` were tuned at:
+/// the sound of Gemini Live's answers (#955), as the engine tests model it,
+/// averages about this over its pieces with sound. Another voice sits higher
+/// or lower (the second route's ElevenLabs, #1712), so each bar is taken as
+/// a share of the turn's own running level, and a quiet voice nods and
+/// sways as a loud one does (the first builder, 19 Oct 21:34 on #1722).
+const REFERENCE: f32 = 0.34;
+/// The running level follows the voice's sound this slowly, over pieces
+/// with sound in them only, so a pause does not pull it down.
+const VOICE_US: f64 = 2_000_000.0;
+/// A piece under this has no sound in it, whatever the voice.
+const SOUND_FLOOR: f32 = 0.01;
+/// How far the bars may scale from the reference, either way.
+const SCALE: (f32, f32) = (0.25, 3.0);
+/// The bars' least values, so that silence stays silence and a hiss is no
+/// word, however quiet the voice.
+const FLOORS: (f32, f32, f32) = (0.015, 0.03, 0.06);
+/// The stress bar's most: the voice's meter stops at 1.0, so a voice that
+/// fills it (a running level near 1.0, scaled past 1.0) would otherwise never
+/// nod, where the fixed bars nodded as each sentence began (Seventh on
+/// #1722, 19 Oct 22:25). `stress_rise` still asks the word to stand out from
+/// the moment before it. A catalogue whose own `stress_level` is higher keeps
+/// it.
+const STRESS_CEILING: f32 = 0.9;
 /// The recent level a stressed word is measured against follows the sound
 /// this fast.
 const RECENT_US: f64 = 250_000.0;
@@ -92,6 +118,10 @@ impl Speaking {
 pub(crate) struct SpeechMotion {
     last_us: Option<u64>,
     recent: f32,
+    /// The turn's running level, over pieces with sound (0: none yet).
+    voice: f32,
+    /// How many pieces with sound it is over, so far this turn.
+    voiced: u32,
     quiet_since: Option<u64>,
     paused: bool,
     spoke_since: Option<u64>,
@@ -193,12 +223,29 @@ impl SpeechMotion {
         }
         if speaking {
             self.spoke_since.get_or_insert(now_us);
-            if level < QUIET_LEVEL {
+            // The voice's own level so far this turn: the mean of its first
+            // pieces, then a slow follow.
+            if level >= SOUND_FLOOR {
+                self.voiced = self.voiced.saturating_add(1);
+                let pace = (1.0 - (-(step as f64) / VOICE_US).exp()).max(1.0 / self.voiced as f64);
+                self.voice += (level - self.voice) * pace as f32;
+            }
+            let scale = if self.voice > 0.0 {
+                (self.voice / REFERENCE).clamp(SCALE.0, SCALE.1)
+            } else {
+                1.0
+            };
+            let quiet_level = (QUIET_LEVEL * scale).max(FLOORS.0);
+            let speaking_level = (SPEAKING_LEVEL * scale).max(FLOORS.1);
+            let stress_level = (rules.stress_level * scale)
+                .min(STRESS_CEILING.max(rules.stress_level))
+                .max(FLOORS.2);
+            if level < quiet_level {
                 let since = *self.quiet_since.get_or_insert(now_us);
                 self.paused |= now_us.saturating_sub(since) >= rules.pause_us;
             } else {
                 self.quiet_since = None;
-                if self.paused && level >= SPEAKING_LEVEL {
+                if self.paused && level >= speaking_level {
                     // A new sentence: the head rolls over to the other side,
                     // a little more or less each time.
                     self.paused = false;
@@ -208,7 +255,7 @@ impl SpeechMotion {
                     self.sway_to(rules, towards * size, now_us);
                 }
             }
-            let stressed = level >= rules.stress_level && level >= self.recent * rules.stress_rise;
+            let stressed = level >= stress_level && level >= self.recent * rules.stress_rise;
             if stressed
                 && self
                     .nod
@@ -230,6 +277,8 @@ impl SpeechMotion {
             self.quiet_since = None;
             self.paused = false;
             self.recent = 0.0;
+            self.voice = 0.0;
+            self.voiced = 0;
             if self.side != 0.0 {
                 self.sway_to(rules, 0.0, now_us);
             }

@@ -38,6 +38,20 @@ usage: lamp-setup COMMAND [OPTIONS]
   resume-reset --plan FILE [--enable]
       At start, before the lamp: finish a reset a power cut interrupted.
       Without --enable it only says whether one is unfinished.
+  change --config FILE [--bus-root PATH] [--enable]
+      Root's helper for changes after setup (#1959): one request line on
+      standard input from lamp-cloud, a name or the time zone, checked and
+      written with setup's own writers; one reply line on standard output.
+      A zone change then restarts lamp-schedule once the lamp is quiet.
+      Without --enable every request is refused.
+  wifi --config FILE [--enable]
+      Root's helper for the Wi-Fi changed after setup (#1959): one request
+      line on standard input from lamp-cloud, the new network and the broker
+      it is on; the new network is kept only once joined with an address and
+      the broker reached within 60 s, else the old one comes back. One reply
+      line on standard output, at the end; then the lamp says what happened.
+      The password is never printed.
+      Without --enable every request is refused.
   wake
       From power-on until the voice asks for the ring: the waking face
       (#1681). Only with LAMP_WAKING_FACE=on; otherwise it exits at once.
@@ -111,6 +125,12 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             return Err("wake takes no options".into());
         }
         return wake();
+    }
+    if command == "change" {
+        return change(given);
+    }
+    if command == "wifi" {
+        return wifi_change(given);
     }
     let (mut options, enabled) = options(given)?;
     let plan_path = PathBuf::from(options.remove("--plan").ok_or("--plan is required")?);
@@ -230,6 +250,106 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         }
         _ => Err(format!("unknown command {command}").into()),
     }
+}
+
+/// `change`: one request from `lamp-cloud`, on the socket systemd hands
+/// over as standard input and output (`lamp-setup-change@.service`).
+fn change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::error::Error>> {
+    use lamp_setup::change;
+    use std::io::{BufRead, Write};
+    let (mut options, enabled) = options(given)?;
+    let config_path = PathBuf::from(options.remove("--config").ok_or("--config is required")?);
+    let bus_root = options.remove("--bus-root");
+    if !options.is_empty() {
+        return Err("change takes --config, --bus-root and --enable".into());
+    }
+    let config = serve_config(&config_path)?;
+    let mut line = String::new();
+    io::stdin()
+        .lock()
+        .take(change::LINE_MOST as u64 + 1)
+        .read_line(&mut line)?;
+    let (reply, done) = change::answer(&line, &config, enabled);
+    {
+        let mut out = io::stdout().lock();
+        writeln!(out, "{reply}")?;
+        out.flush()?;
+    }
+    // What was changed, never the value: the journal is not the person's.
+    match (&done, reply.get("refused")) {
+        (Some(done), _) => eprintln!("lamp-setup: change: {}", done.said),
+        (None, Some(why)) => {
+            eprintln!("lamp-setup: change refused: {}", why.as_str().unwrap_or(""))
+        }
+        _ => {}
+    }
+    if !done.is_some_and(|done| done.restart_schedule) {
+        return Ok(true);
+    }
+    let bus = match bus_root {
+        Some(root) => Bus::new(root)?,
+        None => Bus::from_environment()?,
+    };
+    let mut ears = change::BusEars::new(&bus, &mut |line| eprintln!("lamp-setup: change: {line}"));
+    match change::wait_for_quiet(&mut ears, change::QUIET_MOST) {
+        Ok(()) => {
+            let status = std::process::Command::new("/usr/bin/systemctl")
+                .args(["try-restart", change::SCHEDULE_UNIT])
+                .status();
+            match status {
+                Ok(status) if status.success() => {
+                    eprintln!(
+                        "lamp-setup: change: lamp-schedule restarted on the new zone, at a quiet moment"
+                    );
+                }
+                Ok(status) => {
+                    eprintln!("lamp-setup: change: lamp-schedule's restart ended with {status}")
+                }
+                Err(error) => {
+                    eprintln!("lamp-setup: change: lamp-schedule could not be restarted: {error}")
+                }
+            }
+        }
+        Err(why) => eprintln!(
+            "lamp-setup: change: the lamp was not quiet within {} min ({why}); lamp-schedule keeps the old zone until it next starts",
+            change::QUIET_MOST.as_secs() / 60
+        ),
+    }
+    Ok(true)
+}
+
+/// `wifi`: one Wi-Fi change from `lamp-cloud`, on the socket systemd hands
+/// over as standard input and output (`lamp-setup-wifi@.service`).
+fn wifi_change(given: impl Iterator<Item = String>) -> Result<bool, Box<dyn std::error::Error>> {
+    use lamp_setup::wifi_change;
+    use std::io::{BufRead, Write};
+    let (mut options, enabled) = options(given)?;
+    let config_path = PathBuf::from(options.remove("--config").ok_or("--config is required")?);
+    if !options.is_empty() {
+        return Err("wifi takes --config and --enable".into());
+    }
+    let config = serve_config(&config_path)?;
+    let mut line = String::new();
+    io::stdin()
+        .lock()
+        .take(wifi_change::LINE_MOST as u64 + 1)
+        .read_line(&mut line)?;
+    let mut host = wifi_change::ImageRejoin::new();
+    let answered = wifi_change::answer(&line, &config.country, enabled, &mut host);
+    // Never the password, and never the network's name: `said` holds neither.
+    eprintln!("lamp-setup: wifi: {}", answered.said);
+    {
+        let mut out = io::stdout().lock();
+        writeln!(out, "{}", answered.reply)?;
+        out.flush()?;
+    }
+    // Then the lamp says what happened, never the network's name.
+    if let Some((changed, broker)) = &answered.changed {
+        let mut mouth = wifi_change::SayService::product();
+        let said = wifi_change::say_after(&mut host, &mut mouth, changed, broker);
+        eprintln!("lamp-setup: wifi: {said} line(s) asked of the voice");
+    }
+    Ok(true)
 }
 
 /// Hand the reset to a unit of its own (`detach`), outside `lampos.target`:

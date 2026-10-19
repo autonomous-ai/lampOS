@@ -760,7 +760,8 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::HoldingAnswer { request, .. }
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
-        | ProviderOutput::NewsAnswered { request, .. } => Some(*request),
+        | ProviderOutput::NewsAnswered { request, .. }
+        | ProviderOutput::Stages { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
     }
 }

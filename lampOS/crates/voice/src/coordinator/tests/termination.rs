@@ -274,6 +274,7 @@ fn isolated_signal_child() {
         peer(privacy_peer, None),
     ];
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,
@@ -610,6 +611,7 @@ fn speaker_finish_failure(speaker_late: bool, capture_late: bool) -> (String, Ve
         late_peer(privacy_peer, None, Duration::ZERO, None),
     ];
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,
@@ -723,6 +725,7 @@ fn capture_exiting_during_speaker_reap_is_not_forced() {
         observed.fetch_add(1, Ordering::SeqCst);
     });
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,
@@ -828,6 +831,7 @@ fn service_signal_child(output: PathBuf, termination: Termination, mut trace: Se
         })
     });
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         microphone: crate::options::Microphone::Mic2,
         end_silence_blocks: None,

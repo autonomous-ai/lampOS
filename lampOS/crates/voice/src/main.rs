@@ -46,6 +46,31 @@ fn stt_check_options(rest: &[String]) -> Result<(u32, u32)> {
     Ok((rounds, held))
 }
 
+/// `probe-cascade`'s `[RUNS] [--look JPEG | --wire]`, in that order: five
+/// runs, every candidate and no look unless said; at most 50 runs. True
+/// with `--wire`.
+fn probe_options(rest: &[String]) -> Result<(u32, Option<std::path::PathBuf>, bool)> {
+    let usage = || {
+        io::Error::other(
+            "usage: probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG | --wire]",
+        )
+    };
+    let (runs, rest) = match rest {
+        [runs, rest @ ..] if !runs.starts_with("--") => (runs.parse().map_err(|_| usage())?, rest),
+        _ => (5, rest),
+    };
+    let (look, wire) = match rest {
+        [] => (None, false),
+        [flag, jpeg] if flag == "--look" => (Some(std::path::PathBuf::from(jpeg)), false),
+        [flag] if flag == "--wire" => (None, true),
+        _ => return Err(usage().into()),
+    };
+    if !(1..=50).contains(&runs) {
+        return Err(usage().into());
+    }
+    Ok((runs, look, wire))
+}
+
 fn run() -> Result<()> {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     // The voice runs only as a command on its list, and a worker only in a
@@ -89,7 +114,10 @@ fn run() -> Result<()> {
         // not a stop's latency. One line a round, with the words heard.
         [command, config, wav, rest @ ..] if command == "stt-check" && rest.len() <= 3 => {
             let (rounds, held_ms) = stt_check_options(rest)?;
-            let config = lamp_voice::second_config::load_from_path(Path::new(config))?;
+            // The unit's switches too: LAMP_SECOND_FLUX=on hears the line
+            // with Flux, LAMP_SECOND_KEY_TERMS adds its words.
+            let config = lamp_voice::second_config::load_from_path(Path::new(config))?
+                .with_environment(|name| std::env::var_os(name))?;
             let mut reader = hound::WavReader::open(wav)?;
             let spec = reader.spec();
             if spec.sample_rate != 16_000 || spec.channels != 1 || spec.bits_per_sample != 16 {
@@ -222,7 +250,7 @@ fn run() -> Result<()> {
             let lead_in=std::env::var(lamp_voice::agent_tasks::LEAD_IN_ENVIRONMENT).as_deref()==Ok("on");
             // LAMP_TASKS_ASKED=on: the functions as with work asked of the staff handed over every time (#854).
             let asked=std::env::var(lamp_voice::agent_tasks::ASKED_ENVIRONMENT).as_deref()==Ok("on");
-            let place=lamp_voice::agent_tasks::Place{directory:"/nonexistent".into(),target:lamp_voice::agent_tasks::DEFAULT_TARGET.into(),who:false,lead_in,asked,accounts:false,machine_names:false,needs:None,staff_note:false};
+            let place=lamp_voice::agent_tasks::Place{directory:"/nonexistent".into(),target:lamp_voice::agent_tasks::DEFAULT_TARGET.into(),who:false,lead_in,asked,accounts:false,machine_names:false,needs:None,staff_note:false,make_skill:false};
             // With the switch, each session is told after the persona what a lamp's would be (#854).
             let note=lamp_voice::agent_tasks::session_note(&place).unwrap_or_default();
             let colour=lamp_gemini::Tool{name:"light_colour".into(),description:"Set the colour of your own light when you are asked to.".into(),parameters:Some(serde_json::json!({"type":"object","properties":{"colour":{"type":"string","enum":["white","warm","red","green","blue","purple"]}},"required":["colour"]})),silent:false};
@@ -622,17 +650,58 @@ fn run() -> Result<()> {
                 _ => return Err(io::Error::other("unknown worker role").into()),
             }
         }
-        // worker second DIR PARENT WORKER PROVIDER_CONFIG SECOND_CONFIG [--wait-cue] [--down-line] [--only-voice] [the provider worker's flags but --keep-link]
+        // worker second DIR PARENT WORKER PROVIDER_CONFIG SECOND_CONFIG [--wait-cue] [--down-line] [--only-voice] [--gemini-chat] [--gemini-speech] [the provider worker's flags but --keep-link]
         [command, role, dir, parent, worker, provider_config, second_config, flags @ ..] if command == "worker" && role == "second" => {
-            let (wait_cue, flags) = lamp_voice::second_provider::worker::take_wait_cue(flags);
-            let (down_line, flags) = lamp_voice::second_provider::worker::take_down_line(flags);
-            let (only_voice, flags) = lamp_voice::second_provider::worker::take_only_voice(flags);
+            let (route, flags) = lamp_voice::second_provider::worker::RouteFlags::take(flags);
             let (_, _, files, _) = lamp_voice::second_provider::worker::parse_flags(Path::new(dir), flags)?;
             let parent = parse_boot(parent)?;
             let worker = parse_boot(worker)?;
             let mut channels = WorkerChannels::bind(Path::new(dir), role, parent, worker, true)?;
+            // The only voice takes its input late, as the Live worker does.
+            if route.only_voice {
+                channels = channels.taking_late_input();
+            }
             channels.connect(Path::new(dir), role, true)?;
-            lamp_voice::second_provider::worker::serve(channels, parent, Path::new(provider_config), Path::new(second_config), files, wait_cue, down_line, only_voice)?;
+            lamp_voice::second_provider::worker::serve(channels, parent, Path::new(provider_config), Path::new(second_config), files, route)?;
+        }
+        // probe-cache PROVIDER_CONFIG SECOND_CONFIG [RUNS]
+        [command, provider_config, second_config, rest @ ..] if command == "probe-cache" => {
+            let usage = || io::Error::other("usage: probe-cache PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20]");
+            let runs = match rest {
+                [] => 3,
+                [runs] => runs.parse().ok().filter(|runs| (1..=20).contains(runs)).ok_or_else(usage)?,
+                _ => return Err(usage().into()),
+            };
+            tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                lamp_voice::second_provider::probe::cache::run(Path::new(provider_config), Path::new(second_config), runs),
+            )?;
+        }
+        // probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS]
+        [command, provider_config, second_config, rest @ ..] if command == "probe-tools" => {
+            let usage = || io::Error::other("usage: probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20]");
+            let runs = match rest {
+                [] => 3,
+                [runs] => runs.parse().ok().filter(|runs| (1..=20).contains(runs)).ok_or_else(usage)?,
+                _ => return Err(usage().into()),
+            };
+            tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                lamp_voice::second_provider::probe::tools::run(Path::new(provider_config), Path::new(second_config), runs),
+            )?;
+        }
+        // probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG | --wire]
+        [command, provider_config, second_config, rest @ ..] if command == "probe-cascade" => {
+            let (runs, look, wire) = probe_options(rest)?;
+            let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+            if wire {
+                // Its requests are made by hand, one at a time, blocking;
+                // the chats that build them are made in the runtime.
+                let _entered = runtime.enter();
+                lamp_voice::second_provider::probe::wire::run(Path::new(provider_config), Path::new(second_config), runs)?;
+            } else {
+                runtime.block_on(
+                    lamp_voice::second_provider::probe::run(Path::new(provider_config), Path::new(second_config), runs, look.as_deref()),
+                )?;
+            }
         }
         // worker ring DIR PARENT WORKER --continuous [--resting CEILING] [--bus-root DIR] [--eye] [--head-touch] [--light-requests]
         #[cfg(target_os = "linux")]

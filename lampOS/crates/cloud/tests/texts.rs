@@ -32,6 +32,8 @@ fn lamp(name: &str, texting: bool) -> (Real, PathBuf) {
         texts: Texts::on(texting),
         reports: None,
         skills: None,
+        changes: None,
+        photos: None,
     };
     (lamp, bus_root)
 }

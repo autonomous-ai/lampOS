@@ -617,6 +617,133 @@ A left-out bus message is counted under its topic only when the topic is one
 of lampOS's (`BUS_TOPICS`, held to every `TOPIC` in `crates/msgs` by a test),
 else as `other`; anything beside a payload's `faces` is left out and counted.
 
+## What a played test's arms cost: `cost`
+
+`lamp-voice-eval cost JOURNAL --prices FILE --arm NAME FROM TO...` prints what
+each arm of a played test cost, from `journalctl -u lamp-voice` alone (the first
+builder on #1722, 19 Oct 21:18: `cost-night1.py` as a subcommand). An arm is a
+stretch of the journal by the lamp's time of day, `HH:MM` or `HH:MM:SS`, as
+`score`'s arms are, and may run past midnight.
+
+- **Usage is read from the voice's own lines**, as counts only, never words
+  (`src/cost.rs` names each line):
+  - requests, by process and number;
+  - answered: the second route's `first answer audio`, and Live's answers
+    that began, less those held back. Live's begin with its first sound, which
+    it says only with `LAMP_NAME_SIGNAL`, or its answer judged played (`its
+    answer is played: …`), which it says whenever attention judges, as with
+    `LAMP_SPOKEN_TO`. Either switch counts them; with neither, Live's answered
+    reads 0;
+  - DeepSeek's prompt, cached and completion tokens from each `chat answer`.
+    One with "the cache not said" is priced as all uncached, the dearer, and one
+    with "no usage given" is counted, not priced;
+  - searches, `web_search` called or the chat's plugin searching;
+  - the sound sent to Deepgram, Nova-3's and Flux's lines each at their own price;
+  - the voice's characters from each request's summary of its pieces (#1935).
+    A piece whose first audio never came isn't in it, so this can read a little low;
+  - Live's text and audio tokens in and out from `provider: usage`.
+- **Prices are dollars in a JSON file**, with none in the code.
+  `fixtures/voice-eval-cost-prices.example.json` holds the list prices read on
+  19 Oct, until the team's own rates come. DeepSeek's tiers (peak, off-peak)
+  each give the second route's arms a row; Live's arms get one.
+- **No price for a voice the journal names refuses the run,** rather than
+  pricing that voice at nothing. So does an answered line with no summary of
+  its voice's pieces, as in a journal from before #1935, unless
+  `--voice-estimate VOICE N` is given. Those lines' characters are then
+  estimated as N a completion token, over the arm's share of such lines, as
+  `cost-night1.py` does (4), and the row says they're estimated.
+- **Each row:** requests, answered, the arm's minutes, and the cost per request,
+  per answered line and per "conversation minute". That's 5 requests at the
+  arm's own cost a request: the research's model of 4 answered and 1 not.
+- **Tests:** `src/cost.rs` (each line, each price, the three forms of a chat
+  answer's tokens) and `tests/cost.rs` (the command as it is run).
+
+## The routes' table from the journal: `score`
+
+`lamp-voice-eval score JOURNAL --arm NAME FROM TO [--arm NAME FROM TO]...
+[--scenes DIR --date YYYY-MM-DD --utc-offset +HH:MM]` prints one Markdown
+table, a row a measure and a column an arm of a played
+test (the first builder on #1722, 19 Oct 18:44: tonight's Deepgram,
+Deepgram with Flux and the prepared round, and Live). `JOURNAL` is
+`journalctl -u lamp-voice` text in any of its usual forms; an arm is the
+stretch of it between two times of day (`HH:MM` or `HH:MM:SS`, `TO`
+before `FROM` runs past midnight), read by each line's first `HH:MM:SS`.
+The journal's lines are placed by their time of day alone, so take the
+run's stretch only (`journalctl -u lamp-voice --since … --until …`), and
+give the arms by the lamp's clock: a lamp whose zone is UTC
+(`timedatectl`) needs its arms in UTC. Only the voice's own lines (`lamp-voice second:` and `lamp-voice
+provider:`) are read, and of them only counts, reasons and times: no words
+a person said reach the table (`score::tests::no_words_said_reach_the_table`).
+
+- **Counts:** lines judged, let out and by what (its name or words, a
+  face, a conversation going on, the lamp's news or work, a trusted
+  session, a room not known to be busy), held and why (nobody spoke to the
+  lamp, a busy room, a short sound, a word or two, said to someone else),
+  answered (the second route's `first answer audio`; Live's answer begun,
+  by its `first sound`, said only with `LAMP_NAME_SIGNAL`, or `its answer is
+  played`, said whenever attention judges as with `LAMP_SPOKEN_TO`, and not
+  held back), declined by the model (`called
+  not_for_me`; Live's `the model said it was not for it`, not the one said
+  after doing what was asked, which is not taken), unanswered in time (`chat
+  round N had not begun`; Live's `; closed as unanswered`, not a wait
+  sound's line nor Live's sound, reminder or reply said over, which need no
+  answer), chat failures, voice tries that failed to start a sentence
+  (each is asked once more, so a try that failed need not be an answer
+  lost), lines with no words, sound carried from
+  the line before (`of sound go first` alone, not a carry that only lends
+  its time), and words cut short answered in a held line's place. The
+  answered, declined and unanswered rows count a request once, and a
+  request is known by its process (`lamp-voice[PID]`) and number, which
+  start again with the service (Jarvis on #1899).
+- **A row a route doesn't log prints "—"** in an arm of that route alone:
+  Live logs no chat or voice failures, no word counts, no carried sound or
+  cut words, and none of the times. An arm whose stretch holds no voice
+  lines prints "—" throughout, and a line under the table names it.
+- **Times,** as the median, the 90th percentile in brackets, and how many:
+  line end to words done, the chat's first event, words to the first piece
+  to the voice, words to the first answer audio, and line end to the first
+  answer audio (a request's words done plus its first audio). These are the
+  second route's lines; Live's own times are in its sessions' events, not
+  the journal. Each is the value at its share of the sorted list, rounded
+  to the nearest place: of an even count, the median is the upper of the
+  middle two.
+- **The played test's own files,** with `--scenes DIR --date YYYY-MM-DD
+  --utc-offset +HH:MM`: every `.txt` in `DIR` that is a scene file
+  (`scenario <name> <ISO>Z …`, one event a line) or a battery summary
+  (`battery <round>-<arm>-<HHMM> <HH:MM:SS>`), counted into the arm that
+  holds its start on the run's day. `--date` is the day the first arm
+  begins, by the lamp's clock; an arm that begins earlier in the day than
+  the first is on the day after. `--utc-offset` is the lamp's zone (`+07:00`
+  for lamp-4ace), and is needed: without it both kinds of file fall on the
+  wrong day. A scene's start is its own UTC date and time moved by the
+  offset. A battery's is its `HH:MM:SS`, by the Mac's
+  clock, which must be in the lamp's zone, on the day its file was written,
+  or the day before when that time is later than the writing's. A scene
+  folder keeps earlier days' files, and before `--date` one of the day
+  before at the same hour was counted into tonight's arms (Jarvis on
+  #1899). A line under the table says how many files fell in an arm, and
+  an arm no file fell in prints "—" in the files' rows. From
+  scenes: lines played (`PLAY`) and heard
+  (`HEARD`), the lamp's turns and their end of speech to first sound (`[lamp
+  starts speaking N s after that decision]`), how turns finished (`[turn
+  finished: <reason>]`), yields and rejected inputs. From batteries (the
+  first builder on #1899, 21:01): the two-people rounds first (`== round
+  R, N: …`, then a line `Speaker: words | answer` each), as lines naming
+  the lamp and how many were answered, and lines between people and how
+  many were left alone; a round's words are read only for a word `lamp`
+  set off as a name, not after `the`, `a`, `my`, `your`, `this` or the
+  like ("turn off the lamp" between people does not call it).
+  Then each section, begun by its `-- <suite>` header (`-- day`,
+  `-- follow-ups (#1465)`, `-- hand-overs`): lines played and answered, from
+  its own `… answered: N of M` line where it has one, or else its `|`
+  lines. An answer is read only as blank or not. Rows by their marks and
+  columns alone: no line's words reach the table either
+  (`score::tests::scene_files_and_battery_summaries_add_rows_without_words`).
+- **Not done:** the arms are typed by hand, so each must be one stretch
+  of time. Taking them from the bench log's `== HH:MM:SS <label>-<arm>:
+  <suite>` lines, per arm and suite (the asker's 18:49 shape), is a
+  follow-up.
+
 ## Physical runner (prepared, not executed)
 
 When Lamp returns, the operator first performs the readiness checks in the
@@ -651,8 +778,11 @@ owners are active, and such an attempt is retained as failed.
 ```
 
    Use `provider_config` (a private provider JSON on the Lamp) instead of the
-   fixture pair for Gemini, or `serve_config` for one long-lived serve runtime
-   per attempt (see [serve-session runner](voice-eval-serve.md)). For a direct-human cohort set `"stimulus_source":
+   fixture pair for a provider, or `serve_config` for one long-lived serve runtime
+   per attempt (see [serve-session runner](voice-eval-serve.md)). Either runs on
+   the second route unless the config names `"voice_route": "live"`, with the
+   second route's settings in `runtime_env` (the owner's 19 Oct 19:3x rule; the
+   serve page says how). For a direct-human cohort set `"stimulus_source":
    "direct_human"` and `"human_speaker": "person-1"` (a label, not a name); the
    console then shows each line to say at its trigger and nothing is played.
    Prompt-only timed attempts stay unscored until reviewed attribution is supplied.

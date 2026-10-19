@@ -59,6 +59,8 @@ pub struct Ids {
     seen: Vec<(u32, [f32; 4], u64)>,
     /// Each face's mouth, when speaking is judged (`LAMP_EYES_SPEAKING=on`).
     pub mouths: Option<speaking::Mouths>,
+    /// The last look's ids, in the detector's order.
+    last: Vec<u32>,
 }
 
 fn overlap(a: &[f32; 4], b: &[f32; 4]) -> f32 {
@@ -101,6 +103,7 @@ impl Ids {
             };
             ids.push(id);
         }
+        self.last.clone_from(&ids);
         ids
     }
 }
@@ -285,7 +288,37 @@ impl BusOut {
         if seems && let Err(error) = out.say_seems(&bus) {
             eprintln!("lamp-eyes: how the person at the lamp seems is not said: {error}");
         }
+        // What this process says, so a trial can tell a build or a switch
+        // that didn't take from a behaviour that didn't come (#1722, 20 Oct
+        // 01:11: a lamp-eyes without activity said nothing of it).
+        eprintln!("lamp-eyes: {}", out.said());
         Some(out)
+    }
+
+    /// What is said on the bus, in words for the journal: the topics, and
+    /// the switched ones that aren't said with the switch that would.
+    pub fn said(&self) -> String {
+        let mut topics = vec![Faces::TOPIC, Diagnostic::TOPIC];
+        let mut off = Vec::new();
+        match self.presence {
+            Some(_) => topics.push(RoomPresence::TOPIC),
+            None => off.push(format!("{} ({PRESENCE_ENVIRONMENT})", RoomPresence::TOPIC)),
+        }
+        if self.familiar.is_some() {
+            topics.push(HumanFamiliar::TOPIC);
+        }
+        match self.activity {
+            Some(_) => topics.extend([RoomActivity::TOPIC, StoodUp::TOPIC]),
+            None => off.push(format!("{} ({ACTIVITY_ENVIRONMENT})", RoomActivity::TOPIC)),
+        }
+        if self.seems.is_some() {
+            topics.push(HumanSeems::TOPIC);
+        }
+        let mut line = format!("said on the bus: {}", topics.join(", "));
+        if !off.is_empty() {
+            line.push_str(&format!("; not said: {}", off.join(", ")));
+        }
+        line
     }
 
     pub fn on(bus: &Bus) -> io::Result<Self> {
@@ -445,6 +478,15 @@ impl BusOut {
         if let Some(activity) = self.activity.as_mut() {
             activity.judge.looked(now_us, &Look::all(found, filled));
         }
+    }
+
+    /// The passing id the last look gave the face at `index` of what the
+    /// detector found, only while speaking is judged: the eyes' `known-face`
+    /// file names it beside the known person's name, so the voice can tell
+    /// whether the face seen speaking is theirs.
+    pub fn speaking_id(&self, index: usize) -> Option<String> {
+        self.ids.mouths.as_ref()?;
+        self.ids.last.get(index).map(|id| format!("f{id}"))
     }
 
     /// Call from the loop whether or not the camera is open: with it closed
@@ -988,7 +1030,35 @@ mod tests {
         }
         let up = stood.recv(Duration::ZERO).unwrap().expect("stood up");
         assert_eq!(up.parse::<StoodUp>().unwrap().sitting_s, 30);
+        assert_eq!(
+            up.header.expires_ms,
+            Some(5_000),
+            "a departure's short life"
+        );
         assert!(stood.recv(Duration::ZERO).unwrap().is_none(), "once");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// #1722 (20 Oct 01:11): the start line says what is said, and which
+    /// switched topics aren't with the switch that would say them.
+    #[test]
+    fn the_start_line_says_which_topics_are_said() {
+        let root = std::path::PathBuf::from(format!("/tmp/lebl-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        assert_eq!(
+            out.said(),
+            "said on the bus: humans/faces/tracked, diagnostics; not said: room/presence \
+             (LAMP_PRESENCE), room/activity (LAMP_ACTIVITY)"
+        );
+        out.say_activity(&bus).unwrap();
+        assert_eq!(
+            out.said(),
+            "said on the bus: humans/faces/tracked, diagnostics, room/activity, \
+             room/stood_up; not said: room/presence (LAMP_PRESENCE)"
+        );
         std::fs::remove_dir_all(&root).unwrap();
     }
 

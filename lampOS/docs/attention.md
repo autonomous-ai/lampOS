@@ -83,6 +83,19 @@ withdrawn)`. Every other call, the light, the volume, the schedule, memory,
 skills, stays held as before. A call that adds to what leaves the lamp is
 never put on the list.
 
+On the second route, with `LAMP_REPORTS=on`, a held line is asked one
+round for a `reports_stop` (`attention::DONE_THOUGH_HELD`,
+[second-voice.md](second-voice.md)) only when its heard words name
+reports, sharing or sending: one of `report`, `reports`, `sharing`,
+`sending` or `data` as a whole word, in any case
+(`attention::HELD_ASKED_WORDS`, #1925). That is checked on the heard words
+before anything leaves the lamp, and the model decides on the line asked.
+Every other held line is sent nowhere, as without the switch: a held line
+is people in the room talking to each other (37 in 44 minutes on the first
+arm of 19 October), and asking each one would send it all out and pay a
+chat round for each. The journal says `a held line names reports: asked
+once`, with no words.
+
 ## Where it gives way
 
 The rule fails open. The answer is played when no text of what was heard
@@ -202,6 +215,23 @@ have been held back from someone who had called the lamp by its name.
 With the name heard in the sound it was one, and "Helen" is now among the
 words the text may show a call by (with "Mom", "Amen" and "Weiland", each
 written for the lamp's name at least once in its records).
+
+**On the second route only** (#1973, the first builder at 22:38), more
+words the service writes for the name ("Lynn", "Len", "Lin", "Lump",
+"Land", "Line", "Palin", "Palan", `attention::STAND_ALONE_INS`) are never
+taken for someone else's name, and call the lamp only standing alone, set
+off as a name is. Its worker's rule counts them
+(`Attention::count_stand_alone_ins`, `called_by_name_on`). Deepgram writes
+"Lamp" so; Gemini's transcript doesn't, and Linh and Lin are common names.
+So on Live they are people's names as before, and "Lin, pass me that."
+between people stays held (`the_names_stand_ins_call_the_lamp_on_the_second_route_only`).
+On the second route: "Hey, Lynn. How are you today?", "Lynn, what time is
+it?", "Thank you, Lynn." are its calls, "Line up the meetings" is not
+(`called_by_name`). On lamp-4ace on 19 Oct, on the second route, "Hey Lamp,
+how are you today?" and "Lamp, what time is it?" came back with "Lynn" and
+were held as said to someone it calls by name (#1712). The voice keeps no
+list of the known faces' names yet, so a known person called Lynn is not
+told from the lamp.
 
 Of the three rounds with no answer heard, the rule held one. In one the
 service sent the words of an answer ("Four. Easy one.") and no sound, the

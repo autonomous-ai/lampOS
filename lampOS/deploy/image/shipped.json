@@ -1,0 +1,154 @@
+{
+  "about": "Every SHA-256 the image (robots/lamp/rootfs and its overrides) has shipped at each of the image's files a build carries, by variant (#1369). A lamp's file that is one of these is the image's, not the lamp's own. When a file changes in robots/lamp, add its new SHA-256 here; never remove one.",
+  "variants": {
+    "standard": {
+      "/etc/asound.conf": [
+        "25aef1f691b8e8b62a67a30520e3fbff950bbeee898e2e16be6b8d8b3584b643",
+        "2d9b9bcb8c2473c6c749f2a6d1a598f5a7e65aba0c82026a5aa6a163db42b38f",
+        "490daf2fe3d265083a26a8e4dd95c06f096f2acfcef3fff0b0bca42f88c7091d",
+        "55eef0b732a4c0b6227e22360df3414cf9326fb661e8b4ee3c9fec134b6d9245",
+        "9e66ca67ab1e40d86459e236913269fea8e2bf76114fb985a0ad50bf3e6e2d50"
+      ],
+      "/etc/systemd/system/lamp-cmedia-speaker.service": [
+        "18a4b16cd4eb627c22825f6927c5845a79ff7013a41dc968f18e80fd9e62fd10",
+        "748ab182434a7a82c01e70e7ba2952f94f2a303b3708315817610b155228b8bd",
+        "7bf733815231c54f465f3afde245c0d4feda3582d3fcda68def185314d4eb706"
+      ],
+      "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf": [
+        "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405"
+      ],
+      "/etc/systemd/journald.conf.d/zz-lamp-journal.conf": [
+        "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b"
+      ],
+      "/etc/udev/rules.d/91-pulseaudio-hal-ignore.rules": [
+        "65cf77352bd196cdd5df78436f8cda354abb805b9f0fd561788ab644088d7cb4",
+        "eea69b2dc2dd877456133d6ffe1375dc9a7c6c593722d0a3690c9ca388202bc4"
+      ],
+      "/etc/udev/rules.d/99-lamp-device.rules": [
+        "140572e87c2c4f7c488d35aa331f349587fd30378c608854fd1d5c364cc6e2a6",
+        "2b0146f8599e82c075fc2c7b4ebb6b6b94a6dcfb76da7497910fa18a4495d4d2",
+        "5cd7e3c01eb93044518490d704bd63d4d3965deaac9d4eea786e4ae255c32061",
+        "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
+      ],
+      "/usr/local/libexec/lamp-ramlog-postrotate": [
+        "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
+      ]
+    },
+    "pro": {
+      "/etc/asound.conf": [
+        "1072adba35dc5ca38420dc133c9ca17e0f79604e775548f7ded570302805bd02",
+        "25aef1f691b8e8b62a67a30520e3fbff950bbeee898e2e16be6b8d8b3584b643",
+        "2d9b9bcb8c2473c6c749f2a6d1a598f5a7e65aba0c82026a5aa6a163db42b38f",
+        "490daf2fe3d265083a26a8e4dd95c06f096f2acfcef3fff0b0bca42f88c7091d",
+        "55eef0b732a4c0b6227e22360df3414cf9326fb661e8b4ee3c9fec134b6d9245",
+        "9e66ca67ab1e40d86459e236913269fea8e2bf76114fb985a0ad50bf3e6e2d50",
+        "b6afa2fd8cf0a8c205790bf21a481b5d2416aea9e36cefaa6eb7762835013fee",
+        "e919207b350881bc754ab0169d960b191a6fe53588d3f0a680d0bcf1a64f49e9"
+      ],
+      "/etc/systemd/system/lamp-cmedia-speaker.service": [
+        "18a4b16cd4eb627c22825f6927c5845a79ff7013a41dc968f18e80fd9e62fd10",
+        "3c06065938be8960aec164745b59a98f8d4c3cd2c0068a4628b5a55f32e97359",
+        "748ab182434a7a82c01e70e7ba2952f94f2a303b3708315817610b155228b8bd",
+        "7bf733815231c54f465f3afde245c0d4feda3582d3fcda68def185314d4eb706",
+        "d76a02f2072a74efc2cbf122a4dc27c27b835d4c84f640dde4da6f4cefec3075"
+      ],
+      "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf": [
+        "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405"
+      ],
+      "/etc/systemd/journald.conf.d/zz-lamp-journal.conf": [
+        "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b"
+      ],
+      "/etc/udev/rules.d/91-pulseaudio-hal-ignore.rules": [
+        "65cf77352bd196cdd5df78436f8cda354abb805b9f0fd561788ab644088d7cb4",
+        "69c7386f68cbff81c836e95149b58c31421bbb229a93e2af91b511dabc77271d",
+        "d472a2599e5791b2a9c65dfbfeb562ddf6f1e178589c493c7e59ea9b4851a507",
+        "eea69b2dc2dd877456133d6ffe1375dc9a7c6c593722d0a3690c9ca388202bc4"
+      ],
+      "/etc/udev/rules.d/99-lamp-device.rules": [
+        "140572e87c2c4f7c488d35aa331f349587fd30378c608854fd1d5c364cc6e2a6",
+        "2b0146f8599e82c075fc2c7b4ebb6b6b94a6dcfb76da7497910fa18a4495d4d2",
+        "5cd7e3c01eb93044518490d704bd63d4d3965deaac9d4eea786e4ae255c32061",
+        "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
+      ],
+      "/usr/local/libexec/lamp-ramlog-postrotate": [
+        "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
+      ]
+    },
+    "pro-respeaker-lite": {
+      "/etc/asound.conf": [
+        "25aef1f691b8e8b62a67a30520e3fbff950bbeee898e2e16be6b8d8b3584b643",
+        "2d9b9bcb8c2473c6c749f2a6d1a598f5a7e65aba0c82026a5aa6a163db42b38f",
+        "40f51fdb077038b57981deeee12434b0769c2b6681a967565a08e9778d47f507",
+        "490daf2fe3d265083a26a8e4dd95c06f096f2acfcef3fff0b0bca42f88c7091d",
+        "55eef0b732a4c0b6227e22360df3414cf9326fb661e8b4ee3c9fec134b6d9245",
+        "9e66ca67ab1e40d86459e236913269fea8e2bf76114fb985a0ad50bf3e6e2d50",
+        "e919207b350881bc754ab0169d960b191a6fe53588d3f0a680d0bcf1a64f49e9"
+      ],
+      "/etc/systemd/system/lamp-cmedia-speaker.service": [
+        "18a4b16cd4eb627c22825f6927c5845a79ff7013a41dc968f18e80fd9e62fd10",
+        "748ab182434a7a82c01e70e7ba2952f94f2a303b3708315817610b155228b8bd",
+        "7bf733815231c54f465f3afde245c0d4feda3582d3fcda68def185314d4eb706"
+      ],
+      "/etc/systemd/system/respeaker-lite-softvol.service": [
+        "8f86970535d8c80140597afdfd021b6e70180215a49ceb43f965ebb90033d348"
+      ],
+      "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf": [
+        "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405"
+      ],
+      "/etc/systemd/journald.conf.d/zz-lamp-journal.conf": [
+        "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b"
+      ],
+      "/etc/udev/rules.d/90-respeaker-lite.rules": [
+        "4a977f828b7576b1ddf346dbeaf352f31cda3e67ad351010c7b88ec77a8f73f9"
+      ],
+      "/etc/udev/rules.d/91-pulseaudio-hal-ignore.rules": [
+        "65cf77352bd196cdd5df78436f8cda354abb805b9f0fd561788ab644088d7cb4",
+        "db502288283e0188d5980c86bd9cc0a655f9f649fd48941a2eff05787e8ff7ea",
+        "eea69b2dc2dd877456133d6ffe1375dc9a7c6c593722d0a3690c9ca388202bc4"
+      ],
+      "/etc/udev/rules.d/99-lamp-device.rules": [
+        "140572e87c2c4f7c488d35aa331f349587fd30378c608854fd1d5c364cc6e2a6",
+        "2b0146f8599e82c075fc2c7b4ebb6b6b94a6dcfb76da7497910fa18a4495d4d2",
+        "5cd7e3c01eb93044518490d704bd63d4d3965deaac9d4eea786e4ae255c32061",
+        "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
+      ],
+      "/usr/local/libexec/lamp-ramlog-postrotate": [
+        "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
+      ]
+    },
+    "pro-xvf3800": {
+      "/etc/asound.conf": [
+        "25aef1f691b8e8b62a67a30520e3fbff950bbeee898e2e16be6b8d8b3584b643",
+        "2d9b9bcb8c2473c6c749f2a6d1a598f5a7e65aba0c82026a5aa6a163db42b38f",
+        "490daf2fe3d265083a26a8e4dd95c06f096f2acfcef3fff0b0bca42f88c7091d",
+        "55eef0b732a4c0b6227e22360df3414cf9326fb661e8b4ee3c9fec134b6d9245",
+        "9e66ca67ab1e40d86459e236913269fea8e2bf76114fb985a0ad50bf3e6e2d50",
+        "9eabba477dfb775fe0d3313faa25a991175eaf07c9c4035cf94a892e094f8008"
+      ],
+      "/etc/systemd/system/lamp-cmedia-speaker.service": [
+        "18a4b16cd4eb627c22825f6927c5845a79ff7013a41dc968f18e80fd9e62fd10",
+        "748ab182434a7a82c01e70e7ba2952f94f2a303b3708315817610b155228b8bd",
+        "7bf733815231c54f465f3afde245c0d4feda3582d3fcda68def185314d4eb706"
+      ],
+      "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf": [
+        "b5a1d255287bb177b29e8ce262219d21910dbcdc8a42e76f2a89e3f3a79f0405"
+      ],
+      "/etc/systemd/journald.conf.d/zz-lamp-journal.conf": [
+        "82fed5e77b864fc84925cc8ea1c44e058d3a36baf1192d920a2a50de40da7f7b"
+      ],
+      "/etc/udev/rules.d/91-pulseaudio-hal-ignore.rules": [
+        "65cf77352bd196cdd5df78436f8cda354abb805b9f0fd561788ab644088d7cb4",
+        "eea69b2dc2dd877456133d6ffe1375dc9a7c6c593722d0a3690c9ca388202bc4"
+      ],
+      "/etc/udev/rules.d/99-lamp-device.rules": [
+        "140572e87c2c4f7c488d35aa331f349587fd30378c608854fd1d5c364cc6e2a6",
+        "2b0146f8599e82c075fc2c7b4ebb6b6b94a6dcfb76da7497910fa18a4495d4d2",
+        "5cd7e3c01eb93044518490d704bd63d4d3965deaac9d4eea786e4ae255c32061",
+        "a0cd2745986ce1faa23e4ccbafcdd1821f16fabebdf1318383de2ff6aa2e608a"
+      ],
+      "/usr/local/libexec/lamp-ramlog-postrotate": [
+        "e65400edc324fb60138eae9f1f2010789b124eb01ebce1375efabfd334f149e3"
+      ]
+    }
+  }
+}

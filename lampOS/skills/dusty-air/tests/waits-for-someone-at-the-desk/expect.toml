@@ -1,0 +1,10 @@
+# 140 from 10:00, nobody in view until 11:30. The hour comes at 11:00 with
+# nobody there; the chance is kept (`wait = "1h"`) and taken at the first
+# reading once a face is seen, 11:30 (5,400 s).
+clock = "10:00"
+
+[[expect]]
+at = "5400s"
+within = "60s"
+call = "say"
+args = { text = "The air here has been very dusty for about an hour. I can't tell where it's coming from.", priority = 5, expires_ms = 30000 }

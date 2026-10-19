@@ -45,6 +45,57 @@ const MOST_FILE_BYTES: u64 = 256 * 1024;
 /// dropped (#1505). The folder is 0700, each file 0600, and the product
 /// reset empties it, since these are face prints.
 pub const SET_ASIDE: &str = "set-aside";
+
+/// Beside `--known-file`, while speaking is judged: the passing id
+/// (`humans/faces/tracked`'s `f3`) of the known person's face, one line, and
+/// no file whenever there is no name. Only an id that lasts while the face
+/// stays in view: no picture, print or name.
+pub fn known_face_of(known: &Path) -> PathBuf {
+    let mut beside = known.as_os_str().to_owned();
+    beside.push("-face");
+    PathBuf::from(beside)
+}
+
+/// The name of the one known at the lamp (`--known-file`), replaced whole,
+/// or no file; and while speaking is judged, their face's passing id in
+/// [`known_face_of`], which goes with the name.
+pub fn keep_known(path: &Path, name: Option<&str>, face: Option<&str>) {
+    let beside = known_face_of(path);
+    let Some(name) = name else {
+        let _ = std::fs::remove_file(&beside);
+        let _ = std::fs::remove_file(path);
+        return;
+    };
+    // The name first, then the face (the reviewer on #2008). The voice reads
+    // face, name, face; between the two writes it can only see the new name
+    // beside the old face, which matches nobody and narrows a line to the
+    // room. The other order could pair the old name with the new face and
+    // keep a newcomer's line as the one before's.
+    replace_line(path, name);
+    match face {
+        Some(face) => replace_line(&beside, face),
+        None => {
+            let _ = std::fs::remove_file(&beside);
+        }
+    }
+}
+
+fn replace_line(path: &Path, line: &str) {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut temporary = path.as_os_str().to_owned();
+    temporary.push(".new");
+    let written = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&temporary)
+        .and_then(|mut file| writeln!(file, "{line}"));
+    if written.is_ok() {
+        let _ = std::fs::rename(&temporary, path);
+    }
+}
 /// How quickly a remembered person's familiarity fades (#1670): it halves
 /// in fourteen days without them.
 pub const FAMILIAR_HALF_LIFE_S: u64 = 14 * 86_400;
@@ -304,7 +355,7 @@ pub fn plain_name(name: &str) -> Option<String> {
     fine.then_some(name)
 }
 
-fn same_name(a: &str, b: &str) -> bool {
+pub(crate) fn same_name(a: &str, b: &str) -> bool {
     a.to_lowercase() == b.to_lowercase()
 }
 
@@ -735,13 +786,70 @@ impl People {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ask {
     Remember(String),
-    RememberOne { name: String, replace: bool },
+    RememberOne {
+        name: String,
+        replace: bool,
+    },
+    /// Add the one face in a photo in the eyes' photo folder (`--photo-dir`,
+    /// [`crate::photo`]), unconfirmed until its person says yes: its file
+    /// name.
+    RememberPhoto {
+        name: String,
+        file: String,
+    },
+    /// Whether a face from a photo, unconfirmed, is at the lamp now, and
+    /// under which name: so the voice can ask them.
+    PhotoHere,
+    /// The voice has asked them, in this meeting.
+    PhotoAsked(String),
+    /// Their yes: kept as an ordinary print.
+    PhotoYes(String),
+    /// Their no: deleted.
+    PhotoNo(String),
     Forget(String),
     List,
     Who,
 }
 
 pub fn ask_of(line: &[u8]) -> Option<Ask> {
+    // A face from a photo's consent (`--photo-dir`): one of these alone.
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Consent {
+        photo_here: Option<bool>,
+        photo_asked: Option<String>,
+        photo_yes: Option<String>,
+        photo_no: Option<String>,
+    }
+    if let Ok(consent) = serde_json::from_slice::<Consent>(line) {
+        return match consent {
+            Consent {
+                photo_here: Some(true),
+                photo_asked: None,
+                photo_yes: None,
+                photo_no: None,
+            } => Some(Ask::PhotoHere),
+            Consent {
+                photo_here: None,
+                photo_asked: Some(name),
+                photo_yes: None,
+                photo_no: None,
+            } => Some(Ask::PhotoAsked(name)),
+            Consent {
+                photo_here: None,
+                photo_asked: None,
+                photo_yes: Some(name),
+                photo_no: None,
+            } => Some(Ask::PhotoYes(name)),
+            Consent {
+                photo_here: None,
+                photo_asked: None,
+                photo_yes: None,
+                photo_no: Some(name),
+            } => Some(Ask::PhotoNo(name)),
+            _ => None,
+        };
+    }
     #[derive(Deserialize)]
     #[serde(deny_unknown_fields)]
     struct Line {
@@ -751,6 +859,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
         who: Option<bool>,
         one_face: Option<bool>,
         replace: Option<bool>,
+        photo: Option<String>,
     }
     let line: Line = serde_json::from_slice(line).ok()?;
     match line {
@@ -761,6 +870,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            photo: None,
         } => Some(Ask::Remember(name)),
         Line {
             remember: Some(name),
@@ -769,6 +879,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: Some(true),
             replace,
+            photo: None,
         } => Some(Ask::RememberOne {
             name,
             replace: replace.unwrap_or(false),
@@ -780,6 +891,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            photo: None,
         } => Some(Ask::Forget(name)),
         Line {
             remember: None,
@@ -788,6 +900,7 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: None,
             one_face: None,
             replace: None,
+            photo: None,
         } => Some(Ask::List),
         Line {
             remember: None,
@@ -796,7 +909,17 @@ pub fn ask_of(line: &[u8]) -> Option<Ask> {
             who: Some(true),
             one_face: None,
             replace: None,
+            photo: None,
         } => Some(Ask::Who),
+        Line {
+            remember: Some(name),
+            forget: None,
+            list: None,
+            who: None,
+            one_face: None,
+            replace: None,
+            photo: Some(file),
+        } => Some(Ask::RememberPhoto { name, file }),
         _ => None,
     }
 }
@@ -1274,6 +1397,32 @@ mod tests {
         directory.join("people.json")
     }
 
+    /// The known name, and while speaking is judged its face's passing id
+    /// beside it: both 0600, the face gone with no face, both gone with no
+    /// name.
+    #[test]
+    fn the_known_face_is_kept_beside_the_known_name_and_goes_with_it() {
+        use std::os::unix::fs::PermissionsExt;
+        let known = file("known-face").with_file_name("known");
+        let beside = known_face_of(&known);
+        assert_eq!(beside.file_name().unwrap(), "known-face");
+        keep_known(&known, Some("Lan"), Some("f3"));
+        assert_eq!(std::fs::read_to_string(&known).unwrap(), "Lan\n");
+        assert_eq!(std::fs::read_to_string(&beside).unwrap(), "f3\n");
+        for path in [&known, &beside] {
+            let mode = std::fs::metadata(path).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
+        // Speaking not judged: the name only, and no older face beside it.
+        keep_known(&known, Some("Minh"), None);
+        assert_eq!(std::fs::read_to_string(&known).unwrap(), "Minh\n");
+        assert!(!beside.exists());
+        keep_known(&known, Some("Minh"), Some("f4"));
+        keep_known(&known, None, Some("f4"));
+        assert!(!known.exists() && !beside.exists());
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
     /// #1505: the people file as a later build writes it, with a field this
     /// build doesn't know at its top and in a person, opens with everyone
     /// in it (Tests' forward-read test, made plain by `el/people-forward`).
@@ -1518,6 +1667,41 @@ mod tests {
         );
         assert_eq!(ask_of(br#"{"remember":"A","replace":true}"#), None);
         assert_eq!(ask_of(br#"{"forget":"A","one_face":true}"#), None);
+        // From a photo (`--photo-dir`): a name and the photo's file.
+        assert_eq!(
+            ask_of(br#"{"remember":"A","photo":"a.jpg"}"#),
+            Some(Ask::RememberPhoto {
+                name: "A".into(),
+                file: "a.jpg".into(),
+            })
+        );
+        // A photo never replaces anyone: it has no say for them.
+        assert_eq!(
+            ask_of(br#"{"remember":"A","photo":"a.jpg","replace":true}"#),
+            None
+        );
+        // Its person's consent, one ask at a time.
+        assert_eq!(ask_of(br#"{"photo_here":true}"#), Some(Ask::PhotoHere));
+        assert_eq!(
+            ask_of(br#"{"photo_asked":"A"}"#),
+            Some(Ask::PhotoAsked("A".into()))
+        );
+        assert_eq!(
+            ask_of(br#"{"photo_yes":"A"}"#),
+            Some(Ask::PhotoYes("A".into()))
+        );
+        assert_eq!(
+            ask_of(br#"{"photo_no":"A"}"#),
+            Some(Ask::PhotoNo("A".into()))
+        );
+        assert_eq!(ask_of(br#"{"photo_yes":"A","photo_no":"A"}"#), None);
+        assert_eq!(ask_of(br#"{"photo_here":false}"#), None);
+        assert_eq!(ask_of(br#"{"photo":"a.jpg"}"#), None);
+        assert_eq!(
+            ask_of(br#"{"remember":"A","photo":"a.jpg","one_face":true}"#),
+            None
+        );
+        assert_eq!(ask_of(br#"{"forget":"A","photo":"a.jpg"}"#), None);
         assert_eq!(ask_of(br#"{"list":true}"#), Some(Ask::List));
         assert_eq!(ask_of(br#"{"who":true}"#), Some(Ask::Who));
         for nothing in [

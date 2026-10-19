@@ -1,4 +1,5 @@
 //! A lamp's first boot and its way back there (#806, `docs/setup.md`).
+pub mod change;
 pub mod http;
 pub mod light;
 pub mod reset;
@@ -6,6 +7,7 @@ pub mod scan;
 pub mod serve;
 pub mod wake;
 pub mod wifi;
+pub mod wifi_change;
 
 use lamp_bus::Subscriber;
 use lamp_msgs::TouchEvent;

@@ -18,6 +18,8 @@ use tokio_tungstenite::{
     tungstenite::{Message, client::IntoClientRequest, http::HeaderValue},
 };
 
+mod flux;
+
 const MODEL: &str = "nova-3-general";
 const DEEPGRAM: &str = "wss://api.deepgram.com/v1/listen";
 /// Deepgram closes a socket that hears nothing for 10 s.
@@ -38,8 +40,9 @@ const MAX_MESSAGE: usize = 1 << 20;
 /// question for other people's talk.
 // ponytail: the name is the character's own ("Lamp"); a lamp renamed
 // would pass its name here.
-fn query(language: Option<&str>) -> [(&'static str, &str); 10] {
-    [
+/// The unit's own key terms follow the name ([`SecondConfig::stt_key_terms`]).
+fn query<'a>(language: Option<&'a str>, key_terms: &'a [String]) -> Vec<(&'static str, &'a str)> {
+    let mut query = vec![
         ("model", MODEL),
         ("encoding", "linear16"),
         ("sample_rate", "16000"),
@@ -53,21 +56,36 @@ fn query(language: Option<&str>) -> [(&'static str, &str); 10] {
         ("endpointing", "300"),
         ("vad_events", "true"),
         ("keyterm", "Lamp"),
-    ]
+    ];
+    query.extend(key_terms.iter().map(|term| ("keyterm", term.as_str())));
+    query
 }
 
 /// The websocket URL: the Autonomous proxy at `proxy`, else Deepgram.
-pub(crate) fn url(proxy: Option<&str>, language: Option<&str>) -> Result<reqwest::Url> {
-    let base = match proxy {
-        None => DEEPGRAM.to_owned(),
-        Some(base_url) => {
-            let base = openai_base(base_url)
-                .replacen("https://", "wss://", 1)
-                .replacen("http://", "ws://", 1);
-            format!("{base}/ws/audio/transcriptions")
-        }
-    };
-    let url = reqwest::Url::parse_with_params(&base, query(language)).map_err(|_| Error::Url)?;
+pub(crate) fn url(
+    proxy: Option<&str>,
+    language: Option<&str>,
+    key_terms: &[String],
+) -> Result<reqwest::Url> {
+    let base = proxy.map_or_else(|| DEEPGRAM.to_owned(), proxied);
+    secure(
+        reqwest::Url::parse_with_params(&base, query(language, key_terms))
+            .map_err(|_| Error::Url)?,
+    )
+}
+
+/// The Autonomous proxy's speech-to-text socket at `base_url`. It passes
+/// the query's `model` on to Deepgram, Flux's included (the first builder
+/// on lamp-4ace, 19 Oct 15:54).
+fn proxied(base_url: &str) -> String {
+    let base = openai_base(base_url)
+        .replacen("https://", "wss://", 1)
+        .replacen("http://", "ws://", 1);
+    format!("{base}/ws/audio/transcriptions")
+}
+
+/// `url` when it is a secure websocket; a plain one only in tests.
+fn secure(url: reqwest::Url) -> Result<reqwest::Url> {
     match url.scheme() {
         "wss" => Ok(url),
         "ws" if cfg!(test) => Ok(url),
@@ -169,6 +187,9 @@ pub(crate) struct Transcript {
     ended: bool,
     /// Words (an interim result or `SpeechStarted`) since the last final.
     pending: Option<Pending>,
+    /// The last interim result's words since the last final, kept for a
+    /// line whose finals never came with them (#1712).
+    interim: Option<String>,
 }
 
 impl Transcript {
@@ -176,9 +197,11 @@ impl Transcript {
         if !heard.is_final {
             if !heard.transcript.is_empty() {
                 self.pending = Some(Pending::Interim(heard.end));
+                self.interim = Some(heard.transcript);
             }
             return;
         }
+        self.interim = None;
         self.covered = Some(heard.end);
         self.ended = heard.speech_final;
         self.pending = None;
@@ -225,8 +248,20 @@ impl Transcript {
             ms(sent)
         )
     }
-    pub fn text(&self) -> String {
-        self.segments.join(" ")
+    /// The words at the line's end: the final segments, then the last
+    /// interim result's words if no final came after them, and whether
+    /// those were kept. On lamp-4ace on 19 Oct (#1712) a line came back
+    /// with no words; kept, an interim's words are not lost to an empty
+    /// final.
+    pub fn words(&self) -> (String, bool) {
+        let mut words = self.segments.clone();
+        let interim = self
+            .interim
+            .clone()
+            .filter(|_| matches!(self.pending, Some(Pending::Interim(_))));
+        let kept = interim.is_some();
+        words.extend(interim);
+        (words.join(" "), kept)
     }
 }
 
@@ -274,6 +309,16 @@ impl Replies {
         })
     }
 
+    /// The results with and without words, for the line's end in the
+    /// journal (#1712: whether the service sent any words at all).
+    fn results_told(&self) -> String {
+        format!(
+            ", results {} with words, {} without",
+            self.with_words.load(Ordering::Relaxed),
+            self.without_words.load(Ordering::Relaxed)
+        )
+    }
+
     /// The counts, in words, and how the stream ended if it has; no words
     /// of what was heard.
     pub fn told(&self) -> String {
@@ -312,6 +357,21 @@ pub struct SttStream {
     words: Option<mpsc::UnboundedReceiver<String>>,
     /// What the service has sent back so far, by kind.
     replies: Arc<Replies>,
+    /// The words a line has before they are final, until taken
+    /// ([`Self::take_early`]).
+    early: Option<mpsc::UnboundedReceiver<Early>>,
+}
+
+/// Words a stream has before they are final, for a chat begun on them
+/// (`LAMP_SECOND_PREPARED`, #1712, the first builder at 17:02): with
+/// Nova-3, at the line's end, the finals and the last interim's words while
+/// `Finalize`'s answer is still to come.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Early {
+    /// The words so far, likely the line's.
+    Words(String),
+    /// The person went on: the words given are not the line's.
+    Resumed,
 }
 
 impl SttStream {
@@ -320,7 +380,18 @@ impl SttStream {
             Stt::Deepgram { key } => (None, key),
             Stt::Autonomous { base_url, key } => (Some(base_url.as_str()), key),
         };
-        Self::open(url(proxy, config.stt_language.as_deref())?, key.expose()).await
+        let key_terms = super::key_terms::listening(&config.stt_key_terms);
+        // `LAMP_SECOND_FLUX=on`, in English.
+        if flux::chosen(config) {
+            return Ok(Self::start_flux(
+                socket(flux::url(proxy, &key_terms, flux::eager())?, key.expose()).await?,
+            ));
+        }
+        Self::open(
+            url(proxy, config.stt_language.as_deref(), &key_terms)?,
+            key.expose(),
+        )
+        .await
     }
 
     async fn open(url: reqwest::Url, key: &str) -> Result<Self> {
@@ -377,22 +448,50 @@ impl SttStream {
     where
         S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static,
     {
+        Self::start_on(socket, false)
+    }
+
+    /// A stream on Flux's socket ([`flux`]).
+    fn start_flux<S>(socket: tokio_tungstenite::WebSocketStream<S>) -> Self
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static,
+    {
+        Self::start_on(socket, true)
+    }
+
+    fn start_on<S>(socket: tokio_tungstenite::WebSocketStream<S>, on_flux: bool) -> Self
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static,
+    {
         let (audio, queued) = mpsc::channel(QUEUE);
         let words_at = Arc::new(OnceLock::new());
         let (said, words) = mpsc::unbounded_channel();
+        let (early_words, early) = mpsc::unbounded_channel();
         let replies = Arc::new(Replies::default());
-        Self {
-            audio: Some(audio),
-            task: tokio::spawn(run(
+        let task = if on_flux {
+            tokio::spawn(flux::run(
                 socket,
                 queued,
                 Arc::clone(&words_at),
-                said,
+                (said, early_words),
                 Arc::clone(&replies),
-            )),
+            ))
+        } else {
+            tokio::spawn(run(
+                socket,
+                queued,
+                Arc::clone(&words_at),
+                (said, early_words),
+                Arc::clone(&replies),
+            ))
+        };
+        Self {
+            audio: Some(audio),
+            task,
             words_at,
             words: Some(words),
             replies,
+            early: Some(early),
         }
     }
 
@@ -401,6 +500,12 @@ impl SttStream {
     /// when the stream ends (#828).
     pub fn take_words(&mut self) -> Option<mpsc::UnboundedReceiver<String>> {
         self.words.take()
+    }
+
+    /// The words the line has before they are final ([`Early`]), for one
+    /// taker.
+    pub fn take_early(&mut self) -> Option<mpsc::UnboundedReceiver<Early>> {
+        self.early.take()
     }
 
     /// What the service has sent back on this stream so far, by kind.
@@ -413,6 +518,12 @@ impl SttStream {
     /// measuring how soon a word said can be known (#828).
     pub fn first_words(&self) -> Arc<OnceLock<Instant>> {
         Arc::clone(&self.words_at)
+    }
+
+    /// Whether its socket is still there to take audio: not once its task
+    /// has ended (the service or the relay closed it).
+    pub fn still_open(&self) -> bool {
+        self.audio.as_ref().is_some_and(|audio| !audio.is_closed()) && !self.task.is_finished()
     }
 
     /// Queue 16 kHz mono samples. Fails when the socket has gone or the
@@ -482,16 +593,28 @@ impl Drop for SttStream {
 /// after the last block, `Finalize`, and 2 s later `CloseStream`. Print
 /// everything the service sends back, by kind and when, from the first
 /// block sent. That shows whether results come at all, and if so only
-/// after `Finalize` or only at the close.
+/// after `Finalize` or only at the close. On Flux (`LAMP_SECOND_FLUX=on`),
+/// `ForceEndTurn` takes `Finalize`'s place.
 pub async fn check(config: &SecondConfig, samples: &[i16]) -> Result<()> {
     let (proxy, key) = match &config.stt {
         Stt::Deepgram { key } => (None, key),
         Stt::Autonomous { base_url, key } => (Some(base_url.as_str()), key),
     };
     let asked = Instant::now();
-    let (mut write, mut read) = socket(url(proxy, config.stt_language.as_deref())?, key.expose())
-        .await?
-        .split();
+    let key_terms = super::key_terms::listening(&config.stt_key_terms);
+    let on_flux = flux::chosen(config);
+    let (address, (asking, ask)) = if on_flux {
+        (
+            flux::url(proxy, &key_terms, flux::eager())?,
+            ("ForceEndTurn", flux::FORCE_END_TURN),
+        )
+    } else {
+        (
+            url(proxy, config.stt_language.as_deref(), &key_terms)?,
+            ("Finalize", r#"{"type":"Finalize"}"#),
+        )
+    };
+    let (mut write, mut read) = socket(address, key.expose()).await?.split();
     println!(
         "connected in {} ms; sending {:.2} s of audio",
         asked.elapsed().as_millis(),
@@ -514,10 +637,10 @@ pub async fn check(config: &SecondConfig, samples: &[i16]) -> Result<()> {
         println!("{:>6} ms  the last block went", at());
         tokio::time::sleep(Duration::from_millis(1_500)).await;
         write
-            .send(Message::text(r#"{"type":"Finalize"}"#))
+            .send(Message::text(ask))
             .await
             .map_err(|_| Error::Transport("speech-to-text send"))?;
-        println!("{:>6} ms  Finalize went", at());
+        println!("{:>6} ms  {asking} went", at());
         tokio::time::sleep(Duration::from_secs(2)).await;
         write
             .send(Message::text(r#"{"type":"CloseStream"}"#))
@@ -547,6 +670,21 @@ pub async fn check(config: &SecondConfig, samples: &[i16]) -> Result<()> {
                             heard.from_finalize,
                             heard.end,
                             heard.transcript
+                        );
+                    } else if let Some(turn) = flux::turn_info(&text) {
+                        counts.count(if turn.transcript.is_empty() {
+                            &counts.without_words
+                        } else {
+                            &counts.with_words
+                        });
+                        println!(
+                            "{:>6} ms  TurnInfo {:?} turn={} trigger={} audio {:.2} s: {:?}",
+                            at(),
+                            turn.event,
+                            turn.turn_index,
+                            turn.trigger.as_deref().unwrap_or("none"),
+                            turn.audio_window_end,
+                            turn.transcript
                         );
                     } else {
                         let kind = serde_json::from_str::<serde_json::Value>(&text)
@@ -600,7 +738,7 @@ async fn run<S>(
     socket: tokio_tungstenite::WebSocketStream<S>,
     mut queued: mpsc::Receiver<Outgoing>,
     words_at: Arc<OnceLock<Instant>>,
-    said: mpsc::UnboundedSender<String>,
+    (said, early): (mpsc::UnboundedSender<String>, mpsc::UnboundedSender<Early>),
     replies: Arc<Replies>,
 ) -> Result<(String, Option<String>)>
 where
@@ -613,11 +751,42 @@ where
     // Set at the end of the line, when `Finalize` went: until when its
     // final words are waited for.
     let mut finalize_by: Option<Instant> = None;
-    // `CloseStream` went: its final words and close are waited for.
+    let mut finalize_went: Option<Instant> = None;
+    // `Finalize`'s answer: how long after it went, and where in the audio
+    // it ends, for the journal (#1712: on lamp-4ace most lines' words came
+    // from `CloseStream`, and whether `Finalize` was ignored or answered
+    // short was not told).
+    let mut answered: Option<(Duration, f64)> = None;
+    // `CloseStream` went: its final words, or its close, are waited for.
     let mut closing = false;
     let mut last_final: Option<Instant> = None;
     let mut at_end = String::new();
-    let told = |at_end: &str, from: &str| Some(format!("{at_end}, words from={from}"));
+    // The words at the end, and the journal's account: `Finalize`'s answer
+    // (when it went), the results with and without words, and where the
+    // words came from, with the last interim's if those were kept.
+    let ending = |transcript: &Transcript,
+                  at_end: &str,
+                  answered: Option<Option<(Duration, f64)>>,
+                  from: &str| {
+        let answer = match answered {
+            None => String::new(),
+            Some(Some((after, end))) => format!(
+                ", finalize answered in {} ms to {} ms",
+                after.as_millis(),
+                (end * 1000.0).round() as i64
+            ),
+            Some(None) => ", finalize unanswered".to_owned(),
+        };
+        let (words, kept) = transcript.words();
+        let interim = if kept { "+interim" } else { "" };
+        (
+            words,
+            Some(format!(
+                "{at_end}{answer}{}, words from={from}{interim}",
+                replies.results_told()
+            )),
+        )
+    };
     let close_stream = || Message::text(r#"{"type":"CloseStream"}"#);
     loop {
         let sent = samples_sent as f64 / 16_000.0;
@@ -654,12 +823,19 @@ where
                 at_end = format!("{}, last final {before}", transcript.at_end(sent));
                 if transcript.settled(sent) {
                     let _ = write.send(close_stream()).await;
-                    return Ok((transcript.text(), told(&at_end, "settled")));
+                    return Ok(ending(&transcript, &at_end, None, "settled"));
+                }
+                // The words so far, the last interim's among them, while
+                // `Finalize`'s answer comes: a chat may begin on them.
+                let (words, interim) = transcript.words();
+                if interim && words.chars().any(char::is_alphanumeric) {
+                    let _ = early.send(Early::Words(words));
                 }
                 write
                     .send(Message::text(r#"{"type":"Finalize"}"#))
                     .await
                     .map_err(|_| Error::Transport("speech-to-text send"))?;
+                finalize_went = Some(Instant::now());
                 finalize_by = Some(Instant::now() + FINALIZE);
             }
             _ = tokio::time::sleep_until(last_sent + KEEP_ALIVE), if finalize_by.is_none() && !closing => {
@@ -693,12 +869,23 @@ where
                         if words.is_final && finalize_by.is_none() {
                             last_final = Some(Instant::now());
                         }
+                        if let Some(went) = finalize_went
+                            && finalized
+                            && answered.is_none()
+                        {
+                            answered = Some((went.elapsed(), words.end));
+                        }
                         transcript.add(words);
+                        if closing && transcript.settled(sent) {
+                            // `CloseStream`'s words cover all the audio sent:
+                            // its close is not waited for.
+                            return Ok(ending(&transcript, &at_end, Some(answered), "close_stream"));
+                        }
                         if finalize_by.is_some() && !closing {
                             if transcript.settled(sent) {
                                 // Closes the socket; its answer is not waited for.
                                 let _ = write.send(close_stream()).await;
-                                return Ok((transcript.text(), told(&at_end, "finalize")));
+                                return Ok(ending(&transcript, &at_end, Some(answered), "finalize"));
                             }
                             if finalized {
                                 // `Finalize`'s answer short of the audio sent:
@@ -734,7 +921,7 @@ where
                         },
                     ));
                     return if finalize_by.is_some() {
-                        Ok((transcript.text(), told(&at_end, "close_stream")))
+                        Ok(ending(&transcript, &at_end, Some(answered), "close_stream"))
                     } else {
                         Err(Error::Transport("speech-to-text stream"))
                     };
@@ -742,7 +929,7 @@ where
                 None => {
                     replies.end("ended with no close".to_owned());
                     return if finalize_by.is_some() {
-                        Ok((transcript.text(), told(&at_end, "close_stream")))
+                        Ok(ending(&transcript, &at_end, Some(answered), "close_stream"))
                     } else {
                         Err(Error::Transport("speech-to-text stream"))
                     };
@@ -768,7 +955,12 @@ mod tests {
 
     #[test]
     fn the_proxy_url_is_v1s() {
-        let url = url(Some("https://campaign-api.autonomous.ai/api/v1/ai/"), None).unwrap();
+        let url = url(
+            Some("https://campaign-api.autonomous.ai/api/v1/ai/"),
+            None,
+            &[],
+        )
+        .unwrap();
         assert_eq!(
             url.as_str(),
             format!(
@@ -777,10 +969,23 @@ mod tests {
         );
     }
 
+    /// #1712: the unit's key terms follow the lamp's name, each its own
+    /// `keyterm`, encoded.
+    #[test]
+    fn the_units_key_terms_follow_the_name() {
+        let terms = ["Hanoi".to_owned(), "Ho Chi Minh City".to_owned()];
+        assert_eq!(
+            url(None, None, &terms).unwrap().as_str(),
+            format!(
+                "wss://api.deepgram.com/v1/listen?{QUERY}&keyterm=Hanoi&keyterm=Ho+Chi+Minh+City"
+            )
+        );
+    }
+
     #[test]
     fn deepgram_is_called_directly_in_the_language_asked() {
         assert_eq!(
-            url(None, Some("vi")).unwrap().as_str(),
+            url(None, Some("vi"), &[]).unwrap().as_str(),
             format!(
                 "wss://api.deepgram.com/v1/listen?{}",
                 QUERY.replace("language=en", "language=vi")
@@ -791,7 +996,7 @@ mod tests {
     #[test]
     fn a_service_that_is_not_a_websocket_is_refused() {
         assert_eq!(
-            url(Some("ftp://example.com"), None).unwrap_err(),
+            url(Some("ftp://example.com"), None, &[]).unwrap_err(),
             Error::Url
         );
     }
@@ -817,7 +1022,7 @@ mod tests {
                 transcript.add(words);
             }
         }
-        assert_eq!(transcript.text(), "What time is it?");
+        assert_eq!(transcript.words().0, "What time is it?");
         assert_eq!(ends, 1);
     }
 
@@ -850,7 +1055,7 @@ mod tests {
         assert!(transcript.settled(2.5), "an empty interim is silence");
         transcript.speech_started(2.6);
         assert!(!transcript.settled(2.5), "someone talks again");
-        assert_eq!(transcript.text(), "what time is it");
+        assert_eq!(transcript.words().0, "what time is it");
     }
 
     #[test]
@@ -884,8 +1089,8 @@ mod tests {
     /// Speech to text in memory, on the paused clock: the server reads
     /// audio, sends `before` once some arrived, answers `Finalize` at once
     /// with `finalized`, 50 ms apart (none: ignores it, as a proxy might),
-    /// and answers `CloseStream` `round_trip` later with a last final and
-    /// its close. The client sends one second of audio, waits for its
+    /// and answers `CloseStream` `round_trip` later with a silent final short
+    /// of the audio, a last final and its close. The client sends one second of audio, waits for its
     /// results, then sends `more` frames and finishes. Returns the words,
     /// the journal's account and how long `finish` took.
     async fn finish_after(
@@ -893,6 +1098,18 @@ mod tests {
         finalized: &'static [&'static str],
         round_trip: Duration,
         more: usize,
+    ) -> (String, String, Duration) {
+        finish_closing_after(before, finalized, round_trip, more, Duration::ZERO).await
+    }
+
+    /// [`finish_after`], with the close `close_after` after `CloseStream`'s
+    /// last final.
+    async fn finish_closing_after(
+        before: &'static str,
+        finalized: &'static [&'static str],
+        round_trip: Duration,
+        more: usize,
+        close_after: Duration,
     ) -> (String, String, Duration) {
         use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
         let (near, far) = tokio::io::duplex(1 << 16);
@@ -916,8 +1133,12 @@ mod tests {
                 }
             }
             tokio::time::sleep(round_trip).await;
+            // A segment short of the audio sent, then the last final.
+            let silent = r#"{"type":"Results","is_final":true,"speech_final":false,"start":0.3,"duration":0.2,"channel":{"alternatives":[{"transcript":""}]}}"#;
             let last = r#"{"type":"Results","is_final":true,"speech_final":true,"start":0.5,"duration":0.5,"channel":{"alternatives":[{"transcript":"from close"}]}}"#;
+            let _ = socket.send(Message::text(silent)).await;
             let _ = socket.send(Message::text(last)).await;
+            tokio::time::sleep(close_after).await;
             let _ = socket.close(None).await;
         });
         let stream =
@@ -939,6 +1160,75 @@ mod tests {
 
     const INTERIM: &str = r#"{"type":"Results","is_final":false,"speech_final":false,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"hello"}]}}"#;
 
+    /// #1712 (`LAMP_SECOND_STT_WARM`): a stream kept ready says it is still
+    /// open while its socket is, and not once the service has closed it.
+    #[tokio::test]
+    async fn a_kept_stream_says_whether_its_socket_is_still_open() {
+        use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
+        let (near, far) = tokio::io::duplex(1 << 16);
+        let (close, closing) = tokio::sync::oneshot::channel::<()>();
+        let server = tokio::spawn(async move {
+            let mut socket = WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+            let _ = closing.await;
+            let _ = socket.close(None).await;
+        });
+        let stream =
+            SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
+        assert!(stream.still_open());
+        let _ = close.send(());
+        for _ in 0..200 {
+            if !stream.still_open() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert!(!stream.still_open());
+        server.abort();
+    }
+
+    /// #1712, request 329 on lamp-4ace: finals with words covering most of
+    /// the line came before its end; `Finalize` went unanswered and the
+    /// words came from `CloseStream`. The finals' words are kept, and the
+    /// line's end says how many results had words.
+    #[tokio::test(start_paused = true)]
+    async fn finals_with_words_before_the_close_keep_their_words() {
+        const SAID: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"start":0.0,"duration":0.8,"channel":{"alternatives":[{"transcript":"hey lamp what time"}]}}"#;
+        let (words, at_end, _) = finish_after(SAID, &[], Duration::from_millis(800), 0).await;
+        assert_eq!(words, "hey lamp what time from close");
+        assert!(
+            at_end.contains("finals cover 800 of 1000 ms sent"),
+            "{at_end}"
+        );
+        assert!(
+            at_end.ends_with(
+                ", finalize unanswered, results 2 with words, 1 without, words from=close_stream"
+            ),
+            "{at_end}"
+        );
+    }
+
+    /// #1712: a line whose only words came in an interim result, its
+    /// finals empty, keeps those words; the journal says so.
+    #[tokio::test(start_paused = true)]
+    async fn an_interims_words_with_no_final_after_them_are_kept() {
+        const EMPTY: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":1.0,"channel":{"alternatives":[{"transcript":""}]}}"#;
+        let mut transcript = Transcript::default();
+        transcript.add(heard(INTERIM).unwrap());
+        assert_eq!(transcript.words(), ("hello".to_owned(), true));
+        transcript.add(heard(EMPTY).unwrap());
+        assert_eq!(
+            transcript.words(),
+            (String::new(), false),
+            "a final came after it"
+        );
+        let (words, at_end, _) = finish_after(INTERIM, &[], Duration::from_millis(800), 0).await;
+        assert_eq!(
+            words, "from close",
+            "the close's final came after the interim"
+        );
+        assert!(at_end.ends_with("words from=close_stream"), "{at_end}");
+    }
+
     #[tokio::test(start_paused = true)]
     async fn finals_covering_all_the_audio_sent_do_not_wait_for_close_stream() {
         let ended = r#"{"type":"Results","is_final":true,"speech_final":true,"start":0.0,"duration":1.0,"channel":{"alternatives":[{"transcript":"hello lamp"}]}}"#;
@@ -955,7 +1245,10 @@ mod tests {
             finish_after(INTERIM, &[FINALIZED], Duration::from_millis(800), 0).await;
         assert_eq!(words, "hello lamp");
         assert_eq!(took, Duration::ZERO);
-        assert!(at_end.ends_with(", words from=finalize"), "{at_end}");
+        assert!(
+            at_end.ends_with(", finalize answered in 0 ms to 1000 ms, results 2 with words, 0 without, words from=finalize"),
+            "{at_end}"
+        );
         assert!(!at_end.contains("hello"));
     }
 
@@ -964,7 +1257,12 @@ mod tests {
         let (words, at_end, took) = finish_after(INTERIM, &[], Duration::from_millis(800), 0).await;
         assert_eq!(words, "from close");
         assert_eq!(took, FINALIZE + Duration::from_millis(800));
-        assert!(at_end.ends_with(", words from=close_stream"), "{at_end}");
+        assert!(
+            at_end.ends_with(
+                ", finalize unanswered, results 2 with words, 1 without, words from=close_stream"
+            ),
+            "{at_end}"
+        );
     }
 
     /// #828: when the first words came back is kept, from the first result
@@ -1184,7 +1482,86 @@ mod tests {
         // The server's 50 ms after its answer, then `CloseStream`'s round
         // trip: `FINALIZE` is not waited out.
         assert_eq!(took, Duration::from_millis(850));
+        // The journal tells the answer short: 300 of 1000 ms.
+        assert!(
+            at_end.ends_with(
+                "of 1000 ms sent, pending=interim 600 ms after the last final, last final none, \
+                 finalize answered in 0 ms to 300 ms, results 3 with words, 1 without, words from=close_stream"
+            ),
+            "{at_end}"
+        );
+    }
+
+    /// #1712, lamp-4ace: most lines' words came from `CloseStream`, 0.8 to
+    /// 1.0 s after the line. Once its last final covers all the audio sent,
+    /// the words are taken; the socket's close, which may come later, is not
+    /// waited for.
+    #[tokio::test(start_paused = true)]
+    async fn close_streams_words_are_taken_without_waiting_for_the_close() {
+        const SHORT: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":0.3,"channel":{"alternatives":[{"transcript":"hang"}]}}"#;
+        let (words, at_end, took) = finish_closing_after(
+            INTERIM,
+            &[SHORT],
+            Duration::from_millis(800),
+            0,
+            Duration::from_millis(500),
+        )
+        .await;
+        assert_eq!(words, "hang from close");
+        assert_eq!(took, Duration::from_millis(850));
         assert!(at_end.ends_with(", words from=close_stream"), "{at_end}");
+    }
+
+    /// #1712 (`LAMP_SECOND_PREPARED`, the first builder at 17:02): at the
+    /// line's end, with an interim's words still to be made final, they are
+    /// given at once as early words, before `Finalize`'s answer; words
+    /// already settled give none, as they are final at once.
+    #[tokio::test(start_paused = true)]
+    async fn an_interims_words_are_given_early_at_the_lines_end() {
+        use tokio_tungstenite::{WebSocketStream, tungstenite::protocol::Role};
+        const FINALIZED: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":1.0,"channel":{"alternatives":[{"transcript":"hello lamp"}]}}"#;
+        const ENDED: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"start":0.0,"duration":1.0,"channel":{"alternatives":[{"transcript":"hello lamp"}]}}"#;
+        for (before, early_words) in [(INTERIM, Some("hello")), (ENDED, None)] {
+            let (near, far) = tokio::io::duplex(1 << 16);
+            let server = tokio::spawn(async move {
+                let mut socket = WebSocketStream::from_raw_socket(far, Role::Server, None).await;
+                let mut told = false;
+                while let Some(Ok(message)) = socket.next().await {
+                    match message {
+                        Message::Binary(_) if !told => {
+                            told = true;
+                            socket.send(Message::text(before)).await.unwrap();
+                        }
+                        Message::Text(text) if text.contains("Finalize") => {
+                            tokio::time::sleep(Duration::from_millis(300)).await;
+                            socket.send(Message::text(FINALIZED)).await.unwrap();
+                        }
+                        Message::Text(text) if text.contains("CloseStream") => break,
+                        _ => {}
+                    }
+                }
+            });
+            let mut stream =
+                SttStream::start(WebSocketStream::from_raw_socket(near, Role::Client, None).await);
+            let mut early = stream.take_early().unwrap();
+            assert!(stream.take_early().is_none(), "one taker");
+            for _ in 0..50 {
+                stream.send(&[0; 320]).unwrap();
+            }
+            tokio::time::sleep(Duration::from_millis(300)).await;
+            let began = Instant::now();
+            let finishing = tokio::spawn(stream.finish_told());
+            if let Some(words) = early_words {
+                assert_eq!(early.recv().await, Some(Early::Words(words.to_owned())));
+                assert_eq!(began.elapsed(), Duration::ZERO, "before Finalize's answer");
+            }
+            let (words, _) = finishing.await.unwrap().unwrap();
+            assert_eq!(words, "hello lamp");
+            if early_words.is_none() {
+                assert!(early.try_recv().is_err(), "settled words are final at once");
+            }
+            server.abort();
+        }
     }
 
     /// A local plain websocket server stands in for Deepgram.

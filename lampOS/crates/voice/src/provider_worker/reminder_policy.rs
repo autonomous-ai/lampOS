@@ -41,14 +41,7 @@ impl Policy {
         if !self.enabled {
             return Err(ReminderDeferral::Disabled);
         }
-        if text.trim().is_empty() || text.len() > 300 || text.chars().any(char::is_control) {
-            return Err(ReminderDeferral::Invalid);
-        }
-        // A due reminder is requested work. The coordinator admits it at
-        // local silence under normal authority; the room adds no condition.
-        // JSON quoting makes the data boundary explicit; the tool gate below,
-        // rather than prompt wording, enforces the ban on side effects.
-        Ok(note(text, late, late_by_ms))
+        checked_note(text, late, late_by_ms)
     }
 
     pub fn is_reminder(&self, lineage: Lineage) -> bool {
@@ -73,6 +66,23 @@ impl Policy {
             reason,
         });
     }
+}
+
+/// The note for a due item's `text`, or why it cannot be said. The same for
+/// both voice routes ([`super::reminder_note`]).
+pub(super) fn checked_note(
+    text: &str,
+    late: bool,
+    late_by_ms: Option<u64>,
+) -> Result<String, ReminderDeferral> {
+    if text.trim().is_empty() || text.len() > 300 || text.chars().any(char::is_control) {
+        return Err(ReminderDeferral::Invalid);
+    }
+    // A due reminder is requested work. The coordinator admits it at
+    // local silence under normal authority; the room adds no condition.
+    // JSON quoting makes the data boundary explicit; the tool gate,
+    // rather than prompt wording, enforces the ban on side effects.
+    Ok(note(text, late, late_by_ms))
 }
 
 /// Late by less than this, a due item is said as on time: a creature does
