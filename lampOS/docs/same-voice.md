@@ -330,6 +330,22 @@ speakers, both judged right.)
         right after her line ("Tell me another name.", or a "Lamp, …" whose
         bare name was missed, as in scene 5), is held, as before the rule,
         and now also ends the conversation.
+    - **On the lamp** (the first builder's A/B, 19 October, 08:3x on #829):
+      lamp-4ace, 07:20:43–08:35:13, the office empty, against queue 22's
+      install (`cfce52401`). The build was `eda24bc9b`, this rule without the
+      late-print arm above, scored by `score_ab_fourth.py`. Answered with the
+      check / without:
+      - the umbrella line, the one this check is for: 0/3 / 2/3. A's remark
+        and the car: 0 times with the check;
+      - the wanted lines: 15/15 / 14/15, scene 6 as expected both ways;
+      - scene 1's "And what about tomorrow?", B's follow-up: 0/3 / 2/3, the
+        expected cost of a second speaker's follow-up;
+      - scene 2's "And in yen?": 2/3 / 3/3;
+      - scene 4's "And how long would that take by train?": 3/3 / 2/3;
+      - the busy openings: 0 both ways, as expected after 60 s of quiet.
+
+      The voice print came 217–374 ms after it was asked, on 1.80 s of
+      sound (the journal's lines, the check on).
     - **Tests:**
       `spoken_to::with_a_voice_check_a_question_in_the_conversations_voice_goes_on_after_another_voices_line`
       (scene 5 with her question and her line after it; scene 4; four
