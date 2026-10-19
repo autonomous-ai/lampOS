@@ -2410,6 +2410,10 @@ fn release_after(
     }
     let shared = Arc::clone(&owner.shared);
     let (sent_tx, sent_rx) = mpsc::channel();
+    // Only an input sent during the save is waited for: with none, the
+    // sender stays in a hold the release may never run, and the wait below
+    // ran its whole 5 s for nothing (#1128).
+    let sending = during.is_some();
     owner.while_held = Some(Box::new(move || {
         if let Some(input) = during {
             let waiting = Arc::clone(&shared);
@@ -2427,7 +2431,7 @@ fn release_after(
     }));
     let released = owner.release_if_still_quiet().unwrap();
     let saved = MuteRecord::load(&directory.file(), CLOCK, START).unwrap();
-    if let Ok(sent) = sent_rx.recv_timeout(std::time::Duration::from_secs(5)) {
+    if sending && let Ok(sent) = sent_rx.recv_timeout(std::time::Duration::from_secs(5)) {
         assert!(sent, "queued once the save was done");
     }
     (released, saved.muted)
