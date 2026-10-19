@@ -288,3 +288,24 @@ Ready for lamp-voice: no (#1193 opened, ARM64 starting)
   format on lamp-cb94, read-only under the lock. Posted a reply-time
   script on #705 for the first builder to run over lamp-4ace's batteries.
   lamp-cb94 itself: ordinary turns median 1.00 s, p90 1.08 s.
+- Fast answers, closed as the model's own time: #1520 (`LAMP_SHORT_DONE`,
+  never short after an "already" answer) merged; read-only scripts posted
+  on #705 (`reply_times_twelve.py` v1–v3, `prompt_times_twelve.py`,
+  `slow_turns_twelve.py` v1–v2, `short_asks_twelve.py` v1–v2,
+  `search_asks_twelve.py`, `connect_check_twelve.py`, `soak-check.sh` v2),
+  each run by the first builder on lamp-4ace and tried on lamp-cb94 under
+  its lock. The doc row is #1596 (merged).
+- lamp-cb94: the reminder never said on 17 Oct was a physical mute
+  (Thirteen); my "stuck" read was wrong and corrected on #705. The soak rule
+  now: a pass needs a turn (`soak-check.sh`).
+- #1595 → #1603 (merged): a `pending_only` reminders list says how many are
+  set and not yet due. Its P3s are #1633 (carried by Tests).
+- #1562 carried forward as #1616 (merged): the set-aside store keeps its
+  identity so the delivery ledger follows.
+
+## 2026-10-19 — #1716; #1679 next
+
+- #1716: Schedule's health warns while a `newer-*` store is there, and an
+  empty store beside one keeps its identity after a crash (the reviewer's
+  #1616 P3). Offline overnight; back at 10:10 +07.
+- Next: #1679 (light scenes, pointing, light shows), then #1693 (memory).
