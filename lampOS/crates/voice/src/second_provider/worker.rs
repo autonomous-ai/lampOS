@@ -1289,6 +1289,7 @@ pub fn serve(
     )
     .with_memory_scope(boot, face_cache.clone(), scoped_runner)
     .checking_sounds(checked)
+    .telling_cut_ins(files.cut_in_told)
     .waiting_with_a_sound(route.wait_cue)
     .saying_when_down(route.down_line)
     .announcing(!route.only_voice)
@@ -1429,6 +1430,16 @@ pub fn serve(
             let heeding = heeding.clone();
             engine = engine.noting_the_conversation_alone(Arc::new(move |request| {
                 heeding.lock().ok()?.conversation_note_for(request)
+            }));
+        }
+        // A line that may follow on from the lamp is not told so in a busy
+        // room, as the rule judged it (#1712).
+        {
+            let heeding = heeding.clone();
+            engine = engine.judging_busy(Arc::new(move |request| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.judged_busy(request))
             }));
         }
         {
@@ -1868,6 +1879,8 @@ pub(crate) struct Heeding {
     noted: Option<(u64, Option<&'static str>)>,
     /// The request last let out only as the conversation going on.
     alone: Option<u64>,
+    /// The request last judged in a busy room ([`Self::judged_busy`]).
+    busy: Option<u64>,
     /// The request last let out because its words or the lamp's name heard
     /// in its sound called the lamp.
     by_name: Option<u64>,
@@ -2074,6 +2087,7 @@ impl Heeding {
             name_note: None,
             noted: None,
             alone: None,
+            busy: None,
             by_name: None,
             session: 1,
             session_for: None,
@@ -2399,6 +2413,7 @@ impl Heeding {
         }
         self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
+        self.busy = busy.then_some(request);
         // Its words or the name heard called the lamp, not a face alone.
         self.by_name = (played && attention.called_for_itself()).then_some(request);
         // A call let out: the conversation goes on from it.
@@ -2477,6 +2492,13 @@ impl Heeding {
     /// conversation going on ([`CONVERSATION_ALONE`]).
     pub(crate) fn conversation_note_for(&self, request: u64) -> Option<&'static str> {
         (self.alone == Some(request)).then_some(CONVERSATION_ALONE)
+    }
+
+    /// Whether `request` was judged in a busy room: a line that may follow
+    /// on from the lamp is not told so there (`LAMP_FOLLOWS_ON`), as on the
+    /// Live route.
+    pub(crate) fn judged_busy(&self, request: u64) -> bool {
+        self.busy == Some(request)
     }
 }
 
@@ -4364,6 +4386,29 @@ mod tests {
         };
         assert!(judged(true).is_some(), "by day, held");
         assert_eq!(judged(false), None, "with on alone, played");
+    }
+
+    /// #1712, item 4 (`LAMP_FOLLOWS_ON`): the rule knows which line it
+    /// judged in a busy room, so that line is not told it may follow on.
+    #[test]
+    fn a_line_judged_in_a_busy_room_is_known_as_judged_busy() {
+        use crate::room_told::Room;
+        let signs = |room| super::Signs {
+            room,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        heeding.judge(9, line, "Lamp, what time is it?", signs(Room::Busy));
+        assert!(heeding.judged_busy(9));
+        assert!(!heeding.judged_busy(8));
+        heeding.judge(10, line, "Lamp, what time is it?", signs(Room::Quiet));
+        assert!(!heeding.judged_busy(10) && !heeding.judged_busy(9));
     }
 
     /// #1712, lamp-4ace's A/B: after a hand-over and 104 s, every line
