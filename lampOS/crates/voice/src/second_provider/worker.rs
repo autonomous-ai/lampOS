@@ -2192,9 +2192,11 @@ pub(crate) struct Heeding {
     /// with `--attention-near`: the last [`LEVELS_KEPT_US`].
     levels: Option<Levels>,
     /// The request the rule judged last, the session it is judged in, which
-    /// a request going on from it keeps, and the words it was judged with,
-    /// which are stripped from the front of that request's.
-    judged: Option<(u64, u64, String)>,
+    /// a request going on from it keeps, the words it was judged with,
+    /// which are stripped from the front of that request's, and the whole
+    /// chain's words, the first half's included, which name what it asks
+    /// for (Eighth on #2054: "Remind me" | "in two minutes to stretch").
+    judged: Option<(u64, u64, String, String)>,
     /// This route is the lamp's only voice ([`Self::as_the_only_voice`]):
     /// the room is the one it keeps itself, not Gemini's worker's.
     keeps_room: bool,
@@ -2413,6 +2415,11 @@ struct Waiting {
     since: Instant,
     seen: Seen,
 }
+
+/// Words that ask the lamp to remember or forget something: with the
+/// schedule's words, a line let out only as the conversation going on is
+/// then not told it may be people's talk (`Heeding::asks_its_work`).
+const MEMORY_WORDS: [&str; 2] = ["remember", "forget"];
 
 /// What the bus and the thread say as a spoken turn is judged.
 pub(crate) struct Signs {
@@ -2785,6 +2792,9 @@ impl Heeding {
         signs: Signs,
     ) -> Option<&'static str> {
         let attention = &mut self.attention;
+        // What the engine gave: a request going on from one cut short has
+        // that one's words in front of its own (#1168).
+        let whole = heard;
         // Each turn is its own session here. One going on from the request
         // begun just before it, when the rule judged that one last, keeps
         // what the rule knew of it (its name, the words so far, whether it
@@ -2793,9 +2803,9 @@ impl Heeding {
         let (session, heard) = match self
             .judged
             .as_ref()
-            .filter(|(last, _, _)| signs.continues_from == Some(*last))
+            .filter(|(last, _, _, _)| signs.continues_from == Some(*last))
         {
-            Some((_, session, before)) => {
+            Some((_, session, before, _)) => {
                 attention.continued_at(request, *session, began_us);
                 // The engine put the words going on from in front of these
                 // (#1168); the rule keeps them already, so it is given only
@@ -2813,7 +2823,7 @@ impl Heeding {
                 (self.session, heard)
             }
         };
-        self.judged = Some((request, session, heard.to_owned()));
+        self.judged = Some((request, session, heard.to_owned(), whole.to_owned()));
         attention.ended(request, ended_us);
         if self.cut_in == Some(request) {
             attention.ended_as_cut_in(request);
@@ -3029,8 +3039,40 @@ impl Heeding {
     /// or takes it away (`policy_holds::SCHEDULE_HELD`) in a request let out
     /// only as the conversation going on, as the Live route's busy-room rule
     /// holds the schedule's (#1522, #1712).
+    ///
+    /// Not when its words name a timer, a reminder or the lamp, as Live's
+    /// busy-room rule lets those set it (#1522, the first builder at 19:04):
+    /// on lamp-4ace on 20 Oct "Remind me in two minutes to stretch." was
+    /// held on this route, the person told to say it again, and set on Live
+    /// (the first builder at 04:54 and their yes at 05:01). A line answering
+    /// the lamp's own question is never let out only as the conversation
+    /// going on, so it sets what it asks for, as on Live.
     pub(crate) fn holds_call(&self, request: u64, name: &str) -> bool {
-        self.alone == Some(request) && crate::policy_holds::SCHEDULE_HELD.contains(&name)
+        self.alone == Some(request)
+            && crate::policy_holds::SCHEDULE_HELD.contains(&name)
+            && !self.names_the_schedule(request)
+    }
+
+    /// Whether `request`'s words name a timer, a reminder or the lamp
+    /// (`going_on_asks::names_the_schedule`): the whole chain's, for a
+    /// request going on from one cut short.
+    fn names_the_schedule(&self, request: u64) -> bool {
+        self.judged.as_ref().is_some_and(|(of, _, _, whole)| {
+            *of == request && crate::going_on_asks::names_the_schedule(whole)
+        })
+    }
+
+    /// Whether `request`'s words ask for the lamp's own work: the
+    /// schedule's words, or to remember or forget something. The whole
+    /// chain's, as [`Self::names_the_schedule`].
+    fn asks_its_work(&self, request: u64) -> bool {
+        self.names_the_schedule(request)
+            || self.judged.as_ref().is_some_and(|(of, _, _, whole)| {
+                *of == request
+                    && whole
+                        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+                        .any(|word| MEMORY_WORDS.contains(&word.to_lowercase().as_str()))
+            })
     }
 
     /// Whether the lamp's name was heard (`name/heard`, at
@@ -3060,9 +3102,13 @@ impl Heeding {
     }
 
     /// The note for `request` if the rule let it out only as the
-    /// conversation going on ([`CONVERSATION_ALONE`]).
+    /// conversation going on ([`CONVERSATION_ALONE`]): not for a line whose
+    /// words ask for the lamp's own work ([`Self::asks_its_work`]), which is
+    /// said to the lamp. On lamp-4ace on 20 Oct, told the note, "Remember
+    /// that my favourite colour is green." got `not_for_me` and nothing was
+    /// kept (the first builder at 04:54 and their yes at 05:01).
     pub(crate) fn conversation_note_for(&self, request: u64) -> Option<&'static str> {
-        (self.alone == Some(request)).then_some(CONVERSATION_ALONE)
+        (self.alone == Some(request) && !self.asks_its_work(request)).then_some(CONVERSATION_ALONE)
     }
 
     /// Whether `request` was judged in a busy room: a line that may follow
@@ -5581,6 +5627,98 @@ mod tests {
             None
         );
         assert!(!heeding.holds_call(10, "set_timer"), "called by name");
+        // #1712 (the first builder at 04:54): a line that names the
+        // schedule sets it, as Live's busy-room rule lets it, and isn't told
+        // it may be people's talk; nor is one that asks to remember.
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(
+            heeding.judge(
+                11,
+                line,
+                "Remind me in two minutes to stretch.",
+                signs(true, false)
+            ),
+            None
+        );
+        assert!(!heeding.holds_call(11, "set_reminder"));
+        assert_eq!(heeding.conversation_note_for(11), None);
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(
+            heeding.judge(
+                12,
+                line,
+                "Remember that my favourite colour is green.",
+                signs(true, false)
+            ),
+            None
+        );
+        assert_eq!(heeding.conversation_note_for(12), None);
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(
+            heeding.judge(14, line, "Forget my favourite colour.", signs(true, false)),
+            None
+        );
+        assert_eq!(heeding.conversation_note_for(14), None);
+        // An answer to the lamp's own question sets what it asks for.
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(
+            heeding.judge(15, line, "Yes, give me five minutes.", signs(true, true)),
+            None
+        );
+        assert!(!heeding.holds_call(15, "set_timer"));
+        // Eighth on #2054: a request going on from one cut short is judged
+        // on the whole chain's words, so a first half naming the reminder,
+        // or asking to remember, counts.
+        for (first, then, call) in [
+            (
+                "Remind me",
+                "in two minutes to stretch.",
+                Some("set_reminder"),
+            ),
+            ("Remember that", "my favourite colour is green.", None),
+        ] {
+            let mut heeding = super::Heeding::new(false, false, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.judge(16, line, first, signs(true, false));
+            let going_on = super::Signs {
+                continues_from: Some(16),
+                ..signs(true, false)
+            };
+            assert_eq!(
+                heeding.judge(17, next, &format!("{first} {then}"), going_on),
+                None,
+                "{first}"
+            );
+            if let Some(call) = call {
+                assert!(!heeding.holds_call(17, call), "{first}");
+            }
+            assert_eq!(heeding.conversation_note_for(17), None, "{first}");
+        }
+        // Talk going on from talk still gets the note.
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        heeding.judge(16, line, "I saved", signs(true, false));
+        let going_on = super::Signs {
+            continues_from: Some(16),
+            ..signs(true, false)
+        };
+        assert_eq!(heeding.judge(17, next, talk, going_on), None);
+        assert_eq!(
+            heeding.conversation_note_for(17),
+            Some(super::CONVERSATION_ALONE)
+        );
+        // Talk that names neither still gets the note.
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(heeding.judge(13, line, talk, signs(true, false)), None);
+        assert_eq!(
+            heeding.conversation_note_for(13),
+            Some(super::CONVERSATION_ALONE)
+        );
     }
 
     /// #1712: spoken turns are told how to take what they heard; the

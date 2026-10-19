@@ -1471,8 +1471,19 @@ after a take-over, but now for every turn:
   question (`attention::Attention::played_on_the_conversation_alone`). It is
   asked with `worker::CONVERSATION_ALONE` beside its words: it may be
   people's talk, and if it is plainly said to someone else or a remark to
-  the room, the model calls `not_for_me`; a follow-up is the model's. The
-  journal adds `, only as the conversation going on: the model is told so`
+  the room, the model calls `not_for_me`; a follow-up is the model's. A
+  line whose words ask for the lamp's own work is not told so
+  (`Heeding::asks_its_work`): the schedule's words (a timer, a reminder or
+  the lamp, `going_on_asks::names_the_schedule`) or "remember" or "forget"
+  (`worker::MEMORY_WORDS`), in the whole chain's words for a request going
+  on from one cut short ("Remind me" | "in two minutes to stretch", Eighth
+  on #2054). Either word anywhere counts, so people's own talk with one in
+  it ("I forget his name") loses this note too, and gets the decline note
+  (`DECLINE_NOTE`) in its place, which still asks for `not_for_me` on
+  talk not for the lamp. On lamp-4ace on 20 Oct, told the note,
+  "Remember that my favourite colour is green." got `not_for_me` and
+  nothing was kept (#1712, the first builder at 04:54 and their yes at
+  05:01). The journal adds `, only as the conversation going on: the model is told so`
   to `its answer is played`. Gemini Live hears who is talking to whom; this
   route's model reads one line of words, and on lamp-4ace on 19 Oct it
   answered colleagues' talk after a named request six times, where Live
@@ -1484,7 +1495,11 @@ after a take-over, but now for every turn:
   as the Live route tells it of a call the Policy holds, and the journal
   says `request N asked for set_timer: held, nothing shows it was said to
   the lamp`. At 13:03 on 19 Oct "Yes, give me five minutes", said to
-  someone else, set a five-minute timer. And such a line of one or two
+  someone else, set a five-minute timer. A line whose words name the
+  schedule runs them, as Live's busy-room rule lets it (#1522): "Remind me
+  in two minutes to stretch." was held here and set on Live. A line
+  answering the lamp's own question is never let out this way, so it sets
+  what it asks for. And such a line of one or two
   words, with no question in it and not a short word said to the lamp
   (`not_speech::short_word`: "louder", "thanks", "stop"), is held before
   the model sees it (`worker::LONE_WORDS`): "What's the price of gold?"
