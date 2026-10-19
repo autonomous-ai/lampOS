@@ -972,10 +972,31 @@ kept **unconfirmed**, until its person says yes at the lamp:
   `storage`. The
   journal says only which, never the name or the file.
 
-**Not built yet:** the voice asking. That's the question "Someone added your
-face from a photo, as NAME. Shall I remember you?" the first time the face is
-here, with yes and no as its functions, and lamp-cloud's taking the app's
-photo.
+**The voice's asking** (`LAMP_PHOTO_FACES=on` in the voice, with the eyes'
+socket; `crates/voice/src/photo_faces.rs`):
+- A thread asks the eyes `photo_here` every 2 s, off the voice's loop, so
+  the loop never waits on them (`photo_faces::Watch`).
+- When an unconfirmed face is here and wasn't asked about yet, and the lamp
+  is quiet (no turn under way, nothing queued, nothing said for 3 s, input
+  ready, a session open), the thread tells the eyes `photo_asked`. The
+  voice then says, once, as its own written turn (`photo_face_ask`): "Someone
+  added your face from a photo, as NAME. Shall I remember you?" It doesn't
+  use the name as theirs unless they agree.
+- **Their spoken answer** calls `photo_face_yes` or `photo_face_no`. These
+  run in the provider's worker, a process apart from the coordinator that
+  asked, so they take the face from the eyes, the unconfirmed one
+  `photo_here` names now, and tell the eyes `photo_yes` or `photo_no` for it.
+  The eyes take a yes only for that face once it was asked (`not_asked`
+  otherwise), so no name has to cross processes (the reviewer on #1977,
+  22:50). Like the other
+  face functions, these are taken only from words heard at the lamp, never
+  a written or typed request. A yes for a face that has gone is
+  `not_here`, and the model is told nothing changed.
+- No answer is the eyes' to let go, at the meeting's end.
+
+**Not built yet:** lamp-cloud's taking the app's photo, writing it into
+`--photo-dir` at 0600 and sending the ask, only from the lamp's own
+signed-in account.
 
 Tests (`photo.rs`):
 - the file read once and removed, a second ask finding nothing; one too
