@@ -986,6 +986,122 @@ async fn with_the_switch_and_a_voice_check_a_line_held_as_another_voice_counts_a
     assert_eq!(scene(false).await, (true, true));
 }
 
+/// #829, lamp-4ace on 19 October (queue 22e): Samantha's "Pepper", held as
+/// another voice, ended Daniel's conversation, and his next questions to the
+/// lamp were held: "What about a name for a black kitten then?" (its
+/// "Lamp," not heard as the name) and "And which of those names is more
+/// popular?". So was scene 4's "And how long would that take by train?"
+/// after a television's line. A question in the conversation's own voice
+/// now goes on with it after only another voice's line; her own question
+/// there, and her line after the lamp's answer, are still held. A statement
+/// in his voice there is his talk to her, which ends the conversation, so
+/// his question after it is held too, whether or not the model answered
+/// the statement (the reviewer on #1030 and on #1636).
+#[tokio::test(start_paused = true)]
+async fn with_a_voice_check_a_question_in_the_conversations_voice_goes_on_after_another_voices_line()
+ {
+    let _clock = logical_clock();
+    let scene = |lines: Vec<(i16, &'static str)>| async move {
+        let _mark = OwnMark::kept();
+        let _room = OwnRoom::fresh();
+        let mut options = options(true, attention_now, crate::tools::Settings::default());
+        options.voices = Some(Box::new(TwoVoices(Default::default())));
+        let mut rig = LiveRig::start_configured(
+            quick_policy(),
+            options,
+            BARRIER,
+            false,
+            Continuation::Off,
+            lamp_gemini::MAX_WIRE_BYTES * 2,
+            |config| {
+                config
+                    .timeouts(lamp_gemini::Timeouts {
+                        unanswered: Some(Duration::from_millis(100)),
+                        ..Default::default()
+                    })
+                    .unwrap()
+            },
+        );
+        let mut dial = rig.ready().await;
+        let mut played = Vec::new();
+        for (voice, text) in lines {
+            played.push(voice_line(&mut rig, &mut dial, false, voice, 150, text, true).await);
+        }
+        rig.stop().await;
+        played
+    };
+    const DANIEL: i16 = 1;
+    const SAMANTHA: i16 = -1;
+    // Scene 5, her own question after "Pepper", and her line after the
+    // lamp's answer.
+    assert_eq!(
+        scene(vec![
+            (
+                DANIEL,
+                "Hey Lamp, what is a good name for a small grey cat?"
+            ),
+            (
+                SAMANTHA,
+                "I think we should call her Pepper, she looks like one."
+            ),
+            (SAMANTHA, "Do you like that name?"),
+            (DANIEL, "What about a name for a black kitten then?"),
+            (DANIEL, "And which of those names is more popular?"),
+            (SAMANTHA, "I still like Pepper better."),
+        ])
+        .await,
+        [true, false, false, true, true, false]
+    );
+    // Scene 4: a television's line, then his question.
+    assert_eq!(
+        scene(vec![
+            (DANIEL, "Hey Lamp, how far is it from Hanoi to Da Nang?"),
+            (
+                SAMANTHA,
+                "In other news, heavy rain is expected across the north this weekend."
+            ),
+            (DANIEL, "And how long would that take by train?"),
+        ])
+        .await,
+        [true, false, true]
+    );
+    // A statement in his voice after her line is his talk to her, whatever
+    // "you", "let's" or "thanks" is in it.
+    for statement in [
+        "Yes, and we should leave a bit early.",
+        "Yes, and you should bring yours too.",
+        "Okay, let's leave a bit early then.",
+        "Thanks, I'll take the car.",
+    ] {
+        assert_eq!(
+            scene(vec![
+                (DANIEL, "Hey Lamp, what is the weather like in Hanoi today?"),
+                (SAMANTHA, "I should bring an umbrella then."),
+                (DANIEL, statement),
+            ])
+            .await,
+            [true, false, false],
+            "{statement}"
+        );
+    }
+    // #1030's 06:07 scene with the model answering Daniel's statement: held
+    // by the rule, it still ends the conversation, and his "budget"
+    // question after it is held.
+    assert_eq!(
+        scene(vec![
+            (
+                DANIEL,
+                "Hey Lamp, how much is one hundred dollars in euros?"
+            ),
+            (SAMANTHA, "Anyway, if we drop the trip we save almost half."),
+            (DANIEL, "But the client wants to meet in person."),
+            (DANIEL, "Did you get my message about the budget?"),
+        ])
+        .await,
+        [true, false, false, false]
+    );
+}
+
 /// Voice prints as [`TwoVoices`] makes them, but the other voice's at a
 /// cosine of 0.35 against the first's: between the bar of 0.25 set off the
 /// lamp and the labelled set's 0.45 (#1485).
@@ -1291,6 +1407,61 @@ async fn scene_with(prints: LatePrints, lines: &[(i16, u64, &str)]) -> Vec<bool>
     }
     rig.stop().await;
     played
+}
+
+/// The reviewer on #1636 (03:41): #1030's 06:07 scene with the prints as
+/// lamp-4ace's child gives them. Daniel's short "But the client wants to
+/// meet in person.", after Samantha's line was held as another voice, is
+/// printed only at its end, after its verdict. It still ends the
+/// conversation, so his "budget" question after it is held.
+#[tokio::test(start_paused = true)]
+async fn with_a_voice_check_a_statement_whose_print_is_late_after_another_voices_line_ends_the_conversation()
+ {
+    let _clock = logical_clock();
+    assert_eq!(
+        scene_with(
+            LatePrints::default(),
+            &[
+                (
+                    1,
+                    295,
+                    "Hey Lamp, how much is one hundred dollars in euros?"
+                ),
+                (-1, 200, "Anyway, if we drop the trip we save almost half."),
+                (1, 70, "But the client wants to meet in person."),
+                (1, 200, "Did you get my message about the budget?"),
+            ]
+        )
+        .await,
+        [true, false, false, false]
+    );
+}
+
+/// Beside the test above: a short question in the conversation's voice,
+/// printed only after its verdict, is held for want of its print, but it is
+/// no talk past the lamp. The conversation goes on for the question after
+/// it, printed in time.
+#[tokio::test(start_paused = true)]
+async fn with_a_voice_check_a_question_whose_print_is_late_after_another_voices_line_leaves_the_conversation_going_on()
+ {
+    let _clock = logical_clock();
+    assert_eq!(
+        scene_with(
+            LatePrints::default(),
+            &[
+                (
+                    1,
+                    295,
+                    "Hey Lamp, how much is one hundred dollars in euros?"
+                ),
+                (-1, 200, "Anyway, if we drop the trip we save almost half."),
+                (1, 70, "Is that a lot of money?"),
+                (1, 200, "And how much is that in Japanese yen?"),
+            ]
+        )
+        .await,
+        [true, false, false, true]
+    );
 }
 
 /// #829, through the worker's own loop, with a conversation going on: after
