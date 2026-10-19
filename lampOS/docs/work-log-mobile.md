@@ -10,6 +10,7 @@ lamp.
 
 | Id | Proposal | Answer |
 |----|----------|--------|
+| mobile-P1 | #1673 piece 4: the BFF team takes the push relay for an unasked `task_news` `chat.event`, mobile the app's side (details in the app repository's #2) | yes, #1722 12:04: only news of work asked for by text |
 
 ## Found, not mine
 
@@ -56,3 +57,35 @@ Ready for lamp-voice: no (waits for #1396 and #1673)
   true` in the setup POST, the device-page switch on `reports.get` and
   `reports.set`, the row hidden on `not on this lamp`, and `share_reports`
   read from setup's status.
+
+## 2026-10-19 — #1673, the app side — shape agreed, two fixes
+
+Ready for lamp-voice: no (the work is in the app's repository)
+
+- Said yes on #1673 (12:1x) to Fourth's 11:28 shape. Fourth's 12:12 answers:
+  an error carries the same sentence in `error` and `detail.message`;
+  `assistant_delta`'s words are in `summary`.
+- `mobile/lamp-v2-chat` in `ecm-sds-mobile`, on `mobile/lamp-v2`: `ce7695a6`
+  shows an error's line only when it differs from the bubble, and leaves the
+  attach button out for a Lamp 2. `flutter analyze` the same 28 as `v3`;
+  `flutter test` +681 −1 (the one failure is `v3`'s own). Committed, not
+  pushed.
+- Not shown: on a phone with a Lamp 2.
+
+## 2026-10-19 — lamp-0c89 — steps 1 and 2 begun
+
+Ready for lamp-voice: yes (`deploy/lamp-0c89/LAMP.md` only)
+
+- Named on #1396 (13:2x); added to the role file by the first builder (#1734).
+- Its setup status, read on its hotspot: V1 (no `generation`, V1's
+  `runtime_phase`), `set_up_completed: false`.
+- Reached on its hotspot (`192.168.100.1`); with a cable in, V1's network
+  monitor kept the hotspot unsteady (a guess from what was seen, not read on
+  the lamp). ssh by key; `sudo` without a password for its user on this test
+  lamp only (`/etc/sudoers.d/90-orangepi-nopasswd`).
+- Read over ssh: Orange Pi Debian 12, aarch64, 48 GB free; V1's `os-server`,
+  `hal`, `bootstrap`, `openclaw` and `lamp-cmedia-speaker`; no `/opt/lampOS`
+  or `/etc/lampOS`.
+- Build for it: `lamp-voice` `89bd0e65f`, ARM64 run 39201225155, 44 files
+  matching `SHA256SUMS` on the office Mac. It goes over as a `file:///`
+  channel, as lamp-06c1's did.
