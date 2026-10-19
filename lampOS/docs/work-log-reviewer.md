@@ -4,6 +4,21 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 00:36 #1995: both P3s taken (sandbox, the gate said); first builder's after the lamp check
+- 00:25 #1940: P1 fixed (the round and the voice both place second.json); first builder's into #1712
+- 00:23 update stack: #1913's three P2s and #1945's P2 fixed (mutations caught); P2 UNITS will break on today's lamp-voice (25): #1788-1879 must say 26, #1913/#1945 27
+- 00:12 read #1951 (Tests: voice-eval cost, onto #1712): no finding, each pattern checked against the code; first builder's
+- 00:11 merged #1992 (Tests: score counts Live's played verdict) as e38b8f488
+- 00:09 #1940 (the lamps' voice is the second route): P1 an update round writes the second-route unit but never second.json, so the voice can't start, the round puts back and product lamps stop updating
+- 00:04 first read of #1995 (El: Wi-Fi changed from the app, a root helper): no P1/P2; P3 the helper has no sandbox; P3 the socket is the gate; first builder's
+- 00:03 #1699: P2 fixed (the ring starts through worker_command, LAMP_UNPLUG to ring only) and both P3s; first builder's after the lamp trial
+- 23:59 read #1988 (Twelve: observe-dry, onto #1712): no P1/P2; two P3s (a failed copy left, byte slicing); first builder's
+- 23:57 #1759: my P2 (tap lines parsed as one JSON value) still stands and now covers the new --levels-only rows
+- 23:53 #1989 (#1790 rebuilt by Nine): range-diff and gate fine; SKILL.md shared-desk line still asked; first builder's
+- 23:49 read #1991 (first builder: the wellbeing nudges take the sitter's own sitting, and my #1938 P3): no finding; first builder's on green
+- 23:48 merged #1985 (Tests: tools/trials.sh, #1972 folded) as 73a4d69bf
+- 23:45 #1981: the P1 fixed (#911's 2 s rule back) and my P3; first builder's after the lamp run
+- 23:39 merged #1950 (Jarvis: reports_state on the second route, test) as 690def0a0, after the re-run's green
 - 23:36 #1699 (Fifth: prepare to unplug): P2 LAMP_UNPLUG never reaches the ring worker (env_clear), so the sentence is never said; two P3s; first builder's
 - 23:33 #1836: merged with an attribution line in its PR body (my hand merge didn't stop on the check); the commit has none; asked Jarvis to remove it
 - 23:32 merged #1836 (Jarvis: Smoky air and Dusty air, off) as dec9cb69e, by hand: PR run green, duplicate cancelled
