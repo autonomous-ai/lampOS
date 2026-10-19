@@ -76,6 +76,30 @@ The note takes the existing written-turn path. Its diagnostic event,
 session. This records a queued continuation, not evidence that anybody
 heard an answer. The second voice route does not produce this classification.
 
+## On the second route
+
+The same switch works on the second voice route (the first builder's 22:54
+on #1722); the worker reads Gemini's worker's `--holding-answer` as it reads
+every other flag (`Engine::holding_answers`). The route answers each turn
+whole, so the check is made there once the turn's words are out:
+
+- **Qualifies:** a spoken request, with nothing called in any round, whose
+  words said, all of its sentences joined, match the same list
+  (`holding_answer::holding_only`).
+- **Then** `ProviderOutput::HoldingAnswer` goes for the request and the
+  session it was begun in, before its idle `TurnComplete`, as the Live
+  worker sends it. The coordinator's continuation is the same: once the
+  room is quiet, one written turn of the note to the same voice.
+- **Never:** after a call (a timer may be set; a look asked by its call
+  counts, so the look is never answered twice), with more words, for the
+  lamp's own written turn, or a turn that failed.
+
+Tests: `second_provider`'s
+`a_holding_only_answer_is_told_so_the_route_is_asked_to_go_on` (the route),
+and `coordinator::tests::second_route::a_holding_answer_is_asked_to_go_on_once_on_the_second_route_as_on_live`
+(the loop, on Live and on the second route alone, and nothing with the
+switch off).
+
 ## Verification and latency boundary
 
 The host tests drive the real provider worker with a scripted Gemini

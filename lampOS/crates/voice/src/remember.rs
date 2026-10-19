@@ -979,7 +979,14 @@ pub struct DaysClient {
     threads: AtomicBool,
     /// [`forget_all_on`], read when the client is made (#1693).
     forget_all: AtomicBool,
+    /// The conversation the writer is in: whose, and the exchanges of it
+    /// journalled so far. With [`forget_all_on`], a thing remembered in it
+    /// is kept with them, so forgetting it removes them too (#1693).
+    current: Arc<Mutex<Current>>,
 }
+
+/// Whose conversation it is (`None` for the room's) and its exchanges.
+type Current = (Option<String>, Vec<u64>);
 
 #[derive(Default)]
 struct DaysContext {
@@ -1105,9 +1112,11 @@ impl DaysClient {
         let lost_worker = Arc::clone(&lost);
         let path = socket.clone();
         let name = prefix.clone();
+        let current = Arc::new(Mutex::new(Current::default()));
+        let writing = Arc::clone(&current);
         std::thread::Builder::new()
             .name("lamp-voice-memory-days".into())
-            .spawn(move || days_writer(&path, &name, &work, idle, &lost_worker))?;
+            .spawn(move || days_writer(&path, &name, &work, idle, &lost_worker, &writing))?;
         Ok(Self {
             socket,
             prefix,
@@ -1119,6 +1128,7 @@ impl DaysClient {
                 std::env::var(THREADS_ENVIRONMENT).ok().as_deref() == Some("on"),
             ),
             forget_all: AtomicBool::new(forget_all_on()),
+            current,
         })
     }
 
@@ -1369,6 +1379,17 @@ impl DaysClient {
         };
         if call.name == RECALL && request["query"].is_string() {
             request["op"] = json!("search");
+        }
+        // Kept with the conversation it came up in, this person's own, so
+        // "forget that" removes those exchanges too (#1693). Never waited
+        // for: a writer busy at this moment leaves it kept as before.
+        if call.name == REMEMBER
+            && self.forget_all.load(Ordering::Acquire)
+            && let Ok(current) = self.current.try_lock()
+            && current.0.as_deref() == person
+            && !current.1.is_empty()
+        {
+            request["source_ids"] = json!(current.1);
         }
         let writes = matches!(call.name.as_str(), REMEMBER | FORGET | FORGET_EVERYTHING);
         if writes {
@@ -2017,6 +2038,7 @@ fn days_writer(
     jobs: &Receiver<DaysJob>,
     idle: Duration,
     lost: &AtomicU64,
+    current: &Mutex<Current>,
 ) {
     let mut conversation = Conversation::default();
     let mut next = 0u64;
@@ -2036,6 +2058,9 @@ fn days_writer(
     };
     let mut end = |conversation: &mut Conversation| {
         let ended = std::mem::take(conversation);
+        if let Ok(mut current) = current.lock() {
+            *current = Current::default();
+        }
         // A foreground loss can belong to a later conversation still in this
         // queue. There is no ordered marker for a failed enqueue, so never
         // consume that evidence while ending an earlier conversation. After
@@ -2132,6 +2157,9 @@ fn days_writer(
                 report(id.is_some());
                 if let Some(id) = id {
                     conversation.add(id, finished);
+                    if let Ok(mut current) = current.lock() {
+                        *current = (conversation.person.clone(), conversation.sources.clone());
+                    }
                 } else {
                     conversation.incomplete = true;
                 }
@@ -3064,6 +3092,7 @@ mod tests {
             &receive,
             Duration::from_secs(1),
             &AtomicU64::new(1),
+            &Mutex::new(Current::default()),
         );
         let read = served.join().unwrap();
         assert_eq!(
@@ -4019,6 +4048,7 @@ mod tests {
             lost: Arc::new(AtomicU64::new(0)),
             threads: AtomicBool::new(false),
             forget_all: AtomicBool::new(false),
+            current: Arc::new(Mutex::new(Current::default())),
         };
         hand_on_days(batch(), NOW, &client);
         for (index, whose) in expected.into_iter().enumerate() {

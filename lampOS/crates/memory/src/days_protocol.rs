@@ -134,8 +134,9 @@ fn legacy(store: &mut Days, request: Request) -> Result<Value> {
             person,
             at_unix_ms,
             text,
+            source_ids,
         } => value(Response::Added {
-            id: store.remember(&one(person)?, at_unix_ms, &text)?,
+            id: store.remember_from(&one(person)?, at_unix_ms, &text, &source_ids)?,
         }),
         Request::Kept { person, max_bytes } => value(Response::Kept {
             entries: store.kept(&one(person)?, max_bytes.unwrap_or(4096).min(16384) as usize)?,

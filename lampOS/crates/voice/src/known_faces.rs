@@ -528,7 +528,7 @@ const NOT_AGREED: &str = "They have not said yes to that name yet. Say the new n
 pub const DEADLINE: Duration = Duration::from_secs(6);
 /// The known file counts while it is this fresh: the eyes renew it every
 /// two seconds while the person is there.
-const FRESH: Duration = Duration::from_secs(3);
+pub(crate) const FRESH: Duration = Duration::from_secs(3);
 const MOST_NAME_BYTES: usize = 120;
 
 /// The two functions the model is told of when the eyes remember faces.

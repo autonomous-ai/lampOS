@@ -2321,6 +2321,7 @@ dependencies = [
  "lamp-expression",
  "lamp-ipc",
  "lamp-local-time",
+ "lamp-memory",
  "lamp-msgs",
  "lamp-observer",
  "lamp-policy",

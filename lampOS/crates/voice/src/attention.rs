@@ -657,6 +657,26 @@ pub fn called_by_name_on(heard: &str, stand_alone_ins: bool) -> bool {
     said_to || called_by_stand_in(&words)
 }
 
+/// Whether what was heard is the lamp's name alone, or a word written for
+/// it, with greetings at most: "Lamp.", "Hey Lamp,", "Hey, Lynn." A call cut
+/// off at a pause, the rest still to come ([`called_by_name`] reads it as a
+/// call).
+pub fn only_the_name(heard: &str) -> bool {
+    let is = |word: &str, list: &[&str]| list.iter().any(|known| word.eq_ignore_ascii_case(known));
+    let words: Vec<&str> = heard
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    words.iter().any(|word| !is(word, GREETINGS))
+        && words.iter().all(|word| {
+            is(word, GREETINGS)
+                || is(word, &["lamp", "lamb"])
+                || is(word, STAND_INS)
+                || is(word, STAND_ALONE_INS)
+        })
+        && called_by_name(heard)
+}
+
 /// What the service has written in the name's place, first or after a
 /// greeting ([`called`]).
 fn called_by_stand_in(words: &[&str]) -> bool {
@@ -4402,5 +4422,31 @@ mod tests {
     #[test]
     fn report_to_your_manager_is_asked_and_left_to_the_model() {
         assert!(held_line_names_reports("Report to your manager first."));
+    }
+
+    /// #2002's P1: the piece a pause after the name leaves, heard as the
+    /// name alone, and nothing more.
+    #[test]
+    fn the_name_alone_is_told_from_a_line_with_it() {
+        for alone in [
+            "Lamp.",
+            "lamp",
+            "Hey Lamp,",
+            "Hey, Lynn.",
+            "Okay. Lamp?",
+            "Lamb.",
+        ] {
+            assert!(only_the_name(alone), "{alone}");
+        }
+        for not in [
+            "",
+            "Hey.",
+            "Lamp, what time is it?",
+            "Thank you, Lamp.",
+            "Line up the meetings.",
+            "The lamp.",
+        ] {
+            assert!(!only_the_name(not), "{not}");
+        }
     }
 }
