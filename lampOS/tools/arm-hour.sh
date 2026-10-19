@@ -27,6 +27,8 @@
 #               script holds no address and no credential.
 #   ARM_TRIALS  trials.sh's path on the lamp (/home/orangepi/lampos-tools/trials.sh)
 #   ARM_LOG     where the log goes (./arm-hour-YYYYmmdd-HHMM.log)
+#   ARM_PRESENCE_CHECK  #1677's presence-check.sh on the Mac, in a checkout of
+#               the morning build's commit (row 19)
 #   ARM_ROWS_FILE  rows to use in place of the table below (arm-hour-test.sh)
 set -uo pipefail
 
@@ -44,10 +46,11 @@ LOG=${ARM_LOG:-./arm-hour-$(date '+%Y%m%d-%H%M').log}
 #   mac    a command run on the Mac
 #   trial  a trials.sh row, run on the lamp (its own put-back included)
 #   say    a line for the person to say; Enter once it's said
+#   tell   what the person does now; Enter once they've begun
 #   wait   seconds to let pass
 #   proof  a command on the lamp whose output is the row's proof
-#   back   a command on the lamp that puts it back; all of them run, in order,
-#          after the row, whatever happened
+#   back   a command on the lamp that puts it back ("mac: COMMAND" on the
+#          Mac); all of them run, in order, after the row, whatever happened
 #   sheet  where the run sheet is
 # A row with no steps is done by hand: its two lines, then the question.
 # ---------------------------------------------------------------------------
@@ -154,9 +157,14 @@ sheet | #1836, tools/trials.sh smoky
 trial | smoky
 end
 row | 19 | The light goes out when you leave, for real | still | 25 min
-do | Sit 2 minutes, leave view and earshot for about 11 minutes, then sit back down.
-watch | The light fades to the ember over about 30 s with no step, about 10 minutes after the last face, and comes back within 1 s of sitting down.
-sheet | #1677, Nine, 19 Oct 18:59Z (presence-check.sh from the Mac: by hand)
+do | Run 1: sit 2 minutes, leave view and earshot for 10, come back. Run 2: sit 30 s, leave within earshot, and once the light is out say "Hey Lamp, what time is it?" from out of view.
+watch | The light fades to the ember over about 30 s with no step, after 10 minutes (run 2: 1) with nobody, and comes back within a second of a face or the voice.
+sheet | #1677, Nine, 19 Oct 18:59Z; #1722, Nine, 20 Oct 03:26 (from the Mac: presence-check.sh, a phone filming from the doorway)
+tell | Run 1: sit 2 minutes, then leave view and earshot for 10 minutes, then come back.
+mac | p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && SECONDS_FOR=960 ./presence-check.sh lamp-4ace quiet
+tell | Run 2: sit 30 s, leave within earshot; once the light is out, say "Hey Lamp, what time is it?" from out of view.
+mac | p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && NOBODY_S=60 SECONDS_FOR=300 ./presence-check.sh lamp-4ace quiet
+back | mac: p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && ./presence-check.sh lamp-4ace restore
 end
 ROWS
 )
@@ -219,7 +227,12 @@ put_back() {
   while IFS= read -r line; do
     [[ -z $line ]] && continue
     say_ "    $line"
-    on_lamp "$line" || failed=1
+    case $line in
+      mac:*)
+        if [[ $DRY == 1 ]]; then say_ "    mac: ${line#mac: }"; else bash -c "${line#mac: }" </dev/null || failed=1; fi
+        ;;
+      *) on_lamp "$line" || failed=1 ;;
+    esac
   done <<EOF
 $BACK_PENDING
 EOF
@@ -253,13 +266,13 @@ run_row() { # N
   sheet=$(printf '%s\n' "$lines" | field sheet | head -1)
   [[ -n $sheet ]] && say_ "  Run sheet: $sheet"
   local steps runs
-  steps=$(printf '%s\n' "$lines" | grep -E '^(lamp|mac|trial|say|wait|proof) *\|' || true)
-  runs=$(printf '%s\n' "$lines" | grep -E '^(lamp|mac|trial|say|wait) *\|' || true)
+  steps=$(printf '%s\n' "$lines" | grep -E '^(lamp|mac|trial|say|tell|wait|proof) *\|' || true)
+  runs=$(printf '%s\n' "$lines" | grep -E '^(lamp|mac|trial|say|tell|wait) *\|' || true)
   [[ -z $runs ]] && say_ "  By hand: the builder runs this row from its run sheet; the tool shows its proof and asks."
 
   if [[ $DRY == 1 ]]; then
     [[ $MOVES == moves ]] && say_ "    ask: Hand near the arm? (y)"
-    printf '%s\n' "$lines" | grep -E '^(lamp|mac|trial|say|wait|proof|back) *\|' | sed 's/^/    /'
+    printf '%s\n' "$lines" | grep -E '^(lamp|mac|trial|say|tell|wait|proof|back) *\|' | sed 's/^/    /'
     return 0
   fi
 
@@ -293,6 +306,10 @@ run_row() { # N
       trial) say_ "  trial: trials.sh $value"; on_lamp "sudo $TRIALS $value" || failed=1 ;;
       say)
         answer=$(ask "  SAY: \"$value\"  (Enter once said, q to stop)")
+        [[ $answer == q ]] && stop
+        ;;
+      tell)
+        answer=$(ask "  NOW: $value  (Enter, q to stop)")
         [[ $answer == q ]] && stop
         ;;
       wait) say_ "  waiting $value s"; sleep "$value" ;;

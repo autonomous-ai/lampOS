@@ -195,6 +195,39 @@ printf '\ny\nq\n' | ARM_ROWS_FILE=$T/rows2 "$SCRIPT" >"$T/out" 2>&1; check "a fa
 has "PUT BACK FAILED said" "$T/out" "PUT BACK FAILED"
 hasnt "the next row didn't start" "$T/out" "Row 2: "
 
+# A tell: what the person does now, then Enter; q there stops and puts back.
+cat >"$T/rows6" <<'EOF'
+row | 1 | A tell | still | 1 min
+do | x
+watch | y
+lamp | before
+tell | Sit down now.
+lamp | after
+back | back it
+end
+EOF
+reset
+printf '\n\n\ny\n' | ARM_ROWS_FILE=$T/rows6 "$SCRIPT" >"$T/out" 2>&1; check "a tell" 0 $?
+has "the tell shown" "$T/out" "NOW: Sit down now."
+[[ $(cat "$T/calls" | tr '\n' ',') == "before,after,back it," ]] && ok || bad "a tell: $(cat "$T/calls" | tr '\n' ',')"
+reset
+printf '\nq\n' | ARM_ROWS_FILE=$T/rows6 "$SCRIPT" >"$T/out" 2>&1
+[[ $(cat "$T/calls" | tr '\n' ',') == "before,back it," ]] && ok || bad "q at a tell: $(cat "$T/calls" | tr '\n' ',')"
+
+# A put-back on the Mac ("back | mac: ..."): run there, not on the lamp.
+cat >"$T/rows5" <<'EOF'
+row | 1 | A Mac put-back | still | 1 min
+do | x
+watch | y
+mac | echo mac-step >>"$FAKE/calls"
+back | mac: echo mac-back >>"$FAKE/calls"
+back | lamp back
+end
+EOF
+reset
+printf '\n\ny\n' | ARM_ROWS_FILE=$T/rows5 "$SCRIPT" >"$T/out" 2>&1; check "a Mac put-back" 0 $?
+[[ $(cat "$T/calls" | tr '\n' ',') == "mac-step,mac-back,lamp back," ]] && ok || bad "a Mac put-back: $(cat "$T/calls" | tr '\n' ',')"
+
 # Stopped (TERM) in the middle of a step: put back.
 reset
 cat >"$T/rows3" <<'EOF'
