@@ -4143,7 +4143,7 @@ fn conversation_with_gate(
     #[cfg(not(test))]
     let given_says = None;
     let mut says = if lifetime.continuous() {
-        given_says.or_else(crate::say::Says::from_environment)
+        given_says.or_else(|| crate::say::Says::from_environment(notices.recordings()))
     } else {
         None
     };

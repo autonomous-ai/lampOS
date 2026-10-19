@@ -26,7 +26,11 @@ breaks, a part that says whether the lamp is online, show it) come after it.
   it. The place for the voice's own link state.
 - **Recorded failure lines** ([failure-notices.md](failure-notices.md),
   `--failure-notice-dir`): built, packaged nowhere, no wording approved, and
-  played only for a turn whose request failed. The way to say "I can't reach
+  played only for a turn whose request failed. The product unit passes
+  `--failure-notice-dir /etc/lampOS/voice/notices` since #1959, for the Wi-Fi
+  helper's recorded no-Wi-Fi line (`setup.md`, "The no-Wi-Fi line is a
+  recording"); no recording is in that folder yet, so every line there is
+  still silent. The way to say "I can't reach
   the internet" with no internet: a recording on the lamp.
 - **Schedule's trusted clock** (`crates/schedule/src/time.rs`,
   [schedule.md](schedule.md)): elapsed timers run on the boot clock; calendar

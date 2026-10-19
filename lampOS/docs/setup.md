@@ -495,13 +495,56 @@ the end, `{"done": {"ssid"}}` or `{"refused": why}`.
    **never the hotspot**, since after setup there is no setup page behind it.
 
 **The lamp says what happened**, through the voice's say service (`LAMP_SAY`,
-`speaking-first.md`) as `text` from the skill `wifi`, never the network's name
-or password: "I'm on the new Wi-Fi now."; "I couldn't join that one, so I've
-gone back to the old Wi-Fi."; and with neither network back, "I can't reach any
-Wi-Fi. Hold my button for five seconds to set me up again." at most once a
-minute, for 10 minutes at most or until a network is back. The voice speaks
-through its model, so the last line is said only if the voice can still speak
-with no network (a recording, as #830's offline line, is not built).
+`speaking-first.md`) from the skill `wifi`, never the network's name or
+password. The two lines said while online go as `text`, words for the voice's
+model: "I'm on the new Wi-Fi now."; "I couldn't join that one, so I've gone
+back to the old Wi-Fi.". With neither network back, "I can't reach any Wi-Fi.
+Hold my button for five seconds to set me up again." at most once a minute,
+for 10 minutes at most or until a network is back.
+
+**The no-Wi-Fi line is a recording** (the first builder on #1722, 01:56): with
+no network the voice cannot reach its model, so this one line is never words
+for it. It is recorded once at build time in the lamp's own voice and played
+by the voice:
+
+- **Asked** as `{"skill":"wifi","recording":"wifi_lost","priority":7,"expires_in_ms":60000}`.
+  The say service takes only the names it knows (`wifi_lost`), and only from
+  the Wi-Fi helper: the socket's peer must be root (`SO_PEERCRED`, read on
+  Linux), so a skill, under any name, is refused ("recording is asked by the
+  Wi-Fi helper only") and cannot say there is no Wi-Fi while the lamp is
+  online (`say::Caller`). Its samples are
+  played as a skill's sound is (`play_skill_sound`): a turn of the lamp's own,
+  on the head cue's speaker path at the recorded level, with the same gates
+  (not paused, muted, speaking, listening or owing an answer; 15 s after the
+  last turn; one sound in 30 s). Nothing goes to the provider.
+- **Where it lives:** the failure notice `wifi_lost` (`failure-notices.md`) in
+  `/etc/lampOS/voice/notices`: `manifest.json` names `wifi-lost.en-US.wav`
+  with its SHA-256, frames, transcript, voice and approval, and the loader
+  refuses anything that does not match. `lamp-voice.service` passes
+  `--failure-notice-dir /etc/lampOS/voice/notices --failure-notice-language en-US`.
+  It is read once at start; `failure_notice_capability` reports `wifi_lost`.
+- **Rendered** by `tools/render-wifi-line.sh PROVIDER.json NEW_FOLDER [production|test]`:
+  the voice's own route, model and voice (`gemini-3.8-live`, `Kore`), the line
+  as one written turn, as the say service's `text` is
+  (`crates/gemini/examples/render_line.rs`), kept as 24 kHz mono 16-bit with
+  the silence at either end cut. The example itself hashes it and writes the
+  manifest beside it (the kind, the words, the provider file's voice and
+  model, the approval, the SHA-256 and the frames); the script only calls it
+  and then checks the folder with `lamp-audio notices`. It needs the voice's key in its credential file; it
+  never prints it. `test` unless `production` is given, after a person has
+  listened to it.
+- **Missing:** with no folder, no manifest, or a file that fails a check, the
+  voice refuses the ask at once with the loader's reason (`the recording is not
+  there: not_provisioned`), nothing is heard, and the helper journals it:
+  `lamp-setup: wifi: the recording wifi_lost was not played: refused, ...`. The
+  helper waits at most 2 s for the voice's first answer, and a refusal within
+  them (the lamp speaking or listening when the voice comes to it) is
+  journalled the same way. After them the helper has hung up and counts the
+  ask as waiting in the voice: a refusal that comes later is read by nobody
+  and **not journalled**. Either way the next try is a minute later.
+- **Owed:** the recording itself. No clip has been rendered (it needs the
+  voice's key) and none is in `deploy/product/` or `lamp-update install`'s
+  list; until it is, the line is silent and journalled.
 
 **The password** is in the request line and the network file, and nowhere
 else: no reply, error or journal line holds it, and the journal holds no
@@ -515,7 +558,13 @@ hotspot; an old network that does not come back kept, within 2 min; no Wi-Fi
 file refused; the request's checks in setup's words; the password and the names
 in no reply or journal line, for every outcome; the switch off, the radio
 untouched; the three lines, and the lost line at most once a minute and given
-up at its bound; the units. Not run on a lamp.
+up at its bound; the lost line always the recording, never words for the
+model, and the other two always words; a recording not there journalled with
+the voice's reason, and nothing said; the units, and the voice's unit loading
+the fixed folder. The voice's side (`crates/voice/src/say.rs`,
+`coordinator/notices.rs`): a recording asked by name reaches the voice as a
+sound, one not provisioned is refused with why, and only known names are taken.
+Not run on a lamp.
 
 ## On a lamp
 

@@ -18,6 +18,9 @@ pub(super) struct FailureNotices {
     /// else can answer (#830, `LAMP_SERVICE_DOWN_LINE=on`): said once an
     /// outage, by a local-only turn, in place of `offline`.
     service_down: std::result::Result<Arc<Recording>, Missing>,
+    /// The Wi-Fi helper's line with no network (#1959): played only when
+    /// asked through the say service ([`crate::say::Recordings`]).
+    wifi_lost: std::result::Result<Arc<Recording>, Missing>,
     language: Option<String>,
 }
 pub(super) struct Recording {
@@ -54,6 +57,7 @@ impl FailureNotices {
             offline: get(NoticeKind::ProviderUnavailable),
             back_online: get(NoticeKind::BackOnline),
             service_down: get(NoticeKind::VoiceServiceUnreachable),
+            wifi_lost: get(NoticeKind::WifiLost),
             language: Some(options.language().to_owned()),
         }
     }
@@ -63,6 +67,7 @@ impl FailureNotices {
             offline: Err(Missing::NoDirectory),
             back_online: Err(Missing::NoDirectory),
             service_down: Err(Missing::NoDirectory),
+            wifi_lost: Err(Missing::NoDirectory),
             language: None,
         }
     }
@@ -84,8 +89,24 @@ impl FailureNotices {
             capability["offline"] = state(&self.offline);
             capability["back_online"] = state(&self.back_online);
             capability["service_down"] = state(&self.service_down);
+            capability["wifi_lost"] = state(&self.wifi_lost);
         }
         capability
+    }
+    /// What the say service may play by name (#1959): the samples, or the
+    /// loader's reason as its snake_case name.
+    pub(super) fn recordings(&self) -> crate::say::Recordings {
+        let loaded = self
+            .wifi_lost
+            .as_ref()
+            .map(|recording| Arc::<[i16]>::from(&recording.samples[..]))
+            .map_err(|missing| {
+                serde_json::to_value(missing)
+                    .ok()
+                    .and_then(|value| value.as_str().map(str::to_owned))
+                    .unwrap_or_else(|| "unavailable".into())
+            });
+        crate::say::Recordings::none().with("wifi_lost", loaded)
     }
 }
 
@@ -500,6 +521,7 @@ impl FailureNotices {
             offline: Err(Missing::NotProvisioned),
             back_online: Err(Missing::NotProvisioned),
             service_down: Err(Missing::NotProvisioned),
+            wifi_lost: Err(Missing::NotProvisioned),
             language: Some("en-US".into()),
         }
     }
@@ -553,6 +575,36 @@ mod loading_tests {
             crate::options::NoticeOptions::new(directory.into(), "en-US".into()).unwrap(),
             wav,
         )
+    }
+    /// #1959: the say service is handed the Wi-Fi line's samples when it
+    /// loaded, and the loader's reason when it did not.
+    #[test]
+    fn the_say_service_gets_the_wifi_line_or_why_not() {
+        let none = FailureNotices::none().recordings();
+        assert_eq!(
+            none.samples("wifi_lost"),
+            Err("the recording is not there: no_directory".into())
+        );
+        let directory = directory();
+        let (options, _) = test_asset(&directory.0);
+        let only_turn_lost = FailureNotices::load_with_approval(Some(&options), Approval::Test);
+        assert_eq!(
+            only_turn_lost.recordings().samples("wifi_lost"),
+            Err("the recording is not there: not_provisioned".into())
+        );
+        assert_eq!(
+            only_turn_lost.capability()["wifi_lost"]["missing"],
+            "not_provisioned"
+        );
+        let mut catalog = FailureNotices::synthetic();
+        catalog.wifi_lost = Ok(Arc::new(Recording {
+            info: None,
+            samples: vec![99_i16; 7_200].into_boxed_slice(),
+        }));
+        assert_eq!(
+            catalog.recordings().samples("wifi_lost"),
+            Ok(vec![99_i16; 7_200])
+        );
     }
     #[test]
     fn production_never_accepts_test_pcm_or_unknown_language() {

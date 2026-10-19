@@ -284,8 +284,16 @@ pub const SAY_JOINED: &str = "I'm on the new Wi-Fi now.";
 /// What the lamp says aloud once back on the old one.
 pub const SAY_BACK: &str = "I couldn't join that one, so I've gone back to the old Wi-Fi.";
 /// What the lamp says while neither network is there, at most once a minute.
+/// With no network the voice's model cannot be reached, so this line is
+/// never asked of it: it is [`RECORDING_LOST`], recorded at build time in
+/// the lamp's own voice and played by the voice (`docs/setup.md`). This is
+/// its transcript.
 pub const SAY_LOST: &str =
     "I can't reach any Wi-Fi. Hold my button for five seconds to set me up again.";
+/// The voice's recording of [`SAY_LOST`], by the name the say service takes
+/// (`recording`), the failure notice `wifi_lost` in
+/// `/etc/lampOS/voice/notices` (`docs/failure-notices.md`).
+pub const RECORDING_LOST: &str = "wifi_lost";
 /// [`SAY_LOST`] at most this often.
 pub const LOST_EVERY: Duration = Duration::from_secs(60);
 /// How long [`SAY_LOST`] is kept up for, while no network comes back.
@@ -303,12 +311,16 @@ pub fn line_for(changed: &Changed) -> Option<&'static str> {
 
 /// Where the lamp's lines go: the voice's say service. Injected for tests.
 pub trait Mouth {
+    /// Words for the voice's model to say: only while there is a network.
     fn say(&mut self, text: &str);
+    /// A recording the voice holds, by name: no model, no network.
+    fn play(&mut self, recording: &str);
 }
 
 /// After `changed`, the line once; and with neither network back, the lost
 /// line again at most once a minute until one is, [`LOST_MOST`] at most.
-/// Returns how many lines were asked for.
+/// The lost line is always the recording ([`RECORDING_LOST`]), never words
+/// for the model. Returns how many lines were asked for.
 pub fn say_after(
     host: &mut impl Rejoin,
     mouth: &mut impl Mouth,
@@ -318,10 +330,11 @@ pub fn say_after(
     let Some(line) = line_for(changed) else {
         return 0;
     };
-    mouth.say(line);
     if !matches!(changed, Changed::NotBack { .. }) {
+        mouth.say(line);
         return 1;
     }
+    mouth.play(RECORDING_LOST);
     let started = host.now_ms();
     let mut last = started;
     let mut said = 1;
@@ -335,7 +348,7 @@ pub fn say_after(
             return said;
         }
         if now.saturating_sub(last) >= LOST_EVERY.as_millis() as u64 {
-            mouth.say(SAY_LOST);
+            mouth.play(RECORDING_LOST);
             last = now;
             said += 1;
         }
@@ -343,11 +356,16 @@ pub fn say_after(
 }
 
 /// The voice's say service (`docs/speaking-first.md`, "the say service"):
-/// one line as `text`, from the skill name `wifi`, kept a minute. The
-/// outcome is not waited for; with the say service off, nothing is said.
+/// one line as `text`, or one recording by name, from the skill name
+/// `wifi`, kept a minute. With the say service off, nothing is said.
 pub struct SayService {
     pub socket: PathBuf,
 }
+
+/// How long a recording's ask waits for the voice's first answer: a
+/// recording that is not there is refused at once, and one the lamp cannot
+/// play now (speaking, listening, muted) at its next pass.
+pub const PLAY_ANSWER_WAIT: Duration = Duration::from_secs(2);
 
 impl SayService {
     pub fn product() -> Self {
@@ -370,6 +388,57 @@ impl Mouth for SayService {
         // (`say::tests::a_ticket_dropped_unanswered_is_dropped_and_a_client_gone_is_nothing`),
         // so the outcome is not waited for.
         let _ = stream.write_all(format!("{ask}\n").as_bytes());
+    }
+
+    fn play(&mut self, recording: &str) {
+        if let Some(said) = self.play_recording(recording) {
+            eprintln!("lamp-setup: wifi: {said}");
+        }
+    }
+}
+
+impl SayService {
+    /// Ask the voice to play `recording`, and wait at most
+    /// [`PLAY_ANSWER_WAIT`] for its first answer: the journal line when it
+    /// was not played (missing, refused, no voice), `None` once begun or
+    /// still waiting to be. A refusal after the wait is read by nobody and
+    /// not journalled (`docs/setup.md`). Never the line's words.
+    pub fn play_recording(&self, recording: &str) -> Option<String> {
+        use std::io::{BufRead, BufReader, Write};
+        let ask = json!({"skill": "wifi", "recording": recording, "priority": 7,
+            "expires_in_ms": 60_000});
+        let Ok(mut stream) = std::os::unix::net::UnixStream::connect(&self.socket) else {
+            return Some(format!(
+                "the voice's say service is not there; the recording {recording} was not played"
+            ));
+        };
+        if stream.write_all(format!("{ask}\n").as_bytes()).is_err()
+            || stream.set_read_timeout(Some(PLAY_ANSWER_WAIT)).is_err()
+        {
+            return Some(format!(
+                "the voice's say service did not take the ask; the recording {recording} was not played"
+            ));
+        }
+        let mut first = String::new();
+        if BufReader::new(stream).read_line(&mut first).is_err() || first.is_empty() {
+            // No answer yet: it waits in the voice, or the voice is gone.
+            return None;
+        }
+        let answer: Value = serde_json::from_str(first.trim_end()).unwrap_or(Value::Null);
+        match answer["outcome"].as_str() {
+            None if answer["event"] == "begun" => None,
+            Some("spoken") => None,
+            Some(outcome) => Some(format!(
+                "the recording {recording} was not played: {outcome}{}",
+                answer["why"]
+                    .as_str()
+                    .map(|why| format!(", {why}"))
+                    .unwrap_or_default()
+            )),
+            None => Some(format!(
+                "the voice's say service answered what it cannot be; the recording {recording} was not played"
+            )),
+        }
     }
 }
 

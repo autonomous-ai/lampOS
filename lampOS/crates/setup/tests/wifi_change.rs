@@ -2,8 +2,8 @@
 //! the networks it can see, what each gives, and a clock of its own.
 use lamp_setup::wifi::Host;
 use lamp_setup::wifi_change::{
-    Asked, BACK_WAIT, Changed, JOIN_WAIT, LOST_MOST, Mouth, Rejoin, SAY_BACK, SAY_JOINED, SAY_LOST,
-    answer, change, line_for, parse, say_after,
+    Asked, BACK_WAIT, Changed, JOIN_WAIT, LOST_MOST, Mouth, RECORDING_LOST, Rejoin, SAY_BACK,
+    SAY_JOINED, SAY_LOST, SayService, answer, change, line_for, parse, say_after,
 };
 use serde_json::json;
 use std::{collections::HashMap, io, time::Duration};
@@ -542,9 +542,13 @@ fn with_the_switch_off_every_request_is_refused_and_the_radio_untouched() {
 #[derive(Default)]
 struct Heard(Vec<(u64, String)>, u64);
 
+/// A recording is noted as `played NAME`: never words for the model.
 impl Mouth for Heard {
     fn say(&mut self, text: &str) {
         self.0.push((self.1, text.to_owned()));
+    }
+    fn play(&mut self, recording: &str) {
+        self.0.push((self.1, format!("played {recording}")));
     }
 }
 
@@ -557,6 +561,10 @@ struct Timed<'a> {
 impl Mouth for Timed<'_> {
     fn say(&mut self, text: &str) {
         self.heard.push((self.clock.get(), text.to_owned()));
+    }
+    fn play(&mut self, recording: &str) {
+        self.heard
+            .push((self.clock.get(), format!("played {recording}")));
     }
 }
 
@@ -679,7 +687,13 @@ fn with_no_wifi_back_the_lost_line_is_said_at_most_once_a_minute_until_one_is() 
     let said = say_after(&mut host, &mut mouth, &changed, BROKER);
     let at: Vec<u64> = mouth.heard.iter().map(|(at, _)| *at - started).collect();
     assert_eq!(said, 3, "{at:?}");
-    assert!(mouth.heard.iter().all(|(_, line)| line == SAY_LOST));
+    // Every time the recording, never the model's words (#1959).
+    assert!(
+        mouth
+            .heard
+            .iter()
+            .all(|(_, line)| line == "played wifi_lost")
+    );
     for pair in at.windows(2) {
         assert!(pair[1] - pair[0] >= 60_000, "{at:?}");
     }
@@ -689,6 +703,8 @@ fn with_no_wifi_back_the_lost_line_is_said_at_most_once_a_minute_until_one_is() 
     let mut heard = Heard::default();
     let said = say_after(&mut fake, &mut heard, &changed, BROKER);
     assert_eq!(said as u64, LOST_MOST.as_secs() / 60);
+    assert_eq!(heard.0.len() as u64, LOST_MOST.as_secs() / 60);
+    assert!(heard.0.iter().all(|(_, line)| line == "played wifi_lost"));
     assert!(fake.now_ms - started <= LOST_MOST.as_millis() as u64 + 5_000);
 }
 
@@ -714,4 +730,89 @@ fn the_helpers_units_are_its_own_one_change_at_a_time() {
     assert!(socket.contains("ListenStream=/run/lampos-setup-wifi/wifi.sock\n"));
     assert!(socket.contains("SocketGroup=lampos\nSocketMode=0660\n"));
     assert!(socket.contains("Accept=yes\nMaxConnections=1\n"));
+}
+
+/// A say socket that reads one ask and answers `answers`, line by line;
+/// the ask comes back from the thread.
+fn say_socket(tag: &str, answers: &'static str) -> (SayService, std::thread::JoinHandle<String>) {
+    use std::io::{BufRead, BufReader, Write};
+    let dir = std::path::PathBuf::from(format!("/tmp/lsw-{tag}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let socket = dir.join("say.sock");
+    let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+    let served = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut asked = String::new();
+        BufReader::new(&stream).read_line(&mut asked).unwrap();
+        stream.write_all(answers.as_bytes()).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+        asked
+    });
+    (SayService { socket }, served)
+}
+
+/// #1959: with no Wi-Fi the lost line is the voice's recording, asked by
+/// name, never words for the model; one not there is said in the journal,
+/// with the voice's reason, and nothing is heard.
+#[test]
+fn the_lost_line_is_the_recording_and_one_missing_is_journalled_not_said() {
+    assert_eq!(RECORDING_LOST, "wifi_lost");
+    let (mut say, served) = say_socket(
+        "missing",
+        "{\"outcome\":\"refused\",\"why\":\"the recording is not there: not_provisioned\"}\n",
+    );
+    assert_eq!(
+        say.play_recording(RECORDING_LOST),
+        Some(
+            "the recording wifi_lost was not played: refused, the recording is not there: \
+             not_provisioned"
+                .into()
+        )
+    );
+    let asked: serde_json::Value = serde_json::from_str(&served.join().unwrap()).unwrap();
+    assert_eq!(
+        asked,
+        json!({"skill":"wifi","recording":"wifi_lost","priority":7,"expires_in_ms":60_000})
+    );
+    assert!(asked.get("text").is_none() && asked.get("note").is_none());
+    // Begun: nothing to journal.
+    let (say_begun, served) = say_socket(
+        "begun",
+        "{\"event\":\"begun\",\"at_us\":5}\n{\"outcome\":\"spoken\"}\n",
+    );
+    assert_eq!(say_begun.play_recording(RECORDING_LOST), None);
+    served.join().unwrap();
+    // No say service at all: journalled, nothing said.
+    say.socket = "/tmp/lsw-nobody-here/say.sock".into();
+    assert_eq!(
+        say.play_recording(RECORDING_LOST),
+        Some("the voice's say service is not there; the recording wifi_lost was not played".into())
+    );
+    // The other two lines stay words for the model, said while online.
+    for changed in [Changed::Joined, Changed::Back { why: String::new() }] {
+        let mut fake = Fake::new(&[("Old Home", OLD)]);
+        let mut heard = Heard::default();
+        assert_eq!(say_after(&mut fake, &mut heard, &changed, BROKER), 1);
+        assert_eq!(heard.0[0].1, line_for(&changed).unwrap());
+        assert!(!heard.0[0].1.starts_with("played"));
+    }
+}
+
+/// #1959: the product's voice loads the recorded lines from one fixed
+/// folder, in one language, so the no-Wi-Fi line can be played there.
+#[test]
+fn the_product_voice_loads_its_recorded_lines_from_the_fixed_folder() {
+    let unit = include_str!("../../../deploy/product/lamp-voice.service");
+    let start = unit
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    assert!(
+        start.ends_with(
+            " --failure-notice-dir /etc/lampOS/voice/notices --failure-notice-language en-US"
+        ),
+        "{start}"
+    );
+    assert!(unit.contains("\nEnvironment=LAMP_SAY=on\n"));
 }

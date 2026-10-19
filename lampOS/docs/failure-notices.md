@@ -55,7 +55,7 @@ No wording or voice has been approved.
 
 | Field | Rule |
 |---|---|
-| `kind` | `provider_unavailable`, `turn_lost`, `service_refused`, `back_online` (#830) or `voice_service_unreachable` (#830, `LAMP_SERVICE_DOWN_LINE`) |
+| `kind` | `provider_unavailable`, `turn_lost`, `service_refused`, `back_online` (#830), `voice_service_unreachable` (#830, `LAMP_SERVICE_DOWN_LINE`) or `wifi_lost` (#1959: the Wi-Fi helper's no-Wi-Fi line, played only when asked through the say service as `recording`, `setup.md`) |
 | `language` | A BCP 47 tag, matched exactly. `en` does not satisfy `en-US` |
 | `transcript` | The words in the recording, 1 to 240 bytes, no control characters. Kept for records and review; never sent anywhere to be spoken |
 | `voice`, `voice_revision` | What produced the recording, 1 to 64 bytes each |
@@ -67,6 +67,10 @@ No wording or voice has been approved.
 Unknown fields, an unknown kind or approval, a second entry for the same kind
 and language, more than 8 entries, or a manifest over 16 KiB make the whole
 manifest invalid.
+
+An unknown kind refuses the whole manifest, so one with `wifi_lost` goes onto
+a lamp only with, or after, the build that knows it (#1959), as for #830's
+kinds.
 
 Each recording must be a regular file opened without following a link, a
 complete RIFF/WAVE container of mono 24 kHz 16-bit integer PCM with exactly

@@ -24,6 +24,8 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 [dev-dependencies]
 # Paused runtime clock: minutes of scripted conversation without the wait.
 tokio = { version = "=1.53.1", features = ["test-util"] }
+# The render_line example hashes the WAV it writes for the notice manifest.
+sha2.workspace = true
 
 [lints]
 workspace = true
