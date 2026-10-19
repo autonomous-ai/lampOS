@@ -1904,8 +1904,10 @@ connection (`Arm`):
   after idle, so a request over about 13 KB waits a round trip again.
 
 Each request has its own changing part, as turns do. An answer is read to
-its body's end, so the connection can carry the next request. A service
-that doesn't keep it ends that run's arms, counted as `closed`.
+its body's end, so the connection can carry the next request. Only a 200 is
+timed. A refused answer, and every arm after an answer that doesn't keep the
+connection, is counted `closed`, since a real turn would then pay a new
+connection (the reviewer on #2044).
 
 The lines are `wire kept target=… size=… run=… arm=…`, then each arm's
 medians. `wire kept idle-less-straight target=… size=…` is what restarting
@@ -1938,8 +1940,9 @@ systemd-run --pty --wait \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 10 --wire
 ```
 
-`--wire --kept` takes the same command with `--kept` after `--wire`. Its 10
-runs ask 120 requests and wait 5 s 40 times, about 4 minutes.
+`--wire --kept` takes the same command with `--kept` after `--wire`, at most
+20 runs (`MOST_KEPT_RUNS`). Its 10 runs ask 120 requests and wait 5 s 40
+times, about 4 minutes.
 
 ### How much the prompt cache holds (`probe-cache`)
 
