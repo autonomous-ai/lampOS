@@ -958,6 +958,49 @@ seen; and forgetting takes the number and an unwritten count
 name (`bus_out.rs`). The voice's line comes only with `visits: true`. Not
 run on a lamp.
 
+### How the person at the lamp seems (`--seems`, #1671, step 1)
+
+Off unless `lamp-eyes --seems /opt/lampOS/eyes/models/emotion-ferplus-8.onnx`
+is given. It doesn't need the recogniser, and it never asks who anyone is. It's a
+read for **measuring how often it is wrong**: nothing acts on it yet, and
+the lamp never says how anyone looks (#1671; the first builder's 14:04).
+
+- **The model:** FER+ (`emotion-ferplus-8.onnx`, the ONNX model zoo's,
+  MIT), 35,040,571 bytes, pinned by SHA-256 in `seems.rs`, run under
+  tract. No build or release carries it yet. It is placed by hand on a test lamp.
+- **The read:** at most every 2 s, the nearest face at or over
+  `NEAR_ENOUGH` of the picture's height is cut out upright as for
+  recognition (`who::align`, 112 by 112), made grey and 64 by 64
+  (`seems::grey`), and scored on eight expressions. These are reduced, as V1
+  did: `positive` when happiness holds 0.6 or more of the eight, `negative`
+  when sadness, anger, disgust, fear and contempt together do, else
+  `unsure` (`seems::judge`, `NAMED_FROM`, authored, to be set from the
+  measure).
+- **Said:** with `LAMP_BUS=on`, each read on `humans/seems`
+  (`lamp_msgs::HumanSeems`, good for 5 s): a kind and a confidence only.
+  No name, print or picture is kept or said. With no face near, nothing is
+  said, and a reader treats no fresh value as not known.
+- **The journal** says only how many reads there were in the last minute,
+  how long one took on average and the longest, for the cost on a lamp.
+  A read runs in the look loop, so it delays the look it comes with (one in
+  about eight), and that is the look the body follows a face by. If a read
+  on the lamp takes over about 100 ms, it moves to its own thread before
+  anything turns `--seems` on (the reviewer on #1859).
+
+Next (#1671): a week's log of time, kind, confidence and whether the
+person's own words or laughter agreed, with no identity, picture or audio,
+deleted after the measure; then a labelled session at a lamp. Only then
+may a core skill tell the conversation "they seem low".
+
+Tests: a face made grey and 64 by 64; the eight scores made shares;
+`positive`, `negative` and `unsure` at the line and just under it; a file
+that isn't the pinned model refused; with the model present
+(`LAMP_SEEMS_MODEL`), a read in eight shares (`seems.rs`). The read is said
+only with the switch, from the eyes, as a kind and a confidence
+(`bus_out.rs`); `--seems` is a short absolute path, given once (`main.rs`).
+One read takes about 45 ms on an x86 laptop's release build. **The cost on a
+lamp is not measured yet**, and it is the first thing to measure.
+
 ### Whether anyone is at the lamp (`LAMP_PRESENCE=on`, #1677)
 
 With `LAMP_PRESENCE=on` beside `LAMP_BUS=on`, the eyes also say on

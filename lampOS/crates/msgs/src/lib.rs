@@ -92,6 +92,8 @@ mod reports;
 pub use reports::*;
 mod familiar;
 pub use familiar::*;
+mod seems;
+pub use seems::*;
 
 mod activity;
 pub use activity::*;
@@ -1394,6 +1396,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(reports_topics())
         .chain(familiar_topics())
         .chain(activity_topics())
+        .chain(seems_topics())
         .find_map(|(name, declaration)| (name == topic).then_some(declaration))
 }
 
