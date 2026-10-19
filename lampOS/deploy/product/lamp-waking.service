@@ -1,0 +1,29 @@
+# The waking face (#1681, lampOS/docs/ring-choreography.md, "The waking face"): from power-on until the
+# voice asks for the ring, the asleep face's warm glow opening up the ring like an eye; pale and slow if no
+# voice has asked within 5 minutes. Off: without LAMP_WAKING_FACE=on (a drop-in,
+# lamp-waking.service.d/on.conf) it exits at once and makes no socket, and the voice opens the ring as before.
+[Unit]
+Description=lampOS: the waking face, the ring's light until the voice takes it
+# Early in boot, before most of the system, so the ring is lit soon after power.
+DefaultDependencies=no
+After=local-fs.target systemd-udevd.service
+Conflicts=shutdown.target
+Before=shutdown.target
+# A set-up lamp only: before setup's marker the ring is the setup light's.
+ConditionPathExists=/var/lib/lampos-setup/done
+
+[Service]
+Type=simple
+# Root: the ring's device, as the voice opens it.
+User=root
+ExecStart=/opt/lampOS/setup/current/lamp-setup wake
+# The release socket the voice asks on, /run/lampos-waking/release.sock; gone when it ends.
+RuntimeDirectory=lampos-waking
+RuntimeDirectoryMode=0700
+Restart=no
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-waking
+
+[Install]
+WantedBy=sysinit.target

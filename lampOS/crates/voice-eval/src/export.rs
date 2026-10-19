@@ -152,6 +152,7 @@ const PARTS: &[&str] = &[
     "lamp-tasks",
     "lamp-update",
     "lamp-voice",
+    "lamp-waking",
 ];
 
 /// How far a session's last event may be from its files' modification time
