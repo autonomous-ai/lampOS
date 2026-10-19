@@ -67,10 +67,11 @@ routes are not served. Each kind is carried out by the part that owns it.
 | `led.resting.preview` (`{"color": [r, g, b]}`) | asked on `light/request` at `conversation` priority (over a skill's glow, under the person's own light), on the host's boot clock, holding 10 s unless asked again, so an abandoned screen leaves nothing behind (V1's 10 s); a save gives it back first. A light asked for at the lamp ("make your light blue") ends it, and a drag that goes on stays given way until it pauses past its 10 s (the reviewer on #1464). Answered only when it fails, as V1, so a drag does not flood `fd_channel`. Refused where the ring takes no lights that lapse (`LAMP_LIGHT_REQUESTS`, on in the product) |
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`) and how many reports wait. A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
+| `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Read only. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `device.rename` | refused for now; step 2, through setup's record |
-| anything else (`add_channel`, `skills.*`, `face.*`, `tts.*`, the other `led.*`, `system.reboot`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
+| anything else (`add_channel`, the other `skills.*`, `face.*`, `tts.*`, the other `led.*`, `system.reboot`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
 ### The light: V1's colours on this lamp's
 
@@ -113,6 +114,107 @@ is the same light. Two differences from V1 the page should know:
   the person's later choice on them) and removes
   `/etc/lampOS/setup/backend.json` and `/etc/lampOS/setup/reports.json`
   with the rest of the person's data.
+
+## The skills page (#1722, `skills.list`)
+
+The Autonomous app's Lamp 2 skills page (mobile's design on #1722, the
+first builder's yes at 17:21 on 19 Oct): the lamp's skills as a phone's
+home screen of apps. `skills.list` is the first of four kinds; `remove`
+comes next, then `catalog` and `install` once the update channel carries
+skills. Only `skills.list` is built, and it is read only.
+
+**The switch.** `LAMP_SKILLS_PAGE=on`, with `LAMP_CLOUD=on`; off unless
+set. Without it the kind is answered as any this lamp lacks, `not on this
+lamp: skills.list`, and the app shows no Skills row. Its envelope is V1's,
+as `reports.*`'s.
+
+**Where it reads.** `lamp-skills`' own folder, `/var/lib/lampOS/skills`
+(the product unit's `--dir`), with `lamp-skills`' own loader
+(`lamp_skills::load_each`), so the page says what `lamp-skills list` says,
+a tool's name taken among them; no socket, topic or copy of the schema of
+its own. The folder is 0755 and its files 0644, so `lamp-cloud` reads it as
+`lampos` under its unit's `ProtectSystem=strict` with nothing widened. On
+this Mac the 13 skills of `lampOS/skills/` are read in 32 ms (a debug
+build; not yet timed on a lamp). A folder that can't be read is answered
+"the lamp's skills can't be read now".
+
+**The reply:**
+
+```json
+{"version": 1, "left_out": 0, "skills": [
+  {"name": "dance", "title": "Dance",
+   "description": "When someone asks the lamp to dance (…)",
+   "group": "core", "version": "1.0.0",
+   "can_remove": false, "can_turn_off": false, "off": null,
+   "loads": true, "why": null,
+   "may_use": [
+     {"name": "speak", "says": "speaks, or plays a short sound", "privacy": null},
+     {"name": "light", "says": "changes the light", "privacy": null},
+     {"name": "body", "says": "moves the lamp", "privacy": null},
+     {"name": "hearing", "says": "hears what is said to it", "privacy": "the privacy switch stops it"}]},
+  {"name": "desk-tutor", "title": "Desk tutor", "description": "…",
+   "group": "installed", "version": "1.0.0",
+   "can_remove": true, "can_turn_off": false, "off": null,
+   "loads": true, "why": null,
+   "may_use": [
+     {"name": "speak", "says": "speaks, or plays a short sound", "privacy": null},
+     {"name": "light", "says": "changes the light", "privacy": null},
+     {"name": "body", "says": "moves the lamp", "privacy": null},
+     {"name": "camera", "says": "uses the camera when it runs", "privacy": "the privacy switch stops it"}]}]}
+```
+
+- **`version`** is the reply's own: adding a field keeps 1; removing,
+  renaming or retyping one is 2. A skill's own version is its `version`.
+- **`skills`**, core first, then installed, then made here, by name in
+  each; at most 64, the rest counted in `left_out`.
+- **`name`** is the folder's (the skill's); **`title`** its `SKILL.md`'s
+  first `# ` heading (at most 80 bytes), else the name; **`description`**
+  its `SKILL.md` description (at most 1,024 bytes).
+- **`group`**: `core` for `kind = "core"` (comes with the lamp); `made_here`
+  for an installable skill whose `SKILL.md` front matter says `made: here`,
+  what a skill a person makes on the lamp by talking to it carries (the
+  first builder's 17:21: its own group, "Made on this lamp", removable);
+  `installed` for any other. A core skill that says `made: here` is still
+  core. Nothing writes `made: here` yet: the lamp skill creator will, when
+  it makes one.
+- **`can_remove`**: false for a core skill, true for the others.
+- **`can_turn_off`**: the skill has a `[stop]` (#1837, in review) and loads;
+  the app's switch on a core row. Until #1837 is on `lamp-voice` a skill with
+  a `[stop]` does not load, so it is false for every skill.
+- **`off`**: with a `[stop]`, true when the skill is turned off, as
+  `lamp-skills --state-dir` keeps it (#1837, `/var/lib/lampos-skills/off`,
+  a name a line), false when it is not; it may be snoozed until the morning
+  then, which `lamp-skills` keeps only in memory. Null without a `[stop]`,
+  or when the off file can't be read.
+- **`loads`** and **`why`**: whether the running `lamp-skills` loads it, and
+  if not, why, in its words on one line (at most 300 bytes). A skill that
+  doesn't load stays in its group, with its kind, version and permissions
+  as its `skill.toml` says them.
+- **`may_use`**: what its `[permissions]` give, each once, in this order,
+  each with its line, and `privacy`, the privacy switch's line, for what
+  the camera or a microphone gives:
+
+  | `name` | `says` | `privacy` | From |
+  |---|---|---|---|
+  | `speak` | speaks, or plays a short sound | — | `speak` |
+  | `light` | changes the light | — | `light` |
+  | `body` | moves the lamp | — | `body` |
+  | `camera` | uses the camera when it runs | the privacy switch stops it | `look` |
+  | `faces` | notices faces in front of it, with the camera | the privacy switch stops it | `humans/faces/tracked` |
+  | `presence` | notices whether someone is at the desk, with the camera | the privacy switch stops it | `room/presence`, `room/activity` |
+  | `hearing` | hears what is said to it | the privacy switch stops it | `voice/heard`, `name/heard` |
+  | `room_sound` | hears how loud the room is | the privacy switch stops it | `ears/level`, `ears/sudden` |
+  | `touch` | feels a touch on the lamp | — | `controls/touch`, `controls/gesture` |
+  | `air` | reads the air sensor | — | `air/state` |
+  | `reminders` | knows when a reminder is due | — | `schedule/due` |
+  | `tasks` | knows how the work you handed over is going | — | `tasks/status` |
+  | `memory` | reads what you asked it to remember | — | `memory/rules` |
+  | `lamp_state` | knows what the lamp itself is doing | — | any other topic (`voice/state`, `lamp/health`, …) |
+  | `actions` | uses the lamp's own controls | — | `actions` not empty |
+
+`tests/skills_contract.rs` pins the reply's fields by name and type, in
+V1's envelope through JSON, from `Real` over `lampOS/skills/`, and the
+refusal's exact words without the switch.
 
 ## Health and crash reports (#1683, step 1)
 
@@ -395,6 +497,13 @@ line; the lists against the product's units; `reports.get` and
 report on `fd/…/report` with `info`'s id leaving the queue on the ack, and
 sent again after a dropped connection. `tests/report_contract.rs` pins the
 fields by name and type, the topic, and `sent_at` kept on a send again.
+
+The skills page (#1722): the reply's shape; a core skill never removable
+and an installed one removable; a skill made here in its own group; each
+permission's line and the privacy switch's; a skill that does not load, with
+why; `[stop]` and the off file; the bounds; a folder that can't be read; the
+switch's two gates and the refusal's exact words. `tests/skills_contract.rs`
+pins the fields as sent.
 
 `tests/app_contract.rs` holds the fields the Autonomous app's device page
 reads, by name and type (Fourth on #1396): `versions.firmware`,
