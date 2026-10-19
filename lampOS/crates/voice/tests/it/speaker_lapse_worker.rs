@@ -36,6 +36,9 @@ use std::{
 /// admission leases).
 const TURN_LEASE_US: u64 = 100_000;
 
+/// The longest the reference link is given to connect: a bound, not a wait.
+const CONNECT_AT_MOST: Duration = Duration::from_secs(5);
+
 fn now() -> MonoTime {
     MonoTime::from_micros(monotonic_us())
 }
@@ -176,6 +179,23 @@ impl Rig {
         }
     }
 
+    /// Service until the reference link has connected, as long as it takes
+    /// up to `CONNECT_AT_MOST`. A fixed 150 ms for it failed on a loaded
+    /// ARM64 runner (#1569 row 39): the lapse is what is measured, not how
+    /// soon a busy machine connects a socket.
+    fn connect(&mut self) {
+        let from = Instant::now();
+        while !self.linked {
+            assert!(
+                from.elapsed() < CONNECT_AT_MOST,
+                "the reference link never connected in {CONNECT_AT_MOST:?}"
+            );
+            self.service();
+            self.alive("connecting the reference link");
+            sleep(Duration::from_millis(2));
+        }
+    }
+
     /// Fails with the worker's own account if it has ended: the fault it
     /// sent as it ended, and what it returned.
     fn alive(&mut self, what: &str) {
@@ -220,8 +240,8 @@ impl Rig {
 #[test]
 fn a_speaker_whose_authority_lapses_before_its_prime_stays_up() {
     let mut rig = Rig::start();
+    rig.connect();
     rig.run_for(Duration::from_millis(150), "with authority");
-    assert!(rig.linked, "the reference link never connected");
     // Held: no authority for twice a turn's lease, as when the voice is held
     // up by the eMMC at midnight.
     rig.renewing = false;
@@ -242,8 +262,8 @@ fn a_speaker_whose_authority_lapses_before_its_prime_stays_up() {
 #[test]
 fn a_late_prime_from_before_a_lapse_is_dropped() {
     let mut rig = Rig::start();
+    rig.connect();
     rig.run_for(Duration::from_millis(150), "with authority");
-    assert!(rig.linked, "the reference link never connected");
     rig.renewing = false;
     rig.run_for(Duration::from_millis(200), "the lapse");
     rig.renewing = true;
