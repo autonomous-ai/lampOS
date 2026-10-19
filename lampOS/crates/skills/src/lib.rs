@@ -859,13 +859,20 @@ impl Test {
                         >= f64::from(*near)
                 })
             }),
-            Self::Equals(field, wanted) => equal(&value[field], wanted),
-            Self::NotEquals(field, unwanted) => !equal(&value[field], unwanted),
-            Self::Above(field, line) => value[field].as_f64().is_some_and(|got| got > *line),
-            Self::Below(field, line) => value[field].as_f64().is_some_and(|got| got < *line),
-            Self::Number(field) => value[field].as_f64().is_some(),
+            Self::Equals(field, wanted) => equal(at(value, field), wanted),
+            Self::NotEquals(field, unwanted) => !equal(at(value, field), unwanted),
+            Self::Above(field, line) => at(value, field).as_f64().is_some_and(|got| got > *line),
+            Self::Below(field, line) => at(value, field).as_f64().is_some_and(|got| got < *line),
+            Self::Number(field) => at(value, field).as_f64().is_some(),
         }
     }
+}
+
+/// The field `path` names in `value`: a dot steps into an object, so
+/// `scores.music` is the `music` of `scores` (#1669: `ears/classes` keeps its
+/// scores in one object). A field that is not there is null.
+fn at<'a>(value: &'a Value, path: &str) -> &'a Value {
+    path.split('.').fold(value, |value, name| &value[name])
 }
 
 /// A number is compared as a number, anything else exactly.
@@ -2101,11 +2108,11 @@ fn item_name(value: &Value) -> Option<String> {
 
 /// Each item of the trigger's list in `value`, by name, and whether it holds.
 fn items_of(trigger: &Trigger, list: &str, key: &str, value: &Value) -> BTreeMap<String, bool> {
-    value[list]
+    at(value, list)
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(|item| Some((item_name(&item[key])?, trigger.test.holds(item))))
+        .filter_map(|item| Some((item_name(at(item, key))?, trigger.test.holds(item))))
         .collect()
 }
 
@@ -2729,12 +2736,14 @@ impl Engine {
             rose(index, trigger)
                 && Self::fresh(&self.latest, &trigger.topic, now_us).is_some_and(|value| {
                     match (&trigger.each, item) {
-                        (Some((list, key)), Some(name)) => {
-                            value[list].as_array().into_iter().flatten().any(|item| {
-                                item_name(&item[key]).as_ref() == Some(name)
+                        (Some((list, key)), Some(name)) => at(value, list)
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .any(|item| {
+                                item_name(at(item, key)).as_ref() == Some(name)
                                     && trigger.test.holds(item)
-                            })
-                        }
+                            }),
                         _ => trigger.test.holds(value),
                     }
                 })
@@ -2878,7 +2887,9 @@ impl Engine {
                 // it never came, and breaks nothing (#1684).
                 let mut rose = true;
                 if let Some(rise) = &trigger.rise {
-                    let Some(reading) = value[&rise.field].as_f64().filter(|got| got.is_finite())
+                    let Some(reading) = at(&value, &rise.field)
+                        .as_f64()
+                        .filter(|got| got.is_finite())
                     else {
                         continue;
                     };
@@ -3675,6 +3686,21 @@ pub fn run_tests(dir: &Path) -> Result<(usize, usize), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #1669: a trigger's field may step into an object with a dot, as
+    /// `ears/classes` keeps its scores (`scores.music`); a plain name is
+    /// read as before, and a step that is not there is null, never a match.
+    #[test]
+    fn a_dotted_field_reads_inside_an_object() {
+        let classes = json!({"status": "scored", "scores": {"music": 0.8, "laughter": 0.1}});
+        assert!(Test::Above("scores.music".into(), 0.5).holds(&classes));
+        assert!(!Test::Above("scores.laughter".into(), 0.5).holds(&classes));
+        assert!(Test::Equals("status".into(), json!("scored")).holds(&classes));
+        assert!(!Test::Number("scores.speech".into()).holds(&classes));
+        assert!(!Test::Above("status.music".into(), 0.0).holds(&classes));
+        let unavailable = json!({"status": "unavailable", "reason": "privacy"});
+        assert!(!Test::Above("scores.music".into(), 0.0).holds(&unavailable));
+    }
 
     /// #940: with the switch, a gesture or a move says who asks; without
     /// it, the datagram is as before.
