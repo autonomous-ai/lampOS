@@ -59,6 +59,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         bus_root,
         zone: zone.ok_or("--zone is required")?,
         run_for,
+        report_every: lamp_schedule::runtime::REPORT_EVERY,
     };
     let clock = SystemClock::new(boot_id.as_deref(), trust_clock)?.with_kernel_clock(kernel_clock);
     let stop = Arc::new(AtomicBool::new(false));

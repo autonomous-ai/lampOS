@@ -479,7 +479,9 @@ end-to-end audio, or a person hearing the reminder.
 
 `schedule/due` is `lamp_msgs/ScheduleDue` version 1, **Latest**, with a 1-second
 period and a 3-second lifespan. The owner also publishes on revision and
-readiness changes. Its fields are `stamp`, `store_id`, `revision`, `enabled`,
+readiness changes. The period is `runtime::REPORT_EVERY`, given as
+`Config::report_every`; tests give 50 ms, so a test that reads the report
+does not wait a second for it (#1806). Its fields are `stamp`, `store_id`, `revision`, `enabled`,
 `ready`, pending count, waiting-for-clock count, and optional `oldest` metadata:
 `id`, `delivery`, `due_unix_ms`, `late`, and optional `late_by_ms`. There is no
 reminder text in this topic. It is a hint to inspect durable work, not a queue
