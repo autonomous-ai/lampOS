@@ -913,6 +913,86 @@ same way: before 2026-10-14 it was not given while the camera was not
 permitted, so the eyes read as gone from the bus whenever they were not
 looking.
 
+### A face from a photo (`--photo-dir`, faces from a photo)
+
+Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given, which needs the
+recogniser (`--recogniser`, `--people`, `--who-socket`). The folder is the
+eyes' own (0700); whatever receives a photo from the app on the lamp puts
+it there. That part, lamp-cloud's, isn't built yet. Then it asks on the
+`who` socket, as the voice does: `{"remember":"NAME","photo":"FILE"}`.
+`FILE` is a plain file name in the folder: letters, digits, `-`, `_` and
+`.`, not hidden, at most 128 bytes (`photo::plain_file`).
+
+**Only the prints of people who asked are kept, and a photo isn't their
+asking** (the first builder on #1968, 22:12). So a face from a photo is
+kept **unconfirmed**, until its person says yes at the lamp:
+
+- **Read once, then gone:** the file is read (a regular file, not a link,
+  checked to be the entry it opened; at most 8 MiB) and **removed whatever
+  follows**: a refusal, a bad name, a picture with no face. A link is
+  removed, not what it names. No picture is kept, only the print
+  (`photo::take`).
+- **Its one face:** decoded at the detector's size as a camera frame is,
+  its faces found, and the largest taken. It must be at least `NEAR_ENOUGH`
+  (0.10) of the picture's height, with no other face half its size or more
+  (`photo::one_face`). Then it's cut out upright and printed as recognition
+  does (`photo::print_of`).
+- **Kept apart, unconfirmed:** in its own file beside the people's,
+  `<people>.from-photos` (mode 0600, `photo::Unconfirmeds`), never in
+  `people.json`. An older build never reads it, so never takes it for
+  someone who asked. At most 20. It's **never named, counted, greeted or
+  used for "who is this?"**: recognition, the known file, `humans/familiar`
+  and the hello read the people's file only. The answer is
+  `{"added":NAME,"unconfirmed":true}`. A face already someone's who asked is
+  theirs: `{"remembered":NAME}` for the same name, `known_as` for another.
+- **When it's at the lamp:** recognition finds nobody who asked, but an
+  unconfirmed face matches. The eyes then note that face as here, and say
+  only that when asked: `{"photo_here":true}` gives `{"photo_here":NAME}` or
+  `null`, so the voice can ask the person once (`{"photo_asked":NAME}`).
+- **Their answer, taken only for the face at the lamp now** (seen within
+  `KNOWN_FOR`, `photo::is_here`), so nothing elsewhere can say yes for
+  someone (the reviewer on #1968, 22:28): `photo_asked` for a face not here
+  is `not_here`, and `photo_yes` is `not_here` or, if it wasn't asked,
+  `not_asked`.
+  - `{"photo_yes":NAME}` makes it an ordinary print (`People::remember_one`),
+    with the remembering's own answers. A yes the store refuses (`full`)
+    leaves it unconfirmed as it was.
+  - `{"photo_no":NAME}` deletes it (`{"let_go":true}`).
+  - **No answer:** once asked, a face not seen for 20 s, the meeting over,
+    is let go (`photo::unanswered`, `MEETING_GAP_US`).
+  - **"Forget my face"** deletes it too.
+- **Never confirmed:** deleted 30 days after it was added
+  (`UNCONFIRMED_FOR_S`), looked at once a second. A `.from-photos` file that
+  can't be read is removed, so no print sits out of that reach.
+- **The product reset** wipes `<people>.from-photos` with `people.json`
+  (`reset-plan-product.json`).
+- **The answers** are the voice's: `photos_off`, `not_a_name`, `unreadable`
+  (no file, a link, too large, not a JPEG), `no_face`, `too_far`,
+  `two_faces`, `known_as`, `full`, `not_here`, `not_asked`, `not_unconfirmed` or
+  `storage`. The
+  journal says only which, never the name or the file.
+
+**Not built yet:** the voice asking. That's the question "Someone added your
+face from a photo, as NAME. Shall I remember you?" the first time the face is
+here, with yes and no as its functions, and lamp-cloud's taking the app's
+photo.
+
+Tests (`photo.rs`):
+- the file read once and removed, a second ask finding nothing; one too
+  large refused and removed; a link refused and removed, and what it names
+  kept; a folder left; only plain file names;
+- the one face, or `no_face`, `two_faces` or `too_far`, on made-up faces;
+- the unconfirmed store: its own file, 0600, the people's untouched; found
+  only by likeness; read back; yes takes it out; no deletes it; asked and
+  unseen for 20 s, let go; 30 days, deleted;
+- with the pinned models (`LAMP_EYES_MODELS`): a grey picture is `no_face`,
+  bytes that are no JPEG `unreadable`, and with `LAMP_FACE_PHOTO` a print of
+  length one. That was run here with the two pinned models and NASA's
+  public-domain astronaut portrait (scikit-image's sample, never committed).
+
+The asks' parsing is in `who.rs`, `--photo-dir` in `main.rs`, and the reset's
+wipe in `crates/setup/tests/reset.rs`. Not run on a lamp.
+
 ### How familiar a remembered person is (`--visits on`, #1670)
 
 Off unless `lamp-eyes --visits on`, which needs the recogniser (`--recogniser`, `--people`, `--who-socket`). Only

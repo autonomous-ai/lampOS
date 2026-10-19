@@ -286,13 +286,16 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 25] = [
+const PERSON_STORES: [&str; 26] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
     // Face prints the eyes could not read and set aside, never dropped
     // (#1505): a factory reset must not leave them behind.
     "/var/lib/lampos-eyes/set-aside",
+    // Faces added from photos, not yet agreed to by their person, beside
+    // the people's file (#1968): `photo::Unconfirmeds::beside`.
+    "/var/lib/lampos-eyes/people.json.from-photos",
     "/var/lib/lampos-tasks/store",
     "/var/lib/lampos-tasks/targets.json",
     // The person's parts of Harness under the tasks part's HOME (the fifth

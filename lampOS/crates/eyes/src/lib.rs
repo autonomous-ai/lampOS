@@ -30,6 +30,7 @@ pub mod full_look;
 pub mod kept;
 pub mod mesh;
 pub mod permit;
+pub mod photo;
 pub mod picture;
 pub mod seems;
 pub mod sight;
