@@ -208,6 +208,17 @@ impl RuntimeFlags {
                         "{flag} sets only LAMP_ settings in capitals, not {name:?}"
                     )));
                 }
+                // The values travel on the relay's command line, which a
+                // process list shows: nothing secret goes there. Keys come
+                // by `LoadCredential` (the first builder on #1916).
+                if ["_KEY", "_TOKEN", "_SECRET", "_PASSWORD"]
+                    .iter()
+                    .any(|secret| name.ends_with(secret))
+                {
+                    return Err(invalid(&format!(
+                        "{flag} {name} names a secret: keys come by LoadCredential, never on a command line"
+                    )));
+                }
                 if name == ROUTE_ENVIRONMENT {
                     return Err(invalid(&format!(
                         "{ROUTE_ENVIRONMENT} is set by {}, not {flag}",
@@ -2078,12 +2089,36 @@ mod runtime_flag_tests {
                 &["--voice-route", "live", "--voice-route", "live"][..],
                 "more than once",
             ),
+            (
+                &["--runtime-env", "LAMP_DEEPSEEK_KEY=x"][..],
+                "names a secret",
+            ),
+            (
+                &["--runtime-env", "LAMP_SECOND_TOKEN=x"][..],
+                "names a secret",
+            ),
+            (
+                &["--runtime-env", "LAMP_RELAY_SECRET=x"][..],
+                "names a secret",
+            ),
+            (
+                &["--runtime-env", "LAMP_WIFI_PASSWORD=x"][..],
+                "names a secret",
+            ),
         ] {
             let mut arguments = vec!["--serve-config", "/p.json"];
             arguments.extend(extra);
             let error = parse(&arguments).unwrap_err().to_string();
             assert!(error.contains(expected), "{extra:?}: {error}");
         }
+        // A name that only has KEY inside it is a setting, not a secret.
+        parse(&[
+            "--serve-config",
+            "/p.json",
+            "--runtime-env",
+            "LAMP_SECOND_KEY_TERMS=on",
+        ])
+        .unwrap();
         // A fixture has no provider: a route or setting for it is refused.
         let error = parse(&[
             "--fixture-reply",

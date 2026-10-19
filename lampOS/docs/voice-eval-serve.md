@@ -46,7 +46,10 @@ only for a comparison the first builder names on #1712.
   lamp's voice unit (`--runtime-env NAME=VALUE`, each name once). The second
   route needs `LAMP_VOICE_SECOND_CONFIG`, and takes its switches
   (`LAMP_SECOND_CHAT`, `LAMP_SECOND_SEARCH`, `LAMP_SECOND_SPEECH`, ...) from
-  here. `LAMP_VOICE_ROUTE` itself is set only by `voice_route`.
+  here. `LAMP_VOICE_ROUTE` itself is set only by `voice_route`. The values
+  travel on the relay's command line, which a process list shows, so a name
+  ending in `_KEY`, `_TOKEN`, `_SECRET` or `_PASSWORD` is refused (the first
+  builder on #1916); keys come by `LoadCredential`, below.
 - A run on the second route without `LAMP_VOICE_SECOND_CONFIG` is refused on
   the Mac before anything starts on the lamp. lamp-voice would refuse it at
   start too. A fixture run refuses both fields.
