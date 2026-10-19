@@ -432,8 +432,52 @@ fn read_told(file: &Path) -> BTreeSet<String> {
 pub struct ForTexts {
     directory: PathBuf,
     told_file: PathBuf,
+    /// The tasks asked for by text ([`typed_file`]): only their news is
+    /// given in a text.
+    typed_file: PathBuf,
     read: Arc<Mutex<Vec<News>>>,
     stopping: Arc<AtomicBool>,
+}
+
+/// The tasks asked for and started by text in this process (#1673),
+/// `<store>:<task>` each: only their news is given in a text, and the rest
+/// is told at the lamp as before (the first builder, 19 Oct: another
+/// person's work must not reach the owner's phone). Kept in [`typed_file`]
+/// too, for a worker started again.
+static TYPED: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+
+/// The file of the tasks asked for by text, beside the file of what was told.
+pub fn typed_file() -> PathBuf {
+    told_file().with_file_name("tasks-typed")
+}
+
+/// Keep task `id` of `store` as one asked for and started by text.
+pub fn keep_typed(store: &str, id: u64) {
+    let task = format!("{store}:{id}");
+    if let Ok(mut typed) = TYPED.lock() {
+        typed.insert(task.clone());
+    }
+    let file = typed_file();
+    let kept = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&file)
+        .and_then(|mut file| writeln!(file, "{task}"));
+    if let Err(error) = kept {
+        eprintln!(
+            "lamp-voice: a task asked for by text, not kept in {}: {error}",
+            file.display()
+        );
+    }
+}
+
+/// Whether the news `key` (`<store>:<task>:<what>`) is of a task asked for
+/// by text: in this process, or in `file`.
+pub fn is_typed(key: &str, file: &Path) -> bool {
+    let Some((task, _)) = key.rsplit_once(':') else {
+        return false;
+    };
+    TYPED.lock().is_ok_and(|typed| typed.contains(task)) || read_told(file).contains(task)
 }
 
 impl Drop for ForTexts {
@@ -447,7 +491,7 @@ impl ForTexts {
     /// what is given in the voice's file of what was told; none if its
     /// thread can't start.
     pub fn for_tasks(directory: &Path) -> Option<Self> {
-        Self::start(directory, told_file(), boot_clock)
+        Self::start(directory, told_file(), typed_file(), boot_clock)
     }
 
     /// Read the tasks part in `directory`, keeping what is given in
@@ -455,6 +499,7 @@ impl ForTexts {
     pub fn start(
         directory: &Path,
         told_file: PathBuf,
+        typed_file: PathBuf,
         clock: fn() -> Option<BootClock>,
     ) -> Option<Self> {
         let read = Arc::new(Mutex::new(Vec::new()));
@@ -485,6 +530,7 @@ impl ForTexts {
         Some(Self {
             directory: directory.to_path_buf(),
             told_file,
+            typed_file,
             read,
             stopping,
         })
@@ -499,7 +545,7 @@ impl ForTexts {
             return Vec::new();
         };
         read.iter()
-            .filter(|news| !told.contains(&news.key))
+            .filter(|news| !told.contains(&news.key) && is_typed(&news.key, &self.typed_file))
             .take(TOGETHER_MOST)
             .cloned()
             .collect()
@@ -2032,14 +2078,16 @@ mod tests {
                 BufReader::new(&stream).read_line(&mut line).unwrap();
                 let asked: Value = serde_json::from_str(&line).unwrap();
                 let answer = match (asked["op"].as_str().unwrap(), asked["id"].as_u64()) {
-                    ("list", _) => {
-                        json!({"ok":true,"store_id":"s1","items":[{"id":1,"observations":1}]})
-                    }
-                    ("get_task", Some(1)) => {
-                        task("claude", json!([seen(1, "idle", "boot-a", NOW - 1_000)]))
+                    ("list", _) => json!({"ok":true,"store_id":"s1","items":[
+                        {"id":1,"observations":1},{"id":2,"observations":1}]}),
+                    ("get_task", Some(id)) => {
+                        task("claude", json!([seen(id, "idle", "boot-a", NOW - 1_000)]))
                     }
                     ("get_observation", Some(1)) => {
                         json!({"ok":true,"data":{"state":"idle","answer":"Lumi, Sunny and Archie.","truncated":false}})
+                    }
+                    ("get_observation", Some(2)) => {
+                        json!({"ok":true,"data":{"state":"idle","answer":"Someone else's work.","truncated":false}})
                     }
                     _ => json!({"ok":false}),
                 };
@@ -2047,7 +2095,12 @@ mod tests {
             }
         });
         let told = root.join("told");
-        let texts = ForTexts::start(&root, told.clone(), test_clock).unwrap();
+        // Task 1 was asked for by text; task 2 at the lamp, by anyone: its
+        // news is told there, never given in a text (the first builder,
+        // 19 Oct).
+        let typed = root.join("typed");
+        std::fs::write(&typed, "s1:1\n").unwrap();
+        let texts = ForTexts::start(&root, told.clone(), typed.clone(), test_clock).unwrap();
         let deadline = Instant::now() + Duration::from_secs(5);
         while texts.untold().is_empty() && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(20));
@@ -2067,8 +2120,11 @@ mod tests {
         texts.given(&["s1:1:1".to_owned()]);
         assert!(texts.untold().is_empty());
         assert!(was_told(&told, "s1:1:1"));
-        // The voice's reader reads the same file: it is not offered aloud.
-        assert!(read_once(&socket, &now(), &read_told(&told), &BTreeSet::new()).is_empty());
+        // The voice's reader reads the same file: the text's news is not
+        // offered aloud, and the other task's still is, at the lamp.
+        let aloud = read_once(&socket, &now(), &read_told(&told), &BTreeSet::new());
+        let keys: Vec<&str> = aloud.iter().map(|news| news.key.as_str()).collect();
+        assert_eq!(keys, ["s1:2:2"]);
         drop(texts);
         std::fs::remove_dir_all(root).unwrap();
     }

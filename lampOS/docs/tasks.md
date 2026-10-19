@@ -1152,9 +1152,11 @@ Progress is the Policy's to time already and is told as before.
 
 ### Given with a text (#1673, off unless `LAMP_MESSAGES=on`)
 
-News the lamp hasn't told aloud is given with the answer to the person's
-next text from the Autonomous app, once, and then kept in the same file of
-what was told, so the voice doesn't tell it aloud after
+News of work asked for by text that the lamp hasn't told aloud is given
+with the answer to the person's next text from the Autonomous app, once,
+and then kept in the same file of what was told, so the voice doesn't tell
+it aloud after. Work asked for at the lamp is told at the lamp, never by
+text: a task started by a typed "yes" is kept as a text's (`tasks-typed`)
 ([messages.md](messages.md#news-when-youre-away)).
 
 ### News too long for one written turn (2026-10-15, 02:31)

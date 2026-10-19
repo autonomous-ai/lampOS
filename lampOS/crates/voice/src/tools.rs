@@ -792,7 +792,29 @@ pub const FACES_IN_PERSON: &str =
 /// about faces is refused, as for every request not heard at the lamp (the
 /// reviewer on #1713).
 pub fn answer_typed(settings: &Settings, call: &ToolCall, request: u64) -> Value {
-    match route(settings, &call.name) {
+    let route = route(settings, &call.name);
+    // A skill that moves the body is never run for a text: a lamp that
+    // moves for a text nobody in the room sent looks wrong (#1673, the first
+    // builder, 19 Oct). Light, volume and timers stay the owner's to ask for.
+    let skill = match &route {
+        Route::Executive(_) if is_skills(settings, &route) => Some(call.name.clone()),
+        Route::UseSkill(_) => {
+            let skills = skill_tools(settings);
+            crate::use_skill::translate(call, crate::use_skill::offered(&skills))
+                .ok()
+                .map(|skill| skill.name)
+        }
+        _ => None,
+    };
+    if let Some(skill) = skill
+        && moving_skills(settings).contains(&skill)
+    {
+        eprintln!(
+            "lamp-voice second: text request {request} asked for {skill}, which moves the lamp: refused"
+        );
+        return json!({"error": MOVES_ONLY_AT_THE_LAMP});
+    }
+    match route {
         Route::Memory(socket) => {
             let began = std::time::Instant::now();
             let (told, answered) = crate::remember::run_for(&socket, call, ASK_DEADLINE, None);
@@ -810,6 +832,40 @@ pub fn answer_typed(settings: &Settings, call: &ToolCall, request: u64) -> Value
         }
         _ => answer(settings, call, request, false),
     }
+}
+
+/// What the model is told when a text asks for a skill that moves the lamp.
+pub const MOVES_ONLY_AT_THE_LAMP: &str =
+    "That one moves me, so I do it only when someone asks me at the lamp.";
+
+/// The skills' tools whose skill asks for the body, as each skills folder's
+/// tools file names them beside its tools (`body`, `lamp_skills::tools_file`):
+/// what a text never runs ([`answer_typed`]). An older file names none.
+pub fn moving_skills(settings: &Settings) -> std::collections::BTreeSet<String> {
+    #[derive(serde::Deserialize)]
+    struct Moving {
+        #[serde(default)]
+        body: Vec<String>,
+    }
+    let mut moving = std::collections::BTreeSet::new();
+    for folder in skills_folders(settings) {
+        let Ok(file) = std::fs::File::open(folder.join(CATALOG_FILE)) else {
+            continue;
+        };
+        let mut text = String::new();
+        if file
+            .take(MAX_CATALOG_BYTES + 1)
+            .read_to_string(&mut text)
+            .is_err()
+            || text.len() as u64 > MAX_CATALOG_BYTES
+        {
+            continue;
+        }
+        if let Ok(file) = serde_json::from_str::<Moving>(&text) {
+            moving.extend(file.body);
+        }
+    }
+    moving
 }
 
 /// What the model is told when a call could not be run: words it can say.
@@ -2422,6 +2478,78 @@ mod tests {
         };
         let (a, b) = (median(&itself), median(&through));
         println!("use_skill_cost: itself {a:?}, through use_skill {b:?}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #1673 (the first builder, 19 Oct): a text never runs a skill that asks
+    /// for the body, by its own name or through `use_skill`, and its socket
+    /// is never asked. A text runs one that doesn't, and a spoken call runs
+    /// the moving one as before.
+    #[test]
+    fn a_text_never_runs_a_skill_that_moves_the_body() {
+        // Short names: a socket's whole path has to fit in 103 bytes.
+        let dir = directory("mv");
+        let own = dir.join("own");
+        std::fs::create_dir_all(&own).unwrap();
+        std::fs::write(
+            own.join(CATALOG_FILE),
+            r#"{"tools":[{"name":"dance","description":"Dance."},
+            {"name":"glow","description":"Glow."}],"body":["dance"]}"#,
+        )
+        .unwrap();
+        let mut settings = Settings {
+            skills: Some(own.clone()),
+            ..Default::default()
+        };
+        assert_eq!(
+            moving_skills(&settings),
+            std::collections::BTreeSet::from(["dance".to_owned()])
+        );
+        let named = |name: &str| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args: json!({}),
+        };
+        let text = crate::messages::REQUESTS_FROM + 1;
+        let refused = json!({"error": MOVES_ONLY_AT_THE_LAMP});
+        // The skills' socket answers one call: the first that reaches it.
+        let served = executive(
+            &own,
+            b"{\"ok\":true,\"result\":{\"next\":\"Done.\"}}\n",
+            Duration::ZERO,
+        );
+        assert_eq!(answer_typed(&settings, &named("dance"), text), refused);
+        assert_eq!(
+            answer_typed(&settings, &named("glow"), text),
+            json!({"next":"Done."})
+        );
+        assert_eq!(served.join().unwrap()["name"], "glow");
+        settings.use_skill = true;
+        let through = ToolCall {
+            id: "c".into(),
+            name: crate::use_skill::NAME.into(),
+            args: json!({"skill":"dance"}),
+        };
+        assert_eq!(answer_typed(&settings, &through, text), refused);
+        // Said at the lamp, it dances.
+        std::fs::remove_file(own.join(CALL_SOCKET)).unwrap();
+        let served = executive(
+            &own,
+            b"{\"ok\":true,\"result\":{\"next\":\"Done.\"}}\n",
+            Duration::ZERO,
+        );
+        assert_eq!(
+            answer(&settings, &through, 9, true),
+            json!({"next":"Done."})
+        );
+        assert_eq!(served.join().unwrap()["name"], "dance");
+        // An older tools file names none.
+        std::fs::write(
+            own.join(CATALOG_FILE),
+            r#"{"tools":[{"name":"dance","description":"Dance."}]}"#,
+        )
+        .unwrap();
+        assert!(moving_skills(&settings).is_empty());
         std::fs::remove_dir_all(dir).unwrap();
     }
 

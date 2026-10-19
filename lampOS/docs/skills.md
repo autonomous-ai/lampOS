@@ -559,7 +559,11 @@ lamp): `tool = "check_my_work"` in `skill.toml`, described to the model with
 (the units give `/run/lampos-skills`, lamp-skills' own `RuntimeDirectory`),
 `lamp-skills` keeps `DIR/tools.json`, written whole at each load and
 removed when no skill has a tool, and answers on `DIR/call.sock` the way
-the actions part does ([tools.md](tools.md#the-skills)). It makes `DIR` and
+the actions part does ([tools.md](tools.md#the-skills)). Beside `tools`,
+the file's `body` names the tools whose skill asks for the body
+(`[permissions] body`), when any does: a text from the Autonomous app never
+runs one (#1673, [messages.md](messages.md)). It's a key of the file's own,
+not of each tool, which the voice's function declarations would refuse. It makes `DIR` and
 the socket at its start, and again, with the file, at a look (every 2 s)
 that finds the socket gone from a `DIR` still there, saying so. With `DIR`
 itself gone it ends, not zero, with a line: as its user, under its sandbox,
