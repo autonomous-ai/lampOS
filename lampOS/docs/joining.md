@@ -462,6 +462,10 @@ was busy. Since then:
    on it keeps it.
 4. **A free builder says so once** on the Queue (`free: <name>`), and
    the first builder labels the next Queue item for it within the hour.
+5. **A pull request carries its builder's label** (`builder:<name>`) from
+   the moment it opens, so a builder's open work can be listed. A builder
+   whose account cannot add labels (read access only) asks the first
+   builder, who adds it.
 
 **Moved on 2026-10-14.** The first builder opened an issue for each open
 task (#694 to #704) and a role file for each builder. work-split.md keeps
