@@ -117,8 +117,10 @@ A successful response uses the existing Actions envelope with a structured
 ```
 
 The timestamp and local string in real replies come from Schedule, never from
-model arithmetic. List results contain complete labels, item IDs, state,
-resolved local time and recurrence metadata. They fit Voice's 4,096-byte
+model arithmetic. List results, oldest first, contain complete labels, item
+IDs, `kind` (`timer` or `reminder`; `cancel_reminder` says to cancel only one
+of the kind asked for, #1595), state, resolved local time and recurrence
+metadata. They fit Voice's 4,096-byte
 provider budget with its 16-byte reserve, including JSON escaping. If a page
 is shortened, `next_after_id` is the last included item, `complete` is false,
 and another call with that cursor reads more. A complete `pending_only:true`

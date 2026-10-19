@@ -514,6 +514,9 @@ impl<P: Persistence> Engine<P> {
         let (late, late_by_ms) = self.late(item, now);
         json!({
             "id": item.id, "delivery": item.delivery, "text": item.text,
+            // Only set_timer's duration from now keeps an elapsed clock, and
+            // a snooze never changes the original deadline (#1595).
+            "kind": if item.deadline.elapsed.is_some() { "timer" } else { "reminder" },
             "request_id": item.request_id,
             "state": if item.pending.is_some() { "pending" } else if remaining.is_none() { "waiting_for_clock" } else { "scheduled" },
             "due_unix_ms": Self::shown(item, now).unix_ms, "local": Self::shown(item, now).local,
