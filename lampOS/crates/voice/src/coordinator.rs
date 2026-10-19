@@ -64,7 +64,9 @@ use std::{
 mod camera;
 pub mod motor;
 use motor::{OptionalMotor, PreparedMotor};
+mod cleanup;
 mod cloud;
+use cleanup::{Failures as ShutdownFailures, Stage as CleanupStage};
 mod early_end;
 mod endpoint;
 mod hand;
@@ -1271,7 +1273,10 @@ impl Rig {
                 let _ = end.join();
             }
         }
-        let mut failure = self.ring.cleanup_error();
+        let mut failure = ShutdownFailures::default();
+        if let Some(error) = self.ring.cleanup_error() {
+            failure.push(CleanupStage::RingCleanup, "ring", error);
+        }
         let ring_stop_requested_at_us = self.ring.stop_requested_at(stop_requested_at_us);
         let mut exited = vec![
             false;
@@ -1293,7 +1298,7 @@ impl Rig {
                 crate::scenario_clock::step(crate::scenario_clock::Phase::Shutdown { deadline })
             {
                 // Fixture failure never bypasses the real supervisor's cleanup.
-                failure = Some(error);
+                failure.push(CleanupStage::Fixture, "session", error);
             }
             if let Some(motor) = &mut self.motor {
                 motor.poll(|event| { let _ = record(trace, json!({"kind":"motor_shutdown_receipt","at_us":monotonic_us(),"details":event,"physical_stop_verified":false})); });
@@ -1316,8 +1321,11 @@ impl Rig {
                     match worker.channels.control.receive::<WorkerEvent>() {
                         Ok(Some(WorkerEvent::DiagnosticsFinished { receipt })) if index < 2 => {
                             if receipts[index].replace(receipt).is_some() {
-                                failure =
-                                    Some(io::Error::other("duplicate diagnostic finish receipt"));
+                                failure.push(
+                                    CleanupStage::DiagnosticReceipt,
+                                    &worker.role,
+                                    io::Error::other("duplicate diagnostic finish receipt"),
+                                );
                             }
                         }
                         Ok(Some(WorkerEvent::Ring {
@@ -1332,8 +1340,11 @@ impl Rig {
                                 || !report
                                     .confirms_shutdown(ring_stop_requested_at_us, monotonic_us())
                             {
-                                failure =
-                                    Some(io::Error::other("invalid ring shutdown write receipt"));
+                                failure.push(
+                                    CleanupStage::RingReceipt,
+                                    &worker.role,
+                                    io::Error::other("invalid ring shutdown write receipt"),
+                                );
                             } else {
                                 ring_blank_confirmed = true;
                             }
@@ -1354,10 +1365,19 @@ impl Rig {
                                     WorkerEvent::Fault { .. } | WorkerEvent::ReferenceFault { .. }
                                 )
                             {
-                                failure = Some(io::Error::other(format!(
-                                    "{} failed during shutdown: {event:?}",
-                                    worker.role
-                                )));
+                                let stage = if matches!(event, WorkerEvent::ReferenceFault { .. }) {
+                                    CleanupStage::ReferenceFault
+                                } else {
+                                    CleanupStage::WorkerFault
+                                };
+                                failure.push(
+                                    stage,
+                                    &worker.role,
+                                    io::Error::other(format!(
+                                        "{} failed during shutdown: {event:?}",
+                                        worker.role
+                                    )),
+                                );
                             }
                             let _ = record(
                                 trace,
@@ -1372,7 +1392,7 @@ impl Rig {
                                 && worker.role == "privacy"
                                 && matches!(worker.try_exit(), Ok(Some(status)) if status.success());
                             if !ended_cleanly {
-                                failure = Some(error);
+                                failure.push(CleanupStage::ControlReceive, &worker.role, error);
                             }
                             break;
                         }
@@ -1387,7 +1407,7 @@ impl Rig {
                                     .expect("camera watch")
                                     .observe(&event, monotonic_us())
                                 {
-                                    failure = Some(error);
+                                    failure.push(CleanupStage::CameraObserve, &worker.role, error);
                                 }
                                 if matches!(
                                     event,
@@ -1405,7 +1425,7 @@ impl Rig {
                                     trace,
                                     json!({"kind":"camera_shutdown_channel_failed", "at_us":monotonic_us(), "error":error.to_string()}),
                                 );
-                                failure = Some(error);
+                                failure.push(CleanupStage::CameraReceive, &worker.role, error);
                                 break;
                             }
                         }
@@ -1421,7 +1441,7 @@ impl Rig {
                                     json!({"kind":"worker_exit_failed", "worker":worker.role,
                                     "at_us":monotonic_us(), "error":error.to_string()}),
                                 );
-                                failure = Some(error);
+                                failure.push(CleanupStage::WorkerExit, &worker.role, error);
                             }
                         }
                         Ok(None)
@@ -1433,18 +1453,20 @@ impl Rig {
                                         .deadline_us() =>
                         {
                             exited[index] = true;
-                            failure = Some(worker.terminate_and_reap(
+                            let error = worker.terminate_and_reap(
                                 io::ErrorKind::TimedOut,
                                 "camera local-revoke/driver-teardown deadline expired".into(),
-                            ));
+                            );
+                            failure.push(CleanupStage::ForcedStop, &worker.role, error);
                         }
                         Ok(None) => {}
                         Err(error) => {
                             exited[index] = true;
-                            failure = Some(worker.terminate_and_reap(
+                            let error = worker.terminate_and_reap(
                                 io::ErrorKind::Other,
                                 format!("shutdown status failed: {error}"),
-                            ));
+                            );
+                            failure.push(CleanupStage::ForcedStop, &worker.role, error);
                         }
                     }
                 }
@@ -1481,7 +1503,7 @@ impl Rig {
                             json!({"kind":"worker_forced_shutdown", "worker":worker.role,
                             "at_us":monotonic_us(), "error":error.to_string()}),
                         );
-                        failure = Some(error);
+                        failure.push(CleanupStage::ForcedStop, &worker.role, error);
                     }
                 }
                 break;
@@ -1495,20 +1517,22 @@ impl Rig {
                 json!({"kind":"motor_cleanup","at_us":monotonic_us(),"worker":motor.identity().map(|i|i.worker),"started":motor.started(),"reaped":motor.reaped(),"confirmed":cleanup.is_ok(),"error":cleanup.as_ref().err().map(ToString::to_string),"physical_stop_verified":false}),
             );
             if let Err(error) = cleanup {
-                failure = Some(error);
+                failure.push(CleanupStage::Motor, "session", error);
             }
         }
         // Mandatory hardware cleanup preceded bounded metadata reads. Native kill/wait
         // has no userspace hard deadline; its result is never hidden as success.
         if !ring_blank_confirmed {
-            failure = Some(io::Error::other(
-                "ring shutdown has no verified black-write receipt",
-            ));
+            failure.push(
+                CleanupStage::RingBlank,
+                "ring",
+                io::Error::other("ring shutdown has no verified black-write receipt"),
+            );
         }
         if let Some(watch) = camera_watch
             && let Err(error) = watch.finish()
         {
-            failure = Some(error);
+            failure.push(CleanupStage::CameraFinish, "camera", error);
         }
         // The endpoint client closed when the session's detector dropped. Its
         // loss while running only meant the silence fallback, but a worker
@@ -1522,7 +1546,7 @@ impl Rig {
         {
             let _ = record(trace, event);
             if let Err(error) = teardown {
-                failure = Some(error);
+                failure.push(CleanupStage::Endpoint, "session", error);
             }
         }
         if let Some(directory) = &self.diagnostic_directory {
@@ -1547,13 +1571,18 @@ impl Rig {
                     "receipt":receipts[index], "error":certification.as_ref().err().map(ToString::to_string)}),
                 );
                 if let Err(error) = certification {
-                    failure = Some(error);
+                    // Certification adds evidence; it never replaces worker teardown causes.
+                    failure.push(CleanupStage::Certification, &worker.role, error);
                 }
             }
         } else if receipts.iter().any(Option::is_some) {
-            failure = Some(io::Error::other("unsolicited audio diagnostics receipt"));
+            failure.push(
+                CleanupStage::Unsolicited,
+                "session",
+                io::Error::other("unsolicited audio diagnostics receipt"),
+            );
         }
-        failure.map_or(Ok(()), Err)
+        failure.finish()
     }
 }
 

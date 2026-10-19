@@ -639,6 +639,25 @@ detached; its eventual file update cannot revise that returned timeout. Process
 exit reclaims the remaining thread. A signal during incomplete startup retains
 the existing explicit startup failure path.
 
+Cleanup retains failures by stage and worker instead of letting a later failure
+replace an earlier one. Distinct causes are returned together in first-seen
+order: a forced speaker followed by a forced capture or an endpoint timeout
+names each. Repeated failures from the same stage and worker keep their first
+detail and a repeat count. Production collection is bounded to 128 stage/worker slots and
+1,024 UTF-8 bytes per stored error message; existing trace events remain
+unchanged.
+An ordinary single error retains its original kind and message.
+
+Both audio certifications still run and emit `audio_diagnostics_certified`.
+If both fail, the result includes both the speaker's and capture's certification
+errors. An unsolicited receipt is added to any earlier cleanup causes, rather
+than replacing them. A certification failure on its own still fails the run.
+Collecting errors does not skip cleanup work or change worker stop deadlines,
+microphone revocation, forced termination or teardown success criteria. The
+host regressions for #1620 cover one or both audio workers finishing after
+900 ms against the 750 ms diagnostic grace; they do not establish why a
+worker was late on a lamp.
+
 Serve waits with only its GPIO privacy worker while physically muted. A fresh
 active mute closes the full runtime and returns to that wait only after verified
 cleanup; stable unmute then creates new capture/provider identities. Unknown or
