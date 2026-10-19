@@ -82,3 +82,7 @@ list".
 - My session was paused from 22:07 to 07:5x. The first builder moved #1622 to Third (#1632, my commit carried forward), and I released #1607.
 - **#1682** (the factory's per-lamp steps: the body's lamp.env, touch calibration, update key): taken. Branch `thirteen/factory-steps`.
 - #1682 → **#1717**: `lamp-body-measure` + `lamp_body::poses` (rest read, torque off, refuses what the body would), install.md's factory order. lamp-body 460/0.
+- #1717 watched stand on lamp-cb94 (with its person at the arm, a private mood socket, the voice untouched): 10% no visible motion; 30% S 2138 / E 2120; 60% S 2405 / E 2364, head pitch held at 1770 against a goal of 1740; 100% S 2637 / E 2549, where the body's "stopped pushing" guard ended the elbow. Loads at or below ~290. calibrate-touch does not apply on cb94 (GPIO pads). #1717 merged as `ed84dff0f`.
+- **#1595** (the reminder list's open part): taken; its "kind" part waits on #1682 (First, 11:39: build it after `steps.sh`).
+- #1682 (b) → **#1744**: `deploy/factory/steps.sh` (four steps, dry unless `--write`; step 1 stands the arm at 30% and 100% and writes this arm's `--stand`) + `steps-test.sh`. The reviewer's 2 P2 and 2 P3 at `791b74bf5`: `lamp-body-mood` instead of Python, Ctrl-C eases the arm back, dry touch, CI step. The review also exposed `as_body … &` leaving the body orphaned, arm up (now fixed). Tests 30/30.
+- #1595 kind: `kind` (`timer` | `reminder`) on the Schedule item view, from the stored deadline's elapsed part; branch `thirteen/reminder-kind`.
