@@ -332,6 +332,33 @@ the unchanged legacy client, used unless the new Days client is selected.
   reaches everything derived from a thing needs each entry to say what it
   came from. The opt-in store supports those links and transitive deletion;
   the legacy client does not send them or use frozen snapshots.
+- **Forgetting that reaches everything** (#1693 (1),
+  `LAMP_MEMORY_FORGET_ALL=on`, with the Days client only; off unless set).
+  - `forget {source_id}` forgets something recall gave, by the
+    `source_id` it showed. The id must be one this session was shown, in
+    the scope it was shown from: the person's own when someone known is at
+    the lamp, else the room's. So nobody forgets another person's, and a
+    known person can't forget the room's for everyone. The store's
+    `forget {id}` removes it with its replacement chain, everything linked
+    from it (later exchanges in which it was shown, observations), and for
+    an observation its sources.
+  - `forget_everything {}`, asked once and said yes to, is for **someone
+    known only**: it sends `forget_all` for their own scope (never `null`,
+    which would be everyone's), and for their rules' scope (`r-<person>`)
+    when rules are on. Their kept things, journal, sessions and observations
+    all go. With nobody known it sends nothing and says it can forget
+    everything only for someone it knows by face, and one thing at a time
+    instead: the room's memory is the household's, and a guest, a child or
+    the TV must never empty it (the reviewer on #1723).
+  - Both clear the conversation thread and stop journalling until a fresh
+    worker starts, as `forget` does. `forget` with nothing is as before.
+  - Still not covered: earlier turns of the same conversation, said before
+    the thing was kept, aren't linked to it, so `forget {source_id}` leaves
+    them until they are 30 days old. `forget_everything` removes them.
+  - Tests: `remember::tests::with_the_switch_what_recall_gave_and_everything_can_be_forgotten`
+    (requests and scopes, the switch off), and `crates/memory/tests/voice_forget.rs`
+    (through the voice's Days client against the real store: what recall
+    gave goes and something else stays; everything goes, journal included).
 
 - **Once, at a natural moment** (#1693 (3), `LAMP_MEMORY_THREADS=on`,
   with the Days client only; off unless set). A session opened for someone

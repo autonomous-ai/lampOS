@@ -370,6 +370,8 @@ functions, declared by the voice and run by `lamp-memory`
 | `remember {text}` | Someone asks it to keep something | `{"remembered":true}`, and it says back what it kept |
 | `recall {about?, days_ago?}` | Someone asks about an earlier conversation or day | `{"found":[{"when":"yesterday","heard":"...","you_said":"..."},{"when":"last week","asked_to_remember":"..."}]}`, or an empty list and "Nothing about that in what I remember." |
 | `forget {}` | Someone asks it to forget the last thing it was asked to keep | `{"forgotten":true}`, or `false` with "There was nothing I had been asked to remember." |
+| `forget {source_id}` (with `LAMP_MEMORY_FORGET_ALL=on`) | "Forget that", about something recall just gave: its `source_id`, only one this session was shown, of the person's own memory when someone known is at the lamp, else the room's | `{"forgotten":true}`; an id it wasn't shown is refused and nothing is removed, `false` with a note to call recall first |
+| `forget_everything {}` (with `LAMP_MEMORY_FORGET_ALL=on`) | "Forget everything about me", after the lamp has asked once and they said yes; for someone known by face only | `{"forgotten":true,"everything":true}`, or `false` with "I was keeping nothing of them."; with nobody known `false` and nothing sent ("I can forget everything only for someone I know by face…") |
 
 They take the same road as the executive's: a thread of its own, 1.5 s at
 most, at most eight waiting, the answer only to the connection that
