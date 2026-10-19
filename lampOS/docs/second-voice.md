@@ -940,6 +940,20 @@ after a take-over, but now for every turn:
   the model sees it (`worker::LONE_WORDS`): "What's the price of gold?"
   heard as "Surprise" was answered "Oh! I do like a surprise." "And
   Paris?" is a question and goes on.
+- **A line going on from the last one hears its sound first.** The
+  coordinator ends a line at a short pause, so the owner's "Lamp, … what's
+  the weather?" came as pieces of about 1.3 s, each a speech-to-text stream
+  of its own, and the piece with the name got no words (lamp-4ace, 19 Oct,
+  16:37 to 16:45: four such pieces around lamp-name's hits, `results 0
+  with words`). The engine keeps the last line's sound, at most 6 s
+  (`KEPT_SAMPLES`). A line in the same session that the coordinator says
+  continues it, or that begins within 1.5 s of its end when it was not
+  answered (`CARRY_AFTER_END`), has that sound sent into its stream first:
+  `request N goes on from request M: its <ms> ms of sound go first`. Its
+  window then begins where the first piece's did, so a name lamp-name heard
+  there counts for it, and the old words are not put before its own as well.
+  The sound is let go 2 s after its line ended (`KEEP_AFTER_END`), at the
+  next start, and never crosses a session.
 - **Words cut short by the next line.** A new line ends the turn in
   flight, by the engine's own start and by the coordinator's newer owner,
   before anyone knows whether the new line is for the lamp. A spoken

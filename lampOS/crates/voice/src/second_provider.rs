@@ -101,6 +101,14 @@ pub const COULD_NOT_LOOK: &str = "I couldn't get a good look.";
 /// are answered in the next line's place when that line is held, within
 /// this ([`Shared::cut`], #1712).
 pub const CARRY_WITHIN: Duration = Duration::from_secs(30);
+/// The most of the last line's sound kept for the next: the audio queue's
+/// six seconds, at 16 kHz.
+pub const KEPT_SAMPLES: usize = 6 * 16_000;
+/// A line beginning this soon after the last one ended, that one not
+/// answered, goes on from it: its sound goes first ([`KeptSound`]).
+pub const CARRY_AFTER_END: Duration = Duration::from_millis(1_500);
+/// The last line's sound is let go this long after it ended, whatever comes.
+pub const KEEP_AFTER_END: Duration = Duration::from_secs(2);
 /// The function the model looks with on this route ([`Engine::looking_by_call`]).
 pub const LOOK_CALL: &str = "take_a_look";
 /// What the lamp says as it looks by a call the model made with no words.
@@ -271,6 +279,8 @@ struct Shared {
     /// The spoken request being answered and its words, until any of its
     /// answer is heard or its turn ends.
     in_flight: Mutex<Option<Carried>>,
+    /// The last request whose answer was heard.
+    answered_request: Mutex<Option<u64>>,
     /// A spoken request's words whose turn ended before any of its answer
     /// was heard (a newer line began): answered in the next line's place
     /// if that line is held ([`CARRY_WITHIN`], #1712).
@@ -278,6 +288,20 @@ struct Shared {
     /// The answer's first piece goes once this many words have come
     /// ([`Engine::cutting_first_words`]).
     first_words: Option<usize>,
+}
+
+/// The last spoken line's sound, at most [`KEPT_SAMPLES`], for a line that
+/// goes on from it in the same session: one the coordinator says continues
+/// it, or one begun within [`CARRY_AFTER_END`] of its end when it was not
+/// answered. Let go [`KEEP_AFTER_END`] after its end, at the next start.
+struct KeptSound {
+    request: u64,
+    session: u64,
+    samples: VecDeque<i16>,
+    /// When the line's first sound was read, by this process's clock.
+    said_from: u64,
+    /// When it ended, by the engine's clock; `None` while it goes on.
+    ended: Option<Instant>,
 }
 
 /// A spoken request's words, kept while it is answered ([`Shared::in_flight`],
@@ -478,6 +502,9 @@ pub struct Engine {
     sounds_checked: bool,
     /// The eye a look reads, when the eyes keep a look file.
     look: Option<Look>,
+    /// The last spoken line's sound, for a line that goes on from it
+    /// ([`KeptSound`], #1712).
+    kept: Option<KeptSound>,
     /// A due reminder is said, not deferred ([`Engine::saying_reminders`]).
     reminders: bool,
     /// The room kept on this route when it is the lamp's only voice
@@ -545,6 +572,7 @@ impl Engine {
                 look_by_call: false,
                 begun: Mutex::new(None),
                 in_flight: Mutex::new(None),
+                answered_request: Mutex::new(None),
                 cut: Mutex::new(None),
                 first_words: None,
             }),
@@ -555,6 +583,7 @@ impl Engine {
             begun_last: None,
             sounds_checked: false,
             look: None,
+            kept: None,
             reminders: false,
             room_tick: None,
             memory: None,
@@ -855,7 +884,33 @@ impl Engine {
                     .lock()
                     .ok()
                     .and_then(|mut last| last.take());
+                // The last line's sound, when this one goes on from it: the
+                // coordinator ends a line at a short pause, so "Lamp, …
+                // what's the weather?" came as pieces of about 1.3 s, each a
+                // speech-to-text stream of its own, and the piece with the
+                // name got no words (#1712, the owner on lamp-4ace on 19 Oct
+                // at 16:37). Its sound goes into this line's stream first, so
+                // the words are heard whole; its words then are not put
+                // before this one's as well.
+                let now = (self.shared.clock)();
+                let answered = self
+                    .shared
+                    .answered_request
+                    .lock()
+                    .ok()
+                    .and_then(|last| *last);
+                let carried = self.kept.take().filter(|kept| {
+                    let since = kept.ended.map(|end| now.saturating_duration_since(end));
+                    kept.session == session
+                        && kept.request < request
+                        && !kept.samples.is_empty()
+                        && since.is_none_or(|since| since <= KEEP_AFTER_END)
+                        && (continues
+                            || since.is_some_and(|since| since <= CARRY_AFTER_END)
+                                && answered != Some(kept.request))
+                });
                 let before = last
+                    .filter(|_| carried.is_none())
                     .filter(|(of, _)| continues_cut_off && previous == Some((*of, session)))
                     .map(|(_, words)| words);
                 // A stop to tell: this request's own, or one left by the
@@ -891,6 +946,33 @@ impl Engine {
                 let sound = Arc::new(AtomicBool::new(false));
                 let checked = self.sounds_checked.then(|| sound.clone());
                 let said = Arc::new(Mutex::new((0, 0)));
+                self.kept = Some(match carried {
+                    Some(kept) => {
+                        eprintln!(
+                            "lamp-voice second: request {request} goes on from request {}: its {} ms of sound go first",
+                            kept.request,
+                            kept.samples.len() / 16
+                        );
+                        let _ = audio.try_send(kept.samples.iter().copied().collect());
+                        // The line began with the sound carried: the name
+                        // heard in it is this line's.
+                        if let Ok(mut said) = said.lock() {
+                            *said = (kept.said_from, kept.said_from);
+                        }
+                        KeptSound {
+                            request,
+                            ended: None,
+                            ..kept
+                        }
+                    }
+                    None => KeptSound {
+                        request,
+                        session,
+                        samples: VecDeque::new(),
+                        said_from: 0,
+                        ended: None,
+                    },
+                });
                 let memory_scope = self.memory_scope(request, session, true);
                 let lease = memory_scope.as_ref().map(|scope| scope.lease());
                 let task = tokio::spawn(spoken(
@@ -935,6 +1017,14 @@ impl Engine {
                     }
                     said.1 = read_completed_at_us;
                 }
+                if let Some(kept) = self.kept.as_mut().filter(|kept| kept.request == request) {
+                    if kept.said_from == 0 {
+                        kept.said_from = read_completed_at_us;
+                    }
+                    kept.samples.extend(samples.iter().copied());
+                    let over = kept.samples.len().saturating_sub(KEPT_SAMPLES);
+                    kept.samples.drain(..over);
+                }
                 match audio.try_send(samples) {
                     Ok(()) => {}
                     // The task already failed the turn itself.
@@ -952,6 +1042,9 @@ impl Engine {
             // A note for Gemini's model; this voice keeps none.
             ProviderInput::Called { .. } => {}
             ProviderInput::End { request, sound, .. } => {
+                if let Some(kept) = self.kept.as_mut().filter(|kept| kept.request == request) {
+                    kept.ended = Some((self.shared.clock)());
+                }
                 if let Some(turn) = self.turn.as_mut().filter(|turn| turn.request == request) {
                     room(|room| {
                         if sound {
@@ -1946,6 +2039,9 @@ async fn answer(
                     spoke.store(true, Ordering::Relaxed);
                     // The answer's, never the announcement's or a cue's.
                     if answering && !answered.swap(true, Ordering::Relaxed) {
+                        if let Ok(mut last) = shared.answered_request.lock() {
+                            *last = Some(request);
+                        }
                         // Some of its answer heard: no longer to be carried.
                         if let Ok(mut in_flight) = shared.in_flight.lock() {
                             in_flight.take_if(|carried| carried.request == request);

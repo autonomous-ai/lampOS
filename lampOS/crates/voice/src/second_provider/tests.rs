@@ -2972,3 +2972,78 @@ async fn words_cut_short_by_a_line_let_out_are_let_go() {
         &Message::user("Lamp, what time is it?")
     );
 }
+
+/// A frame of the line's sound read at `at_us`.
+fn audio_at(request: u64, sequence: u64, at_us: u64) -> ProviderInput {
+    ProviderInput::Audio {
+        request,
+        privacy_generation: 1,
+        sequence,
+        read_completed_at_us: at_us,
+        samples: vec![0; lamp_audio::CAPTURE_SAMPLES],
+    }
+}
+
+/// #1712, the owner on lamp-4ace at 16:37: "Lamp, … what's the weather?"
+/// came as two lines of about 1.3 s, each its own speech-to-text stream,
+/// and the one with the name got no words. A line begun right after one
+/// not answered, in the same session, has that line's sound sent first,
+/// and its window begins where that line's did. Not after 2 s, and not
+/// after a line that was answered.
+#[tokio::test]
+async fn a_line_going_on_from_one_unanswered_hears_its_sound_first() {
+    let frame = lamp_audio::CAPTURE_SAMPLES;
+    let run = |first: &'static str, gap: Duration| async move {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(first.to_owned()), Ok("what's the weather?".to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![text("Noon."), Ok(ChatEvent::Done)],
+                    vec![text("Sunny."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, now) = scripted(script.clone());
+        let windows: Arc<Mutex<Vec<(u64, u64)>>> = Arc::default();
+        let seen = windows.clone();
+        let mut engine = engine.heeding(Arc::new(move |request, window, _, _| {
+            seen.lock().unwrap().push((request, window.0));
+            None
+        }));
+        engine.submit(start(1));
+        engine.submit(audio_at(1, 1, 1_000));
+        engine.submit(end(1));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        *now.lock().unwrap() += gap;
+        engine.submit(start(2));
+        engine.submit(audio_at(2, 1, 9_000));
+        engine.submit(end(2));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let heard = script.samples_heard.load(Ordering::Relaxed);
+        let window = windows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(of, _)| *of == 2)
+            .map(|(_, from)| *from);
+        (heard, window)
+    };
+    // No words in the first line: the name's piece, unanswered.
+    assert_eq!(
+        run("", Duration::from_millis(500)).await,
+        (3 * frame, Some(1_000)),
+        "its sound, then this line's, and its window from the first piece"
+    );
+    assert_eq!(
+        run("", Duration::from_secs(3)).await,
+        (2 * frame, Some(9_000)),
+        "too late"
+    );
+    assert_eq!(
+        run("What time is it?", Duration::from_millis(500)).await,
+        (2 * frame, Some(9_000)),
+        "the first line was answered"
+    );
+}
