@@ -904,8 +904,11 @@ after a take-over, but now for every turn:
     and after 8 lines held in a row, at most every 15 minutes.
   - **a conversation goes on from a call** (#1712): a line that called the
     lamp for itself (its name, its words, a face turned to it), let out,
-    carries the person's next lines for 45 s as the lamp's own words do,
-    and ends the count of talk past the lamp before it (`RoomTold::called`).
+    carries the person's next lines for 15 s (`CALL_CARRIES_FOR`), and ends
+    the count of talk past the lamp before it (`RoomTold::called`). The
+    lamp's own words carry them for 45 s, as on Live. 15 s is enough for
+    the owner's lines every 6 s, and a sound half a minute after a call the
+    lamp never answered isn't carried (the first builder at 17:26).
     On lamp-4ace on 19 Oct the owner said a line every 6 s, and 5 of the 10
     let out never got their first word out before the next line's Start.
     So the lamp never "spoke", the office's talk before still counted, and
@@ -914,6 +917,17 @@ after a take-over, but now for every turn:
     the journal says why, without words: `request N: no conversation going
     on: it was last heard saying words S s ago, it was last called C s ago,
     K lines left alone since it last spoke` ("it was never …" when never).
+  - **the journal names the sign that let a line out** (#1712, the first
+    builder at 17:49). With `--spoken-to`, the rule's first reason can be
+    one that lets nothing out by itself, the session trusted or the room
+    not known to be busy. The line goes out only with one more sign, and
+    `its answer is played:` names that sign (`Attention::sign`): its name
+    heard, a tap, its words calling the lamp, someone turned to it, said
+    close to it, or a conversation going on. On lamp-4ace on 19 Oct, the
+    office's short lines while the owner sat facing the lamp were journaled
+    as let out by trust; the turned face had let them out. The face rule
+    stays as Live has it (the first builder at 17:53). The model is to
+    decline what isn't for it, as Gemini does.
 
   Not here, as they have no part on this route: the Policy's hold of a line
   going on (`LAMP_GOING_ON_ASKS`, which also ends a busy room sooner once

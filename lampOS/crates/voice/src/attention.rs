@@ -629,8 +629,14 @@ pub fn decide(
     decide_busy(room, going_on, own, fresh, heard, named, false, None)
 }
 
-const TURNED: &str = "someone is turned to the lamp";
-const GOING_ON: &str = "a conversation with the lamp is going on";
+pub(crate) const TURNED: &str = "someone is turned to the lamp";
+pub(crate) const GOING_ON: &str = "a conversation with the lamp is going on";
+/// Two first reasons that, with `--spoken-to`, let nothing out alone: a line
+/// let out so had another sign as well (the second route names it, #1712).
+pub(crate) const TRUSTED: &str = "the session has heard enough to be trusted";
+pub(crate) const ROOM_NOT_BUSY: &str = "the room is not known to be busy";
+/// The text calling the lamp, as the rule says it.
+pub(crate) const CALLED_IN_TEXT: &str = "the text shows it was called";
 const SOUND_A_WORD: &str = "a short sound, heard as a short word said to the lamp";
 const SOUND_NEAR: &str = "a short sound, said close to the lamp";
 const SOUND_TURNED: &str = "a short sound, with someone turned to the lamp";
@@ -689,13 +695,13 @@ fn decide_called(
     if own {
         Verdict::Play("the lamp began this turn itself")
     } else if !(fresh || strict && room == Room::Busy) {
-        Verdict::Play("the session has heard enough to be trusted")
+        Verdict::Play(TRUSTED)
     } else if room != Room::Busy {
-        Verdict::Play("the room is not known to be busy")
+        Verdict::Play(ROOM_NOT_BUSY)
     } else if going_on {
         Verdict::Play(GOING_ON)
     } else if called_in_text {
-        Verdict::Play("the text shows it was called")
+        Verdict::Play(CALLED_IN_TEXT)
     } else if turned == Some(true) {
         Verdict::Play(TURNED)
     } else if named && !strict {
@@ -817,6 +823,9 @@ pub struct Attention {
     /// With `spoken_to`: the request in hand was let out only as the
     /// conversation going on ([`Self::played_on_the_conversation_alone`]).
     conversation_alone: bool,
+    /// The request in hand was judged with a conversation going on, and
+    /// nobody else's line before it.
+    went_on: bool,
 }
 
 /// The most text kept for one request.
@@ -1294,10 +1303,12 @@ impl Attention {
         let own = own_request().load(Ordering::Acquire) == request;
         self.judged_own = own;
         self.conversation_alone = false;
+        self.went_on = false;
         let fresh = self.begun <= FRESH_REQUESTS;
         let another = self.another(room, own);
         let answering_another = another.is_some();
         let going_on = going_on && !answering_another;
+        self.went_on = going_on;
         // The lamp's news has one reply: the first thing judged after it,
         // whatever path judges it, takes it (the reviewer on #918 at 07:12:
         // a short "Thanks" judged as a sound had left it for later talk).
@@ -1558,6 +1569,35 @@ impl Attention {
     /// on lamp-4ace on 19 Oct, colleagues' talk after a named request was
     /// answered six times, each answer keeping the conversation going,
     /// where Gemini Live leaves such talk alone).
+    /// The sign that let the request in hand out with `--spoken-to`, as
+    /// the journal says it, where the rule's first reason lets nothing out
+    /// alone (the session trusted, the room not known to be busy): its name
+    /// heard, a tap, its words calling the lamp, someone turned to it, said
+    /// close to it, or a conversation going on (#1712, the first builder at
+    /// 17:49: such lines were journaled as let out by trust).
+    pub fn sign(&self, turned: Option<bool>) -> Option<&'static str> {
+        let called_in_text = if self.name_in_passing_ignored {
+            called_by_name(&self.heard)
+        } else {
+            called(&self.heard)
+        };
+        if self.named {
+            Some(NAMED)
+        } else if self.tapped {
+            Some(TAPPED)
+        } else if called_in_text {
+            Some(CALLED_IN_TEXT)
+        } else if turned == Some(true) {
+            Some(TURNED)
+        } else if self.addressed {
+            Some(ADDRESSED)
+        } else if self.went_on {
+            Some(GOING_ON)
+        } else {
+            None
+        }
+    }
+
     pub fn played_on_the_conversation_alone(&self) -> bool {
         self.conversation_alone && matches!(self.verdict, Some(Verdict::Play(_)))
     }

@@ -1567,11 +1567,31 @@ pub(crate) struct Heeding {
     held_run: u32,
     renewed_at: Option<Instant>,
     /// When a line that called the lamp for itself (its name, its words,
-    /// a face turned to it) was let out: the conversation goes on from it as
-    /// from the lamp's own words ([`crate::thread::GOING_ON_FOR`]), whether
-    /// or not its answer was said before the person spoke again.
+    /// a face turned to it) was let out: the conversation goes on from it
+    /// for [`CALL_CARRIES_FOR`], whether or not its answer was said before
+    /// the person spoke again.
     called_at: Option<Instant>,
 }
+
+/// What let a line out, as the journal says it: the sign itself where the
+/// rule's first reason is one that lets nothing out alone with
+/// `--spoken-to` (the session trusted, the room not known to be busy). On
+/// lamp-4ace on 19 Oct (the first builder at 17:49) lines were journaled as
+/// let out by a trusted session, and the sign that did was not told.
+fn shown(why: &'static str, sign: Option<&'static str>) -> &'static str {
+    let weak = [crate::attention::TRUSTED, crate::attention::ROOM_NOT_BUSY].contains(&why);
+    match sign {
+        Some(sign) if weak => sign,
+        _ => why,
+    }
+}
+
+/// How long a call let out carries the person's next lines when the lamp
+/// has said no word since (`Heeding::called_at`): the owner's lines on
+/// lamp-4ace came every 6 s. The lamp's own words carry them for
+/// [`crate::thread::GOING_ON_FOR`], as on Live (the first builder at 17:26:
+/// noises after a call the lamp never answered were carried and answered).
+pub(crate) const CALL_CARRIES_FOR: Duration = Duration::from_secs(15);
 
 /// Lines held in a row before the rule's session is renewed, as Live renews
 /// its own after eight unanswered (`provider_worker`).
@@ -1826,8 +1846,7 @@ impl Heeding {
         // before the lamp's answers were said, and were held as no
         // conversation).
         let called_ago = self.called_at.map(|at| now.saturating_duration_since(at));
-        let going_on =
-            said_going_on || called_ago.is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
+        let going_on = said_going_on || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR);
         let mut left_alone = None;
         let mut signs = Signs {
             room: crate::room_told::Room::Unknown,
@@ -1993,6 +2012,7 @@ impl Heeding {
                 } else {
                     ""
                 };
+                let why = shown(why, attention.sign(turned));
                 eprintln!(
                     "lamp-voice second: request {request}: its answer is played: {why}{alone}"
                 );
@@ -2382,6 +2402,68 @@ mod tests {
             assert!(strict.judge(request, said, "And then?", busy()).is_some());
         }
         assert_eq!(strict.session, 2);
+    }
+
+    /// #1712, the first builder at 17:49: the journal names the sign that
+    /// let a line out, never the session's trust or the room alone.
+    #[test]
+    fn the_journal_names_the_sign_that_let_a_line_out() {
+        use crate::attention::{GOING_ON, ROOM_NOT_BUSY, TRUSTED, TURNED};
+        assert_eq!(super::shown(TRUSTED, Some(TURNED)), TURNED);
+        assert_eq!(super::shown(ROOM_NOT_BUSY, Some(GOING_ON)), GOING_ON);
+        // A strong reason stays, and a weak one with no other sign (the
+        // rule without `--spoken-to`) is the reason.
+        let named = "its name was heard plainly in the room's sound";
+        assert_eq!(super::shown(named, Some(TURNED)), named);
+        assert_eq!(super::shown(TRUSTED, None), TRUSTED);
+        // From the rule: someone turned to the lamp, in a trusted session.
+        let busy = || Signs {
+            room: crate::room_told::Room::Unknown,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(true),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let said = (10_000_000, 11_000_000);
+        let mut heeding = Heeding::new(true, true, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        for request in [1, 2, 3] {
+            assert_eq!(
+                heeding.judge(request, said, "Okay yeah sure.", busy()),
+                None
+            );
+        }
+        assert_eq!(heeding.attention.sign(Some(true)), Some(TURNED));
+        assert_eq!(heeding.attention.sign(Some(false)), None);
+    }
+
+    /// #1712, the first builder at 17:26: a call the lamp never answered
+    /// carries the person's next lines for 15 s, not the lamp's own 45 s: a
+    /// three-word line later, in a trusted session, is held.
+    #[test]
+    fn a_call_unanswered_carries_the_next_lines_for_fifteen_seconds() {
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+        crate::room_told::room()
+            .lock()
+            .unwrap()
+            .count_only_talk(true);
+        let said = (10_000_000, 11_000_000);
+        let mut heeding = Heeding::new(true, true, None, None);
+        heeding.as_the_only_voice(false, true, false);
+        assert_eq!(
+            heeding.heed(207, said, "Lamp, what time is it?", None),
+            None
+        );
+        assert_eq!(heeding.heed(208, said, "And the weather?", None), None);
+        // Trusted now, past the session's first two.
+        heeding.called_at = Some(Instant::now() - CALL_CARRIES_FOR - Duration::from_secs(1));
+        assert!(heeding.heed(209, said, "Okay yeah sure.", None).is_some());
+        heeding.called_at = Some(Instant::now() - Duration::from_secs(10));
+        assert_eq!(heeding.heed(210, said, "Okay yeah sure.", None), None);
+        *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
     }
 
     /// #1712: a line that called the lamp, let out, carries the person's
