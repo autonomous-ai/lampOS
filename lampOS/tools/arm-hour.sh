@@ -35,6 +35,8 @@
 #   ARM_LOG     where the log goes (./arm-hour-YYYYmmdd-HHMM.log)
 #   ARM_LAMP_HOST  the lamp for a file copied from the Mac, as scp takes it
 #               (orangepi@lamp-4ace.local)
+#   ARM_SCP     the command that copies a file to the lamp (scp), so one with
+#               its own key and known hosts can be given
 #   ARM_PRESENCE_CHECK  #1677's presence-check.sh on the Mac, in a checkout of
 #               the morning build's commit (row 19)
 #   ARM_ROWS_FILE  rows to use in place of the table below (arm-hour-test.sh)
@@ -159,7 +161,7 @@ sheet | #1941, Seventh, 19 Oct 18:57Z; #1722, Seventh, 20 Oct 03:27
 tell | A, today's voice: five rounds of mute, 3 s, unmute.
 proof | journalctl -u lamp-eyes --since -5min -o short-monotonic | grep 'camera closed' | tail -10
 mac | mkdir -p /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063 && gh run download 39266127252 -R autonomous-ai/lampOS -n lampos-arm64-05f8290d316825f0b6f5a9d4a72af0d093e7d063 -D /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063
-mac | scp /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063
+mac | ${ARM_SCP:-scp} /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063
 lamp | systemctl cat lamp-voice | grep '^ExecStart=' | tail -1
 tell | Is that today's voice? If not, q now. Otherwise Enter to put #1941's voice in.
 lamp | sudo install -D -m 0755 /tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063 /var/lib/lampos-seventh/05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice && sudo mkdir -p /run/systemd/system/lamp-voice.service.d && systemctl cat lamp-voice | grep '^ExecStart=' | tail -1 | sed -E 's#^ExecStart=[^ ]+#ExecStart=/var/lib/lampos-seventh/05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice#' | { printf '[Service]\nExecStart=\n'; cat; } | sudo tee /run/systemd/system/lamp-voice.service.d/60-seventh.conf >/dev/null && sudo systemctl daemon-reload && sudo systemctl restart lamp-voice
