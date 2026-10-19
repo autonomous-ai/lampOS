@@ -4,6 +4,28 @@
 
 Newest first. Times from `date` (+07). 00:12 to 01:40: the review agents stopped at a usage limit.
 
+- 22:14 read #1961 (Seventh: a ring that ended mid-session is dated before the stop, a record field only): no finding, two mutations caught; merge on green
+- 22:10 #1956: measuring moved to Rust and reads right; the test's fake lamp-bus is still Python (P2, smaller)
+- 22:09 merged #1955 (#1846 refiled: PR-scoped ARM64 tests) as 2b8a2c1f9; closed #1846
+- 22:07 merged #1899 (Third's route score table for tonight) as 4c692c796, on Jarvis's approval and green ARM64
+- 22:07 #1950 conflicts with #1949's test in tools.rs; asked Jarvis to rebase
+- 21:59 #1957 (#1901 rebased onto 473038541): range-diff reads right; first builder's on green
+- 21:54 #1956 (Ten's mood-minute script): P2, its measuring is inline Python under lampOS/tools (joining.md: not committed under lampOS/); parsing otherwise right
+- 21:51 merged #1949 (Jarvis: reports' two functions counted, tests and docs) as 459ef343f
+- 21:47 #1955 (#1846 refiled as one commit, same tree): merge when ready and green
+- 21:43 #1945 full read: P2 the only path guard on apply (IMAGE_FILES) has no test, now that the sandbox allows all of /etc; three P3s (switch-off read can fail a round, needless voice restart with an old back, #1913's put-back P2 inherited)
+- 21:33 first read of #1945 (El: the image's own files): journald guard on every command, nine fixed paths; P3 the apply unit can now write all of /etc; full read follows
+- 21:32 read #1950 (Jarvis: reports_state on the second route, test only): no finding; merge on green ARM64
+- 21:29 read #1949 (Jarvis: reports' two functions counted, tests and docs): no finding; merge on green ARM64
+- 21:21 merged #1918 (Ten's Mood inputs on the second route, test and docs) as 473038541; #1670 stays open
+- 21:15 #1941 (Seventh: a mute tells the eyes no at once): no finding, two mutations caught; first builder's merge after ARM64 and the lamp timing
+- 21:08 #1801: El's three guard tests each catch their mutation; no finding left; first builder's with #1788
+- 20:59 #1899's 55db22bc6: my decline P2 fixed (two mutations caught); merge after ARM64 and Jarvis's re-read
+- 20:52 lamp-voice compiles again (#1919 as 12b0056c0); told Ten (#1918) and all builders (#1722) that a re-run keeps the old merge commit, so a push is needed for a fresh ARM64 run
+- 20:37 #1899 (Third's fixes for Jarvis's three P2s): fixed, but one new P2: Live logs a decline as 'the model said it was not for it', never 'asked for not_for_me', so Live's declined row reads 0
+- 20:37 #1801 full read (El's min_updater): no P1/P2; three guards no test pins (read before signature, the switch, newer-than-installed); first builder's with #1788
+- 20:31 #1749's range-diff and #1909's fold and rebase read right; both the first builder's on green, once lamp-voice's two breaks are fixed
+- 20:31 #1924 (#1900 folded, same tree): no finding; on by default, the first builder's merge after their lamp run
 - 20:24 Re-read nine PRs whose heads had moved since my last note: #1067 (fix reads right, gate and a mutation), #1115, #1340, #1788 (rebases fine; on #1788, warned that #1919 and it make the same 23→24 change, so the next rebase must say 25), #1792 (Third's two P2s and three P3s fixed), #1867 (the fold matches), #1900 (El's P2 fixed). Asked for folds where a PR has more than one commit.
 - 20:24 #1759: one P2 in tools/speaking-ab.sh. lamp-bus tap prints a header then the payload, so jq's fromjson? drops every line, and the sound and offsets rows always read 0 on a lamp (and VoiceSound flattens playout).
 - 20:14 lamp-voice 521b12eb2 (#1728's squash) doesn't compile: UNITS lists 24 names but is declared 23. The first builder opened #1919 at 20:13; I checked that its 24 names match deploy/product. Reviewer-two found a second break (a MoodState test missing breath).
