@@ -210,6 +210,8 @@ struct Presence {
     out: Publisher,
     heard: Subscriber,
     away: Away,
+    /// Whether the last value said someone, for the journal's line.
+    said_someone: bool,
 }
 
 impl BusOut {
@@ -268,6 +270,7 @@ impl BusOut {
             out,
             heard,
             away: Away::default(),
+            said_someone: false,
         });
         Ok(())
     }
@@ -284,7 +287,13 @@ impl BusOut {
         self.alive_at_us = now_us;
         let _ = self.faces.publish_json(now_us, &seen);
         if let Some(presence) = self.presence.as_mut() {
-            presence.away.looked(now_us, !seen.faces.is_empty());
+            let tall = found
+                .iter()
+                .map(|face| face.height / filled.1.max(1) as f32)
+                .reduce(f32::max);
+            presence
+                .away
+                .looked(now_us, tall.filter(|_| !seen.faces.is_empty()));
         }
     }
 
@@ -303,7 +312,12 @@ impl BusOut {
             while let Ok(Some(line)) = presence.heard.recv(Duration::ZERO) {
                 presence.away.heard(line.header.at_us.min(now_us));
             }
+            let before = presence.said_someone;
             if let Some(now) = presence.away.say(now_us) {
+                if now.someone && !before {
+                    eprintln!("lamp-eyes: someone at the lamp ({})", presence.away.cause());
+                }
+                presence.said_someone = now.someone;
                 let _ = presence.out.publish_json(now_us, &now);
             }
         }
@@ -626,7 +640,8 @@ mod tests {
             said.first(),
             Some(&RoomPresence {
                 someone: false,
-                nobody_s: 0
+                nobody_s: 0,
+                by: None,
             })
         );
         let before_voice = said
@@ -637,10 +652,14 @@ mod tests {
             said[before_voice - 1],
             RoomPresence {
                 someone: false,
-                nobody_s: 24
+                nobody_s: 24,
+                by: None,
             }
         );
         assert_eq!(before_voice, 25, "once a second, then at once: {said:?}");
+        // What showed someone: the voice first, then the face at 28 s.
+        assert_eq!(said[before_voice].by, Some(lamp_msgs::SeenBy::Voice));
+        assert_eq!(said.last().unwrap().by, Some(lamp_msgs::SeenBy::Face));
         // Someone from the voice on, for as long as the eyes look.
         assert!(
             said[before_voice..].iter().all(|now| now.someone),
