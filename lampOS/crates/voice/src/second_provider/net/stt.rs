@@ -177,6 +177,9 @@ pub(crate) struct Transcript {
     ended: bool,
     /// Words (an interim result or `SpeechStarted`) since the last final.
     pending: Option<Pending>,
+    /// The last interim result's words since the last final, kept for a
+    /// line whose finals never came with them (#1712).
+    interim: Option<String>,
 }
 
 impl Transcript {
@@ -184,9 +187,11 @@ impl Transcript {
         if !heard.is_final {
             if !heard.transcript.is_empty() {
                 self.pending = Some(Pending::Interim(heard.end));
+                self.interim = Some(heard.transcript);
             }
             return;
         }
+        self.interim = None;
         self.covered = Some(heard.end);
         self.ended = heard.speech_final;
         self.pending = None;
@@ -233,8 +238,20 @@ impl Transcript {
             ms(sent)
         )
     }
-    pub fn text(&self) -> String {
-        self.segments.join(" ")
+    /// The words at the line's end: the final segments, then the last
+    /// interim result's words if no final came after them, and whether
+    /// those were kept. On lamp-4ace on 19 Oct (#1712) a line came back
+    /// with no words; kept, an interim's words are not lost to an empty
+    /// final.
+    pub fn words(&self) -> (String, bool) {
+        let mut words = self.segments.clone();
+        let interim = self
+            .interim
+            .clone()
+            .filter(|_| matches!(self.pending, Some(Pending::Interim(_))));
+        let kept = interim.is_some();
+        words.extend(interim);
+        (words.join(" "), kept)
     }
 }
 
@@ -280,6 +297,16 @@ impl Replies {
             "other_messages": read(&self.other),
             "ended": self.ended(),
         })
+    }
+
+    /// The results with and without words, for the line's end in the
+    /// journal (#1712: whether the service sent any words at all).
+    fn results_told(&self) -> String {
+        format!(
+            ", results {} with words, {} without",
+            self.with_words.load(Ordering::Relaxed),
+            self.without_words.load(Ordering::Relaxed)
+        )
     }
 
     /// The counts, in words, and how the stream ended if it has; no words
@@ -634,16 +661,31 @@ where
     let mut closing = false;
     let mut last_final: Option<Instant> = None;
     let mut at_end = String::new();
-    let told = |at_end: &str, answered: Option<(Duration, f64)>, from: &str| {
+    // The words at the end, and the journal's account: `Finalize`'s answer
+    // (when it went), the results with and without words, and where the
+    // words came from, with the last interim's if those were kept.
+    let ending = |transcript: &Transcript,
+                  at_end: &str,
+                  answered: Option<Option<(Duration, f64)>>,
+                  from: &str| {
         let answer = match answered {
-            Some((after, end)) => format!(
+            None => String::new(),
+            Some(Some((after, end))) => format!(
                 ", finalize answered in {} ms to {} ms",
                 after.as_millis(),
                 (end * 1000.0).round() as i64
             ),
-            None => ", finalize unanswered".to_owned(),
+            Some(None) => ", finalize unanswered".to_owned(),
         };
-        Some(format!("{at_end}{answer}, words from={from}"))
+        let (words, kept) = transcript.words();
+        let interim = if kept { "+interim" } else { "" };
+        (
+            words,
+            Some(format!(
+                "{at_end}{answer}{}, words from={from}{interim}",
+                replies.results_told()
+            )),
+        )
     };
     let close_stream = || Message::text(r#"{"type":"CloseStream"}"#);
     loop {
@@ -681,7 +723,7 @@ where
                 at_end = format!("{}, last final {before}", transcript.at_end(sent));
                 if transcript.settled(sent) {
                     let _ = write.send(close_stream()).await;
-                    return Ok((transcript.text(), Some(format!("{at_end}, words from=settled"))));
+                    return Ok(ending(&transcript, &at_end, None, "settled"));
                 }
                 write
                     .send(Message::text(r#"{"type":"Finalize"}"#))
@@ -731,13 +773,13 @@ where
                         if closing && transcript.settled(sent) {
                             // `CloseStream`'s words cover all the audio sent:
                             // its close is not waited for.
-                            return Ok((transcript.text(), told(&at_end, answered, "close_stream")));
+                            return Ok(ending(&transcript, &at_end, Some(answered), "close_stream"));
                         }
                         if finalize_by.is_some() && !closing {
                             if transcript.settled(sent) {
                                 // Closes the socket; its answer is not waited for.
                                 let _ = write.send(close_stream()).await;
-                                return Ok((transcript.text(), told(&at_end, answered, "finalize")));
+                                return Ok(ending(&transcript, &at_end, Some(answered), "finalize"));
                             }
                             if finalized {
                                 // `Finalize`'s answer short of the audio sent:
@@ -773,7 +815,7 @@ where
                         },
                     ));
                     return if finalize_by.is_some() {
-                        Ok((transcript.text(), told(&at_end, answered, "close_stream")))
+                        Ok(ending(&transcript, &at_end, Some(answered), "close_stream"))
                     } else {
                         Err(Error::Transport("speech-to-text stream"))
                     };
@@ -781,7 +823,7 @@ where
                 None => {
                     replies.end("ended with no close".to_owned());
                     return if finalize_by.is_some() {
-                        Ok((transcript.text(), told(&at_end, answered, "close_stream")))
+                        Ok(ending(&transcript, &at_end, Some(answered), "close_stream"))
                     } else {
                         Err(Error::Transport("speech-to-text stream"))
                     };
@@ -874,7 +916,7 @@ mod tests {
                 transcript.add(words);
             }
         }
-        assert_eq!(transcript.text(), "What time is it?");
+        assert_eq!(transcript.words().0, "What time is it?");
         assert_eq!(ends, 1);
     }
 
@@ -907,7 +949,7 @@ mod tests {
         assert!(transcript.settled(2.5), "an empty interim is silence");
         transcript.speech_started(2.6);
         assert!(!transcript.settled(2.5), "someone talks again");
-        assert_eq!(transcript.text(), "what time is it");
+        assert_eq!(transcript.words().0, "what time is it");
     }
 
     #[test]
@@ -1012,6 +1054,49 @@ mod tests {
 
     const INTERIM: &str = r#"{"type":"Results","is_final":false,"speech_final":false,"start":0.0,"duration":0.6,"channel":{"alternatives":[{"transcript":"hello"}]}}"#;
 
+    /// #1712, request 329 on lamp-4ace: finals with words covering most of
+    /// the line came before its end; `Finalize` went unanswered and the
+    /// words came from `CloseStream`. The finals' words are kept, and the
+    /// line's end says how many results had words.
+    #[tokio::test(start_paused = true)]
+    async fn finals_with_words_before_the_close_keep_their_words() {
+        const SAID: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"start":0.0,"duration":0.8,"channel":{"alternatives":[{"transcript":"hey lamp what time"}]}}"#;
+        let (words, at_end, _) = finish_after(SAID, &[], Duration::from_millis(800), 0).await;
+        assert_eq!(words, "hey lamp what time from close");
+        assert!(
+            at_end.contains("finals cover 800 of 1000 ms sent"),
+            "{at_end}"
+        );
+        assert!(
+            at_end.ends_with(
+                ", finalize unanswered, results 2 with words, 1 without, words from=close_stream"
+            ),
+            "{at_end}"
+        );
+    }
+
+    /// #1712: a line whose only words came in an interim result, its
+    /// finals empty, keeps those words; the journal says so.
+    #[tokio::test(start_paused = true)]
+    async fn an_interims_words_with_no_final_after_them_are_kept() {
+        const EMPTY: &str = r#"{"type":"Results","is_final":true,"speech_final":true,"from_finalize":true,"start":0.0,"duration":1.0,"channel":{"alternatives":[{"transcript":""}]}}"#;
+        let mut transcript = Transcript::default();
+        transcript.add(heard(INTERIM).unwrap());
+        assert_eq!(transcript.words(), ("hello".to_owned(), true));
+        transcript.add(heard(EMPTY).unwrap());
+        assert_eq!(
+            transcript.words(),
+            (String::new(), false),
+            "a final came after it"
+        );
+        let (words, at_end, _) = finish_after(INTERIM, &[], Duration::from_millis(800), 0).await;
+        assert_eq!(
+            words, "from close",
+            "the close's final came after the interim"
+        );
+        assert!(at_end.ends_with("words from=close_stream"), "{at_end}");
+    }
+
     #[tokio::test(start_paused = true)]
     async fn finals_covering_all_the_audio_sent_do_not_wait_for_close_stream() {
         let ended = r#"{"type":"Results","is_final":true,"speech_final":true,"start":0.0,"duration":1.0,"channel":{"alternatives":[{"transcript":"hello lamp"}]}}"#;
@@ -1029,7 +1114,7 @@ mod tests {
         assert_eq!(words, "hello lamp");
         assert_eq!(took, Duration::ZERO);
         assert!(
-            at_end.ends_with(", finalize answered in 0 ms to 1000 ms, words from=finalize"),
+            at_end.ends_with(", finalize answered in 0 ms to 1000 ms, results 2 with words, 0 without, words from=finalize"),
             "{at_end}"
         );
         assert!(!at_end.contains("hello"));
@@ -1041,7 +1126,9 @@ mod tests {
         assert_eq!(words, "from close");
         assert_eq!(took, FINALIZE + Duration::from_millis(800));
         assert!(
-            at_end.ends_with(", finalize unanswered, words from=close_stream"),
+            at_end.ends_with(
+                ", finalize unanswered, results 2 with words, 1 without, words from=close_stream"
+            ),
             "{at_end}"
         );
     }
@@ -1267,7 +1354,7 @@ mod tests {
         assert!(
             at_end.ends_with(
                 "of 1000 ms sent, pending=interim 600 ms after the last final, last final none, \
-                 finalize answered in 0 ms to 300 ms, words from=close_stream"
+                 finalize answered in 0 ms to 300 ms, results 3 with words, 1 without, words from=close_stream"
             ),
             "{at_end}"
         );
