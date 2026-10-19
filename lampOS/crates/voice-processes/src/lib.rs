@@ -36,10 +36,13 @@ pub enum Command {
     /// How much of a chat request DeepSeek's prompt cache holds
     /// (`lamp-voice probe-cache`, #1712): counts only, run by hand.
     ProbeCache,
+    /// Which function DeepSeek calls for each light-and-volume follow-up
+    /// line (`lamp-voice probe-tools`, #1712): counts only, run by hand.
+    ProbeTools,
 }
 
 impl Command {
-    pub const ALL: [Command; 14] = [
+    pub const ALL: [Command; 15] = [
         Command::Serve,
         Command::Directed,
         Command::DirectedFixture,
@@ -54,6 +57,7 @@ impl Command {
         Command::Stalls,
         Command::ProbeCascade,
         Command::ProbeCache,
+        Command::ProbeTools,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -72,6 +76,7 @@ impl Command {
             Command::Stalls => "stalls",
             Command::ProbeCascade => "probe-cascade",
             Command::ProbeCache => "probe-cache",
+            Command::ProbeTools => "probe-tools",
         }
     }
 

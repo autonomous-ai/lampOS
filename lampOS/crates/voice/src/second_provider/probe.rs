@@ -32,6 +32,7 @@
 use super::net::{self, Chat, ChatEvent, GeminiTts, Message, Sentences, Tts, search::Search};
 
 pub mod cache;
+pub mod tools;
 use crate::second_config::{
     CREDENTIALS_ENV, DEEPSEEK_CREDENTIAL, DEEPSEEK_TEXT_ONLY, OPENROUTER_CREDENTIAL,
     OPENROUTER_MODEL, OPENROUTER_SECOND_MODEL, least_effort, unit_credential,

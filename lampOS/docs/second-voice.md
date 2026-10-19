@@ -1547,6 +1547,46 @@ systemd-run --pty --wait \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 3
 ```
 
+### Which function each follow-up line calls (`probe-tools`)
+
+`lamp-voice probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS]` (1 to 20, 3 by
+default; `second_provider/probe/tools.rs`). It was built for one fault the
+four-arm test found (the first builder on #1722, 20:22). On lamp-4ace at
+20:08 and 09:12, after "make your light a little dimmer" and "a little
+dimmer still", DeepSeek answered "Hey Lamp, turn yourself down a bit." with
+`light_dimmer`, then "turn yourself back up a little" with `volume_up`: the
+lamp ended 20 steps louder. Live calls `volume_down`, then `volume_up`.
+
+- **The conversation:** the character and a turn's changing part, then five
+  lines (`LINES`): the four above and "That's better, thanks." (no call).
+  Each line is asked with the lines before it as right history: the right
+  call, the actions part's short answer to it (`LAMP_SHORT_DONE=on`, as on
+  the lamps), and a word or two. So each line is judged on its own.
+- **The functions:** the voice's own, as `probe-cache` declares them, and
+  the actions part's from its catalog in `LAMP_ACTIONS_DIR`
+  (`/run/lampos-actions`), the way the voice reads them. On a lamp that's
+  the light and volume with their installed descriptions. Without them it
+  refuses to run.
+- **The arms**, on DeepSeek's own API (`hosted.deepseek_model`, thinking
+  off, the unit's `deepseek.key`):
+  - `today`: every function;
+  - `few`: narrowed as `LAMP_SECOND_FEW_TOOLS=on` narrows a spoken turn's;
+  - `note`: today's, with one sentence after the changing part (`NOTE`):
+    "'Turn yourself up' or 'turn yourself down' always means your voice
+    (volume_up, volume_down), whatever was said about your light before."
+
+It prints, for each arm and line, how many requests called each function
+first (`none` for an answer in words) and how many were right. Then it names
+the arms that were right every time on every line. Counts only, no words.
+Run it like `probe-cache`, where lamp-actions runs:
+
+```sh
+systemd-run --pty --wait \
+  -p LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key \
+  /opt/lampOS/voice/current/lamp-voice probe-tools \
+  /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 20
+```
+
 ## Not done
 
 - **Gemini Terminal** (a wrong key or configuration) still ends the voice
