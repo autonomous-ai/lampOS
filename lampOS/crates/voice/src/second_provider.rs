@@ -47,7 +47,7 @@ use std::{
     collections::VecDeque,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -58,6 +58,7 @@ use tokio::{
 
 pub mod link;
 pub mod net;
+pub mod policy;
 pub mod probe;
 mod services;
 pub mod worker;
@@ -299,6 +300,18 @@ pub type WordsHeard = Arc<dyn Fn(u64, &str) + Send + Sync>;
 /// Whether a call, by its request and name, is held as not said to the
 /// lamp ([`Engine::holding_calls`]).
 pub type CallHold = Arc<dyn Fn(u64, &str) -> bool + Send + Sync>;
+/// What the Policy makes of a call in a spoken turn
+/// ([`Engine::holding_for_the_policy`], `crate::policy_holds`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Policed {
+    /// Run it, as without the switch.
+    Run,
+    /// Not run: the Policy judged the turn not for the lamp.
+    Held,
+}
+/// The Policy's gate for a call, by its request and name: it waits for the
+/// turn's decision, at most `crate::policy_holds::WAIT`.
+pub type PolicyGate = Arc<dyn Fn(u64, String) -> BoxFuture<'static, Policed> + Send + Sync>;
 
 /// What every turn task shares.
 struct Shared {
@@ -351,6 +364,8 @@ struct Shared {
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
     hold: Option<CallHold>,
+    /// Calls that wait for the Policy's decision ([`Engine::holding_for_the_policy`]).
+    policy: Option<PolicyGate>,
     /// Told a spoken request's words before its chat ([`Engine::hearing_words`]).
     words_heard: Option<WordsHeard>,
     /// The model looks by calling [`LOOK_CALL`] ([`Engine::looking_by_call`]).
@@ -719,6 +734,7 @@ impl Engine {
                 task_waiting: None,
                 did: None,
                 hold: None,
+                policy: None,
                 words_heard: None,
                 look_by_call: false,
                 prepare: false,
@@ -1014,6 +1030,20 @@ impl Engine {
     pub fn holding_calls(mut self, hold: CallHold) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.hold = Some(hold);
+        }
+        self
+    }
+
+    /// With `LAMP_POLICY_HOLDS_ACTIONS=on` (#800, #1712): each call of a
+    /// spoken turn is put to `gate` before it runs, which waits for the
+    /// Policy's decision about the turn. One it holds is not run: the model
+    /// is told it was not done ([`crate::policy_holds::HELD`]), the round's
+    /// other calls run as they would, and the turn ends there in silence,
+    /// as `not_for_me` ends it: nothing more is said, and the model is not
+    /// asked again. Before any turn only.
+    pub fn holding_for_the_policy(mut self, gate: PolicyGate) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.policy = Some(gate);
         }
         self
     }
@@ -2299,6 +2329,10 @@ async fn answer(
     let spoke = AtomicBool::new(false);
     // The answer's own first audio went (not the announcement's).
     let answered = AtomicBool::new(false);
+    // The words of the answer's sentences begun so far, for a call the
+    // Policy holds after them.
+    let words_begun = AtomicUsize::new(0);
+    let words_out = &words_begun;
     let mut queue = Queue {
         shared,
         speech: &mut speech,
@@ -2576,6 +2610,8 @@ async fn answer(
                 &calls,
                 reasoning.take(),
             ));
+            // A call the Policy held ends the turn after this round.
+            let mut policy_held = false;
             for call in &calls {
                 if shared
                     .hold
@@ -2591,6 +2627,22 @@ async fn answer(
                         crate::policy_holds::held().to_string(),
                     ));
                     continue;
+                }
+                // The Policy's decision about a spoken turn, for the calls it
+                // holds (#800, #1712); the lamp's own turns are never held.
+                if heard && let Some(gate) = &shared.policy {
+                    let policed = gate(request, call.name.clone()).await;
+                    if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                        return Err(Stop::Gone);
+                    }
+                    if policed == Policed::Held {
+                        policy_held = true;
+                        messages.push(Message::tool(
+                            call.id.clone(),
+                            crate::policy_holds::held().to_string(),
+                        ));
+                        continue;
+                    }
                 }
                 // The lamp's own work, for a question about it later, as the
                 // Live worker marks it for any turn not held (#829).
@@ -2638,6 +2690,17 @@ async fn answer(
                 }
                 messages.push(Message::tool(call.id.clone(), result.to_string()));
             }
+            // Held: nothing more of the turn is said, as on the Live route,
+            // where none of a held turn's sound is let out. What the model
+            // said before its call may have gone out already: counted, for
+            // the battery (the first builder on #1712, 20:46).
+            if policy_held {
+                eprintln!(
+                    "lamp-voice second: request {request}: {} words were let out before a held call; the turn ends here, and nothing more is said",
+                    words_out.load(Ordering::Relaxed)
+                );
+                return Err(Stop::Silent);
+            }
         }
         // ponytail: a model still calling tools after MAX_ROUNDS ends the
         // turn with what it has said; a spoken "I could not finish" if seen.
@@ -2654,6 +2717,7 @@ async fn answer(
             // space, so the lamp's words read "just now. Hmm," (#1014).
             let answering = text != ANNOUNCEMENT;
             if answering {
+                words_out.fetch_add(text.split_whitespace().count(), Ordering::Relaxed);
                 let words = ProviderOutput::Transcript {
                     request: Some(request),
                     text: if std::mem::replace(&mut after, true) {

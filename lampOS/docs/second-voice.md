@@ -885,10 +885,14 @@ s after the words.
   - `decided_at_us` is the end-of-speech decision's time on the
     coordinator's clock, to line the two records up.
 
-The battery's tool counter reads the journal: a call the Live route would
-hold for the Policy is said on this route as that route says one it lets
-run: `request N asked for X; run after 0 ms: this route holds no call for
-the Policy` (`worker::run_after`). This route holds none.
+The battery's tool counter reads the journal. Without
+`LAMP_POLICY_HOLDS_ACTIONS`, a call the Live route would hold for the
+Policy is said on this route as that route says one it lets run:
+`request N asked for X; run after 0 ms: this route holds no call for the
+Policy` (`worker::run_after`). With the switch, the bus and the route's
+rule (`LAMP_ATTENTION`), this route holds those calls as Live does, by the
+Policy's decision about the turn. Its gate then says Live's own lines with
+the real wait ([attention.md](attention.md#on-the-second-route-1712)).
 
 ## Coordinator switch
 
