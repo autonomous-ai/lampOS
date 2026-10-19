@@ -1786,7 +1786,8 @@ its key is placed.
 ### Timing the candidates (`probe-cascade`)
 
 `lamp-voice probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG]`
-(`second_provider/probe.rs`) times the route's candidates from where it
+(`second_provider/probe.rs`; with `--wire`, the next section) times the
+route's candidates from where it
 runs, with the character of `provider.json` and one fixed question, and
 with `--look` once more with that JPEG (at most 184 KiB) as the question's
 picture, to each model that takes one:
@@ -1827,6 +1828,83 @@ systemd-run --pty --wait \
   -p LoadCredential=gemini.key:/etc/lampOS/voice/gemini.key \
   /opt/lampOS/voice/current/lamp-voice probe-cascade \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 20 --look /run/lampos-eyes/sight.jpg
+```
+
+### Where the relay's time goes (`probe-cascade --wire`)
+
+`lamp-voice probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] --wire`
+(`second_provider/probe/wire.rs`) times a chat request step by step, from
+the lamp's side, for DeepSeek through the relay and on its own API (#1934;
+the first builder on #1722, 00:56). On lamp-4ace the relay's answers began
+about 0.6 s later than DeepSeek's own. Each request is the route's own as
+`Chat` builds it (`hosted.deepseek_model`, thinking off), made by hand on a
+connection of its own:
+
+- **dns, tcp, tls:** the name looked up, the TCP connect and the TLS
+  handshake, each on its own;
+- **send:** the request handed to the kernel, its body whole. On a large
+  request part of the upload may still be going, and is counted in the
+  first byte;
+- **first byte:** from then to the response's first;
+- **events:** from the same point to the stream's first and second `data:`
+  events, the gap between them (`gap_ms`), and to its first words or call
+  (`words_ms`);
+- **done:** to the stream's end.
+
+Each run asks each target two requests:
+- **lamp:** a spoken turn's size: the character, a turn's changing part,
+  and every function a turn declares, the actions part's read from
+  `LAMP_ACTIONS_DIR` as `probe-tools` reads them. The route's own was
+  31 KB with 31 functions on lamp-4ace; the probe prints its own `bytes`.
+- **small:** one short line and no functions.
+
+Two things it is not (the first builder's agent on #2024):
+- **The lamp's request is smaller than a real turn's.** It has no memory
+  note, facts, time line or the route's notes. Read its `bytes=` beside the
+  route's own `chat request` journal line for the same lamp, so a size
+  effect isn't read short.
+- **Every request is on a new connection.** It pays `tcp_ms` and `tls_ms`
+  each time, where the route reuses a kept one. So `done_ms` is the
+  request's, not a turn's. The difference line keeps `first_byte` apart
+  from the connect.
+
+How to read it:
+- **A first byte late by the same on both sizes:** the network or the
+  relay's own wait.
+- **Late on the lamp's only:** the request's size.
+- **A late first byte with the first two events close together:** the
+  relay holding the stream back.
+- **A first byte on time and a late first event:** the relay answering
+  its headers at once and holding the stream back.
+
+The relay is `deepseek_base_url` (or `LAMP_SECOND_DEEPSEEK_BASE_URL`) with
+the route's credential. DeepSeek's own API takes the unit's `deepseek.key`.
+A target without its URL or key is left out, saying so.
+
+**The output:** one line per request:
+`wire target=relay size=lamp run=1 bytes=… status=200 dns_ms=… tcp_ms=…
+tls_ms=… send_ms=… first_byte_ms=… first_event_ms=… second_event_ms=…
+gap_ms=… words_ms=… done_ms=… events=…`. Then each target's and size's
+medians (and the 90th percentile of the first byte, the first event and
+the words), and,
+with both targets, the relay's medians less DeepSeek's own, step by step
+(`wire relay-less-direct size=lamp tcp_ms=+… tls_ms=+… …`).
+
+A failed step is told by its name and kind only (`tcp: TimedOut`). Like
+the rest of the probe it prints counts and milliseconds only, never the
+words asked or answered, a key, a host or a URL. Five runs unless said, at
+most 50. `systemd-run` doesn't carry the voice unit's environment, so the
+relay's URL is given as lamp-4ace's unit has it. Without it, and with no
+`deepseek_base_url` in `second.json`, the relay is left out and only
+DeepSeek's own API is timed (the reviewer on #2024):
+
+```sh
+systemd-run --pty --wait \
+  -p LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key \
+  -E LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek \
+  -E LAMP_ACTIONS_DIR=/run/lampos-actions \
+  /opt/lampOS/voice/current/lamp-voice probe-cascade \
+  /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 10 --wire
 ```
 
 ### How much the prompt cache holds (`probe-cache`)
