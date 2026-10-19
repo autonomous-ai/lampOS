@@ -9,11 +9,14 @@ where it must be.
 - **Name:** `twelve`
 - **Person:** the colleague who started this session (named in the team's own
   channels, not in this public repository); a Claude Code session they start
-- **Lamp(s):** `lamp-cb94`, named by its person on 2026-10-16; not yet its own
-  until an owner file says so
-- **Lamp address:** `lamp-cb94.local`, by key only
-- **Owner file:** none yet (`deploy/lamp-cb94/LAMP.md` does not exist on
-  `lamp-voice`); twelve does not touch the lamp until it does and names twelve
+- **Lamp(s):** `lamp-c0a4`, shared with Thirteen, from 2026-10-19 in place
+  of `lamp-cb94` (which has left the network; the first builder on #1722,
+  14:12)
+- **Lamp address:** its address on the office network (its `.local` name may
+  not resolve there), by key only; no address in the repository
+- **Owner file:** `deploy/lamp-c0a4/LAMP.md` (#1804): owner twelve, every
+  action under `lamp-lock.sh lamp-c0a4`, Thirteen told on each take and
+  release
 
 ## Branches it may push
 
