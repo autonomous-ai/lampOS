@@ -55,7 +55,7 @@ pub const ASKED: u64 = 1;
 /// The parts a report may name: the product's `--expect` list
 /// (`deploy/product/lamp-health.service`) and those `lamp-health show`
 /// knows by name, plus this one. Any other is only counted.
-pub const PARTS: [&str; 18] = [
+pub const PARTS: &[&str] = &[
     "board",
     "voice",
     "eyes",
@@ -77,7 +77,7 @@ pub const PARTS: [&str; 18] = [
 ];
 
 /// The parts the self-test names (`lamp_msgs::PartResult::part`).
-pub const SELFTEST_PARTS: [&str; 16] = [
+pub const SELFTEST_PARTS: &[&str] = &[
     "voice_mic",
     "room_mic",
     "speaker",
@@ -98,7 +98,7 @@ pub const SELFTEST_PARTS: [&str; 16] = [
 
 /// The units a report may name: the product's `lamp-*.service` files
 /// (`deploy/product/`). A test holds the two the same.
-pub const UNITS: [&str; 25] = [
+pub const UNITS: &[&str] = &[
     "lamp-actions.service",
     "lamp-air-clock.service",
     "lamp-air.service",
@@ -1503,7 +1503,7 @@ impl Sources for Lamp {
             return found.clone();
         }
         let mut args = vec!["show", "-p", "Id", "-p", "NRestarts"];
-        args.extend(UNITS);
+        args.extend(UNITS.iter().copied());
         let found = bounded_output(&self.systemctl, &args)
             .map(|text| restarts(&text))
             .unwrap_or_default();
