@@ -3420,6 +3420,93 @@ mod tests {
         assert_eq!(spoken, [Message::user("Hi."), Message::assistant("Hello.")]);
     }
 
+    /// Tests' map on #1712 (20:11), (2): the task switches
+    /// (`LAMP_TASKS_WHO`, `_ASKED`, `_ACCOUNTS`, `_MACHINE_NAMES` and
+    /// `LAMP_TOOL_LEAD_IN`) reach the second worker as Live's do. The
+    /// coordinator gives it the Live worker's flags (`coordinator/second.rs`,
+    /// `arguments`), and it parses them with the same parser into its tools'
+    /// place. What each one does is `agent_tasks`', the same code on either
+    /// route.
+    #[test]
+    fn the_second_worker_takes_the_task_switches_as_live_does() {
+        let dir = Path::new("/run/lamp-voice");
+        let (_, _, files, _) = parse_flags(
+            dir,
+            &strings(&[
+                "--tools",
+                crate::agent_tasks::FLAG,
+                "/run/lampos-tasks",
+                crate::agent_tasks::WHO_FLAG,
+                crate::agent_tasks::LEAD_IN_FLAG,
+                crate::agent_tasks::ASKED_FLAG,
+                crate::agent_tasks::ACCOUNTS_FLAG,
+                crate::agent_tasks::NAMES_FLAG,
+            ]),
+        )
+        .unwrap();
+        let place = files.tools.tasks.expect("the tasks part");
+        assert_eq!(place.directory, Path::new("/run/lampos-tasks"));
+        assert!(place.who && place.lead_in && place.asked);
+        assert!(place.accounts && place.machine_names);
+        let (_, _, files, _) = parse_flags(
+            dir,
+            &strings(&["--tools", crate::agent_tasks::FLAG, "/run/lampos-tasks"]),
+        )
+        .unwrap();
+        let place = files.tools.tasks.expect("the tasks part");
+        assert!(!place.who && !place.lead_in && !place.asked);
+        assert!(!place.accounts && !place.machine_names);
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_ATTENTION=busy-near` on the
+    /// second route. With `--attention-near` this route samples the room
+    /// microphone's rise over its quiet from the bus (`ears/level`,
+    /// `hear_levels`, every 100 ms), and a line during which it rose
+    /// `NEAR_RISE_DB` or more is near (`signs`). One whose rise was the
+    /// lamp's own voice is not, nor one in a quiet room. On the real clock,
+    /// about a second.
+    #[test]
+    fn with_attention_near_the_rooms_rise_on_the_bus_makes_a_line_near() {
+        // A short root: a Unix socket's address holds 103 bytes.
+        let root = std::path::PathBuf::from(format!("/tmp/lsn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut ears = bus
+            .publisher_declared(
+                lamp_msgs::RoomSound::TOPIC,
+                &lamp_msgs::RoomSound::declaration(),
+                "ears",
+            )
+            .unwrap();
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        heeding.hear_levels(&root);
+        let floor = -50.0;
+        // A line begins once its first level is the bus's newest, so no
+        // sample taken in it can be the line's before.
+        let mut line = |rise: f32, own_voice: bool| {
+            let level = lamp_msgs::RoomSound {
+                level_db: floor + rise,
+                floor_db: Some(floor),
+                own_voice,
+            };
+            ears.publish_json(monotonic_us(), &level).unwrap();
+            let began = monotonic_us();
+            for _ in 0..8 {
+                std::thread::sleep(Duration::from_millis(60));
+                ears.publish_json(monotonic_us(), &level).unwrap();
+            }
+            (began, monotonic_us())
+        };
+        let near = line(crate::attention::NEAR_RISE_DB + 3.0, false);
+        let own = line(crate::attention::NEAR_RISE_DB + 3.0, true);
+        let quiet = line(1.0, false);
+        assert!(heeding.signs(9, near).near, "risen: near");
+        assert!(!heeding.signs(10, own).near, "its own voice: not near");
+        assert!(!heeding.signs(11, quiet).near, "quiet: not near");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[test]
     fn the_second_worker_takes_the_live_workers_flags_but_keep_link() {
         let dir = Path::new("/run/lamp-voice");
