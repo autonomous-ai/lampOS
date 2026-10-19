@@ -192,6 +192,12 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
          down at the desk must never lose their light",
     ),
     (
+        "laugh-glance",
+        "it reads `ears/classes`, which lamp-ears says only with `LAMP_EARS_CLASSES=on` (#1669), off \
+         until its scores are measured in an empty room and a busy one: a glance at every loud \
+         voice would read as a machine",
+    ),
+    (
         "not-feeling-well",
         "not yet tried on a lamp (#1681): whether its droop and dim on `lamp/health`'s `error` \
          read as a lamp a little unwell, not a status light, is for the lamp check",

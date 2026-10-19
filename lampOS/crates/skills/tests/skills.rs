@@ -312,6 +312,7 @@ fn every_skill_folder_says_its_kind_and_version() {
         named(SkillKind::Core),
         [
             "dance",
+            "laugh-glance",
             "light-out",
             "light-scenes",
             "light-show",

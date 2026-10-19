@@ -1,0 +1,8 @@
+# From 10:00, a face in view; laughter from 10 s to 13 s: one glance about 11 s.
+clock = "10:00"
+
+[[expect]]
+at = "11s"
+within = "1s"
+call = "body.gaze"
+args = { look_at = "face" }

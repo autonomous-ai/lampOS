@@ -1,0 +1,45 @@
+# Laugh glance (#1669, the owner, 19 Oct 07:2x: "a glance up at a laugh ...
+# rare and small, and never while the lamp is speaking or someone is talking
+# to it"; docs/creature.md: "a glance now and then at whoever laughs"). It
+# reads ears/classes (LAMP_EARS_CLASSES=on in lamp-ears) and glances at the
+# face in view, once, when someone laughs. Written to lamp-skills' schema
+# (docs/skills.md).
+needs = ["ears", "eyes", "body"]
+# A core skill (docs/skills.md, "Core and installable skills"), held out of
+# the product's install until its lamp check (install::NOT_PRODUCT_SKILLS).
+# Without the ears' classes it does nothing.
+kind = "core"
+version = "1.0.0"
+
+# What it may read and use, and nothing more: the room's sound scores, the
+# faces, the voice's state, and the body. It never speaks or lights.
+[permissions]
+topics = ["ears/classes", "humans/faces/tracked", "voice/state"]
+body = true
+
+[trigger]
+topic = "ears/classes"
+field = "scores.laughter" # YAMNet's laughter score, 0 to 1; an unavailable message has none and never holds
+above = 0.5               # provisional: no threshold is measured yet (sound-events.md); the lamp check sets it
+for = "1s"                # a laugh, not one loud syllable: two scores in a row
+rearm = { below = 0.2, for = "20s" }  # once a burst of laughter; again only after twenty seconds without it
+cooldown = "5m"           # now and then, never at every laugh in a merry room
+
+[[while]]                 # never in the middle of a turn: not while it speaks, listens or thinks
+topic = "voice/state"
+field = "state"
+equals = "resting"
+
+[[while]]                 # someone to glance at: a laugh with nobody in view gets nothing
+topic = "humans/faces/tracked"
+present = true
+
+[quiet]                   # not at night: the night is the lamp's sleep (Expression's 23:00 to 06:00)
+from = "23:00"
+to = "06:00"
+
+[ask]
+policy = "nudge"
+
+[[do]]
+body = { look_at = "face" }
