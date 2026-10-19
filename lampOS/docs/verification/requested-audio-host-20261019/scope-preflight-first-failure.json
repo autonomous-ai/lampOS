@@ -1,0 +1,38 @@
+{
+  "purpose": "First scoped-audio integration preflight; stopped at test compilation before any test ran.",
+  "failure": "A local RequestedAudioRunner named audio shadowed the existing audio(request, sample) input fixture in second_provider/tests.rs. Renamed to audio_runner; production code unchanged.",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.6,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "log_name": "second-music-scope-preflight-fmt.log"
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-voice",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 101,
+      "seconds": 21.18,
+      "log_sha256": "1b71d15f52c7c5d33f718b375af4b1585f411d55db6e72e93a27788a3d9adc88",
+      "log_name": "second-music-scope-preflight-clippy.log"
+    }
+  ],
+  "tests_run": false,
+  "superseded_by": "Separate corrected preflight and complete workspace gate; this failure remains preserved."
+}

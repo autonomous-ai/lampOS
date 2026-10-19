@@ -72,6 +72,8 @@ mod endpoint;
 mod hand;
 mod holding;
 mod notices;
+mod requested_media;
+use requested_media::RequestedMedia;
 mod second;
 mod service;
 mod speaker_tone;
@@ -552,6 +554,7 @@ struct Reply {
     start: StartGate,
     need: StartNeed,
     notice: NoticeDelivery,
+    media: RequestedMedia,
     /// Taken while the internet could not be reached (#830): never sent.
     local_only: Option<notices::LocalOnly>,
     reminder: Option<crate::reminders::Receipt>,
@@ -569,6 +572,10 @@ struct Reply {
 }
 impl Reply {
     fn settled(&self, speaker_pending: &Option<PendingSpeaker>) -> bool {
+        self.output_settled(speaker_pending) && !self.requested_audio_waiting()
+    }
+
+    fn output_settled(&self, speaker_pending: &Option<PendingSpeaker>) -> bool {
         self.provider_idle
             && self.cloud.outcome.is_some()
             && self.local_input_ended
@@ -643,6 +650,7 @@ impl Reply {
     }
 
     fn append_provider_audio(&mut self, samples: Vec<i16>, received_at_us: u64) {
+        self.media.confirmation_retired_at_us = None;
         if !samples.is_empty()
             && let Some(reminder) = &mut self.reminder
         {
@@ -2309,6 +2317,24 @@ fn service_speaker_control(
                             json!({"kind":format!("{}_first_write",pending.origin.trace_name()),"origin":pending.origin,"notice":current.notice.evidence(),"turn":turn,"owner":current.owner,"playback_sequence":token.sequence(),"at_us":observed_at_us,"boundary":"ALSA accepted; acoustic onset unmeasured",
                                 "start_gate":current.start_trace()}),
                         )?;
+                        if pending.origin == SpeechOrigin::RequestedAudio {
+                            let retired =
+                                current.media.confirmation_retired_at_us.ok_or_else(|| {
+                                    io::Error::other("requested audio has no retired confirmation")
+                                })?;
+                            let latency = observed_at_us.checked_sub(retired).ok_or_else(|| {
+                                io::Error::other("requested audio preceded confirmation retirement")
+                            })?;
+                            record(
+                                trace,
+                                json!({"kind":"requested_audio_handoff",
+                                "turn":turn,"owner":current.owner,"at_us":observed_at_us,
+                                "confirmation_retired_at_us":retired,
+                                "confirmation_to_first_write_us":latency,
+                                "target_us":250_000,
+                                "boundary":"confirmation final retirement to first accepted recording PCM; acoustic onset unmeasured"}),
+                            )?;
+                        }
                     }
                     if pending.accepted == 240 {
                         if pending.final_chunk {
@@ -2377,6 +2403,8 @@ fn service_speaker_control(
                     }
                     if origin.local() {
                         current.notice.retire(observed_at_us)?;
+                    } else {
+                        current.media.confirmation_retired_at_us = Some(observed_at_us);
                     }
                     *snapshot = owner.snapshot(now())?;
                     io.publish_speaker_snapshot(*snapshot)?;
@@ -2600,7 +2628,9 @@ fn observe_provider_output(
         ProviderOutput::OwnershipAssumed { .. } => {}
         // Asked again by the loop once the turn is over (#926); a tool's
         // look is taken by the loop too (#941).
-        ProviderOutput::Unclear { .. } | ProviderOutput::LookAsked { .. } => {}
+        ProviderOutput::Unclear { .. }
+        | ProviderOutput::LookAsked { .. }
+        | ProviderOutput::RequestedAudio { .. } => {}
         // A finished task's news the person asked about, answered in this
         // turn: the tasks part is told so only once the turn is heard whole
         // (#1390), as with news told unasked.
@@ -3863,6 +3893,11 @@ fn conversation_with_gate(
 ) -> Result<()> {
     let mut cloud = startup.cloud;
     let mut output_flow = startup.output_flow;
+    let requested_audio =
+        crate::requested_audio::Service::from_environment().unwrap_or_else(|error| {
+            eprintln!("lamp-voice: requested audio unavailable: {error}");
+            None
+        });
     for event in startup.events {
         record(trace, event)?;
     }
@@ -5113,6 +5148,33 @@ fn conversation_with_gate(
                 }
                 // Put on its turn by `observe_provider_output`.
                 ProviderOutput::NewsAnswered { .. } => {}
+                ProviderOutput::RequestedAudio {
+                    request,
+                    session,
+                    offer,
+                } => {
+                    let accepted = requested_audio.as_ref().is_some_and(|service| {
+                        reply
+                            .as_mut()
+                            .filter(|current| {
+                                current.owner.turn() == request && current.cloud.session == session
+                            })
+                            .is_some_and(|current| {
+                                current.accept_requested_audio(
+                                    service,
+                                    rig.provider.boot,
+                                    snapshot,
+                                    offer,
+                                )
+                            })
+                    });
+                    record(
+                        trace,
+                        json!({"kind":"requested_audio_offered",
+                        "turn":request,"provider_session":session,"accepted":accepted,
+                        "at_us":monotonic_us(),"boundary":"queued preparation; no playback authority"}),
+                    )?;
+                }
                 ProviderOutput::LookAsked {
                     request,
                     session,
@@ -6763,6 +6825,26 @@ fn conversation_with_gate(
         }
         outage.note_delivery(reply);
         select_failure_notice_in(notices, reply, &speaker_pending, &mut outage, trace)?;
+        if reply.as_ref().is_some_and(|current| {
+            current.requested_audio_invalid(rig.provider.boot, snapshot, monotonic_us())
+        }) {
+            cancel_reply(owner, reply, trace, "requested_audio_revoked")?;
+            provider_queue.clear();
+            speaker_pending = None;
+            snapshot = owner.snapshot(now())?;
+            rig.publish(snapshot)?;
+            last_publish = monotonic_us();
+        }
+        if let Some(current) = reply.as_mut()
+            && current.prepare_requested_audio(&speaker_pending, monotonic_us())
+        {
+            record(
+                trace,
+                json!({"kind":"requested_audio_prepared","turn":current.owner.turn(),
+                "confirmation_retired_at_us":current.media.confirmation_retired_at_us,
+                "at_us":monotonic_us(),"boundary":"immutable samples ready after actual confirmation retirement"}),
+            )?;
+        }
         let prior_speaker_sequence = speaker_sequence;
         settle_duplex_yield_before_dispatch(&playback_mask, reply, monotonic_us(), trace)?;
         // While the asker rule waits on a line and the answer has not begun,
@@ -6853,6 +6935,7 @@ fn conversation_with_gate(
                 lamp_words_ended_us = Some(monotonic_us());
             }
             owner.complete_turn(now(), current.owner)?;
+            current.complete_requested_audio(monotonic_us());
             trace.receipts.completed(current.owner)?;
             snapshot = owner.snapshot(now())?;
             admission.owner_completed(current.owner, snapshot, monotonic_us())?;
@@ -6950,6 +7033,7 @@ fn conversation_with_gate(
         let attending = playback_mask.yielded(clock);
         // The lamp's own voice while it speaks, the person's otherwise.
         let voice_level = match reply.as_ref() {
+            Some(current) if current.notice.origin() == SpeechOrigin::RequestedAudio => 0,
             Some(current) if current.playback.is_some() && !attending => current.voice_level,
             _ => heard_level,
         };
@@ -8609,7 +8693,7 @@ fn tell_ring_of_turn(choreography: &mut RingChoreographer, origin: Option<Speech
         origin,
         Some(SpeechOrigin::HeadCue | SpeechOrigin::UnclearHum)
     );
-    choreography.set_listening(cue);
+    choreography.set_listening(cue || origin == Some(SpeechOrigin::RequestedAudio));
     choreography.set_unshown(origin.is_some_and(SpeechOrigin::unshown) && !cue);
 }
 
@@ -9307,6 +9391,7 @@ fn commit_written_turn(
         final_chunk: None,
         playback_gaps: 0,
         notice: NoticeDelivery::default(),
+        media: Default::default(),
         local_only: None,
         reminder: None,
         say: None,
@@ -9440,6 +9525,7 @@ fn commit_admitted_input(
         final_chunk: None,
         playback_gaps: 0,
         notice: NoticeDelivery::default(),
+        media: RequestedMedia::spoken(),
         local_only: None,
         reminder: None,
         say: None,
@@ -9539,6 +9625,7 @@ fn commit_offline_input(
         final_chunk: None,
         playback_gaps: 0,
         notice: NoticeDelivery::default(),
+        media: Default::default(),
         local_only: Some(notices::LocalOnly {
             speech: false,
             back: false,
@@ -9701,6 +9788,7 @@ fn commit_back_online(
         final_chunk: None,
         playback_gaps: 0,
         notice: NoticeDelivery::default(),
+        media: Default::default(),
         local_only: Some(notices::LocalOnly {
             speech: true,
             back: true,
@@ -9792,6 +9880,7 @@ fn continue_after_early_end(
         final_chunk: None,
         playback_gaps: 0,
         notice: NoticeDelivery::default(),
+        media: RequestedMedia::spoken(),
         local_only: None,
         reminder: None,
         say: None,
@@ -10002,7 +10091,16 @@ fn dispatch_speaker_chunk(
             return Ok(None);
         }
     }
-    let permit = owner.issue_output(now(), current.plan, SPEAKER_PERMIT_LEASE_US)?;
+    let permit_at = now();
+    let lease = if origin == SpeechOrigin::RequestedAudio {
+        let Some(lease) = current.requested_audio_permit_us(permit_at.as_micros()) else {
+            return Ok(None);
+        };
+        lease
+    } else {
+        SPEAKER_PERMIT_LEASE_US
+    };
+    let permit = owner.issue_output(permit_at, current.plan, lease)?;
     let (samples, final_chunk, first_notice) = if origin.local() {
         current.notice.reserve_chunk(monotonic_us())?
     } else {
@@ -10574,6 +10672,7 @@ mod tests {
     mod provider_terminal;
     mod reminder_roundtrip;
     mod reminders;
+    mod requested_audio;
     mod say;
     mod second_route;
     mod service;
@@ -11454,6 +11553,7 @@ mod tests {
                 final_chunk: None,
                 playback_gaps: 0,
                 notice: NoticeDelivery::default(),
+                media: Default::default(),
                 local_only: None,
                 reminder: None,
                 say: None,
@@ -12319,6 +12419,7 @@ mod tests {
             final_chunk: None,
             playback_gaps: 0,
             notice: NoticeDelivery::default(),
+            media: Default::default(),
             local_only: None,
             reminder: None,
             say: None,
@@ -12605,6 +12706,7 @@ mod tests {
             final_chunk: None,
             playback_gaps: 0,
             notice: NoticeDelivery::default(),
+            media: Default::default(),
             local_only: None,
             reminder: None,
             say: None,

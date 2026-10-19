@@ -469,9 +469,18 @@ async fn a_held_verdict_is_told_before_its_words_are_taken() {
     let (engine, _, _) = scripted(script);
     let (said, told) = tokio::sync::oneshot::channel();
     let said = Mutex::new(Some(said));
+    let boot = lamp_turn_owner::BootId::new([12; 16]).unwrap();
+    let scoped: ScopedToolRunner = Arc::new(|_, _, _, _, _| panic!("a held turn runs no tools"));
+    let audio_runner: RequestedAudioRunner =
+        Arc::new(|_, _, _| panic!("a held turn offers no audio"));
+    let verdicts = Arc::new(AtomicUsize::new(0));
+    let seen = verdicts.clone();
     let mut engine = engine
+        .with_memory_scope(boot, Arc::default(), scoped)
+        .requesting_audio(boot, audio_runner)
         .heeding(Arc::new(|_, _, _, _| Some("a busy room")))
         .telling_verdicts(Arc::new(move |request, verdict| {
+            seen.fetch_add(1, Ordering::Relaxed);
             if let Some(said) = said.lock().unwrap().take() {
                 let _ = said.send((request, verdict));
             }
@@ -488,6 +497,7 @@ async fn a_held_verdict_is_told_before_its_words_are_taken() {
         turn(&mut engine).await,
         ["started:1", "heard:Me.", "complete"]
     );
+    assert_eq!(verdicts.load(Ordering::Relaxed), 1);
 }
 
 /// #1155: a turn the heed lets out is told answered. With nothing that

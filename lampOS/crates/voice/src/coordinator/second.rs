@@ -404,6 +404,7 @@ impl Route {
     fn can_take(&self, current: &Reply) -> bool {
         !self.second_active
             && !current.cloud.same_session_only
+            && !current.requested_audio_bound()
             && self.cloud.available()
             && !current.had_audio
             && current.pcm.is_empty()
@@ -420,6 +421,7 @@ impl Route {
             && let Some(current) = reply.filter(|current| {
                 !current.cloud.start_submitted
                     && !current.cloud.same_session_only
+                    && !current.requested_audio_bound()
                     && current.cloud.outcome.is_none()
                     && current.reminder.is_none()
             })
@@ -428,7 +430,9 @@ impl Route {
         }
         self.hold.is_some_and(|(turn, _)| {
             reply.is_some_and(|current| {
-                current.owner.turn() == turn && !current.cloud.same_session_only
+                current.owner.turn() == turn
+                    && !current.cloud.same_session_only
+                    && !current.requested_audio_bound()
             })
         })
     }
@@ -439,7 +443,9 @@ impl Route {
     fn upkeep(&mut self, reply: Option<&Reply>) {
         // A continuation belongs to the session that made its promise. It
         // has no replay copy, including one retained before it was pinned.
-        if reply.is_some_and(|current| current.cloud.same_session_only) {
+        if reply.is_some_and(|current| {
+            current.cloud.same_session_only || current.requested_audio_bound()
+        }) {
             self.line.clear();
             self.replay.clear();
             self.hold = None;
@@ -569,7 +575,7 @@ fn take_over(
     current: &mut Reply,
     queue: &mut VecDeque<ProviderInput>,
 ) -> io::Result<usize> {
-    if current.cloud.same_session_only {
+    if current.cloud.same_session_only || current.requested_audio_bound() {
         return Err(io::Error::other(
             "a session-bound request cannot change voice route",
         ));
@@ -592,12 +598,12 @@ fn take_over(
 }
 
 /// The turn in hand and its commands to the active route's session.
-fn rebind(
+pub(super) fn rebind(
     cloud: &CloudAvailability,
     current: &mut Reply,
     commands: &mut VecDeque<ProviderInput>,
 ) -> io::Result<()> {
-    if current.cloud.same_session_only {
+    if current.cloud.same_session_only || current.requested_audio_bound() {
         return Err(io::Error::other(
             "a session-bound request cannot be rebound",
         ));
@@ -634,6 +640,7 @@ fn resolve_hold(
     let Some(current) = reply.as_mut().filter(|current| {
         current.owner.turn() == turn
             && !current.cloud.same_session_only
+            && !current.requested_audio_bound()
             && current.cloud.outcome.is_none()
             && !current.cloud.input_abandoned
     }) else {
@@ -715,7 +722,9 @@ pub(super) fn service(
     if !route.second_active
         && at_rest
         && reply.as_ref().is_none_or(|current| {
-            current.cloud.outcome.is_some() && !current.cloud.same_session_only
+            current.cloud.outcome.is_some()
+                && !current.cloud.same_session_only
+                && !current.requested_audio_bound()
         })
         && !cloud.available()
         && !cloud.terminal()
@@ -836,6 +845,7 @@ pub(super) fn flush(
         && let Some(current) = reply.as_mut().filter(|current| {
             !current.cloud.start_submitted
                 && !current.cloud.same_session_only
+                && !current.requested_audio_bound()
                 && current.cloud.outcome.is_none()
                 && current.reminder.is_none()
         })
@@ -863,9 +873,9 @@ pub(super) fn flush(
     };
     // A line given back to Gemini after a hold is kept as any other.
     let keep = !route.second_active
-        && reply
-            .as_ref()
-            .is_none_or(|current| !current.cloud.same_session_only);
+        && reply.as_ref().is_none_or(|current| {
+            !current.cloud.same_session_only && !current.requested_audio_bound()
+        });
     let mut paced = (keep && replaying).then_some(LIVE_REPLAY_PER_TICK);
     let line = &mut route.line;
     Ok(flush_provider_input_with(

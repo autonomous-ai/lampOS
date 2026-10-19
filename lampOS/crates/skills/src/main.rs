@@ -4,10 +4,11 @@
 //! actions part and the voice's say service.
 use lamp_bus::{Bus, Declaration, Kind, Publisher, Subscriber};
 use lamp_msgs::{
-    BodyGesture, Decision, GestureState, Hand, Light, LightRequest, Pause, SkillEvent, SkillStage,
-    Speech, Voice, VoiceState,
+    BodyGesture, Decision, GestureState, Hand, Light, LightRequest, Pause, RequestedAudioContext,
+    RequestedAudioOperation, SkillEvent, SkillStage, Speech, Voice, VoiceState,
 };
 use lamp_skills::glow::{GLOW_EVERY, Glow, Glows, REQUESTS_ENVIRONMENT};
+use lamp_skills::requested_audio::{self, Authority};
 use lamp_skills::routine::Permit;
 use lamp_skills::{
     Admission, BODY_REQUESTS_ENVIRONMENT, CLIP_GAP_US, Call, Engine, Permissions, Run, body_ask,
@@ -536,6 +537,10 @@ fn serve(
     };
     let mut out =
         bus.publisher_declared(SkillEvent::TOPIC, &SkillEvent::declaration(), "skills")?;
+    let audio = Arc::new(Mutex::new(Authority::new(
+        requested_audio::from_environment(),
+        out.boot().to_owned(),
+    )));
     let glows = if options.light_requests {
         Some(Glows {
             bus: bus.clone(),
@@ -615,7 +620,7 @@ fn serve(
     };
     let (ask, asks) = mpsc::channel::<ToolAsk>();
     if let Some(tools) = tools {
-        listen(tools, ask.clone())?;
+        listen(tools, ask.clone(), audio.clone())?;
     }
     let (skip, skips) = mpsc::channel::<Skip>();
     if let Some(path) = &options.clock_control {
@@ -670,8 +675,17 @@ fn serve(
         }
         if looked.is_none_or(|at| clock::now().saturating_duration_since(at) >= RELOAD_EVERY) {
             looked = Some(clock::now());
+            // Potential file I/O stays outside the authority lock. A stalled
+            // scan cannot keep old leases alive: authorization checks its age.
+            let scan = audio.lock().unwrap().scan();
+            let unchanged = scan.unchanged();
+            let accepted =
+                audio
+                    .lock()
+                    .unwrap()
+                    .scanned(&scan, unchanged, lamp_ipc::monotonic_us());
             let print = fingerprint(dir);
-            if seen.as_ref() != Some(&print) {
+            if !accepted || seen.as_ref() != Some(&print) {
                 seen = Some(print);
                 let (mut skills, errors) = load_all(dir);
                 skills.retain(|skill| options.routines || !skill.is_routine());
@@ -680,11 +694,20 @@ fn serve(
                 }
                 // Keep the previous accepted generation intact if its
                 // cap declarations cannot be installed as one bounded set.
+                // The earlier asset scan still revokes changed media;
+                // refusing this replacement cannot restore those grants.
                 if let Some(limits) = &limits
                     && let Err(error) = limits.replace(&skills)
                 {
                     eprintln!("lamp-skills: reload refused: {error}");
                     continue;
+                }
+                if let Err(why) = audio
+                    .lock()
+                    .unwrap()
+                    .replace(&skills, lamp_ipc::monotonic_us())
+                {
+                    eprintln!("lamp-skills: requested audio disabled: {why}");
                 }
                 let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
                 eprintln!("lamp-skills: loaded {names:?}");
@@ -725,7 +748,7 @@ fn serve(
                 }
             }
             if let Some(tools) = tools {
-                keep_tools(tools, &ask, &engine)?;
+                keep_tools(tools, &ask, &engine, &audio)?;
             }
             let _ = out.alive();
         }
@@ -752,7 +775,7 @@ fn serve(
         }
         if subscribers.is_empty() {
             if let Ok(call) = asks.recv_timeout(clock::poll(Duration::from_millis(250))) {
-                tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner);
+                tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner, &audio);
             }
             continue;
         }
@@ -785,7 +808,7 @@ fn serve(
                         );
                     }
                 }
-                tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner);
+                tool_call(call, &mut engine, &mut runs.busy, &mut out, &runner, &audio);
             }
             if let Some((_, answers)) = &mut asking.gate {
                 answer_asks(
@@ -1272,6 +1295,7 @@ fn give_up_late(waiting: &mut HashMap<u64, (lamp_skills::Run, Instant)>, out: &m
 type ToolAsk = (
     String,
     serde_json::Value,
+    Option<RequestedAudioContext>,
     mpsc::Sender<serde_json::Value>,
     Admission,
 );
@@ -1281,11 +1305,12 @@ type ToolAsk = (
 /// the light are made (#1146). The say is the model's and the look the
 /// voice's, asked in the answer; the body and the light are made here.
 fn tool_call(
-    (name, args, reply, admission): ToolAsk,
+    (name, args, context, reply, admission): ToolAsk,
     engine: &mut Engine,
     busy: &mut HashSet<String>,
     out: &mut Publisher,
     runner: &Runner,
+    audio: &Arc<Mutex<Authority>>,
 ) {
     let refuse = |why: &str| {
         if admission.commit() {
@@ -1301,7 +1326,15 @@ fn tool_call(
         eprintln!("lamp-skills: {name} with {args} not run: its run is under way");
         return refuse(still);
     }
-    let mut run = match engine.tool(&name, &args, clock::now_us()) {
+    let spoken = context
+        .as_ref()
+        .is_some_and(|context| context.check().is_ok());
+    let mut run = match engine.tool_with_requested_audio(
+        &name,
+        &args,
+        clock::now_us(),
+        spoken && requested_audio::from_environment(),
+    ) {
         Ok(run) => run,
         Err(why) => {
             eprintln!("lamp-skills: {name} with {args} not run: {why}");
@@ -1310,6 +1343,41 @@ fn tool_call(
     };
     // The look's picture goes to the model only for a skill that may see it.
     let sockets = runner.sockets_for(&run.skill);
+    if run
+        .calls
+        .iter()
+        .any(|call| matches!(call, Call::RequestedAudio(_)))
+    {
+        // A requested sound is never scheduled or played here. Return one
+        // private offer bound to the worker's spoken request; Voice strips
+        // it from the model's result and owns confirmation and cancellation.
+        if let Some(why) = run.calls.iter().find_map(|call| sockets.may.refuses(call)) {
+            return refuse(&why);
+        }
+        let Some(context) = context else {
+            return refuse("Requested audio needs spoken context.");
+        };
+        if !admission.commit() {
+            return;
+        }
+        let offered = audio
+            .lock()
+            .unwrap()
+            .offer(&run.skill, context, lamp_ipc::monotonic_us());
+        let answer = match offered {
+            Ok(offer) => {
+                let mut answer = told(&run.calls);
+                answer["requested_audio"] = json!(offer);
+                answer
+            }
+            Err(why) => json!({"error":why}),
+        };
+        let _ = reply.send(answer);
+        for event in run.events {
+            publish(out, event);
+        }
+        return;
+    }
     run.calls
         .retain(|call| *call != Call::Look || sockets.may.refuses(call).is_none());
     let made: Vec<Call> = run
@@ -1434,7 +1502,12 @@ fn write_tools(dir: &Path, engine: &Engine) {
 ///   it again as its user, under a sandbox whose writable bind went with
 ///   the folder (the reviewer on #1656); systemd makes the folder again as
 ///   it starts it once more (`Restart=on-failure`).
-fn keep_tools(dir: &Path, asks: &mpsc::Sender<ToolAsk>, engine: &Engine) -> io::Result<()> {
+fn keep_tools(
+    dir: &Path,
+    asks: &mpsc::Sender<ToolAsk>,
+    engine: &Engine,
+    audio: &Arc<Mutex<Authority>>,
+) -> io::Result<()> {
     if dir.join("call.sock").exists() {
         return Ok(());
     }
@@ -1447,7 +1520,7 @@ fn keep_tools(dir: &Path, asks: &mpsc::Sender<ToolAsk>, engine: &Engine) -> io::
             ),
         ));
     }
-    listen(dir, asks.clone())?;
+    listen(dir, asks.clone(), audio.clone())?;
     write_tools(dir, engine);
     eprintln!(
         "lamp-skills: {} had no call.sock: made again",
@@ -1459,7 +1532,7 @@ fn keep_tools(dir: &Path, asks: &mpsc::Sender<ToolAsk>, engine: &Engine) -> io::
 /// Listens on `dir/call.sock` as the actions part does: one line in
 /// (`{"op":"call","name":...,"args":{...}}`), one line out, the main loop
 /// answering.
-fn listen(dir: &Path, asks: mpsc::Sender<ToolAsk>) -> io::Result<()> {
+fn listen(dir: &Path, asks: mpsc::Sender<ToolAsk>, audio: Arc<Mutex<Authority>>) -> io::Result<()> {
     std::fs::create_dir_all(dir)?;
     let socket = dir.join("call.sock");
     let _ = std::fs::remove_file(&socket);
@@ -1474,6 +1547,39 @@ fn listen(dir: &Path, asks: mpsc::Sender<ToolAsk>) -> io::Result<()> {
                 let mut line = String::new();
                 BufReader::new((&stream).take(8_192)).read_line(&mut line)?;
                 let call: serde_json::Value = serde_json::from_str(&line).unwrap_or_default();
+                if matches!(
+                    call["op"].as_str(),
+                    Some("audio_authorize" | "audio_finish")
+                ) {
+                    let result = serde_json::from_value::<RequestedAudioOperation>(call)
+                        .map_err(|_| "invalid private audio operation".to_owned())
+                        .and_then(|op| {
+                            audio
+                                .lock()
+                                .unwrap()
+                                .operation(op, lamp_ipc::monotonic_us())
+                        });
+                    let answer = match result {
+                        Ok(result) => json!({"ok":true,"result":result}),
+                        Err(error) => json!({"ok":false,"error":error}),
+                    };
+                    return writeln!(&stream, "{answer}");
+                }
+                let context = match call.get("requested_audio_context") {
+                    None => None,
+                    Some(context) => {
+                        match serde_json::from_value::<RequestedAudioContext>(context.clone()) {
+                            Ok(context) if context.check().is_ok() => Some(context),
+                            _ => {
+                                return writeln!(
+                                    &stream,
+                                    "{}",
+                                    json!({"ok":false,"error":"invalid requested audio context"})
+                                );
+                            }
+                        }
+                    }
+                };
                 let (reply, told) = mpsc::channel();
                 let admission = Admission::default();
                 let result = (call["op"] == "call")
@@ -1483,6 +1589,7 @@ fn listen(dir: &Path, asks: mpsc::Sender<ToolAsk>) -> io::Result<()> {
                         asks.send((
                             (*name).to_owned(),
                             call["args"].clone(),
+                            context.clone(),
                             reply,
                             admission.clone(),
                         ))
@@ -2378,6 +2485,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Sound { .. } => "sound: made by its own step".into(),
         Call::Cue => "cue: made by its own step".into(),
         Call::Rest(_) => "rest: admitted by Expression before presentation".into(),
+        Call::RequestedAudio(_) => "requested audio: requires Voice's private authorization".into(),
         Call::Look => "look: the voice's, asked in the call's answer".into(),
         Call::AfterSay => "after the say".into(),
         Call::Ends => "its trigger ended".into(),

@@ -216,6 +216,22 @@ the executive's, and the request counts as one in which the lamp acted.
 No file, and nothing changes. Host test:
 `the_skills_tools_are_told_after_the_executives_and_go_to_the_skills`.
 
+**Requested local audio** (#1685). With exact `LAMP_REQUESTED_AUDIO=on`, a
+tool-only skill may return one fixed recording after a short confirmation.
+Voice adds private `requested_audio_context` beside the ordinary call's
+`name` and `args`; it binds worker boot, provider session, request, privacy
+generation, call id and original issue time. Skills returns a typed
+`requested_audio` offer beside `next`. Voice removes that offer before
+giving the tool result to the model and uses the existing Skills socket's
+private `audio_authorize`/`audio_finish` operations for its bounded lease.
+Unknown private fields and enum values are refused. Neither direct calls nor
+`use_skill` can obtain authority through model arguments; both preserve the
+original context and deadlines. Written and Messages requests, including
+`speak=true`, cannot supply spoken context. Ordinary calls retain their
+existing wire. See [requested audio](requested-audio.md) for default-off
+advertisement, confirmation retirement, immutable asset checks and terminal
+cancellation. This does not extend autonomous three-second sound cues.
+
 **Many skills: `use_skill`** (#1668, `LAMP_USE_SKILL=on`, the worker's
 `--use-skill`; off unless set). A session may be given 32 functions; the
 voice's own and the executive's are 30 on a product lamp, so a third skill's

@@ -199,6 +199,23 @@ impl Gate {
         Ok(())
     }
 
+    /// Taking an event from Engine does not authorize a later IPC retry. A
+    /// camera change can revoke its scope while the microphone owner stays.
+    /// `true` consumes the pending entry. A discard spends no output credit.
+    fn send_or_discard(
+        &mut self,
+        engine: &Engine,
+        now_us: u64,
+        event: &ProviderOutput,
+        send: impl FnOnce(&ProviderOutput) -> io::Result<()>,
+    ) -> io::Result<bool> {
+        if !engine.current_output(event) {
+            return Ok(true);
+        }
+        self.may_send(now_us, event)?;
+        self.flow.try_send(|| send(event))
+    }
+
     fn drain(&mut self, control: &mut Channel, engine: &mut Engine) -> io::Result<Drain> {
         let mut drained = Drain::Deferred;
         for _ in 0..CONTROL_SLICE {
@@ -408,6 +425,26 @@ pub fn serve(
             file.as_deref(),
         )
     };
+    let audio_runner = tools.requested_audio.then(|| {
+        let settings = tools.clone();
+        Arc::new(
+            move |context: lamp_msgs::RequestedAudioContext,
+                  call: lamp_gemini::ToolCall,
+                  scope: crate::memory_scope::ScopeLease| {
+                let settings = settings.clone();
+                Box::pin(async move {
+                    tokio::task::spawn_blocking(move || {
+                        crate::tools::answer_spoken_scoped(&settings, &call, &context, &scope)
+                    })
+                    .await
+                    .unwrap_or_else(|_| {
+                        crate::tools::ToolAnswer::plain(crate::tools::unavailable())
+                    })
+                })
+                    as futures_util::future::BoxFuture<'static, crate::tools::ToolAnswer>
+            },
+        ) as super::RequestedAudioRunner
+    });
     let runner: ToolRunner = Arc::new(move |request, heard, name, args| {
         let settings = tools.clone();
         Box::pin(async move {
@@ -453,6 +490,9 @@ pub fn serve(
     .waiting_with_a_sound(wait_cue)
     .saying_when_down(down_line)
     .announcing(!only_voice);
+    if let Some(runner) = audio_runner {
+        engine = engine.requesting_audio(boot, runner);
+    }
     // A look reads the eyes' look file with the Live route's bounds: a full
     // look's still may be older and larger (#836, #941).
     if let Some(path) = files.look.clone() {
@@ -1151,11 +1191,12 @@ pub async fn run(
                 keep(event, thread.as_deref());
             }
         }
-        if let Some(event) = pending.take() {
-            gate.may_send(monotonic_us(), &event)?;
-            if !gate.flow.try_send(|| channels.data.send(&event))? {
-                pending = Some(event);
-            }
+        if let Some(event) = pending.take()
+            && !gate.send_or_discard(&engine, monotonic_us(), &event, |event| {
+                channels.data.send(event)
+            })?
+        {
+            pending = Some(event);
         }
     }
 }
@@ -1443,6 +1484,212 @@ mod tests {
         assert_eq!(gate.last_control_us, read_us);
         assert_eq!(gate.skipped_expired, 0);
         gate.fresh(read_us).unwrap();
+    }
+
+    #[tokio::test]
+    async fn requested_audio_pending_without_ipc_credit_rechecks_camera_scope() {
+        const NOW: u64 = 10_000_000;
+        let at = MonoTime::from_micros(NOW);
+        for change in ["none", "denied", "reopened"] {
+            let directory = crate::process::SessionDirectory::create().unwrap();
+            let boot = BootId::new([7; 16]).unwrap();
+            let worker_boot = BootId::new([8; 16]).unwrap();
+            let mut parent =
+                WorkerChannels::bind(&directory.path, "second", boot, worker_boot, false).unwrap();
+            let mut worker =
+                WorkerChannels::bind(&directory.path, "second", boot, worker_boot, true).unwrap();
+            parent.connect(&directory.path, "second", false).unwrap();
+            worker.connect(&directory.path, "second", true).unwrap();
+            let mut owner = Controller::new(boot, at);
+            owner
+                .set_microphone_permission(at, Permission::Allowed)
+                .unwrap();
+            owner
+                .set_camera_permission(at, Permission::Allowed)
+                .unwrap();
+            let until = MonoTime::from_micros(NOW + 100_000);
+            owner
+                .set_capture(at, CaptureState::RetainingUntil(until))
+                .unwrap();
+            owner
+                .set_admission(at, AdmissionState::OpenUntil(until))
+                .unwrap();
+            let request = owner.admit(at, AdmittedInput::NewTurn).unwrap().turn();
+            let before = owner.snapshot(at).unwrap();
+            let cache = Arc::new(crate::memory_scope::FaceCache::default());
+            let mut engine = Engine::new(
+                Arc::new(Silent),
+                Told::default,
+                Arc::new(|_, _, _, _| panic!("the fixture runs no tools")),
+            )
+            .with_memory_scope(
+                boot,
+                cache.clone(),
+                Arc::new(|_, _, _, _, _| panic!("the fixture runs no tools")),
+            )
+            .requesting_audio(
+                boot,
+                Arc::new(|_, _, _| panic!("the fixture runs no tools")),
+            );
+            let mut gate = Gate::new(boot, NOW);
+            gate.install(NOW, before, &mut engine).unwrap();
+            let face = directory.path.join("face");
+            std::fs::write(&face, "credit-fixture").unwrap();
+            assert!(cache.replace(
+                cache.begin_refresh(),
+                crate::known_faces::FaceObservation::read(&face)
+            ));
+            engine.submit(ProviderInput::Start {
+                request,
+                session: 1,
+                privacy_generation: before.microphone_generation(),
+                continues: false,
+                continues_cut_off: false,
+                over_the_lamp: false,
+                after_stop: false,
+                follows_on: false,
+                over_the_lamps_voice: false,
+            });
+            engine.submit(ProviderInput::End {
+                request,
+                privacy_generation: before.microphone_generation(),
+                sound: false,
+                cut_in: false,
+            });
+            engine.urgent.clear();
+            let lease = engine
+                .turn
+                .as_ref()
+                .unwrap()
+                .memory_scope
+                .as_ref()
+                .unwrap()
+                .lease();
+            assert!(lease.scope().unwrap().person().is_some());
+            // These are already-generated events; taking them does not retire
+            // the turn. Both initial credits are spent on the real IPC channel.
+            for event in [
+                ProviderOutput::GenerationComplete { request },
+                ProviderOutput::TurnComplete {
+                    request,
+                    idle: true,
+                },
+            ] {
+                engine.shared.out.try_send(event).unwrap();
+                let pending = engine.try_output().unwrap();
+                assert!(
+                    gate.send_or_discard(&engine, NOW, &pending, |event| worker
+                        .data
+                        .send_with(event, || NOW))
+                        .unwrap()
+                );
+                assert!(
+                    parent
+                        .data
+                        .receive_with::<ProviderOutput>(|| NOW)
+                        .unwrap()
+                        .is_some()
+                );
+            }
+            let offer = lamp_msgs::RequestedAudioOffer {
+                skills_boot: "skills-test".into(),
+                definition_generation: 1,
+                offer_id: 1,
+                context: lamp_msgs::RequestedAudioContext {
+                    worker_boot: crate::process::boot_text(boot),
+                    provider_session: 1,
+                    request,
+                    privacy_generation: before.microphone_generation(),
+                    call_id: "credit-call".into(),
+                    issued_us: NOW,
+                },
+                skill: "relaxing-music".into(),
+                asset: "/local/relaxing.wav".into(),
+                sha256: "a".repeat(64),
+                frames: 24_000,
+                issued_us: NOW,
+                start_before_us: NOW + lamp_msgs::REQUESTED_AUDIO_START_US,
+                finish_before_us: NOW + lamp_msgs::REQUESTED_AUDIO_START_US + 1_000_000,
+            };
+            engine
+                .shared
+                .out
+                .try_send(ProviderOutput::RequestedAudio {
+                    request,
+                    session: 1,
+                    offer,
+                })
+                .unwrap();
+            // This is the event held outside Engine when the worker has no
+            // credit. The later retry must not trust that earlier dequeue.
+            let pending = engine.try_output().unwrap();
+            assert!(
+                !gate
+                    .send_or_discard(&engine, NOW, &pending, |event| worker
+                        .data
+                        .send_with(event, || NOW))
+                    .unwrap()
+            );
+            assert!(
+                parent
+                    .data
+                    .receive_with::<ProviderOutput>(|| NOW)
+                    .unwrap()
+                    .is_none()
+            );
+            if change != "none" {
+                owner.set_camera_permission(at, Permission::Denied).unwrap();
+                if change == "reopened" {
+                    owner
+                        .set_camera_permission(at, Permission::Allowed)
+                        .unwrap();
+                }
+                gate.install(NOW, owner.snapshot(at).unwrap(), &mut engine)
+                    .unwrap();
+            }
+            let after = gate.guard.state().unwrap();
+            assert_eq!(before.owner(), after.owner());
+            assert_eq!(
+                before.microphone_generation(),
+                after.microphone_generation()
+            );
+            assert!(request > gate.retired_through);
+            assert_eq!(lease.is_current(), change == "none");
+            gate.flow.grant(3).unwrap();
+            assert!(
+                gate.send_or_discard(&engine, NOW, &pending, |event| worker
+                    .data
+                    .send_with(event, || NOW))
+                    .unwrap()
+            );
+            assert_eq!(
+                matches!(
+                    parent.data.receive_with::<ProviderOutput>(|| NOW).unwrap(),
+                    Some(ProviderOutput::RequestedAudio { .. })
+                ),
+                change == "none",
+                "{change}"
+            );
+            assert_eq!(
+                gate.flow.can_send(),
+                change != "none",
+                "a discard spends no credit"
+            );
+            gate.flow.grant(4).unwrap();
+            assert!(
+                gate.send_or_discard(
+                    &engine,
+                    NOW,
+                    &ProviderOutput::GenerationComplete { request },
+                    |event| worker.data.send_with(event, || NOW)
+                )
+                .unwrap()
+            );
+            assert!(
+                matches!(parent.data.receive_with::<ProviderOutput>(|| NOW).unwrap(),
+                Some(ProviderOutput::GenerationComplete { request: got }) if got == request)
+            );
+        }
     }
 
     #[tokio::test]

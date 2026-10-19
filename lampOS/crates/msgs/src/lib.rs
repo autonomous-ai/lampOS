@@ -94,6 +94,10 @@ mod reports;
 pub use reports::*;
 mod familiar;
 pub use familiar::*;
+mod requested_audio;
+pub use requested_audio::*;
+mod speaker_state;
+pub use speaker_state::*;
 
 /// Why a message is not one its type allows, in words.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1377,6 +1381,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(presence_topics())
         .chain(reports_topics())
         .chain(familiar_topics())
+        .chain(speaker_state_topics())
         .find_map(|(name, declaration)| (name == topic).then_some(declaration))
 }
 
@@ -2185,6 +2190,19 @@ mod tests {
         assert_eq!(
             (declared.type_name.as_str(), declared.kind),
             (Rules::TYPE, Kind::Latest)
+        );
+    }
+
+    #[test]
+    fn speaker_state_is_recognised_without_becoming_a_baseline_topic() {
+        assert!(
+            !first_topics()
+                .iter()
+                .any(|(name, _)| *name == SpeakerState::TOPIC)
+        );
+        assert_eq!(
+            declaration_of(SpeakerState::TOPIC),
+            Some(SpeakerState::declaration())
         );
     }
 

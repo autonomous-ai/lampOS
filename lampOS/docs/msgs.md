@@ -296,6 +296,34 @@ Only confirmed completion may be acknowledged. Voice still owns admission,
 privacy, interruption and the final speaker check; First wires that path.
 See [the bus contract](bus.md#optional-schedule-topic-third-2026-10-14).
 
+## Optional speaker observation and private audio receipts (#1685)
+
+`crates/msgs/src/speaker_state.rs` defines the optional bus type below.
+`speaker_state_topics()` and `declaration_of()` find it; `first_topics()` is
+unchanged. Actions publishes it only with exact `LAMP_REQUESTED_AUDIO=on`.
+
+| Type | Topic | Kind | Period / lifespan | Meaning |
+|---|---|---|---|---|
+| `SpeakerState` | `speaker/state` | latest | 1 / 3 s | The mixer's owning Actions process reports host `stamp`, publisher `session_id`, monotonic `mute_generation`, optional `volume_raw` (0–100) and logical/observed `muted`; unavailable volume grants no output |
+
+The bus envelope must identify `actions`, `lamp_msgs/SpeakerState`, JSON and
+Latest with a three-second expiry. The payload's publisher session, sequence
+and monotonic timestamp must match the envelope; consumers also check host
+boot, freshness and generation/sequence continuity. Actions advances the
+generation before handling an explicit mute's mixer I/O. Later unmute does
+not restore an old generation. Additive fields are tolerated as for other
+bus messages; required fields and known values remain checked. This is an
+observation, not permission to change volume or proof of physical silence.
+
+`crates/msgs/src/requested_audio.rs` instead defines strict private socket
+receipts: `RequestedAudioContext`, `RequestedAudioOffer`,
+`RequestedAudioOperation` and `RequestedAudioLease`. They have no bus topic.
+They reject unknown fields and unknown operation/phase/outcome enum values.
+Voice supplies the context outside model arguments; Skills binds its offer
+to checked asset bytes, definition generation and original monotonic
+deadlines. See [requested audio](requested-audio.md) for all fields, the
+500 ms lease, final output checks and bounded revocation semantics.
+
 ## Adding one
 
 1. Write the structure in `crates/msgs/src/lib.rs` with `Serialize` and

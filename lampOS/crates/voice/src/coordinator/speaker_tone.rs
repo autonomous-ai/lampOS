@@ -222,6 +222,7 @@ pub(super) fn commit_sound_turn(
         final_chunk: None,
         playback_gaps: 0,
         notice: sound,
+        media: Default::default(),
         local_only: None,
         reminder: None,
         say: None,
