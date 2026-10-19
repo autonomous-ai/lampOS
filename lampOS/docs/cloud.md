@@ -68,6 +68,7 @@ routes are not served. Each kind is carried out by the part that owns it.
 | `chat.send` (`{"message", "session_id", "speak"}`) | with `LAMP_MESSAGES=on`: acked with `{"run_id", "session_id"}` and put on `chat/in`; the answer goes out after it as `chat.event`s, in V1's shapes ([messages.md](messages.md)). Refused at once when nothing on the lamp takes texts, and for a photo or a file, which aren't read yet. Without the switch, V1's "not on this lamp" |
 | `reports.get`, `reports.set` (`{"share": bool}`) | with `LAMP_REPORTS=on` (#1683, "Health and crash reports" below): `{"share", "since", "queued", "by", "held", "at"}`, whether the person's yes stands, since when (RFC 3339 UTC, or `null`), how many reports wait, and how the newest choice was made: `by` is `voice` (only ever a stop), `app` or `setup` (`null` for a choice kept before these were), `held` is true for a voice's stop from a line whose answer was held, and `at` is when (as `since`), so the app's row can say "Stopped by voice at 3 pm" (#1880). A set takes only a JSON bool (else `"share must be true or false"`), is kept and read back; a no deletes what waits and leaves one `stopped`. The only way to turn reports on after setup. Without the switch, V1's "not on this lamp" |
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Read only. Without the switch, V1's "not on this lamp" |
+| `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
@@ -141,6 +142,44 @@ is the same light. Two differences from V1 the page should know:
   the person's later choice on them) and removes
   `/etc/lampOS/setup/backend.json` and `/etc/lampOS/setup/reports.json`
   with the rest of the person's data.
+
+## A face from the app's photo (#1968, `faces.add_photo`)
+
+Off unless `LAMP_PHOTO_FACES=on`, with the eyes' photo folder
+(`LAMP_EYES_PHOTO_DIR`, the folder given to `lamp-eyes --photo-dir`, for
+example `/run/lampos-eyes/photos`) and their request socket
+(`LAMP_EYES_WHO_SOCKET`). lamp-cloud's unit is `ProtectSystem=strict`, so a
+lamp switching it on also adds the folder to the unit's `ReadWritePaths` in
+the same drop-in. lamp-cloud and the eyes are both `lampos`; the eyes make
+the folder theirs at 0700 when they start and refuse one open to others
+(`photo::ready`).
+
+- **Only the lamp's own account:** the kind comes over the lamp's `fa_channel`
+  like every other, which only its signed-in account may publish to
+  (`crate::online`).
+- **The photo** is checked: a name of 1 to 40 characters, and base64 that
+  decodes to a JPEG (`FF D8`) of at most 8 MiB (`photos::asked`). Then it's
+  written as a **new** file, `app-<ms>.jpg`, at mode 0600 in the folder.
+  The eyes are asked `{"remember":NAME,"photo":FILE}` with a 2 s deadline,
+  kept short because it's waited for on the runtime that keeps the broker's
+  connection alive.
+- **Never kept:** the eyes read it once and remove it. lamp-cloud removes it
+  too afterwards, answered or not, so a photo the eyes never took doesn't
+  stay (`photos::add`).
+- **The answer** is the eyes': `added` (unconfirmed) or `remembered`.
+  Otherwise their reason in the person's words: no face, more than one
+  person, the face too small, not readable, known by another name, a name
+  that can't be kept, no room, photos not taken. `the lamp's eyes did not
+  answer` when they didn't.
+- **Then at the lamp** the voice asks the person once (`LAMP_PHOTO_FACES=on`
+  in the voice, `docs/eyes.md`, "A face from a photo"). No answer or no
+  deletes the face, and so do 30 days unconfirmed.
+
+Tests (`photos.rs`): the switch needs both absolute places; the name and
+the JPEG checked, too long, empty, not base64, not a JPEG and too large
+refused; the photo written 0600 as a new file, the eyes asked for it by
+name, and gone afterwards, also when nobody answers; the eyes' reasons said
+plainly.
 
 ## The skills page (#1722, `skills.list`)
 

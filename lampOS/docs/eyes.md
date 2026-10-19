@@ -994,9 +994,11 @@ socket; `crates/voice/src/photo_faces.rs`):
   `not_here`, and the model is told nothing changed.
 - No answer is the eyes' to let go, at the meeting's end.
 
-**Not built yet:** lamp-cloud's taking the app's photo, writing it into
-`--photo-dir` at 0600 and sending the ask, only from the lamp's own
-signed-in account.
+**From the app:** lamp-cloud's `faces.add_photo` writes the app's photo into
+`--photo-dir` as a new 0600 file and sends the ask, only over the lamp's own
+account channel, and removes the file afterwards ([cloud.md](cloud.md), "A
+face from the app's photo"). The eyes make the folder theirs at 0700 when
+they start, and refuse one open to others (`photo::ready`).
 
 Tests (`photo.rs`):
 - the file read once and removed, a second ask finding nothing; one too
