@@ -211,3 +211,64 @@ fn the_asked_line_is_journaled_without_its_words() {
         "lamp-voice second: request 7: a held line names reports: asked once"
     );
 }
+
+/// Second's P2 on #1925: with `LAMP_SECOND_SCOPED_CONTEXT=on`, a held
+/// reports line is told for the person admitted with it, never for the
+/// session's sticky person. A is the session's person, whose memory and
+/// thread the unscoped builder tells; B is at the lamp when the line is
+/// admitted. The held round carries B's context alone, none of A's.
+#[tokio::test]
+async fn a_held_reports_line_is_told_only_its_admitted_persons_context() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    const STICKY: &str = "A's memory and thread";
+    let path = std::env::temp_dir().join(format!(
+        "jarvis-held-scoped-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    let cache = Arc::new(FaceCache::default());
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Lamp, stop sharing my data.".to_owned())].into()),
+        chats: Mutex::new([vec![Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let tools: ToolRunner = Arc::new(|_, _, _, _| Box::pin(async { json!({"ok": true}) }));
+    let runner: ScopedToolRunner =
+        Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok": true}) }));
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| STICKY.to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .with_memory_scope(
+        lamp_turn_owner::BootId::new([25; 16]).unwrap(),
+        cache.clone(),
+        runner,
+        Some(Arc::new(|lease: &ScopeLease| {
+            Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+        })),
+    )
+    .announcing(false)
+    .heeding(Arc::new(|_, _, _, _| Some("a busy room")))
+    .doing_though_held(true);
+    engine.memory_camera(true, 1);
+    // B is at the lamp when the line is admitted.
+    std::fs::write(&path, "B").unwrap();
+    cache.replace(
+        cache.begin_refresh(),
+        crate::known_faces::FaceObservation::read(&path),
+    );
+    say(&mut engine, 1);
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    let b = crate::remember::person_id("B");
+    assert_eq!(
+        asked[0][0],
+        Message::system(format!("for {:?}", Some(b.as_str())))
+    );
+    let round = serde_json::to_string(&asked[0]).unwrap();
+    assert!(!round.contains(STICKY), "{round}");
+    std::fs::remove_file(path).unwrap();
+}
