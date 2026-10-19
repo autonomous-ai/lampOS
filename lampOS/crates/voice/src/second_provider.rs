@@ -97,6 +97,10 @@ pub const LOOK_BEGIN_WITHIN: Duration = Duration::from_secs(5);
 /// What the lamp says when a look's first round has not begun within
 /// [`LOOK_BEGIN_WITHIN`]: after "Let me look.", silence reads as broken.
 pub const COULD_NOT_LOOK: &str = "I couldn't get a good look.";
+/// A spoken request's words cut short before any of its answer was heard
+/// are answered in the next line's place when that line is held, within
+/// this ([`Shared::cut`], #1712).
+pub const CARRY_WITHIN: Duration = Duration::from_secs(30);
 /// The function the model looks with on this route ([`Engine::looking_by_call`]).
 pub const LOOK_CALL: &str = "take_a_look";
 /// What the lamp says as it looks by a call the model made with no words.
@@ -264,9 +268,25 @@ struct Shared {
     look_by_call: bool,
     /// The request begun last, with its session, for a look asked by a call.
     begun: Mutex<Option<(u64, u64)>>,
+    /// The spoken request being answered and its words, until any of its
+    /// answer is heard or its turn ends.
+    in_flight: Mutex<Option<Carried>>,
+    /// A spoken request's words whose turn ended before any of its answer
+    /// was heard (a newer line began): answered in the next line's place
+    /// if that line is held ([`CARRY_WITHIN`], #1712).
+    cut: Mutex<Option<Carried>>,
     /// The answer's first piece goes once this many words have come
     /// ([`Engine::cutting_first_words`]).
     first_words: Option<usize>,
+}
+
+/// A spoken request's words, kept while it is answered ([`Shared::in_flight`],
+/// [`Shared::cut`]).
+#[derive(Clone)]
+struct Carried {
+    request: u64,
+    text: String,
+    at: Instant,
 }
 
 /// A stop to be told beside a request's chat ([`crate::provider_worker::STOPPED_NOTE`]).
@@ -524,6 +544,8 @@ impl Engine {
                 words_heard: None,
                 look_by_call: false,
                 begun: Mutex::new(None),
+                in_flight: Mutex::new(None),
+                cut: Mutex::new(None),
                 first_words: None,
             }),
             output,
@@ -1097,6 +1119,7 @@ impl Engine {
         if request <= self.retired_through {
             return false;
         }
+        self.cut_short(request - 1);
         self.turn = None;
         self.begun_last = Some((request, session));
         if let Ok(mut begun) = self.shared.begun.lock() {
@@ -1114,6 +1137,7 @@ impl Engine {
     /// abandoned): their task stops and their unsent output is dropped.
     pub fn retire_through(&mut self, through: u64) {
         self.retired_through = self.retired_through.max(through);
+        self.cut_short(self.retired_through);
         if self
             .turn
             .as_ref()
@@ -1124,6 +1148,30 @@ impl Engine {
         let retired = self.retired_through;
         self.urgent
             .retain(|event| output_request(event).is_none_or(|r| r > retired));
+    }
+
+    /// A spoken request up to `through` still being answered, none of its
+    /// answer heard, is cut short: its words are kept for the next line, and
+    /// the journal says so (#1712: on lamp-4ace on 19 Oct the weather and a
+    /// race result were searched, then ended by the next line, which was
+    /// held, and were never said).
+    fn cut_short(&self, through: u64) {
+        let Some(carried) = self
+            .shared
+            .in_flight
+            .lock()
+            .ok()
+            .and_then(|mut in_flight| in_flight.take_if(|carried| carried.request <= through))
+        else {
+            return;
+        };
+        eprintln!(
+            "lamp-voice second: request {}: ended before its answer: a newer line began; its words wait for that line's verdict",
+            carried.request
+        );
+        if let Ok(mut cut) = self.shared.cut.lock() {
+            *cut = Some(carried);
+        }
     }
 
     /// The next output ready now, if any.
@@ -1324,6 +1372,14 @@ async fn spoken(
     if let Some(why) = heeded {
         eprintln!("lamp-voice second: request {request}: its answer is held back: {why}");
     }
+    // Words cut short by this line: answered in its place if it is held,
+    // dropped if it is answered itself (#1712).
+    let carried = shared
+        .cut
+        .lock()
+        .ok()
+        .and_then(|mut cut| cut.take())
+        .filter(|carried| carried.request < request && carried.at.elapsed() <= CARRY_WITHIN);
     if empty || held || heeded.is_some() {
         // Left unanswered: a line held by the rule is not talk, nor are no
         // words at all, which are a sound (as a short sound already is).
@@ -1333,6 +1389,29 @@ async fn spoken(
             }
             room.unanswered(request, monotonic_us());
         });
+        if let Some(carried) = carried {
+            eprintln!(
+                "lamp-voice second: request {request} is held, so request {}'s words, cut short by it, are answered in its place",
+                carried.request
+            );
+            if let Ok(mut in_flight) = shared.in_flight.lock() {
+                *in_flight = Some(Carried {
+                    request,
+                    ..carried.clone()
+                });
+            }
+            answer(
+                &shared,
+                (request, scope),
+                carried.text,
+                Asker::Spoken,
+                None,
+                Vec::new(),
+                times,
+            )
+            .await;
+            return;
+        }
         if shared.stages(request, &times).await {
             shared
                 .emit(ProviderOutput::TurnComplete {
@@ -1381,6 +1460,19 @@ async fn spoken(
         .chain(alone)
         .chain(waiting)
         .collect();
+    if let Some(carried) = carried {
+        eprintln!(
+            "lamp-voice second: request {}'s words, cut short, are let go: request {request} is answered",
+            carried.request
+        );
+    }
+    if let Ok(mut in_flight) = shared.in_flight.lock() {
+        *in_flight = Some(Carried {
+            request,
+            text: text.clone(),
+            at: Instant::now(),
+        });
+    }
     if let Some(heard) = &shared.words_heard {
         heard(request, &text);
     }
@@ -1850,6 +1942,10 @@ async fn answer(
                     spoke.store(true, Ordering::Relaxed);
                     // The answer's, never the announcement's or a cue's.
                     if answering && !answered.swap(true, Ordering::Relaxed) {
+                        // Some of its answer heard: no longer to be carried.
+                        if let Ok(mut in_flight) = shared.in_flight.lock() {
+                            in_flight.take_if(|carried| carried.request == request);
+                        }
                         // An answer to someone, or the lamp's own turn or a
                         // reminder, which is no answer.
                         room(|room| {
@@ -1922,6 +2018,10 @@ async fn answer(
         },
         Err(Stop::Gone) => return,
     };
+    // Its turn over: nothing of it is carried.
+    if let Ok(mut in_flight) = shared.in_flight.lock() {
+        in_flight.take_if(|carried| carried.request == request);
+    }
     // A spoken line the turn ended without answering: what the model left
     // alone, the busy room's talk.
     if asked == Asker::Spoken

@@ -897,6 +897,18 @@ after a take-over, but now for every turn:
   the model sees it (`worker::LONE_WORDS`): "What's the price of gold?"
   heard as "Surprise" was answered "Oh! I do like a surprise." "And
   Paris?" is a question and goes on.
+- **Words cut short by the next line.** A new line ends the turn in
+  flight, by the engine's own start and by the coordinator's newer owner,
+  before anyone knows whether the new line is for the lamp. A spoken
+  request still being answered, none of its answer heard, is cut short:
+  `request N: ended before its answer: a newer line began; its words wait
+  for that line's verdict`. If that line is held (no words, a short sound,
+  or the rule), its turn answers the words cut short in its place, within
+  30 s (`CARRY_WITHIN`): `request M is held, so request N's words, cut
+  short by it, are answered in its place`. If it is let out, it is answered
+  itself and they are let go. On lamp-4ace on 19 Oct at 15:56 the weather
+  and a race result were searched, then ended by the owner's next line,
+  which was held, and were never said.
 - **The name note** (`LAMP_NAME_NOTE`) is given as on the Live route
   (`worker::Heeding::telling_the_name`): a line the lamp's name began, heard
   by `lamp-name` at `called::LEAST_SCORE` or more no more than

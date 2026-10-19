@@ -2658,3 +2658,171 @@ async fn revoked_tool_result_is_not_sent_to_another_chat_round() {
     .unwrap();
     assert_eq!(script.asked.lock().unwrap().len(), 1);
 }
+
+/// #1712, lamp-4ace 19 Oct 15:56: "what's the weather" called a search, and
+/// the next line, 4 s later, was held as not for the lamp; it had ended the
+/// turn still searching, so the weather was never said. Now the words cut
+/// short are answered in the held line's place; a line let out for the lamp
+/// lets them go.
+#[tokio::test]
+async fn words_cut_short_by_a_held_line_are_answered_in_its_place() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("What's the weather?".to_owned()),
+                Ok("Yes, give me five minutes.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "web_search",
+                        json!({"query": "weather"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("It is 31 degrees and sunny."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (searching, searched) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+        let searching = searching.clone();
+        Box::pin(async move {
+            let _ = searching.send(());
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            json!({"results": []})
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .heeding(Arc::new(|request, _, _, _| {
+        (request == 2).then_some("not said to the lamp")
+    }));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    // Until the search is under way.
+    loop {
+        if searched.try_recv().is_ok() {
+            break;
+        }
+        let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+    }
+    // The next line begins, as the coordinator says, and is held.
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let mut said = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the held line's turn ends");
+        match event {
+            ProviderOutput::Transcript {
+                request: Some(2),
+                text,
+                ..
+            } if !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { request: 2, .. } => break,
+            _ => {}
+        }
+    }
+    assert_eq!(said, ["It is 31 degrees and sunny."]);
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(
+        asked[1].last().unwrap(),
+        &Message::user("What's the weather?"),
+        "the words cut short are asked again"
+    );
+}
+
+/// #1712: a line let out for the lamp is answered itself, and the words it
+/// cut short are let go: the person has moved on.
+#[tokio::test]
+async fn words_cut_short_by_a_line_let_out_are_let_go() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("What's the weather?".to_owned()),
+                Ok("Lamp, what time is it?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "web_search",
+                        json!({"query": "weather"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("It's noon."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (searching, searched) = std::sync::mpsc::channel();
+    let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+        let searching = searching.clone();
+        Box::pin(async move {
+            let _ = searching.send(());
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            json!({"results": []})
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    loop {
+        if searched.try_recv().is_ok() {
+            break;
+        }
+        let _ = tokio::time::timeout(Duration::from_millis(20), engine.next()).await;
+    }
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let mut said = Vec::new();
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(2), engine.next())
+            .await
+            .expect("the turn ends");
+        match event {
+            ProviderOutput::Transcript {
+                request: Some(2),
+                text,
+                ..
+            } if !text.is_empty() => said.push(text),
+            ProviderOutput::TurnComplete { request: 2, .. } => break,
+            _ => {}
+        }
+    }
+    assert_eq!(said, ["It's noon."]);
+    assert_eq!(
+        script.asked.lock().unwrap()[1].last().unwrap(),
+        &Message::user("Lamp, what time is it?")
+    );
+}
