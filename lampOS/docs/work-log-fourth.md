@@ -4837,6 +4837,20 @@ A usage limit paused me from about 00:40 to 06:2x.
   - #1978 (air facts) is closed for Nine's #1960;
   - the Policy's holds are the first builder's agent's, and my uncommitted start is gone.
 
+## 2026-10-20, 00:43 ICT: the speed gap split and two cuts up (#1993, #2002); #1940's P1 fixed and re-read
+
+- **The 0.6 s against Live** (posted on #1712, 23:4x), from the line's end:
+  - words 618 ms, the chat's first event 910 ms, the first piece 121 ms, the voice's first byte 420 ms, then about 150 ms to playout;
+  - the chat alone is quicker than all of Live.
+- **#1993: `Finalize`'s words taken at once when what's left is the line's quiet end.** On lamp-4ace it worked on 4 of 12 lines, 252–353 ms. ARM64 is green and it waits for the reviewer.
+- **The other 8 lines:** each line opened its own speech-to-text socket only as it began, so its sound waited and went at once, and Deepgram was still hearing it at `Finalize`.
+- **#2002:** a journal line for each line's connect, and `LAMP_SECOND_STT_WARM`, the next line's socket kept open. It lasts at most 3 min, closes at privacy or mute, and a closed one is dropped. The relay's counting of open sockets is asked on #1934.
+- **#1940's P1 (the reviewer, 00:09):**
+  - an update round wrote the second-route unit without `second.json`;
+  - fixed: the round places it before writing units, and the voice places it when an older updater didn't (a round never switches the updater);
+  - the reviewer re-read it at 00:25 with no finding left. Its ARM64 is running.
+- **#1973, the landing:** green and re-read, the first builder's to merge.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
