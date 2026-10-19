@@ -296,6 +296,10 @@ pub type WordsHeard = Arc<dyn Fn(u64, &str) + Send + Sync>;
 /// lamp ([`Engine::holding_calls`]).
 pub type CallHold = Arc<dyn Fn(u64, &str) -> bool + Send + Sync>;
 
+/// The Policy's gate for a call ([`Engine::gating_calls`]): the call's
+/// request and name, and how long it has waited.
+pub type CallGate = Arc<dyn Fn(u64, &str, Duration) -> crate::policy_holds::Gate + Send + Sync>;
+
 /// What every turn task shares.
 struct Shared {
     services: Arc<dyn Services>,
@@ -346,6 +350,8 @@ struct Shared {
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
     hold: Option<CallHold>,
+    /// Calls the Policy holds or lets run ([`Engine::gating_calls`]).
+    gate: Option<CallGate>,
     /// Told a spoken request's words before its chat ([`Engine::hearing_words`]).
     words_heard: Option<WordsHeard>,
     /// The model looks by calling [`LOOK_CALL`] ([`Engine::looking_by_call`]).
@@ -713,6 +719,7 @@ impl Engine {
                 task_waiting: None,
                 did: None,
                 hold: None,
+                gate: None,
                 words_heard: None,
                 look_by_call: false,
                 prepare: false,
@@ -992,6 +999,22 @@ impl Engine {
     pub fn holding_calls(mut self, hold: CallHold) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.hold = Some(hold);
+        }
+        self
+    }
+
+    /// A call that changes the lamp or sets something on its schedule runs
+    /// only as the Policy's decision for its turn lets it
+    /// (`LAMP_POLICY_HOLDS_ACTIONS`, #800, `gate`): asked every
+    /// [`POLICY_POLL`] while it says wait, at most
+    /// `policy_holds::WAIT` and four polls more, never blocking the worker.
+    /// Held, the model is told so (`policy_holds::HELD`); held again after
+    /// it was told, it is told it will not be done
+    /// (`policy_holds::HELD_AGAIN`) and the turn ends, as on the Live
+    /// route. Before any turn only.
+    pub fn gating_calls(mut self, gate: CallGate) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.gate = Some(gate);
         }
         self
     }
@@ -2302,6 +2325,8 @@ async fn answer(
             messages.clone_from(&prepared.messages);
         }
         let asked_at = messages.len() - 1;
+        // A call the Policy held has been told so in a round before this one.
+        let mut held_told = false;
         let mut round = 0;
         while round < MAX_ROUNDS {
             if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
@@ -2522,6 +2547,7 @@ async fn answer(
                 &calls,
                 reasoning.take(),
             ));
+            let mut held_this_round = false;
             for call in &calls {
                 if shared
                     .hold
@@ -2537,6 +2563,51 @@ async fn answer(
                         crate::policy_holds::held().to_string(),
                     ));
                     continue;
+                }
+                // The Policy's decision for an action (#800), as the Live
+                // route waits for it, from the call.
+                if let Some(gate) = &shared.gate {
+                    let called = tokio::time::Instant::now();
+                    let bound = crate::policy_holds::WAIT + POLICY_POLL * 4;
+                    let held = loop {
+                        match gate(request, &call.name, called.elapsed()) {
+                            crate::policy_holds::Gate::Wait if called.elapsed() < bound => {
+                                tokio::time::sleep(POLICY_POLL).await;
+                            }
+                            crate::policy_holds::Gate::Hold => break true,
+                            _ => break false,
+                        }
+                    };
+                    let waited = called.elapsed().as_millis();
+                    if held && held_told {
+                        eprintln!(
+                            "lamp-voice second: request {request} asked again for {}, held after {waited} ms: told it will not be done, and the turn ends",
+                            call.name
+                        );
+                        messages.push(Message::tool(
+                            call.id.clone(),
+                            crate::policy_holds::held_again().to_string(),
+                        ));
+                        return Ok(());
+                    }
+                    if held {
+                        eprintln!(
+                            "lamp-voice second: request {request} asked for {}: held after {waited} ms, the Policy judged the turn not for the lamp",
+                            call.name
+                        );
+                        held_this_round = true;
+                        messages.push(Message::tool(
+                            call.id.clone(),
+                            crate::policy_holds::held().to_string(),
+                        ));
+                        continue;
+                    }
+                    if waited > 0 {
+                        eprintln!(
+                            "lamp-voice second: request {request} asked for {}: run after {waited} ms, as the Policy's decision lets it",
+                            call.name
+                        );
+                    }
                 }
                 // The lamp's own work, for a question about it later, as the
                 // Live worker marks it for any turn not held (#829).
@@ -2584,6 +2655,7 @@ async fn answer(
                 }
                 messages.push(Message::tool(call.id.clone(), result.to_string()));
             }
+            held_told |= held_this_round;
         }
         // ponytail: a model still calling tools after MAX_ROUNDS ends the
         // turn with what it has said; a spoken "I could not finish" if seen.

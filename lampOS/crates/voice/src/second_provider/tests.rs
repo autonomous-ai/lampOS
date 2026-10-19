@@ -3885,3 +3885,131 @@ async fn a_line_that_waits_for_the_policy_goes_as_it_decides() {
         }
     }
 }
+
+/// #1712, item 6 (`LAMP_POLICY_HOLDS_ACTIONS`, #800): an action waits for
+/// the Policy's gate, polled without blocking; it runs once the gate says
+/// run, and is not run when it says hold, the model told so; asked again in
+/// a later round after it was told, it is told it will not be done and the
+/// turn ends, as on the Live route (#1465).
+#[tokio::test(start_paused = true)]
+async fn an_action_runs_or_is_held_as_the_policys_gate_says() {
+    use crate::policy_holds::Gate;
+    let volume = || call("c1", "volume_up", json!({}));
+    for (gates, ran, chats, again) in [
+        (vec![Gate::Wait, Gate::Wait, Gate::Run], true, 2, false),
+        (vec![Gate::Hold], false, 2, false),
+        (vec![Gate::Hold, Gate::Hold], false, 2, true),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("turn it up".to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![
+                        Ok(ChatEvent::ToolCalls(vec![volume()])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    if again {
+                        vec![
+                            Ok(ChatEvent::ToolCalls(vec![volume()])),
+                            Ok(ChatEvent::Done),
+                        ]
+                    } else {
+                        vec![Ok(ChatEvent::Done)]
+                    },
+                    vec![Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let calls: Calls = Arc::default();
+        let seen = calls.clone();
+        let runner: ToolRunner = Arc::new(move |_, heard, name, args| {
+            seen.lock().unwrap().push((name, args, heard));
+            Box::pin(async { json!({"ok": true}) })
+        });
+        let asked_gate = Arc::new(Mutex::new(
+            gates.clone().into_iter().collect::<VecDeque<_>>(),
+        ));
+        let gate = asked_gate.clone();
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false)
+        .gating_calls(Arc::new(move |request, name, _| {
+            assert_eq!((request, name), (1, "volume_up"));
+            gate.lock().unwrap().pop_front().unwrap_or(Gate::Run)
+        }));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        assert_eq!(!calls.lock().unwrap().is_empty(), ran, "{gates:?}");
+        assert!(
+            asked_gate.lock().unwrap().is_empty(),
+            "every gate asked: {gates:?}"
+        );
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), chats, "{gates:?}");
+        if !ran {
+            assert_eq!(
+                asked[1].last().unwrap(),
+                &Message::tool("c1".to_owned(), crate::policy_holds::held().to_string())
+            );
+        }
+    }
+}
+
+/// A gate that waits for ever is let go at `policy_holds::WAIT` and four
+/// polls more: the action runs, as with no decision.
+#[tokio::test(start_paused = true)]
+async fn an_action_whose_gate_never_decides_runs_after_the_bound() {
+    use crate::policy_holds::Gate;
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("turn it up".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        "volume_up",
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let calls: Calls = Arc::default();
+    let seen = calls.clone();
+    let runner: ToolRunner = Arc::new(move |_, heard, name, args| {
+        seen.lock().unwrap().push((name, args, heard));
+        Box::pin(async { json!({"ok": true}) })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .gating_calls(Arc::new(|_, _, _| Gate::Wait));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    loop {
+        let event = tokio::time::timeout(Duration::from_secs(10), engine.next())
+            .await
+            .expect("the turn ends");
+        if matches!(event, ProviderOutput::TurnComplete { .. }) {
+            break;
+        }
+    }
+    assert_eq!(calls.lock().unwrap().len(), 1, "run after the bound");
+}

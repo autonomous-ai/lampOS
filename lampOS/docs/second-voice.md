@@ -635,6 +635,24 @@ order is kept. A written turn is the same from the chat on.
     lamp said" (or "… in a busy room; the model is not told …"), "only
     the lamp's name was said, and the model is told so", and "… no words
     of it came back: asked as the name".
+- **The Policy holds the lamp's actions** (`LAMP_POLICY_HOLDS_ACTIONS=on`,
+  with `LAMP_FOLLOWS_RUN`, the rule and the bus, #800; #1712, item 6): a
+  call that changes the lamp (its volume, its light, the executive's and
+  the skills' functions) or sets or takes away something on its schedule
+  runs only as the Policy's attention decision for its turn lets it, as on
+  the Live route (`policy_holds::gate`, by `Heeding::action_gate`): run when
+  the name was heard in the turn (0.9 or more) or on `answer`/`look_up`,
+  held on `stay_quiet`, a reply to the lamp running what
+  `policy_holds::runs_on_a_reply` says, and run with no decision in
+  `policy_holds::WAIT` (2 s). The turn asks the gate every 50 ms, never
+  blocking the worker. Held, the model is told `policy_holds::HELD`; held
+  again in a later round, after it was told, it is told `HELD_AGAIN` and
+  the turn ends (#1465: 72 asks in 49 s on Live). Unlike Live, whose held
+  turn lets none of its sound out, words the model said before the call
+  may already be spoken. The journal says "asked for X: held after N ms",
+  "asked again for X, held …: told it will not be done, and the turn
+  ends", or "asked for X: run after N ms, as the Policy's decision lets
+  it". Without the rule (`LAMP_ATTENTION`), nothing is held here.
 - **In a busy room, a line going on waits for the Policy**
   (`LAMP_GOING_ON_ASKS=on`, with the rule and the bus, #1522; #1712, item
   4): a line the rule would let out only as a conversation going on, and

@@ -1167,6 +1167,8 @@ pub fn serve(
     let scope_file = who.clone();
     let face_cache = Arc::new(crate::memory_scope::FaceCache::default());
     let scoped_settings = tools.clone();
+    // The Policy's gate for a call reads the routes (#800).
+    let gate_settings = tools.clone();
     let days = crate::remember::days_from_environment();
     // Told after the character with `LAMP_TASKS_ASKED=on`, as the Live route is (#854).
     let tasks = tools.tasks.clone();
@@ -1452,6 +1454,25 @@ pub fn serve(
             && let (Ok(mut heeding), Some(root)) = (heeding.lock(), files.bus_root.as_deref())
         {
             heeding.hear_levels(root);
+        }
+        // The lamp's actions held on the Policy's decision (#800), as on
+        // the Live route: with the rule and the bus.
+        if files.policy_holds
+            && let Some(root) = files.bus_root.as_deref()
+        {
+            if let Ok(mut held) = heeding.lock() {
+                held.holding_actions(root, files.follows_run);
+            }
+            let heeding = heeding.clone();
+            let settings = gate_settings.clone();
+            engine = engine.gating_calls(Arc::new(move |request, name, waited| {
+                let route = crate::tools::route(&settings, name);
+                heeding
+                    .lock()
+                    .map_or(crate::policy_holds::Gate::Run, |mut heeding| {
+                        heeding.action_gate(request, (&route, name), &settings, waited)
+                    })
+            }));
         }
         // In a busy room, a line going on waits for the Policy (#1522), as
         // on the Live route: with the rule and the bus.
@@ -1897,6 +1918,12 @@ pub(crate) struct Heeding {
     policy: Option<crate::policy_holds::Verdicts>,
     /// The line that waits for the Policy's decision, and how it was seen.
     waiting: Option<Waiting>,
+    /// With `LAMP_POLICY_HOLDS_ACTIONS`, whether a reply to the lamp runs
+    /// its light and its volume too (`LAMP_FOLLOWS_RUN`,
+    /// [`Self::holding_actions`]).
+    holds_actions: Option<bool>,
+    /// `LAMP_GOING_ON_ASKS` ([`Self::asking_the_policy`]).
+    going_on_asks: bool,
     /// The request last let out because its words or the lamp's name heard
     /// in its sound called the lamp.
     by_name: Option<u64>,
@@ -2125,6 +2152,8 @@ impl Heeding {
             busy: None,
             policy: None,
             waiting: None,
+            holds_actions: None,
+            going_on_asks: false,
             by_name: None,
             session: 1,
             session_for: None,
@@ -2496,18 +2525,105 @@ impl Heeding {
     /// going on, in a busy room (`LAMP_GOING_ON_ASKS`, #1522): its attention
     /// decisions from the bus at `root`.
     pub(crate) fn asking_the_policy(&mut self, root: &Path) {
+        if self.reading_the_policy(root) {
+            eprintln!(
+                "lamp-voice second: in a busy room, a line let out only as a conversation going on waits for the Policy's decision (LAMP_GOING_ON_ASKS)"
+            );
+            self.going_on_asks = true;
+            self.attention.ask_policy_when_going_on(true);
+        }
+    }
+
+    /// Hold the lamp's actions on the Policy's decision for their turn
+    /// (`LAMP_POLICY_HOLDS_ACTIONS`, #800), with `follows_run`
+    /// (`LAMP_FOLLOWS_RUN`, #1465): its attention decisions from the bus at
+    /// `root`.
+    pub(crate) fn holding_actions(&mut self, root: &Path, follows_run: bool) {
+        if self.reading_the_policy(root) {
+            eprintln!(
+                "lamp-voice second: a call that changes the lamp or sets its schedule runs as the Policy's decision for its turn lets it (LAMP_POLICY_HOLDS_ACTIONS{})",
+                if follows_run {
+                    ", LAMP_FOLLOWS_RUN"
+                } else {
+                    ""
+                }
+            );
+            self.holds_actions = Some(follows_run);
+        }
+    }
+
+    /// The Policy's attention decisions from the bus at `root`, read once
+    /// for both of its uses; whether they can be.
+    fn reading_the_policy(&mut self, root: &Path) -> bool {
+        if self.policy.is_some() {
+            return true;
+        }
         match crate::policy_holds::Verdicts::on(root) {
             Ok(verdicts) => {
-                eprintln!(
-                    "lamp-voice second: in a busy room, a line let out only as a conversation going on waits for the Policy's decision (LAMP_GOING_ON_ASKS)"
-                );
                 self.policy = Some(verdicts);
-                self.attention.ask_policy_when_going_on(true);
+                true
             }
-            Err(error) => eprintln!(
-                "lamp-voice second: the Policy's decisions can't be read ({error}); a line going on is judged without them"
-            ),
+            Err(error) => {
+                eprintln!(
+                    "lamp-voice second: the Policy's decisions can't be read ({error}); nothing waits for them"
+                );
+                false
+            }
         }
+    }
+
+    /// The gate for a call `name` (by its `route`) in `request`, having
+    /// waited `waited`, as the Live route's (`policy_holds::gate`, #800):
+    /// run without the switch, for a call that is not held, or for a turn
+    /// the lamp wrote itself; run when its name was heard in the turn; else
+    /// as the Policy decided the turn, a reply to the lamp running what
+    /// `policy_holds::runs_on_a_reply` says, and a reply in a busy room
+    /// setting nothing on the schedule unless it names it (#1522).
+    pub(crate) fn action_gate(
+        &mut self,
+        request: u64,
+        (route, name): (&crate::tools::Route, &str),
+        settings: &crate::tools::Settings,
+        waited: Duration,
+    ) -> crate::policy_holds::Gate {
+        use crate::policy_holds::{Gate, Verdict};
+        let Some(follows_run) = self.holds_actions else {
+            return Gate::Run;
+        };
+        if !crate::policy_holds::holds(route, name)
+            || crate::attention::own_request().load(std::sync::atomic::Ordering::Acquire) == request
+        {
+            return Gate::Run;
+        }
+        let lamp_spoke_lately = self.said_ended_ago(monotonic_us()).is_some_and(|ago| {
+            ago <= Duration::from_micros(crate::policy_holds::IN_CONVERSATION_US)
+        });
+        let Some(policy) = self.policy.as_mut() else {
+            return Gate::Run;
+        };
+        policy.take();
+        let decided = policy.verdict(request);
+        let attention = &self.attention;
+        let name_heard = attention.in_hand().is_some_and(|turn| {
+            turn.request == request && turn.name_score >= crate::policy_holds::NAME_FROM
+        });
+        // A turn after someone else's line left unanswered, or with the lamp
+        // not speaking lately, follows no line of the lamp's (#1054).
+        let verdict = decided.map(|verdict| match verdict {
+            Verdict::StayQuietFollowing
+                if attention.follows_an_unanswered_line(request) || !lamp_spoke_lately =>
+            {
+                Verdict::StayQuiet
+            }
+            verdict => verdict,
+        });
+        let busy_talk = self.going_on_asks
+            && self.busy == Some(request)
+            && !attention.names_the_schedule()
+            && !attention.answers_the_lamps_question();
+        let on_a_reply = crate::policy_holds::runs_on_a_reply(settings, route, name, follows_run)
+            && !(busy_talk && crate::policy_holds::sets(route, name));
+        crate::policy_holds::gate(verdict, name_heard, waited, on_a_reply)
     }
 
     /// The verdict on `request`, seen as `seen`, said and kept.
@@ -4571,6 +4687,106 @@ mod tests {
         assert_ne!(
             without.judge(9, line, said, signs(Room::Busy)),
             Some(crate::second_provider::WAITS_FOR_POLICY)
+        );
+        let _ = std::fs::remove_dir_all(&bus);
+    }
+
+    /// #1712, item 6 (`LAMP_POLICY_HOLDS_ACTIONS`, #800): the gate for an
+    /// action is the Live route's: wait, then run on `answer`, hold on
+    /// `stay_quiet`, run after `policy_holds::WAIT` with no decision, run
+    /// when the name was heard in the turn; a call that is not held runs at
+    /// once; without the switch everything runs.
+    #[test]
+    fn an_actions_gate_is_the_policys_decision_for_its_turn() {
+        use crate::policy_holds::Gate;
+        use crate::room_told::Room;
+        let signs = |names: Vec<(u64, f32)>| super::Signs {
+            room: Room::Quiet,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(false),
+            names,
+            near: false,
+            continues_from: None,
+        };
+        // Short: a socket's whole path must fit in 103 bytes.
+        let bus = PathBuf::from(format!("/tmp/lph6-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&bus);
+        std::fs::create_dir_all(&bus).unwrap();
+        let mut decisions = lamp_bus::Bus::new(&bus)
+            .unwrap()
+            .publisher_declared(
+                lamp_msgs::Decision::TOPIC,
+                &lamp_msgs::Decision::declaration(),
+                "policy",
+            )
+            .unwrap();
+        let mut decide = |request: u64, choice: &str| {
+            let decision = serde_json::json!({"about": "attention", "choice": choice,
+                "probability": 0.235, "answers": {}, "by": "typesafe/jev-1.13-20260917",
+                "took_ms": 540, "shadow": false, "request": request});
+            decisions.publish_json(0, &decision).unwrap();
+        };
+        let settings = crate::tools::Settings {
+            exec: Some(PathBuf::from("/tmp/exec")),
+            ..Default::default()
+        };
+        let volume = crate::tools::route(&settings, "volume_up");
+        let clock = crate::tools::Route::Clock;
+        let line = (1_000_000_000, 1_001_500_000);
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        // Without the switch, everything runs.
+        heeding.judge(9, line, "Lamp, turn it up", signs(Vec::new()));
+        assert_eq!(
+            heeding.action_gate(9, (&volume, "volume_up"), &settings, Duration::ZERO),
+            Gate::Run
+        );
+        heeding.holding_actions(&bus, false);
+        assert_eq!(
+            heeding.action_gate(9, (&volume, "volume_up"), &settings, Duration::ZERO),
+            Gate::Wait
+        );
+        assert_eq!(
+            heeding.action_gate(
+                9,
+                (&volume, "volume_up"),
+                &settings,
+                crate::policy_holds::WAIT
+            ),
+            Gate::Run,
+            "no decision in the wait"
+        );
+        assert_eq!(
+            heeding.action_gate(9, (&clock, "the_time"), &settings, Duration::ZERO),
+            Gate::Run,
+            "not a held call"
+        );
+        decide(9, "stay_quiet");
+        assert_eq!(
+            heeding.action_gate(9, (&volume, "volume_up"), &settings, Duration::ZERO),
+            Gate::Hold
+        );
+        heeding.judge(10, line, "turn it up", signs(Vec::new()));
+        decide(10, "answer");
+        assert_eq!(
+            heeding.action_gate(10, (&volume, "volume_up"), &settings, Duration::ZERO),
+            Gate::Run
+        );
+        // The name heard in the turn lets it run, whatever the Policy said.
+        heeding.judge(11, line, "turn it up", signs(vec![(1_000_100_000, 0.95)]));
+        decide(11, "stay_quiet");
+        assert_eq!(
+            heeding.action_gate(11, (&volume, "volume_up"), &settings, Duration::ZERO),
+            Gate::Run
+        );
+        // The Policy read for going-on asks alone holds no action.
+        let mut going_on_only = super::Heeding::new(true, false, None, None);
+        going_on_only.asking_the_policy(&bus);
+        going_on_only.judge(12, line, "turn it up", signs(Vec::new()));
+        decide(12, "stay_quiet");
+        assert_eq!(
+            going_on_only.action_gate(12, (&volume, "volume_up"), &settings, Duration::ZERO),
+            Gate::Run
         );
         let _ = std::fs::remove_dir_all(&bus);
     }
