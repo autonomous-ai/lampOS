@@ -1253,6 +1253,33 @@ record is written.
   with nothing called, sends `HoldingAnswer` before it completes, and the
   coordinator asks the route once to go on
   ([holding-answer.md](holding-answer.md), "On the second route").
+- **A line lost on the network is asked once more** (`LAMP_RESEND_LOST_LINE=on`,
+  as on Live; the first builder's 00:02 on #1722), as the lamp's only voice.
+  - **When:** a spoken line whose round-1 chat failed before its first
+    event (no word said, nothing called), with a fault `link::lost` counts:
+    `Transport` or `ConnectTimeout`, the faults the link's own check runs
+    for, less `ResponseTimeout`, which Live's `resend::mendable` holds
+    would only stay silent again.
+  - **How:** the turn waits for the link, asking every 250 ms whether any
+    service host takes a bare connection, as the link's check does
+    (`link::any_answers`). If one does within `resend::RESEND_WITHIN_US`
+    (5 s) of the failure, the same messages are asked once more, round 1's
+    bounds running from then.
+  - **Otherwise** it fails as before, and the link's check and down line
+    follow. The turn's `TurnFailed`, which starts that check, waits only
+    those 5 s, so the two never act on one failure at once.
+  - **Never:** twice, after a word or a call, for a status (a refusal is no
+    network loss), for the lamp's own written turn, or once a newer line has
+    begun. That line replaces the turn (`Engine::begin`).
+  - **No second "sorry":** the down line is said only for a refusal or a chat
+    not begun in time, never for these.
+  - Journal: `lamp-voice second: request N lost on the network (…): the link
+    is back, asked once more`, or why it is not asked again.
+  - Tests: `second_provider`'s
+    `a_line_lost_on_the_network_is_asked_once_more_when_the_link_is_back`
+    and `a_line_is_not_asked_again_after_words_a_call_a_refusal_or_a_newer_line`
+    (paused clock), and `link`'s
+    `a_line_is_lost_only_on_the_network_and_never_for_a_silent_answer`.
 - **Its input is taken late**, in order and from the parent's boot, as the
   Live worker's is since 40de19327 (`WorkerChannels::taking_late_input`): its
   input is checked against fresh authority when used, and its end would end
