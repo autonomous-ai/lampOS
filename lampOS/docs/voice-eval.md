@@ -74,11 +74,11 @@ expected behavior per step, triggers, deadlines, fake replies/faults and three
 fake profiles. It changes ordinary follow-ups to the whole-turn completion
 trigger; the original v1 plan and its hashes remain unchanged and readable.
 `fixtures/voice-eval-stimuli-v1.json` extends `desk-v1` with
-eight utterances and seventeen scenes. `desk-v1.json` is unchanged (SHA-256
+twelve utterances and twenty scenes. `desk-v1.json` is unchanged (SHA-256
 `636a5199…`); extension utterances that reuse a desk ID must be identical and
 scene IDs may not collide. Eight of the new scenes only remix cached speech (for
 example `quiet-question` is `math` at -24 dB, `interrupt-sky` reuses `mid-name`);
-nine use the eight new utterances, which need speech rendering once, on the Mac
+twelve use the twelve new utterances, which need speech rendering once, on the Mac
 that holds the existing cache (`render-stimuli`, which reuses every verified
 object).
 
@@ -93,6 +93,19 @@ object).
 | Background conversation, two speakers, other devices, noise | `background-conversation-question`, `two-colleagues`, `ambiguous-not-invited`, `overlapping-speakers`, `colleague-aside`, `other-device`, `computer-call`, `background-media`, `noise-only`, `noisy-question`, `typing-question` |
 | Echo-only playback | `fixed-reply-echo-only` (the h4jds57i condition), `long-answer` |
 | Delays, disconnects and recovery (fake only) | `provider-slow-first-audio`, `provider-late-answer`, `provider-supply-gap`, `slow-response-then-follow-up`, `provider-failure-before-audio`, `provider-disconnect-mid-reply`, `disconnect-between-turns`, `disconnect-mid-reply-recovery`, `provider-spurious-interrupt` |
+
+`fixtures/voice-eval-late-cut-in-v1.json` plays the 20 s forgiveness of a
+fruitless yield over a long story (`turn_taking.rs`). It is a plan of its own,
+so the v2 plan's bytes and hash stay as registered. Both scenarios ask for a story of
+about a minute; 3 s into it two asides ("What was that?", then "Oh, really?"
+4 s later) each yield and resume, which spends both fruitless yields. In
+`late-cut-in-after-fruitless-yields` a request ("Hey Lamp, what's seven times
+eight?") comes 25 s after the second aside, past the 20 s, and must cut in and
+be answered. In `late-line-too-soon-after-fruitless-yields` it comes 10 s after,
+while both still count, and the story must go on. The evaluator reads no
+`duplex_yield` or `duplex_resume`, so that second pass is shown only with the
+two yields and resumes in the session's own events; an aside admitted as a turn
+fails either. Run it with `--plan fixtures/voice-eval-late-cut-in-v1.json`.
 
 Expectations: `answer` (one turn, complete within the 15 s deadline),
 `interrupt_and_answer`, `no_interrupt`, `silence`, `observe` (no admission during
@@ -656,7 +669,7 @@ owners are active, and such an attempt is retained as failed.
 
 1. Build natively on the Lamp with the pinned toolchain:
    `cargo build --locked --offline --release -p lamp-voice-eval -p lamp-voice`.
-2. Render the eight new utterances once on the Mac that holds the existing
+2. Render the twelve new utterances once on the Mac that holds the existing
    cache, then check that `assets` resolves every scene to be run.
 3. Write a private config (no credentials; it reuses the authorized SSH setup):
 

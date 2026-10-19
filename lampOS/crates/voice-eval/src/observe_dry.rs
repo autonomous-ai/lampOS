@@ -30,16 +30,25 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
-pub const USAGE: &str = "lamp-voice-eval observe-dry --store FILE --out NEW_DIR --key-file FILE
-      [--base URL] [--model NAME] [--gap-seconds N] [--limit N]";
+pub const USAGE: &str =
+    "lamp-voice-eval observe-dry (--store FILE | --conversations FILE) --out NEW_DIR
+      --key-file FILE [--base URL] [--model NAME] [--gap-seconds N] [--limit N]";
 
 /// The voice's own idle between conversations (`remember::CONVERSATION_IDLE`).
 const GAP_MS: u64 = 45_000;
 /// The most exchanges one conversation may cite (`remember::SOURCE_IDS`).
 const MOST_SOURCES: usize = 64;
 
+/// What the pass is run over: a copy of a lamp's store, or a set of
+/// made-up conversations with what each should keep (#1693, the first
+/// builder's 01:36), built into a store of the run's own and scored.
+enum Source {
+    Store(PathBuf),
+    Conversations(PathBuf),
+}
+
 struct Arguments {
-    store: PathBuf,
+    source: Source,
     out: PathBuf,
     key_file: PathBuf,
     base: String,
@@ -50,6 +59,7 @@ struct Arguments {
 
 fn parse(args: &[String]) -> Result<Arguments> {
     let mut store = None;
+    let mut made_up = None;
     let mut out = None;
     let mut key_file = None;
     let mut base = "https://api.deepseek.com".to_owned();
@@ -65,6 +75,7 @@ fn parse(args: &[String]) -> Result<Arguments> {
         };
         match flag.as_str() {
             "--store" => store = Some(PathBuf::from(value()?)),
+            "--conversations" => made_up = Some(PathBuf::from(value()?)),
             "--out" => out = Some(PathBuf::from(value()?)),
             "--key-file" => key_file = Some(PathBuf::from(value()?)),
             "--base" => base = value()?,
@@ -88,7 +99,11 @@ fn parse(args: &[String]) -> Result<Arguments> {
         }
     }
     Ok(Arguments {
-        store: store.ok_or_else(|| invalid(USAGE))?,
+        source: match (store, made_up) {
+            (Some(store), None) => Source::Store(store),
+            (None, Some(made_up)) => Source::Conversations(made_up),
+            _ => return Err(invalid(USAGE)),
+        },
         out: out.ok_or_else(|| invalid(USAGE))?,
         key_file: key_file.ok_or_else(|| invalid(USAGE))?,
         base,
@@ -147,19 +162,24 @@ pub fn run(args: &[String]) -> Result<i32> {
         return Err(invalid("--key-file is empty"));
     }
     let observer = lamp_voice::second_provider::worker::observer_at(&args.base, &args.model, &key)?;
-    run_with(&args, &observer)
+    let summary = run_with(&args, &observer)?;
+    println!("{}", serde_json::to_string_pretty(&summary)?);
+    Ok(0)
 }
 
 /// [`run`] with its model given: the lamp's own (`observer_at`), or a
 /// scripted one in a test.
-fn run_with(args: &Arguments, observer: &lamp_voice::remember::Observer) -> Result<i32> {
+fn run_with(args: &Arguments, observer: &lamp_voice::remember::Observer) -> Result<Value> {
     DirBuilder::new().mode(0o700).create(&args.out)?;
     let copy = args.out.join("store");
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64;
     let outcome = (|| -> Result<Value> {
         // Inside, so a copy that fails partway is removed with the rest
         // (the reviewer on #1988).
-        copy_store(&args.store, &copy)?;
+        match &args.source {
+            Source::Store(store) => copy_store(store, &copy)?,
+            Source::Conversations(_) => DirBuilder::new().mode(0o700).create(&copy)?,
+        }
         // Kept for ten years: nothing of the copy is pruned on opening.
         let mut days = Days::open(
             Options {
@@ -169,10 +189,28 @@ fn run_with(args: &Arguments, observer: &lamp_voice::remember::Observer) -> Resu
             },
             now,
         )?;
+        let expected = match &args.source {
+            Source::Store(_) => vec![],
+            Source::Conversations(file) => {
+                made_up_store(&mut days, &fs::read_to_string(file)?, now)?
+            }
+        };
+        let mut score = Score::default();
         let mut labels = private_file(&args.out.join("labels.jsonl"))?;
         let mut counts = BTreeMap::<String, u64>::new();
         let mut asked_ms = vec![];
         let cut = conversations(&days.exchanges()?, args.gap_ms);
+        // Scored one for one: the set's n-th conversation is the cut's n-th,
+        // so a gap or limit that joins or drops some is refused (the peer
+        // read's P3 on #2021).
+        if !expected.is_empty() && (cut.len() != expected.len() || args.limit < cut.len()) {
+            return Err(invalid(&format!(
+                "the made-up set has {} conversations and the cut {} (limit {}): leave --gap-seconds under 600 and --limit out",
+                expected.len(),
+                cut.len(),
+                args.limit.min(cut.len())
+            )));
+        }
         for (n, (person, ids)) in cut.iter().take(args.limit).enumerate() {
             *counts.entry("conversations".into()).or_default() += 1;
             let input = match days.conversation_end_with(person, &format!("dry-{n}"), ids, &[]) {
@@ -219,6 +257,17 @@ fn run_with(args: &Arguments, observer: &lamp_voice::remember::Observer) -> Resu
                 }
             }
             let kept = applied.is_ok();
+            if let Some(expect) = expected.get(n) {
+                let texts: Vec<&str> = match (&proposed, &applied) {
+                    (Some(output), Ok(_)) => output
+                        .observations
+                        .iter()
+                        .map(|p| p.text.as_str())
+                        .collect(),
+                    _ => vec![],
+                };
+                score.add(expect, &texts);
+            }
             let line = json!({
                 "conversation": n,
                 "person": if person.as_str() == Person::EVERYONE { "everyone".to_owned() } else { format!("{}…", person.as_str().chars().take(6).collect::<String>()) },
@@ -237,17 +286,115 @@ fn run_with(args: &Arguments, observer: &lamp_voice::remember::Observer) -> Resu
                 .get(((asked_ms.len().max(1) - 1) as f64 * q).round() as usize)
                 .copied()
         };
-        Ok(
-            json!({"counts": counts, "asked_ms": {"n": asked_ms.len(), "median": at(0.5), "p90": at(0.9)},
-            "labels": args.out.join("labels.jsonl")}),
-        )
+        let mut summary = json!({"counts": counts, "asked_ms": {"n": asked_ms.len(), "median": at(0.5), "p90": at(0.9)},
+            "labels": args.out.join("labels.jsonl")});
+        if !expected.is_empty() {
+            summary["bar"] = score.summary();
+        }
+        Ok(summary)
     })();
     // The copy of the store goes, whatever happened, a partial one too.
     let removed = !copy.exists() || fs::remove_dir_all(&copy).is_ok();
     let mut summary = outcome?;
     summary["store_copy_removed"] = json!(removed);
-    println!("{}", serde_json::to_string_pretty(&summary)?);
-    Ok(0)
+    Ok(summary)
+}
+
+/// One made-up conversation: its turns (heard, said) and what the pass
+/// should keep of it: a thing carrying `keep`, or nothing; `intrusive` marks
+/// one whose keeping, unasked, a person would mind (health, money).
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MadeUp {
+    pub turns: Vec<(String, String)>,
+    #[serde(default)]
+    pub keep: Option<String>,
+    #[serde(default)]
+    pub intrusive: bool,
+}
+
+/// The set built into the run's own store, the room's, each conversation
+/// ten minutes after the last and its turns ten seconds apart, so the cut
+/// gives them back one for one. What each should keep, in that order.
+fn made_up_store(days: &mut Days, set: &str, now: u64) -> Result<Vec<MadeUp>> {
+    let set: Vec<MadeUp> = serde_json::from_str(set)?;
+    let room = Person::everyone();
+    let start = now.saturating_sub(set.len() as u64 * 600_000 + 600_000);
+    for (n, conversation) in set.iter().enumerate() {
+        if conversation.turns.is_empty() || conversation.turns.len() > MOST_SOURCES {
+            return Err(invalid("each made-up conversation has 1 to 64 turns"));
+        }
+        for (k, (heard, said)) in conversation.turns.iter().enumerate() {
+            let at = start + n as u64 * 600_000 + k as u64 * 10_000;
+            days.append(&room, at, heard, said, &[])?;
+        }
+    }
+    Ok(set)
+}
+
+/// The first builder's bar, counted: things kept rightly (each carries the
+/// word it should, as a whole word), things kept wrongly (anything else
+/// kept), conversations missed, intrusive things kept, and conversations
+/// rightly left with nothing.
+#[derive(Default)]
+struct Score {
+    kept_rightly: u64,
+    kept_wrongly: u64,
+    missed: u64,
+    intrusive_kept: u64,
+    nothing_right: u64,
+    /// Conversations with something worth keeping.
+    worth: u64,
+}
+
+impl Score {
+    fn add(&mut self, expect: &MadeUp, kept: &[&str]) {
+        match &expect.keep {
+            Some(word) => {
+                // A whole word, as lamp-skills' `if_heard` matches: "mum" is
+                // not in "minimum" (the peer read's P3 on #2021).
+                let carries = |text: &&&str| {
+                    text.split(|c: char| !c.is_alphanumeric())
+                        .any(|w| w.to_lowercase() == word.to_lowercase())
+                };
+                let right = kept.iter().filter(carries).count() as u64;
+                self.worth += 1;
+                if right == 0 {
+                    self.missed += 1;
+                }
+                // Each thing kept counts once: right if it carries the word,
+                // wrong if not; two right ones are both right.
+                self.kept_rightly += right;
+                self.kept_wrongly += kept.len() as u64 - right;
+            }
+            None if kept.is_empty() => self.nothing_right += 1,
+            None => {
+                self.kept_wrongly += kept.len() as u64;
+                if expect.intrusive {
+                    self.intrusive_kept += kept.len() as u64;
+                }
+            }
+        }
+    }
+
+    fn summary(&self) -> Value {
+        let kept = self.kept_rightly + self.kept_wrongly;
+        json!({
+            "kept_rightly": self.kept_rightly,
+            "kept_wrongly": self.kept_wrongly,
+            "missed": self.missed,
+            "intrusive_kept": self.intrusive_kept,
+            "nothing_right": self.nothing_right,
+            "wrong_per_kept": if kept == 0 { Value::Null } else { json!(self.kept_wrongly as f64 / kept as f64) },
+            // The conversations worth keeping from that were missed: beside
+            // the bar, not in it, so the bar's line can't hide them (the
+            // reviewer's P3 on #2021).
+            "missed_of_worth": if self.worth == 0 { Value::Null } else { json!(self.missed as f64 / self.worth as f64) },
+            // The first builder's bar on #1693: under 1 in 10 kept wrongly,
+            // none intrusive. It says nothing of what was missed.
+            "passes_wrong_and_intrusive": kept > 0 && self.kept_wrongly * 10 < kept && self.intrusive_kept == 0,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -356,7 +503,7 @@ mod tests {
                 json!({"observations":[]})
             })
         });
-        assert_eq!(run_with(&args, &observer).unwrap(), 0);
+        run_with(&args, &observer).unwrap();
         assert!(!out.join("store").exists());
         let labels: Vec<Value> = fs::read_to_string(out.join("labels.jsonl"))
             .unwrap()
@@ -407,6 +554,122 @@ mod tests {
         assert!(run_with(&args, &observer).is_err());
         assert!(!out.join("store").exists());
         fs::set_permissions(&wal, fs::Permissions::from_mode(0o600)).unwrap();
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The made-up set (#1693, the first builder's 01:36) built into the
+    /// run's own store and scored against what each should keep. A scripted
+    /// model that keeps the ten right things, misses none, and keeps the
+    /// health line it should leave: 10 right, 1 wrong, 1 intrusive, and the
+    /// bar not passed.
+    #[test]
+    fn the_made_up_set_is_scored_against_what_each_conversation_should_keep() {
+        const SET: &str = include_str!("../observe/synthetic-20.json");
+        let set: Vec<MadeUp> = serde_json::from_str(SET).unwrap();
+        assert_eq!(set.len(), 20);
+        let root =
+            std::env::temp_dir().join(format!("lamp-observe-made-up-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        DirBuilder::new().mode(0o700).create(&root).unwrap();
+        let file = root.join("set.json");
+        fs::write(&file, SET).unwrap();
+        let out = root.join("out");
+        let args = parse(
+            &[
+                "--conversations",
+                file.to_str().unwrap(),
+                "--out",
+                out.to_str().unwrap(),
+                "--key-file",
+                "unused",
+            ]
+            .map(str::to_owned),
+        )
+        .unwrap();
+        let keep: Vec<String> = set.iter().filter_map(|c| c.keep.clone()).collect();
+        let observer: lamp_voice::remember::Observer = Box::new(move |input: &Value| {
+            let first = &input["records"][0];
+            let heard = first["heard"].as_str()?;
+            let worth = keep.iter().any(|word| heard.contains(word.as_str()))
+                || heard.contains("cholesterol");
+            Some(if worth {
+                json!({"observations":[{"text":heard,"category":"thread","source_ids":[first["id"]],"supersedes":null}]})
+            } else {
+                json!({"observations":[]})
+            })
+        });
+        let summary = run_with(&args, &observer).unwrap();
+        assert_eq!(
+            summary["bar"],
+            json!({"kept_rightly":10,"kept_wrongly":1,"missed":0,"intrusive_kept":1,"nothing_right":9,
+                "wrong_per_kept":1.0/11.0,"missed_of_worth":0.0,"passes_wrong_and_intrusive":false})
+        );
+        assert_eq!(summary["counts"]["conversations"], 20);
+        assert!(!out.join("store").exists());
+        assert_eq!(
+            fs::read_to_string(out.join("labels.jsonl"))
+                .unwrap()
+                .lines()
+                .count(),
+            20
+        );
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The peer read's P3s on #2021: a whole word counts, a part of one
+    /// doesn't, and two right things are both right.
+    #[test]
+    fn the_score_counts_whole_words_and_each_thing_once() {
+        let made_up = |keep: Option<&str>| MadeUp {
+            turns: vec![],
+            keep: keep.map(str::to_owned),
+            intrusive: false,
+        };
+        let mut score = Score::default();
+        score.add(&made_up(Some("mum")), &["Visiting mum on Sunday"]);
+        score.add(&made_up(Some("mum")), &["At least the minimum"]);
+        score.add(&made_up(Some("warm")), &["Warm light", "Warm, never blue"]);
+        assert_eq!(
+            (score.kept_rightly, score.kept_wrongly, score.missed),
+            (3, 1, 1)
+        );
+    }
+
+    /// A gap or a limit that doesn't give the made-up set back one for one
+    /// is refused, so the bar is never scored on a mismatch.
+    #[test]
+    fn a_cut_that_joins_or_drops_made_up_conversations_is_refused() {
+        const SET: &str = include_str!("../observe/synthetic-20.json");
+        let root =
+            std::env::temp_dir().join(format!("lamp-observe-made-up-cut-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        DirBuilder::new().mode(0o700).create(&root).unwrap();
+        let file = root.join("set.json");
+        fs::write(&file, SET).unwrap();
+        let observer: lamp_voice::remember::Observer =
+            Box::new(|_: &Value| Some(json!({"observations":[]})));
+        for (n, extra) in [["--gap-seconds", "900"], ["--limit", "5"]]
+            .iter()
+            .enumerate()
+        {
+            let out = root.join(format!("out{n}"));
+            let args = parse(
+                &[
+                    "--conversations",
+                    file.to_str().unwrap(),
+                    "--out",
+                    out.to_str().unwrap(),
+                    "--key-file",
+                    "unused",
+                    extra[0],
+                    extra[1],
+                ]
+                .map(str::to_owned),
+            )
+            .unwrap();
+            assert!(run_with(&args, &observer).is_err(), "{extra:?}");
+            assert!(!out.join("store").exists(), "{extra:?}");
+        }
         let _ = fs::remove_dir_all(&root);
     }
 
