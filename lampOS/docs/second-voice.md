@@ -378,6 +378,16 @@ end of the line: the person's words, then the chat answer, each sentence
 said as it is complete while the next is still being written. Sentence
 order is kept. A written turn is the same from the chat on.
 
+- **Each stage after the words is journaled, without words:** `chat round
+  1 first event in … ms`, then `first piece to the voice … ms after the
+  words were heard, K words` (the first clause or sentence asked of the
+  voice), then `first answer audio … ms after the words were heard`. The
+  first piece's time less the first event's is the wait for the clause.
+  The first audio's time less the first piece's is the voice's own. The
+  coordinator's `--playout-start-ms` (350 on the units) comes after (#1712,
+  the first builder at 17:27: the chat's first clause about 0.9 s and the
+  voice's first audio about 0.3 s, but the first answer audio 1.4 to 3.9 s
+  after the words).
 - **With `LAMP_SECOND_PREPARED=on` the chat is begun on the line's early
   words** (off unless set; #1712, the first builder at 17:02: the route's
   first word came about 3.4 s after a line, Live's 2.4 s, and the bar is

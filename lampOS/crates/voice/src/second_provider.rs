@@ -1911,6 +1911,8 @@ async fn answer(
         announcement,
         sentences,
         started: false,
+        request,
+        heard_at: Instant::now(),
     };
     let began = Instant::now();
     // The bounds below are on the runtime's clock, which a test can step.
@@ -2413,6 +2415,12 @@ struct Queue<'a> {
     sentences: mpsc::Sender<(String, Packets)>,
     /// Some of the answer itself is on its way.
     started: bool,
+    /// Whose, and when its words were heard: for the journal's line when
+    /// the first piece goes to the voice (#1712, the first builder at 17:27:
+    /// the chat's first clause in about 0.9 s and the voice's first audio in
+    /// about 0.3 s, but the first answer audio 1.4 to 3.9 s after the words).
+    request: u64,
+    heard_at: Instant,
 }
 impl Queue<'_> {
     async fn announce(&mut self) -> Result<(), Stop> {
@@ -2438,6 +2446,14 @@ impl Queue<'_> {
             return Ok(());
         }
         self.announce().await?;
+        if !self.started {
+            eprintln!(
+                "lamp-voice second: request {} first piece to the voice {} ms after the words were heard, {} words",
+                self.request,
+                self.heard_at.elapsed().as_millis(),
+                text.split_whitespace().count()
+            );
+        }
         self.started = true;
         let packets = start_speech(self.shared, self.speech, text.clone());
         self.send(text, packets).await
