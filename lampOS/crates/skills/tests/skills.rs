@@ -8110,6 +8110,12 @@ fn a_watch_is_turned_only_by_its_tool_and_holds_to_its_permissions() {
     let watch = loaded.watch.as_ref().unwrap();
     assert_eq!(watch.every_us, 600_000_000);
     assert_eq!(watch.asked_within_us, 30_000_000);
+    assert_eq!(watch.most_us, 12 * 3_600_000_000);
+    assert!(
+        watch
+            .if_heard
+            .contains(&vec!["keep".to_owned(), "an".into(), "eye".into()])
+    );
     assert_eq!(loaded.tool.as_deref(), Some("keep_watch"));
     assert!(loaded.triggers.is_empty());
     for (from, to, why) in [
@@ -8157,6 +8163,19 @@ fn a_watch_is_turned_only_by_its_tool_and_holds_to_its_permissions() {
             "every = \"10m\"",
             "every = \"10m\"\npicture = true",
             "unknown field `picture`",
+        ),
+        ("most = \"12h\"", "most = \"30m\"", "most is 1h to 24h"),
+        ("most = \"12h\"", "most = \"25h\"", "most is 1h to 24h"),
+        ("most = \"12h\"", "", "missing field `most`"),
+        (
+            "if_heard = [",
+            "if_heard = [\"\", ",
+            "if_heard is 1 to 16 entries",
+        ),
+        (
+            "if_heard = [",
+            "if_heard = [] #",
+            "if_heard is 1 to 16 entries",
         ),
         (
             "[watch]\nevery",
@@ -8287,8 +8306,8 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
         "{refused}"
     );
     assert!(next(&mut requests, Duration::from_millis(300)).is_none());
-    // Minh, whose face the eyes know, asks out loud.
-    fs::write(&known, "Minh\n").unwrap();
+    // A, whose face the eyes know, asks out loud.
+    fs::write(&known, "known-a\n").unwrap();
     heard
         .publish_json(
             1,
@@ -8318,7 +8337,7 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
         (mark.claim.source.as_str(), mark.claim.priority),
         ("skill:guard-mode", Priority::Skill)
     );
-    // Minh leaves; someone comes and stays two minutes, then goes.
+    // A leaves; someone comes and stays two minutes, then goes.
     fs::remove_file(&known).unwrap();
     say(&mut presence, true);
     say(&mut presence, false);
@@ -8336,10 +8355,10 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
             && text.text.starts_with("Someone was at your desk"),
         "{text:?}"
     );
-    assert!(!text.text.contains("Minh"));
-    // Minh back, known again: the watch ends, its mark given back.
+    assert!(!text.text.contains("known-a"));
+    // A back, known again: the watch ends, its mark given back.
     say(&mut presence, true);
-    fs::write(&known, "Minh\n").unwrap();
+    fs::write(&known, "known-a\n").unwrap();
     let mut back = None;
     let until = Instant::now() + Duration::from_secs(10);
     while back.is_none() && Instant::now() < until {
@@ -8362,4 +8381,174 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
         off["result"]["next"].as_str().unwrap().contains("weren't"),
         "{off}"
     );
+}
+
+/// The peer read's P2 on #1807, the program: guard mode counts only while
+/// the ring shows its mark. Told the mark is outranked (the person asked
+/// for their own light), the program gives the mark back and asks for it
+/// again with a new claim, which the ring hears over the person's light;
+/// until the ring says it is shown again (`light/reached`), a visit is not
+/// counted and nothing is texted; shown, the next visit is.
+#[test]
+fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
+    use lamp_msgs::{LightOutranked, LightReached, MessageOut, RoomPresence};
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("gs")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    copy(
+        &skills_root().join("guard-mode"),
+        &root.join("skills/guard-mode"),
+    );
+    let bus = Bus::new(root.join("bus")).unwrap();
+    let mut requests = bus.subscribe(LightRequest::TOPIC, "ring").unwrap();
+    let mut texts = bus.subscribe(MessageOut::TOPIC, "phone").unwrap();
+    let mut presence = bus
+        .publisher_declared(RoomPresence::TOPIC, &RoomPresence::declaration(), "eyes")
+        .unwrap();
+    let mut heard = bus
+        .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+        .unwrap();
+    let mut outranked = bus
+        .publisher_declared(
+            LightOutranked::TOPIC,
+            &LightOutranked::declaration(),
+            "ring",
+        )
+        .unwrap();
+    let mut reached = bus
+        .publisher_declared(LightReached::TOPIC, &LightReached::declaration(), "ring")
+        .unwrap();
+    let tools = root.join("tools");
+    let clock = Clock::at(root);
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                root.join("skills").as_os_str(),
+                "--bus-root".as_ref(),
+                root.join("bus").as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--boot-id".as_ref(),
+                OsStr::new("boot-test"),
+            ])
+            .args(clock.args())
+            .env("LAMP_LIGHT_REQUESTS", "on")
+            .env_remove("LAMP_SKILLS_ASK")
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !tools.join("call.sock").exists()
+        || bus.subscribers(RoomPresence::TOPIC).unwrap().is_empty()
+    {
+        assert!(Instant::now() < deadline, "guard mode was never loaded");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let next = |subscriber: &mut lamp_bus::Subscriber, within: Duration| {
+        let until = Instant::now() + within;
+        loop {
+            if let Some(message) = subscriber.recv(Duration::from_millis(50)).unwrap() {
+                break Some(message);
+            }
+            if Instant::now() >= until {
+                break None;
+            }
+        }
+    };
+    let say = |presence: &mut lamp_bus::Publisher, someone: bool| {
+        presence
+            .publish_json(
+                1,
+                &RoomPresence {
+                    someone,
+                    nobody_s: if someone { 0 } else { 20 },
+                    by: someone.then_some(lamp_msgs::SeenBy::Voice),
+                },
+            )
+            .unwrap();
+        clock.skip(Duration::ZERO);
+    };
+    // A visit: they leave, someone comes for two minutes and goes.
+    let visit = |presence: &mut lamp_bus::Publisher| {
+        say(presence, false);
+        say(presence, true);
+        clock.skip(Duration::from_secs(120));
+        say(presence, true);
+        say(presence, false);
+    };
+    heard
+        .publish_json(
+            1,
+            &Speech {
+                text: "Lamp, keep an eye on things while I'm out".into(),
+                finished: true,
+                locale: None,
+                request: None,
+            },
+        )
+        .unwrap();
+    // Taken in before the call.
+    std::thread::sleep(Duration::from_millis(300));
+    let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
+    writeln!(
+        &stream,
+        r#"{{"op":"call","name":"keep_watch","args":{{"turn":"on"}}}}"#
+    )
+    .unwrap();
+    let mut line = String::new();
+    BufReader::new(&stream).read_line(&mut line).unwrap();
+    assert!(line.contains(r#""ok":true"#), "{line}");
+    let mark: LightRequest = next(&mut requests, Duration::from_secs(5))
+        .expect("the mark")
+        .parse()
+        .unwrap();
+    let source = mark.claim.source.clone();
+    assert_eq!(source, "skill:guard-mode");
+    // The person's light over it: given back, and asked for again anew.
+    outranked
+        .publish_json(
+            1,
+            &LightOutranked {
+                source: source.clone(),
+                by: LightOutranked::PERSON.into(),
+            },
+        )
+        .unwrap();
+    let mut asked = Vec::new();
+    while let Some(message) = next(&mut requests, Duration::from_secs(2)) {
+        asked.push(message.parse::<LightRequest>().unwrap());
+    }
+    let now = lamp_ipc::monotonic_us();
+    assert!(
+        asked.len() >= 2
+            && !asked[0].claim.holds_at("boot-test", now)
+            && asked[1].claim.holds_at("boot-test", now)
+            && asked[1].light == mark.light,
+        "given back and asked again: {asked:?}"
+    );
+    // Not yet said shown again: a visit is not counted.
+    visit(&mut presence);
+    assert!(next(&mut texts, Duration::from_millis(800)).is_none());
+    // Shown: the next visit is.
+    reached
+        .publish_json(
+            1,
+            &LightReached {
+                source,
+                light: mark.light.clone(),
+            },
+        )
+        .unwrap();
+    std::thread::sleep(Duration::from_millis(300));
+    clock.skip(Duration::from_secs(600));
+    visit(&mut presence);
+    let text: MessageOut = next(&mut texts, Duration::from_secs(5))
+        .expect("a text once the mark shows")
+        .parse()
+        .unwrap();
+    assert!(text.text.ends_with(", for about 2 minutes."), "{text:?}");
 }
