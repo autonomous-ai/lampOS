@@ -1,0 +1,75 @@
+{
+  "head": "90faee56fa4464f270b9ac12d40fca0ee8c0d307",
+  "foundation_parent": "d3ab2046545f3f09f52a9c0071b7ae59c46af1cf",
+  "integration_base": "52a42b1eb5fca5d73c394fdc18637e7e3159585d",
+  "source_sha256": {
+    "lampOS/crates/voice/src/second_provider.rs": "fa0898c2315118edfad5c9541424862fb212c91f26073522b2ca857fd3a7e122",
+    "lampOS/crates/voice/src/second_provider/tests.rs": "1fd3e917872e070309e5ea15b0972a64cb3b7f7327a2383f3f5d4caa210f2740",
+    "lampOS/crates/voice/src/second_provider/worker.rs": "2c345a0e5efb657a3d46f3340d9e03e7a284946badc65203429d206c92d6971a"
+  },
+  "function_union": [
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "source": "upstream",
+      "revision": "d3ab2046545f3f09f52a9c0071b7ae59c46af1cf",
+      "functions_retained": 109,
+      "missing": []
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "source": "incoming_music",
+      "revision": "c44d66557bf6c7f8ac541ef4e4fc6498c07b9c65",
+      "functions_retained": 116,
+      "missing": []
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "source": "upstream",
+      "revision": "d3ab2046545f3f09f52a9c0071b7ae59c46af1cf",
+      "functions_retained": 96,
+      "missing": []
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "source": "incoming_music",
+      "revision": "c44d66557bf6c7f8ac541ef4e4fc6498c07b9c65",
+      "functions_retained": 104,
+      "missing": []
+    }
+  ],
+  "review": "Carried/held-only answers pass no SpokenTurn; final admitted fresh raw words are required for Music. Busy-room Policy and held-report routing remain from integration. Ordinary tool calls use the shared run_tool helper; private offers keep scope, identity, and deadline guards.",
+  "new_tests": [
+    "warm_listeners_keep_exact_words_and_distinct_music_request_identities",
+    "replaced_warm_listeners_hear_current_words_and_current_music_identity",
+    "written_and_say_turns_neither_open_nor_consume_a_warm_music_listener",
+    "warm_prepared_music_waits_for_final_raw_words_and_admission",
+    "stop_during_music_rpc_and_warm_stt_opening_finishes_without_waiting"
+  ],
+  "limits": [
+    "Private composition only; final publication follows actual Bedtime landing.",
+    "Engine simulations and one real local worker IPC fixture, without live STT, provider, playback, or device qualification.",
+    "First reported the warm-STT pause/split P1 on #2002; Fourth owns its fix and the switch remains off on lamps.",
+    "Known held-report context and speaking-face activation findings remain separately owned."
+  ],
+  "newer_integration_boundary": {
+    "head": "175e411c17b061137a5fa94deda21d243e228c21",
+    "merged_after_rehearsal_freeze": [
+      2003,
+      1967
+    ],
+    "finding": {
+      "pr": 2003,
+      "severity": "P2",
+      "url": "https://github.com/autonomous-ai/lampOS/pull/2003#issuecomment-6274506329",
+      "summary": "Deleted current-conversation source IDs remain attached to the next remember request; source-verified only, Memory owner retains fix."
+    },
+    "port_notes": [
+      "Memory adds conversation source provenance, without changing Music runtime files.",
+      "Unclear-line behavior adds Engine CutIn/AskAgain hooks and a misheard note, worker heeding hooks, and coordinator test support.",
+      "Only overlapping changed-line insertion identified is the test block after words_the_heed_holds_end_the_turn_unanswered; preserve both groups.",
+      "Final port must test prepared Music held as unclear, misheard-note invalidation of prepared context, carried-answer precedence without a new Music identity, and new-owner cancellation.",
+      "The shared Memory runner must retain source/person provenance with Music both off and on."
+    ],
+    "limits": "Static comparison only. The rehearsal does not include these newer changes, and final Music follows the actual Bedtime landing."
+  }
+}

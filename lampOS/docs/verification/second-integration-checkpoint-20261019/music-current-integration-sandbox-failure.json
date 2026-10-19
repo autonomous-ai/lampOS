@@ -1,0 +1,71 @@
+{
+  "head": "90faee56fa4464f270b9ac12d40fca0ee8c0d307",
+  "integration_base": "52a42b1eb5fca5d73c394fdc18637e7e3159585d",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "source_only": true,
+  "fresh_isolated_target": true,
+  "source_file_count": 1616,
+  "source_tree_sha256": "5faa7b1efc7e1baf4382b41fd99f05e552ebe71e20f37de485980f548917d7e5",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.64,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 127.15,
+      "log_sha256": "b3b7331d6e1728a0045a7d3b11f03db44ff47823b0dd697c121aec357df38085",
+      "summaries": []
+    },
+    {
+      "stage": "second_provider",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 101,
+      "seconds": 64.95,
+      "log_sha256": "779506b9317ddac8425c167e9fc56c56bfe72b747693db5446dc22443974e0d6",
+      "summaries": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2365 filtered out; finished in 0.00s",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2365 filtered out; finished in 0.00s",
+        "test result: FAILED. 244 passed; 34 failed; 0 ignored; 0 measured; 2088 filtered out; finished in 1.95s"
+      ]
+    }
+  ],
+  "scope": "Focused combined integration preflight; filters overlap and are not a complete workspace gate.",
+  "conclusion": "failed",
+  "failure": "The sandbox denied local TCP and Unix socket creation; provider suite 244 passed, 34 failed, 0 ignored, 2088 filtered. Child-process summaries are not added to that suite count.",
+  "all_frozen_checkout_and_source_copy_hashes_match": true,
+  "continuation": "The same source and target continue with local socket permission; this failed attempt remains separate."
+}

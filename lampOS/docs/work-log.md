@@ -19,7 +19,7 @@ Ready for integration: yes (#1996 output caps passed automatic ARM64; inherited 
 
 Ready for integration: no (#1732 ARM64 is green; the authored skill is being split from shared foundations)
 
-Ready for integration: no (#1757 follows Bedtime; complete private host gate failed the unchanged Policy and motion fixtures)
+Ready for integration: no (#1757 follows Bedtime; warm-listener rehearsal passed focused gates; final full and ARM64 gates remain)
 
 Ready for integration: yes (#2005 Policy fixture repair passed host and automatic ARM64; reviewer merge pending)
 
@@ -33,11 +33,11 @@ lamp qualification and merging.
 
 The [14:30 UTC checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6269677751)
 acknowledges the missed checkpoint and the new second-route requirement.
-The full Queue and all four own PR review threads were reread at 18:02 UTC
-(712 Queue comments; no reviews, inline comments or unresolved threads on
-#1732, #1757, #1996 or #2005). The integration tip at that read was `e9d84fbee7`;
+The full Queue and all four own PR review threads were reread at 18:32 UTC
+(737 Queue comments; no reviews, inline comments or unresolved threads on
+#1732, #1757, #1996 or #2005). The integration tip at that read was `175e411c17`;
 #1925, the separate #1976 stress-bar fix, #1966 Tasks fix, #1990 motion
-fixture amendment and #1940 are merged. Foundation preparation starts at `df722db2d0`. The
+fixture amendment, #1940, #2002, #2003 and #1967 are merged. Foundation preparation starts at `df722db2d0`. The
 Bedtime publication is based on #1712's `b919291458`: Deepgram, DeepSeek and
 ElevenLabs. No provider session or device is started by these host tests.
 
@@ -339,14 +339,42 @@ pre-final offer on this path: prepared chat buffers events without running
 tools, and final admission uses the live lease. Conditional regression
 cases are recorded for whichever revisions actually land.
 
-At 18:18 UTC, the integration tip is `52a42b1eb5`, including #2002's warm
-STT connections. The [Music boundary review](verification/second-integration-checkpoint-20261019/music-warm-stt-integration-review.json)
-found no new P1/P2; the shared fixture needs both sets of fields. A private
-rehearsal on that tip applied all four Bedtime commits cleanly, retaining
-their 28/19/26/5-file scopes. Music's Engine, worker and test conflicts are
-being resolved there, with exact-transcript, fresh-request, typed-isolation
-and bounded-Stop regressions. This is preparation; publication still follows
-actual Bedtime landing and the final head's complete gates.
+The private warm-listener rehearsal is `90faee56fa4464f270b9ac12d40fca0ee8c0d307`
+on `52a42b1eb5` plus the four Bedtime foundations. Its [source review](verification/second-integration-checkpoint-20261019/music-current-integration-review.json)
+confirms the Engine/worker union retains carried-answer restrictions, scoped
+calls, busy-room Policy waiting and private-offer checks. Five new regressions
+cover exact transcripts, current request identity, spare replacement, typed/Say
+isolation, prepared admission and Stop during a pending Music RPC and warm STT
+connection. All inherited helper/function names remain.
+
+The [focused preflight](verification/second-integration-checkpoint-20261019/music-current-integration-preflight.json)
+passed formatting **3.64 s**, strict workspace/all-target Clippy **127.15 s**,
+**278 second-provider**, **46 requested-audio**, **3 accepted-decline** and
+**1 prior-action** cases; these filters overlap. Full Actions/Msgs/Skills
+passed **486/0/0**, none filtered, **124.16 s**, ring-worker **23/0/0**, and
+workspace build **77.12 s**. All **1,616** source hashes match both the checkout
+and source-only copy. The [27-consumer scan](verification/second-integration-checkpoint-20261019/music-current-integration-consumers.json)
+records the final full gate's scope; this preflight is not that gate.
+The [initial sandbox attempt](verification/second-integration-checkpoint-20261019/music-current-integration-sandbox-failure.json)
+reported **244 passed, 34 failed** when local socket creation was denied.
+The identical frozen source/target continued with socket access; that failure
+is preserved, and formatting/Clippy were not repeated.
+
+First subsequently reported #2002's warm-STT pause/split P1 on the lamp:
+a name-only fragment followed by a pause could leave both fragments held.
+Its owner is fixing it and the switch remains off on lamps. The above Engine
+and local IPC checks do not qualify live STT or acoustic behavior. A further
+private composition on `175e411c17` is preparing #1967 unclear/hum regression
+coverage; it has no runtime result yet. Final Music publication follows the
+actual Bedtime landing and preserves the separately owned held-report and
+speaking-face fixes when they land.
+
+Review of the newer #2003 Memory change found a [separate source-verified P2](https://github.com/autonomous-ai/lampOS/pull/2003#issuecomment-6274506329):
+after forget deletes a kept fact's exchange, the client can send that deleted
+source ID on the next remember call in the same conversation, causing the new
+fact to be refused. The existing real-client/store test ends after deletion;
+the owner has the requested follow-on-write regression. No runtime or lamp
+reproduction, peer source edit, or fix ownership is claimed here.
 
 Bedtime and Tasks have only their original automatic PR ARM64 run,
 following First's no-duplicate-dispatch direction. GitHub's [Actions incident](https://www.githubstatus.com/incidents/8tzbpcnl75jp)
