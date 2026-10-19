@@ -39,6 +39,9 @@ tar = { version = "0.4", default-features = false }
 # (src/package.rs), whose values differ between Linux, its ARM64 build and
 # macOS. Constants only: no unsafe code.
 libc = "0.2"
+# The main loop's one wait on every topic's socket and its wake pipe
+# (`poll`, `pipe`), safe calls, as the voice's controls make (#1806).
+rustix = { version = "=1.1.5", features = ["pipe", "fs", "event"] }
 
 [dev-dependencies]
 tempfile = "3"
