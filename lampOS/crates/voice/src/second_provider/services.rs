@@ -66,7 +66,14 @@ pub struct Net {
     /// one when it fails.
     gemini_tts: Option<Arc<GeminiTts>>,
     declare: net::Declare,
+    /// `LAMP_SECOND_CHAT_WARM=on`: the chat's connection is opened as a line
+    /// begins ([`Chat::warm`]).
+    warm_chat: bool,
 }
+
+/// Where the worker reads whether the chat's connection is opened as a line
+/// begins: `on`, and nothing else.
+pub const CHAT_WARM_ENVIRONMENT: &str = "LAMP_SECOND_CHAT_WARM";
 
 /// Gemini's API as the route calls it: where, with which key and model.
 pub struct GeminiCall<'a> {
@@ -83,8 +90,18 @@ impl Net {
             tts: Arc::new(Tts::new(&config)?),
             gemini_tts: None,
             declare,
+            warm_chat: false,
             config: Arc::new(config),
         })
+    }
+
+    /// The chat's connection is opened ahead as a line begins, when it has
+    /// been idle ([`Chat::warm`], `LAMP_SECOND_CHAT_WARM=on`, #1712: the
+    /// chat's first event came in 0.9 to 1.9 s on lamp-4ace, 0.7 s from the
+    /// probe).
+    pub fn warming_the_chat(mut self, on: bool) -> Self {
+        self.warm_chat = on;
+        self
     }
 
     /// The chat's requests are given only the tools `narrow` keeps
@@ -260,16 +277,30 @@ impl Services for Net {
     }
 
     fn warm(&self) -> BoxFuture<'static, ()> {
-        let Some(gemini) = self.gemini_tts.clone() else {
-            return Box::pin(async {});
-        };
+        let gemini = self.gemini_tts.clone();
+        let chat = self.warm_chat.then(|| self.chat.clone());
         Box::pin(async move {
-            if let Some((status, took)) = gemini.warm().await {
-                eprintln!(
-                    "lamp-voice second: Gemini's speech connection opened ahead in {} ms (HTTP {status})",
-                    took.as_millis()
-                );
-            }
+            let speech = async {
+                if let Some(gemini) = gemini
+                    && let Some((status, took)) = gemini.warm().await
+                {
+                    eprintln!(
+                        "lamp-voice second: Gemini's speech connection opened ahead in {} ms (HTTP {status})",
+                        took.as_millis()
+                    );
+                }
+            };
+            let chatting = async {
+                if let Some(chat) = chat
+                    && let Some((status, took)) = chat.warm().await
+                {
+                    eprintln!(
+                        "lamp-voice second: the chat's connection opened ahead in {} ms (HTTP {status})",
+                        took.as_millis()
+                    );
+                }
+            };
+            tokio::join!(speech, chatting);
         })
     }
 }
