@@ -1,0 +1,26 @@
+# Who was here (#1685): "was anyone here while I was out?". Started by its
+# tool alone: no trigger and no [ask], since a person asked. Its answer is
+# the model's, from the lamp's record of the room ([history]): when someone
+# was at the lamp and for how long, from the eyes' room/presence (#1721),
+# times only, kept in lamp-skills' memory for a day at most and never a
+# picture, a face or who.
+needs = ["eyes", "ears", "voice"]
+# Its owner puts it on and takes it off (docs/skills.md, "Core and
+# installable skills").
+kind = "installable"
+version = "1.0.0"
+tool = "who_was_here"
+
+# What it may read and use, and nothing more: the room's presence, and its
+# note to the model. No light, no body, no look.
+[permissions]
+topics = ["room/presence"]
+speak = true
+
+# The model's call is told the record of the last twelve hours.
+[history]
+topic = "room/presence"
+within = "12h"
+
+[[do]]
+say = "Answer from the lamp's record below whether anyone was at the lamp while they were away, in a few words: when, and about how long, as \"someone was here for a few minutes around two\". It cannot tell who: never guess who it was. The time going on now is theirs. If it could not see the room for a while, say so. If there is no record, say you can't tell."

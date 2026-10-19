@@ -325,7 +325,7 @@ fn every_skill_folder_says_its_kind_and_version() {
     );
     assert_eq!(
         named(SkillKind::Installable),
-        ["desk-tutor", "desk-tutor-marks"]
+        ["desk-tutor", "desk-tutor-marks", "who-was-here"]
     );
     for skill in &skills {
         assert_eq!(skill.version.as_deref(), Some("1.0.0"), "{}", skill.name);
@@ -6274,5 +6274,109 @@ fn a_step_for_some_choices_is_made_only_for_them_and_the_default_stands_in() {
             ["say", "light"]
         );
         assert_eq!(relax[1].1["colour"], "warm");
+    }
+}
+
+/// Who was here (#1685), with its record of the last hour.
+const WHO: &str = r#"
+tool = "who_was_here"
+[permissions]
+topics = ["room/presence"]
+speak = true
+[history]
+topic = "room/presence"
+within = "1h"
+[[do]]
+say = "Say who was here."
+"#;
+
+/// #1685: a `[history]` skill listens to `room/presence`, and its call's
+/// note is followed by the record of the room: a visit with its length and
+/// how long ago, and with the local time known, its time of day too. Not in
+/// a triggered skill, of another topic, past a day, or without the topic in
+/// its permissions.
+#[test]
+fn a_history_is_told_to_the_call_from_room_presence_and_held_to_its_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    let who = load(&skill_with(dir.path(), "who", WHO)).unwrap();
+    let mut engine = Engine::new(vec![who], true);
+    assert_eq!(engine.topics(), ["room/presence"]);
+    let presence = |engine: &mut Engine, at_s: u64, someone: bool, nobody_s: u32| {
+        engine.observe(
+            "room/presence",
+            at_s * 1_000_000,
+            format!(r#"{{"someone":{someone},"nobody_s":{nobody_s}}}"#).as_bytes(),
+            Some(3_000),
+        );
+    };
+    // A visit from 60 s, its last face at 179 s, said gone at 200 s; then
+    // someone again from 600 s.
+    for at in (0..=620).step_by(2) {
+        let (someone, nobody_s) = match at {
+            60..=198 => (true, 0),
+            600.. => (true, 0),
+            _ if at < 60 => (false, at as u32),
+            _ => (false, at as u32 - 179),
+        };
+        presence(&mut engine, at, someone, nobody_s);
+    }
+    let note = |engine: &mut Engine| -> String {
+        let calls = engine
+            .tool("who_was_here", &serde_json::json!({}), 620_000_000)
+            .unwrap()
+            .calls;
+        match &calls[..] {
+            [Call::Say(note)] => note.clone(),
+            other => panic!("{other:?}"),
+        }
+    };
+    assert_eq!(
+        note(&mut engine),
+        "Say who was here.\n\nThe lamp's record of the room over the last 1 h, times only, from \
+         its eyes and ears: it never knows who anyone was, and keeps no picture.\
+         \n- someone was at the lamp for 1 min, 9 min ago\
+         \n- someone has been at the lamp for under a minute, since under a minute ago, and still is"
+    );
+    // At 12:00:00 local when the clock read 620 s: the visit began at 11:50.
+    engine.clock(60, 620_000_000, 1_792_407_600_000);
+    assert!(
+        note(&mut engine).contains("\n- someone was at the lamp for 1 min, at 11:50, 9 min ago"),
+        "{}",
+        note(&mut engine)
+    );
+    // Then nothing for half a minute: the spell going on ends where it was
+    // last known, and the stretch unseen is said.
+    presence(&mut engine, 650, false, 30);
+    let calls = engine
+        .tool("who_was_here", &serde_json::json!({}), 650_000_000)
+        .unwrap()
+        .calls;
+    let [Call::Say(after)] = &calls[..] else {
+        panic!("{calls:?}");
+    };
+    assert!(
+        after.contains("\n- someone was at the lamp for under a minute, at 11:59")
+            && after.contains("\n- it could not see or hear the room for under a minute, at 12:00")
+            && !after.contains("still is"),
+        "{after}"
+    );
+    for (number, (from, to, why)) in [
+        (
+            "tool = \"who_was_here\"",
+            "tool = \"who_was_here\"\n[trigger]\ntopic = \"room/presence\"\nfield = \"someone\"\nequals = true\n[ask]\npolicy = \"hello\"",
+            "started by its tool alone",
+        ),
+        ("topic = \"room/presence\"\nwithin", "topic = \"voice/heard\"\nwithin", "times only"),
+        ("within = \"1h\"", "within = \"25h\"", "1m to 24h"),
+        ("within = \"1h\"", "within = \"30s\"", "1m to 24h"),
+        ("topics = [\"room/presence\"]", "topics = []", "not permitted"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let toml = WHO.replace(from, to);
+        assert_ne!(toml, WHO, "{from}");
+        let error = load(&skill_with(dir.path(), &format!("bad{number}"), &toml)).unwrap_err();
+        assert!(error.contains(why), "{to}: {error}");
     }
 }
