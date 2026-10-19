@@ -210,10 +210,10 @@ fn unknown_active_tags_and_invalid_known_fields_are_refused_without_rewriting() 
         zone: None,
     });
     let original = snapshot(&disk);
+    // A reminder with a value this build doesn't know is kept unread, not
+    // refused (#1680, `a_reminder_this_build_cannot_read_is_kept_...`); one
+    // that reads but doesn't hold together is still refused.
     for (pointer, replacement) in [
-        ("/items/0/deadline/repeat/kind", json!("monthly")),
-        ("/items/0/deadline/repeat/weekday", json!("someday")),
-        ("/items/0/deadline/unix_ms", json!("later")),
         ("/items/0/deadline/local", json!("incoherent")),
         ("/items/0/id", json!(0)),
         ("/items/0/text", json!("")),
@@ -243,13 +243,6 @@ fn duplicate_known_fields_and_oversized_snapshots_are_not_normalized_away() {
         original
             .replacen("\"next_id\":2", "\"next_id\":1,\"next_id\":2", 1)
             .into_bytes(),
-        original
-            .replacen(
-                "\"at_boot_ms\":60000",
-                "\"at_boot_ms\":0,\"at_boot_ms\":60000",
-                1,
-            )
-            .into_bytes(),
         vec![b' '; MAX_STATE_BYTES + 1],
     ] {
         assert_ne!(bytes, original.as_bytes());
@@ -257,6 +250,183 @@ fn duplicate_known_fields_and_oversized_snapshots_are_not_normalized_away() {
         assert!(Engine::open(disk.clone(), "Etc/UTC", &now(0), FRESH).is_err());
         assert_eq!(disk.load().unwrap(), Some(bytes));
     }
+}
+
+/// A reminder's own text in the store, as `replace` wrote it.
+fn stored_text(value: &Value) -> String {
+    serde_json::to_string(value).unwrap()
+}
+
+/// #1680: a stored reminder with a value this build doesn't know (a repeat
+/// `kind: "monthly"`, a weekday it has no name for, a field twice), written
+/// with no `schema` bump, never stops the part. It is passed over with a
+/// line, never sounded here, kept in the store byte for byte and counted;
+/// the part serves; and the build that wrote it finds it again, whole.
+#[test]
+fn a_reminder_this_build_cannot_read_is_kept_as_it_is_and_the_part_serves() {
+    for (pointer, later_value) in [
+        ("/items/0/deadline/repeat/kind", json!("monthly")),
+        ("/items/0/deadline/repeat/weekday", json!("someday")),
+        ("/items/0/deadline/unix_ms", json!("later")),
+    ] {
+        let (disk, _, _) = fixture(When::Weekly {
+            weekday: Weekday::Monday,
+            time: "09:00".into(),
+            zone: None,
+        });
+        let mut engine = Engine::open(disk.clone(), "Etc/UTC", &now(0), FRESH).unwrap();
+        let other = engine
+            .answer(set(&engine, When::After { seconds: 60 }), &now(0))
+            .unwrap()["id"]
+            .clone();
+        drop(engine);
+        let original = snapshot(&disk);
+        let mut later = original.clone();
+        *later.pointer_mut(pointer).unwrap() = later_value;
+        let unread = stored_text(&later["items"][0]);
+        let bytes = replace(&disk, &later);
+        let mut engine = Engine::open(disk.clone(), "Etc/UTC", &now(0), FRESH)
+            .unwrap_or_else(|error| panic!("{pointer}: {error}"));
+        assert_eq!(engine.store_id(), STORE, "{pointer}");
+        assert_eq!(engine.set_aside(), None, "{pointer}");
+        assert_eq!(engine.unread(), 1, "{pointer}");
+        assert_eq!(engine.counts(&now(0)), (1, 0, 0), "{pointer}");
+        assert_eq!(
+            disk.load().unwrap(),
+            Some(bytes),
+            "{pointer}: not rewritten"
+        );
+        // It is never sounded here: past its time only the other is due.
+        let week = 8 * 24 * 3_600_000;
+        engine.tick(&now(week)).unwrap();
+        assert_eq!(engine.counts(&now(week)), (1, 1, 0), "{pointer}");
+        // It serves: a new reminder is saved, the unread one with it, as it
+        // is and in id order.
+        let new = engine
+            .answer(set(&engine, When::After { seconds: 60 }), &now(week))
+            .unwrap()["id"]
+            .clone();
+        let saved = String::from_utf8(disk.load().unwrap().unwrap()).unwrap();
+        assert!(
+            saved.contains(&format!("\"items\":[{unread},")),
+            "{pointer}: {saved}"
+        );
+        let saved: Value = serde_json::from_str(&saved).unwrap();
+        let items = saved["items"].as_array().unwrap();
+        assert_eq!(items.len(), 3, "{pointer}");
+        assert_eq!(items[0]["id"], 1, "{pointer}");
+        assert_eq!(items[1]["id"], other, "{pointer}");
+        assert_eq!(items[2]["id"], new, "{pointer}");
+        drop(engine);
+        // The build that wrote it, which knows the value, reads it again.
+        let mut back = saved;
+        back["items"][0] = original["items"][0].clone();
+        replace(&disk, &back);
+        let mut engine = Engine::open(disk.clone(), "Etc/UTC", &now(week), FRESH).unwrap();
+        assert_eq!(engine.unread(), 0, "{pointer}");
+        assert_eq!(engine.counts(&now(week)).0, 3, "{pointer}");
+        let first = engine.answer(Request::Get { id: 1 }, &now(week)).unwrap();
+        assert_eq!(first["item"]["text"], "Check the timer", "{pointer}");
+    }
+}
+
+/// #1680: a reminder with a field twice is not read either (the bytes are
+/// refused, never normalised): it is kept as it is, unread, and the store
+/// opens.
+#[test]
+fn a_reminder_with_a_field_twice_is_kept_unread_and_the_store_opens() {
+    let (disk, _, _) = fixture(When::After { seconds: 60 });
+    let original = String::from_utf8(disk.load().unwrap().unwrap()).unwrap();
+    let doubled = original.replacen(
+        "\"at_boot_ms\":60000",
+        "\"at_boot_ms\":0,\"at_boot_ms\":60000",
+        1,
+    );
+    assert_ne!(doubled, original);
+    *disk.0.borrow_mut() = Some(doubled.clone().into_bytes());
+    let mut engine = Engine::open(disk.clone(), "Etc/UTC", &now(0), FRESH)
+        .expect("the store opens without the reminder");
+    assert_eq!(engine.unread(), 1);
+    assert_eq!(engine.counts(&now(0)), (0, 0, 0));
+    engine
+        .answer(set(&engine, When::After { seconds: 60 }), &now(0))
+        .unwrap();
+    let saved = String::from_utf8(disk.load().unwrap().unwrap()).unwrap();
+    assert!(
+        saved.contains("\"at_boot_ms\":0,\"at_boot_ms\":60000"),
+        "{saved}"
+    );
+}
+
+/// #1680, the reviewer's P3 on #2066: a newer tzdb's rules for a zone this
+/// build knows (a daily 07:00 in Asia/Ho_Chi_Minh, stored at +08:00) don't
+/// refuse the store. The reminder is kept unread, byte for byte, and never
+/// rung at this build's idea of 07:00; a damaged deadline is still refused
+/// (`unknown_active_tags_and_invalid_known_fields_are_refused_without_rewriting`).
+#[test]
+fn a_reminder_by_newer_rules_for_a_known_zone_is_kept_unread() {
+    let disk = Memory::default();
+    let mut engine = Engine::open(disk.clone(), "Asia/Ho_Chi_Minh", &now(0), STORE).unwrap();
+    let daily = When::Daily {
+        time: "07:00".into(),
+        zone: None,
+    };
+    engine.answer(set(&engine, daily), &now(0)).unwrap();
+    drop(engine);
+    let mut later = snapshot(&disk);
+    let deadline = &mut later["items"][0]["deadline"];
+    let local = deadline["local"].as_str().unwrap().to_owned();
+    assert!(
+        local.contains("T07:00:00+07:00[Asia/Ho_Chi_Minh]"),
+        "{local}"
+    );
+    deadline["local"] = json!(local.replace("+07:00[", "+08:00["));
+    deadline["unix_ms"] = json!(deadline["unix_ms"].as_i64().unwrap() - 3_600_000);
+    let unread = stored_text(&later["items"][0]);
+    replace(&disk, &later);
+    let mut engine = Engine::open(disk.clone(), "Asia/Ho_Chi_Minh", &now(0), FRESH)
+        .expect("newer rules for a known zone do not stop the part");
+    assert_eq!(engine.unread(), 1);
+    assert_eq!(engine.counts(&now(0)), (0, 0, 0));
+    let day = 2 * 24 * 3_600_000;
+    engine.tick(&now(day)).unwrap();
+    assert_eq!(engine.counts(&now(day)), (0, 0, 0), "never rung");
+    engine
+        .answer(set(&engine, When::After { seconds: 60 }), &now(day))
+        .unwrap();
+    let saved = String::from_utf8(disk.load().unwrap().unwrap()).unwrap();
+    assert!(saved.contains(&format!("\"items\":[{unread},")), "{saved}");
+}
+
+/// #1680: a reminder set in a zone this build's time zone rules don't know
+/// (a newer build's tzdb has it) is kept unread: this build can't tell when
+/// it rings next, so it never sounds it at a wrong time, and keeps it for
+/// the build that knows the zone.
+#[test]
+fn a_reminder_in_a_zone_this_build_does_not_know_is_kept_unread() {
+    let (disk, _, _) = fixture(When::Daily {
+        time: "07:00".into(),
+        zone: None,
+    });
+    let original = snapshot(&disk);
+    let mut later = original.clone();
+    let local = later["items"][0]["deadline"]["local"]
+        .as_str()
+        .unwrap()
+        .replace("[Etc/UTC]", "[Middle_Earth/Rivendell]");
+    later["items"][0]["deadline"]["local"] = json!(local);
+    later["items"][0]["deadline"]["repeat"]["zone"] = json!("Middle_Earth/Rivendell");
+    let unread = stored_text(&later["items"][0]);
+    replace(&disk, &later);
+    let mut engine = Engine::open(disk.clone(), "Etc/UTC", &now(0), FRESH)
+        .expect("a reminder in an unknown zone does not stop the part");
+    assert_eq!(engine.unread(), 1);
+    assert_eq!(engine.counts(&now(0)), (0, 0, 0));
+    engine
+        .answer(set(&engine, When::After { seconds: 60 }), &now(0))
+        .unwrap();
+    let saved = String::from_utf8(disk.load().unwrap().unwrap()).unwrap();
+    assert!(saved.contains(&format!("\"items\":[{unread},")), "{saved}");
 }
 
 #[test]

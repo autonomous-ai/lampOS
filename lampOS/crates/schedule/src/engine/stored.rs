@@ -1,8 +1,9 @@
 //! Tolerant reads belong only to persisted state. Shared time and request
 //! types stay strict for live messages and delivery-ledger validation.
-use super::{Error, Receipt, SCHEMA, State, storage};
+use super::{Error, Item, Receipt, SCHEMA, State, Unread, storage};
 use crate::time::{Deadline, Elapsed, Repeat, Weekday};
 use serde::{Deserialize, Deserializer, de::IgnoredAny};
+use serde_json::{Value, value::RawValue};
 
 pub(super) enum Read {
     Current(Box<State>, bool),
@@ -34,6 +35,38 @@ pub(super) fn read(bytes: &[u8]) -> Result<Read, Error> {
     // Decode the original bytes, not a Value round trip: duplicate known
     // fields remain errors. Only the cached receipt can be discarded.
     let mut state: State = serde_json::from_slice(bytes).map_err(storage)?;
+    // A reminder or timer this build can't read (a newer build's value with
+    // no `schema` bump, or a zone its time zone rules don't know) never stops
+    // the part: it is passed over with a line, never sounded here, and kept
+    // in the store as it is (#1680). Only its `id` reaches the journal.
+    #[derive(Deserialize)]
+    struct Rows<'a> {
+        #[serde(borrow)]
+        items: Vec<&'a RawValue>,
+    }
+    let Rows { items } = serde_json::from_slice(bytes).map_err(storage)?;
+    state.items.clear();
+    for raw in items {
+        let why = match serde_json::from_str::<Item>(raw.get()) {
+            Ok(item) if !time_unread(&item) => {
+                state.items.push(item);
+                continue;
+            }
+            Ok(_) => "is set in a zone, or by zone rules, this build's time zone rules don't know",
+            Err(_) => "is not one this build reads",
+        };
+        let id = serde_json::from_str::<Value>(raw.get())
+            .ok()
+            .and_then(|item| item["id"].as_u64());
+        eprintln!(
+            "schedule: stored reminder {} {why}; it is kept in the store as it is, for the build that wrote it, and this build does not sound it",
+            id.map_or("without an id".to_owned(), |id| id.to_string())
+        );
+        state.unread.push(Unread {
+            id,
+            json: raw.get().to_owned(),
+        });
+    }
     let cache: Cache = serde_json::from_slice(bytes).map_err(storage)?;
     let mut dropped = false;
     match cache.last_receipt {
@@ -49,6 +82,28 @@ pub(super) fn read(bytes: &[u8]) -> Result<Read, Error> {
     }
     state.check()?;
     Ok(Read::Current(Box::new(state), dropped))
+}
+
+/// An item whose deadline or snooze this build's time zone rules don't
+/// agree with: a zone they don't know, or a newer tzdb's rules for one they
+/// do (an offset that doesn't match, [`Deadline::zone_rules_differ`]). It
+/// can't be told when it rings, so it is never rung wrong (#1680).
+fn time_unread(item: &Item) -> bool {
+    std::iter::once(&item.deadline)
+        .chain(&item.snooze)
+        .any(Deadline::zone_rules_differ)
+}
+
+/// The stored items this build reads; the others are found again by
+/// [`read`], as [`State::unread`].
+pub(super) fn readable_items<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<Item>, D::Error> {
+    let raw = Vec::<Box<RawValue>>::deserialize(deserializer)?;
+    Ok(raw
+        .iter()
+        .filter_map(|item| serde_json::from_str::<Item>(item.get()).ok())
+        .collect())
 }
 
 #[derive(Deserialize)]
@@ -116,4 +171,106 @@ pub(super) fn snooze<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<Deadline>, D::Error> {
     Option::<SavedDeadline>::deserialize(deserializer).map(|saved| saved.map(Into::into))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every value a stored reminder can hold, by `schema`. A new one can't
+    /// be read by the build before it, so it raises [`SCHEMA`] and this line
+    /// is written again: the `match`es below stop compiling on a new variant,
+    /// and the line pins the vocabulary to the schema (#1680).
+    #[test]
+    fn a_new_stored_value_comes_with_a_schema_bump() {
+        use Weekday as W;
+        let weekdays = [
+            W::Monday,
+            W::Tuesday,
+            W::Wednesday,
+            W::Thursday,
+            W::Friday,
+            W::Saturday,
+            W::Sunday,
+        ];
+        for value in weekdays {
+            match value {
+                W::Monday
+                | W::Tuesday
+                | W::Wednesday
+                | W::Thursday
+                | W::Friday
+                | W::Saturday
+                | W::Sunday => {}
+            }
+        }
+        let parts = || {
+            (
+                "07:00".to_owned(),
+                "Etc/UTC".to_owned(),
+                "2026-10-19".to_owned(),
+            )
+        };
+        let repeats = [
+            {
+                let (time, zone, date) = parts();
+                Repeat::Daily { time, zone, date }
+            },
+            {
+                let (time, zone, date) = parts();
+                Repeat::Weekly {
+                    weekday: W::Monday,
+                    time,
+                    zone,
+                    date,
+                }
+            },
+        ];
+        for value in &repeats {
+            match value {
+                Repeat::Daily { .. } | Repeat::Weekly { .. } => {}
+            }
+        }
+        // What this build reads them as, too.
+        let saved = SavedRepeat::Daily {
+            time: String::new(),
+            zone: String::new(),
+            date: String::new(),
+        };
+        match saved {
+            SavedRepeat::Daily { .. } | SavedRepeat::Weekly { .. } => {}
+        }
+        let weekdays: Vec<_> = weekdays
+            .iter()
+            .map(|day| {
+                serde_json::to_value(day)
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            })
+            .collect();
+        let repeats: Vec<_> = repeats
+            .iter()
+            .map(|repeat| {
+                serde_json::to_value(repeat).unwrap()["kind"]
+                    .as_str()
+                    .unwrap()
+                    .to_owned()
+            })
+            .collect();
+        let vocabulary = format!(
+            "repeat: {}; weekday: {}",
+            repeats.join(" "),
+            weekdays.join(" ")
+        );
+        assert_eq!(
+            (SCHEMA, vocabulary.as_str()),
+            (
+                1,
+                "repeat: daily weekly; weekday: monday tuesday wednesday thursday friday saturday sunday"
+            ),
+            "a new stored value needs a `schema` bump (see SCHEMA): raise it, then write this line again"
+        );
+    }
 }

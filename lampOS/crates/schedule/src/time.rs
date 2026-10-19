@@ -222,6 +222,43 @@ impl fmt::Display for TimeError {
 
 impl std::error::Error for TimeError {}
 
+impl Deadline {
+    /// True when [`Self::check`] fails only for this build's zone rules: a
+    /// zone they don't know, or a newer tzdb's rules for one they do, so the
+    /// stored offset is not the one they give (#1680). The stored time must
+    /// still hold together: its `local` names its own instant, `unix_ms`,
+    /// with an offset, and a zone that could be a name. Anything else is a
+    /// damaged deadline, not a newer one.
+    pub fn zone_rules_differ(&self) -> bool {
+        match self.check() {
+            Err(TimeError::InvalidZone) => true,
+            Err(TimeError::InvalidDeadline) => {
+                let Some((stamp, zone)) = self
+                    .local
+                    .strip_suffix(']')
+                    .and_then(|s| s.rsplit_once('['))
+                else {
+                    return false;
+                };
+                let weekday_fits = self.repeat.as_ref().is_none_or(|repeat| {
+                    let (_, _, date, weekday) = repeat.parts();
+                    parse_date(date).is_ok_and(|date| {
+                        weekday
+                            .is_none_or(|day| day.index() == date.weekday().to_monday_zero_offset())
+                    })
+                });
+                named_zone(zone).is_ok()
+                    && !(self.elapsed.is_some() && self.repeat.is_some())
+                    && weekday_fits
+                    && stamp
+                        .parse::<Timestamp>()
+                        .is_ok_and(|at| at.as_millisecond() == self.unix_ms)
+            }
+            _ => false,
+        }
+    }
+}
+
 pub fn validate_zone(zone: &str) -> Result<(), TimeError> {
     named_zone(zone).map(|_| ())
 }

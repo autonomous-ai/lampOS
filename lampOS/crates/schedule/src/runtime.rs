@@ -130,6 +130,10 @@ pub struct Config {
     pub socket: PathBuf,
     pub bus_root: PathBuf,
     pub zone: String,
+    /// The lamp's UTC offset east when setup ran (`LAMP_UTC_OFFSET_MINUTES`
+    /// in `zone.env`): the fallback when `zone` is not one this build knows
+    /// (#1680).
+    pub utc_offset_minutes: Option<i32>,
     pub run_for: Option<Duration>,
     /// How often the part says how it is while nothing changes:
     /// [`REPORT_EVERY`] on a lamp. A new revision or a change in readiness
@@ -144,6 +148,11 @@ struct Report {
     sample: ClockSample,
     due: ScheduleDue,
     items: usize,
+    /// Stored reminders this build can't read, kept and not sounded (#1680).
+    unread: usize,
+    /// The zone asked for and the one used, when this build doesn't know
+    /// the one asked for (#1680).
+    zone_fallback: Option<(String, String)>,
     requests: u64,
 }
 
@@ -291,6 +300,10 @@ fn report<P: crate::engine::Persistence>(
         updated: Instant::now(),
         due: engine.due(&sample, stamp(&sample, 0)?, true),
         items: engine.counts(&sample).0,
+        unread: engine.unread(),
+        zone_fallback: engine
+            .zone_fallback()
+            .map(|(asked, zone)| (asked.to_owned(), zone.to_owned())),
         sample,
         requests,
     })
@@ -475,7 +488,9 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
         .map(|b| format!("{b:02x}"))
         .collect::<String>();
     let store = Store::open(&config.dir)?;
-    let mut engine = Engine::open(store, &config.zone, &sample, &id).map_err(io::Error::other)?;
+    let mut engine =
+        Engine::open_with_offset(store, &config.zone, config.utc_offset_minutes, &sample, &id)
+            .map_err(io::Error::other)?;
     engine.tick(&sample).map_err(io::Error::other)?;
     let current = Arc::new(Mutex::new(report(&engine, sample, 0)?));
     let (listener, _binding) = bind(&config.socket)?;
@@ -572,6 +587,16 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
                         Level::Warn,
                         "Schedule set aside a store from a newer build; its reminders will not sound",
                     )
+                } else if report.unread > 0 {
+                    (
+                        Level::Warn,
+                        "Schedule kept stored reminders from a newer build that this build can't read; they will not sound",
+                    )
+                } else if report.zone_fallback.is_some() {
+                    (
+                        Level::Warn,
+                        "Schedule doesn't know the lamp's zone; a new reminder is set in the fallback zone's time",
+                    )
                 } else if state.waiting_for_clock > 0 {
                     (
                         Level::Warn,
@@ -589,10 +614,16 @@ pub fn serve<C: Clock>(config: Config, clock: C, stop: Arc<AtomicBool>) -> io::R
                     .with("store_ready", ready)
                     .with("publish_errors", publish_errors)
                     .with("clients_refused", rejected.load(Ordering::Relaxed));
-                let report_out = match set_aside.as_deref() {
+                let mut report_out = match set_aside.as_deref() {
                     Some(name) => report_out.with("set_aside", name),
                     None => report_out,
                 };
+                if report.unread > 0 {
+                    report_out = report_out.with("unread", report.unread);
+                }
+                if let Some((asked, zone)) = &report.zone_fallback {
+                    report_out = report_out.with("zone_asked", asked).with("zone", zone);
+                }
                 publish(&mut diagnostic, at_us, &report_out, &mut publish_errors);
                 last_revision = Some(state.revision);
                 was_ready = Some(ready);
@@ -704,6 +735,7 @@ mod tests {
             socket: root.path().join("run/s.sock"),
             bus_root: root.path().join("b"),
             zone: "Etc/UTC".into(),
+            utc_offset_minutes: None,
             run_for: Some(Duration::from_secs(5)),
             report_every: REPORT_EVERY,
         };

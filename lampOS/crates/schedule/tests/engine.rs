@@ -910,12 +910,6 @@ fn corrupt_persisted_item_ids_and_deadlines_fail_closed() {
         assert!(Engine::open(d, "Etc/UTC", &now(0), STORE).is_err());
     }
 }
-#[test]
-fn a_bad_default_zone_cannot_create_or_open_a_store() {
-    let disk = Disk::default();
-    assert!(Engine::open(disk.clone(), "Bad/Zone", &now(0), STORE).is_err());
-    assert!(disk.load().unwrap().is_none());
-}
 
 /// #1505: a store as a later build writes it, with a field this build doesn't
 /// know at its top and in a reminder. It opens with its revision kept: a field
@@ -995,23 +989,218 @@ fn with_the_system_zone_a_new_reminder_follows_a_re_setup_and_an_old_one_keeps_i
     assert!(first.to_string().contains("Asia/Ho_Chi_Minh"), "{first}");
 }
 
-/// A system zone that names no zone this build knows is refused at start,
-/// as an unknown named one is.
+/// A system zone pointed at `name` in a folder of its own.
+fn system_at(root: &std::path::Path, name: &str) -> lamp_local_time::LocalTime {
+    point(root, name);
+    lamp_local_time::LocalTime::System(
+        lamp_local_time::SystemZone::open(root.join("localtime"), root.join("timezone")).unwrap(),
+    )
+}
+
+/// #1680: a zone in `zone.env` this build's time zone rules don't know (a
+/// newer tzdb's) never stops the part. It falls back to the system's zone,
+/// says so, and reminders still ring: one already set at the time it was set
+/// for, in its own zone, and a new one with no zone at its time in the
+/// system's (07:00 is 07:00 in Ho Chi Minh City).
 #[test]
-fn a_system_zone_with_no_known_name_is_refused_at_start() {
+fn an_unknown_zone_falls_back_to_the_systems_and_reminders_still_ring() {
+    let disk = Disk::default();
+    let at = now(0);
+    let mut paris = Engine::open(disk.clone(), "Europe/Paris", &at, STORE).unwrap();
+    let daily = || When::Daily {
+        time: "07:00".into(),
+        zone: None,
+    };
+    let old = create(&mut paris, &at, daily());
+    drop(paris);
+    let root = tempfile::tempdir().unwrap();
+    let system = system_at(root.path(), "Asia/Ho_Chi_Minh");
+    let mut engine = Engine::open_with_system(
+        disk,
+        "Middle_Earth/Rivendell",
+        || Ok(system),
+        None,
+        &at,
+        STORE,
+    )
+    .expect("an unknown zone does not stop the part");
+    assert_eq!(
+        engine.zone_fallback(),
+        Some(("Middle_Earth/Rivendell", "Asia/Ho_Chi_Minh"))
+    );
+    assert_eq!(
+        engine.answer(Request::Status {}, &at).unwrap()["zone"],
+        "Asia/Ho_Chi_Minh"
+    );
+    let new = create(&mut engine, &at, daily());
+    assert!(
+        new["local"]
+            .as_str()
+            .unwrap()
+            .contains("T07:00:00+07:00[Asia/Ho_Chi_Minh]"),
+        "{new}"
+    );
+    let id = old["id"].as_u64().unwrap();
+    let kept = get(&mut engine, &at, id);
+    assert_eq!(kept["local"], old["local"], "{kept}");
+    let local = kept["local"].as_str().unwrap();
+    assert!(
+        local.contains("T07:00:00+0") && local.ends_with("[Europe/Paris]"),
+        "{kept}"
+    );
+    // At its time it rings, and not a moment before.
+    let due_at = old["due_unix_ms"].as_i64().unwrap();
+    let before = now(u64::try_from(due_at - WALL - 1).unwrap());
+    engine.tick(&before).unwrap();
+    assert_eq!(get(&mut engine, &before, id)["state"], "scheduled");
+    let ring = now(u64::try_from(due_at - WALL).unwrap());
+    engine.tick(&ring).unwrap();
+    assert_eq!(get(&mut engine, &ring, id)["state"], "pending");
+}
+
+/// #1680, the reviewer's P2 on #2066: setup points the system's zone at the
+/// same name as `zone.env`'s, so a zone this build doesn't know (a newer
+/// tzdb's America/Coyhaique, -03:00) has no system zone to fall back to.
+/// The fallback is then the offset `zone.env` stored: "at 7 tomorrow" rings
+/// at 07:00 at the lamp, not at 07:00 UTC (04:00 there).
+#[test]
+fn an_unknown_zone_falls_back_to_the_stored_utc_offset() {
+    let at = now(0);
+    let unreadable = || Err(io::Error::other("no system zone"));
+    let mut engine = Engine::open_with_system(
+        Disk::default(),
+        "Middle_Earth/Rivendell",
+        unreadable,
+        Some(-180),
+        &at,
+        STORE,
+    )
+    .expect("an unknown zone does not stop the part");
+    assert_eq!(
+        engine.zone_fallback(),
+        Some(("Middle_Earth/Rivendell", "Etc/GMT+3"))
+    );
+    for when in [
+        When::At {
+            time: "07:00".into(),
+            day: Some("tomorrow".into()),
+            zone: None,
+            fold: None,
+        },
+        When::Daily {
+            time: "07:00".into(),
+            zone: None,
+        },
+    ] {
+        let new = create(&mut engine, &at, when);
+        assert!(
+            new["local"]
+                .as_str()
+                .unwrap()
+                .contains("T07:00:00-03:00[Etc/GMT+3]"),
+            "{new}"
+        );
+    }
+    // East of UTC too, and `--zone system` with an unreadable system zone.
+    let engine =
+        Engine::open_with_system(Disk::default(), "system", unreadable, Some(420), &at, STORE)
+            .unwrap();
+    assert_eq!(engine.zone_fallback(), Some(("system", "Etc/GMT-7")));
+}
+
+/// #1680: with no zone this build knows and no whole-hour offset stored,
+/// the fallback is UTC, and a new reminder at a clock time with no zone of
+/// its own is refused with a reason, since it would ring hours off; one in
+/// minutes from now, or at a time in a named zone, is set. The same for
+/// `--zone system` when the system's zone names no zone this build knows,
+/// which was refused at start.
+#[test]
+fn with_no_known_zone_or_offset_a_clock_time_is_refused_and_minutes_still_work() {
+    let at = now(0);
+    let unreadable = || Err(io::Error::other("no system zone"));
+    for offset in [None, Some(330)] {
+        let mut engine = Engine::open_with_system(
+            Disk::default(),
+            "Middle_Earth/Rivendell",
+            unreadable,
+            offset,
+            &at,
+            STORE,
+        )
+        .expect("an unknown zone does not stop the part");
+        assert_eq!(
+            engine.zone_fallback(),
+            Some(("Middle_Earth/Rivendell", "Etc/UTC"))
+        );
+        for when in [
+            When::At {
+                time: "07:00".into(),
+                day: Some("tomorrow".into()),
+                zone: None,
+                fold: None,
+            },
+            When::Daily {
+                time: "07:00".into(),
+                zone: None,
+            },
+            When::Weekly {
+                weekday: lamp_schedule::time::Weekday::Monday,
+                time: "07:00".into(),
+                zone: None,
+            },
+        ] {
+            engine.tick(&at).unwrap();
+            let refused = engine
+                .answer(
+                    Request::Set {
+                        guard: guard(&engine),
+                        text: "Call Maria".into(),
+                        when,
+                    },
+                    &at,
+                )
+                .unwrap_err();
+            assert_eq!(refused.code, "bad_time", "{offset:?}");
+            assert!(refused.message.contains("clock time"), "{refused}");
+        }
+        let later = set(&mut engine, &at, 1_200);
+        assert_eq!(later["due_unix_ms"], WALL + 1_200_000, "{later}");
+        let named = create(
+            &mut engine,
+            &at,
+            When::Daily {
+                time: "07:00".into(),
+                zone: Some("Asia/Ho_Chi_Minh".into()),
+            },
+        );
+        assert!(
+            named["local"]
+                .as_str()
+                .unwrap()
+                .contains("T07:00:00+07:00[Asia/Ho_Chi_Minh]"),
+            "{named}"
+        );
+    }
     let root = tempfile::tempdir().unwrap();
     std::fs::write(
         root.path().join("localtime"),
         jiff_tzdb::get("Asia/Ho_Chi_Minh").unwrap().1,
     )
     .unwrap();
-    let system = lamp_local_time::LocalTime::System(
+    let nameless = lamp_local_time::LocalTime::System(
         lamp_local_time::SystemZone::open(
             root.path().join("localtime"),
             root.path().join("timezone"),
         )
         .unwrap(),
     );
-    assert!(Engine::open_following(Disk::default(), system, &now(0), STORE).is_err());
-    assert!(Engine::open(Disk::default(), "Middle_Earth/Rivendell", &now(0), STORE).is_err());
+    let engine = Engine::open_following(Disk::default(), nameless, &at, STORE)
+        .expect("a system zone with no known name does not stop the part");
+    assert_eq!(engine.zone_fallback(), Some(("system", "Etc/UTC")));
+    let engine = Engine::open_with_system(Disk::default(), "system", unreadable, None, &at, STORE)
+        .expect("an unreadable system zone does not stop the part");
+    assert_eq!(engine.zone_fallback(), Some(("system", "Etc/UTC")));
+    // A zone it knows is no fallback.
+    let engine = Engine::open(Disk::default(), "Etc/UTC", &at, STORE).unwrap();
+    assert_eq!(engine.zone_fallback(), None);
 }

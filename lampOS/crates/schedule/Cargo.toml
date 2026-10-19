@@ -8,7 +8,7 @@ publish.workspace = true
 [dependencies]
 lamp-ipc = { path = "../ipc" }
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 lamp-bus = { path = "../bus" }
 lamp-msgs = { path = "../msgs" }
 # `--zone system`: the zone every other part reads (#820).
