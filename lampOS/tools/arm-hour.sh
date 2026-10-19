@@ -72,8 +72,8 @@ IFS= read -r -d '' ROWS_TABLE <<'ROWS' || true
 row | 1 | The safe fold before an unplug | moves | 25 min
 do | Hands near the arm but off it, desk clear; say each line when asked; never touch the cable.
 watch | The arm folds slowly (under 30 s) to its rest and stays held, no sag; then the bottom LEDs breathe dim amber and it says "My arm is folded. You can unplug me now."; asked to look or dance after, it doesn't move.
-sheet | #1722, Fifth, 20 Oct 03:57 (any lamp; scripted, fifth-rows.sh)
-mac | d=/tmp/fifth-row1; rm -rf $d && mkdir -p $d && gh api repos/autonomous-ai/lampOS/issues/comments/6277160673 --jq .body | awk '/^```bash$/{f=1;next} f&&/^```$/{exit} f' >$d/fifth-rows.sh && echo "1be88030af34ef0096781a0103c69a6451e795024706d67fc7aa35de3c182133  $d/fifth-rows.sh" | shasum -a 256 -c && gh run download 39313641196 -R autonomous-ai/lampOS -n lampos-arm64-396e8a2b3eea57322bf38a27ec453e2d0cebb74c -D $d/a && mv $d/a/lamp-voice $d/a/lamp-expression $d/a/lamp-body $d/a/lamp-skills $d/ && rm -rf $d/a && for f in skill.toml SKILL.md; do gh api -H 'Accept: application/vnd.github.raw' "repos/autonomous-ai/lampOS/contents/lampOS/skills/prepare-unplug/$f?ref=396e8a2b3eea57322bf38a27ec453e2d0cebb74c" >$d/$f || exit 1; done
+sheet | #1722, Fifth, 20 Oct 04:43, row 1 without the reboot (any lamp; scripted, fifth-rows.sh)
+mac | d=/tmp/fifth-row1; rm -rf $d && mkdir -p $d && gh api repos/autonomous-ai/lampOS/issues/comments/6278063826 --jq .body | awk '/^```bash$/{f=1;next} f&&/^```$/{exit} f' >$d/fifth-rows.sh && echo "d8a06babff6bf85043dadefc69039451d57951b43d52bdd52aef50c78b115b70  $d/fifth-rows.sh" | shasum -a 256 -c && gh run download 39313641196 -R autonomous-ai/lampOS -n lampos-arm64-396e8a2b3eea57322bf38a27ec453e2d0cebb74c -D $d/a && mv $d/a/lamp-voice $d/a/lamp-expression $d/a/lamp-body $d/a/lamp-skills $d/ && rm -rf $d/a && for f in skill.toml SKILL.md; do gh api -H 'Accept: application/vnd.github.raw' "repos/autonomous-ai/lampOS/contents/lampOS/skills/prepare-unplug/$f?ref=396e8a2b3eea57322bf38a27ec453e2d0cebb74c" >$d/$f || exit 1; done
 lamp | rm -rf /tmp/fifth-row1 && mkdir -p /tmp/fifth-row1
 mac | ${ARM_SCP:-scp} -q /tmp/fifth-row1/* "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/fifth-row1/
 lamp | sudo bash /tmp/fifth-row1/fifth-rows.sh 1 preflight
@@ -84,7 +84,7 @@ lamp | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 body
 say | Lamp, what time is it?
 wait | 15
 proof | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 proof
-tell | Answered on the second route and the lamp still now? If not, q (nothing is folded yet: the put-back needs no reboot).
+tell | Answered on the second route and the lamp still now? If not, q (nothing is folded yet: the put-back gives everything back).
 say | Lamp, get ready, I'm going to unplug you.
 wait | 45
 proof | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 proof
@@ -92,10 +92,8 @@ say | Lamp, look at me.
 say | Lamp, dance.
 wait | 15
 proof | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 proof
-tell | A hand on the lamp: it reboots now (only a reboot ends a fold). Stay until it stands and answers.
-lamp | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 reboot
-mac | sleep 20; for i in $(seq 1 36); do "$ARM_LAMP" true >/dev/null 2>&1 && exit 0; sleep 5; done; echo "the lamp isn't back after 3 min"; exit 1
 lamp | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 back
+tell | The arm stays folded and held with torque; only the next start of the lamp clears it. Nothing here reboots: ask the owner now. A no: it stays folded until the lamp next starts.
 back | [ ! -d /var/lib/lampos-fifth/row1 ] || sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 back
 back | rm -rf /tmp/fifth-row1
 back | mac: rm -rf /tmp/fifth-row1
@@ -125,7 +123,7 @@ row | 5 | Light scenes that move the head (reading, focus) | moves | 3 min
 do | Hands near the head, not under it; say "Lamp, reading light please.", later "Lamp, light for focus please."
 watch | The head tips down smoothly and the arm leans in; the light goes white and brighter; it holds 60 s, then the head returns.
 sheet | #1730, Fifth, 19 Oct 19:44Z
-proof | journalctl -u lamp-skills --since -5min -o cat | grep -E 'light-scenes (Triggered|Done)' | tail -3
+proof | sudo journalctl -u lamp-skills --since -5min -o cat | grep -E 'light-scenes (Triggered|Done)' | tail -3
 proof | lamp-bus latest light/state
 end
 row | 6 | Touch pads | still | 20 min
@@ -166,15 +164,32 @@ sheet | #1968, Ten, 19 Oct 20:04Z (the photo is copied from the Mac: by hand)
 proof | python3 -c 'import socket;s=socket.socket(socket.AF_UNIX);s.settimeout(10);s.connect("/run/lampos-eyes/who.sock");s.sendall(b"{\"list\":true}\n");print(s.makefile().readline().strip())'
 proof | python3 -c 'import socket;s=socket.socket(socket.AF_UNIX);s.settimeout(10);s.connect("/run/lampos-eyes/who.sock");s.sendall(b"{\"who\":true}\n");print(s.makefile().readline().strip())'
 end
-row | 10 | The first five minutes | moves | 10 min
-do | A fresh setup: a new person meets the lamp for its first five minutes.
-watch | Each step as onboarding.md has it, in order, nothing skipped.
-sheet | #1964, Seventh (run sheet due 04:30)
+row | 10 | The first five minutes | moves | 15 min
+do | A new person in the chair, a hand near the arm. Once they sit, the lamp starts its first five minutes on its own; they answer each step as it asks. Say "stop" at any jerk.
+watch | In order: where they sit (still for 3 s, face seen); their name, and whether it may remember their face (kept only on a yes); "Hey Lamp" called from the chair up to 5 times, with no answer to those; privacy, not available here; giving way (they push the head gently, more than a nudge, hold 1 to 2 s, let go: it says it felt that and nods); preferences, one question at a time.
+sheet | #1964, Seventh, 20 Oct 04:34 and 04:39 (build c334d25ae: #1792, #2004, #1964, #1998; ARM64 39328531309)
+mac | R=39328531309 S=c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d; [ "$(gh run view $R -R autonomous-ai/lampOS --json conclusion -q .conclusion)" = success ] || { echo "run $R is not green: skip this row"; exit 1; }; mkdir -p /tmp/seventh-$S && gh run download $R -R autonomous-ai/lampOS -n lampos-arm64-$S -D /tmp/seventh-$S
+mac | S=c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d; ${ARM_SCP:-scp} -q /tmp/seventh-$S/lamp-voice "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/lamp-voice-$S
+lamp | systemctl cat lamp-voice | grep -E '^(ExecStart|Environment)='
+tell | Is that today's voice, with LAMP_BODY_MOOD_SOCKET set? If not, q now.
+lamp | systemctl is-active lamp-name lamp-ears
+lamp | b=/var/lib/lampos-seventh/row10; sudo mkdir -p $b && for p in /var/lib/lampOS/voice/onboarding /var/lib/lampOS/voice/near-call.json; do if [ -e $p ]; then sudo cp -a $p $b/ && echo "set aside: $p" || exit 1; else echo "not there: $p"; fi; done && sudo touch $b/taken && sudo rm -rf /var/lib/lampOS/voice/onboarding /var/lib/lampOS/voice/near-call.json && sudo install -d -m 0700 /var/lib/lampOS/voice/onboarding
+lamp | S=c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d; sudo install -D -m 0755 /tmp/lamp-voice-$S /var/lib/lampos-seventh/$S/lamp-voice && sudo mkdir -p /run/systemd/system/lamp-voice.service.d && { printf '[Service]\nExecStart=\n'; systemctl cat lamp-voice | grep '^ExecStart=' | tail -1 | sed -E "s#^ExecStart=[^ ]+#ExecStart=/var/lib/lampos-seventh/$S/lamp-voice#"; printf 'Environment=LAMP_ONBOARDING=on\nEnvironment=LAMP_ONBOARDING_FILE=/var/lib/lampOS/voice/onboarding/progress.json\nEnvironment=LAMP_VOICE_ROUTE=second\nEnvironment=LAMP_MEMORY_DAYS=on\nEnvironment=LAMP_MEMORY_RULES=on\n'; } | sudo tee /run/systemd/system/lamp-voice.service.d/60-seventh.conf >/dev/null && sudo systemctl daemon-reload && sudo systemctl restart lamp-voice && sudo cat /proc/$(systemctl show -p MainPID --value lamp-voice)/environ | tr '\0' '\n' | grep -E '^LAMP_(ONBOARDING|VOICE_ROUTE)'
+tell | The new person sits in the chair. Time each step from the lamp's ask to its answer. If nothing is asked within 30 s: "Lamp, let's redo the setup."
+tell | Enter once the lamp says the walk is finished, or after 10 minutes.
+proof | sudo sh -c 'cat /var/lib/lampOS/voice/sessions/$(systemctl show -p InvocationID --value lamp-voice)/metadata/events-*.jsonl' | grep -E 'onboarding_(step|near_call|giving_way_try|stopped|redo|finished)|setup_step' | tail -30
+tell | If they said yes to being remembered: "Hey Lamp, forget my face." Any rule they gave in preferences: ask the lamp to forget it.
+question | Each step: outcome and seconds from the ask (step, outcome, s)? Did anything jerk or read as a machine?
+back | S=c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d b=/var/lib/lampos-seventh/row10; ok=1; sudo rm -f /run/systemd/system/lamp-voice.service.d/60-seventh.conf; sudo systemctl daemon-reload; if [ -e $b/taken ]; then sudo systemctl stop lamp-voice; sudo rm -rf /var/lib/lampOS/voice/onboarding /var/lib/lampOS/voice/near-call.json; for n in onboarding near-call.json; do [ ! -e $b/$n ] || sudo cp -a $b/$n /var/lib/lampOS/voice/ || ok=0; done; fi; sudo systemctl restart lamp-voice || ok=0; [ $ok = 1 ] && sudo rm -rf $b /var/lib/lampos-seventh/$S /tmp/lamp-voice-$S && echo "put back: the voice on its own build, its onboarding as it was"; [ $ok = 1 ]
+back | mac: rm -rf /tmp/seventh-c334d25aeb0f5c1c7c1d86ec142d04ae4fee740d
 end
-row | 11 | Setup for a home, the 5 s reset | still | 10 min
-do | Press for 5 s to reset setup.
-watch | The lamp comes back ready to be set up.
-sheet | #806 (no run sheet yet)
+row | 11 | Setup for a home, the 5 s reset | still | 3 min
+do | Nothing at the lamp: a read-only check only. The reset itself waits for the owner (it wipes lamp-4ace's person and key and takes it off the office network).
+watch | Nothing changes on the lamp. A 0 on the last line means the button would do nothing.
+sheet | #2034, Nine, 20 Oct 04:46 (the reset run itself, with a way back, is there for the owner's yes)
+proof | for u in lamp-setup.service lamp-setup-reset.service lampos-setup-done.path; do printf '%s: ' $u; systemctl is-enabled $u 2>&1; done
+proof | for f in /etc/lampOS/setup/serve.json /etc/lampOS/setup/reset-plan.json /var/lib/lampos-setup/done; do [ -e $f ] && echo "$f: present" || echo "$f: missing"; done
+proof | tr '\0' ' ' </proc/$(systemctl show -p MainPID --value lamp-controls)/cmdline | grep -o -- '--pins [^ ]*' | cut -d' ' -f2 | xargs grep -c '"reset"'
 end
 row | 12 | The wellbeing nudges (rest your eyes) | moves | 3 min
 do | Nobody at the desk; hands clear of the head.
@@ -183,21 +198,35 @@ sheet | #1957, tools/trials.sh nudges
 trial | nudges
 end
 row | 13 | Giving way, the first five minutes' step 6 | moves | 5 min
-do | At onboarding step 6, when asked, push the head clearly (more than a nudge), hold 1 to 2 s, let go.
+do | Shown in row 10: giving way is a step of its walk, and #1998 is in its build. Here only if row 10 was skipped, by hand.
 watch | The lamp says it felt that, and the body nods.
-sheet | #1998, Seventh, 19 Oct 18:57Z (its install is by hand)
+sheet | #1998, Seventh; #1964, Seventh, 20 Oct 04:34 (row 10's step 5)
 end
 row | 14 | Watches you leave | moves | 3 min
 do | Sit facing the lamp for 3 minutes, then stand and walk off to one side.
 watch | One short turn of the base toward the side they left (about 3 s), then back.
 sheet | #2012, Sixth, 19 Oct 18:15Z; #2022
-proof | journalctl -u lamp-skills --since -10min -o cat | grep watch-you-leave | tail -3
+proof | sudo journalctl -u lamp-skills --since -10min -o cat | grep watch-you-leave | tail -3
 proof | lamp-bus latest room/stood_up
 end
 row | 15 | Two people at the desk | still | 10 min
-do | Two people talk; one of them speaks to the lamp.
-watch | The lamp answers only the one who speaks to it.
-sheet | #1895 (no run sheet here)
+do | Two people sit at the desk and talk to each other; each line to the lamp is said when the screen asks, the rest is ordinary talk.
+watch | The lamp says nothing while they talk; it answers A's time question, A's follow-up, and B's timer, and nothing of B's aside or the closing chat.
+sheet | #2034, Eighth, 20 Oct 04:27 (second route; lamp-4ace's unit as it is, nothing switched)
+proof | sudo journalctl -u lamp-voice --since -1min -o cat | grep -c 'lamp-voice second: request' || true
+tell | A and B talk to each other for about a minute, not to the lamp: what they did this morning, lunch plans. Normal voices, turned to each other.
+say | A, turned to the lamp: "Hey Lamp, what time is it?"
+wait | 6
+say | B, to A, not the lamp: "Is it really that late already?"
+wait | 4
+say | A, to the lamp, no name, within 10 s of its answer: "And what's the weather like tomorrow?"
+wait | 8
+say | B, turned to the lamp: "Hey Lamp, set a timer for five minutes."
+wait | 6
+tell | A and B talk to each other again for about 30 seconds, not to the lamp.
+proof | sudo journalctl -u lamp-voice --since -4min -o cat | grep -E 'lamp-voice second: request [0-9]+(: its answer is (played|held back)| first answer audio)' | sed -E 's/ [0-9]+ ms after.*//' | tail -40
+proof | sudo journalctl -u lamp-voice --since -4min -o cat | grep -c 'its answer is played' ; sudo journalctl -u lamp-voice --since -4min -o cat | grep -c 'its answer is held back'
+question | Did it answer exactly the three lines to it (time, weather, timer), and nothing else? (played=, held back=, and any line answered that wasn't to it)
 end
 row | 16 | Change the Wi-Fi from the app | still | 5 min
 do | From the app: first a network that doesn't exist, then the person's own, typed by them.
@@ -209,16 +238,16 @@ do | Five rounds on today's voice, then five on #1941's: mute (the button, or a 
 watch | The camera closes each time. Pass: on #1941's voice, mute to "camera closed" is under 100 ms at the median and under 500 ms every round (today's is about 1.0 to 1.5 s).
 sheet | #1941, Seventh, 19 Oct 18:57Z; #1722, Seventh, 20 Oct 03:27
 tell | A, today's voice: five rounds of mute, 3 s, unmute.
-proof | journalctl -u lamp-eyes --since -5min -o short-monotonic | grep 'camera closed' | tail -10
+proof | sudo journalctl -u lamp-eyes --since -5min -o short-monotonic | grep 'camera closed' | tail -10
 mac | mkdir -p /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063 && gh run download 39266127252 -R autonomous-ai/lampOS -n lampos-arm64-05f8290d316825f0b6f5a9d4a72af0d093e7d063 -D /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063
 mac | ${ARM_SCP:-scp} /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063
 lamp | systemctl cat lamp-voice | grep '^ExecStart=' | tail -1
 tell | Is that today's voice? If not, q now. Otherwise Enter to put #1941's voice in.
 lamp | sudo install -D -m 0755 /tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063 /var/lib/lampos-seventh/05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice && sudo mkdir -p /run/systemd/system/lamp-voice.service.d && systemctl cat lamp-voice | grep '^ExecStart=' | tail -1 | sed -E 's#^ExecStart=[^ ]+#ExecStart=/var/lib/lampos-seventh/05f8290d316825f0b6f5a9d4a72af0d093e7d063/lamp-voice#' | { printf '[Service]\nExecStart=\n'; cat; } | sudo tee /run/systemd/system/lamp-voice.service.d/60-seventh.conf >/dev/null && sudo systemctl daemon-reload && sudo systemctl restart lamp-voice
 tell | B, #1941's voice: five rounds of mute, 3 s, unmute.
-proof | journalctl -u lamp-eyes --since -5min -o short-monotonic | grep 'camera closed' | tail -10
-proof | journalctl -u lamp-voice --since -5min -o short-monotonic | grep 'the eyes are told no' | tail -10
-back | sudo rm -f /run/systemd/system/lamp-voice.service.d/60-seventh.conf && sudo systemctl daemon-reload && sudo systemctl restart lamp-voice && sudo rm -rf /var/lib/lampos-seventh /tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063
+proof | sudo journalctl -u lamp-eyes --since -5min -o short-monotonic | grep 'camera closed' | tail -10
+proof | sudo journalctl -u lamp-voice --since -5min -o short-monotonic | grep 'the eyes are told no' | tail -10
+back | sudo rm -f /run/systemd/system/lamp-voice.service.d/60-seventh.conf && sudo systemctl daemon-reload && sudo systemctl restart lamp-voice && sudo rm -rf /var/lib/lampos-seventh/05f8290d316825f0b6f5a9d4a72af0d093e7d063 /tmp/lamp-voice-05f8290d316825f0b6f5a9d4a72af0d093e7d063
 back | mac: rm -rf /tmp/seventh-05f8290d316825f0b6f5a9d4a72af0d093e7d063
 end
 row | 18 | Smoky air | moves | 3 min
