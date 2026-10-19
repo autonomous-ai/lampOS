@@ -418,6 +418,31 @@ order is kept. A written turn is the same from the chat on.
   time right after the character. A text's request is unchanged. Each turn's
   journal says how much the cache held (above): the A/B is the played check
   both ways, by H and by the first event's time.
+- **With `LAMP_SECOND_FEW_TOOLS=on` a spoken turn's chat is given its few
+  functions first** (off unless set; #1712, the first builder at 18:56:
+  "light, volume, timer, search, look, tasks"). The others are behind one,
+  `more_functions`, whose description names them (`worker::few_tools`).
+  - **Given at once** (`given_at_once`):
+    - the light's and the volume's;
+    - the timer's and the reminders';
+    - the tasks';
+    - the web search and its fetch;
+    - the look;
+    - the decline (`not_for_me`), which a busy room needs at every turn;
+    - `use_skill`, which the skills' lines in the instruction name;
+    - setup's walk (`setup_step`, `redo_setup`), which a setup talk calls at
+      every turn.
+  - **Behind `more_functions`:** the memory's (`remember`, `recall`,
+    `forget`, `forget_everything`), the faces', the time elsewhere
+    (`the_time`), a mark for review, the stop of reports, and any skill
+    function given on its own.
+  - **Once the model calls it in a turn**, the route answers it itself, with
+    nothing run ("Every function is given to you now…"), and that turn's
+    next round is given every function. A round costs about a second, only
+    for those.
+  - **The first request is smaller** and the same from turn to turn for a
+    prompt cache. The journal's `chat request … T tools` line shows the
+    count. A text's chat and the probe are given every function.
 - **The answer's first piece goes after a few words** if no clause or
   sentence ended sooner: 4 with the configured voice
   (`CONFIGURED_FIRST_WORDS`; the first builder at 18:26: a 9-word first
