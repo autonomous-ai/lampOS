@@ -3453,3 +3453,22 @@ wait on their owners and a lamp
   makes it again if it goes (2152/0). **#1655** (keep actions' folder
   across a restart, El's #1588 P3) waits as a draft until #1656 merges.
   #1362 waits on Monday. `cargo clean` at 04:4x (3.3 GiB).
+- **19 Oct, the day.** Merged: #1656 (lamp-skills' own folder). **#1655**
+  is ready (`06f822bc0`, rebased, `RuntimeDirectoryPreserve=restart` on
+  `lamp-actions` alone; ARM64 green). Took over **#1712** (the second voice
+  route) from the first builder at 10:1x, now lamp-4ace's main voice. One
+  fold mistake at 11:2x: folded onto a freshly fetched lamp-voice, which
+  undid four newer commits for about five minutes; fixed, and a memory rule
+  added. On #1712 since, one commit each, rebased onto lamp-voice
+  `5ea36b2ae` at 14:3x: the hand-over's yes starts the task; the rule is
+  told the lamp's work and its own turns; `Finalize`'s answer journaled;
+  Gemini's endpoint, voice and key terms from the unit; a line let out only
+  as the conversation going on is told so, sets no timer and holds a lone
+  word; the lamp's place (`LAMP_PLACE`); "turn yourself down/up" is the
+  voice; the look only when "let me look" closes (a privacy bug: "let me
+  look that up" took pictures); Gemini's speech opens its connection ahead,
+  journals each sentence and says the first six words early; a dated and an
+  early search. The 13:03 battery: 12 of 12 day lines, the hand-over
+  started, one reply to the room's talk, median 3.47 s (speed is next).
+  Privacy read of Sixth's #1748 and #1707 (one P2, fixed). Head-pad step on
+  lamp-52e6 failed (no touch seen); the next probe is on #1362.
