@@ -8364,6 +8364,10 @@ mod tests {
         snapshot: Snapshot,
         dials: UnboundedReceiver<Dial>,
         worker: JoinHandle<Result<()>>,
+        /// How long each heartbeat's capture and admission leases last: the
+        /// coordinator's 100 ms (`INPUT_LEASE_US`), unless a test that
+        /// measures something else sets more.
+        lease_us: u64,
         /// Held for the rig's life, and let go last (#1422).
         _one: OneThread,
     }
@@ -8577,6 +8581,7 @@ mod tests {
                 worker: tokio::spawn(serve_with_visual(
                     worker, boot, provider, options, visual, None,
                 )),
+                lease_us: 100_000,
                 _one: one,
             };
             rig.publish();
@@ -8602,7 +8607,7 @@ mod tests {
         fn heartbeat(&mut self) -> io::Result<()> {
             let at = monotonic_us();
             let now = MonoTime::from_micros(at);
-            let lease = MonoTime::from_micros(at + 100_000);
+            let lease = MonoTime::from_micros(at + self.lease_us);
             self.owner
                 .set_capture(now, CaptureState::RetainingUntil(lease))
                 .unwrap();
@@ -11993,6 +11998,15 @@ mod tests {
             .map(|index| provider_audio(index as i16, FRAMES))
             .collect();
         let mut rig = LiveRig::start(quick_policy());
+        // The rig is the coordinator, on this one thread with the worker and
+        // the scripted service. Each 2 s message is about 128 KB of JSON, and
+        // in a debug build the worker can take more than 100 ms to read and
+        // decode one, so on a loaded host the next heartbeat came late, the
+        // turn lost its owner and every packet was dropped (no output in 5 s,
+        // 8 of 20 runs here under load; #1569). On a lamp the coordinator is
+        // its own process. This test is about flow control and order, so its
+        // leases are a second long.
+        rig.lease_us = 1_000_000;
         let mut dial = rig.ready().await;
         let request = rig.speak(&mut dial, false, true).await;
         // 80 s of speech offered at once: 40 provider messages of 2 s each,
