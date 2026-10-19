@@ -638,8 +638,10 @@ a person said reach the table (`score::tests::no_words_said_reach_the_table`).
   face, a conversation going on, the lamp's news or work, a trusted
   session, a room not known to be busy), held and why (nobody spoke to the
   lamp, a busy room, a short sound, a word or two, said to someone else),
-  answered (the second route's `first answer audio`; Live's `first
-  sound` of a request not held back), declined by the model (`called
+  answered (the second route's `first answer audio`; Live's answer begun,
+  by its `first sound`, said only with `LAMP_NAME_SIGNAL`, or `its answer is
+  played`, said whenever attention judges as with `LAMP_SPOKEN_TO`, and not
+  held back), declined by the model (`called
   not_for_me`; Live's `the model said it was not for it`, not the one said
   after doing what was asked, which is not taken), unanswered in time (`chat
   round N had not begun`; Live's `; closed as unanswered`, not a wait

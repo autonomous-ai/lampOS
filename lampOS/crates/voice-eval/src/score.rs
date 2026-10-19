@@ -205,7 +205,7 @@ const COUNTS: &[&str] = &[
     "held: a word or two",
     "held: said to someone else",
     "held: another reason",
-    "answered (first answer audio; Live: first sound, not held)",
+    "answered (first answer audio; Live: first sound or played, not held)",
     "declined by the model (not_for_me)",
     "unanswered in time",
     "chat failed",
@@ -256,7 +256,9 @@ struct Tally {
     first_audio: BTreeMap<Request, u64>,
     /// The rows already counted for a request, each once.
     seen: std::collections::BTreeSet<(&'static str, Request)>,
-    /// Live's requests that made a first sound, and those held back.
+    /// Live's requests whose answer began, by its first sound (said only
+    /// with `LAMP_NAME_SIGNAL`) or its verdict played (said whenever
+    /// attention judges, as with `LAMP_SPOKEN_TO`), and those held back.
     sounded: std::collections::BTreeSet<Request>,
     held: std::collections::BTreeSet<Request>,
     /// Whether the arm's stretch holds the second route's lines, and Live's.
@@ -364,7 +366,7 @@ impl Tally {
         }
         if let Some(ms) = number_after(line, "first answer audio ") {
             self.once(
-                "answered (first answer audio; Live: first sound, not held)",
+                "answered (first answer audio; Live: first sound or played, not held)",
                 request,
             );
             self.time("words to first answer audio, ms", ms);
@@ -372,7 +374,7 @@ impl Tally {
                 self.first_audio.insert(request, ms);
             }
         }
-        if !second && line.contains(": first sound") {
+        if !second && (line.contains(": first sound") || line.contains("its answer is played: ")) {
             self.sounded.extend(request);
         }
     }
@@ -490,7 +492,7 @@ impl Tally {
     }
 
     /// Line end to first answer audio, for each request with both, and
-    /// Live's answered: a first sound not held back.
+    /// Live's answered: begun (a first sound or played) and not held back.
     fn join(&mut self) {
         let both: Vec<u64> = self
             .first_audio
@@ -503,7 +505,7 @@ impl Tally {
         let answered: Vec<Request> = self.sounded.difference(&self.held).copied().collect();
         for request in answered {
             self.once(
-                "answered (first answer audio; Live: first sound, not held)",
+                "answered (first answer audio; Live: first sound or played, not held)",
                 Some(request),
             );
         }
@@ -808,7 +810,7 @@ Oct 19 20:31:30 lamp-4ace kernel: something else at 20:31:30
         assert_eq!(
             row(
                 &table,
-                "answered (first answer audio; Live: first sound, not held)"
+                "answered (first answer audio; Live: first sound or played, not held)"
             ),
             ["1", "1"]
         );
@@ -838,6 +840,30 @@ Oct 19 20:31:30 lamp-4ace kernel: something else at 20:31:30
         assert!(!table.contains("no voice lines"), "{table}");
     }
 
+    /// The first builder on #1712 (19 Oct 23:29): a Live arm without
+    /// `LAMP_NAME_SIGNAL` has no first-sound lines, and read 0 answered.
+    /// Its answers judged played count, less those held back, and a request
+    /// with both counts once (as `cost` counts them, #1951).
+    #[test]
+    fn live_answers_count_from_a_played_verdict_without_the_name_signal() {
+        let journal = "\
+Oct 19 21:00:01 lamp-4ace lamp-voice[300]: lamp-voice provider: request 1: its answer is played: its name was heard close to the lamp
+Oct 19 21:00:30 lamp-4ace lamp-voice[300]: lamp-voice provider: request 2: its answer is played: a conversation with the lamp is going on
+Oct 19 21:01:00 lamp-4ace lamp-voice[300]: lamp-voice provider: request 3: its answer is held back: nobody spoke to the lamp: no name, nobody turned to it, no conversation with it going on
+Oct 19 21:01:30 lamp-4ace lamp-voice[300]: lamp-voice provider: request 4: first sound, and the model has not said it heard its name
+Oct 19 21:01:31 lamp-4ace lamp-voice[300]: lamp-voice provider: request 4: its answer is played: its name was heard close to the lamp
+";
+        let table = score(journal, &[Arm::parse("live", "21:00", "21:15").unwrap()]);
+        assert_eq!(
+            row(
+                &table,
+                "answered (first answer audio; Live: first sound or played, not held)"
+            ),
+            ["3"],
+            "{table}"
+        );
+    }
+
     /// Jarvis on #1899: request numbers start again with the service, so a
     /// request is known by its process too; an arm with no voice lines
     /// prints "—" and says so.
@@ -861,7 +887,7 @@ Oct 19 20:05:03 lamp-4ace lamp-voice[20]: lamp-voice second: request 7 first ans
         assert_eq!(
             row(
                 &table,
-                "answered (first answer audio; Live: first sound, not held)"
+                "answered (first answer audio; Live: first sound or played, not held)"
             ),
             ["2", "—"]
         );
