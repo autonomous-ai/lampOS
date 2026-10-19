@@ -119,8 +119,14 @@ From `lampOS/`, the group alone, one test at a time as on the runner:
 cargo nextest run --release --workspace --profile realtime -j 1
 ```
 
-What a pull request runs: `--profile pr`, every test, the group one at a
-time. Everything one test at a time, as the full run:
+What a pull request runs: `--profile pr`, the group one at a time, over the
+crates its diff changes, every crate that depends on them, and lamp-cloud,
+lamp-voice-eval and lamp-update, whose tests read other crates' files
+(`.github/scripts/lampos-pr-crates.py`, the project lead's proposal, 19 Oct).
+It runs every crate when the diff touches `Cargo.lock`, any `Cargo.toml`,
+`crates/msgs`, `bus` or `ipc`, `deploy/`, `skills/`, `.config/`, the docs
+tests read, the script, the workflow or any other path. A push to
+`lamp-voice` runs every crate. Everything one test at a time, as the full run:
 `cargo nextest run --release --workspace -j 1`. `cargo test` is unaffected
 and runs everything.
 
