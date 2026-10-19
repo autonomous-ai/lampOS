@@ -661,9 +661,11 @@ impl Peers {
                         waiting_for_barrier: false,
                     });
                 }
+                // Alone, the second route answers the lamp's own turns as
+                // the Live route would, with its own samples.
                 ProviderInput::Written {
                     request, session, ..
-                } if live => {
+                } if live || self.script.only => {
                     let queued = &mut self.peers[index].queued;
                     let started = ProviderOutput::Started {
                         request,
@@ -687,7 +689,7 @@ impl Peers {
                         }
                         Written::Said(packets) => {
                             queued.push_back(started);
-                            self.audio(index, request, packets, LIVE);
+                            self.audio(index, request, packets, if live { LIVE } else { SECOND });
                             self.finish(index, request);
                         }
                     }
@@ -1780,6 +1782,131 @@ fn the_second_route_alone_exiting_ends_the_voice_as_gemini_does() {
     assert!(error.contains("second worker exited"), "{}", run.summary());
     assert!(run.events("voice_route_dropped").is_empty());
     assert!(run.seen.live.is_empty());
+}
+
+/// The first builder's 20:15 on #1722: a task's news told unasked on the
+/// second route alone is said once, at the next quiet moment, as on Live.
+/// After the person's question is answered, the news waiting is begun as
+/// the lamp's own turn at the first pause (`LAMP_TASK_NEWS_AT_PAUSE=on`),
+/// sent to the voice that answers, said whole, and only then handed on as
+/// heard; it is never sent again.
+#[test]
+fn news_is_told_once_at_the_next_quiet_moment_on_the_second_route_as_on_live() {
+    let _one = super::pilot_faults::one_session();
+    const NOTE: &str = "Claude Code just finished the story you asked for.";
+    let told = |only: bool| {
+        let (news, heard) = crate::task_news::TaskNews::waiting_for_test_heard(
+            crate::task_news::News {
+                key: "s1:2:4".into(),
+                note: NOTE.into(),
+                until: None,
+                progress: None,
+                finished: None,
+                also: Vec::new(),
+            },
+            Duration::from_secs(30),
+        );
+        TEST_TASK_NEWS.with(|given| *given.borrow_mut() = Some(news));
+        TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(true));
+        let run = run(Script {
+            second: false,
+            only,
+            written: Written::Said(12),
+            mute_at_frame: Some(800),
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(false));
+        TEST_TASK_NEWS.with(|given| given.borrow_mut().take());
+        (run, heard.try_iter().collect::<Vec<_>>())
+    };
+    for (only, voice) in [(false, LIVE), (true, SECOND)] {
+        let (run, heard) = told(only);
+        run.assert_clean();
+        let sent = if only {
+            &run.seen.second
+        } else {
+            &run.seen.live
+        };
+        let notes: Vec<u64> = sent
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::Written { request, text, .. } if text == NOTE => Some(*request),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(notes, [2], "only {only}: {}", run.summary());
+        assert_eq!(run.events("task_news").len(), 1, "only {only}");
+        assert_eq!(run.events("task_news")[0]["key"], "s1:2:4");
+        // At the first pause after the answer, not after 15 s with no turn.
+        let since = run.events("task_news")[0]["since_turn_ms"]
+            .as_u64()
+            .unwrap();
+        assert!(
+            (crate::task_news::PAUSE_US / 1_000..crate::task_news::QUIET_US / 1_000)
+                .contains(&since),
+            "only {only}: {since} ms"
+        );
+        assert_eq!(run.played(1), vec![voice; 48], "only {only}");
+        assert_eq!(run.played(2), vec![voice; 48], "only {only}");
+        assert_eq!(heard, ["s1:2:4"], "only {only}: {}", run.summary());
+        if only {
+            assert!(run.seen.live.is_empty(), "{:?}", run.seen.live);
+        }
+    }
+}
+
+/// `LAMP_SAY` (#939) on the second route alone, as on Live: a skill's say
+/// is begun as the lamp's own turn once the person's answer is over and the
+/// room is quiet, sent to the voice that answers, said whole, and its asker
+/// told `begun` and then `spoken`, once.
+#[test]
+fn a_skills_say_is_said_and_answered_spoken_on_the_second_route_as_on_live() {
+    use crate::say::{Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    const NOTE: &str = "Remind the person to stretch.";
+    let said = |only: bool| {
+        let (says, answered) =
+            crate::say::Says::note_for_test("stretch", NOTE, crate::say::URGENT_FROM);
+        TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+        let run = run(Script {
+            second: false,
+            only,
+            written: Written::Said(12),
+            mute_at_frame: Some(800),
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_SAYS.with(|given| given.borrow_mut().take());
+        (run, answered.try_iter().collect::<Vec<_>>())
+    };
+    for (only, voice) in [(false, LIVE), (true, SECOND)] {
+        let (run, answered) = said(only);
+        run.assert_clean();
+        let sent = if only {
+            &run.seen.second
+        } else {
+            &run.seen.live
+        };
+        let notes: Vec<u64> = sent
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::Written { request, text, .. } if text == NOTE => Some(*request),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(notes.len(), 1, "only {only}: {}", run.summary());
+        let turn = notes[0];
+        assert_eq!(run.played(turn), vec![voice; 48], "only {only}");
+        assert!(
+            matches!(
+                answered.as_slice(),
+                [Answer::Begun(_), Answer::Done(Outcome::Spoken)]
+            ),
+            "only {only}: {answered:?}"
+        );
+        if only {
+            assert!(run.seen.live.is_empty(), "{:?}", run.seen.live);
+        }
+    }
 }
 
 /// (p) #960, lamp-4ace (`server_go_away`): Gemini's link drops with no turn

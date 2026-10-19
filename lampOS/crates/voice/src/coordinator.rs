@@ -3844,6 +3844,15 @@ thread_local! {
     static TEST_MISHEARD_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_HOLDING_ANSWER=on`, without changing process-wide flags.
     static TEST_HOLDING_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's task news, in place of the tasks part, as
+    /// `TEST_FULL_LOOK`: taken by the loop as it starts.
+    static TEST_TASK_NEWS: std::cell::RefCell<Option<crate::task_news::TaskNews>> =
+        const { std::cell::RefCell::new(None) };
+    /// A loop test's `LAMP_TASK_NEWS_AT_PAUSE=on` (#560), as `TEST_FULL_LOOK`.
+    static TEST_NEWS_AT_PAUSE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's say service (`LAMP_SAY=on`, #939), as `TEST_TASK_NEWS`.
+    static TEST_SAYS: std::cell::RefCell<Option<crate::say::Says>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4055,8 +4064,12 @@ fn conversation_with_gate(
     };
     // News from the work handed to agents on other computers, told
     // unasked at a good moment (`docs/tasks.md`).
+    #[cfg(test)]
+    let given_news = TEST_TASK_NEWS.with(|news| news.borrow_mut().take());
+    #[cfg(not(test))]
+    let given_news = None;
     let mut task_news = if lifetime.continuous() {
-        crate::task_news::TaskNews::from_environment()
+        given_news.or_else(crate::task_news::TaskNews::from_environment)
     } else {
         None
     };
@@ -4067,10 +4080,16 @@ fn conversation_with_gate(
             .ok()
             .as_deref(),
     );
+    #[cfg(test)]
+    let news_at_pause = news_at_pause || TEST_NEWS_AT_PAUSE.with(std::cell::Cell::get);
     // What other parts ask the voice to say, skills first (#939,
     // `LAMP_SAY=on`).
+    #[cfg(test)]
+    let given_says = TEST_SAYS.with(|says| says.borrow_mut().take());
+    #[cfg(not(test))]
+    let given_says = None;
     let mut says = if lifetime.continuous() {
-        crate::say::Says::from_environment()
+        given_says.or_else(crate::say::Says::from_environment)
     } else {
         None
     };
