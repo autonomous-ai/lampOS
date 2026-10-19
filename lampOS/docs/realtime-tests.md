@@ -93,6 +93,11 @@ profile's exclusion:
   and `with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump`. They
   took 2.6 s and 1.3 s on ARM64; beside 8 busy cores and four SQLite stores
   syncing on a Mac, the first's stop took 103 ms to 1.09 s in 18 of 20 runs;
+- two more of `lamp-skills::skills`, named exactly, that start the real
+  program twice on the host's clock, a restart between, and wait 800 ms of
+  real time for a nudge that must not come (#1837):
+  `the_program_keeps_a_skill_off_across_a_restart` and
+  `the_program_forgets_a_snooze_at_a_restart`;
 - tests with a real-clock bound that a loaded runner misses: none now. A
   test goes here only until it gets its own time; the bound the lamp runs
   with is never raised for it. `lamp-voice`'s `coordinator::motor::tests::native_head`

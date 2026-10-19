@@ -7433,3 +7433,389 @@ fn the_nudge_limits_are_held_to_their_rules() {
     );
     assert_eq!(edges.rest.map(|rest| rest.within_us), Some(300_000_000));
 }
+
+/// A stuffy-room nudge with a `[stop]` function, `stuffy_nudges` (#1685).
+fn stoppable(dir: &Path) -> PathBuf {
+    skill_with(
+        dir,
+        "sip",
+        "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n\
+         [stop]\ntool = \"stuffy_nudges\"\nabout = \"When someone asks you to stop the stuffy-room nudges, for today or for good, or to have them again.\"\n\
+         [[do]]\nlight = { colour = \"warm\", for = \"5s\" }\n",
+    )
+}
+
+/// Whether a stuffy-room reading at `at_s` starts the nudge.
+fn nudges(engine: &mut Engine, at_s: u64) -> bool {
+    engine
+        .observe("air/indoor", at_s * 1_000_000, br#"{"co2":1200}"#, None)
+        .iter()
+        .any(|run| !run.calls.is_empty())
+}
+
+/// What the model is told of `how`, called at `at_s`.
+fn stop(engine: &mut Engine, how: &str, at_s: u64) -> Result<String, String> {
+    engine
+        .tool(
+            "stuffy_nudges",
+            &serde_json::json!({ "how": how }),
+            at_s * 1_000_000,
+        )
+        .map(|run| {
+            lamp_skills::told(&run.calls)["next"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+}
+
+/// #1685: a skill's `[stop]` is one function for the model, its choice
+/// `how`: `snooze` until the next local morning, `off` until it is asked
+/// for again, `on` to have it again. It stops only what the skill starts
+/// itself, and says so to the model in words to pass on.
+#[test]
+fn a_skills_stop_snoozes_it_until_the_morning_or_turns_it_off_until_asked() {
+    let dir = tempfile::tempdir().unwrap();
+    let skill = load(&stoppable(dir.path())).unwrap();
+    let tools = tools_file(std::slice::from_ref(&skill));
+    assert_eq!(tools["tools"][0]["name"], "stuffy_nudges");
+    assert_eq!(
+        tools["tools"][0]["parameters"]["properties"]["how"]["enum"],
+        serde_json::json!(["snooze", "off", "on"])
+    );
+    // 20:00 local (UTC+7) at 0 s: the morning is ten hours on.
+    let mut engine = Engine::new(vec![skill.clone()], true);
+    engine.clock(420, 0, 1_792_414_800_000);
+    assert!(nudges(&mut engine, 0));
+    let told = stop(&mut engine, "snooze", 1).unwrap();
+    assert!(told.contains("tomorrow morning"), "{told}");
+    assert!(!nudges(&mut engine, 2));
+    assert!(!nudges(&mut engine, 10 * 3_600 - 1));
+    assert!(nudges(&mut engine, 10 * 3_600));
+    let told = stop(&mut engine, "off", 10 * 3_600 + 1).unwrap();
+    assert!(told.contains("ask"), "{told}");
+    assert!(!nudges(&mut engine, 40 * 3_600));
+    let told = stop(&mut engine, "on", 40 * 3_600 + 1).unwrap();
+    assert!(told.contains("again"), "{told}");
+    assert!(nudges(&mut engine, 40 * 3_600 + 2));
+    // A snooze lifted by `on`; 12 h with the local time not known.
+    let mut engine = Engine::new(vec![skill], true);
+    stop(&mut engine, "snooze", 0).unwrap();
+    assert!(!nudges(&mut engine, 12 * 3_600 - 1));
+    assert!(nudges(&mut engine, 12 * 3_600));
+    stop(&mut engine, "snooze", 12 * 3_600 + 1).unwrap();
+    stop(&mut engine, "on", 12 * 3_600 + 2).unwrap();
+    assert!(nudges(&mut engine, 12 * 3_600 + 3));
+    // Asked wrongly: told how, and nothing changed.
+    for args in [
+        serde_json::json!({}),
+        serde_json::json!({ "how": "later" }),
+        serde_json::json!({ "how": "off", "for": "a week" }),
+        serde_json::json!("off"),
+    ] {
+        let refused = engine.tool("stuffy_nudges", &args, 0).unwrap_err();
+        assert!(refused.contains("snooze, off or on"), "{refused}");
+    }
+    assert!(nudges(&mut engine, 12 * 3_600 + 4));
+}
+
+/// #1685: a `[stop]` is one function a skill, in its tools file beside the
+/// skill's own, so a session's 32 count it once; `lamp-skills list` counts
+/// it. Its name is one skill's, as a tool's is. It is held to its rules:
+/// only in a skill with a trigger, not with `each`, a function's name not
+/// the skill's own tool, and an `about` that says when to call it.
+#[test]
+fn a_skills_stop_is_one_function_held_to_its_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    stoppable(dir.path());
+    // Another skill's by the same name, later in folder order.
+    skill_with(
+        dir.path(),
+        "zz-other",
+        "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n\
+         [stop]\ntool = \"stuffy_nudges\"\nabout = \"Another.\"\n[[do]]\nlight = { colour = \"warm\" }\n",
+    );
+    let (loaded, errors) = load_all(dir.path());
+    assert_eq!(loaded.len(), 1);
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.contains("is the installable skill sip's")),
+        "{errors:?}"
+    );
+    let tools = tools_file(&loaded);
+    assert_eq!(tools["tools"].as_array().unwrap().len(), 1, "{tools}");
+    assert!(
+        tools["tools"][0]["description"]
+            .as_str()
+            .unwrap()
+            .starts_with("When someone asks you to stop")
+    );
+    fs::remove_dir_all(dir.path().join("zz-other")).unwrap();
+    let listed = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+        .args(["list".as_ref(), "--dir".as_ref(), dir.path().as_os_str()])
+        .output()
+        .unwrap();
+    let listed = String::from_utf8_lossy(&listed.stdout);
+    assert!(
+        listed.contains("The skills here give the model 1 function (stuffy_nudges)."),
+        "{listed}"
+    );
+    let trigger = "[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n";
+    let each = "[trigger]\ntopic = \"tasks/status\"\neach = \"settled\"\nkey = \"task\"\nfield = \"state\"\nequals = \"idle\"\nwhen = \"appears\"\n[ask]\npolicy = \"nudge\"\n";
+    let step = "[[do]]\nlight = { colour = \"warm\" }\n";
+    let stop =
+        |tool: &str, about: &str| format!("[stop]\ntool = \"{tool}\"\nabout = \"{about}\"\n");
+    let refused = tempfile::tempdir().unwrap();
+    for (number, (head, stop, why)) in [
+        (
+            "tool = \"stuffy\"\n",
+            stop("stuffy_nudges", "When."),
+            "in a skill with a trigger",
+        ),
+        (each, stop("news_off", "When."), "not an each trigger"),
+        (trigger, stop("Stuffy", "When."), "a lowercase letter"),
+        (trigger, stop("9_lives", "When."), "a lowercase letter"),
+        (
+            "tool = \"stuffy\"\n[trigger]\ntopic = \"air/indoor\"\nfield = \"co2\"\nabove = 1000\n[ask]\npolicy = \"nudge\"\n",
+            stop("stuffy", "When."),
+            "not the skill's tool",
+        ),
+        (trigger, stop("stuffy_nudges", " "), "about is 1 to 512 bytes"),
+        (
+            trigger,
+            stop("stuffy_nudges", &"a".repeat(513)),
+            "about is 1 to 512 bytes",
+        ),
+        (
+            trigger,
+            stop("stuffy_nudges", "When.\\tNow."),
+            "no control characters",
+        ),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let error = load(&skill_with(
+            refused.path(),
+            &format!("bad{number}"),
+            &format!("{head}{stop}{step}"),
+        ))
+        .unwrap_err();
+        assert!(error.contains(why), "{stop}: {error}");
+    }
+    let most = load(&skill_with(
+        refused.path(),
+        "longest",
+        &format!("{trigger}{}{step}", stop("stuffy_nudges", &"a".repeat(512))),
+    ))
+    .unwrap();
+    assert_eq!(most.stop.map(|stop| stop.about.len()), Some(512));
+}
+
+/// #1685: `off` is kept in the part's state folder (`--state-dir`) as one
+/// line, the skill's name, and nothing else: a new engine reading it has the
+/// skill off, and `on` takes the line away. A snooze is never written, so a
+/// new engine has forgotten it. A line that is not a name is passed over.
+#[test]
+fn off_is_kept_as_one_line_a_skill_and_a_snooze_is_not() {
+    let dir = tempfile::tempdir().unwrap();
+    let state = tempfile::tempdir().unwrap();
+    let skill = load(&stoppable(dir.path())).unwrap();
+    let off = state.path().join(lamp_skills::OFF_FILE);
+    let mut engine = Engine::new(vec![skill.clone()], true);
+    assert!(engine.keep_off_in(state.path()).unwrap().is_empty());
+    stop(&mut engine, "snooze", 0).unwrap();
+    assert!(!off.exists());
+    let told = stop(&mut engine, "off", 1).unwrap();
+    assert!(!told.contains("restarts"), "{told}");
+    assert_eq!(fs::read_to_string(&off).unwrap(), "sip\n");
+    // Written beside it and moved over it: nothing left beside it.
+    assert!(!state.path().join("off.new").exists());
+    // The program again, on the same folder.
+    let mut again = Engine::new(vec![skill.clone()], true);
+    assert_eq!(again.keep_off_in(state.path()).unwrap(), ["sip"]);
+    assert!(again.stopped("sip", 0));
+    assert!(!nudges(&mut again, 13 * 3_600));
+    stop(&mut again, "on", 13 * 3_600 + 1).unwrap();
+    assert_eq!(fs::read_to_string(&off).unwrap(), "");
+    assert!(nudges(&mut again, 13 * 3_600 + 2));
+    // A snooze, then the program again: it is forgotten.
+    stop(&mut again, "snooze", 13 * 3_600 + 3).unwrap();
+    assert!(again.stopped("sip", (13 * 3_600 + 4) * 1_000_000));
+    let mut after = Engine::new(vec![skill.clone()], true);
+    after.keep_off_in(state.path()).unwrap();
+    assert!(!after.stopped("sip", 0));
+    assert!(nudges(&mut after, 0));
+    // A line that is not a name passed over; one of a skill not loaded kept.
+    fs::write(&off, "sip\nNot a name\n\nother-skill\n").unwrap();
+    let mut read = Engine::new(vec![skill.clone()], true);
+    assert_eq!(
+        read.keep_off_in(state.path()).unwrap(),
+        ["other-skill", "sip"]
+    );
+    // Kept nowhere: off until the program stops, and the model told so.
+    let mut nowhere = Engine::new(vec![skill], true);
+    let told = stop(&mut nowhere, "off", 0).unwrap();
+    assert!(told.contains("only until the lamp restarts"), "{told}");
+    assert!(!nudges(&mut nowhere, 1));
+}
+
+/// The program on the host's clock with the skills in `root/skills` and
+/// its state in `root/state`, on a bus and a tools folder of its own for
+/// `start`, its trigger's topic subscribed to.
+fn stop_program(root: &Path, start: u32) -> (Running, Bus, PathBuf) {
+    let bus = Bus::new(root.join(format!("bus{start}"))).unwrap();
+    let tools = root.join(format!("tools{start}"));
+    let running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .args([
+                "--dir".as_ref(),
+                root.join("skills").as_os_str(),
+                "--bus-root".as_ref(),
+                root.join(format!("bus{start}")).as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--state-dir".as_ref(),
+                root.join("state").as_os_str(),
+                "--actions-socket".as_ref(),
+                root.join("actions.sock").as_os_str(),
+            ])
+            .env("LAMP_SKILLS_ASK", "skip")
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !tools.join("tools.json").exists() || bus.subscribers("air/indoor").unwrap().is_empty() {
+        assert!(Instant::now() < deadline, "the skill was never loaded");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    (running, bus, tools)
+}
+
+/// The model's call of the `[stop]` function with `how`, as the voice
+/// makes it.
+fn call_stop(tools: &Path, how: &str) -> serde_json::Value {
+    let stream = UnixStream::connect(tools.join("call.sock")).unwrap();
+    writeln!(
+        &stream,
+        r#"{{"op":"call","name":"stuffy_nudges","args":{{"how":"{how}"}}}}"#
+    )
+    .unwrap();
+    let mut line = String::new();
+    BufReader::new(&stream).read_line(&mut line).unwrap();
+    serde_json::from_str(&line).unwrap()
+}
+
+/// The air part and the skills' events, on one program's bus: one
+/// publisher a start, so each reading is newer than the last.
+struct Air {
+    indoor: lamp_bus::Publisher,
+    events: lamp_bus::Subscriber,
+}
+
+impl Air {
+    fn on(bus: &Bus) -> Self {
+        let air = lamp_bus::Declaration::new("test/Air", 1, lamp_bus::Kind::Latest);
+        Self {
+            indoor: bus.publisher_declared("air/indoor", &air, "air").unwrap(),
+            events: bus.subscribe(SkillEvent::TOPIC, "test").unwrap(),
+        }
+    }
+
+    /// Whether a stuffy-room reading starts the nudge within `wait`: its
+    /// trigger's run, not the model's call of `[stop]`.
+    fn nudged_within(&mut self, wait: Duration) -> bool {
+        self.indoor
+            .publish_json(1, &serde_json::json!({ "co2": 1200 }))
+            .unwrap();
+        let deadline = Instant::now() + wait;
+        while Instant::now() < deadline {
+            if let Some(message) = self.events.recv(Duration::from_millis(50)).unwrap() {
+                let event: SkillEvent = message.parse().unwrap();
+                if event.skill == "sip"
+                    && event.stage == SkillStage::Triggered
+                    && event.why.contains("air/indoor")
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+}
+
+/// #1685, the program: a skill a person turned off is off again after a
+/// restart, read from `--state-dir`, until they turn it on.
+#[test]
+fn the_program_keeps_a_skill_off_across_a_restart() {
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("so")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    fs::create_dir(root.join("skills")).unwrap();
+    fs::create_dir(root.join("state")).unwrap();
+    stoppable(&root.join("skills"));
+    let (running, bus, tools) = stop_program(root, 1);
+    let mut air = Air::on(&bus);
+    let told = call_stop(&tools, "off");
+    assert!(
+        told["result"]["next"]
+            .as_str()
+            .unwrap()
+            .contains("until they ask"),
+        "{told}"
+    );
+    assert!(!air.nudged_within(Duration::from_millis(800)));
+    drop(running);
+    assert_eq!(fs::read_to_string(root.join("state/off")).unwrap(), "sip\n");
+    let (_running, bus, tools) = stop_program(root, 2);
+    let mut air = Air::on(&bus);
+    assert!(
+        !air.nudged_within(Duration::from_millis(800)),
+        "off after the restart"
+    );
+    let told = call_stop(&tools, "on");
+    assert!(
+        told["result"]["next"].as_str().unwrap().contains("again"),
+        "{told}"
+    );
+    assert!(air.nudged_within(Duration::from_secs(3)), "on again");
+    assert_eq!(fs::read_to_string(root.join("state/off")).unwrap(), "");
+}
+
+/// #1685, the program: a snooze is in memory only, so after a restart the
+/// skill nudges again, and nothing was written.
+#[test]
+fn the_program_forgets_a_snooze_at_a_restart() {
+    // Short: a socket's whole path has to fit in 103 bytes.
+    let dir = tempfile::Builder::new()
+        .prefix("sn")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let root = dir.path();
+    fs::create_dir(root.join("skills")).unwrap();
+    fs::create_dir(root.join("state")).unwrap();
+    stoppable(&root.join("skills"));
+    let (running, bus, tools) = stop_program(root, 1);
+    let mut air = Air::on(&bus);
+    let told = call_stop(&tools, "snooze");
+    assert!(
+        told["result"]["next"]
+            .as_str()
+            .unwrap()
+            .contains("tomorrow morning"),
+        "{told}"
+    );
+    assert!(!air.nudged_within(Duration::from_millis(800)));
+    drop(running);
+    assert!(!root.join("state/off").exists());
+    let (_running, bus, _tools) = stop_program(root, 2);
+    let mut air = Air::on(&bus);
+    assert!(
+        air.nudged_within(Duration::from_secs(3)),
+        "the snooze forgotten"
+    );
+}
