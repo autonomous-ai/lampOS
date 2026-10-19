@@ -742,9 +742,11 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   `systemd-tmpfiles --create /etc/tmpfiles.d/lampos.conf` if that file
   changed and is there, then writes `apply/done.json` (the records the state takes). The
   round takes those into `state.json` and removes the request. Its unit:
-  `ProtectSystem=strict`, writable only `/etc/lampOS`,
-  `/etc/tmpfiles.d`, `/var/lib/lampOS`, the records and `/run` (for the
-  tmpfiles), the update key read-only, no network.
+  `ProtectSystem=strict`, writable only `/etc` (for the image's
+  `/etc/asound.conf`, replaced by a rename beside it; what is written
+  there is only what the path rules allow), `/var/lib/lampOS`, the records,
+  `/run` (for the tmpfiles) and `/usr/local/libexec`, the update key
+  read-only, no network.
 - **Restarted with it.** A part whose unit names a written path, or its
   folder as a folder, is restarted and watched with the switch, as for a
   model: the controls for `controls.json`, the expression for
@@ -779,6 +781,83 @@ Off, or absent: a build's settings aren't written, and the round says
 which (`build N's settings are not written (...): LAMP_UPDATE_APPLY=on is
 not set`). The rest of the build is taken as today. Users and groups
 aren't carried: a later step, when a build needs a new one.
+
+### The image's own files (`LAMP_UPDATE_IMAGE`, off)
+
+The image lays down files of its own that `install` never placed
+(`robots/lamp/rootfs/`, and `robots/lamp/overrides/<variant>/rootfs/`
+over it): a fix to one reached only newly imaged lamps (#1369). A build can
+carry them (`image.rs`, #1680 step 6): an `image` list in the signed
+manifest, each entry `variant`, `path`, `text`, `sha256` and `shipped`.
+Not in `settings`: install's fixed `lamp-update-back` refuses a setting
+path it doesn't know, and ignores a field it doesn't know.
+
+- **Which.** Only `manifest::IMAGE_FILES` (checked when the manifest is
+  read, and again by lamp-update-apply before its first write, as on
+  put-back; a build that names any other path, or one path as both a
+  setting and an image file, writes nothing): `/etc/asound.conf`,
+  `lamp-cmedia-speaker.service`, `respeaker-lite-softvol.service`,
+  logrotate's `zz-lamp-ramlog.conf` and its `lamp-ramlog-postrotate`,
+  journald's `zz-lamp-journal.conf`, and the udev rules `90-respeaker-lite`,
+  `91-pulseaudio-hal-ignore` and `99-lamp-device`. Never V1's HAL
+  (`/opt/hal/.env`, `led-boot`/`led-shutdown`, `hal.service`'s drop-in),
+  never the radio scripts (`device-ap-mode`/`device-sta-mode` are written
+  by `build-orangepi.sh`, not files in the tree), and never a drop-in a
+  lamp or a person made, such as lamp-4ace's
+  `lamp-cmedia-speaker.service.d/30-local-gain.conf`.
+- **Variants.** `lamp-update manifest --image robots/lamp` writes each
+  variant merged as `apply-overrides.py` merges it: the variant's own file
+  where it has one, else the standard one. On the lamp, the variant is
+  `/etc/autonomous/hardware-profile` as the image wrote it (none, empty or
+  `standard`: the standard lamp); one that isn't a plain name carries
+  nothing. `min_updater` is then at least 4 (`manifest::IMAGE_UPDATER`);
+  `UPDATER` is 4.
+- **Shipped.** `install` never recorded these files, so the build's before
+  is also every SHA-256 the image has shipped at that path for that
+  variant: `deploy/image/shipped.json`, from the history of `robots/lamp`.
+  Publishing refuses a file whose SHA-256 it doesn't list, and a test
+  (`image::tests`) fails the same way: change a file in `robots/lamp`, add
+  its new SHA-256, never remove one. A lamp's file that is none of them
+  and not what an update recorded is the lamp's own: kept and said.
+- **Written** by `lamp-update-apply` with the settings, by the same rule,
+  when the round's request says `image` (only with the switch on). Each
+  unit (not a drop-in) is first staged in `/run/lampos-update-apply/` and
+  checked with `systemd-analyze verify`; one systemd can't load fails the
+  apply with nothing written. After the writes: `systemctl daemon-reload`
+  for a unit or a unit's drop-in, `udevadm control --reload` for a rule
+  (no trigger: a rule is used at the next plug or boot), and
+  `lamp-cmedia-speaker.service` started once when it changed (a failure
+  there is said: a lamp without the C-Media card). A put-back restores each
+  file byte for byte and runs the same reloads.
+- **journald is never restarted** or signalled by an update (the first
+  builder on #1680, 19:48: restarting it broke every part's log pipe on
+  15 Oct). Its drop-in is read at the next boot, and that is said. Every
+  command lamp-update-apply runs passes `image::guard` first, which
+  refuses any that names journald.
+- **The voice, at a quiet moment.** `/etc/asound.conf` changed restarts
+  the voice (`image::restarts`), which ALSA's configuration reaches only
+  when it opens its devices. A round writes it only after the switch's
+  quiet gate (`quiet.rs`: nobody heard or answered and the voice resting
+  for 45 s), the gate every switch of the voice passes. With no quiet
+  moment within `--quiet-wait-s`, nothing is written or restarted, the
+  round ends `not-quiet`, and the next round tries again. A lamp's own
+  `asound.conf`, kept, restarts nothing.
+- **Older lamp-update-back.** A lamp installed before this has a
+  lamp-update-back that ignores `image`: nothing of it is written, the
+  round says so (`this lamp's lamp-update-back is older than them, so
+  install again`), and the rest of the build goes on. A part restarted
+  only for a file not written (the voice for `asound.conf`) isn't
+  restarted.
+- **check-units.** The image's units (`lamp-cmedia-speaker.service`,
+  `respeaker-lite-softvol.service`) are "the image's", not "not in the
+  product". With `--image robots/lamp [--variant NAME]` each is compared
+  with that variant's, and a difference fails the check.
+
+Off, or absent: none of the image's files is written, neither they nor
+`/etc/autonomous/hardware-profile` is read, and the round says so
+(`build N's image files are not written: LAMP_UPDATE_IMAGE=on is not
+set`). On, a profile or image file that can't be read is said, and the
+rest of the build goes on without the image's files.
 
 ## What was measured, and where
 
@@ -1040,6 +1119,17 @@ committed, never the owner's real key). `L` is the runbook's SSH alias.
 - Models in the manifest (`LAMP_UPDATE_MODELS`): tested on the Mac only
   (`tests/round.rs`). A download cut short starts again from nothing; it
   isn't resumed. No published build carries models yet.
+- The image's own files (`LAMP_UPDATE_IMAGE`): tested on the Mac only
+  (`image.rs`, `apply.rs`, `tests/round.rs`), with lamp-update-apply called
+  in the round's place of systemd and every command recorded, not run.
+  From the review of #1945: an image path outside `IMAGE_FILES` (manifest
+  check), listed twice, or whose text isn't its SHA-256 is refused; a
+  signed build naming `/etc/sudoers.d/lamp` writes nothing; a hardware
+  profile that can't be read fails no round, on or off; an older
+  lamp-update-back doesn't get the voice restarted.
+  `systemd-analyze verify`, `daemon-reload`, `udevadm control --reload`
+  and the speaker unit's start haven't run on a lamp, nor the wider
+  sandbox. No published build carries the image's files yet.
 - Settings and tmpfiles (`LAMP_UPDATE_APPLY`): tested on the Mac only
   (`apply.rs`, `tests/round.rs`), with lamp-update-apply called in the
   round's place of systemd. The unit's sandbox, `systemd-tmpfiles` and

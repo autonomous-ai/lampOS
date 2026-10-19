@@ -29,13 +29,36 @@ pub const SCHEMA: u32 = 1;
 /// This updater's own level: raised whenever the updater learns to apply
 /// something an older one cannot. A manifest whose `min_updater` is above
 /// it is refused whole, before anything is fetched or written. 2: the
-/// build's `models` (#1680). 3: its `settings` (#1680).
-pub const UPDATER: u64 = 3;
+/// build's `models` (#1680). 3: its `settings` (#1680). 4: the image's
+/// own files, `image` (#1369).
+pub const UPDATER: u64 = 4;
 /// The level a build that carries models needs: an updater below it does
 /// not read the field.
 pub const MODELS_UPDATER: u64 = 2;
 /// The level a build that carries settings needs.
 pub const SETTINGS_UPDATER: u64 = 3;
+/// The level a build that carries the image's files needs.
+pub const IMAGE_UPDATER: u64 = 4;
+/// The image's own files a build may carry (#1369): those of
+/// `robots/lamp/rootfs/` and its overrides that are the product's to keep
+/// up to date after a lamp ships. Not V1's HAL (`/opt/hal`, the LED boot
+/// units, `hal.service`'s drop-in), and never a drop-in a lamp or a person
+/// made: only these paths.
+pub const IMAGE_FILES: &[&str] = &[
+    "/etc/asound.conf",
+    "/etc/systemd/system/lamp-cmedia-speaker.service",
+    "/etc/systemd/system/respeaker-lite-softvol.service",
+    "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf",
+    "/etc/systemd/journald.conf.d/zz-lamp-journal.conf",
+    "/etc/udev/rules.d/90-respeaker-lite.rules",
+    "/etc/udev/rules.d/91-pulseaudio-hal-ignore.rules",
+    "/etc/udev/rules.d/99-lamp-device.rules",
+    "/usr/local/libexec/lamp-ramlog-postrotate",
+];
+/// At most this many of the image's files in one build, all variants.
+pub const MOST_IMAGE: usize = 64;
+/// At most this many SHA-256s the image has shipped, for one file.
+pub const MOST_SHIPPED: usize = 64;
 /// At most this many settings in one build, and this many bytes of them in
 /// all: today's are 14 files and about 40 KB.
 pub const MOST_SETTINGS: usize = 128;
@@ -134,6 +157,107 @@ pub struct Manifest {
     /// changed it. Left out when there are none, and not written.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub settings: Vec<Setting>,
+    /// The image's own files (#1369), for each variant of the lamp: written
+    /// by `lamp-update-apply` only where the lamp has one the image shipped.
+    /// Not in `settings`, which a `lamp-update-back` older than the field
+    /// would refuse whole: one that old ignores this field. Left out when
+    /// there are none, and not written.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub image: Vec<ImageFile>,
+}
+
+/// One of the image's own files, for one variant of the lamp
+/// (`/etc/autonomous/hardware-profile`, none being `standard`). Read by
+/// `lamp-update-apply`, so it is a contract for good, as [`Setting`] is.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImageFile {
+    pub variant: String,
+    pub path: String,
+    pub text: String,
+    pub sha256: String,
+    /// Every SHA-256 the image has shipped at this path for this variant:
+    /// a lamp's file that is one of them is the image's, never the lamp's
+    /// own, since install never recorded these.
+    #[serde(default)]
+    pub shipped: Vec<String>,
+}
+
+impl ImageFile {
+    /// As a setting: what the three-way rule reads.
+    pub fn setting(&self) -> Setting {
+        Setting {
+            path: self.path.clone(),
+            text: Some(self.text.clone()),
+            sha256: Some(self.sha256.clone()),
+            mode: Some("0644".to_owned()),
+            removed: false,
+        }
+    }
+}
+
+/// A variant's name: what `apply-overrides.py` reads, plain.
+pub fn is_variant(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
+/// The image's files checked: a path of [`IMAGE_FILES`] and a variant, once
+/// each pair; the text's SHA-256; every shipped SHA-256 a hash.
+pub fn check_image(image: &[ImageFile]) -> Result<(), Refused> {
+    if image.len() > MOST_IMAGE {
+        return Err(refused(format!(
+            "more than {MOST_IMAGE} of the image's files"
+        )));
+    }
+    let mut pairs = std::collections::BTreeSet::new();
+    let mut bytes = 0;
+    for file in image {
+        if !IMAGE_FILES.contains(&file.path.as_str()) {
+            return Err(refused(format!(
+                "{:?} is not one of the image's files a build may carry",
+                file.path
+            )));
+        }
+        if !is_variant(&file.variant) {
+            return Err(refused(format!(
+                "{:?} is not a variant's name",
+                file.variant
+            )));
+        }
+        if !pairs.insert((file.variant.as_str(), file.path.as_str())) {
+            return Err(refused(format!(
+                "{} of {} is listed twice",
+                file.path, file.variant
+            )));
+        }
+        if sha256_hex(file.text.as_bytes()) != file.sha256 {
+            return Err(refused(format!(
+                "{} of {}: its text is not its SHA-256",
+                file.path, file.variant
+            )));
+        }
+        if file.shipped.len() > MOST_SHIPPED
+            || file
+                .shipped
+                .iter()
+                .any(|sha| sha.len() != 64 || !is_lower_hex(sha))
+        {
+            return Err(refused(format!(
+                "{} of {}: its shipped SHA-256s are not up to {MOST_SHIPPED} hashes",
+                file.path, file.variant
+            )));
+        }
+        bytes += file.text.len();
+    }
+    if bytes > MOST_SETTINGS_BYTES {
+        return Err(refused(format!(
+            "the image's files are more than {MOST_SETTINGS_BYTES} bytes"
+        )));
+    }
+    Ok(())
 }
 
 /// A setting a build carries: its path, and its text, SHA-256 and mode; or
@@ -441,6 +565,12 @@ pub fn public_key_text(key: &Ed25519KeyPair) -> String {
 /// checked first, so nothing that a lamp would refuse is ever signed.
 pub fn seal(manifest: &[u8], key: &Ed25519KeyPair) -> Result<Vec<u8>, Refused> {
     parse(manifest)?;
+    seal_unchecked(manifest, key)
+}
+
+/// [`seal`] without the check: what a publisher with the key but not this
+/// program could sign, for tests of what a lamp refuses.
+pub(crate) fn seal_unchecked(manifest: &[u8], key: &Ed25519KeyPair) -> Result<Vec<u8>, Refused> {
     let public: [u8; 32] = key
         .public_key()
         .as_ref()
@@ -608,7 +738,24 @@ fn check(manifest: &Manifest) -> Result<(), Refused> {
             "a build with settings needs min_updater {SETTINGS_UPDATER} or more"
         )));
     }
-    check_settings(&manifest.settings)
+    check_settings(&manifest.settings)?;
+    if !manifest.image.is_empty() && manifest.min_updater.unwrap_or(1) < IMAGE_UPDATER {
+        return Err(refused(format!(
+            "a build with the image's files needs min_updater {IMAGE_UPDATER} or more"
+        )));
+    }
+    if let Some(file) = manifest.image.iter().find(|file| {
+        manifest
+            .settings
+            .iter()
+            .any(|setting| setting.path == file.path)
+    }) {
+        return Err(refused(format!(
+            "{} is both a setting and the image's",
+            file.path
+        )));
+    }
+    check_image(&manifest.image)
 }
 
 fn check_models(manifest: &Manifest) -> Result<(), Refused> {
@@ -751,6 +898,41 @@ mod tests {
     use super::*;
     use ring::rand::SystemRandom;
 
+    /// The reviewer on #1945, 21:43: the image's files' one guard on what
+    /// may be written as root, and its other refusals.
+    #[test]
+    fn an_image_file_outside_the_list_listed_twice_or_not_its_sha_is_refused() {
+        let good = ImageFile {
+            variant: "standard".into(),
+            path: "/etc/asound.conf".into(),
+            text: "asound".into(),
+            sha256: sha256_hex(b"asound"),
+            shipped: Vec::new(),
+        };
+        assert_eq!(check_image(std::slice::from_ref(&good)), Ok(()));
+        let refused = |image: &[ImageFile]| check_image(image).unwrap_err().0;
+        for path in [
+            "/etc/sudoers.d/lamp",
+            "/etc/asound.conf.d/x",
+            "/etc/../etc/asound.conf",
+        ] {
+            let outside = ImageFile {
+                path: path.into(),
+                ..good.clone()
+            };
+            assert!(
+                refused(&[outside]).contains("is not one of the image's files"),
+                "{path}"
+            );
+        }
+        assert!(refused(&[good.clone(), good.clone()]).contains("listed twice"));
+        let wrong = ImageFile {
+            sha256: sha256_hex(b"other"),
+            ..good.clone()
+        };
+        assert!(refused(&[wrong]).contains("its text is not its SHA-256"));
+    }
+
     /// A key made for this test and thrown away with it.
     pub(crate) fn throwaway() -> Ed25519KeyPair {
         let document = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
@@ -784,6 +966,7 @@ mod tests {
             min_updater: None,
             models: Vec::new(),
             settings: Vec::new(),
+            image: Vec::new(),
         }
     }
 

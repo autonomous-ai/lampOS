@@ -28,9 +28,9 @@ lamp-update harness-off
 lamp-update harness-on
 lamp-update back
 lamp-update apply
-lamp-update check-units --cat FILE [--product DIR]
+lamp-update check-units --cat FILE [--product DIR] [--image DIR [--variant NAME]]
 lamp-update manifest --binaries DIR --deploy DIR --skills DIR --channel NAME --sequence N --commit SHA --files-url URL
-                     [--min-updater N] [--models FILE] [--settings on|off]
+                     [--min-updater N] [--models FILE] [--settings on|off] [--image DIR]
 lamp-update sign --key-file PRIVATE --manifest FILE --out FILE
 lamp-update public-key --key-file PRIVATE
 lamp-update --help
@@ -86,6 +86,8 @@ check-units  says whether a lamp runs exactly the product's units (docs/install.
           the `deploy/product/` folder given with --product. Each product unit is
           `same`, `missing` or its differing lines; every drop-in, every unit the
           product has no file for, and every unit not in /etc/systemd/system/ is said.
+          The image's own units that updates carry are the image's, not extra: with
+          --image (robots/lamp) each is compared with --variant's (standard), else said.
           It ends with 0 when everything is the same and nothing else is found, 1 when
           not, and 2 for a wrong option or a file it cannot read.
 
@@ -99,6 +101,9 @@ manifest  writes DIR/manifest.json for the binaries in --binaries, the units of
           carried, and N is then at least 2.
           --settings on: the product's settings and tmpfiles are carried, and N is
           then at least 3.
+          --image DIR: the image's own files of DIR (robots/lamp: its rootfs and each
+          variant's override), each listed in --deploy's image/shipped.json, are
+          carried, and N is then at least 4.
 sign      writes the signed envelope (lampos-manifest.json) for a manifest, with a
           private key: an unencrypted PKCS#8 Ed25519 key in base64.
 public-key prints the public key of a private key, in base64: what a lamp is given.
@@ -154,7 +159,7 @@ fn check_units(options: &BTreeMap<String, String>) -> ExitCode {
     use lamp_update::check_units;
     if options
         .keys()
-        .any(|name| name != "cat" && name != "product")
+        .any(|name| !["cat", "product", "image", "variant"].contains(&name.as_str()))
     {
         return usage();
     }
@@ -178,7 +183,26 @@ fn check_units(options: &BTreeMap<String, String>) -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let report = check_units::check(&product, &printed);
+    let image = match options.get("image") {
+        None => None,
+        Some(lamp) => {
+            let shipped = lamp_update::image::shipped_from(lamp_update::image::SHIPPED)
+                .and_then(|shipped| lamp_update::image::from_tree(Path::new(lamp), &shipped));
+            match shipped {
+                Ok(files) => Some(check_units::image_units(
+                    &files,
+                    options
+                        .get("variant")
+                        .map_or(lamp_update::image::STANDARD, String::as_str),
+                )),
+                Err(error) => {
+                    eprintln!("lamp-update: {lamp}: {error}");
+                    return ExitCode::from(2);
+                }
+            }
+        }
+    };
+    let report = check_units::check_with_image(&product, image.as_ref(), &printed);
     print!("{}", report.said());
     if report.passes() {
         ExitCode::SUCCESS
@@ -222,8 +246,21 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
             "min-updater",
             "models",
             "settings",
+            "image",
         ],
     )?;
+    let image = match options.get("image") {
+        None => Vec::new(),
+        Some(lamp) => {
+            let deploy = Path::new(wanted(options, "deploy")?);
+            let shipped_path = deploy.join("image/shipped.json");
+            let shipped = std::fs::read_to_string(&shipped_path)
+                .and_then(|text| lamp_update::image::shipped_from(&text))
+                .map_err(|error| format!("{}: {error}", shipped_path.display()))?;
+            lamp_update::image::from_tree(Path::new(lamp), &shipped)
+                .map_err(|error| format!("{lamp}: {error}"))?
+        }
+    };
     let settings = match options.get("settings").map(String::as_str) {
         None | Some("off") => Vec::new(),
         Some("on") => install::product_settings(),
@@ -260,16 +297,18 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
         min_updater,
         models,
         settings,
+        image,
     )
     .map_err(|error| error.to_string())?;
     println!(
-        "manifest of build {} of {}: {} binaries, {} units, {} models, {} settings",
+        "manifest of build {} of {}: {} binaries, {} units, {} models, {} settings, {} of the image's files",
         made.sequence,
         made.channel,
         made.files.len(),
         made.units.len(),
         made.models.len(),
-        made.settings.len()
+        made.settings.len(),
+        made.image.len()
     );
     Ok(())
 }
@@ -406,22 +445,23 @@ fn apply(options: &BTreeMap<String, String>) -> Result<(), String> {
     let key = fs::read_to_string(key_file).map_err(|error| format!("{key_file}: {error}"))?;
     let key = manifest::read_public_key(&key).map_err(|why| format!("{key_file}: {why}"))?;
     let mut say = |line: &str| eprintln!("lamp-update-apply: {line}");
-    let mut tmpfiles = |path: &str| {
-        let status = Command::new("systemd-tmpfiles")
-            .args(["--create", path])
+    // Each command has passed lamp_update::image::guard in apply::run.
+    let mut command = |parts: &[&str]| {
+        let status = Command::new(parts[0])
+            .args(&parts[1..])
             .status()
-            .map_err(|error| format!("systemd-tmpfiles: {error}"))?;
+            .map_err(|error| format!("{}: {error}", parts[0]))?;
         if status.success() {
             Ok(())
         } else {
-            Err(format!("systemd-tmpfiles --create {path}: {status}"))
+            Err(format!("{}: {status}", parts.join(" ")))
         }
     };
     lamp_update::apply::run(
         Path::new("/"),
         Path::new(lamp_update::install::RECORDS),
         &key,
-        &mut tmpfiles,
+        &mut command,
         &mut say,
     )
 }
@@ -556,6 +596,7 @@ fn config(
         updater: manifest::UPDATER,
         models: lamp_update::models::on(std::env::var(lamp_update::models::SWITCH).ok().as_deref()),
         settings: lamp_update::apply::on(std::env::var(lamp_update::apply::SWITCH).ok().as_deref()),
+        image: lamp_update::image::on(std::env::var(lamp_update::image::SWITCH).ok().as_deref()),
     };
     Ok((
         config,

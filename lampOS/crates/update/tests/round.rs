@@ -11,7 +11,7 @@ use lamp_update::{
     Config, Outcome, World, apply,
     fetch::{Channel, Fetch},
     judge::UnitState,
-    manifest::{self, File, Manifest, Model, Setting, Unit, sha256_hex},
+    manifest::{self, File, ImageFile, Manifest, Model, Setting, Unit, sha256_hex},
     own,
     quiet::Heard,
     round, unit,
@@ -430,6 +430,7 @@ impl Lamp {
             updater: manifest::UPDATER,
             models: false,
             settings: false,
+            image: false,
         };
         Self {
             _folder: folder,
@@ -506,6 +507,7 @@ impl Lamp {
             min_updater: None,
             models: Vec::new(),
             settings: Vec::new(),
+            image: Vec::new(),
         }
     }
 
@@ -3548,8 +3550,13 @@ fn lamp_with_settings() -> (Lamp, Rc<RefCell<Vec<String>>>) {
             &root,
             &root.join("var/lib/lampos-update"),
             &key,
-            &mut |path| {
-                ran.borrow_mut().push(path.to_owned());
+            // The tmpfiles' path, or any other command whole.
+            &mut |parts| {
+                ran.borrow_mut().push(if parts[0] == "systemd-tmpfiles" {
+                    parts[2].to_owned()
+                } else {
+                    parts.join(" ")
+                });
                 Ok(())
             },
             &mut |_| {},
@@ -3763,4 +3770,288 @@ fn a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start() {
     );
     assert_eq!(lamp.read(CONTROLS_JSON), "controls 1");
     assert_eq!(lamp.state()["settings"][CONTROLS_JSON], sha("controls 1"));
+}
+
+const ASOUND: &str = "/etc/asound.conf";
+const SPEAKER: &str = "/etc/systemd/system/lamp-cmedia-speaker.service";
+const JOURNAL: &str = "/etc/systemd/journald.conf.d/zz-lamp-journal.conf";
+
+fn image_file(path: &str, text: &str, shipped: &[&str]) -> ImageFile {
+    ImageFile {
+        variant: "standard".into(),
+        path: path.into(),
+        text: text.into(),
+        sha256: sha(text),
+        shipped: shipped.iter().map(|text| sha(text)).collect(),
+    }
+}
+
+/// A product lamp flashed with an earlier image, `LAMP_UPDATE_IMAGE=on`
+/// (#1369): its own `/etc/asound.conf` and speaker unit the image's.
+fn lamp_with_image() -> (Lamp, Rc<RefCell<Vec<String>>>) {
+    let (mut lamp, ran) = lamp_with_settings();
+    lamp.config.image = true;
+    for (path, text) in [
+        (ASOUND, "asound 1"),
+        (SPEAKER, "speaker 1"),
+        (JOURNAL, "journal 1"),
+    ] {
+        fs::write(lamp.root.join(path.trim_start_matches('/')), text)
+            .or_else(|_| {
+                let at = lamp.root.join(path.trim_start_matches('/'));
+                fs::create_dir_all(at.parent().unwrap())?;
+                fs::write(at, text)
+            })
+            .unwrap();
+    }
+    (lamp, ran)
+}
+
+/// Build `sequence`: build 1's binaries, and these of the image's files.
+fn publish_image(lamp: &mut Lamp, sequence: u64, image: Vec<ImageFile>) {
+    let mut manifest = lamp.manifest(
+        sequence,
+        &[
+            ("lamp-voice", "voice 1"),
+            ("lamp-turn-end", "turn-end 1"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[],
+    );
+    manifest.min_updater = Some(manifest::IMAGE_UPDATER);
+    manifest.image = image;
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    let envelope = manifest::seal(&bytes, &lamp.key).unwrap();
+    lamp.channel
+        .files
+        .insert(format!("{CHANNEL}{}", manifest::ENVELOPE), envelope);
+}
+
+fn asound_build(lamp: &mut Lamp, sequence: u64) {
+    publish_image(
+        lamp,
+        sequence,
+        vec![
+            image_file(ASOUND, "asound 2", &["asound 1", "asound 2"]),
+            image_file(SPEAKER, "speaker 2", &["speaker 1", "speaker 2"]),
+            image_file(JOURNAL, "journal 2", &["journal 1", "journal 2"]),
+        ],
+    );
+}
+
+#[test]
+fn with_image_on_the_images_files_are_written_and_asound_restarts_the_voice_at_a_quiet_moment() {
+    let (mut lamp, ran) = lamp_with_image();
+    asound_build(&mut lamp, 2);
+    let before = lamp.now.get();
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(ASOUND), "asound 2");
+    assert_eq!(lamp.read(SPEAKER), "speaker 2");
+    assert_eq!(lamp.read(JOURNAL), "journal 2");
+    assert_eq!(
+        *ran.borrow(),
+        [
+            "systemd-analyze verify /run/lampos-update-apply/lamp-cmedia-speaker.service",
+            "systemctl daemon-reload",
+            "systemctl start lamp-cmedia-speaker.service"
+        ]
+    );
+    // The voice restarted for asound.conf, after 45 s of quiet, and the
+    // files written only then.
+    let calls = lamp.calls();
+    let applied = calls
+        .iter()
+        .position(|call| call == &format!("restart {}", apply::UNIT))
+        .unwrap();
+    let voice = calls
+        .iter()
+        .position(|call| call == "restart lamp-voice.service")
+        .unwrap();
+    assert!(applied < voice, "{calls:?}");
+    let (_, at) = lamp
+        .systemd
+        .restarted_at
+        .iter()
+        .find(|(unit, _)| unit == "lamp-voice.service")
+        .unwrap();
+    assert!(*at >= before + 45_000, "{at} {before}");
+    // journald: never restarted, nor anything of it run.
+    assert!(
+        !calls.iter().any(|call| call.contains("journald")),
+        "{calls:?}"
+    );
+    assert!(
+        !ran.borrow()
+            .iter()
+            .any(|command| command.contains("journald"))
+    );
+    assert_eq!(lamp.state()["settings"][ASOUND], sha("asound 2"));
+}
+
+/// The first builder on #1680, 19:48: asound.conf restarts the voice only
+/// when the lamp is quiet. Someone talks through the whole bound: nothing
+/// is written, the voice is not restarted, and the next quiet round does it.
+#[test]
+fn asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round() {
+    let (mut lamp, ran) = lamp_with_image();
+    asound_build(&mut lamp, 2);
+    lamp.talking = Some(Box::new(|at| at % 30_000 == 0));
+    lamp.config.quiet_wait = Duration::from_secs(120);
+    let start = lamp.now.get();
+    let outcome = lamp.round();
+    assert!(
+        matches!(&outcome, Outcome::NotQuiet(why) if why.contains("no quiet moment in 120 s")),
+        "{outcome:?}"
+    );
+    // The bound held: the round gave up after it, not before, not later.
+    let waited = lamp.now.get() - start;
+    assert!((120_000..=125_000).contains(&waited), "{waited}");
+    assert_eq!(lamp.read(ASOUND), "asound 1");
+    assert!(ran.borrow().is_empty());
+    assert!(
+        !lamp
+            .calls()
+            .iter()
+            .any(|call| call == "restart lamp-voice.service" || call.contains(apply::UNIT)),
+        "{:?}",
+        lamp.calls()
+    );
+    // A turn going on, the voice speaking, is not quiet either: the gate
+    // reads the voice's state as well as its speech.
+    lamp.talking = Some(Box::new(|_| false));
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(ASOUND), "asound 2");
+    assert!(
+        lamp.calls()
+            .iter()
+            .any(|call| call == "restart lamp-voice.service")
+    );
+}
+
+#[test]
+fn with_image_off_the_images_files_are_not_written_and_that_is_said() {
+    let (mut lamp, ran) = lamp_with_image();
+    lamp.config.image = false;
+    asound_build(&mut lamp, 2);
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(lamp.read(ASOUND), "asound 1");
+    assert!(ran.borrow().is_empty());
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("image files are not written")
+                && line.contains("LAMP_UPDATE_IMAGE=on")),
+        "{:?}",
+        lamp.said
+    );
+}
+
+/// The reviewer on #1945, 21:43: with the switch off the hardware profile
+/// and the image's files are never read, so one that can't be read fails
+/// nothing. On, it is said, and the rest of the build goes on.
+#[test]
+fn a_hardware_profile_that_cannot_be_read_never_fails_the_round() {
+    for on in [false, true] {
+        let (mut lamp, ran) = lamp_with_image();
+        lamp.config.image = on;
+        // A folder where the profile is: reading it fails, not "not found".
+        fs::create_dir_all(lamp.root.join("etc/autonomous/hardware-profile")).unwrap();
+        publish_image(
+            &mut lamp,
+            2,
+            vec![image_file(ASOUND, "asound 2", &["asound 1", "asound 2"])],
+        );
+        assert_eq!(lamp.round(), Outcome::UpToDate(2), "{on} {:?}", lamp.said);
+        assert_eq!(lamp.read(ASOUND), "asound 1");
+        assert!(ran.borrow().is_empty());
+        let said = |text: &str| lamp.said.iter().any(|line| line.contains(text));
+        if on {
+            assert!(said("cannot be read"), "{:?}", lamp.said);
+        } else {
+            assert!(said("LAMP_UPDATE_IMAGE=on is not set"), "{:?}", lamp.said);
+            assert!(!said("cannot be read"), "{:?}", lamp.said);
+        }
+    }
+}
+
+#[test]
+fn a_lamps_own_asound_is_kept_and_the_voice_not_restarted_for_it() {
+    let (mut lamp, _) = lamp_with_image();
+    fs::write(lamp.root.join("etc/asound.conf"), "this lamp's").unwrap();
+    asound_build(&mut lamp, 2);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(ASOUND), "this lamp's");
+    assert!(
+        !lamp
+            .calls()
+            .iter()
+            .any(|call| call == "restart lamp-voice.service")
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.starts_with(&format!("kept {ASOUND}"))),
+        "{:?}",
+        lamp.said
+    );
+}
+
+#[test]
+fn a_build_put_back_puts_the_images_files_back() {
+    let (mut lamp, ran) = lamp_with_image();
+    lamp.systemd.crashing.push("lamp-voice.service".into());
+    asound_build(&mut lamp, 2);
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::RolledBack { sequence: 2, .. }),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.read(ASOUND), "asound 1");
+    assert_eq!(lamp.read(SPEAKER), "speaker 1");
+    // Reloaded once for the write and once for the put-back.
+    let reloads = ran
+        .borrow()
+        .iter()
+        .filter(|command| *command == "systemctl daemon-reload")
+        .count();
+    assert_eq!(reloads, 2, "{:?}", ran.borrow());
+}
+
+/// A lamp-update-back from before the field ignores `image`: the round says
+/// so, and the rest of the build goes on.
+#[test]
+fn an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so() {
+    let (mut lamp, _) = lamp_with_image();
+    let (root, key) = (lamp.root.clone(), lamp.config.key);
+    lamp.systemd.applier = Some(Box::new(move || {
+        let records = root.join("var/lib/lampos-update");
+        // An older copy: the request's `image` is a field it doesn't know.
+        let request = records.join("apply/request.json");
+        let mut asked: serde_json::Value =
+            serde_json::from_slice(&fs::read(&request).unwrap()).unwrap();
+        asked.as_object_mut().unwrap().remove("image");
+        fs::write(&request, asked.to_string()).unwrap();
+        apply::run(&root, &records, &key, &mut |_| Ok(()), &mut |_| {})
+    }));
+    asound_build(&mut lamp, 2);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(ASOUND), "asound 1");
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("lamp-update-back is older") && line.contains(ASOUND)),
+        "{:?}",
+        lamp.said
+    );
+    // The reviewer on #1945, 21:43: no asound.conf written, so the voice
+    // is not restarted for it.
+    assert!(
+        !lamp
+            .calls()
+            .iter()
+            .any(|call| call == "restart lamp-voice.service"),
+        "{:?}",
+        lamp.calls()
+    );
 }

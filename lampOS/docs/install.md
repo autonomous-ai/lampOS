@@ -756,6 +756,8 @@ sudo systemctl cat 'lamp-*.service' 'lamp-*.timer' 'lampos*' > units.txt
 lamp-update check-units --cat units.txt
 # or against a checkout's deploy/product/ at another commit:
 lamp-update check-units --cat units.txt --product lampOS/deploy/product
+# with the image's own units compared too, for a pro lamp:
+lamp-update check-units --cat units.txt --image robots/lamp --variant pro
 ```
 
 - **Each product unit** is `same`, `missing on the lamp`, or `differs` with
@@ -770,6 +772,12 @@ lamp-update check-units --cat units.txt --product lampOS/deploy/product
 - **Every lamp unit the product has no file for** is said (`not in the
   product`), and a product unit read from anywhere but
   `/etc/systemd/system/` (`not where install puts it`).
+- **The image's own units** that updates carry (`lamp-cmedia-speaker.service`,
+  `respeaker-lite-softvol.service`, #1369) are said as `the image's`, not
+  `not in the product`. With `--image robots/lamp [--variant NAME]`
+  (standard unless named, as the lamp's `/etc/autonomous/hardware-profile`
+  says) each is compared with that variant's, and one that differs is a
+  finding; without it, each is only said.
 - **A masked unit** (`# Unit NAME is masked.`) is a finding too.
 - It ends with **0** when everything is `same` and nothing else is found,
   **1** when not, and **2** for a wrong option or a file it cannot read, so a
@@ -884,10 +892,12 @@ lamp-update check-units --cat units.txt --product lampOS/deploy/product
     against the disk. Where `systemd-analyze` exists, it checks that systemd
     reads them last beside a 100M `persistent.conf`. lamp-75c9's systemd 252
     reads it last after its own `journald.conf` too.
-  - **Existing lamps:** only a newly imaged lamp has it. `install` and
-    updates don't place the image's files (#1369). On a lamp already in use
-    it is copied there by hand, and journald reads it when it next starts,
-    at the next boot. `journalctl --vacuum-size=20M` shrinks the journal at
+  - **Existing lamps:** only a newly imaged lamp has it, unless a build
+    carries the image's files and `LAMP_UPDATE_IMAGE=on` (#1369,
+    updates.md "The image's own files"); `install` doesn't place them. On a
+    lamp already in use it is otherwise copied there by hand, and journald
+    reads it when it next starts, at the next boot (an update never
+    restarts journald either). `journalctl --vacuum-size=20M` shrinks the journal at
     once, with no restart of anything.
 - The night's copy-back of the logs leaves the journal alone:
   `robots/lamp/rootfs/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf`

@@ -4,8 +4,11 @@
 # that only `lamp-update install` writes, never from /opt/lampOS/update/current, which a round can write. It checks
 # the envelope's signature again with the lamp's own key, writes only the paths a build's settings may name (the
 # expression's and the controls' folders, records.json, the product skills and /etc/tmpfiles.d/lampos.conf), keeps
-# every one the lamp changed, and keeps each file as it was in its records before the first write. Without a request
-# it does nothing. Outside lampos.target, as lamp-update is.
+# every one the lamp changed, and keeps each file as it was in its records before the first write. With
+# LAMP_UPDATE_IMAGE=on it also writes the image's own files a build carries (#1369: asound.conf, the speaker's level
+# unit, the udev rules, the journal's and logrotate's drop-ins), only where the lamp's is one the image shipped, then
+# reloads systemd and udev. It never restarts or signals journald. Without a request it does nothing. Outside
+# lampos.target, as lamp-update is.
 [Unit]
 Description=lampOS updates, a build's settings and tmpfiles (lamp-update-apply)
 # A lamp not installed since #1680 has no lamp-update-back: its start is then skipped, the round finds nothing done
@@ -24,8 +27,10 @@ NoNewPrivileges=yes
 PrivateNetwork=yes
 ProtectSystem=strict
 # The settings' folders, the skills, the records, and what systemd-tmpfiles --create of lampos.conf makes (in /run
-# and /var/lib/lampOS). The update key stays read-only.
-ReadWritePaths=/etc/lampOS /etc/tmpfiles.d /var/lib/lampOS /var/lib/lampos-update /run
+# and /var/lib/lampOS). /etc whole, since /etc/asound.conf is replaced by a rename beside it; what is written there
+# is only what lamp-update-back allows (manifest::is_setting_path, manifest::IMAGE_FILES). The update key stays
+# read-only.
+ReadWritePaths=/etc /var/lib/lampOS /var/lib/lampos-update /run /usr/local/libexec
 ReadOnlyPaths=-/etc/lampOS/update
 ProtectHome=yes
 PrivateTmp=yes

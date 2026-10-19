@@ -30,6 +30,7 @@
 use crate::{
     apply,
     fetch::{Channel, Fetch},
+    image,
     judge::{Before, UnitState, Watch, part_of},
     manifest::{self, Manifest, Model, Opened, TooOld},
     models::{self, ModelBack, Need},
@@ -103,6 +104,9 @@ pub struct Config {
     /// `LAMP_UPDATE_APPLY=on`: the settings and tmpfiles a build carries
     /// are written at the switch by `lamp-update-apply` (crate::apply).
     pub settings: bool,
+    /// `LAMP_UPDATE_IMAGE=on`: the image's own files a build carries are
+    /// written the same way (crate::image, #1369).
+    pub image: bool,
 }
 
 impl Config {
@@ -380,6 +384,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         model_backs: Vec::new(),
         envelope: Vec::new(),
         setting_writes: Vec::new(),
+        image_writes: Vec::new(),
         applying: None,
     };
     if !config.apply {
@@ -465,6 +470,8 @@ struct Run<'r, 'w> {
     /// The settings the build writes here (crate::apply), and the build
     /// `lamp-update-apply` was asked to write them for: put back with it.
     setting_writes: Vec<String>,
+    /// Those of them that are the image's own files (crate::image).
+    image_writes: Vec<String>,
     applying: Option<u64>,
 }
 
@@ -681,6 +688,15 @@ impl Run<'_, '_> {
             .map(|placing| placing.model.path.clone())
             .chain(self.setting_writes.iter().cloned())
             .collect();
+        // And a part an image file is read by without its unit naming it:
+        // the voice, by /etc/asound.conf. It is switched, as every switch
+        // of the voice, only at a quiet moment.
+        let forced: Vec<String> = self
+            .image_writes
+            .iter()
+            .filter_map(|path| image::restarts(path))
+            .map(str::to_owned)
+            .collect();
         let changes = plan(
             self.config,
             &manifest,
@@ -688,6 +704,7 @@ impl Run<'_, '_> {
             &carried,
             &taken,
             &touched,
+            &forced,
         )
         .map_err(Outcome::Refused)?;
         self.fetching = to_fetch(self.config, &changes, &self.placings);
@@ -846,29 +863,88 @@ impl Run<'_, '_> {
         envelope: Vec<u8>,
     ) -> Result<(), Outcome> {
         self.setting_writes.clear();
-        if manifest.settings.is_empty() {
-            return Ok(());
-        }
-        let steps = apply::plan(
-            &self.config.root,
-            &manifest.settings,
-            &state.settings,
-            &state.settings_writing,
-        )
-        .map_err(|error| Outcome::Failed(format!("the settings cannot be read: {error}")))?;
-        let writes = apply::writes(&steps);
-        if !self.config.settings {
-            if !writes.is_empty() {
-                self.say(&format!(
-                    "build {}'s settings are not written ({}): {}=on is not set",
-                    manifest.sequence,
-                    writes.join(", "),
-                    apply::SWITCH
-                ));
+        self.image_writes.clear();
+        let mut writes = Vec::new();
+        if !manifest.settings.is_empty() {
+            let steps = apply::plan(
+                &self.config.root,
+                &manifest.settings,
+                &state.settings,
+                &state.settings_writing,
+                &BTreeMap::new(),
+            )
+            .map_err(|error| Outcome::Failed(format!("the settings cannot be read: {error}")))?;
+            let these = apply::writes(&steps);
+            if !self.config.settings {
+                if !these.is_empty() {
+                    self.say(&format!(
+                        "build {}'s settings are not written ({}): {}=on is not set",
+                        manifest.sequence,
+                        these.join(", "),
+                        apply::SWITCH
+                    ));
+                }
+            } else {
+                self.say_kept(&steps);
+                writes.extend(these);
             }
-            return Ok(());
         }
-        for step in &steps {
+        // The image's files only with the switch on: off, neither the
+        // hardware profile nor any of them is read. On, one that can't be
+        // read is said, and the rest of the build goes on without them.
+        if !manifest.image.is_empty() && !self.config.image {
+            self.say(&format!(
+                "build {}'s image files are not written: {}=on is not set",
+                manifest.sequence,
+                image::SWITCH
+            ));
+        } else if !manifest.image.is_empty() {
+            let steps = match image::variant(&self.config.root) {
+                Ok(Some(variant)) => {
+                    let (files, shipped) = image::for_variant(&manifest.image, &variant);
+                    apply::plan(
+                        &self.config.root,
+                        &files,
+                        &state.settings,
+                        &BTreeMap::new(),
+                        &shipped,
+                    )
+                    .unwrap_or_else(|error| {
+                        self.say(&format!(
+                            "the image's files are not written: they cannot be read: {error}"
+                        ));
+                        Vec::new()
+                    })
+                }
+                Ok(None) => {
+                    self.say(&format!(
+                        "the image's files are not written: {} names no variant",
+                        image::PROFILE
+                    ));
+                    Vec::new()
+                }
+                Err(error) => {
+                    self.say(&format!(
+                        "the image's files are not written: {} cannot be read: {error}",
+                        image::PROFILE
+                    ));
+                    Vec::new()
+                }
+            };
+            let these = apply::writes(&steps);
+            self.say_kept(&steps);
+            self.image_writes = these.clone();
+            writes.extend(these);
+        }
+        if !writes.is_empty() {
+            self.setting_writes = writes;
+            self.envelope = envelope;
+        }
+        Ok(())
+    }
+
+    fn say_kept(&mut self, steps: &[apply::Step]) {
+        for step in steps {
             if let apply::Act::Keep(why) = &step.act {
                 self.say(&format!(
                     "kept {}: {why}; the build's is not written",
@@ -876,9 +952,69 @@ impl Run<'_, '_> {
                 ));
             }
         }
-        self.setting_writes = writes;
-        self.envelope = envelope;
-        Ok(())
+    }
+
+    /// The image's files `lamp-update-apply` was asked for and did not
+    /// record: a `lamp-update-back` older than them ignores them. Said, and
+    /// the rest of the build goes on. Those paths, returned.
+    fn image_not_written(
+        &mut self,
+        manifest_image: &[manifest::ImageFile],
+        state: &State,
+    ) -> Vec<String> {
+        let missing: Vec<String> = self
+            .image_writes
+            .iter()
+            .filter(|path| {
+                let new = manifest_image
+                    .iter()
+                    .filter(|file| &&file.path == path)
+                    .map(|file| &file.sha256)
+                    .collect::<Vec<_>>();
+                !state
+                    .settings
+                    .get(path.as_str())
+                    .is_some_and(|sha| new.contains(&sha))
+            })
+            .cloned()
+            .collect();
+        if !missing.is_empty() {
+            self.say(&format!(
+                "the image's files were not written ({}): this lamp's lamp-update-back is older than them, so install again",
+                missing.join(", ")
+            ));
+        }
+        missing
+    }
+
+    /// The units of `changes` restarted only for an image file that was
+    /// not written (`missing`): their unit, folder and link the same, and
+    /// no written model, setting or image file they read. Not restarted.
+    fn only_for(&self, changes: &[Change], missing: &[String]) -> Vec<String> {
+        let written: Vec<&String> = self
+            .placings
+            .iter()
+            .map(|placing| &placing.model.path)
+            .chain(self.setting_writes.iter())
+            .filter(|path| !missing.contains(path))
+            .collect();
+        changes
+            .iter()
+            .filter(|change| {
+                change.before == change.after
+                    && change.old_folder == change.new_folder
+                    && change.make.is_none()
+                    && change.link.as_ref().is_none_or(|link| link.old == link.new)
+                    && missing
+                        .iter()
+                        .any(|path| image::restarts(path) == Some(change.unit.as_str()))
+                    && !written.iter().any(|path| {
+                        models::reads(&change.before, path)
+                            || image::restarts(path) == Some(change.unit.as_str())
+                    })
+            })
+            .map(|change| change.unit.clone())
+            .collect()
     }
 
     /// Asks `lamp-update-apply` to apply the build's settings, or put them
@@ -886,7 +1022,8 @@ impl Run<'_, '_> {
     fn ask_apply(&mut self, op: apply::Op, sequence: u64) -> Result<(), String> {
         let records = self.records.folder().to_owned();
         let envelope = (op == apply::Op::Apply).then_some(self.envelope.as_slice());
-        apply::stage(&records, op, sequence, envelope)
+        let image = op == apply::Op::Apply && !self.image_writes.is_empty();
+        apply::stage(&records, op, sequence, envelope, image)
             .map_err(|error| format!("the settings cannot be staged: {error}"))?;
         self.world
             .systemd
@@ -1541,12 +1678,22 @@ impl Run<'_, '_> {
         }
         // The settings first, by lamp-update-apply: one that fails puts back
         // what it wrote, and nothing else has moved.
+        let mut unrestarted = Vec::new();
         if !self.setting_writes.is_empty() {
             self.applying = Some(build.sequence);
             let applied = self.ask_apply(apply::Op::Apply, build.sequence);
             self.settings_now(state);
             if let Err(why) = applied {
                 return self.put_back(state, &build, &backs, None, why, String::new());
+            }
+            if !self.image_writes.is_empty() {
+                let image = self
+                    .seen
+                    .as_ref()
+                    .map(|seen| seen.image.clone())
+                    .unwrap_or_default();
+                let missing = self.image_not_written(&image, state);
+                unrestarted = self.only_for(&changes, &missing);
             }
         }
         // A linked part's unit is written only when the build changes it;
@@ -1601,7 +1748,7 @@ impl Run<'_, '_> {
         self.say(&format!("switching to build {}", build.sequence));
         let mut watches = Vec::new();
         for at in 0..backs.len() {
-            if !backs[at].was_active {
+            if !backs[at].was_active || unrestarted.contains(&backs[at].unit) {
                 continue;
             }
             backs[at].restarted = true;
@@ -1942,6 +2089,7 @@ impl Run<'_, '_> {
             min_updater: None,
             models: Vec::new(),
             settings: Vec::new(),
+            image: Vec::new(),
         };
         match self.own_switch(&only_the_updater) {
             Ok(Some(Outcome::SelfSwitched { from, to, .. })) => Some(Outcome::Climbs {
@@ -2382,6 +2530,7 @@ fn plan(
     carried: &BTreeMap<String, String>,
     models: &[Model],
     touched: &[String],
+    forced: &[String],
 ) -> Result<Vec<Change>, String> {
     let files: BTreeMap<&str, &manifest::File> = manifest
         .files
@@ -2457,7 +2606,8 @@ fn plan(
         });
         let old_folder = part.program.folder();
         // A part that reads a model a switch moves is restarted with it.
-        let reads_moved = touched.iter().any(|path| models::reads(&part.text, path));
+        let reads_moved = touched.iter().any(|path| models::reads(&part.text, path))
+            || forced.contains(&part.unit);
         if new_folder == old_folder && unit::same(&after, &part.text) && !reads_moved {
             continue;
         }

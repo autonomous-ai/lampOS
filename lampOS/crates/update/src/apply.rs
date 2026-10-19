@@ -24,11 +24,17 @@
 //! takes. It never writes `state.json` itself, which may be of a newer
 //! updater than it.
 //!
+//! With the request's `image`, the image's own files for the lamp's
+//! variant are written the same way (crate::image, #1369), where the lamp's
+//! is still one the image shipped; then systemd and udev are reloaded, and
+//! journald never is. A copy older than the field ignores it.
+//!
 //! The request, `back.json` and `done.json` are a contract for good, as
 //! `self.json` is: their fields keep their meaning, and a field one side
 //! does not know is ignored.
 use crate::{
-    manifest::{self, Setting},
+    image,
+    manifest::{self, ImageFile, Setting},
     records::{State, sync_folder, write_whole},
 };
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -74,6 +80,9 @@ pub struct Request {
     pub op: Op,
     /// The build: the envelope's, and `back.json`'s.
     pub sequence: u64,
+    /// The image's files are written too (`LAMP_UPDATE_IMAGE=on`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub image: bool,
 }
 
 /// One file as it was before an apply wrote it.
@@ -173,19 +182,26 @@ fn builds_before(
 
 /// What each setting needs, from the three: the build's before
 /// (`recorded`, or `writing` for one install was about to write, or for
-/// an unrecorded tmpfiles [`TMPFILES_SHIPPED`]), the build's now, and the
+/// an unrecorded tmpfiles [`TMPFILES_SHIPPED`], or for the image's files
+/// any SHA-256 in `shipped`), the build's now, and the
 /// lamp's now. Nothing to do is left out.
 pub fn plan(
     root: &Path,
     settings: &[Setting],
     recorded: &BTreeMap<String, String>,
     writing: &BTreeMap<String, String>,
+    shipped: &BTreeMap<String, Vec<String>>,
 ) -> io::Result<Vec<Step>> {
     let mut steps = Vec::new();
     for setting in settings {
         let now = now_sha(root, &setting.path)
             .map_err(|error| io::Error::new(error.kind(), format!("{}: {error}", setting.path)))?;
-        let builds = |sha: &String| builds_before(&setting.path, sha, recorded, writing);
+        let builds = |sha: &String| {
+            builds_before(&setting.path, sha, recorded, writing)
+                || shipped
+                    .get(&setting.path)
+                    .is_some_and(|shipped| shipped.contains(sha))
+        };
         let act = match (&now, setting.removed, &setting.sha256) {
             (None, true, _) => None,
             (Some(now), true, _) if builds(now) => Some(Act::Remove),
@@ -241,7 +257,13 @@ fn write_json<T: Serialize>(path: &Path, value: &T) -> io::Result<()> {
 /// Written by the round: what it asks, with the build's envelope for an
 /// apply. A `done.json` left before is gone first, so only this request's
 /// is ever read.
-pub fn stage(records: &Path, op: Op, sequence: u64, envelope: Option<&[u8]>) -> io::Result<()> {
+pub fn stage(
+    records: &Path,
+    op: Op,
+    sequence: u64,
+    envelope: Option<&[u8]>,
+    image: bool,
+) -> io::Result<()> {
     let folder = folder(records);
     fs::DirBuilder::new()
         .recursive(true)
@@ -257,6 +279,7 @@ pub fn stage(records: &Path, op: Op, sequence: u64, envelope: Option<&[u8]>) -> 
             version: VERSION,
             op,
             sequence,
+            image,
         },
     )
 }
@@ -313,6 +336,8 @@ struct Signed {
     sequence: u64,
     #[serde(default)]
     settings: Vec<Setting>,
+    #[serde(default)]
+    image: Vec<ImageFile>,
 }
 
 /// The little of the state it reads: the records, never written by it.
@@ -325,15 +350,21 @@ struct Recorded {
 }
 
 /// `lamp-update-back apply`: the request the round staged, done. No
-/// request, nothing. `tmpfiles` is `systemd-tmpfiles --create` of one file,
-/// run when the tmpfiles were written or put back.
+/// request, nothing. `command` runs one program with its arguments:
+/// `systemd-tmpfiles --create` when the tmpfiles were written or put back,
+/// and what the image's files need after (crate::image::after). Every
+/// command passes [`image::guard`] first: journald is never one.
 pub fn run(
     root: &Path,
     records: &Path,
     key: &[u8; 32],
-    tmpfiles: &mut dyn FnMut(&str) -> Result<(), String>,
+    command: &mut dyn FnMut(&[&str]) -> Result<(), String>,
     say: &mut dyn FnMut(&str),
 ) -> Result<(), String> {
+    let mut guarded = |parts: &[&str]| {
+        image::guard(parts)?;
+        command(parts)
+    };
     let folder = folder(records);
     let failed = |what: &Path, error: io::Error| format!("{}: {error}", what.display());
     let Some(request) = read_json::<Request>(&folder.join(REQUEST))
@@ -343,9 +374,69 @@ pub fn run(
         return Ok(());
     };
     match request.op {
-        Op::Apply => apply(root, &folder, records, key, request.sequence, tmpfiles, say),
-        Op::Back => back(root, &folder, request.sequence, tmpfiles, say),
+        Op::Apply => apply(root, &folder, records, key, &request, &mut guarded, say),
+        Op::Back => back(root, &folder, request.sequence, &mut guarded, say),
     }
+}
+
+/// `systemd-tmpfiles --create` of the product's tmpfiles.
+fn tmpfiles(command: &mut dyn FnMut(&[&str]) -> Result<(), String>) -> Result<(), String> {
+    command(&[
+        "systemd-tmpfiles",
+        "--create",
+        crate::install::TMPFILES_PATH,
+    ])
+}
+
+/// What the image's files written or put back need: each command run, one
+/// whose failure is only said, and what waits for the next boot said.
+fn after_image(
+    paths: &[String],
+    command: &mut dyn FnMut(&[&str]) -> Result<(), String>,
+    say: &mut dyn FnMut(&str),
+) -> Result<(), String> {
+    for (parts, only_said) in image::after(paths) {
+        let parts: Vec<&str> = parts.iter().map(String::as_str).collect();
+        match command(&parts) {
+            Ok(()) => {}
+            Err(why) if only_said => say(&format!("{}: {why}", parts.join(" "))),
+            Err(why) => return Err(why),
+        }
+    }
+    for path in paths {
+        if let Some(line) = image::later(path) {
+            say(&line);
+        }
+    }
+    Ok(())
+}
+
+/// Where an image unit is staged for `systemd-analyze verify`.
+pub const VERIFYING: &str = "/run/lampos-update-apply/";
+
+/// `systemd-analyze verify` of an image unit (not a drop-in) before it is
+/// written: staged under [`VERIFYING`] by its own name, and removed after.
+fn verify_unit(
+    root: &Path,
+    path: &str,
+    text: &str,
+    command: &mut dyn FnMut(&[&str]) -> Result<(), String>,
+) -> Result<(), String> {
+    let Some(name) = path
+        .strip_prefix(crate::install::UNITS)
+        .filter(|name| !name.contains('/'))
+    else {
+        return Ok(());
+    };
+    let staged = format!("{VERIFYING}{name}");
+    put(root, &staged, text.as_bytes(), 0o644)?;
+    let verified = command(&["systemd-analyze", "verify", &staged]);
+    remove(&on_root(root, &staged)).map_err(|error| failed_at(&staged, error))?;
+    verified.map_err(|why| format!("{path} is not written, systemd can't load it: {why}"))
+}
+
+fn is_image_path(path: &str) -> bool {
+    manifest::IMAGE_FILES.contains(&path)
 }
 
 fn apply(
@@ -353,10 +444,11 @@ fn apply(
     folder: &Path,
     records: &Path,
     key: &[u8; 32],
-    sequence: u64,
-    tmpfiles: &mut dyn FnMut(&str) -> Result<(), String>,
+    request: &Request,
+    command: &mut dyn FnMut(&[&str]) -> Result<(), String>,
     say: &mut dyn FnMut(&str),
 ) -> Result<(), String> {
+    let sequence = request.sequence;
     let envelope =
         fs::read(folder.join(ENVELOPE)).map_err(|error| format!("the envelope: {error}"))?;
     let bytes = manifest::signed(&envelope, key).map_err(|why| why.0)?;
@@ -369,16 +461,66 @@ fn apply(
         ));
     }
     manifest::check_settings(&signed.settings).map_err(|why| why.0)?;
+    manifest::check_image(&signed.image).map_err(|why| why.0)?;
     let recorded: Recorded = read_json(&records.join("state.json"))
         .map_err(|error| format!("the state: {error}"))?
         .unwrap_or_default();
-    let steps = plan(
+    let mut steps = plan(
         root,
         &signed.settings,
         &recorded.settings,
         &recorded.settings_writing,
+        &BTreeMap::new(),
     )
     .map_err(|error| error.to_string())?;
+    let of_settings = steps.len();
+    if request.image && !signed.image.is_empty() {
+        match image::variant(root).map_err(|error| format!("{}: {error}", image::PROFILE))? {
+            Some(variant) => {
+                let (files, shipped) = image::for_variant(&signed.image, &variant);
+                if files
+                    .iter()
+                    .any(|file| signed.settings.iter().any(|s| s.path == file.path))
+                {
+                    return Err("a path is both a setting and the image's".into());
+                }
+                steps.extend(
+                    plan(root, &files, &recorded.settings, &BTreeMap::new(), &shipped)
+                        .map_err(|error| error.to_string())?,
+                );
+            }
+            None => say(&format!(
+                "the image's files are not written: {} names no variant",
+                image::PROFILE
+            )),
+        }
+    }
+    // Every path checked again before anything is written, as `back`
+    // does: a setting's a setting's path, an image file one of
+    // `IMAGE_FILES`, whatever the checks above let through.
+    for (at, step) in steps.iter().enumerate() {
+        let path = &step.setting.path;
+        let allowed = if at < of_settings {
+            manifest::is_setting_path(path)
+        } else {
+            is_image_path(path)
+        };
+        if !allowed {
+            return Err(format!("{path} is not a path this build may write"));
+        }
+    }
+    // Each of the image's units checked by systemd before anything is
+    // written: a unit it can't load would be a broken unit at boot.
+    for step in &steps {
+        if step.act == Act::Write && is_image_path(&step.setting.path) {
+            verify_unit(
+                root,
+                &step.setting.path,
+                step.setting.text.as_deref().unwrap_or_default(),
+                command,
+            )?;
+        }
+    }
     // Every file as it was, kept before the first is changed.
     let mut files = Vec::new();
     for step in &steps {
@@ -427,6 +569,7 @@ fn apply(
     }
     let mut records_now = BTreeMap::new();
     let mut tmpfiles_written = false;
+    let mut image_written = Vec::new();
     for step in &steps {
         let path = &step.setting.path;
         match &step.act {
@@ -450,10 +593,14 @@ fn apply(
             }
         }
         tmpfiles_written |= path == crate::install::TMPFILES_PATH && step.act != Act::Record;
+        if is_image_path(path) && step.act != Act::Record {
+            image_written.push(path.clone());
+        }
     }
     if tmpfiles_written && tmpfiles_there(root) {
-        tmpfiles(crate::install::TMPFILES_PATH)?;
+        tmpfiles(command)?;
     }
+    after_image(&image_written, command, say)?;
     write_json(
         &folder.join(DONE),
         &Done {
@@ -470,18 +617,19 @@ fn back(
     root: &Path,
     folder: &Path,
     sequence: u64,
-    tmpfiles: &mut dyn FnMut(&str) -> Result<(), String>,
+    command: &mut dyn FnMut(&[&str]) -> Result<(), String>,
     say: &mut dyn FnMut(&str),
 ) -> Result<(), String> {
     let back = read_json::<Back>(&folder.join(BACK)).map_err(|error| format!("{BACK}: {error}"))?;
     let mut records_now = BTreeMap::new();
     let mut tmpfiles_back = false;
+    let mut image_back = Vec::new();
     match back {
         Some(back) if back.sequence == sequence => {
             let mut troubles = Vec::new();
             for before in &back.files {
                 let path = &before.path;
-                if !manifest::is_setting_path(path) {
+                if !manifest::is_setting_path(path) && !is_image_path(path) {
                     troubles.push(format!("{path} is not a setting's path"));
                     continue;
                 }
@@ -504,6 +652,9 @@ fn back(
                         records_now.insert(path.clone(), before.record.clone());
                         remove_made(root, path, &before.made);
                         tmpfiles_back |= path == crate::install::TMPFILES_PATH;
+                        if is_image_path(path) {
+                            image_back.push(path.clone());
+                        }
                         continue;
                     }
                     Ok(_) => {
@@ -531,14 +682,20 @@ fn back(
                         say(&format!("put {path} back as it was"));
                         records_now.insert(path.clone(), before.record.clone());
                         tmpfiles_back |= path == crate::install::TMPFILES_PATH;
+                        if is_image_path(path) {
+                            image_back.push(path.clone());
+                        }
                     }
                     Err(why) => troubles.push(why),
                 }
             }
             if tmpfiles_back
                 && tmpfiles_there(root)
-                && let Err(why) = tmpfiles(crate::install::TMPFILES_PATH)
+                && let Err(why) = tmpfiles(command)
             {
+                troubles.push(why);
+            }
+            if let Err(why) = after_image(&image_back, command, say) {
                 troubles.push(why);
             }
             if !troubles.is_empty() {
@@ -631,6 +788,12 @@ mod tests {
         key: Ed25519KeyPair,
         said: Vec<String>,
         tmpfiles: Vec<String>,
+        /// Every command run, whole.
+        commands: Vec<String>,
+        /// The request asks for the image's files.
+        image: bool,
+        /// A command that fails, by its start.
+        failing: Option<String>,
     }
 
     impl Lamp {
@@ -647,6 +810,9 @@ mod tests {
                 key: Ed25519KeyPair::from_pkcs8(document.as_ref()).unwrap(),
                 said: Vec::new(),
                 tmpfiles: Vec::new(),
+                commands: Vec::new(),
+                image: false,
+                failing: None,
             }
         }
 
@@ -681,6 +847,20 @@ mod tests {
         }
 
         fn envelope(&self, sequence: u64, settings: Vec<Setting>) -> Vec<u8> {
+            self.envelope_with(sequence, settings, Vec::new())
+        }
+
+        fn envelope_with(
+            &self,
+            sequence: u64,
+            settings: Vec<Setting>,
+            image: Vec<ImageFile>,
+        ) -> Vec<u8> {
+            let min_updater = if image.is_empty() {
+                manifest::SETTINGS_UPDATER
+            } else {
+                manifest::IMAGE_UPDATER
+            };
             let manifest = manifest::Manifest {
                 schema: 1,
                 channel: "lamp-voice".into(),
@@ -693,25 +873,38 @@ mod tests {
                     size: 1,
                 }],
                 units: Vec::new(),
-                min_updater: Some(manifest::SETTINGS_UPDATER),
+                min_updater: Some(min_updater),
                 models: Vec::new(),
                 settings,
+                image,
             };
-            manifest::seal(&serde_json::to_vec(&manifest).unwrap(), &self.key).unwrap()
+            // Signed unchecked: what a lamp refuses is a publisher's to sign.
+            manifest::seal_unchecked(&serde_json::to_vec(&manifest).unwrap(), &self.key).unwrap()
         }
 
         fn run(&mut self, op: Op, sequence: u64, envelope: Option<&[u8]>) -> Result<(), String> {
-            stage(&self.records, op, sequence, envelope).unwrap();
+            stage(&self.records, op, sequence, envelope, self.image).unwrap();
             let key: [u8; 32] = self.key.public_key().as_ref().try_into().unwrap();
             let said = &mut self.said;
             let tmp = &mut self.tmpfiles;
+            let commands = &mut self.commands;
+            let failing = self.failing.clone();
             let result = run(
                 &self.root,
                 &self.records,
                 &key,
-                &mut |path| {
-                    tmp.push(path.to_owned());
-                    Ok(())
+                &mut |parts| {
+                    let whole = parts.join(" ");
+                    commands.push(whole.clone());
+                    if parts[0] == "systemd-tmpfiles" {
+                        tmp.push(parts[2].to_owned());
+                    }
+                    match &failing {
+                        Some(start) if whole.starts_with(start.as_str()) => {
+                            Err(format!("{whole}: failed"))
+                        }
+                        _ => Ok(()),
+                    }
                 },
                 &mut |line| said.push(line.to_owned()),
             );
@@ -1014,5 +1207,331 @@ mod tests {
         )
         .unwrap();
         assert_eq!(back.files[0].bytes, None);
+    }
+    const SPEAKER: &str = "/etc/systemd/system/lamp-cmedia-speaker.service";
+    const RULES: &str = "/etc/udev/rules.d/99-lamp-device.rules";
+    const ASOUND: &str = "/etc/asound.conf";
+    const JOURNAL: &str = "/etc/systemd/journald.conf.d/zz-lamp-journal.conf";
+
+    fn image_file(variant: &str, path: &str, text: &str, shipped: &[&str]) -> ImageFile {
+        ImageFile {
+            variant: variant.into(),
+            path: path.into(),
+            text: text.into(),
+            sha256: manifest::sha256_hex(text.as_bytes()),
+            shipped: shipped
+                .iter()
+                .map(|text| manifest::sha256_hex(text.as_bytes()))
+                .collect(),
+        }
+    }
+
+    /// A lamp flashed with an earlier image, one file of it changed by hand.
+    fn flashed(lamp: &Lamp) {
+        lamp.installed(&[]);
+        lamp.write(SPEAKER, "speaker 9, remain");
+        lamp.write(RULES, "rules of this lamp");
+        lamp.write(ASOUND, "asound 1");
+        lamp.write(JOURNAL, "journal 1");
+        // The person's drop-in beside the unit.
+        lamp.write(
+            "/etc/systemd/system/lamp-cmedia-speaker.service.d/30-local-gain.conf",
+            "local gain",
+        );
+    }
+
+    fn image_build(lamp: &Lamp, variant_text: &str) -> Vec<u8> {
+        lamp.envelope_with(
+            2,
+            Vec::new(),
+            vec![
+                image_file(
+                    "standard",
+                    SPEAKER,
+                    "speaker 9",
+                    &["speaker 9, remain", "speaker 9"],
+                ),
+                image_file("pro", SPEAKER, variant_text, &["speaker 6, remain"]),
+                image_file("standard", RULES, "rules 2", &["rules 1", "rules 2"]),
+                image_file("standard", ASOUND, "asound 2", &["asound 1", "asound 2"]),
+                image_file(
+                    "standard",
+                    JOURNAL,
+                    "journal 2",
+                    &["journal 1", "journal 2"],
+                ),
+            ],
+        )
+    }
+
+    #[test]
+    fn the_images_files_are_written_where_the_lamp_has_one_the_image_shipped() {
+        let mut lamp = Lamp::new();
+        lamp.image = true;
+        flashed(&lamp);
+        let envelope = image_build(&lamp, "speaker 6");
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        assert_eq!(lamp.read(SPEAKER).as_deref(), Some("speaker 9"));
+        assert_eq!(lamp.read(ASOUND).as_deref(), Some("asound 2"));
+        assert_eq!(lamp.read(JOURNAL).as_deref(), Some("journal 2"));
+        // Changed by hand: none the image shipped, kept and said.
+        assert_eq!(lamp.read(RULES).as_deref(), Some("rules of this lamp"));
+        assert!(
+            lamp.said
+                .iter()
+                .any(|line| line.starts_with(&format!("kept {RULES}"))),
+            "{:?}",
+            lamp.said
+        );
+        // A drop-in is never the image's.
+        assert_eq!(
+            lamp.read("/etc/systemd/system/lamp-cmedia-speaker.service.d/30-local-gain.conf")
+                .as_deref(),
+            Some("local gain")
+        );
+        assert_eq!(
+            lamp.commands,
+            [
+                "systemd-analyze verify /run/lampos-update-apply/lamp-cmedia-speaker.service",
+                "systemctl daemon-reload",
+                "systemctl start lamp-cmedia-speaker.service"
+            ]
+        );
+        assert!(!lamp.commands.iter().any(|c| c.contains("journald")));
+        assert!(
+            !lamp
+                .root
+                .join("run/lampos-update-apply/lamp-cmedia-speaker.service")
+                .exists()
+        );
+        assert!(
+            lamp.said.iter().any(|line| line.contains("next boot")),
+            "{:?}",
+            lamp.said
+        );
+        let state = lamp.state();
+        assert_eq!(state.settings[SPEAKER], manifest::sha256_hex(b"speaker 9"));
+        assert!(!state.settings.contains_key(RULES));
+        // Applied again: nothing more.
+        lamp.commands.clear();
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        assert!(lamp.commands.is_empty(), "{:?}", lamp.commands);
+    }
+
+    #[test]
+    fn the_variants_file_is_written_and_none_of_another() {
+        let mut lamp = Lamp::new();
+        lamp.image = true;
+        lamp.installed(&[]);
+        lamp.write(image::PROFILE, "pro\n");
+        lamp.write(SPEAKER, "speaker 6, remain");
+        lamp.write(RULES, "rules 1");
+        let envelope = image_build(&lamp, "speaker 6");
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        assert_eq!(lamp.read(SPEAKER).as_deref(), Some("speaker 6"));
+        // The build has no pro rules: the lamp's stay as they are.
+        assert_eq!(lamp.read(RULES).as_deref(), Some("rules 1"));
+        assert_eq!(lamp.read(ASOUND), None);
+    }
+
+    #[test]
+    fn put_back_restores_the_images_files_and_reloads_again() {
+        let mut lamp = Lamp::new();
+        lamp.image = true;
+        flashed(&lamp);
+        lamp.write(RULES, "rules 1");
+        let envelope = image_build(&lamp, "speaker 6");
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        assert_eq!(lamp.read(RULES).as_deref(), Some("rules 2"));
+        lamp.commands.clear();
+        lamp.run(Op::Back, 2, None).unwrap();
+        assert_eq!(lamp.read(SPEAKER).as_deref(), Some("speaker 9, remain"));
+        assert_eq!(lamp.read(RULES).as_deref(), Some("rules 1"));
+        assert_eq!(lamp.read(ASOUND).as_deref(), Some("asound 1"));
+        assert_eq!(
+            lamp.commands,
+            [
+                "systemctl daemon-reload",
+                "udevadm control --reload",
+                "systemctl start lamp-cmedia-speaker.service"
+            ]
+        );
+        assert!(lamp.state().settings.is_empty());
+    }
+
+    /// The reviewer on #1945, 21:43: a signed build whose image names a
+    /// path outside `IMAGE_FILES` writes nothing, as root or otherwise.
+    #[test]
+    fn a_signed_image_file_outside_the_list_is_refused_with_nothing_written() {
+        let mut lamp = Lamp::new();
+        lamp.image = true;
+        flashed(&lamp);
+        let sudoers = "/etc/sudoers.d/lamp";
+        let envelope = lamp.envelope_with(
+            2,
+            Vec::new(),
+            vec![
+                image_file("standard", ASOUND, "asound 2", &["asound 1"]),
+                image_file("standard", sudoers, "lampos ALL=(ALL) NOPASSWD: ALL", &[]),
+            ],
+        );
+        assert!(lamp.run(Op::Apply, 2, Some(&envelope)).is_err());
+        assert_eq!(lamp.read(sudoers), None);
+        assert_eq!(lamp.read(ASOUND).as_deref(), Some("asound 1"));
+        assert!(!lamp.records.join(FOLDER).join(BACK).exists());
+        assert!(lamp.commands.is_empty(), "{:?}", lamp.commands);
+    }
+
+    #[test]
+    fn a_path_both_a_setting_and_an_image_file_is_refused_with_nothing_written() {
+        let mut lamp = Lamp::new();
+        lamp.image = true;
+        flashed(&lamp);
+        let envelope = lamp.envelope_with(
+            2,
+            vec![
+                Setting::new(EXPRESSION, "expression 2"),
+                Setting::new(ASOUND, "asound by settings"),
+            ],
+            vec![image_file("standard", ASOUND, "asound 2", &["asound 1"])],
+        );
+        assert!(lamp.run(Op::Apply, 2, Some(&envelope)).is_err());
+        assert_eq!(lamp.read(ASOUND).as_deref(), Some("asound 1"));
+        assert_eq!(lamp.read(EXPRESSION), None);
+        assert!(!lamp.records.join(FOLDER).join(BACK).exists());
+        assert!(lamp.commands.is_empty(), "{:?}", lamp.commands);
+    }
+
+    #[test]
+    fn without_the_image_asked_or_from_an_older_copy_none_is_written() {
+        let mut lamp = Lamp::new();
+        flashed(&lamp);
+        let envelope = image_build(&lamp, "speaker 6");
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        assert_eq!(lamp.read(SPEAKER).as_deref(), Some("speaker 9, remain"));
+        assert!(lamp.commands.is_empty());
+        // A copy older than the field reads the manifest as before.
+        let bytes = manifest::signed(
+            &envelope,
+            &lamp.key.public_key().as_ref().try_into().unwrap(),
+        )
+        .unwrap();
+        #[derive(Deserialize)]
+        struct Older {
+            sequence: u64,
+            #[serde(default)]
+            settings: Vec<Setting>,
+        }
+        let older: Older = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!((older.sequence, older.settings.len()), (2, 0));
+    }
+
+    #[test]
+    fn a_reload_that_fails_fails_the_apply_and_a_speaker_that_fails_is_said() {
+        let mut lamp = Lamp::new();
+        lamp.image = true;
+        flashed(&lamp);
+        lamp.failing = Some("systemctl start".into());
+        let envelope = image_build(&lamp, "speaker 6");
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        assert!(
+            lamp.said
+                .iter()
+                .any(|line| line.starts_with("systemctl start")),
+            "{:?}",
+            lamp.said
+        );
+        let mut lamp = Lamp::new();
+        lamp.image = true;
+        flashed(&lamp);
+        lamp.failing = Some("systemctl daemon-reload".into());
+        let envelope = image_build(&lamp, "speaker 6");
+        assert!(lamp.run(Op::Apply, 2, Some(&envelope)).is_err());
+    }
+
+    /// A unit systemd can't load is never written: a broken unit at boot.
+    #[test]
+    fn a_unit_systemd_cannot_load_writes_nothing() {
+        let mut lamp = Lamp::new();
+        lamp.image = true;
+        flashed(&lamp);
+        lamp.failing = Some("systemd-analyze verify".into());
+        let envelope = image_build(&lamp, "speaker 6");
+        let why = lamp.run(Op::Apply, 2, Some(&envelope)).unwrap_err();
+        assert!(why.contains("systemd can't load it"), "{why}");
+        assert_eq!(lamp.read(SPEAKER).as_deref(), Some("speaker 9, remain"));
+        assert_eq!(lamp.read(ASOUND).as_deref(), Some("asound 1"));
+        assert!(!lamp.records.join(FOLDER).join(BACK).exists());
+    }
+
+    /// The first builder on #1680, 19:48: an apply and its put-back of
+    /// every one of the image's files, journald's drop-in among them, run
+    /// nothing of journald; and the guard every command passes refuses one.
+    #[test]
+    fn the_apply_path_never_restarts_or_signals_journald() {
+        let mut lamp = Lamp::new();
+        lamp.image = true;
+        lamp.installed(&[]);
+        let mut image = Vec::new();
+        for path in manifest::IMAGE_FILES {
+            lamp.write(path, &format!("{path} 1"));
+            image.push(image_file(
+                "standard",
+                path,
+                &format!("{path} 2"),
+                &[&format!("{path} 1")],
+            ));
+        }
+        let envelope = lamp.envelope_with(2, Vec::new(), image);
+        lamp.run(Op::Apply, 2, Some(&envelope)).unwrap();
+        lamp.run(Op::Back, 2, None).unwrap();
+        assert!(!lamp.commands.is_empty());
+        for command in &lamp.commands {
+            assert!(!command.contains("journald"), "{command}");
+            let parts: Vec<&str> = command.split(' ').collect();
+            image::guard(&parts).unwrap();
+        }
+        for refused in [
+            &["systemctl", "restart", "systemd-journald.service"][..],
+            &["systemctl", "kill", "--signal=HUP", "systemd-journald"],
+        ] {
+            assert!(image::guard(refused).is_err(), "{refused:?}");
+        }
+    }
+    /// lamp-update-apply.service can write every path a build may name,
+    /// and names nothing of journald.
+    #[test]
+    fn the_apply_unit_can_write_every_carried_path_and_never_names_journald() {
+        let unit = include_str!("../../../deploy/product/lamp-update-apply.service");
+        let writes: Vec<&str> = unit
+            .lines()
+            .find_map(|line| line.strip_prefix("ReadWritePaths="))
+            .unwrap()
+            .split_whitespace()
+            .collect();
+        let writable = |path: &str| {
+            let folder = path.rsplit_once('/').unwrap().0;
+            writes
+                .iter()
+                .any(|at| folder == *at || folder.starts_with(&format!("{at}/")))
+        };
+        for path in manifest::IMAGE_FILES
+            .iter()
+            .chain(manifest::SETTING_FILES)
+            .copied()
+            .chain(
+                manifest::SETTING_FOLDERS
+                    .iter()
+                    .map(|f| f.trim_end_matches('/')),
+            )
+        {
+            assert!(writable(path), "{path}: {writes:?}");
+        }
+        assert!(
+            unit.lines()
+                .filter(|line| !line.starts_with('#'))
+                .all(|line| !line.contains("journald"))
+        );
+        assert!(unit.contains("ReadOnlyPaths=-/etc/lampOS/update"));
     }
 }

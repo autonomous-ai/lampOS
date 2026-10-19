@@ -8,7 +8,7 @@
 //! what is published.
 use crate::{
     install,
-    manifest::{self, File, Manifest, Model, SCHEMA, Setting, Unit},
+    manifest::{self, File, ImageFile, Manifest, Model, SCHEMA, Setting, Unit},
     product_skills, unit,
 };
 use std::{fs, io, path::Path};
@@ -52,11 +52,14 @@ pub fn make(
         min_updater,
         models,
         Vec::new(),
+        Vec::new(),
     )
 }
 
 /// [`make`], with the product's `settings` carried too (#1680):
-/// `min_updater` is then at least [`manifest::SETTINGS_UPDATER`].
+/// `min_updater` is then at least [`manifest::SETTINGS_UPDATER`]; and the
+/// image's own files (#1369, crate::image::from_tree), with it then at
+/// least [`manifest::IMAGE_UPDATER`].
 #[allow(clippy::too_many_arguments)]
 pub fn make_with(
     binaries: &Path,
@@ -69,6 +72,7 @@ pub fn make_with(
     min_updater: Option<u64>,
     models: Vec<Model>,
     settings: Vec<Setting>,
+    image: Vec<ImageFile>,
 ) -> io::Result<Manifest> {
     let min_updater = if models.is_empty() {
         min_updater
@@ -79,6 +83,11 @@ pub fn make_with(
         min_updater
     } else {
         Some(min_updater.unwrap_or(1).max(manifest::SETTINGS_UPDATER))
+    };
+    let min_updater = if image.is_empty() {
+        min_updater
+    } else {
+        Some(min_updater.unwrap_or(1).max(manifest::IMAGE_UPDATER))
     };
     let mut files = Vec::new();
     let sums = fs::read_to_string(binaries.join("SHA256SUMS")).ok();
@@ -171,6 +180,7 @@ pub fn make_with(
         min_updater,
         models,
         settings,
+        image,
     };
     let mut bytes = serde_json::to_vec_pretty(&made).map_err(io::Error::other)?;
     bytes.push(b'\n');
@@ -418,6 +428,7 @@ mod tests {
             None,
             Vec::new(),
             settings.clone(),
+            Vec::new(),
         )
         .unwrap();
         assert_eq!(made.settings, settings);
@@ -439,5 +450,47 @@ mod tests {
                 .iter()
                 .any(|path| path.starts_with("/var/lib/lampOS/skills/"))
         );
+    }
+    #[test]
+    fn the_images_files_are_carried_with_the_updater_they_need() {
+        let folder = tempfile::tempdir().unwrap();
+        let out = folder.path().join("out");
+        let deploy = folder.path().join("deploy");
+        fs::create_dir_all(&out).unwrap();
+        fs::create_dir_all(&deploy).unwrap();
+        fs::write(out.join("lamp-update"), b"update").unwrap();
+        let lamp =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../robots/lamp");
+        let shipped =
+            crate::image::shipped_from(include_str!("../../../deploy/image/shipped.json")).unwrap();
+        let image = crate::image::from_tree(&lamp, &shipped).unwrap();
+        let commit = "d".repeat(40);
+        let skills = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+        let made = make_with(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            9,
+            &commit,
+            "https://channel.test/build-9/",
+            None,
+            Vec::new(),
+            Vec::new(),
+            image.clone(),
+        )
+        .unwrap();
+        assert_eq!(made.image, image);
+        assert_eq!(made.min_updater, Some(manifest::IMAGE_UPDATER));
+        let written = fs::read(out.join("manifest.json")).unwrap();
+        assert!(
+            written.len() < manifest::MOST_MANIFEST_BYTES,
+            "{}",
+            written.len()
+        );
+        assert_eq!(manifest::parse(&written).unwrap(), made);
+        // An updater older than the field refuses it by min_updater, clearly.
+        let too_old = manifest::too_old(&written, manifest::SETTINGS_UPDATER).unwrap();
+        assert_eq!(too_old.needed, manifest::IMAGE_UPDATER);
     }
 }
