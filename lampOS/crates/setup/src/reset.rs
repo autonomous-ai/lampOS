@@ -66,6 +66,93 @@ pub struct Plan {
     pub detach: Vec<String>,
 }
 
+/// The plan's fields, as [`read`] knows them.
+pub const FIELDS: [&str; 6] = ["marker", "journal", "wipe", "stop", "reboot", "detach"];
+
+/// The one field a newer build keeps something back from the reset in
+/// (#1680, Third on #2060). This build knows no entry of it yet, so every
+/// entry is dropped with a line and what it would keep is wiped: the
+/// privacy-safe side, a pairing lost at worst.
+pub const KEEP_BACK: &str = "keep_back";
+
+/// What the person is told when a reset is refused (Third on #2060).
+pub const SAY_REFUSED: &str = "Nothing was wiped. Update me, then reset again.";
+
+/// Why a written plan is not acted on. Either way no reset runs: nothing is
+/// journalled, the marker stays, nothing is wiped.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Refused {
+    /// A newer build's plan asks what this build cannot do: a `wipe` entry
+    /// of a kind it does not know, or a field it does not know. The person
+    /// is told ([`SAY_REFUSED`]) when they hold the button.
+    Ahead(String),
+    /// The plan does not read, or a known value is bad.
+    Bad(String),
+}
+
+impl std::fmt::Display for Refused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Ahead(why) => write!(
+                f,
+                "the reset plan is a newer build's: {why}; a reset is refused and nothing is wiped (update the lamp, then reset again)"
+            ),
+            Self::Bad(why) => write!(f, "the plan: {why}"),
+        }
+    }
+}
+
+impl std::error::Error for Refused {}
+
+/// Read a written plan, one version ahead (#1680, the rule agreed on #2060).
+/// Anything to wipe is a plain path's text in `wipe`, which every build
+/// wipes, so a newer plan's extra path is wiped here too (and still checked
+/// against [`PROTECTED`]). A newer build keeps something back only in
+/// [`KEEP_BACK`]: an entry this build does not understand there is dropped
+/// with a returned line, so the reset wipes more, never less. Everything
+/// else this build cannot do refuses the whole reset ([`Refused::Ahead`]):
+/// a `wipe` entry that is not a path's text (wiping it as a path could wipe
+/// what a newer build keeps, skipping it would keep the person's data), and
+/// any other unknown field (it could be a step the reset needs). So a reset
+/// is all or nothing, never a half-done one that reads as done.
+pub fn read(bytes: &[u8]) -> Result<(Plan, Vec<String>), Refused> {
+    let mut value: serde_json::Value =
+        serde_json::from_slice(bytes).map_err(|error| Refused::Bad(error.to_string()))?;
+    let mut notes = Vec::new();
+    if let Some(object) = value.as_object_mut() {
+        if let Some(field) = object
+            .keys()
+            .find(|field| *field != KEEP_BACK && !FIELDS.contains(&field.as_str()))
+        {
+            return Err(Refused::Ahead(format!(
+                "field `{field}` is not one this build knows"
+            )));
+        }
+        if let Some(entries) = object.remove(KEEP_BACK) {
+            let Some(entries) = entries.as_array() else {
+                return Err(Refused::Bad(format!("`{KEEP_BACK}` is a list")));
+            };
+            for at in 1..=entries.len() {
+                notes.push(format!(
+                    "reset plan: {KEEP_BACK} entry {at} is not one this build understands; dropped, so what it keeps is wiped"
+                ));
+            }
+        }
+    }
+    if let Some(entries) = value.get("wipe").and_then(|wipe| wipe.as_array())
+        && let Some(at) = entries.iter().position(|entry| !entry.is_string())
+    {
+        return Err(Refused::Ahead(format!(
+            "wipe entry {} is of a kind this build does not know",
+            at + 1
+        )));
+    }
+    let plan: Plan =
+        serde_json::from_value(value).map_err(|error| Refused::Bad(error.to_string()))?;
+    plan.check().map_err(Refused::Bad)?;
+    Ok((plan, notes))
+}
+
 fn plain(path: &Path) -> bool {
     // Read the text itself: `Path::components` quietly drops a `.` in the
     // middle and a trailing `/`, which would let `/var/lib/./x` through.

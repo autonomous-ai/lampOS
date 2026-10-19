@@ -378,16 +378,7 @@ impl SayService {
 
 impl Mouth for SayService {
     fn say(&mut self, text: &str) {
-        use std::io::Write;
-        let ask = json!({"skill": "wifi", "text": text, "priority": 7, "expires_in_ms": 60_000});
-        let Ok(mut stream) = std::os::unix::net::UnixStream::connect(&self.socket) else {
-            eprintln!("lamp-setup: wifi: the voice's say service is not there; nothing said");
-            return;
-        };
-        // A client gone before the outcome changes nothing for the say
-        // (`say::tests::a_ticket_dropped_unanswered_is_dropped_and_a_client_gone_is_nothing`),
-        // so the outcome is not waited for.
-        let _ = stream.write_all(format!("{ask}\n").as_bytes());
+        self.say_as("wifi", text);
     }
 
     fn play(&mut self, recording: &str) {
@@ -398,6 +389,22 @@ impl Mouth for SayService {
 }
 
 impl SayService {
+    /// Words for the voice's model to say, from the skill name `skill`, kept
+    /// a minute: only while there is a network, and with the say service off
+    /// nothing is said. The outcome is not waited for.
+    pub fn say_as(&self, skill: &str, text: &str) {
+        use std::io::Write;
+        let ask = json!({"skill": skill, "text": text, "priority": 7, "expires_in_ms": 60_000});
+        let Ok(mut stream) = std::os::unix::net::UnixStream::connect(&self.socket) else {
+            eprintln!("lamp-setup: {skill}: the voice's say service is not there; nothing said");
+            return;
+        };
+        // A client gone before the outcome changes nothing for the say
+        // (`say::tests::a_ticket_dropped_unanswered_is_dropped_and_a_client_gone_is_nothing`),
+        // so the outcome is not waited for.
+        let _ = stream.write_all(format!("{ask}\n").as_bytes());
+    }
+
     /// Ask the voice to play `recording`, and wait at most
     /// [`PLAY_ANSWER_WAIT`] for its first answer: the journal line when it
     /// was not played (missing, refused, no voice), `None` once begun or
