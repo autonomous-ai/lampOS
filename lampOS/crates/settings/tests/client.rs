@@ -385,7 +385,10 @@ fn multiple_hops_share_one_absolute_deadline() {
         expect_closed_without_more_request(&mut second, deadline);
     });
     let started = Instant::now();
-    let deadline = started + Duration::from_secs(2);
+    // 800 ms, over three times the first hop's 250 ms: the first still
+    // answers inside it, the second runs into it (#1806: 2 s took 2.0 s on
+    // ARM64).
+    let deadline = started + Duration::from_millis(800);
     let first = exchange(&socket, &json!({"op":"status"}), deadline);
     let second = exchange(&socket, &json!({"op":"set"}), deadline);
     let completed = Instant::now();
