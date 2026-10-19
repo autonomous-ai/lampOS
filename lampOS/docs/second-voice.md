@@ -806,8 +806,9 @@ When the coordinator switches (below):
   on from one the rule never judged (replaced before its words came back)
   is judged fresh, never as going on from an older question (the reviewer
   on #1226). `over_the_lamp` (a line begun over the
-  lamp's reply) is used by nothing here: this route runs no same-voice
-  check and no staff note, the two things it guards on the Live route. On
+  lamp's reply) is used by nothing here: this route runs no staff note,
+  which it guards on the Live route. The same-voice check below reads
+  `over_the_lamps_voice`, as Live's does. On
   lamp-4ace on 2026-10-16 this route answered "Me." and half a question
   between colleagues while Gemini's session was renewed; both are held now.
   With `LAMP_REPORTS=on`, a held line whose heard words name `report`,
@@ -1434,10 +1435,23 @@ after a take-over, but now for every turn:
     stays as Live has it (the first builder at 17:53). The model is to
     decline what isn't for it, as Gemini does.
 
-  Not here, as they have no part on this route: the Policy's hold of a line
+  Not here, as it has no part on this route: the Policy's hold of a line
   going on (`LAMP_GOING_ON_ASKS`, which also ends a busy room sooner once
-  answered) and another voice's line (the same-voice check). The busy-room
-  battery on lamp-4ace is its check.
+  answered). The busy-room battery on lamp-4ace is its check.
+- **The same-voice check** (`LAMP_SAME_VOICE_MODEL`, beside
+  `LAMP_SPOKEN_TO=on`, [same-voice.md](same-voice.md)): as on Live. The
+  worker starts the same `lamp-same-voice` child, gives it each spoken
+  line's first samples (`Engine::hearing`; a line begun over the lamp's
+  voice is not printed), and at the line's verdict (`Heeding::judge`) a
+  line in another voice than the conversation's is no part of it: "request
+  N: another voice than the conversation's (cosine …): no conversation is
+  going on for it", and the room counts it as talk past the lamp. A late
+  print of another voice ends the conversation at the next line; after
+  another voice's line held, a question in the conversation's own voice
+  goes on and a statement in it is talk past the lamp. Off unless set;
+  the route judges a line once its words are final, so its print is
+  usually back by then. Test:
+  `worker::tests::another_voice_going_on_is_held_and_the_conversations_own_goes_on`.
 - **How to take what it heard** (`worker::SPOKEN_NOTE`, spoken turns
   only, after the character): the ears turn some words into others, names
   and places most of all; a question plainly about the weather, a price, a
@@ -1591,10 +1605,8 @@ after a take-over, but now for every turn:
   words "Let me look." stays beside it (`speak_up::asks_to_look`); both
   ask for the same turn's look, which is taken once. The first builder on
   #1712: a phrase rule is easy to trip.
-- **Live route only, so not on this route:** the same-voice
-  check,
-  the head tap
-  and `--addressed` for whom it answers, sight and camera facts, and
+- **Live route only, so not on this route:**
+  the head tap for whom it answers, sight and camera facts, and
   `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).
 - **The air (`LAMP_AIR_FACTS=on`, #1712's map item 6):** as on the Live
   route (`crate::air_told`), `air/state` is read every 5 s on the bus
@@ -2204,12 +2216,26 @@ Reported by the builders:
   [not-speech.md](not-speech.md#a-room-sound-let-through-and-answered-800)).
   Being close to the lamp or facing it cannot be seen here, so it does not
   count as it does on the Live route.
-- **The rule for whom it answers, without two signs:** a tap on the head
-  and whether it was said from close (`--addressed`) are not given to it,
-  so a line in a busy room that only those would let through on the Live
-  route is held here. Both are off on lamp-4ace. Like the Live route, it
-  does not wait for the Policy's attention decision, which holds only
-  actions.
+- **The rule for whom it answers, without one sign:** a tap on the head is
+  not given to it, so a line in a busy room that only that would let
+  through on the Live route is held here. Like the Live route, it does not
+  wait for the Policy's attention decision, which holds only actions.
+- **Said from close (`LAMP_ADDRESSED=on`, the worker's `--addressed`)** is
+  judged on this route as on the Live route ([attention.md](attention.md#said-to-the-lamp-from-close-to-it-753)):
+  the room microphone's rise over its quiet (`room/sound`) and the eyes'
+  close faces turned to the lamp (`humans/faces/tracked`), both sampled
+  every 100 ms, over the line's sound. Each spoken line is judged once as
+  it is judged for whom it answers, published on `attention/addressed`, and
+  in a busy room it lets the line out. Off unless set; off on lamp-4ace.
+- **The name signal (`LAMP_NAME_SIGNAL=on`)** offers spoken turns
+  `heard_my_name`, as the Live route's sessions are offered it, given at
+  once with `LAMP_SECOND_FEW_TOOLS`. Its call is answered as declined and
+  runs nothing. The journal says `request N: the model said it heard its
+  name`, then, at the answer's first audio, `request N: first sound M ms
+  after the model said it heard its name` (or that it has not). On this
+  route the call comes in a chat round of its own, so a line where the
+  model calls it is answered a round later. A measurement switch, off, as
+  on the Live route (attention.md, "One more thing was tried").
 - **Deepgram direct uses nova-3 on `/v1/listen`.** V1's default
   (`hal/drivers/voice/stt/deepgram.py`) is `flux-general-en` on Deepgram's v2
   protocol.
