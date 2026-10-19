@@ -1594,8 +1594,17 @@ after a take-over, but now for every turn:
 - **Live route only, so not on this route:** the same-voice
   check,
   the head tap
-  and `--addressed` for whom it answers, sight, camera and air facts, and
+  and `--addressed` for whom it answers, sight and camera facts, and
   `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).
+- **The air (`LAMP_AIR_FACTS=on`, #1712's map item 6):** as on the Live
+  route (`crate::air_told`), `air/state` is read every 5 s on the bus
+  (`worker::air_task`, a reading older than 30 s says nothing), and once the
+  room has felt stuffy for ten minutes a spoken request is told so beside
+  its words (`Engine::noting_the_air`, `worker::air_noting`), not in a busy
+  room, then not again for three hours. A written turn, the lamp's own,
+  never is. The journal: `request N is told the air is stuffy`. Its room
+  is the one this route keeps (`room/state`); the room's quiet or busy is
+  in each turn's system message with `LAMP_ROOM_FACTS`, as before.
 - **`voice/link`** (`LAMP_VOICE_LINK`) is this route's link, Ready from its
   start. As a standby it stays Ready: an outage shows only as failed turns.
   As the only voice it goes down and back with the network (below, "The
@@ -2166,7 +2175,8 @@ systemd-run --pty --wait \
 Reported by the builders:
 
 - **Facts not told:** the worker accepts the Gemini worker's flags, but
-  sight, the camera and air facts are not told to the text model. A
+  sight and the camera facts are not told to the text model (the air is,
+  above). A
   written turn with `look` (the lamp taking a look) sends the eyes'
   newest picture with its words, as an OpenAI image part (a JPEG `data:`
   URL) to this route's `llm_base_url` (the company relay and the model
