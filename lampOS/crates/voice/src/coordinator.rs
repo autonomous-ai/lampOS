@@ -4457,6 +4457,7 @@ fn conversation_with_gate(
             "plain_percent":Hearing::EVALUATED.plain_percent,
             "commit_on_stillness_after_plain_blocks":Confirmation::EVALUATED.plain_blocks,
             "fruitless_yields_before_fallback":FRUITLESS_YIELDS,
+            "fruitless_yield_forgiven_after_ms":crate::turn_taking::FORGIVE_FRUITLESS_US / 1_000,
             "decision_budget_us":hold.decision_budget_us,
             "first_words_kept_blocks":first_words.then_some(crate::activity::REACH_BACK_BLOCKS),
             "listen_gaps":listen_gaps.then_some(json!({"after_ms":crate::listen_gaps::AFTER_FRAMES * 1_000 / u64::from(lamp_audio::RENDER_RATE),"quiet_run_ms":crate::listen_gaps::LOW_RUN_CHUNKS * 10,"gap_ms":crate::listen_gaps::GAP_US / 1_000,"silence_heard":true})),

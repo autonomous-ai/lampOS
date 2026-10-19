@@ -42,8 +42,16 @@
 //!   answered, and that is looked at again right before it would run (the
 //!   reviewer on #908).
 //! - Without the bus, or on a turn the lamp wrote itself, nothing is held.
-//!   The second voice (`crate::second_provider`) has no bus: its actions run
-//!   as before.
+//! - **On the second route** (`crate::second_provider`, #1712) the same
+//!   gate holds the same calls of a spoken turn, with the same journal
+//!   lines, by the decision about the same turn: its request numbers are the
+//!   ones `voice/heard` tells. The call waits in the turn's own task, so
+//!   nothing else waits. Held, the model is told [`HELD`] and the turn ends
+//!   there, its words not yet said dropped: with no session to keep, the
+//!   model is never asked again, so never told [`HELD_AGAIN`]. What it said
+//!   before the call may have been let out already, and the journal counts
+//!   it. The turn's facts come from the route's own rule (`LAMP_ATTENTION`):
+//!   without the rule, nothing is held there.
 //!
 //! - **A reply to the lamp is not held from its schedule** (#1040): a
 //!   `stay_quiet` whose `follows_lamp` answer is [`FOLLOWS_FROM`] or more
@@ -269,6 +277,36 @@ pub fn gate(
         Some(Verdict::TakenUp) => Gate::Run,
         None if waited < WAIT => Gate::Wait,
         None => Gate::Run,
+    }
+}
+
+/// A decision's verdict as it stands for its turn: a reply to the lamp
+/// ([`Verdict::StayQuietFollowing`]) is not one after someone else's line
+/// the lamp left unanswered (`after_unanswered`, #1054, the quiet-room case
+/// on #1090), nor when the lamp has not spoken lately (`lamp_spoke_lately`,
+/// [`IN_CONVERSATION_US`]): out of conversation it follows no line of the
+/// lamp's (the reviewer on #1054).
+pub fn for_turn(verdict: Verdict, after_unanswered: bool, lamp_spoke_lately: bool) -> Verdict {
+    match verdict {
+        Verdict::StayQuietFollowing if after_unanswered || !lamp_spoke_lately => Verdict::StayQuiet,
+        verdict => verdict,
+    }
+}
+
+/// Why an action [`gate`] let run ran, as the journal says it after
+/// "run after N ms: ", by its turn's verdict, whether the name was heard,
+/// and whether the call is one the schedule [`sets`].
+pub fn why_run(verdict: Option<Verdict>, name_heard: bool, sets: bool) -> &'static str {
+    match verdict {
+        _ if name_heard => "its name was heard",
+        Some(Verdict::StayQuietFollowing) if !sets => {
+            "the turn follows the lamp's last line, and its light and its volume are not held from it"
+        }
+        Some(Verdict::StayQuietFollowing) => {
+            "the turn follows the lamp's last line, and what it sets on the schedule is not held from it"
+        }
+        Some(_) => "the Policy took the turn as the lamp's",
+        None => "no decision came in time",
     }
 }
 
@@ -639,6 +677,36 @@ mod tests {
         ] {
             assert!(!holds(&route, "set_timer"));
         }
+    }
+
+    /// #1712: both routes say why a call ran in the same words, which the
+    /// battery's counters read, and take a reply to the lamp the same way:
+    /// not one after a line left unanswered, nor out of conversation.
+    #[test]
+    fn why_a_call_ran_and_a_reply_to_the_lamp_are_one_for_both_routes() {
+        use Verdict::*;
+        assert_eq!(why_run(Some(StayQuiet), true, false), "its name was heard");
+        assert_eq!(
+            why_run(Some(StayQuietFollowing), false, false),
+            "the turn follows the lamp's last line, and its light and its volume are not held from it"
+        );
+        assert_eq!(
+            why_run(Some(StayQuietFollowing), false, true),
+            "the turn follows the lamp's last line, and what it sets on the schedule is not held from it"
+        );
+        assert_eq!(
+            why_run(Some(TakenUp), false, false),
+            "the Policy took the turn as the lamp's"
+        );
+        assert_eq!(why_run(None, false, false), "no decision came in time");
+        assert_eq!(
+            for_turn(StayQuietFollowing, false, true),
+            StayQuietFollowing
+        );
+        assert_eq!(for_turn(StayQuietFollowing, true, true), StayQuiet);
+        assert_eq!(for_turn(StayQuietFollowing, false, false), StayQuiet);
+        assert_eq!(for_turn(TakenUp, true, false), TakenUp);
+        assert_eq!(for_turn(StayQuiet, false, true), StayQuiet);
     }
 
     #[test]

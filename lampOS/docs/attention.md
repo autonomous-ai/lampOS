@@ -1363,8 +1363,8 @@ not held (the first builder, 05:57), nor is any other call:
   other three among them. A request the
   voice's own rule holds ([#829](#the-lamp-spoken-of-is-not-a-call-829),
   the busy room) has its calls answered and not run before this is reached.
-  A turn the lamp wrote itself is not held. The second voice has no bus: its
-  actions run as before.
+  A turn the lamp wrote itself is not held. On the second route the same
+  gate holds the same calls ([below](#on-the-second-route-1712)).
 
 The worker logs, with no words of what was heard: `request N asked for
 volume_up; waiting for the Policy's decision`, then `run after M ms:
@@ -1403,6 +1403,88 @@ scenario clock for the worker's leases, heartbeat bound and the 2 s wait,
 and a paused Tokio clock for the session and the scripted service, moved
 together 2 ms at a time by the rig's `tick`. The ten take about 1.7 s, not
 15 s, with the same assertions, the 2 s wait included.
+
+### On the second route (#1712)
+
+With the same switches the second route (`LAMP_VOICE_ROUTE=second`,
+[second-voice.md](second-voice.md)) holds the same calls of a spoken turn
+by the same gate (`policy_holds::gate`, `for_turn`, `runs_on_a_reply`),
+in `crates/voice/src/second_provider/policy.rs`. The journal lines are
+Live's word for word, `lamp-voice second:` for `lamp-voice provider:`, so
+the battery's counters read both routes alike.
+- **Its turns are the Policy's by number.** The engine's `Started` for a
+  turn comes before the turn's heard words, and the coordinator tells
+  those words on `voice/heard` under that number
+  (`bus_out::input_started`), as for Live. A turn begun before the last
+  one's words were heard ends that one, so its words never come under the
+  newer number.
+- **One reader of the Policy's decisions.** The rule keeps the route's
+  one subscriber on `policy/decisions` (`Heeding::reading_the_policy`).
+  The gate reads each decision's kind from it (`Heeding::policy_verdict`),
+  and a line going on in a busy room (`LAMP_GOING_ON_ASKS`, #1969) reads
+  the same decisions for its own verdict (`Heeding::policy_now`). So the
+  route has one way to read the Policy's decision by request.
+- **The turn's facts come from the route's own rule** (`LAMP_ATTENTION`),
+  as the line is judged (`Heeding::policy_turn`):
+  - the name heard at 0.9 or more;
+  - a line someone said and the lamp left unanswered just before;
+  - the lamp's words heard to their end within 20 s before the line.
+
+  Without the rule, or without the bus, the route holds nothing, and says
+  so once at its start. Live's `busy_talk` comes with going-on asks,
+  which this route has not. Its rule already holds what a line let out
+  only as the conversation going on would set on the schedule
+  (`Heeding::holds_call`), before the gate is asked.
+- **The wait is in the turn's own task.** The call looks for its decision
+  every 20 ms (`policy::LOOK_EVERY`) for at most 2 s, and nothing else
+  waits. A round's calls are put to the gate together, so the round waits
+  2 s at most however many it holds, as Live parks a round's calls at once.
+  Before this, three actions with the Policy down took 6.04 s, one wait
+  after another (the peer read on #1984,
+  `a_rounds_held_calls_wait_for_the_policy_together`). A newer turn ends the task, and with it the call, which is not
+  run (`its turn ended while it waited for the Policy's decision; not
+  run`). Calls the route answers itself (the web search's, `more_functions`)
+  and the lamp's own turns are never held.
+- **Held:** the model is told `HELD`, the round's other calls run, and the
+  turn ends there in silence, as `not_for_me` ends it. The model is not
+  asked again, so it is never told `HELD_AGAIN`, and the #1465 loop cannot
+  happen here.
+- **What was said before a held call may be out already.** The cascade
+  streams the model's words as they come, and Live lets none of a held
+  turn's sound out. The first builder took that trade on #1712: keeping
+  every turn's words back until its calls are known would make every
+  turn later. The journal counts them: `request N: W words were let out
+  before a held call; the turn ends here, and nothing more is said`. If
+  the battery shows such words on held turns, the fix is to hold the
+  words back only once a call the Policy holds is in the round.
+- **What the wait costs.** It is measured from the model's call to its run
+  on the route's harness (`second_provider::tests::policy::measure_the_wait_from_the_call_to_its_run`,
+  run with `--ignored`; Mac, debug build, the decision on a real bus):
+  - with the turn's decision already there, 40 calls: median 0.1 ms, p90
+    0.1 ms, most 0.4 ms;
+  - with none, the cap, 10 calls: median 2,012.5 ms, p90 2,019.9 ms,
+    most 2,022.7 ms.
+
+  Without the switch nothing waits, and the 0 ms line stays the
+  battery's. A decision that comes during the wait is taken at the next
+  look, at most 20 ms later. Speech is never delayed: only the held
+  call's round waits. Not measured on a lamp: how often the decision is
+  there before the model's call.
+- **Tests:**
+  - `second_provider::policy::tests`: the gate on a bus of the test's
+    own; `stay_quiet` held, `answer` and `look_up` run, no decision run
+    after 2 s, another turn's never counted, the name run at once, a reply
+    to the lamp with and without `LAMP_FOLLOWS_RUN`, and the route's own
+    calls never held;
+  - `second_provider::tests::policy`: through the engine. It covers the
+    turn's numbers, a held call ending the turn in silence with its
+    round's other call run, a call let run, and the lamp's own turn never
+    put to it. As `serve` builds it, a held `light_on` never reaches the
+    executive, and a taken one does;
+  - `second_provider::worker::tests::the_policy_is_told_the_name_a_line_left_unanswered_and_the_lamp_speaking_lately`;
+  - `the_policy_holds_this_routes_actions_only_with_the_bus_and_the_rule`;
+  - `the_lamps_actions_and_a_line_going_on_read_one_reader_of_the_policy`;
+  - `policy_holds::tests::why_a_call_ran_and_a_reply_to_the_lamp_are_one_for_both_routes`.
 
 **Needs the Policy's side:** `lamp-policy --act attention`, which publishes
 its attention decisions with `shadow: false` ([policy.md](policy.md#acting-on-the-lamps-actions---act-attention-800)).

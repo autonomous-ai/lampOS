@@ -46,13 +46,13 @@ fn stt_check_options(rest: &[String]) -> Result<(u32, u32)> {
     Ok((rounds, held))
 }
 
-/// `probe-cascade`'s `[RUNS] [--look JPEG | --wire]`, in that order: five
-/// runs, every candidate and no look unless said; at most 50 runs. True
-/// with `--wire`.
-fn probe_options(rest: &[String]) -> Result<(u32, Option<std::path::PathBuf>, bool)> {
+/// `probe-cascade`'s `[RUNS] [--look JPEG | --wire [--kept]]`, in that
+/// order: five runs, every candidate and no look unless said; at most 50
+/// runs. With `--wire`, `Some`, holding whether `--kept` was given.
+fn probe_options(rest: &[String]) -> Result<(u32, Option<std::path::PathBuf>, Option<bool>)> {
     let usage = || {
         io::Error::other(
-            "usage: probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG | --wire]",
+            "usage: probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG | --wire [--kept]]",
         )
     };
     let (runs, rest) = match rest {
@@ -60,9 +60,10 @@ fn probe_options(rest: &[String]) -> Result<(u32, Option<std::path::PathBuf>, bo
         _ => (5, rest),
     };
     let (look, wire) = match rest {
-        [] => (None, false),
-        [flag, jpeg] if flag == "--look" => (Some(std::path::PathBuf::from(jpeg)), false),
-        [flag] if flag == "--wire" => (None, true),
+        [] => (None, None),
+        [flag, jpeg] if flag == "--look" => (Some(std::path::PathBuf::from(jpeg)), None),
+        [flag] if flag == "--wire" => (None, Some(false)),
+        [flag, kept] if flag == "--wire" && kept == "--kept" => (None, Some(true)),
         _ => return Err(usage().into()),
     };
     if !(1..=50).contains(&runs) {
@@ -688,15 +689,15 @@ fn run() -> Result<()> {
                 lamp_voice::second_provider::probe::tools::run(Path::new(provider_config), Path::new(second_config), runs),
             )?;
         }
-        // probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG | --wire]
+        // probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG | --wire [--kept]]
         [command, provider_config, second_config, rest @ ..] if command == "probe-cascade" => {
             let (runs, look, wire) = probe_options(rest)?;
             let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
-            if wire {
+            if let Some(kept) = wire {
                 // Its requests are made by hand, one at a time, blocking;
                 // the chats that build them are made in the runtime.
                 let _entered = runtime.enter();
-                lamp_voice::second_provider::probe::wire::run(Path::new(provider_config), Path::new(second_config), runs)?;
+                lamp_voice::second_provider::probe::wire::run(Path::new(provider_config), Path::new(second_config), runs, kept)?;
             } else {
                 runtime.block_on(
                     lamp_voice::second_provider::probe::run(Path::new(provider_config), Path::new(second_config), runs, look.as_deref()),

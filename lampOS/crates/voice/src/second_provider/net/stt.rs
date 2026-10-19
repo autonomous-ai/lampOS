@@ -1020,6 +1020,102 @@ mod tests {
         );
     }
 
+    /// #1712 (the first builder at 21:28 and 22:54): a local server stands
+    /// in for the proxy and reads the stream's query. `second.json`'s
+    /// `stt_language` `vi` asks Nova-3 for `vi`, with the key terms, even
+    /// with Flux on, which has no Vietnamese; English with Flux on asks
+    /// Flux; unset asks Nova-3 in English.
+    // The large error is tungstenite's own handshake callback signature.
+    #[allow(clippy::result_large_err)]
+    #[tokio::test]
+    async fn vietnamese_keeps_off_flux_and_reaches_the_stream_with_its_key_terms() {
+        let directory =
+            std::env::temp_dir().join(format!("lamp-voice-stt-language-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let key = directory.join("llm.key");
+        std::fs::write(&key, "secret\n").unwrap();
+        std::fs::set_permissions(&key, std::os::unix::fs::PermissionsExt::from_mode(0o600))
+            .unwrap();
+        for (stt_language, flux, model, language) in [
+            (Some("vi"), true, "nova-3-general", Some("vi")),
+            (Some("vi"), false, "nova-3-general", Some("vi")),
+            (Some("en-US"), true, "flux-general-en", None),
+            (None, true, "flux-general-en", None),
+            (None, false, "nova-3-general", Some("en")),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            let server = tokio::spawn(async move {
+                let (stream, _) = listener.accept().await.unwrap();
+                let mut asked = String::new();
+                let _socket = tokio_tungstenite::accept_hdr_async(
+                    stream,
+                    |request: &tokio_tungstenite::tungstenite::handshake::server::Request,
+                     response| {
+                        asked = request.uri().to_string();
+                        Ok(response)
+                    },
+                )
+                .await
+                .unwrap();
+                asked
+            });
+            let config = directory.join("second.json");
+            std::fs::write(
+                &config,
+                format!(
+                    r#"{{"llm_base_url":"https://llm.example.invalid/v1","llm_model":"m","llm_credential_file":"{}","stt_base_url":"https://stt.example.invalid"}}"#,
+                    key.display()
+                ),
+            )
+            .unwrap();
+            std::fs::set_permissions(&config, std::os::unix::fs::PermissionsExt::from_mode(0o600))
+                .unwrap();
+            let mut route = crate::second_config::load_from_path(&config).unwrap();
+            route.stt_language = stt_language.map(str::to_owned);
+            // The file takes https only: the stream is pointed here after.
+            let Stt::Autonomous { key: secret, .. } = route.stt.clone() else {
+                panic!("the proxy's speech to text");
+            };
+            route.stt = Stt::Autonomous {
+                base_url: format!("http://{address}"),
+                key: secret,
+            };
+            route.stt_flux = flux;
+            route.stt_key_terms = vec!["Hanoi".to_owned()];
+            let _stream = SttStream::connect(&route).await.unwrap();
+            let asked = server.await.unwrap();
+            let query: Vec<(String, String)> = reqwest::Url::parse(&format!("ws://x{asked}"))
+                .unwrap()
+                .query_pairs()
+                .into_owned()
+                .collect();
+            let value = |name: &str| {
+                query
+                    .iter()
+                    .find(|(key, _)| key == name)
+                    .map(|(_, value)| value.as_str())
+            };
+            assert_eq!(
+                value("model"),
+                Some(model),
+                "{stt_language:?}, flux {flux}: {asked}"
+            );
+            assert_eq!(
+                value("language"),
+                language,
+                "{stt_language:?}, flux {flux}: {asked}"
+            );
+            let terms: Vec<&str> = query
+                .iter()
+                .filter(|(key, _)| key == "keyterm")
+                .map(|(_, value)| value.as_str())
+                .collect();
+            assert_eq!(terms, ["Lamp", "Hanoi"], "{stt_language:?}: {asked}");
+        }
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
     #[test]
     fn a_service_that_is_not_a_websocket_is_refused() {
         assert_eq!(
