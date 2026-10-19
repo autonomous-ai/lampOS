@@ -1,0 +1,3 @@
+# From 10:00, five minutes of music while the lamp speaks: nothing.
+clock = "10:00"
+none = true

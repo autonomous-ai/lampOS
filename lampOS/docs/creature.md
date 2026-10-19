@@ -123,7 +123,7 @@ is released or the reader has failed.
 | You talk over it | Stops and listens | Now for sentences (6 of 10 played), weak for one word; tonight's work |
 | Two people talk near it | Stays out; a glance now and then at whoever laughs | Now (stays out); the glance built, off: `skills/laugh-glance` on `ears/classes` (#1669), not tried on a lamp |
 | A bang, something dropped | One startled glance, then lets it go; the next ones get nothing | Now when awake; resting #710 |
-| Music | A slight sway in time while it plays, only if it is not working with you | To build |
+| Music | Once, a slight sway when music has played a while, only if it is not working with you | Built, off: `skills/music-sway` on `ears/classes` (#1669), not tried on a lamp |
 | A long silence | Breathing eye, tiny shifts of weight; dozes after a while | Rest clip now; sleep to build |
 
 ### Sight
