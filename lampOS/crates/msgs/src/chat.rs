@@ -120,6 +120,53 @@ impl ChatOut {
     }
 }
 
+/// The most a short text the lamp sends unasked carries, in bytes: one line
+/// a phone shows whole in its notice.
+pub const MESSAGE_TEXT_BYTES: usize = 280;
+
+/// A short text the lamp sends unasked, for the person's phone
+/// (`messages/out`): a skill's news while they are away, as guard mode's
+/// "Someone was at your desk at 14:31, for about 2 minutes."
+/// (`docs/guard-mode.md`). Nothing carries it off the lamp yet: `lamp-cloud`
+/// and the app's push relay are to take it (`docs/messages.md`, "Unasked
+/// texts").
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MessageOut {
+    /// Who sends it: `skill:<name>`, stamped by the part that publishes it,
+    /// never by the skill's own files.
+    pub from: String,
+    /// One line, at most [`MESSAGE_TEXT_BYTES`]: never a picture, never a
+    /// name of anyone the lamp saw.
+    pub text: String,
+}
+
+impl MessageOut {
+    pub const TYPE: &str = "lamp_msgs/MessageOut";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "messages/out";
+    /// A text not taken off the lamp within this long is old news, and is
+    /// not handed to a subscriber after.
+    pub const LASTS: Duration = Duration::from_secs(600);
+
+    /// A text sent: no period, nothing kept, good for [`MessageOut::LASTS`].
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event).lasting(Self::LASTS)
+    }
+
+    pub fn check(&self) -> Result<(), Invalid> {
+        check_id("from", &self.from)?;
+        if self.text.trim().is_empty()
+            || self.text.len() > MESSAGE_TEXT_BYTES
+            || self.text.chars().any(char::is_control)
+        {
+            return Err(Invalid(format!(
+                "a text sent unasked is one line of 1..{MESSAGE_TEXT_BYTES} bytes"
+            )));
+        }
+        Ok(())
+    }
+}
+
 fn check_id(what: &str, id: &str) -> Result<(), Invalid> {
     if id.is_empty()
         || id.len() > CHAT_ID_BYTES
@@ -148,6 +195,7 @@ pub fn chat_topics() -> Vec<(&'static str, Declaration)> {
     vec![
         (ChatIn::TOPIC, ChatIn::declaration()),
         (ChatOut::TOPIC, ChatOut::declaration()),
+        (MessageOut::TOPIC, MessageOut::declaration()),
     ]
 }
 
@@ -213,6 +261,45 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&reply(Some("run-1"), ChatPart::Final)).unwrap(),
             r#"{"run_id":"run-1","part":"final","text":"Sure."}"#
+        );
+    }
+
+    /// Guard mode's text (#1685): one line from a named sender, short enough
+    /// for a phone's notice, and old news after ten minutes.
+    #[test]
+    fn a_text_sent_unasked_is_one_short_line_from_its_sender() {
+        let sent = |from: &str, text: &str| MessageOut {
+            from: from.into(),
+            text: text.into(),
+        };
+        let text = "Someone was at your desk at 14:31, for about 2 minutes.";
+        assert_eq!(sent("skill:guard-mode", text).check(), Ok(()));
+        assert_eq!(
+            serde_json::to_string(&sent("skill:guard-mode", "Hi.")).unwrap(),
+            r#"{"from":"skill:guard-mode","text":"Hi."}"#
+        );
+        for (from, text) in [
+            ("", text),
+            ("skill guard", text),
+            ("skill:guard-mode", "  "),
+            ("skill:guard-mode", "two\nlines"),
+            ("skill:guard-mode", &"a".repeat(MESSAGE_TEXT_BYTES + 1)),
+        ] {
+            assert!(sent(from, text).check().is_err(), "{from:?} {text:?}");
+        }
+        assert!(
+            sent("skill:guard-mode", &"a".repeat(MESSAGE_TEXT_BYTES))
+                .check()
+                .is_ok()
+        );
+        assert_eq!(
+            MessageOut::declaration().lifespan(),
+            Some(MessageOut::LASTS)
+        );
+        assert!(
+            chat_topics()
+                .iter()
+                .any(|(topic, _)| *topic == "messages/out")
         );
     }
 }

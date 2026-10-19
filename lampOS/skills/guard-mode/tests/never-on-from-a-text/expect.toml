@@ -1,0 +1,9 @@
+# The tool is called with nothing heard at the lamp, as a typed message
+# would: it is refused, so no mark and no text for the visit after.
+clock = "14:20"
+none = true
+
+[[call_tool]]
+name = "keep_watch"
+at = "4s"
+args = { turn = "on" }

@@ -686,6 +686,7 @@ const BUS_TOPICS: &[&str] = &[
     "light/state",
     "light/test",
     "memory/rules",
+    "messages/out",
     "mic2/audio",
     "mood/state",
     "name/heard",
