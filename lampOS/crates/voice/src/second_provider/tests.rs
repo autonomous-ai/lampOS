@@ -3731,6 +3731,80 @@ async fn only_a_wordless_piece_carries_and_only_its_last_moments() {
     );
 }
 
+/// #2002's P1 (the first builder at 01:23): with the next line's socket
+/// kept ready, "Lamp, [600 ms] what time is it?" came back as "Lamp", held
+/// as a short sound, and "what time is it?", held for no name. The name's
+/// words now begin the next line, which is judged and asked whole and
+/// answered; the piece's sound isn't sent again, and its time is the
+/// line's. A piece with other words still carries nothing.
+#[tokio::test]
+async fn the_name_cut_off_by_a_pause_begins_the_next_line_with_the_listener_kept_ready() {
+    let frame = lamp_audio::CAPTURE_SAMPLES;
+    let run = |first: &'static str| async move {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(first.to_owned()), Ok("what time is it?".to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![text("Noon."), Ok(ChatEvent::Done)],
+                    vec![text("Noon."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, now) = scripted(script.clone());
+        let judged: Arc<Mutex<Vec<(u64, u64, String)>>> = Arc::default();
+        let seen = judged.clone();
+        // The name piece is held, as a short sound was on lamp-4ace; any
+        // other line by its words, as the rule holds a line with no name.
+        let mut engine = engine
+            .heeding(Arc::new(move |request, window, words, _| {
+                seen.lock()
+                    .unwrap()
+                    .push((request, window.0, words.to_owned()));
+                if request == 1 {
+                    Some("a short sound")
+                } else {
+                    (!crate::attention::called_by_name(words)).then_some("no name")
+                }
+            }))
+            .keeping_a_listener_ready(true);
+        engine.submit(start(1));
+        engine.submit(audio_at(1, 1, 1_000));
+        engine.submit(end(1));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        *now.lock().unwrap() += Duration::from_millis(600);
+        engine.submit(start(2));
+        engine.submit(audio_at(2, 1, 9_000));
+        engine.submit(end(2));
+        let second = turn(&mut engine).await;
+        let judged = judged.lock().unwrap().clone();
+        let asked = script.asked.lock().unwrap().last().cloned();
+        (
+            second,
+            judged,
+            asked,
+            script.samples_heard.load(Ordering::Relaxed),
+        )
+    };
+    let (second, judged, asked, heard) = run("Lamp.").await;
+    assert!(second.contains(&"said:Noon.".to_owned()), "{second:?}");
+    assert_eq!(judged[1], (2, 1_000, "Lamp. what time is it?".to_owned()));
+    assert_eq!(
+        asked.unwrap().last(),
+        Some(&Message::user("Lamp. what time is it?"))
+    );
+    assert_eq!(heard, 2 * frame, "each piece's own sound, once");
+    // Other words came back: nothing carried, and the line is held.
+    let (second, judged, _, heard) = run("Okay.").await;
+    assert!(
+        !second.iter().any(|label| label.starts_with("said:")),
+        "{second:?}"
+    );
+    assert_eq!(judged[1], (2, 9_000, "what time is it?".to_owned()));
+    assert_eq!(heard, 2 * frame);
+}
+
 /// #1712, the first builder at 19:21: a wordless piece whose name lamp-name
 /// heard gives the next line its time, so the name counts, but not its
 /// sound, which held the words back about 2 s. Without the name heard, the

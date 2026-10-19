@@ -1233,28 +1233,49 @@ impl Engine {
                     .lock()
                     .ok()
                     .and_then(|last| *last);
+                // The piece's words, when they came back before this line
+                // began.
+                let words_back = |kept: &KeptSound| {
+                    last.as_ref()
+                        .filter(|(of, _)| *of == kept.request)
+                        .map(|(_, words)| words.trim())
+                };
                 let carried = self.kept.take().filter(|kept| {
                     let since = kept.ended.map(|end| now.saturating_duration_since(end));
-                    // Only the piece that came back with no words, the name
-                    // cut off on its own: one whose words came back carries
-                    // nothing (#1712, 18:56).
-                    let words_back = last
-                        .as_ref()
-                        .filter(|(of, _)| *of == kept.request)
-                        .map(|(_, words)| !words.trim().is_empty());
+                    // Only the name cut off on its own: a piece that came
+                    // back with no words, or with the lamp's name alone. One
+                    // whose other words came back carries nothing (#1712,
+                    // 18:56). With the next line's socket kept ready
+                    // (`LAMP_SECOND_STT_WARM`) the name's piece comes back as
+                    // "Lamp", where a socket opened for it heard nothing
+                    // (#2002's P1, the first builder at 01:23).
+                    let carries = words_back(kept).is_none_or(|words| {
+                        words.is_empty() || crate::attention::only_the_name(words)
+                    });
                     kept.session == session
                         && kept.request < request
                         && !kept.samples.is_empty()
-                        && words_back != Some(true)
+                        && carries
                         && since.is_none_or(|since| since <= KEEP_AFTER_END)
                         && (continues
                             || since.is_some_and(|since| since <= CARRY_AFTER_END)
                                 && answered != Some(kept.request))
                 });
-                let before = last
-                    .filter(|_| carried.is_none())
-                    .filter(|(of, _)| continues_cut_off && previous == Some((*of, session)))
-                    .map(|(_, words)| words);
+                // The name's words, when they came back: they begin this
+                // line's, so it is heard and judged whole, and its sound
+                // need not go again.
+                let name_words = carried
+                    .as_ref()
+                    .and_then(words_back)
+                    .filter(|words| !words.is_empty())
+                    .map(str::to_owned);
+                let before = match &name_words {
+                    Some(words) => Some(words.clone()),
+                    None => last
+                        .filter(|_| carried.is_none())
+                        .filter(|(of, _)| continues_cut_off && previous == Some((*of, session)))
+                        .map(|(_, words)| words),
+                };
                 // A stop to tell: this request's own, or one left by the
                 // request begun just before it in this session. Left when that
                 // one was never asked (heard nothing, held, or replaced before
@@ -1305,7 +1326,13 @@ impl Engine {
                             .name_sounded
                             .as_ref()
                             .is_some_and(|heard| heard(kept.said_from));
-                        if name_heard {
+                        if let Some(words) = &name_words {
+                            eprintln!(
+                                "lamp-voice second: request {request} goes on from request {}: its {} words, the lamp's name alone, begin it; its sound is not sent again",
+                                kept.request,
+                                words.split_whitespace().count()
+                            );
+                        } else if name_heard {
                             eprintln!(
                                 "lamp-voice second: request {request} goes on from request {}: the name heard in it counts; its sound is not sent again",
                                 kept.request

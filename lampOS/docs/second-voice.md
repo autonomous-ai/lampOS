@@ -1418,9 +1418,19 @@ after a take-over, but now for every turn:
   16:37 to 16:45: four such pieces around lamp-name's hits, `results 0
   with words`). The engine keeps the last line's sound, its last 1.5 s
   (`KEPT_SAMPLES`): carried whole, 2 to 4 s of it held each line's words
-  back 1 to 2.5 s while Deepgram worked through it (18:56). Only a piece
-  that came back with no words carries it, the name cut off on its own; one
-  whose words came back carries nothing. A line in the same session that
+  back 1 to 2.5 s while Deepgram worked through it (18:56). Only the name
+  cut off on its own carries: a piece that came back with no words, or with
+  the lamp's name alone (`attention::only_the_name`: "Lamp.", "Hey Lamp,",
+  a word written for the name, greetings at most). One whose other words
+  came back carries nothing. With `LAMP_SECOND_STT_WARM=on` the name's
+  piece comes back as "Lamp", where a socket opened for it heard nothing.
+  On lamp-4ace on 20 Oct, "Lamp" alone was held as a short sound and the
+  rest for no name: 4 of 6 held, twice (#2002's P1, the first builder at
+  01:23). The name's words then begin the next
+  line's, so it is judged and asked whole ("Lamp. what time is it?"), and
+  its sound is not sent again: `request N goes on from request M: its 1
+  words, the lamp's name alone, begin it; its sound is not sent again`. A
+  line in the same session that
   the coordinator says continues it, or that begins within 1.5 s of its end
   when it was not answered (`CARRY_AFTER_END`), takes that piece's time,
   so a name lamp-name heard in it counts for the line. Its sound is sent
