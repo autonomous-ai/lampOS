@@ -646,6 +646,20 @@ unit or setting takes effect when its part next starts, at a reboot or a
 `systemctl restart` of that part: the product's `lamp-controls` gaining
 `--touch` and the reset button (#1167) is one (Nine on #1167).
 
+The Actions product unit declares `StateDirectory=lampos-output-caps` and
+`StateDirectoryMode=0700`, and passes `--caps-dir /var/lib/lampos-output-caps`.
+Systemd creates and owns that private directory for the `lampos` service
+account. Install writes the unit, not the runtime state. The directory
+argument does not enable `LAMP_OUTPUT_CAPS`, which remains unset; Actions
+opens the store only with the exact value `on`. Factory reset empties it
+while preserving the directory and its private mode ([setup.md](setup.md)).
+
+Publish a compatible Actions binary to the chosen update channel before
+installing an updater carrying this unit, then start the unit with that
+binary. A disabled feature does not make an older binary accept `--caps-dir`.
+A matching build of the updater and Actions satisfies the argument contract;
+it does not establish physical output or device restart behavior.
+
 The product units and settings are carried inside the program
 (`include_str!` of `deploy/product/`), so they are those of the commit the
 program was built from; the binaries are the channel's newest build.

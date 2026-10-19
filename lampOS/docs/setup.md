@@ -518,8 +518,12 @@ the backend's link and the answer on reports: those are best effort, and a marke
 `backend.json` is what a failed write leaves (its journal line is below). The
 reset plan (`reset-plan-product.json`) also wipes the person's stores
 (memory, faces, tasks and Harness's sign-in, schedule, the Policy's and
-`lamp-cloud`'s folders, the voice's sessions); the zone is the one thing it
-keeps.
+`lamp-cloud`'s folders, the voice's sessions). It also empties
+`/var/lib/lampos-output-caps`, including interrupted writes and state kept
+aside, even when output caps are switched off. These restrictions belong to
+the previous owner; the private service directory remains for the next
+start. The zone is the one setup setting it keeps. The installed wipe list
+matches the keeper example in `reset-plan-example.json`.
 
 **The units the marker starts.** `lampos-setup-done.path` starts
 `lampos.target` once the marker exists. Every part that is `PartOf` it waits

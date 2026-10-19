@@ -418,6 +418,7 @@ that owns it:
 | `room/state` | the voice's provider worker, on each change and once a second | the policy, and Expression |
 | `room/presence` | the eyes, with `LAMP_PRESENCE=on`, from their looks and `voice/heard` ([presence.md](presence.md)) | `lamp-skills` (Light out when you leave); Messages (#1673) |
 | `voice/timing`, `voice/activity`, `voice/playout` | the voice, with `LAMP_EXPRESSION_OUT=on` ([expression.md](expression.md), "What the voice says, as built") | Expression |
+| `output/caps` | `lamp-actions`, with `LAMP_OUTPUT_CAPS=on` | Voice's ring worker, with `LAMP_OUTPUT_CAPS=on` |
 | `policy/decisions` | the policy ([policy.md](policy.md)) | nothing yet |
 | `body/joint_states` | the body ([body.md](body.md), "On the bus") | nothing yet; recorded to measure how the lamp moves |
 | `light/command` | the actions program ([actions.md](actions.md)); `lamp-cloud`, the app's Light row ([cloud.md](cloud.md)) | the voice's ring worker |
@@ -466,6 +467,21 @@ The new payload timestamps explicitly use the shared host monotonic clock
 and boot identity. This does not change the meaning of existing bus header
 `at_us`: that remains a publisher-private timestamp. Expression's replay
 importer warns when it estimates a shared timeline from legacy wall stamps.
+
+## Optional output restrictions
+
+`output_caps_topics()` declares `output/caps`, a complete Actions-owned
+latest snapshot every second with a three-second admission lifespan. It
+contains a persisted revision and up to eight source-owned light/volume
+ceilings. Voice applies the light ceiling; Actions owns volume enforcement.
+Restrictions combine by minimum and grant no output authority. A missing
+heartbeat cannot release an admitted cap; unknown wall time retains it.
+Snapshots and nested entries accept additive fields, while private Actions
+commands stay strict. `declaration_of()` recognizes the topic without
+changing the original seventeen-topic catalogue. Voice-eval exports count
+these messages by topic and omit their entire payloads. See
+[msgs.md](msgs.md#optional-output-restrictions) and
+[actions.md](actions.md#optional-output-ceilings).
 
 ## Optional Controls topics (Third, 2026-10-14)
 

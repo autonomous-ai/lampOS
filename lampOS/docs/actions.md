@@ -260,6 +260,67 @@ is judged before anything is carried over. For V1's intent component
 | Six scenes (the seventh of the count may be the command that turns one off) | Rebuilt as a skill | Light scenes (`skills/light-scenes`, #1679): V1's six names and their order of brightness on the five levels, set as the person's own light through `light_colour` and the level steps, kept; reading and focus bring the head over the desk. Never the microphone, the camera or the speaker. Not in the product yet |
 | Following, music, "stop talking" | Not yet judged | Each when it is built |
 
+## Optional output ceilings
+
+Exact `LAMP_OUTPUT_CAPS=on` enables durable light and raw-volume restrictions.
+Actions then requires absolute `--caps-dir` and `--bus-root` paths. With the
+switch absent, the cap directory is not opened. The separate private socket
+operations are `caps_get`, `caps_put` with a `cap`, and `caps_remove` with
+`source` and `token`. They are strict commands, not model tools, and cannot
+be called through `use_skill`.
+
+A cap contains `source`, `token`, `issued_unix_ms`, `valid_until_unix_ms`,
+and at least one ceiling: `light_channel_max` (12–120) or `volume_raw_max`
+(1–100). New puts must be at most five seconds old and last no more than
+24 hours. The bounded 16 KiB state keeps at most eight source identities,
+including terminal records. Exact retries do not extend deadlines; changed
+retries, older replacements and removal with the wrong token are refused.
+
+The existing Schedule store commits the complete state before acceptance.
+Added fields in schema 1 are tolerated; unsupported schemas, unknown status
+values and invalid state are preserved and refused. Storage uncertainty
+requires reopening the owner before further success. Initialized wall time
+means 2020–2099, a sanity range rather than proof of synchronization. Unknown
+time retains restored restrictions and refuses new caps; removal with the
+current token still works. Durable expiry prevents rollback from reviving a
+retired cap.
+
+Actions remains the mixer owner. Effective volume is the minimum of the
+product ceiling and active caps, enforced by every setter. Entry lowers a
+louder mixer but never raises a quieter setting or unmutes. The remembered
+pre-mute level is clamped too. Release never restores a saved level: a later
+explicit volume action owns that change.
+
+Startup clears readiness, restores the restrictions and applies any required
+volume clamp before becoming ready. Replies distinguish durable acceptance,
+`volume.confirmed` and `ring.published`; `ring.confirmed` remains false.
+Failed mixer application retains the restriction. Snapshot publication,
+expiry and failed-clamp retries run at most once per second. Failed clamp or
+publication withholds readiness; ordinary volume failures invalidate the
+confirmation. Successful reads do not add a journal line.
+
+With the same switch enabled in Voice, both directed and continuous ring
+workers start dark until a valid complete `output/caps` snapshot arrives.
+The snapshot binds the host boot, publisher session, sequence, monotonic
+stamp and persisted revision. Stale or malformed input, lower revisions,
+conflicting equal revisions and bus silence cannot loosen an admitted cap.
+A valid newer complete snapshot can release it, even with unknown wall time.
+Known wall deadlines can expire entries; unknown time or a cached clock
+sample at least three seconds old retains them.
+
+The ring intake reads at most every 20 ms on a separate thread. The output
+loop reads its cache without waiting, and a tighter ceiling blanks already
+latched brighter pixels in that worker pass, even without a new frame.
+Ordinary turn and resting output remain under the existing owner and
+privacy gates. Separate asleep/tap feedback peaks at 12 and privacy feedback
+at 10, within the minimum cap of 12. The existing light-off readiness ember
+remains; a cap grants no output or listening authority.
+
+These are software timing bounds, not measurements of acoustic volume,
+optical brightness, device scheduling or flash power-loss behavior. The
+switch remains off in product units. See [bus.md](bus.md#optional-output-restrictions)
+and [install.md](install.md) for transport and durable-directory setup.
+
 ## Not shown
 
 The 2026-10-14 Mac x86_64 checks passed 33 Actions tests, including 14 new

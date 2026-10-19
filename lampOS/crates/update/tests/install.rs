@@ -1026,6 +1026,66 @@ fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
     assert!(service.contains(&"Environment=LAMP_ACTIONS_DIR=/run/lampos-actions"));
 }
 
+#[test]
+fn product_cap_state_is_private_persistent_and_disabled() {
+    let mut lamp = Lamp::new(196, &[]);
+    lamp.install().unwrap();
+    let installed =
+        fs::read_to_string(lamp.on("/etc/systemd/system/lamp-actions.service")).unwrap();
+    let service = section(&installed, "Service");
+    for required in [
+        format!("User={}", install::USER),
+        format!("Group={}", install::USER),
+        "StateDirectory=lampos-output-caps".into(),
+        "StateDirectoryMode=0700".into(),
+        "ProtectSystem=strict".into(),
+    ] {
+        assert_eq!(
+            service.iter().filter(|line| **line == required).count(),
+            1,
+            "lamp-actions.service: {required}"
+        );
+    }
+    let command = service
+        .iter()
+        .find_map(|line| line.strip_prefix("ExecStart="))
+        .unwrap();
+    let arguments: Vec<_> = command.split_whitespace().collect();
+    assert_eq!(
+        arguments
+            .windows(2)
+            .filter(|pair| pair[0] == "--caps-dir")
+            .collect::<Vec<_>>(),
+        [&["--caps-dir", "/var/lib/lampos-output-caps"][..]],
+    );
+    for (unit, text) in install::PRODUCT {
+        for line in section(text, "Service") {
+            assert!(!line.contains("LAMP_OUTPUT_CAPS=on"), "{unit}: {line}");
+        }
+    }
+    // A directory argument does not enable the service or open its store.
+    let caps = Path::new("/var/lib/lampos-output-caps");
+    let bus = Path::new("/run/lampos-bus");
+    assert!(
+        lamp_actions::caps_service::Config::configured(None, None, None)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        lamp_actions::caps_service::Config::configured(None, Some(caps), Some(bus))
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        lamp_actions::caps_service::Config::configured(
+            Some(std::ffi::OsStr::new("on")),
+            None,
+            Some(bus)
+        )
+        .is_err()
+    );
+}
+
 /// The skills' tools were in the actions part's folder, which systemd
 /// removes at each restart of actions, and the voice had no skill functions
 /// until lamp-skills restarted (lamp-4ace, 19 Oct 04:33). The product's

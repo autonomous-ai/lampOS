@@ -688,6 +688,7 @@ const BUS_TOPICS: &[&str] = &[
     "mood/state",
     "name/heard",
     "name/rising",
+    "output/caps",
     "policy/decisions",
     "reports/request",
     "reports/state",
@@ -1443,6 +1444,7 @@ mod tests {
             line("humans/known/annasmith", 3, json!({})),
             line(SECRETS[12], 3, json!({})),
             format!("not a recording {}", SECRETS[13]),
+            line("output/caps", 3, json!({"source": "excluded_output_cap_payload", "light_channel_max": 17})),
         ];
         let path = dir.join("bus.jsonl");
         fs::write(&path, lines.join("\n") + "\n").unwrap();
@@ -1898,6 +1900,35 @@ mod tests {
         assert_eq!(counts["voice_state"], 1);
         assert_eq!(counts["voice_state.state=listening"], 1);
         assert_eq!(left["bus_messages_by_topic"]["unreadable"], 1);
+    }
+
+    #[test]
+    fn output_cap_bus_payloads_are_omitted_and_counted_by_topic() {
+        let dir = temp("output-caps-topic");
+        let (sessions, journal) = fixture(&dir.0);
+        let mut given = options(&dir.0, sessions, Some(journal));
+        given.bus = vec![bus_fixture(&dir.0)];
+        export(&given).unwrap();
+        let out = dir.0.join("out");
+        let left: Value =
+            serde_json::from_str(&fs::read_to_string(out.join("left-out.json")).unwrap()).unwrap();
+        let text = all_output(&out);
+        assert_eq!(left["bus_messages_by_topic"]["output/caps"], 1, "{left}");
+        assert!(left["bus_fields_by_topic"].get("output/caps").is_none());
+        assert!(!text.contains("excluded_output_cap_payload"), "{text}");
+        // Only the existing three unknown topics use the catch-all bucket.
+        assert_eq!(left["bus_messages_by_topic"]["other"], 3);
+        for name in [
+            "events.jsonl",
+            "case/voice_state.jsonl",
+            "case/humans_faces_tracked.jsonl",
+        ] {
+            let kept = fs::read_to_string(out.join(name)).unwrap();
+            assert!(
+                !kept.contains("output/caps"),
+                "output/caps exported in {name}"
+            );
+        }
     }
 
     /// Every topic `crates/msgs` names is one a left-out message may be

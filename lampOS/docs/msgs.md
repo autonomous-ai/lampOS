@@ -41,8 +41,8 @@ memory's typed rules, and `name_topics()` the first sign of a hearing of the
 lamp's name (`name/rising`), and `presence_topics()` whether anyone is at
 the lamp (`room/presence`). Touch, Schedule, Ears and privacy have separate
 additive catalogues. `logging_topics()` adds the optional operational log
-stream. `declaration_of()` recognizes every catalogue without changing
-`first_topics()`.
+stream, and `output_caps_topics()` the Actions-owned output restrictions.
+`declaration_of()` recognizes every catalogue without changing `first_topics()`.
 
 ## The types
 
@@ -154,6 +154,25 @@ keeps that generation. Terminal retirement and freshness still take priority.
 New generation messages require First's Voice publisher integration; this
 task changes no hardware owner. See
 [Expression](expression.md) for exact integration and evidence limits.
+
+## Optional output restrictions
+
+`output_caps_topics()` adds one complete Actions snapshot:
+
+| Type | Topic | Kind | Period / lifespan | Meaning |
+|---|---|---|---|---|
+| `OutputCaps` | `output/caps` | latest | 1,000 / 3,000 ms | Actions session, persisted revision and up to eight source-owned light/volume ceilings |
+
+The snapshot, nested `OutputCap` entries and clock stamp accept additive
+fields. Required fields, scalar bounds, identities, duplicate sources,
+envelope identity and freshness remain checked. Snapshot freshness controls
+admission, not a restriction's lifetime: a missing heartbeat cannot release
+an accepted ceiling. Unknown wall time retains restrictions; a valid newer
+complete snapshot may explicitly release them. Ceilings combine by minimum
+and grant no output authority. The separate `caps_get`, `caps_put` and
+`caps_remove` socket commands reject unknown fields and operations. See
+[actions.md](actions.md#optional-output-ceilings) for clock and consumer
+limits. Voice-eval omits these payloads and records only topic counts.
 
 ## Optional controls contracts
 

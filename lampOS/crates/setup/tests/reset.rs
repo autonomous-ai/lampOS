@@ -286,7 +286,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 25] = [
+const PERSON_STORES: [&str; 26] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -307,6 +307,8 @@ const PERSON_STORES: [&str; 25] = [
     "/var/lib/lampos-tasks/.harness/hook-routes",
     "/var/lib/lampos-tasks/.harness/logs",
     "/var/lib/lampos-schedule/store",
+    // Durable output restrictions belong to this owner even while disabled.
+    "/var/lib/lampos-output-caps",
     "/var/lib/lampos-policy",
     "/var/lib/lampOS/voice/sessions",
     "/var/lib/lampOS/voice/schedule-delivery",
@@ -416,6 +418,41 @@ fn the_product_plan_is_the_example_stopped_by_systemd() {
         },
         example
     );
+}
+
+#[test]
+fn the_product_reset_wipes_caps_but_keeps_the_service_directory() {
+    let plan: Plan =
+        serde_json::from_str(include_str!("../fixtures/reset-plan-product.json")).unwrap();
+    plan.check().unwrap();
+    let root = Root::new();
+    let path = root.path("lampos-output-caps");
+    fs::create_dir(&path).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+    // Wipe the whole store, including interrupted writes and state set aside.
+    for file in [
+        "state",
+        "state.new",
+        "set-aside/previous",
+        "schedule.sqlite3",
+    ] {
+        let file = path.join(file);
+        fs::create_dir_all(file.parent().unwrap()).unwrap();
+        fs::write(file, b"previous owner's state").unwrap();
+    }
+    fs::write(root.path("kept-setting"), b"kept").unwrap();
+    assert!(
+        plan.wipe
+            .contains(&Path::new("/var/lib/lampos-output-caps").to_owned())
+    );
+    reset::wipe(&path).unwrap();
+    assert!(path.is_dir());
+    assert_eq!(fs::read_dir(&path).unwrap().count(), 0);
+    assert_eq!(
+        fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+        0o700
+    );
+    assert_eq!(fs::read(root.path("kept-setting")).unwrap(), b"kept");
 }
 
 fn event(at_us: u64, held_us: u64) -> TouchEvent {

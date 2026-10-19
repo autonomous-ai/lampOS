@@ -1,5 +1,17 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Durable output restrictions (2026-10-19)
+
+Keep V1's ownership principle: restoring sleep-owned output must not undo a
+person's mute or privacy choice. Reuse the existing Actions mixer owner,
+Voice ring owner and `lamp-schedule::store::Store` for durable caps. Compose
+limits by minimum, including the product ceiling, and never restore an old
+volume on release. Do not add an actuator writer, model tool or legacy
+callback bridge. Unknown time and missing bus input retain admitted
+restrictions. The ring reads a bounded cache so filesystem work stays off
+its output loop. `LAMP_OUTPUT_CAPS` remains off; host checks do not establish
+acoustic level, optical brightness, flash durability or device latency.
+
 ## Said to the lamp from close to it, task 49 (#753, 2026-10-15)
 
 Keep V1's gaze rule for the face (`hal/drivers/tracking/gaze.py`,

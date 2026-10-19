@@ -84,6 +84,8 @@ mod arbitration;
 pub use arbitration::*;
 mod privacy;
 pub use privacy::*;
+mod output_caps;
+pub use output_caps::*;
 mod chat;
 pub use chat::*;
 mod presence;
@@ -1314,6 +1316,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
     first_topics()
         .into_iter()
         .chain(expression_topics())
+        .chain(output_caps_topics())
         .chain(controls_topics())
         .chain(touch_topics())
         .chain(schedule_topics())
@@ -1968,6 +1971,26 @@ mod tests {
                  \"answers\":{},\"by\":\"rule\",\"took_ms\":0,\"shadow\":true}"
             )
             .is_err()
+        );
+    }
+
+    #[test]
+    fn output_caps_are_discoverable_without_changing_the_original_catalogue() {
+        let declared = declaration_of(OutputCaps::TOPIC).unwrap();
+        assert_eq!(declared.type_name, OutputCaps::TYPE);
+        assert_eq!(declared.version, 1);
+        assert_eq!(declared.kind, Kind::Latest);
+        assert_eq!(declared.period_ms, Some(1_000));
+        assert_eq!(declared.lifespan_ms, Some(3_000));
+        assert!(
+            !first_topics()
+                .iter()
+                .any(|(name, _)| *name == OutputCaps::TOPIC)
+        );
+        assert_eq!(first_topics().len(), 17);
+        assert_eq!(
+            output_caps_topics(),
+            vec![(OutputCaps::TOPIC, OutputCaps::declaration())]
         );
     }
 
