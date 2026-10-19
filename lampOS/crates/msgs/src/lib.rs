@@ -84,6 +84,8 @@ mod arbitration;
 pub use arbitration::*;
 mod privacy;
 pub use privacy::*;
+mod output_caps;
+pub use output_caps::*;
 mod chat;
 pub use chat::*;
 mod presence;

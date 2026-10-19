@@ -8,6 +8,7 @@ use lamp_msgs::{
     Speech, Voice, VoiceState,
 };
 use lamp_skills::glow::{GLOW_EVERY, Glow, Glows, REQUESTS_ENVIRONMENT};
+use lamp_skills::routine::Permit;
 use lamp_skills::{
     Admission, BODY_REQUESTS_ENVIRONMENT, CLIP_GAP_US, Call, Engine, Permissions, Run, body_ask,
     clip_us, clock, duration_us, load_all, package, run_tests, told, tools_file,
@@ -29,7 +30,7 @@ use std::{
 
 const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] \
                      [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] \
-                     [--tools-dir DIR] [--boot-id ID] [--clock-control PATH]\n       \
+                     [--tools-dir DIR] [--boot-id ID] [--clock-control PATH] [--daily-state PATH]\n       \
                      [--zone system|NAME | --utc-offset-minutes N]\n       \
                      lamp-skills test SKILL_DIR...\n       \
                      lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar\n       \
@@ -155,6 +156,7 @@ fn main() -> ExitCode {
     let mut tools = None;
     let mut boot_id = None;
     let mut clock_control = None;
+    let mut daily_state = None;
     let mut offset = None;
     let mut zone = None;
     let mut sockets = Sockets {
@@ -211,6 +213,7 @@ fn main() -> ExitCode {
             "--tools-dir" => tools = Some(value),
             "--boot-id" => boot_id = value.to_str().map(str::to_owned),
             "--clock-control" => clock_control = Some(value),
+            "--daily-state" if daily_state.is_none() => daily_state = Some(value),
             _ => {
                 eprintln!("{USAGE}");
                 return ExitCode::from(2);
@@ -242,6 +245,8 @@ fn main() -> ExitCode {
         body_requests: std::env::var(BODY_REQUESTS_ENVIRONMENT).is_ok_and(|value| value == "on"),
         boot_id,
         clock_control,
+        daily_state,
+        routines: std::env::var(lamp_skills::routine::ENVIRONMENT).is_ok_and(|value| value == "on"),
         local_time,
     };
     match serve(&dir, root, &sockets, &options) {
@@ -398,6 +403,7 @@ struct Options {
     tools: Option<PathBuf>,
     /// `LAMP_SKILLS_ASK`: `skip`, `policy`, or anything else for nothing done.
     ask: String,
+    routines: bool,
     /// `LAMP_LIGHT_REQUESTS=on`: a skill's light is asked of the ring.
     light_requests: bool,
     /// `LAMP_BODY_REQUESTS=on`: a skill's gestures and moves say who asks,
@@ -409,6 +415,9 @@ struct Options {
     /// `--clock-control`: a test's socket to skip the program's clock
     /// ([`clock_control`]).
     clock_control: Option<PathBuf>,
+    /// Durable consumption of named daily chances. Optional: without it,
+    /// daily triggers fail quiet while ordinary skills keep working.
+    daily_state: Option<PathBuf>,
     /// `--zone` or `--utc-offset-minutes`: the lamp's local time, for quiet
     /// hours.
     local_time: Option<Arc<lamp_local_time::LocalTime>>,
@@ -543,7 +552,35 @@ fn serve(
         None
     };
     let (finished, done) = mpsc::channel::<SkillEvent>();
+    let limits =
+        if options.routines && std::env::var("LAMP_OUTPUT_CAPS").is_ok_and(|value| value == "on") {
+            let local = options
+                .local_time
+                .clone()
+                .ok_or_else(|| io::Error::other("skill output limits require a local zone"))?;
+            Some(lamp_skills::limits::Client::start(
+                sockets.actions.clone(),
+                local,
+            )?)
+        } else {
+            None
+        };
+    let (mut routines, rest_client) = if options.routines {
+        let (manager, client) = lamp_skills::routine::Manager::new(
+            bus.clone(),
+            boot_clock(options.boot_id.as_deref())?,
+        )?;
+        (Some(manager), Some(client))
+    } else {
+        (None, None)
+    };
     let mut engine = Engine::new(Vec::new(), skip_ask);
+    if let Some(path) = &options.daily_state {
+        match lamp_skills::daily::Journal::open(path) {
+            Ok(journal) => engine = engine.with_daily_journal(journal),
+            Err(error) => eprintln!("lamp-skills: daily chances disabled: {error}"),
+        }
+    }
     // The Policy's gate (#958): asks out on `skills/ask`, its answers in on
     // `policy/decisions`, by the ask's number. The ask's wire is #958's
     // `lamp_msgs::SkillAsk`, written here as JSON until it is on lamp-voice.
@@ -573,6 +610,7 @@ fn serve(
         body_requests: options.body_requests,
         ends: RefCell::new(HashMap::new()),
         local_time: options.local_time.clone(),
+        rest_client,
         permissions: RefCell::new(HashMap::new()),
     };
     let (ask, asks) = mpsc::channel::<ToolAsk>();
@@ -635,12 +673,27 @@ fn serve(
             let print = fingerprint(dir);
             if seen.as_ref() != Some(&print) {
                 seen = Some(print);
-                let (skills, errors) = load_all(dir);
+                let (mut skills, errors) = load_all(dir);
+                skills.retain(|skill| options.routines || !skill.is_routine());
                 for error in errors {
                     eprintln!("lamp-skills: not loaded: {error}");
                 }
+                // Keep the previous accepted generation intact if its
+                // cap declarations cannot be installed as one bounded set.
+                if let Some(limits) = &limits
+                    && let Err(error) = limits.replace(&skills)
+                {
+                    eprintln!("lamp-skills: reload refused: {error}");
+                    continue;
+                }
                 let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
                 eprintln!("lamp-skills: loaded {names:?}");
+                if let Some(manager) = &mut routines {
+                    manager.reload(
+                        names.iter().map(|name| (*name).to_owned()).collect(),
+                        lamp_ipc::monotonic_us(),
+                    );
+                }
                 *runner.permissions.borrow_mut() = skills
                     .iter()
                     .map(|skill| (skill.name.clone(), skill.permissions.clone()))
@@ -652,7 +705,11 @@ fn serve(
                 if let Some(tools) = tools {
                     write_tools(tools, &engine);
                 }
-                let topics = engine.topics();
+                let topics: Vec<_> = engine
+                    .topics()
+                    .into_iter()
+                    .filter(|topic| topic != lamp_skills::LOCAL_CLOCK_TOPIC)
+                    .collect();
                 subscribers
                     .retain(|subscriber| topics.iter().any(|topic| topic == subscriber.topic()));
                 for topic in topics {
@@ -671,6 +728,27 @@ fn serve(
                 keep_tools(tools, &ask, &engine)?;
             }
             let _ = out.alive();
+        }
+        let now_us = clock::now_us();
+        if let Some(manager) = &mut routines {
+            manager.tick(
+                lamp_ipc::monotonic_us(),
+                runner.local_time.as_deref(),
+                unix_ms(),
+            );
+        }
+        if let Some(local) = &runner.local_time {
+            engine.clock_in(local, now_us, unix_ms());
+        }
+        dispatch(
+            engine.clock_tick(now_us),
+            &mut runs,
+            &mut out,
+            &runner,
+            &mut asking,
+        );
+        for run in engine.tick(now_us) {
+            handle(run, &mut runs, &mut out, &runner);
         }
         if subscribers.is_empty() {
             if let Ok(call) = asks.recv_timeout(clock::poll(Duration::from_millis(250))) {
@@ -785,6 +863,16 @@ fn observe(
         &message.payload,
         message.header.expires_ms,
     );
+    dispatch(made, runs, out, runner, asking);
+}
+
+fn dispatch(
+    made: Vec<Run>,
+    runs: &mut Runs,
+    out: &mut Publisher,
+    runner: &Runner,
+    asking: &mut Asking,
+) {
     for mut run in made {
         for event in std::mem::take(&mut run.events) {
             publish(out, event);
@@ -906,6 +994,7 @@ struct Runner {
     ends: RefCell<HashMap<String, mpsc::Sender<()>>>,
     /// The lamp's local time, for quiet hours.
     local_time: Option<Arc<lamp_local_time::LocalTime>>,
+    rest_client: Option<lamp_skills::routine::Client>,
     /// By skill, what each loaded skill may use, as of the last load: a
     /// skill not loaded may use nothing.
     permissions: RefCell<HashMap<String, Permissions>>,
@@ -962,12 +1051,16 @@ fn start(
     // SAY_TIMEOUT a line) or a light's for (at most 10 min): its own
     // thread, one a skill, so the skills go on listening.
     // ponytail: a skill removed meanwhile still finishes its run.
-    let (sockets, finished, bus, glows, asks_body) = (
+    let (sockets, finished, bus, glows, asks_body, rest_client) = (
         runner.sockets_for(&skill),
         runner.finished.clone(),
         runner.bus.clone(),
         runner.glows.clone(),
         runner.body_requests,
+        runner
+            .rest_client
+            .as_ref()
+            .map(lamp_skills::routine::Client::for_run),
     );
     let before = light_now(&bus);
     // A run that holds something until its trigger ends waits for the end.
@@ -977,9 +1070,64 @@ fn start(
         ended
     });
     std::thread::spawn(move || {
+        // Rest bypasses perform's per-output checks. Check the whole plan
+        // first: a denied accompanying cue must never cause an earlier wake.
+        if calls.iter().any(|call| matches!(call, Call::Rest(_)))
+            && let Some(why) = calls.iter().find_map(|call| sockets.may.refuses(call))
+        {
+            let _ = finished.send(SkillEvent {
+                skill,
+                stage: SkillStage::Done,
+                why,
+                allowed: Some(false),
+            });
+            return;
+        }
+        // Rest admission, or completion of the owner's planned wake,
+        // precedes accompanying sound/light. Say can change the Voice
+        // owner, so starting its hum during the stretch would cancel it.
+        let mut rest_permits = Vec::new();
+        for call in &calls {
+            if let Call::Rest(rest) = call {
+                let result = rest_client
+                    .as_ref()
+                    .ok_or_else(|| "skill routines are disabled".to_owned())
+                    .and_then(|client| client.request(&skill, rest.clone()));
+                match result {
+                    Ok(permit) => rest_permits.push(permit),
+                    Err(why) => {
+                        let _ = finished.send(SkillEvent {
+                            skill,
+                            stage: SkillStage::Done,
+                            why,
+                            allowed: Some(false),
+                        });
+                        return;
+                    }
+                }
+            }
+        }
+        if rest_client.as_ref().is_some_and(|client| !client.current()) {
+            let _ = finished.send(SkillEvent {
+                skill,
+                stage: SkillStage::Done,
+                why: "skill definitions changed before presentation".into(),
+                allowed: Some(false),
+            });
+            return;
+        }
+        if let Err(why) = rest_permits.iter().try_for_each(|permit| permit.check()) {
+            let _ = finished.send(SkillEvent {
+                skill,
+                stage: SkillStage::Done,
+                why,
+                allowed: Some(false),
+            });
+            return;
+        }
         let why = perform(
             &skill,
-            &calls,
+            (&calls, &rest_permits),
             &sockets,
             &bus,
             before,
@@ -1456,7 +1604,7 @@ fn body_gestures(bus: &Bus) -> Option<Subscriber> {
 /// way ([`Glow`]).
 fn perform(
     skill: &str,
-    calls: &[Call],
+    (calls, rest_permits): (&[Call], &[Permit]),
     sockets: &Sockets,
     bus: &Bus,
     before: Option<Light>,
@@ -1499,7 +1647,12 @@ fn perform(
             .filter(|call| {
                 !matches!(
                     call,
-                    Call::Say(_) | Call::Words(_) | Call::SayFrom(..) | Call::Sound { .. }
+                    Call::Say(_)
+                        | Call::Words(_)
+                        | Call::SayFrom(..)
+                        | Call::Sound { .. }
+                        | Call::Cue
+                        | Call::Rest(_)
                 ) && (glow.is_some() || before.is_some() || !is_light(call))
             })
             .cloned()
@@ -1527,6 +1680,7 @@ fn perform(
             Some(("say", ask))
         }
         Call::Sound { path, .. } => Some(("sound", json!({"sound": path, "priority": 5}))),
+        Call::Cue => Some(("sound", json!({"cue": "hum", "priority": 5}))),
         _ => None,
     });
     // A say or a sound the skill may not make is never asked, so it is
@@ -1536,7 +1690,7 @@ fn perform(
         .filter(|call| {
             matches!(
                 call,
-                Call::Say(_) | Call::Words(_) | Call::SayFrom(..) | Call::Sound { .. }
+                Call::Say(_) | Call::Words(_) | Call::SayFrom(..) | Call::Sound { .. } | Call::Cue
             )
         })
         .find_map(|call| sockets.may.refuses(call))
@@ -1550,7 +1704,7 @@ fn perform(
         Some((what, asking)) => {
             let mut begun = Vec::new();
             let mut was_begun = false;
-            let outcome = say(&sockets.say, what, skill, asking, || {
+            let outcome = say(&sockets.say, what, skill, asking, rest_permits, || {
                 was_begun = true;
                 act(
                     &first,
@@ -2034,16 +2188,39 @@ fn answer(result: io::Result<String>) -> String {
 /// Asks the voice to say `asking`, a `note` or what it keeps `from`, or to
 /// play a `sound`, with its `priority` (#939's say service: one line in, a
 /// `begun` line when the turn starts, then the outcome). `begun` is called
-/// with the first. What became of it, in words, after `what`.
+/// with the first. Rest permits bound connection and carry their original
+/// deadline to the voice. What became of it, in words, after `what`.
 fn say(
     path: &Path,
     what: &str,
     skill: &str,
     asking: serde_json::Value,
+    rest_permits: &[Permit],
     mut begun: impl FnMut(),
 ) -> String {
+    let start_before_us = rest_permits.iter().map(Permit::expires_us).min();
     let mut attempt = || -> io::Result<String> {
-        let mut stream = UnixStream::connect(path)?;
+        let mut stream = if let Some(expires_us) = start_before_us {
+            // Sample Instant first so conversion cannot extend the original
+            // shared-clock deadline. Only permit-bearing runs use this path.
+            let began = Instant::now();
+            let left_us = expires_us
+                .checked_sub(lamp_ipc::monotonic_us())
+                .filter(|left| *left > 0)
+                .ok_or_else(|| {
+                    io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        "rest transition confirmation expired",
+                    )
+                })?;
+            let stream =
+                lamp_schedule::client::connect(path, began + Duration::from_micros(left_us))
+                    .map_err(io::Error::other)?;
+            stream.set_nonblocking(false)?;
+            stream
+        } else {
+            UnixStream::connect(path)?
+        };
         stream.set_read_timeout(Some(SAY_TIMEOUT))?;
         stream.set_write_timeout(Some(ACTIONS_TIMEOUT))?;
         let mut ask = asking.clone();
@@ -2051,6 +2228,15 @@ fn say(
         if ask.get("expires_in_ms").is_none() {
             ask["expires_in_ms"] = json!(lamp_skills::SAY_EXPIRES_MS);
         }
+        if let Some(expires_us) = start_before_us {
+            ask["start_before_us"] = json!(expires_us);
+        }
+        // A blocked connect or a reload cannot turn a stale confirmation
+        // into a new request. Voice also checks the deadline after transport.
+        rest_permits
+            .iter()
+            .try_for_each(Permit::check)
+            .map_err(io::Error::other)?;
         writeln!(stream, "{ask}")?;
         let mut lines = BufReader::new(stream.take(64 * 1_024));
         loop {
@@ -2190,6 +2376,8 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Show { name, .. } => format!("show {name}: made by its own step"),
         Call::Say(_) | Call::Words(_) | Call::SayFrom(..) => "say: made by its own step".into(),
         Call::Sound { .. } => "sound: made by its own step".into(),
+        Call::Cue => "cue: made by its own step".into(),
+        Call::Rest(_) => "rest: admitted by Expression before presentation".into(),
         Call::Look => "look: the voice's, asked in the call's answer".into(),
         Call::AfterSay => "after the say".into(),
         Call::Ends => "its trigger ended".into(),
@@ -2349,20 +2537,121 @@ mod tests {
                 ..Permissions::default()
             },
         );
-        let (made, told) = mpsc::channel();
-        let said = perform(
-            "test",
-            &[Call::Say("Hello.".into()), Call::Gesture("nod".into())],
-            &moved,
-            &bus,
-            None,
-            (None, false),
-            (made, None),
-        );
-        assert!(said.contains("say: refused"), "{said}");
-        assert!(!said.contains("gesture"), "{said}");
-        // Never told that its body was made: the sender is gone.
-        assert!(told.recv().is_err());
+        for speech in [
+            Call::Say("Hello.".into()),
+            Call::Words(lamp_skills::Words {
+                words: "Hello.".into(),
+                exact: true,
+                priority: 8,
+                expires_ms: 3_600_000,
+            }),
+            Call::Words(lamp_skills::Words {
+                words: "Greet them briefly.".into(),
+                exact: false,
+                priority: 8,
+                expires_ms: 3_600_000,
+            }),
+            Call::Cue,
+        ] {
+            let (made, told) = mpsc::channel();
+            let said = perform(
+                "test",
+                (&[speech, Call::Gesture("nod".into())], &[]),
+                &moved,
+                &bus,
+                None,
+                (None, false),
+                (made, None),
+            );
+            assert!(said.contains("refused") && said.contains("speak"), "{said}");
+            assert!(!said.contains("gesture"), "{said}");
+            // Never told that its body was made: the sender is gone.
+            assert!(told.recv().is_err());
+        }
+    }
+
+    #[test]
+    fn a_forged_rest_plan_is_refused_before_any_rest_or_say_request() {
+        use lamp_msgs::ExpressionRestOp as Op;
+        use lamp_skills::{daily::Window, routine};
+
+        for (body, speak, refused) in [
+            (false, true, "body"),
+            (true, false, "speak"),
+            (true, true, "light"),
+        ] {
+            for op in [Op::Rest, Op::Wake, Op::Cancel] {
+                let root = tempfile::Builder::new()
+                    .prefix("rest-permission-")
+                    .tempdir_in("/tmp")
+                    .unwrap();
+                let bus = Bus::new(root.path().join("bus")).unwrap();
+                let (mut manager, rest_client) =
+                    routine::Manager::new(bus.clone(), "permission-host".into()).unwrap();
+                manager.reload(vec!["test".into()], lamp_ipc::monotonic_us());
+                let mut requests = bus
+                    .subscribe(lamp_msgs::ExpressionRestRequest::TOPIC, "permission_probe")
+                    .unwrap();
+                let mut out = bus
+                    .publisher_declared(SkillEvent::TOPIC, &SkillEvent::declaration(), "skills")
+                    .unwrap();
+                let say = UnixListener::bind(root.path().join("say.sock")).unwrap();
+                say.set_nonblocking(true).unwrap();
+                let (finished, done) = mpsc::channel();
+                let runner = Runner {
+                    sockets: nowhere(root.path(), Permissions::default()),
+                    finished,
+                    bus,
+                    glows: None,
+                    body_requests: false,
+                    ends: RefCell::default(),
+                    local_time: None,
+                    rest_client: Some(rest_client),
+                    permissions: RefCell::new(HashMap::from([
+                        (
+                            "test".into(),
+                            Permissions {
+                                body,
+                                speak,
+                                ..Permissions::default()
+                            },
+                        ),
+                        (
+                            "another".into(),
+                            Permissions {
+                                body: true,
+                                speak: true,
+                                ..Permissions::default()
+                            },
+                        ),
+                    ])),
+                };
+                let told = start(
+                    "test".into(),
+                    vec![
+                        Call::Rest(routine::Rest {
+                            op,
+                            during: (op == Op::Rest)
+                                .then(|| Window::parse("23:00", "10:00").unwrap()),
+                        }),
+                        Call::Cue,
+                        light("warm"),
+                    ],
+                    &mut HashSet::new(),
+                    &mut out,
+                    &runner,
+                );
+                // No manager tick is needed to refuse this plan: permission
+                // failure precedes sending even its first Rest request.
+                let event = done.recv_timeout(Duration::from_secs(2)).unwrap();
+                assert_eq!(event.allowed, Some(false), "{event:?}");
+                assert!(event.why.contains("refused") && event.why.contains(refused));
+                assert!(told.recv().is_err());
+                manager.tick(lamp_ipc::monotonic_us(), None, 0);
+                assert!(requests.recv(Duration::ZERO).unwrap().is_none());
+                assert_eq!(say.accept().unwrap_err().kind(), io::ErrorKind::WouldBlock);
+            }
+        }
     }
 
     /// A run's sockets carry its own skill's permissions, as of the last
@@ -2379,6 +2668,7 @@ mod tests {
             body_requests: false,
             ends: RefCell::default(),
             local_time: None,
+            rest_client: None,
             permissions: RefCell::new(HashMap::from([(
                 "dance".to_owned(),
                 Permissions {

@@ -1,8 +1,9 @@
 # lampOS skills: physical skills, each a folder in /var/lib/lampOS/skills (lampOS/docs/skills.md).
 # The product unit (lampOS/docs/install.md); install puts every product skill in that folder
 # (lamp-update's install::PRODUCT_SKILLS: Welcome back, Reminders, Task news, Stretch break,
-# Stuffy air and Dance). A skill speaks only through the voice's say service (LAMP_SAY=on in
-# lamp-voice.service, its socket in the group lampos); the voice's own hello is off there, so only
+# Stuffy air, Dance, and disabled Bedtime and Morning). Six are enabled; the new routine
+# stays off until its lamp comparison. A skill speaks only through the voice's say service
+# (LAMP_SAY=on in lamp-voice.service, its socket in the group lampos); the voice's own hello is off there, so only
 # Welcome back greets, and its reminders and task news wait for their skills' asks (=skill).
 # LAMP_SKILLS_ASK=skip acts without asking the Policy, whose gate is not built yet (#939);
 # without it every skill is asked about and refused, and nothing is done.
@@ -21,12 +22,14 @@ User=lampos
 Group=lampos
 Slice=lampos-parts.slice
 Nice=10
+StateDirectory=lampos-skills-state
+StateDirectoryMode=0700
 Environment=LAMP_SKILLS_ASK=skip
 # A skill's light is asked of the ring (#1132): the ring's half is the voice's LAMP_LIGHT_REQUESTS (17 Oct).
 Environment=LAMP_LIGHT_REQUESTS=on
 # --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), for a skill's
 # [quiet] hours, which without it never start themselves (docs/skills.md); across summer time (#1384).
-ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --zone system
+ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --zone system --daily-state /var/lib/lampos-skills-state/daily.json
 Restart=on-failure
 RestartSec=5s
 StandardInput=null
