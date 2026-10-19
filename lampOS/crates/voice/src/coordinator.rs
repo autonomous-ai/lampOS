@@ -68,6 +68,7 @@ mod cloud;
 mod early_end;
 mod endpoint;
 mod hand;
+mod holding;
 mod notices;
 mod second;
 mod service;
@@ -2554,6 +2555,16 @@ fn observe_provider_output(
                 ),
             }
         }
+        ProviderOutput::HoldingAnswer { request, session } => {
+            if let Some(current) = reply.as_ref().filter(|r| r.owner.turn() == *request) {
+                current.cloud.require_output()?;
+                if current.cloud.session != *session {
+                    return Err(io::Error::other(
+                        "holding answer belongs to another session",
+                    ));
+                }
+            }
+        }
         ProviderOutput::Ended { .. } => cloud.end_output()?,
         ProviderOutput::Started {
             request, session, ..
@@ -2852,6 +2863,9 @@ fn provider_arguments(
     arguments.extend(crate::going_on_asks::arguments_from_environment());
     arguments.extend(crate::cut_in_told::arguments_from_environment());
     arguments.extend(crate::misheard_hum::arguments_from_environment());
+    if crate::holding_answer::on() {
+        arguments.push(crate::holding_answer::FLAG.to_owned());
+    }
     if let Some(camera) = camera {
         arguments.extend(camera.source.arguments());
     }
@@ -4105,6 +4119,7 @@ fn conversation_with_gate(
     }
     let mut second_look =
         crate::second_look::SecondLook::default().with_the_note(crate::called::on());
+    let mut holding_answer = holding::Continuation::new(crate::holding_answer::on());
     let policy_detector = match rig.turn_taking {
         // Duplex gates the scores this detector sees; its rule is unchanged.
         TurnTaking::V1Baseline | TurnTaking::Duplex => TurnDetector::v1_baseline(),
@@ -4644,6 +4659,7 @@ fn conversation_with_gate(
                 answer_opening = None;
                 second_look =
                     crate::second_look::SecondLook::default().with_the_note(crate::called::on());
+                holding_answer.clear();
                 last_turn_us = monotonic_us();
                 speech_ended = None;
                 ended_turn = None;
@@ -5009,6 +5025,9 @@ fn conversation_with_gate(
                         json!({"kind":"provider_turn_complete","turn":request,"idle":idle,"at_us":monotonic_us()}),
                     )?;
                 }
+                ProviderOutput::HoldingAnswer { request, session } => {
+                    holding_answer.observed(request, session, rig.provider.boot, reply.as_ref());
+                }
                 ProviderOutput::Transcript {
                     request,
                     text,
@@ -5361,6 +5380,7 @@ fn conversation_with_gate(
                 )?;
             }
             last_capture = Some(frame.read_completed_at_us);
+            holding_answer.observe_capture(&frame);
             session_clock.capture_retained();
             owner.set_capture(
                 now(),
@@ -6757,6 +6777,13 @@ fn conversation_with_gate(
                 )?;
             }
             let sound_finished = current.notice.origin().unshown();
+            holding_answer.settled(
+                turn,
+                matches!(current.cloud.outcome, Some(RequestOutcome::Complete))
+                    && current.delivery_outcome() == "audio_written_unscored"
+                    && !sound_finished,
+                monotonic_us(),
+            );
             if !sound_finished
                 && let Some(score) = second_look.finished(turn, said_nothing, monotonic_us())
             {
@@ -7280,6 +7307,36 @@ fn conversation_with_gate(
                 snapshot = started;
                 last_publish = monotonic_us();
             }
+        }
+        // A holding phrase is not the promised answer. Ask once on the
+        // same connection, after playback and one second of fresh quiet.
+        // The same ownership, capture and speaker gates as a reminder
+        // apply; a new turn or a lost session drops the opportunity.
+        let holding_now_us = monotonic_us();
+        if let Some(started) = holding::start(
+            &mut holding_answer,
+            holding::Gates {
+                at_us: holding_now_us,
+                cycle_started_us: reminder_cycle_started_us,
+                last_speech_us,
+                last_capture_us: last_capture,
+                session: unasked_session(&cloud, paused),
+                worker: rig.provider.boot,
+                snapshot: &snapshot,
+                admission: &admission,
+                playback: &playback_mask,
+                speaker_pending: speaker_pending.is_some(),
+                submission_draining,
+            },
+            owner,
+            reply,
+            &mut provider_queue,
+            rig.playout_start,
+            trace,
+            |state| rig.publish(state),
+        )? {
+            snapshot = started;
+            last_publish = monotonic_us();
         }
         // A second look at something said to the lamp by name that got
         // nothing, as soon as the lamp is at rest. Someone who has spoken
@@ -10369,6 +10426,7 @@ mod tests {
     mod failure_notice;
     mod fixture_at;
     mod hand_controls;
+    mod holding_answer;
     mod pilot_faults;
     mod playout_continuity;
     mod playout_start;

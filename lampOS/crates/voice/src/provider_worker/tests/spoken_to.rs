@@ -20,6 +20,7 @@ fn options(
 ) -> Options {
     Options {
         reporting: Reporting::Typed,
+        holding_answer: false,
         tools,
         attention: Some(room),
         name_signal: false,

@@ -926,6 +926,10 @@ fn cancelled_request_tails_are_filtered_without_swallowing_new_requests_or_link_
     use crate::provider_worker::{FailedStage, Fault};
     for request in [3, 4, 5] {
         let events = [
+            ProviderOutput::HoldingAnswer {
+                request,
+                session: 1,
+            },
             ProviderOutput::Started {
                 request,
                 session: 1,

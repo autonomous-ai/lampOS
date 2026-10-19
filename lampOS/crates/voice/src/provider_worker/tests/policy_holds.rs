@@ -69,6 +69,7 @@ impl Desk {
     pub(super) fn options(&self, holds: bool) -> Options {
         Options {
             reporting: Reporting::Typed,
+            holding_answer: false,
             tools: crate::tools::Settings {
                 decline: false,
                 exec: Some(self.home.path.clone()),

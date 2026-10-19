@@ -757,6 +757,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::GenerationComplete { request }
         | ProviderOutput::Interrupted { request }
         | ProviderOutput::TurnComplete { request, .. }
+        | ProviderOutput::HoldingAnswer { request, .. }
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
         | ProviderOutput::NewsAnswered { request, .. } => Some(*request),

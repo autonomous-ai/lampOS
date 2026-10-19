@@ -109,6 +109,7 @@ fn busy() -> (crate::room_told::Room, bool) {
 fn in_a_busy_room() -> Options {
     Options {
         reporting: Reporting::Typed,
+        holding_answer: false,
         tools: crate::tools::Settings::default(),
         attention: Some(busy),
         name_signal: false,

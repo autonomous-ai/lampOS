@@ -287,6 +287,7 @@ impl Route {
     /// Gemini, before any answer was heard, with every sent command kept.
     fn can_take(&self, current: &Reply) -> bool {
         !self.second_active
+            && !current.cloud.same_session_only
             && self.cloud.available()
             && !current.had_audio
             && current.pcm.is_empty()
@@ -302,20 +303,32 @@ impl Route {
             && self.hold.is_none()
             && let Some(current) = reply.filter(|current| {
                 !current.cloud.start_submitted
+                    && !current.cloud.same_session_only
                     && current.cloud.outcome.is_none()
                     && current.reminder.is_none()
             })
         {
             self.hold = Some((current.owner.turn(), monotonic_us()));
         }
-        self.hold
-            .is_some_and(|(turn, _)| reply.is_some_and(|current| current.owner.turn() == turn))
+        self.hold.is_some_and(|(turn, _)| {
+            reply.is_some_and(|current| {
+                current.owner.turn() == turn && !current.cloud.same_session_only
+            })
+        })
     }
 
     /// A line goes once it is answered or abandoned, and a replay and a
     /// hold with the request they were for (so a turn admitted in its
     /// place in the same tick is held afresh).
     fn upkeep(&mut self, reply: Option<&Reply>) {
+        // A continuation belongs to the session that made its promise. It
+        // has no replay copy, including one retained before it was pinned.
+        if reply.is_some_and(|current| current.cloud.same_session_only) {
+            self.line.clear();
+            self.replay.clear();
+            self.hold = None;
+            return;
+        }
         let turn = reply.map(|current| current.owner.turn());
         if self.hold.is_some_and(|(held, _)| {
             reply.is_none_or(|current| {
@@ -440,6 +453,11 @@ fn take_over(
     current: &mut Reply,
     queue: &mut VecDeque<ProviderInput>,
 ) -> io::Result<usize> {
+    if current.cloud.same_session_only {
+        return Err(io::Error::other(
+            "a session-bound request cannot change voice route",
+        ));
+    }
     swap(provider, cloud, flow, route);
     let turn = current.owner.turn();
     let sent = if route.line.covers(turn) {
@@ -463,6 +481,11 @@ fn rebind(
     current: &mut Reply,
     commands: &mut VecDeque<ProviderInput>,
 ) -> io::Result<()> {
+    if current.cloud.same_session_only {
+        return Err(io::Error::other(
+            "a session-bound request cannot be rebound",
+        ));
+    }
     let session = cloud
         .ready_session()
         .ok_or_else(|| io::Error::other("a route lost its link before a replay"))?;
@@ -494,6 +517,7 @@ fn resolve_hold(
     };
     let Some(current) = reply.as_mut().filter(|current| {
         current.owner.turn() == turn
+            && !current.cloud.same_session_only
             && current.cloud.outcome.is_none()
             && !current.cloud.input_abandoned
     }) else {
@@ -574,9 +598,9 @@ pub(super) fn service(
     let at_rest = queue.is_empty() && route.replay.is_empty() && !draining;
     if !route.second_active
         && at_rest
-        && reply
-            .as_ref()
-            .is_none_or(|current| current.cloud.outcome.is_some())
+        && reply.as_ref().is_none_or(|current| {
+            current.cloud.outcome.is_some() && !current.cloud.same_session_only
+        })
         && !cloud.available()
         && !cloud.terminal()
         && !cloud.output_ended()
@@ -677,6 +701,15 @@ pub(super) fn flush(
     // A replay goes with the request it was for (a cancellation in this
     // tick may have ended it).
     route.upkeep(reply.as_ref());
+    // Holding continuations originate on Gemini. A numeric session match
+    // on the standby cannot authorize sending their note to that worker.
+    if route.second_active
+        && reply
+            .as_ref()
+            .is_some_and(|current| current.cloud.same_session_only)
+    {
+        return Err(io::Error::other("a session-bound request reached another voice route").into());
+    }
     // A turn begun while the second route answers goes to Gemini once its
     // link is Ready again, before anything of it is sent: between turns is
     // not the only way back, as a busy room may never leave one (#960,
@@ -686,6 +719,7 @@ pub(super) fn flush(
         && route.replay.is_empty()
         && let Some(current) = reply.as_mut().filter(|current| {
             !current.cloud.start_submitted
+                && !current.cloud.same_session_only
                 && current.cloud.outcome.is_none()
                 && current.reminder.is_none()
         })
@@ -712,7 +746,10 @@ pub(super) fn flush(
         &mut route.replay
     };
     // A line given back to Gemini after a hold is kept as any other.
-    let keep = !route.second_active;
+    let keep = !route.second_active
+        && reply
+            .as_ref()
+            .is_none_or(|current| !current.cloud.same_session_only);
     let mut paced = (keep && replaying).then_some(LIVE_REPLAY_PER_TICK);
     let line = &mut route.line;
     Ok(flush_provider_input_with(
@@ -738,6 +775,7 @@ pub(super) fn flush(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::provider_worker::{FailedStage, Fault};
 
     fn audio(request: u64, sequence: u64, samples: usize) -> ProviderInput {
         ProviderInput::Audio {
@@ -1069,6 +1107,189 @@ mod tests {
         all.extend((1..=blocks).map(|sequence| (request, sequence)));
         all.push((request, u64::MAX));
         all
+    }
+
+    fn written(request: u64) -> ProviderInput {
+        ProviderInput::Written {
+            request,
+            session: 1,
+            privacy_generation: 1,
+            text: crate::holding_answer::NOTE.into(),
+            look: false,
+        }
+    }
+
+    #[test]
+    fn a_session_bound_written_turn_fails_on_its_original_route_without_replay() {
+        for pinned in [false, true] {
+            let mut bench = Bench::standing_in();
+            bench.gemini_link(1, true);
+            bench.service(&mut None, &mut VecDeque::new());
+            assert!(!bench.route().second_active);
+            let original_worker = bench.rig.provider.boot;
+            let (_owner, mut current) = unsent_reply();
+            let turn = current.owner.turn();
+            current.cloud.same_session_only = pinned;
+            current.playback = None;
+            current.input_sequence = 0;
+            let mut reply = Some(current);
+            let mut queue = VecDeque::from([written(turn)]);
+            bench.service(&mut reply, &mut queue);
+            bench.flush(&mut reply, &mut queue);
+            assert!(matches!(
+                bench.gemini.data.receive::<ProviderInput>().unwrap(),
+                Some(ProviderInput::Written { request, session: 1, text, .. })
+                    if request == turn && text == crate::holding_answer::NOTE
+            ));
+            assert!(queue.is_empty());
+            reply.as_mut().unwrap().cloud.confirm_start(1).unwrap();
+            bench.cloud.observe(link(2, false), monotonic_us()).unwrap();
+            let failed = ProviderOutput::TurnFailed {
+                request: turn,
+                stage: FailedStage::Responding,
+                reason: Fault::Transport,
+            };
+            let moved = takes_failed_turn(
+                &mut bench.rig,
+                &mut bench.cloud,
+                &mut bench.flow,
+                &mut reply,
+                &mut queue,
+                &failed,
+                &mut bench.trace,
+            )
+            .unwrap();
+            assert_eq!(moved, !pinned);
+            if pinned {
+                observe_provider_output(&mut bench.cloud, &mut reply, &failed).unwrap();
+                bench.service(&mut reply, &mut queue);
+                bench.flush(&mut reply, &mut queue);
+                assert_eq!(bench.rig.provider.boot, original_worker);
+                assert!(!reply.as_ref().unwrap().cloud.movable);
+                assert!(matches!(
+                    reply.as_ref().unwrap().cloud.outcome,
+                    Some(RequestOutcome::Failed {
+                        stage: FailedStage::Responding,
+                        ..
+                    })
+                ));
+                assert!(
+                    bench
+                        .second
+                        .data
+                        .receive::<ProviderInput>()
+                        .unwrap()
+                        .is_none()
+                );
+                assert!(bench.route().replay.is_empty());
+                assert!(!bench.route().line.covers(turn));
+                // Once this reply retires, normal idle fallback is available.
+                reply = None;
+                bench.service(&mut reply, &mut queue);
+                assert!(bench.route().second_active);
+            } else {
+                bench.flush(&mut reply, &mut queue);
+                assert!(matches!(
+                    bench.second.data.receive::<ProviderInput>().unwrap(),
+                    Some(ProviderInput::Written { request, .. }) if request == turn
+                ));
+            }
+            assert!(
+                bench
+                    .gemini
+                    .data
+                    .receive::<ProviderInput>()
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                bench
+                    .second
+                    .data
+                    .receive::<ProviderInput>()
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn a_session_bound_note_cannot_use_a_stand_ins_matching_session_number() {
+        for live_ready in [false, true] {
+            let mut bench = Bench::standing_in();
+            if live_ready {
+                bench
+                    .route()
+                    .cloud
+                    .observe(link(1, true), monotonic_us())
+                    .unwrap();
+            }
+            let original_worker = bench.rig.provider.boot;
+            let (_owner, mut current) = unsent_reply();
+            current.cloud.same_session_only = true;
+            let turn = current.owner.turn();
+            assert!(!bench.route().holds(Some(&current)));
+            let mut reply = Some(current);
+            let mut queue = VecDeque::from([written(turn)]);
+            assert!(
+                flush(
+                    &mut bench.rig,
+                    &mut bench.cloud,
+                    &mut bench.flow,
+                    &mut reply,
+                    &mut queue,
+                    &mut bench.trace,
+                )
+                .is_err()
+            );
+            assert_eq!(bench.rig.provider.boot, original_worker);
+            assert_eq!(queue.len(), 1);
+            assert!(!reply.as_ref().unwrap().cloud.start_submitted);
+            assert!(bench.route().hold.is_none());
+            assert!(bench.route().replay.is_empty());
+            assert!(
+                bench
+                    .gemini
+                    .data
+                    .receive::<ProviderInput>()
+                    .unwrap()
+                    .is_none()
+            );
+            assert!(
+                bench
+                    .second
+                    .data
+                    .receive::<ProviderInput>()
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn a_session_bound_request_refuses_rebinding_before_commands_or_evidence_change() {
+        let mut cloud = CloudAvailability::default();
+        let mut ready = link(1, true);
+        ready.session = 2;
+        ready.state = ProviderLinkState::Ready {
+            setup_us: 1,
+            attempts: 1,
+            context: crate::provider_link::LinkContext::Fresh,
+            outage_started_at_us: Some(ready.observed_at_us),
+            after: Some(Fault::Transport),
+        };
+        cloud.observe(ready, monotonic_us()).unwrap();
+        let (_owner, mut current) = unsent_reply();
+        current.cloud.same_session_only = true;
+        let mut queue = VecDeque::from([written(current.owner.turn())]);
+        assert!(rebind(&cloud, &mut current, &mut queue).is_err());
+        assert!(current.cloud.same_session_only);
+        assert_eq!(current.cloud.session, 1);
+        assert!(!current.cloud.start_submitted);
+        assert!(matches!(
+            queue.front(),
+            Some(ProviderInput::Written { session: 1, .. })
+        ));
     }
 
     /// Held, given to Gemini at its first Ready, and Gemini's link lost

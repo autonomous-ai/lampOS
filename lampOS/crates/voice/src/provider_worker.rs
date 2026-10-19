@@ -239,6 +239,8 @@ pub struct Files {
     /// (`--provider-patience`, `LAMP_PROVIDER_PATIENCE`,
     /// [`ProviderConfig::with_patience`]).
     pub provider_patience: bool,
+    /// Whether a holding-only answer is reported for one continuation.
+    pub holding_answer: bool,
 }
 
 /// The bus's root for this worker, if it publishes.
@@ -318,6 +320,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (going_on_asks, flags) = crate::going_on_asks::take(flags);
     let (cut_in_told, flags) = crate::cut_in_told::take(flags);
     let (misheard_hum, flags) = crate::misheard_hum::take(flags);
+    let (holding_answer, flags) = crate::holding_answer::take(flags);
     // `start_agent_task` says what the staff's note asks, when it is sent.
     if let Some(place) = tools.tasks.as_mut() {
         place.staff_note = staff_note;
@@ -363,6 +366,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         going_on_asks,
         cut_in_told,
         misheard_hum,
+        holding_answer,
     };
     Ok((continuation, sight, files, visual))
 }
@@ -648,6 +652,12 @@ pub enum ProviderOutput {
         request: u64,
         idle: bool,
     },
+    /// The whole answer was a short holding phrase with no function call.
+    /// Observed before its idle TurnComplete; no input or speech is granted.
+    HoldingAnswer {
+        request: u64,
+        session: u64,
+    },
     /// What was heard for `request` made no sense in the conversation and
     /// its answer is held (#926): the coordinator asks again. Sent before
     /// the request's `TurnComplete`.
@@ -888,6 +898,7 @@ pub enum Reporting {
 
 pub(crate) struct Options {
     pub(crate) reporting: Reporting,
+    pub(crate) holding_answer: bool,
     /// What the model may do other than speak.
     pub(crate) tools: crate::tools::Settings,
     /// The lamp's own rule for whom it answers ([`crate::attention`]), with
@@ -960,6 +971,7 @@ impl Options {
     pub(crate) fn reporting(reporting: Reporting) -> Self {
         Self {
             reporting,
+            holding_answer: false,
             tools: crate::tools::Settings::default(),
             attention: None,
             name_signal: false,
@@ -1010,6 +1022,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
             | ProviderOutput::GenerationComplete { request }
             | ProviderOutput::Interrupted { request }
             | ProviderOutput::TurnComplete { request, .. }
+            | ProviderOutput::HoldingAnswer { request, .. }
         | ProviderOutput::Unclear { request, .. }
         | ProviderOutput::LookAsked { request, .. }
         | ProviderOutput::NewsAnswered { request, .. } => Some(*request),
@@ -1240,6 +1253,7 @@ pub async fn run_with_continuation(
     provider.resend_lost_lines(files.resend_lost_line);
     let options = Options {
         reporting,
+        holding_answer: files.holding_answer,
         tools: files.tools,
         attention: files.attention.then_some(attention_now),
         name_signal: files.name_signal,
@@ -1359,6 +1373,9 @@ async fn serve_with_visual<C: Connect>(
     let mut urgent: VecDeque<Outbound> = VecDeque::with_capacity(4);
     let mut output = VecDeque::with_capacity(MAX_QUEUED_OUTPUT);
     let mut output_sequence = 0u64;
+    let mut holding_answer = options
+        .holding_answer
+        .then(crate::holding_answer::Tracker::default);
     let mut discards = DiscardLog::default();
     let mut renewed_at = Instant::now();
     // Until when a skill tool's look may still be owed (#941).
@@ -1595,6 +1612,9 @@ async fn serve_with_visual<C: Connect>(
                 // while no provider event is being taken.
                 service_link(&mut provider, link_clock.as_mut(), &mut link_status, |link|
                     channels.control.send(WorkerEvent::ProviderLink { link }))?;
+                if !provider.is_connected() && let Some(answer) = holding_answer.as_mut() {
+                    answer.clear();
+                }
                 // A line lost with its connection, sent once more on the
                 // next one, or its outcome now owed (#705, Step B).
                 intake.handoff.resend_upkeep(&provider, monotonic_us());
@@ -2181,6 +2201,13 @@ async fn serve_with_visual<C: Connect>(
             // output waits for the Policy's decision (#1522), as while the
             // output is full.
             notice=next_or_let_go(&mut provider, &mut let_go, coordinated), if !upstream_ended && output.len() < OUTPUT_HIGH_WATER && kept_for_policy.is_none()=>{
+                // Count even silent or withheld functions before any policy
+                // can consume them. A kept notice may repeat this mark safely.
+                if let (Some(answer), Ok(Notice::Event(Event::ToolCall { lineage, .. }))) =
+                    (holding_answer.as_mut(), &notice)
+                {
+                    answer.called(*lineage);
+                }
                 if let Ok(notice) = &notice
                     && reminder_notice(&intake.handoff, notice, &provider)
                 {
@@ -2229,6 +2256,28 @@ async fn serve_with_visual<C: Connect>(
                             kept_for_policy = Some(KeptForPolicy { request, since_us: monotonic_us(), notice: first });
                             continue;
                         }
+                    }
+                }
+                // A policy-held transcript reaches this point only after it
+                // is released, so its words are accumulated exactly once.
+                if let Some(answer) = holding_answer.as_mut() {
+                    match &notice {
+                        Ok(notice) => {
+                            if let Some(lineage) = answer.observe(notice)
+                                && !reminder_origin
+                                && provider.live_session() == Some(lineage.session)
+                                && !intake.handoff.retired(lineage.request.get())
+                                && !desk.declined(lineage.request)
+                                && !desk.quieted(lineage.request)
+                                && !attention.holds(lineage.request.get())
+                            {
+                                output.push_back(Outbound::Output(ProviderOutput::HoldingAnswer {
+                                    request: lineage.request.get(),
+                                    session: lineage.session.get(),
+                                }));
+                            }
+                        }
+                        Err(_) => answer.clear(),
                     }
                 }
                 if let Ok(Notice::Event(Event::Audio { lineage, .. })) = &notice {
@@ -5415,6 +5464,7 @@ fn push_text(
 
 #[cfg(test)]
 mod tests {
+    mod holding_answer;
     mod reminders;
     mod resend;
 
@@ -8423,6 +8473,7 @@ mod tests {
     fn typed_with(tools: crate::tools::Settings) -> Options {
         Options {
             reporting: Reporting::Typed,
+            holding_answer: false,
             tools,
             attention: None,
             name_signal: false,
@@ -8453,6 +8504,7 @@ mod tests {
             quick_policy(),
             Options {
                 reporting: Reporting::Typed,
+                holding_answer: false,
                 tools: crate::tools::Settings::default(),
                 attention: None,
                 name_signal: true,
@@ -8508,6 +8560,7 @@ mod tests {
             quick_policy(),
             Options {
                 reporting: Reporting::Typed,
+                holding_answer: false,
                 tools: crate::tools::Settings::default(),
                 attention: Some(busy),
                 name_signal: false,
@@ -9493,6 +9546,7 @@ mod tests {
             quick_policy(),
             Options {
                 reporting: Reporting::Typed,
+                holding_answer: false,
                 tools: crate::tools::Settings {
                     decline: false,
                     exec: Some(home.path.clone()),
@@ -12960,6 +13014,7 @@ mod tests {
                 quick_policy(),
                 Options {
                     reporting: Reporting::Typed,
+                    holding_answer: false,
                     tools: crate::tools::Settings::default(),
                     attention: Some(busy),
                     name_signal: false,
@@ -13035,6 +13090,7 @@ mod tests {
                 quick_policy(),
                 Options {
                     reporting: Reporting::Typed,
+                    holding_answer: false,
                     tools: crate::tools::Settings::default(),
                     attention: Some(busy),
                     name_signal: false,
