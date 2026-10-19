@@ -12,9 +12,12 @@ every ten minutes.
 **On and off.** You turn it on by asking out loud, at the lamp: "Lamp, keep
 an eye on things while I'm out." The lamp says in one short line that it's
 on, and the ring keeps a faint blue mark while it is, so nobody is watched
-without a sign. It starts counting once you've left the desk. It goes off
-when you say stop, or when the lamp sees your own face again, if it knows
-your face. It never turns itself on, and a typed message doesn't turn it on.
+without a sign: if your own light or another hides the mark, the lamp asks
+for it again, and counts nothing until it shows. It starts counting once
+you've left the desk. It goes off when you say stop, when the lamp sees
+your own face again, if it knows your face, or by itself after twelve
+hours, with a text that it has stopped. It never turns itself on, and a
+typed message doesn't turn it on: it needs to hear you ask for it.
 
 **What it says.** Only when someone came, about when and for how long. Who
 it was is said only as "someone you've introduced me to" or "someone I
@@ -28,8 +31,8 @@ scan the room, flash, or make a sound: the lamp does what it always does,
 and answers anyone who speaks to it as usual.
 
 **The privacy switch wins.** With the switch closed the lamp can't see: it
-says so once by text ("I can't see right now, the privacy switch is
-closed.") and is quiet after.
+says so by text each time it's closed ("I can't see right now, the privacy
+switch is closed."), and counts nothing until it's open again.
 
 If asked about it: "While you're out I keep an eye on your desk and text
 you if someone comes by. I don't take pictures, and I never say who. Say

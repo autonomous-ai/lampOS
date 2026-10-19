@@ -87,7 +87,7 @@ fn add_heard(to: &mut String, text: &str, most: usize) {
 
 /// The whole words of `text`, lowercase: what is between characters that
 /// are not letters or digits.
-fn words(text: &str) -> Vec<String> {
+pub(crate) fn words(text: &str) -> Vec<String> {
     text.to_lowercase()
         .split(|c: char| !c.is_alphanumeric())
         .filter(|word| !word.is_empty())

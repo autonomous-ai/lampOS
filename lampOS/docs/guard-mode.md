@@ -17,9 +17,15 @@ relay delivers it (mobile-P1; [messages.md](messages.md), "Unasked texts").
 
 - **On only when asked, out loud.** "Lamp, keep an eye on things while I'm
   out." The model calls `keep_watch` with `turn = "on"`. The watch turns on
-  only if the lamp heard someone speak within 30 s of the call (`[watch]
-  asked_within`), so a typed message from the app can't turn it on, and only
-  if its mark can be shown. Refused, the model is told why in words the lamp
+  only if the newest thing the lamp heard, within 30 s of the call
+  (`[watch] asked_within`), asks for it in words: one of `[watch] if_heard`
+  ("keep an eye", "keep watch", "watch my desk", "guard", "while I'm out",
+  and a few more) among its whole words, any case. So a typed message from
+  the app can't turn it on, nor can the model's own call after talk of
+  something else (the peer read's P3 on #1807). It also needs its mark to be
+  showable. Any voice at the lamp can ask, not only yours: the texts still
+  go only to you, and the mark shows. Tying the call to the very turn that
+  asked waits for the voice to give a skill's call its request number. Refused, the model is told why in words the lamp
   can say ("I keep an eye on things only when someone asks me out loud, at
   the lamp."). It never turns itself on: a watch has no trigger, and a load,
   a reload or a restart of `lamp-skills` leaves it off.
@@ -27,7 +33,16 @@ relay delivers it (mobile-P1; [messages.md](messages.md), "Unasked texts").
   on. While it's on, the ring keeps a faint mark, blue at level 1, asked of
   the ring at skill priority on `light/request` and renewed every 10 s, so
   nobody is watched without a sign. Without the ring's light requests
-  (`LAMP_LIGHT_REQUESTS=on`) it refuses to turn on.
+  (`LAMP_LIGHT_REQUESTS=on`) it refuses to turn on. **While the mark isn't
+  shown, nothing is counted** (the peer read's P2 on #1807). When the ring
+  says the mark is outranked (`light/outranked`, by your own light, as
+  "turn the light off" on the way out, or by Light out's), the program
+  gives the mark back and asks for it again with a new claim, which the
+  ring hears over your light and over any skill's older one. That is done
+  at most once every 30 s, so a light that outranks it again soon after
+  stays on top and the mark stays hidden. Until the ring says the mark is
+  shown again (`light/reached`), no visit begins, ends or is texted, and
+  the journal and `skills/events` say so.
 - **It counts from when you leave.** A visit counts only once the desk has
   been empty since you asked (`room/presence` says nobody). A visit is
   someone at the lamp: from when `room/presence` says someone (or a face at
@@ -47,12 +62,17 @@ relay delivers it (mobile-P1; [messages.md](messages.md), "Unasked texts").
 - **It ends** when you say stop (`turn = "off"`, which needs no voice, so the
   app could stop it too), or when the eyes know your own face at the lamp
   again after you'd left: the mark is given back, and no text is sent for
-  you coming back. If the eyes didn't know your face when you asked, the
+  you coming back. **Or by itself,** 12 hours after you asked (`[watch]
+  most`, 1 to 24 h), with one text, "I've stopped keeping an eye on things."
+  So a watch nobody stopped doesn't text you about yourself the next morning
+  (the peer read's P3 on #1807). If the eyes didn't know your face when you asked, the
   lamp asks you to tell it to stop when you're back.
 - **The privacy switch wins.** With the switch closed (`voice/privacy`'s
   `physical_muted`), the lamp can't see: one text, "I can't see right now,
-  the privacy switch is closed.", once while the watch is on, and quiet
-  after. While it is closed the watch takes nothing it is told about the
+  the privacy switch is closed.", once each closing, and quiet while it
+  stays closed. A closing within a minute of the last line isn't texted
+  again, so a switch flicked to and fro isn't a stream of texts (the peer
+  read's P3 on #1807: a second closing was never told). While it is closed the watch takes nothing it is told about the
   desk, whoever says it: no visit begins or ends and none is texted, and
   the asker's face ends nothing. So the promise is the watch's own, not
   only the eyes closing with the switch (reviewer-two's P3 on #1807).
