@@ -621,7 +621,17 @@ pub fn services(
             provider.voice()
         );
     }
-    Ok(net)
+    // The chat's connection opened as a line begins (#1712).
+    let warm = std::env::var(super::services::CHAT_WARM_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if warm {
+        eprintln!(
+            "lamp-voice second: the chat's connection is opened as a line begins (LAMP_SECOND_CHAT_WARM)"
+        );
+    }
+    Ok(net.warming_the_chat(warm))
 }
 
 /// The web search the model may call as its own functions, as `route` sets
@@ -679,6 +689,40 @@ pub fn with_search(
             tools.push(tool.clone());
         }
     }
+    tools
+}
+
+/// What [`crate::tools::THE_TIME`] is told on this route (#1712): each
+/// request is told the time here as it is asked
+/// ([`crate::local_time::told_asked_here`]), so the function is only for
+/// the time in another place.
+pub(crate) const TIME_ELSEWHERE: &str = "Call this only for the time somewhere else, such as \"what time is it in London\": give the place as its time zone. The time here is in what you were told, read as you were asked: answer the time here, the date and how long until something from that, never with this. Then say it as it gives it \"said aloud\", with its hour and the place it names, and never say a time unless you were asked for it.";
+
+/// The lamp's functions with [`crate::tools::THE_TIME`] only for another
+/// place's time: told [`TIME_ELSEWHERE`], its place needed, with `places`
+/// (`LAMP_TIME_PLACES`), and not given without, when it could say only the
+/// time here that every request is told.
+pub(crate) fn time_elsewhere(
+    mut tools: Vec<lamp_gemini::Tool>,
+    places: bool,
+) -> Vec<lamp_gemini::Tool> {
+    tools.retain_mut(|tool| {
+        if tool.name != crate::tools::THE_TIME {
+            return true;
+        }
+        tool.description = TIME_ELSEWHERE.into();
+        tool.parameters = Some(serde_json::json!({
+            "type": "object",
+            "properties": {
+                "place": {
+                    "type": "string",
+                    "description": "The time zone of the place asked about, as its IANA name: Europe/London, America/New_York, Asia/Tokyo."
+                }
+            },
+            "required": ["place"]
+        }));
+        places
+    });
     tools
 }
 
@@ -1020,11 +1064,17 @@ pub fn serve(
         .map(|search| search.declarations())
         .unwrap_or_default();
     let declared = tools.clone();
+    // The time here is told in every request; the_time is for elsewhere.
+    let places = tools.clock && tools.places;
     // With `use_skill` the skills' lines are told after the character, as
     // the Live route tells them (#1668).
     let skills_told = tools.clone();
-    let declare: crate::second_provider::net::Declare =
-        Arc::new(move || with_search(crate::tools::declared(&declared), &searched));
+    let declare: crate::second_provider::net::Declare = Arc::new(move || {
+        with_search(
+            time_elsewhere(crate::tools::declared(&declared), places),
+            &searched,
+        )
+    });
     // Texts from the Autonomous app (#1673): a client of their own, on the
     // same model, beside the spoken turns.
     let texts = match (&files.bus_root, files.messages) {
@@ -1066,8 +1116,6 @@ pub fn serve(
     };
     let thread = files.thread;
     let file = thread.clone();
-    let clock = tools.clock;
-    let places = tools.places;
     // Each turn is one person's, as a Live session is (#764): whose it is,
     // counted from the eyes' known file as the Live worker counts it, opens
     // the thread for them and asks for their kept things. A Days note is
@@ -1171,7 +1219,7 @@ pub fn serve(
         // The lamp's own place, with `LAMP_PLACE`, beside its time (#1712),
         // and the weather there while it is fresh.
         let time = with_place(
-            crate::local_time::told_here(clock, places),
+            crate::local_time::told_asked_here(places),
             crate::local_time::place_told(place.as_deref()),
         );
         let time = with_place(
@@ -2586,7 +2634,7 @@ pub(crate) fn texts_ends(
         texts_system_message(
             &character,
             crate::agent_tasks::noted(
-                crate::local_time::told_here(told.clock, told.places),
+                crate::local_time::told_asked_here(told.clock && told.places),
                 told.tasks.as_ref(),
             )
             .as_deref(),
@@ -3771,6 +3819,14 @@ mod tests {
         assert!(!told.text.contains("spare key"), "{}", told.text);
         assert!(told.text.starts_with("You are a lamp."), "{}", told.text);
         assert!(told.history.is_empty());
+        // Told the time as it is asked (#1712), where this machine has one.
+        if crate::local_time::offset_here().is_some() {
+            assert!(
+                told.text.contains("Your clock read this as you were asked"),
+                "{}",
+                told.text
+            );
+        }
         *crate::thread::THREAD.lock().unwrap() = kept;
     }
 
@@ -4629,5 +4685,60 @@ mod tests {
         assert!(!full.contains(&"tool_31".to_owned()));
         assert!(!full.contains(&"fetch_page".to_owned()));
         assert_eq!(names(super::with_search(lamp(5), &[])).len(), 5);
+    }
+
+    /// #1712, the first builder at 19:43: on lamp-4ace "what time is it?"
+    /// called the_time, a round whose first event came 2100 ms later. Every
+    /// request is told the time here, so the_time is for another place's
+    /// time only, its place needed, and is not given without places.
+    #[test]
+    fn the_time_is_given_only_for_another_places_time() {
+        let settings = |places| crate::tools::Settings {
+            clock: true,
+            places,
+            ..Default::default()
+        };
+        let the_time = |tools: Vec<lamp_gemini::Tool>| {
+            tools
+                .into_iter()
+                .find(|tool| tool.name == crate::tools::THE_TIME)
+        };
+        let live = the_time(crate::tools::declared(&settings(true))).unwrap();
+        assert!(
+            live.description
+                .starts_with("Call this whenever you need the time")
+        );
+        let elsewhere = the_time(super::time_elsewhere(
+            crate::tools::declared(&settings(true)),
+            true,
+        ))
+        .unwrap();
+        assert_eq!(elsewhere.description, super::TIME_ELSEWHERE);
+        assert!(!elsewhere.description.contains("woke"));
+        assert_eq!(
+            elsewhere.parameters.unwrap()["required"],
+            serde_json::json!(["place"])
+        );
+        assert!(
+            the_time(super::time_elsewhere(
+                crate::tools::declared(&settings(false)),
+                false
+            ))
+            .is_none()
+        );
+        // The rest are untouched.
+        let others = |tools: Vec<lamp_gemini::Tool>| -> Vec<lamp_gemini::Tool> {
+            tools
+                .into_iter()
+                .filter(|tool| tool.name != crate::tools::THE_TIME)
+                .collect()
+        };
+        assert_eq!(
+            others(super::time_elsewhere(
+                crate::tools::declared(&settings(false)),
+                false
+            )),
+            others(crate::tools::declared(&settings(false)))
+        );
     }
 }

@@ -159,6 +159,14 @@ pub type Narrow =
 /// research of 19 Oct; 0.80 to 0.83 s to the first token, published).
 pub const GEMINI_REASONING: &str = "minimal";
 
+/// A chat connection idle this long is opened ahead as a line begins
+/// ([`Chat::warm`]): the client's pool keeps an idle one 90 s, and the
+/// service may close it sooner.
+pub const WARM_AFTER: std::time::Duration = std::time::Duration::from_secs(60);
+/// At most this much of the warming answer is read: enough to finish a
+/// models list, so its connection goes back to the pool.
+const WARM_BYTES: usize = 256 << 10;
+
 pub struct Chat {
     client: reqwest::Client,
     url: String,
@@ -317,6 +325,37 @@ impl Chat {
     /// Whether the model is sent a look's picture.
     pub fn sees(&self) -> bool {
         self.sees
+    }
+
+    /// The connection opened ahead, as a line begins, when no request went
+    /// in the last [`WARM_AFTER`] (`LAMP_SECOND_CHAT_WARM=on`, #1712): a GET
+    /// of the service's `models`, read whole, so the line's chat goes on a
+    /// connection already made. Its status and how long it took; `None`
+    /// when not due, or when it failed (the chat then connects as before).
+    pub async fn warm(&self) -> Option<(u16, std::time::Duration)> {
+        let began = std::time::Instant::now();
+        {
+            let mut last = self.last_sent.lock().ok()?;
+            if last.is_some_and(|at| began.duration_since(at) < WARM_AFTER) {
+                return None;
+            }
+            *last = Some(began);
+        }
+        let models = self.url.replacen("/chat/completions", "/models", 1);
+        let request = self.client.get(&models).header("authorization", &self.auth);
+        let mut response = tokio::time::timeout(super::CONNECT + super::STALL, request.send())
+            .await
+            .ok()?
+            .ok()?;
+        let status = response.status().as_u16();
+        let mut read = 0;
+        while read <= WARM_BYTES {
+            match tokio::time::timeout(super::STALL, response.chunk()).await {
+                Ok(Ok(Some(bytes))) => read += bytes.len(),
+                _ => break,
+            }
+        }
+        Some((status, began.elapsed()))
     }
 
     /// Its requests are given only the tools `narrow` keeps of those
@@ -734,6 +773,52 @@ impl Deltas {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #1712: as a line begins, a chat idle past `WARM_AFTER` opens its
+    /// connection with a GET of `models`; one used lately, or warmed just
+    /// now, is not asked again.
+    #[tokio::test]
+    async fn an_idle_chat_opens_its_connection_ahead_and_a_busy_one_does_not() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen = asked.clone();
+        let server = tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut read = vec![0; 4096];
+            let n = socket.read(&mut read).await.unwrap();
+            let head = String::from_utf8_lossy(&read[..n]).to_string();
+            seen.lock()
+                .unwrap()
+                .push(head.lines().next().unwrap_or_default().to_owned());
+            assert!(head.contains("authorization: Bearer k"), "{head}");
+            let body = r#"{"data":[]}"#;
+            socket
+                .write_all(
+                    format!(
+                        "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{body}",
+                        body.len()
+                    )
+                    .as_bytes(),
+                )
+                .await
+                .unwrap();
+        });
+        let chat = Chat::with(
+            &format!("http://{address}/v1"),
+            "m",
+            "k",
+            Arc::new(Vec::new),
+        )
+        .unwrap();
+        let (status, _) = chat.warm().await.expect("warmed");
+        assert_eq!(status, 200);
+        assert_eq!(*asked.lock().unwrap(), ["GET /v1/models HTTP/1.1"]);
+        // Just warmed: not asked again.
+        assert!(chat.warm().await.is_none());
+        server.await.unwrap();
+    }
 
     /// #1712, the first builder at 18:26: a chat request is journaled by its
     /// size and counts, how soon its answer began, and the gap since the

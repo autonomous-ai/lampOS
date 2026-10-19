@@ -61,7 +61,7 @@ pub mod probe;
 mod services;
 pub mod worker;
 
-pub use services::{Listener, Net, Services};
+pub use services::{CHAT_WARM_ENVIRONMENT, Listener, Net, Services};
 
 #[cfg(test)]
 mod tests;
