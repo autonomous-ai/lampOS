@@ -1206,3 +1206,31 @@ fn mood_in_reads_only_a_fresh_valid_state_from_mood() {
         .unwrap();
     assert_eq!(runtime::mood_in(latest().as_ref(), 5_000_000), (None, None));
 }
+
+/// The journal says the liveliness the idle layer takes from Mood, first and
+/// on a change, and nothing with no fresh state: Mood off writes nothing new
+/// (the first builder on #1722, 03:54).
+#[test]
+fn the_liveliness_taken_is_said_and_nothing_with_mood_off() {
+    let mut said = lamp_msgs::MoodTaken::default();
+    for at in [0, 60_000_000, 600_000_000] {
+        assert_eq!(runtime::liveliness_line(&mut said, None, at), None);
+    }
+    assert_eq!(
+        runtime::liveliness_line(&mut said, Some(-0.31), 1).as_deref(),
+        Some("lamp-expression: Mood's liveliness -0.31")
+    );
+    assert_eq!(
+        runtime::liveliness_line(&mut said, Some(-0.3), 120_000_000),
+        None
+    );
+    assert!(runtime::liveliness_line(&mut said, Some(0.5), 120_000_000).is_some());
+    // A change 59 s after the last line waits for the minute.
+    assert_eq!(
+        runtime::liveliness_line(&mut said, Some(-0.3), 179_000_000),
+        None
+    );
+    // Mood gone, then back at the same liveliness: said again after a minute.
+    assert_eq!(runtime::liveliness_line(&mut said, None, 200_000_000), None);
+    assert!(runtime::liveliness_line(&mut said, Some(0.5), 200_000_001).is_some());
+}

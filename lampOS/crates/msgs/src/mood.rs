@@ -240,3 +240,71 @@ pub fn plain_breath_phase(now_us: u64) -> f64 {
 pub fn mood_topics() -> Vec<(&'static str, Declaration)> {
     vec![(MoodState::TOPIC, MoodState::declaration())]
 }
+
+/// A part's journal line for what it took from Mood (the first builder on
+/// #1722, 20 Oct 03:54, for `trials.sh mood`): said only while it takes a
+/// fresh state, so a lamp with Mood off writes nothing new; first on the
+/// first, then on a change of [`MOOD_TAKEN_CHANGE`] or more, never more
+/// often than [`MOOD_TAKEN_EVERY_US`]. A number only.
+pub const MOOD_TAKEN_CHANGE: f32 = 0.05;
+pub const MOOD_TAKEN_EVERY_US: u64 = 60_000_000;
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct MoodTaken {
+    said: Option<(f32, u64)>,
+}
+
+impl MoodTaken {
+    /// `value` taken from a fresh state at `now_us`: whether to say it now.
+    pub fn due(&mut self, value: f32, now_us: u64) -> bool {
+        if let Some((was, at)) = self.said
+            && ((value - was).abs() < MOOD_TAKEN_CHANGE
+                || now_us.saturating_sub(at) < MOOD_TAKEN_EVERY_US)
+        {
+            return false;
+        }
+        self.said = Some((value, now_us));
+        true
+    }
+
+    /// No fresh state now: the value is forgotten, the time kept. When Mood
+    /// comes again its first state is said once the minute since the last
+    /// line has passed, even at the same value (Jarvis on #2042: a second
+    /// trial at night, Mood asleep at the same pace, wrote nothing).
+    pub fn gone(&mut self) {
+        if let Some((_, at)) = self.said {
+            self.said = Some((f32::NAN, at));
+        }
+    }
+}
+
+#[cfg(test)]
+mod taken_tests {
+    use super::*;
+
+    /// The first, then only a change of 0.05 or more and a minute on.
+    #[test]
+    fn what_was_taken_is_said_first_then_on_a_change_at_most_once_a_minute() {
+        let mut taken = MoodTaken::default();
+        assert!(taken.due(0.81, 0));
+        assert!(!taken.due(0.81, MOOD_TAKEN_EVERY_US * 5));
+        assert!(!taken.due(0.83, MOOD_TAKEN_EVERY_US * 5));
+        assert!(!taken.due(1.10, MOOD_TAKEN_EVERY_US - 1));
+        assert!(taken.due(1.10, MOOD_TAKEN_EVERY_US));
+        assert!(!taken.due(0.81, MOOD_TAKEN_EVERY_US + 1));
+        assert!(taken.due(0.81, MOOD_TAKEN_EVERY_US * 2));
+        assert_eq!(MOOD_TAKEN_EVERY_US, 60_000_000, "a minute");
+    }
+
+    /// Mood gone and back at the same value: said again once a minute has
+    /// passed since the last line, not before; nothing said while gone.
+    #[test]
+    fn mood_back_at_the_same_value_is_said_after_the_minute() {
+        let mut taken = MoodTaken::default();
+        taken.gone();
+        assert!(taken.due(0.70, 0));
+        taken.gone();
+        assert!(!taken.due(0.70, 59_000_000));
+        assert!(taken.due(0.70, 60_000_000));
+    }
+}
