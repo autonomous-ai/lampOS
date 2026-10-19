@@ -64,11 +64,39 @@ LOG=${ARM_LOG:-./arm-hour-$(date '+%Y%m%d-%H%M').log}
 #   sheet  where the run sheet is
 # A row with no steps is done by hand: its two lines, then the question.
 # ---------------------------------------------------------------------------
-ROWS_TABLE=$(cat <<'ROWS'
-row | 1 | The safe fold before an unplug | moves | 5 min
-do | Hands near the arm but off it, desk clear; say "Lamp, get ready, I'm going to unplug you."; never touch the cable.
-watch | The arm folds slowly (under 30 s) to its rest and stays held; the lamp says it is folded and safe to unplug.
-sheet | #1699, Fifth, 19 Oct 19:23Z (written for lamp-52e6: its setup is by hand here)
+# Read with read, not $(cat <<...): bash 3.2 counts quotes inside a here-doc
+# in $( ), and a row's apostrophe would end the script.
+IFS= read -r -d '' ROWS_TABLE <<'ROWS' || true
+row | 1 | The safe fold before an unplug | moves | 25 min
+do | Hands near the arm but off it, desk clear; say each line when asked; never touch the cable.
+watch | The arm folds slowly (under 30 s) to its rest and stays held, no sag; then the bottom LEDs breathe dim amber and it says "My arm is folded. You can unplug me now."; asked to look or dance after, it doesn't move.
+sheet | #1722, Fifth, 20 Oct 03:57 (any lamp; scripted, fifth-rows.sh)
+mac | d=/tmp/fifth-row1; rm -rf $d && mkdir -p $d && gh api repos/autonomous-ai/lampOS/issues/comments/6277160673 --jq .body | awk '/^```bash$/{f=1;next} f&&/^```$/{exit} f' >$d/fifth-rows.sh && echo "1be88030af34ef0096781a0103c69a6451e795024706d67fc7aa35de3c182133  $d/fifth-rows.sh" | shasum -a 256 -c && gh run download 39313641196 -R autonomous-ai/lampOS -n lampos-arm64-396e8a2b3eea57322bf38a27ec453e2d0cebb74c -D $d/a && mv $d/a/lamp-voice $d/a/lamp-expression $d/a/lamp-body $d/a/lamp-skills $d/ && rm -rf $d/a && for f in skill.toml SKILL.md; do gh api -H 'Accept: application/vnd.github.raw' "repos/autonomous-ai/lampOS/contents/lampOS/skills/prepare-unplug/$f?ref=396e8a2b3eea57322bf38a27ec453e2d0cebb74c" >$d/$f || exit 1; done
+lamp | rm -rf /tmp/fifth-row1 && mkdir -p /tmp/fifth-row1
+mac | ${ARM_SCP:-scp} -q /tmp/fifth-row1/* "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/fifth-row1/
+lamp | sudo bash /tmp/fifth-row1/fifth-rows.sh 1 preflight
+tell | On the camera: is the arm folded and still? If not, q now.
+lamp | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 install
+tell | Hand near the arm: the body restarts on #1699's build and comes up as on any start.
+lamp | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 body
+say | Lamp, what time is it?
+wait | 15
+proof | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 proof
+tell | Answered on the second route and the lamp still now? If not, q (nothing is folded yet: the put-back needs no reboot).
+say | Lamp, get ready, I'm going to unplug you.
+wait | 45
+proof | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 proof
+say | Lamp, look at me.
+say | Lamp, dance.
+wait | 15
+proof | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 proof
+tell | A hand on the lamp: it reboots now (only a reboot ends a fold). Stay until it stands and answers.
+lamp | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 reboot
+mac | sleep 20; for i in $(seq 1 36); do "$ARM_LAMP" true >/dev/null 2>&1 && exit 0; sleep 5; done; echo "the lamp isn't back after 3 min"; exit 1
+lamp | sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 back
+back | [ ! -d /var/lib/lampos-fifth/row1 ] || sudo bash /var/lib/lampos-fifth/row1/fifth-rows.sh 1 back
+back | rm -rf /tmp/fifth-row1
+back | mac: rm -rf /tmp/fifth-row1
 end
 row | 2 | Moves with its words while it speaks | moves | 5 min
 do | Ask for a short story and listen.
@@ -103,11 +131,25 @@ watch | Dimmer, warmer, quieter, a slow settle; in the morning the reverse.
 sheet | #1732, Second (no run sheet yet)
 end
 row | 8 | Not feeling well (the droop) | moves | 20 min
-do | The builder stops lamp-eyes; from about 4:50 after, hold an open hand 5 cm under the head without touching; say "stop" if it would hit.
-watch | About 305 s after the stop the head droops slowly once and the ring goes pale and low; after the eyes start again the light is back within 12 s.
-sheet | #1681, Fifth, 19 Oct 18:46Z (written for lamp-52e6: its setup is by hand here)
-proof | journalctl -u lamp-skills --since -15min -o cat | grep not-feeling-well | tail -3
-proof | lamp-bus latest lamp/health
+do | Move any cable from under the arm; stand beside it; nobody talks to the lamp. When told (about 4:45 after the eyes stop), hold an open hand 5 cm under the head, not touching, until the droop is over; say "stop" only if it would hit something.
+watch | About 305 s after the stop the head droops slowly once and the ring goes pale and low, breathing slowly; after the eyes start again the light is back within 12 s, with no second droop.
+sheet | #1722, Fifth, 20 Oct 03:57 (any lamp; scripted, fifth-rows.sh)
+mac | d=/tmp/fifth-row8; rm -rf $d && mkdir -p $d && gh api repos/autonomous-ai/lampOS/issues/comments/6277160673 --jq .body | awk '/^```bash$/{f=1;next} f&&/^```$/{exit} f' >$d/fifth-rows.sh && echo "1be88030af34ef0096781a0103c69a6451e795024706d67fc7aa35de3c182133  $d/fifth-rows.sh" | shasum -a 256 -c && gh run download 39299260822 -R autonomous-ai/lampOS -n lampos-arm64-782e6ef34547008443828158fe3540fd2cd23cec -D $d/a && mv $d/a/lamp-skills $d/a/lamp-health $d/ && rm -rf $d/a && for f in skill.toml SKILL.md; do gh api -H 'Accept: application/vnd.github.raw' "repos/autonomous-ai/lampOS/contents/lampOS/skills/not-feeling-well/$f?ref=782e6ef34547008443828158fe3540fd2cd23cec" >$d/$f || exit 1; done
+lamp | rm -rf /tmp/fifth-row8 && mkdir -p /tmp/fifth-row8
+mac | ${ARM_SCP:-scp} -q /tmp/fifth-row8/* "${ARM_LAMP_HOST:-orangepi@lamp-4ace.local}":/tmp/fifth-row8/
+lamp | sudo bash /tmp/fifth-row8/fifth-rows.sh 8 preflight
+lamp | sudo bash /var/lib/lampos-fifth/row8/fifth-rows.sh 8 install
+lamp | sudo bash /var/lib/lampos-fifth/row8/fifth-rows.sh 8 stop-eyes
+wait | 285
+tell | Hand 5 cm under the head now, not touching, until the droop is over; then watch the ring for 60 s.
+wait | 80
+proof | sudo bash /var/lib/lampos-fifth/row8/fifth-rows.sh 8 proof
+lamp | sudo bash /var/lib/lampos-fifth/row8/fifth-rows.sh 8 start-eyes
+wait | 15
+proof | sudo bash /var/lib/lampos-fifth/row8/fifth-rows.sh 8 proof
+back | [ ! -d /var/lib/lampos-fifth/row8 ] || sudo bash /var/lib/lampos-fifth/row8/fifth-rows.sh 8 back
+back | rm -rf /tmp/fifth-row8
+back | mac: rm -rf /tmp/fifth-row8
 end
 row | 9 | Faces from a photo, confirmed at the lamp | still | 5 min
 do | A consenting person's photo is added while they are out of view; then they sit facing the lamp and answer "Yes, remember me."
@@ -188,7 +230,6 @@ mac | p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p"
 back | mac: p=${ARM_PRESENCE_CHECK:?the path of presence-check.sh}; cd "$(dirname "$p")" && ./presence-check.sh lamp-4ace restore
 end
 ROWS
-)
 [[ -n ${ARM_ROWS_FILE:-} ]] && ROWS_TABLE=$(cat "$ARM_ROWS_FILE")
 
 # ---------------------------------------------------------------------------
