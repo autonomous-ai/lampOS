@@ -35,6 +35,12 @@ rustix = { version = "=1.1.5", features = ["fs"] }
 
 [dev-dependencies]
 tempfile = "3"
+# The functions a product lamp declares to a session, worked out by the
+# voice, the actions part and the skills' own code (tests/functions.rs).
+lamp-voice = { path = "../voice" }
+lamp-actions = { path = "../actions" }
+lamp-skills = { path = "../skills" }
+lamp-gemini = { path = "../gemini" }
 
 [lints]
 workspace = true

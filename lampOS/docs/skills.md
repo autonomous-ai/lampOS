@@ -440,13 +440,21 @@ As built on 2026-10-16 (#938, `crates/skills`, not yet run on a lamp):
   tool's caller), which bound a peer that keeps its own time.
 
 `lamp-update install` puts it on a home lamp (#811): the product unit
-`deploy/product/lamp-skills.service`, Welcome back in `/var/lib/lampOS/skills`,
-and the product voice with the say service on and its own hello off.
+`deploy/product/lamp-skills.service`, every product skill in
+`/var/lib/lampOS/skills` (since 19 October: Welcome back, Reminders, Task
+news, Stretch break, Stuffy air and Dance, `install::PRODUCT_SKILLS`; Desk
+tutor and its marks wait for the full look in the product,
+`install::NOT_PRODUCT_SKILLS`), and the product voice with the say service
+on, its own hello off, and its reminders and task news waiting for their
+skills (`LAMP_SCHEDULE_SPEAK=skill`, `LAMP_TASK_NEWS=skill`; install.md).
+A skill with a tool costs one of the 32 functions a session takes, after
+the voice's own and the actions part's, and what is past 32 is left out
+without a word: a product lamp's are 31 (`crates/update/tests/functions.rs`).
 `deploy/units/lamp-skills.service` stays the template for a lamp set up by hand.
 The product unit passes `--zone system`, the zone setup saved (#820), across
 summer time (#1384). lamp-4ace's passes neither yet, so there a skill with
-`[quiet]` hours never starts itself. Neither puts Stuffy air in its
-folder today (install puts only Welcome back on a home lamp).
+`[quiet]` hours never starts itself. Install puts Stuffy air on a home lamp;
+lamp-4ace's folder doesn't have it.
 lamp-4ace's folder carries `lamp-skills.service`, and its voice unit has the
 voice's own hello (`LAMP_SPEAK_FIRST`) off and the say service on, so only
 one greets. Elsewhere the voice's hello (`speak_up.rs`, Arrival) still
@@ -734,9 +742,9 @@ where it goes:
 
 | Behaviour today | Where it lives now | Becomes |
 |---|---|---|
-| Hello when someone comes back to the desk | The voice (`speak_up.rs`), asking the Policy (#883) | Skill: Welcome back |
-| A reminder or timer coming due | The voice's reminder consumer | Skill: Reminders (setting one stays a voice tool) |
-| News of a task handed to Claude Code or Codex, and progress news | The voice (`task_news.rs`), the Policy's progress act | Skill: Task news |
+| Hello when someone comes back to the desk | The Welcome back skill on a product lamp and on lamp-4ace; the voice's own (`speak_up.rs`, asking the Policy, #883) is off on both and only records when one was due | Skill: Welcome back |
+| A reminder or timer coming due | The Reminders skill on a product lamp (`LAMP_SCHEDULE_SPEAK=skill`): the voice keeps the words and says it itself when no ask comes within 10 s. The voice's reminder consumer, timing it too, on lamp-4ace (`on`) | Skill: Reminders (setting one stays a voice tool) |
+| News of a task handed to Claude Code or Codex, and progress news | The Task news skill on a product lamp for done and failed (`LAMP_TASK_NEWS=skill`): the voice keeps the words and tells it itself when no ask comes within 10 s, as it does stopped and asking news, which no skill takes. The voice (`task_news.rs`) on lamp-4ace; progress news is the Policy's act, off in the product | Skill: Task news |
 | Sleep at night, waking in the morning | Expression's catalogue (`alive`) | Skill: Bedtime and Morning, later |
 | Turning to a voice, looking away to think, back before its first word, nods while speaking | Voice, body, Expression | Built in: the conversation, under a second |
 | A tap on the head, a hand held on it, three seconds to sleep | Controls, Expression, voice (#711, #849) | Built in: a reflex, under 150 ms |
@@ -755,8 +763,8 @@ library as skills.
 | Skill | Trigger | What it does | Replaces |
 |---|---|---|---|
 | Welcome back | A face arrives after 5 minutes with nobody | Policy; turns to them, the light warms, a short hello, by name if known | The hello (#883, `speak_up.rs`) |
-| Reminders | `schedule/due` | Looks at the person, says it: `say = { from = "schedule" }`, the voice keeping the words and the acknowledgement (#939, (c); `skills/reminders`). The ring's pulse waits for a light step that can pulse | The reminder consumer's timing in the voice (`LAMP_SCHEDULE_SPEAK=skill`); its delivery stays there |
-| Task news (#1021) | `tasks/status`: a task comes into `settled` (#1048) as `idle` (done) or `failed`, each task on its own | Policy (`news`); done: looks at the person if a face is in view, `happy`, and the voice's own news of it (`say = { from = "tasks" }`); failed: `caring`, its own light a step dimmer until the droop and the words end, and the news, asking whether to try again. No red ring | Task news in the voice (`task_news.rs`), once it has done 5 of 5 on lamp-4ace with the voice's news off; until then both exist and the skill's folder is not installed. Written by jarvis; the per-item trigger (`each`), steps by trigger (`on`) and the waiting of item runs were added to `lamp-skills` for it. Its cases are replays; it has not run on a lamp |
+| Reminders | `schedule/due` | Looks at the person, says it: `say = { from = "schedule" }`, the voice keeping the words and the acknowledgement (#939, (c); `skills/reminders`). The ring's pulse waits for a light step that can pulse | The reminder consumer's timing in the voice (`LAMP_SCHEDULE_SPEAK=skill`, on a product lamp since 19 October); its delivery stays there |
+| Task news (#1021) | `tasks/status`: a task comes into `settled` (#1048) as `idle` (done) or `failed`, each task on its own | Policy (`news`); done: looks at the person if a face is in view, `happy`, and the voice's own news of it (`say = { from = "tasks" }`); failed: `caring`, its own light a step dimmer until the droop and the words end, and the news, asking whether to try again. No red ring | The timing of task news in the voice (`task_news.rs`): on a product lamp since 19 October, installed with `LAMP_TASK_NEWS=skill`, so the voice waits up to 10 s for its ask and tells each task once, its words staying the voice's; the voice's own timing is removed once it has done 5 of 5 on lamp-4ace. Written by jarvis; the per-item trigger (`each`), steps by trigger (`on`) and the waiting of item runs were added to `lamp-skills` for it. Its cases are replays; it has not run on a lamp |
 | Stretch break | Someone at the desk for 50 minutes | Stretches itself as an invitation, never a lecture (creature.md) | New |
 | Stuffy air (#1021) | `air/state`'s `co2_ppm` above 1,200 for 10 minutes | Droops once (`sleepy`) and dims a shade until the air is under 1,200 again; once a spell, again only after 10 minutes under 1,000; never from 22:00 to 08:00 (a spell that holds through the night droops once at 08:00), nor while someone talks to it; the dim also ends 15 minutes after the sensor falls silent; never speaks of it (the voice's air facts do, when spoken to) | New: reworked by jarvis from ten's; the rearm line, the quiet hours and the dim held until the trigger ends were added to `lamp-skills` for it. Its cases are made by hand (lamp-4ace's sensor is flaky: it answers, with 20 to 30 failed reads a minute). It ran on lamp-06c1 once with the air fed by hand (`docs/verification/stuffy-air-lamp-06c1-20261017/`). No lamp with a working sensor has run it: lamp-06c1's and lamp-cb94's never answer on I2C bus 0 (#705, 17 Oct) |
 | Dance (#999) | "Lamp, dance", "show me a dance", "dance to this": its tool, `dance(style, long)` | One short playful line, then, when the line ends, one of V1's five dances (#979) picked by the mood asked for (calm: chill or waltz; upbeat: groove or hype; jazz), played twice for a long one, with a low warm glow given back at its end. Never on its own: the ears cannot yet tell music from talk | New: written by jarvis; its tool's arguments, the body's clips by name and the steps after the say were added to `lamp-skills` for it. Its cases are replays; it has not run on a lamp |

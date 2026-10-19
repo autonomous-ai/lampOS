@@ -866,21 +866,94 @@ fn unreadable_records_stop_install_rather_than_being_written_over() {
     lamp.install().unwrap();
 }
 
-/// #811, from lamp-06c1: a home lamp gets `lamp-skills` and its first skill,
-/// Welcome back, and the voice speaks it through its say service with its
-/// own hello off, so the lamp greets once.
+/// The repository's skill folders, `lampOS/skills/`.
+fn skills_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills")
+}
+
+/// Every file of a skill folder but its tests, as paths in it.
+fn skill_files(folder: &Path) -> Vec<String> {
+    fn walk(folder: &Path, under: &str, files: &mut Vec<String>) {
+        for entry in fs::read_dir(folder).unwrap().flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let path = format!("{under}{name}");
+            if entry.path().is_dir() {
+                if path != "tests" {
+                    walk(&entry.path(), &format!("{path}/"), files);
+                }
+            } else {
+                files.push(path);
+            }
+        }
+    }
+    let mut files = Vec::new();
+    walk(folder, "", &mut files);
+    files.sort();
+    files
+}
+
+/// The owner, 19 Oct: a lamp runs every behaviour that has a skill as the
+/// skill. So every folder in `lampOS/skills/` is a product skill or says why
+/// it isn't, and a new one is decided, not left out unseen.
 #[test]
-fn a_blank_lamp_gets_lamp_skills_with_welcome_back_and_greets_once() {
+fn every_skill_folder_is_in_the_product_or_says_why_not() {
+    let mut folders: Vec<String> = fs::read_dir(skills_root())
+        .unwrap()
+        .flatten()
+        .filter(|entry| entry.path().is_dir())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| !name.starts_with('.'))
+        .collect();
+    folders.sort();
+    let mut decided: Vec<String> = install::PRODUCT_SKILLS
+        .iter()
+        .chain(install::NOT_PRODUCT_SKILLS.iter().map(|(name, _)| name))
+        .map(|name| (*name).to_owned())
+        .collect();
+    decided.sort();
+    assert_eq!(folders, decided);
+    for (name, why) in install::NOT_PRODUCT_SKILLS {
+        assert!(!why.is_empty(), "{name}");
+    }
+}
+
+/// #811, from lamp-06c1, and every skill since (the owner, 19 Oct): a home
+/// lamp gets `lamp-skills` and every product skill whole but its tests,
+/// byte for byte, and no other skill. The voice speaks them through its say
+/// service; its own hello is off, so the lamp greets once, and its reminders
+/// and task news wait for their skills' asks, so each is told once.
+#[test]
+fn a_blank_lamp_runs_every_product_skill_as_the_skill() {
     let mut lamp = Lamp::new(188, &[]);
     lamp.install().unwrap();
     assert!(lamp.on("/opt/lampOS/skills/current/lamp-skills").exists());
-    for file in ["skill.toml", "SKILL.md", "lights/warm_glow.toml"] {
-        let on_lamp = fs::read(lamp.on(&format!("/var/lib/lampOS/skills/welcome-back/{file}")));
-        let ours = fs::read(format!(
-            "{}/../../skills/welcome-back/{file}",
-            env!("CARGO_MANIFEST_DIR")
-        ));
-        assert_eq!(on_lamp.unwrap(), ours.unwrap(), "{file}");
+    let mut installed = Vec::new();
+    for skill in install::PRODUCT_SKILLS {
+        let folder = skills_root().join(skill);
+        let files = skill_files(&folder);
+        assert!(files.contains(&"skill.toml".to_owned()), "{skill}");
+        assert!(files.contains(&"SKILL.md".to_owned()), "{skill}");
+        for file in files {
+            let path = format!("/var/lib/lampOS/skills/{skill}/{file}");
+            let ours = fs::read(folder.join(&file)).unwrap();
+            assert_eq!(fs::read(lamp.on(&path)).unwrap(), ours, "{path}");
+            installed.push(path);
+        }
+    }
+    // Nothing else in the skills folder: no tests, no skill left out.
+    let mut placed: Vec<String> = SETTINGS
+        .iter()
+        .map(|(path, _)| (*path).to_owned())
+        .filter(|path| path.starts_with("/var/lib/lampOS/skills/"))
+        .collect();
+    placed.sort();
+    installed.sort();
+    assert_eq!(placed, installed);
+    for (skill, _) in install::NOT_PRODUCT_SKILLS {
+        assert!(
+            !lamp.on(&format!("/var/lib/lampOS/skills/{skill}")).exists(),
+            "{skill}"
+        );
     }
     assert!(
         lamp.host
@@ -897,9 +970,23 @@ fn a_blank_lamp_gets_lamp_skills_with_welcome_back_and_greets_once() {
             .iter()
             .any(|line| line.starts_with("Environment=LAMP_SPEAK_FIRST="))
     );
+    // A due reminder and the news of a task waits up to 10 s for its skill's
+    // ask, then the voice says it itself: never both, never neither. Each
+    // set once, so no later line puts the voice's own timing back.
+    for switch in ["LAMP_SCHEDULE_SPEAK", "LAMP_TASK_NEWS"] {
+        let set: Vec<&str> = service
+            .iter()
+            .filter_map(|line| line.strip_prefix(&format!("Environment={switch}=")))
+            .collect();
+        assert_eq!(set, ["skill"], "{switch}");
+    }
     let skills = fs::read_to_string(lamp.on("/etc/systemd/system/lamp-skills.service")).unwrap();
     assert!(skills.contains("--say-socket /run/lampos-say/say.sock"));
     assert!(skills.contains("--dir /var/lib/lampOS/skills"));
+    // Dance's tool reaches the model beside the actions part's, which the
+    // voice reads at each session.
+    assert!(skills.contains("--tools-dir /run/lampos-actions/skills"));
+    assert!(service.contains(&"Environment=LAMP_ACTIONS_DIR=/run/lampos-actions"));
 }
 
 /// #1390: the product's tasks part closes the harness each task started once

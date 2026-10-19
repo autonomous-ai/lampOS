@@ -155,8 +155,52 @@ pub const PRODUCT: &[(&str, &str)] = &[
     ),
 ];
 
+/// The skills every lamp runs: each a folder of `lampOS/skills/`, put in
+/// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
+/// Every behaviour that has a skill runs as the skill (the owner, 19 Oct):
+/// the voice's own hello is off in `lamp-voice.service`, and its reminders
+/// and task news wait for the skill's ask (`LAMP_SCHEDULE_SPEAK=skill`,
+/// `LAMP_TASK_NEWS=skill`).
+pub const PRODUCT_SKILLS: &[&str] = &[
+    "welcome-back",
+    "reminders",
+    "task-news",
+    "stretch-break",
+    "stuffy-air",
+    "dance",
+];
+
+/// The skills of `lampOS/skills/` a lamp does not get yet, each with why.
+/// A product session's functions are 31 of the 32 it takes
+/// (`tests/functions.rs`): the two tools of Desk tutor and its marks would
+/// put the last of them past it, left out without a word.
+pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
+    (
+        "desk-tutor",
+        "it reads handwriting from the full look (`LAMP_LOOK_FULL=on` with `lamp-eyes --full-look`), \
+         which the product doesn't run: its look is the working frame, 320 across; and with its \
+         marks its two functions would be 33 of a session's 32",
+    ),
+    (
+        "desk-tutor-marks",
+        "it is called only after Desk tutor's look, and Desk tutor isn't in the product",
+    ),
+];
+
+/// One file of a product skill, `lampOS/skills/SKILL/FILE`, and where
+/// `lamp-skills` reads it on a lamp: `/var/lib/lampOS/skills/SKILL/FILE`.
+macro_rules! skill_file {
+    ($skill:literal, $file:literal) => {
+        (
+            concat!("/var/lib/lampOS/skills/", $skill, "/", $file),
+            include_str!(concat!("../../../skills/", $skill, "/", $file)),
+        )
+    };
+}
+
 /// The product's settings that no build carries, and where each goes:
-/// in `/etc/lampOS/<part>/`, readable by the parts' user (docs/install.md).
+/// in `/etc/lampOS/<part>/`, readable by the parts' user (docs/install.md),
+/// and the product skills' files.
 pub const SETTINGS: &[(&str, &str)] = &[
     (
         "/etc/lampOS/expression/expression.json",
@@ -177,20 +221,22 @@ pub const SETTINGS: &[(&str, &str)] = &[
         "/etc/lampOS/records.json",
         include_str!("../../../deploy/product/settings/records.json"),
     ),
-    // The first skill (#811): Welcome back, the hello on arrival. Its tests
-    // stay in the repository; `lamp-skills` reloads the folder by itself.
-    (
-        "/var/lib/lampOS/skills/welcome-back/skill.toml",
-        include_str!("../../../skills/welcome-back/skill.toml"),
-    ),
-    (
-        "/var/lib/lampOS/skills/welcome-back/SKILL.md",
-        include_str!("../../../skills/welcome-back/SKILL.md"),
-    ),
-    (
-        "/var/lib/lampOS/skills/welcome-back/lights/warm_glow.toml",
-        include_str!("../../../skills/welcome-back/lights/warm_glow.toml"),
-    ),
+    // The product skills ([`PRODUCT_SKILLS`]), every file but their tests,
+    // which stay in the repository; `lamp-skills` reloads the folder by
+    // itself. Welcome back, the hello on arrival, came first (#811).
+    skill_file!("welcome-back", "skill.toml"),
+    skill_file!("welcome-back", "SKILL.md"),
+    skill_file!("welcome-back", "lights/warm_glow.toml"),
+    skill_file!("reminders", "skill.toml"),
+    skill_file!("reminders", "SKILL.md"),
+    skill_file!("task-news", "skill.toml"),
+    skill_file!("task-news", "SKILL.md"),
+    skill_file!("stretch-break", "skill.toml"),
+    skill_file!("stretch-break", "SKILL.md"),
+    skill_file!("stuffy-air", "skill.toml"),
+    skill_file!("stuffy-air", "SKILL.md"),
+    skill_file!("dance", "skill.toml"),
+    skill_file!("dance", "SKILL.md"),
 ];
 
 /// Setup's two settings (docs/setup.md, "On a lamp"), written only with

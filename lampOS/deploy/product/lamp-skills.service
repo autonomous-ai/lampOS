@@ -1,7 +1,9 @@
 # lampOS skills: physical skills, each a folder in /var/lib/lampOS/skills (lampOS/docs/skills.md).
-# The product unit (lampOS/docs/install.md); install puts Welcome back in that folder (#811).
-# A skill speaks only through the voice's say service (LAMP_SAY=on in lamp-voice.service, its
-# socket in the group lampos); the voice's own hello is off there, so only Welcome back greets.
+# The product unit (lampOS/docs/install.md); install puts every product skill in that folder
+# (lamp-update's install::PRODUCT_SKILLS: Welcome back, Reminders, Task news, Stretch break,
+# Stuffy air and Dance). A skill speaks only through the voice's say service (LAMP_SAY=on in
+# lamp-voice.service, its socket in the group lampos); the voice's own hello is off there, so only
+# Welcome back greets, and its reminders and task news wait for their skills' asks (=skill).
 # LAMP_SKILLS_ASK=skip acts without asking the Policy, whose gate is not built yet (#939);
 # without it every skill is asked about and refused, and nothing is done.
 [Unit]

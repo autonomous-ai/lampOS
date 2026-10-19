@@ -336,8 +336,12 @@ in `docs/install.md` (step 9, and "Checking a lamp runs the product's
 units").
 
 `install` puts lampOS on a blank lamp from the newest build: every product
-part through its `current` link, the product units, users and zone, enabled
-and not started ([install.md](install.md)). `check` never writes, whatever `--apply` says. `once` and `check` end with
+part through its `current` link, the product units, users and zone, the
+product settings and every product skill (`/var/lib/lampOS/skills/`),
+enabled and not started ([install.md](install.md)). A round writes only
+the units a build carries for this lamp by name, never the product's
+settings or skills: a product lamp gets a new product skill or switch when
+`lamp-update install` is run again. `check` never writes, whatever `--apply` says. `once` and `check` end with
 0 (up to date, switched, or only saying), 1 (refused, put back, failed), 3
 (the channel cannot be reached), 4 (no quiet moment); a wrong option with 2.
 `serve` prints a round's outcome only when it differs from the last. The

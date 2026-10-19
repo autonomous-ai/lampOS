@@ -114,8 +114,14 @@ Environment=LAMP_TASKS_DIR=/run/lampos-tasks
 # The tasks part runs only with Harness (its unit's condition): without it the voice says work
 # can't be handed on yet, not that a part failed (#811).
 Environment=LAMP_TASKS_NEEDS=/usr/local/bin/harness
+# News of work handed over is timed by the Task news skill (lampOS/skills/task-news): the voice keeps the
+# words and tells each task once, with the skill's ask, or itself when no ask has come within 10 s (#1038).
+# News of a task that stopped or asks something has no skill yet: the voice tells it after those 10 s.
+Environment=LAMP_TASK_NEWS=skill
 Environment=LAMP_SCHEDULE_TOOLS=on
-Environment=LAMP_SCHEDULE_SPEAK=on
+# A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
+# its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
+Environment=LAMP_SCHEDULE_SPEAK=skill
 Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
 Environment=LAMP_SCHEDULE_DELIVERY_DIR=/var/lib/lampOS/voice/schedule-delivery
 Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock
