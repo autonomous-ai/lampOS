@@ -1054,8 +1054,9 @@ fn credentials_worker_environment(
         .map(|path| (crate::second_config::CREDENTIALS_ENV, path.to_owned()))
 }
 
-// The second route's Gemini endpoint and voice (#1712), to its worker
-// only, as set: the worker checks them as `second.json`'s, and says so.
+// The second route's Gemini endpoint and voice and its key terms (#1712),
+// to its worker only, as set: the worker checks them as `second.json`'s,
+// and says so.
 fn gemini_worker_environment(
     role: &str,
     var: impl Fn(&str) -> Option<std::ffi::OsString>,
@@ -1063,6 +1064,7 @@ fn gemini_worker_environment(
     [
         crate::second_config::GEMINI_BASE_URL_ENV,
         crate::second_config::SPEECH_MODEL_ENV,
+        crate::second_config::KEY_TERMS_ENV,
     ]
     .into_iter()
     .filter(|_| role == "second")
@@ -1306,6 +1308,8 @@ mod tests {
                     "https://relay.example.invalid/v1beta"
                 } else if name == crate::second_config::SPEECH_MODEL_ENV {
                     "gemini-3.8-flash-lite-tts"
+                } else if name == crate::second_config::KEY_TERMS_ENV {
+                    "Hanoi"
                 } else {
                     "a-secret"
                 },
@@ -1359,6 +1363,7 @@ mod tests {
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_SECOND_GEMINI_BASE_URL=https://relay.example.invalid/v1beta",
+                    "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
                 ],
             ),

@@ -38,8 +38,9 @@ const MAX_MESSAGE: usize = 1 << 20;
 /// question for other people's talk.
 // ponytail: the name is the character's own ("Lamp"); a lamp renamed
 // would pass its name here.
-fn query(language: Option<&str>) -> [(&'static str, &str); 10] {
-    [
+/// The unit's own key terms follow the name ([`SecondConfig::stt_key_terms`]).
+fn query<'a>(language: Option<&'a str>, key_terms: &'a [String]) -> Vec<(&'static str, &'a str)> {
+    let mut query = vec![
         ("model", MODEL),
         ("encoding", "linear16"),
         ("sample_rate", "16000"),
@@ -53,11 +54,17 @@ fn query(language: Option<&str>) -> [(&'static str, &str); 10] {
         ("endpointing", "300"),
         ("vad_events", "true"),
         ("keyterm", "Lamp"),
-    ]
+    ];
+    query.extend(key_terms.iter().map(|term| ("keyterm", term.as_str())));
+    query
 }
 
 /// The websocket URL: the Autonomous proxy at `proxy`, else Deepgram.
-pub(crate) fn url(proxy: Option<&str>, language: Option<&str>) -> Result<reqwest::Url> {
+pub(crate) fn url(
+    proxy: Option<&str>,
+    language: Option<&str>,
+    key_terms: &[String],
+) -> Result<reqwest::Url> {
     let base = match proxy {
         None => DEEPGRAM.to_owned(),
         Some(base_url) => {
@@ -67,7 +74,8 @@ pub(crate) fn url(proxy: Option<&str>, language: Option<&str>) -> Result<reqwest
             format!("{base}/ws/audio/transcriptions")
         }
     };
-    let url = reqwest::Url::parse_with_params(&base, query(language)).map_err(|_| Error::Url)?;
+    let url = reqwest::Url::parse_with_params(&base, query(language, key_terms))
+        .map_err(|_| Error::Url)?;
     match url.scheme() {
         "wss" => Ok(url),
         "ws" if cfg!(test) => Ok(url),
@@ -320,7 +328,11 @@ impl SttStream {
             Stt::Deepgram { key } => (None, key),
             Stt::Autonomous { base_url, key } => (Some(base_url.as_str()), key),
         };
-        Self::open(url(proxy, config.stt_language.as_deref())?, key.expose()).await
+        Self::open(
+            url(proxy, config.stt_language.as_deref(), &config.stt_key_terms)?,
+            key.expose(),
+        )
+        .await
     }
 
     async fn open(url: reqwest::Url, key: &str) -> Result<Self> {
@@ -489,9 +501,8 @@ pub async fn check(config: &SecondConfig, samples: &[i16]) -> Result<()> {
         Stt::Autonomous { base_url, key } => (Some(base_url.as_str()), key),
     };
     let asked = Instant::now();
-    let (mut write, mut read) = socket(url(proxy, config.stt_language.as_deref())?, key.expose())
-        .await?
-        .split();
+    let address = url(proxy, config.stt_language.as_deref(), &config.stt_key_terms)?;
+    let (mut write, mut read) = socket(address, key.expose()).await?.split();
     println!(
         "connected in {} ms; sending {:.2} s of audio",
         asked.elapsed().as_millis(),
@@ -796,7 +807,12 @@ mod tests {
 
     #[test]
     fn the_proxy_url_is_v1s() {
-        let url = url(Some("https://campaign-api.autonomous.ai/api/v1/ai/"), None).unwrap();
+        let url = url(
+            Some("https://campaign-api.autonomous.ai/api/v1/ai/"),
+            None,
+            &[],
+        )
+        .unwrap();
         assert_eq!(
             url.as_str(),
             format!(
@@ -805,10 +821,23 @@ mod tests {
         );
     }
 
+    /// #1712: the unit's key terms follow the lamp's name, each its own
+    /// `keyterm`, encoded.
+    #[test]
+    fn the_units_key_terms_follow_the_name() {
+        let terms = ["Hanoi".to_owned(), "Ho Chi Minh City".to_owned()];
+        assert_eq!(
+            url(None, None, &terms).unwrap().as_str(),
+            format!(
+                "wss://api.deepgram.com/v1/listen?{QUERY}&keyterm=Hanoi&keyterm=Ho+Chi+Minh+City"
+            )
+        );
+    }
+
     #[test]
     fn deepgram_is_called_directly_in_the_language_asked() {
         assert_eq!(
-            url(None, Some("vi")).unwrap().as_str(),
+            url(None, Some("vi"), &[]).unwrap().as_str(),
             format!(
                 "wss://api.deepgram.com/v1/listen?{}",
                 QUERY.replace("language=en", "language=vi")
@@ -819,7 +848,7 @@ mod tests {
     #[test]
     fn a_service_that_is_not_a_websocket_is_refused() {
         assert_eq!(
-            url(Some("ftp://example.com"), None).unwrap_err(),
+            url(Some("ftp://example.com"), None, &[]).unwrap_err(),
             Error::Url
         );
     }

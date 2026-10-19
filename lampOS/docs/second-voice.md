@@ -133,7 +133,16 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   targets), `vad_events=true`, and
   `keyterm=Lamp`, as V1 boosts the lamp's name: without it, on lamp-52e6,
   "Hey Lamp" came back as "Palin", "Palan" and "Len", and the model took
-  the question for other people's talk. A keep-alive
+  the question for other people's talk. After it, one `keyterm` each for
+  `LAMP_SECOND_KEY_TERMS` in the voice service's environment,
+  comma-separated (at most 20, each at most 40 bytes of letters in any
+  script, digits, spaces, `-`, `.` and `'`; refused at the worker's start
+  otherwise, naming the variable), for the places people here ask about:
+  on lamp-4ace on 19 Oct "Hanoi" was heard as "Hannover" twice and the
+  weather came back for Hannover. It reaches the second route's worker
+  alone, whose journal says `lamp-voice second: speech to text expects N
+  words beside the name (LAMP_SECOND_KEY_TERMS)`; the stop words' stream
+  keeps the name alone. A keep-alive
   every 5 s. Only final segments are kept. At the end of the line, when
   the words are already settled (final segments cover all the audio sent,
   and no interim words or `SpeechStarted` came after them), they are the
