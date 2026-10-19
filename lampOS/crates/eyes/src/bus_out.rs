@@ -285,7 +285,37 @@ impl BusOut {
         if seems && let Err(error) = out.say_seems(&bus) {
             eprintln!("lamp-eyes: how the person at the lamp seems is not said: {error}");
         }
+        // What this process says, so a trial can tell a build or a switch
+        // that didn't take from a behaviour that didn't come (#1722, 20 Oct
+        // 01:11: a lamp-eyes without activity said nothing of it).
+        eprintln!("lamp-eyes: {}", out.said());
         Some(out)
+    }
+
+    /// What is said on the bus, in words for the journal: the topics, and
+    /// the switched ones that aren't said with the switch that would.
+    pub fn said(&self) -> String {
+        let mut topics = vec![Faces::TOPIC, Diagnostic::TOPIC];
+        let mut off = Vec::new();
+        match self.presence {
+            Some(_) => topics.push(RoomPresence::TOPIC),
+            None => off.push(format!("{} ({PRESENCE_ENVIRONMENT})", RoomPresence::TOPIC)),
+        }
+        if self.familiar.is_some() {
+            topics.push(HumanFamiliar::TOPIC);
+        }
+        match self.activity {
+            Some(_) => topics.extend([RoomActivity::TOPIC, StoodUp::TOPIC]),
+            None => off.push(format!("{} ({ACTIVITY_ENVIRONMENT})", RoomActivity::TOPIC)),
+        }
+        if self.seems.is_some() {
+            topics.push(HumanSeems::TOPIC);
+        }
+        let mut line = format!("said on the bus: {}", topics.join(", "));
+        if !off.is_empty() {
+            line.push_str(&format!("; not said: {}", off.join(", ")));
+        }
+        line
     }
 
     pub fn on(bus: &Bus) -> io::Result<Self> {
@@ -989,6 +1019,29 @@ mod tests {
         let up = stood.recv(Duration::ZERO).unwrap().expect("stood up");
         assert_eq!(up.parse::<StoodUp>().unwrap().sitting_s, 30);
         assert!(stood.recv(Duration::ZERO).unwrap().is_none(), "once");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// #1722 (20 Oct 01:11): the start line says what is said, and which
+    /// switched topics aren't with the switch that would say them.
+    #[test]
+    fn the_start_line_says_which_topics_are_said() {
+        let root = std::path::PathBuf::from(format!("/tmp/lebl-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = Bus::new(&root).unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        assert_eq!(
+            out.said(),
+            "said on the bus: humans/faces/tracked, diagnostics; not said: room/presence \
+             (LAMP_PRESENCE), room/activity (LAMP_ACTIVITY)"
+        );
+        out.say_activity(&bus).unwrap();
+        assert_eq!(
+            out.said(),
+            "said on the bus: humans/faces/tracked, diagnostics, room/activity, \
+             room/stood_up; not said: room/presence (LAMP_PRESENCE)"
+        );
         std::fs::remove_dir_all(&root).unwrap();
     }
 
