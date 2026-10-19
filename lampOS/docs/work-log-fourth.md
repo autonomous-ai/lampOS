@@ -4824,6 +4824,19 @@ A usage limit paused me from about 00:40 to 06:2x.
   The first builder's three conditions are met (22:26). They merge it into #1712 on its ARM64 green.
 - **Next:** the landing's runs and its review. The hums moved to Eighth (21:51), so my list is #1973 and #1940 until they land.
 
+## 2026-10-19, 23:37 ICT: the landing's P2 fixed and re-read; #1940 on #1712's head; the speaker-by-voice table for the lead
+
+- **#1973, the landing:**
+  - the reviewer's 22:36 P2 is fixed in `cae37bca6`, by the first builder's 22:38 ruling. The name's stand-ins ("Lynn", "Lin", "Lump"…) count only in the second route's rule, so Live judges names as before. Tests cover both routes, and breaking the gate fails them.
+  - the body now says what changes on a Live lamp (that, and `asks_to_look`'s closing mark).
+  - the reviewer re-read it at 23:23: fixed. It waits on its ARM64 run, which is queued.
+  - I missed the 22:32–22:38 comments until 23:05; it's in memory now.
+- **#1940:** at `d85c89d83`, on #1712's head `c1024721c`, with lamp-4ace on the relay too. Its last ARM64 run passed (`c5fbfaa57`), and the new one is queued.
+- **Speaker by voice (the lead's item 4, #1711):** a cited table of eleven candidates. The first decision is the owner's: the training data's terms (research, non-commercial, or not stated).
+- **Dropped at the first builder's word (22:54):**
+  - #1978 (air facts) is closed for Nine's #1960;
+  - the Policy's holds are the first builder's agent's, and my uncommitted start is gone.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
