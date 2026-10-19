@@ -4,6 +4,18 @@
 
 Newest first. Times from `date` (+07).
 
+- 02:03 #2008 read (Ten: seeing who speaks): no P1/P2; P3 eyes write face before name, a torn read keeps A's line for B (checked by hand); P3 looks counted per read; P3 no off test
+- 02:01 #1997 c79db5cc6: P3 fixed (prune mutation caught); merge on green
+- 01:54 #1997 read (Nine: who was here says someone the lamp knows): no finding, P3 prune untested; merge on green
+- 01:54 update stack after El's 01:50 rebase: clean, names only in reports.rs; first builder's
+- 01:53 #2012 full read: no P1/P2, four P3s (middle departure spends the cooldown; Policy gate would refuse it; tool refusal untested; 5 deg turn); first builder's
+- 01:52 #1986 fold confirmed (called set before the look and not_for_me returns); said my 01:28 read missed the first builder's agent's P2
+- 01:52 #2016 read (Jarvis: held line told its admitted scope): no finding; body has an attribution line, asked Jarvis to delete it
+- 01:48 #2015 merged as 1614ca668 (trials.sh says each unit's build sha); no issue
+- 01:41 first look #2012 (Sixth: watch you leave): msgs StoodUp change + body motion -> first builder's; two commits; full read running
+- 01:40 #1981 1be2c49f3 is a rebase only (tests/it move); 23:45 read carries; first builder's after the lamp run
+- 01:38 #1988 re-read after merge: both P3s fixed
+- 01:38 #2007 re-read: P3 fixed; first builder's on green
 - 01:36 told El the stack conflicts only in reports.rs after #2009; rebase keeping slices
 - 01:35 #2009 merged as 1c98eddd4 (UNITS/PARTS slices); no issue
 - 01:35 #2010 merged as 553ce5d86 (trials Smoky/Dusty air); no issue
