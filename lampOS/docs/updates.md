@@ -384,6 +384,24 @@ done
 sudo systemctl restart lamp-voice lamp-body   # each unit in previous/ that was running
 ```
 
+### The second route's services in a round
+
+A round places `/etc/lampOS/voice/second.json` when the build's voice unit
+names it (`LAMP_VOICE_SECOND_CONFIG`), before any unit is written
+(`Round::place_second`; #1940, the reviewer's P1 and the first builder at
+00:11, 20 Oct). It places it as install does, with install's own writer
+and records: 0600, from the round's own `install::SECOND`. A missing file,
+or one still install's and not the build's, is written; a lamp's own is
+kept. A round that cannot place it writes no unit and keeps the old one
+(`Outcome::Failed`), so the running voice goes on.
+
+A round runs the updater a lamp already has (below), so a lamp whose
+updater predates this step gets the voice's new unit without the file. The
+voice covers that one transition itself: as it starts, with
+`LAMP_VOICE_ROUTE=second` at the product's path and no file there, it
+places the same bytes (`second_config::place_product_if_missing`), and a
+later install takes them as its own.
+
 ### lamp-update's own build on a product lamp
 
 A round never switches lamp-update itself (`lamp-update.service` is never
@@ -587,7 +605,8 @@ committed, never the owner's real key). `L` is the runbook's SSH alias.
   tested with the files a cut would leave, on the Mac.
 - lamp-update updating itself (its own unit is never a part), the keeper,
   `lampos.target`, timers, models and libraries a build does not carry,
-  configuration under `/etc/lampOS`, and a part new to a lamp.
+  configuration under `/etc/lampOS` (but for `second.json`, above), and a
+  part new to a lamp.
 - Two parts of one build that must change together across a failed
   switch: everything changed is put back together, but a part that stores
   data in a new form (memory, schedule) before being put back is not

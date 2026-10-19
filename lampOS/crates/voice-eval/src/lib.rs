@@ -12,6 +12,7 @@
 //! discrimination.
 pub mod annotations;
 pub mod canary;
+pub mod cost;
 pub mod evaluate;
 pub mod events;
 pub mod export;

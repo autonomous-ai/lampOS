@@ -1318,7 +1318,11 @@ fn set_up_later_reads_the_targets_again_and_says_why_hand_overs_are_off() {
     s.counts.signed_out.store(false, Ordering::SeqCst);
 
     write_targets(&path, b"{\"version\":1,\"targets\":");
-    let report = tasks_diagnostic_until(&s, |d| said(d, "targets_invalid").is_some());
+    // File refresh and sign-in observation finish independently. Wait for
+    // both before judging the diagnostic; signed-out has higher priority.
+    let report = tasks_diagnostic_until(&s, |d| {
+        said(d, "targets_invalid").is_some() && said(d, "signed_in").as_deref() == Some("yes")
+    });
     assert_eq!(report.level, Level::Warn);
     assert_eq!(
         report.message,

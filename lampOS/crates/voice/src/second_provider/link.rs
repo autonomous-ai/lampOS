@@ -32,6 +32,17 @@ pub fn network(fault: &Fault) -> bool {
     )
 }
 
+/// Whether a turn lost on the network may be asked once more when a host
+/// answers again (`LAMP_RESEND_LOST_LINE`, the first builder's 00:02 on
+/// #1722): [`network`], less the answer that never came
+/// (`ResponseTimeout`), which a second try would only wait for again, as
+/// Live's `resend::mendable` holds. The rule this route's resend and the
+/// link's check share: the same faults are the network's, and the link is
+/// back when any service host takes a bare connection ([`any_answers`]).
+pub fn lost(fault: &Fault) -> bool {
+    network(fault) && *fault != Fault::ResponseTimeout
+}
+
 /// `host:port` of a service URL (`https://`, `wss://`, `http://`, `ws://`),
 /// for a bare connection: the URL's own port, or the scheme's.
 pub fn target(url: &str) -> Option<String> {
@@ -283,6 +294,27 @@ mod tests {
     use super::*;
 
     const S: u64 = 1_000_000;
+
+    /// The rule the resend shares with the link's check (#1722): a line is
+    /// asked again only for the network's faults the check runs for, less
+    /// an answer that never came; never for a service that answered.
+    #[test]
+    fn a_line_is_lost_only_on_the_network_and_never_for_a_silent_answer() {
+        for fault in [Fault::Transport, Fault::ConnectTimeout] {
+            assert!(lost(&fault) && network(&fault), "{fault:?}");
+        }
+        assert!(network(&Fault::ResponseTimeout) && !lost(&Fault::ResponseTimeout));
+        for fault in [
+            Fault::RateLimited,
+            Fault::Authentication,
+            Fault::QuotaExceeded,
+            Fault::ServerUnavailable,
+            Fault::Protocol,
+            Fault::Local,
+        ] {
+            assert!(!lost(&fault), "{fault:?}");
+        }
+    }
 
     #[test]
     fn a_network_failure_with_a_host_answering_changes_nothing() {

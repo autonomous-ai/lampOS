@@ -17,6 +17,21 @@ pub trait Services: Send + Sync + 'static {
     /// The answer to `messages`, as it is written; a failure to connect is
     /// the stream's first item.
     fn chat(&self, messages: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>>;
+    /// [`Self::chat`], told only the lamp's functions named in `only`, for
+    /// a held line's calls done though its answer is held
+    /// ([`crate::attention::DONE_THOUGH_HELD`]); never narrowed further.
+    /// None, from services that cannot.
+    fn chat_only(
+        &self,
+        messages: Vec<Message>,
+        only: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        let _ = (messages, only);
+        stream::iter([Err(net::Error::Protocol(
+            "no chat told only some functions",
+        ))])
+        .boxed()
+    }
     /// `text` spoken, as 24 kHz mono packets; dropping it stops the download.
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>>;
     /// As [`Services::speak`], a piece of `turn`'s answer, which the voice
@@ -58,9 +73,17 @@ pub trait Listener: Send {
     fn early(&mut self) -> Option<mpsc::UnboundedReceiver<net::Early>> {
         None
     }
+    /// Whether it can still take a line: one kept ready whose socket has
+    /// closed since cannot ([`crate::second_provider::Engine::keeping_a_listener_ready`]).
+    fn open(&self) -> bool {
+        true
+    }
 }
 
 impl Listener for SttStream {
+    fn open(&self) -> bool {
+        SttStream::still_open(self)
+    }
     fn send(&self, samples: &[i16]) -> net::Result<()> {
         SttStream::send(self, samples)
     }
@@ -186,6 +209,23 @@ impl Net {
             false,
         )?);
         Ok(self)
+    }
+
+    /// A chat told every function, or only those named.
+    fn chat_told(
+        &self,
+        messages: Vec<Message>,
+        only: Option<&'static [&'static str]>,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        let chat = self.chat.clone();
+        stream::once(async move { chat.send_only(&messages, only).await })
+            .map_ok(|answer| {
+                stream::try_unfold(answer, |mut answer| async move {
+                    Ok(answer.next().await?.map(|event| (event, answer)))
+                })
+            })
+            .try_flatten()
+            .boxed()
     }
 
     /// Speech is Gemini's, in `voice` (`LAMP_SECOND_SPEECH=gemini`); a
@@ -333,15 +373,15 @@ impl Services for Net {
     }
 
     fn chat(&self, messages: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>> {
-        let chat = self.chat.clone();
-        stream::once(async move { chat.send(&messages).await })
-            .map_ok(|answer| {
-                stream::try_unfold(answer, |mut answer| async move {
-                    Ok(answer.next().await?.map(|event| (event, answer)))
-                })
-            })
-            .try_flatten()
-            .boxed()
+        self.chat_told(messages, None)
+    }
+
+    fn chat_only(
+        &self,
+        messages: Vec<Message>,
+        only: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.chat_told(messages, Some(only))
     }
 
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {

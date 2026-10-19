@@ -244,7 +244,10 @@ sound average 0.34, as Gemini Live's do in the engine test. Each turn keeps
 the voice's own running level: the mean of its first pieces with sound
 (level 0.01 or more), then a 2 s follow, never pulled down by a pause. The
 three bars scale by that level over 0.34, between 0.25 and 3 times, and
-never fall under 0.015, 0.03 and 0.06. So a quieter voice, such as the
+never fall under 0.015, 0.03 and 0.06. The stress bar never rises over
+0.9 (or the catalogue's own `stress_level`, if higher): the voice's meter
+stops at 1.0, so a voice that fills it would otherwise never nod, where the
+fixed bars nodded as each sentence began (Seventh on #1722, 22:25). So a quieter voice, such as the
 second route's ElevenLabs (#1712), nods and sways as Live's does, and a
 hiss is still no word. `stress_rise` was relative already.
 
@@ -279,7 +282,9 @@ settled after.
 The same answer from a voice a third as loud (0.33 times), and a fifth
 louder (1.2 times), gives 5 to 8 nods, a sway and the settle alike. On the
 old fixed bars the quiet one failed. At 0.01 times, all hiss, it nods and
-sways never.
+sways never. A voice that fills the meter (1.0 through every sentence) nods as
+each of its three sentences begins, where without the ceiling it nodded
+never.
 
 Not shown: how it looks on a lamp, and the body's own smoothing and speed
 limits on these offsets.

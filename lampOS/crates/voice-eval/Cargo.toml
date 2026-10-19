@@ -19,6 +19,8 @@ lamp-ipc = { path = "../ipc" }
 lamp-voice = { path = "../voice" }
 lamp-observer = { path = "../observer" }
 lamp-local-time = { path = "../local-time" }
+# The observation pass's dry run on a copy of a lamp's store (#1693 (4)).
+lamp-memory = { path = "../memory" }
 
 [lints]
 workspace = true

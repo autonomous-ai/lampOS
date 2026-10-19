@@ -58,6 +58,26 @@ Environment=LAMP_SHORT_SOUNDS=quiet-room
 # Whom it answered: one line per first output the rule judged, private to root on the lamp, never published
 # (lampOS/docs/attention.md, "The record of whom it answered"). Take this line out and nothing is written.
 Environment=LAMP_FIRST_OUTPUT=/var/lib/lampOS/voice/first-output
+# The lamp's voice is the second route since 19 Oct (the owner, #1712; lampOS/docs/second-voice.md, "Second only"):
+# speech to text, DeepSeek's text model and search, and the configured voice (ElevenLabs, eleven_v4_turbo) answer
+# every turn, all through the Autonomous relay; Gemini Live is not used. Live stays a per-lamp setting: a drop-in with
+# Environment=LAMP_VOICE_ROUTE=gemini. It needs two files in /etc/lampOS/voice, both placed by install and the
+# updater, and nothing for a person to add: second.json (deploy/product/settings/second.json) and the relay key it
+# names for every service, credential (the one provider.json names; setup takes the user's). Without either the
+# voice does not start, and never falls back to Live: lamp-selftest's "voice route" says which is missing.
+# With the two switches lamp-4ace's route runs with: an answer plays only when the lamp was spoken to, and its name
+# in passing is no call (#828, #864).
+Environment=LAMP_VOICE_ROUTE=second
+Environment=LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json
+Environment=LAMP_SECOND_CHAT=deepseek
+Environment=LAMP_SECOND_SEARCH=deepseek
+Environment=LAMP_SECOND_SPEECH_MODEL=eleven_v4_turbo
+# DeepSeek's chat and search through the relay with second.json's llm_credential_file, so no deepseek.key (#1934, #1939).
+Environment=LAMP_SECOND_DEEPSEEK_BASE_URL=https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek
+Environment=LAMP_SECOND_DOWN_LINE=on
+Environment=LAMP_SECOND_WAIT_CUE=on
+Environment=LAMP_SPOKEN_TO=on
+Environment=LAMP_NAME_IN_PASSING=ignored
 # Said to the lamp by name and nothing answered: the model is told the name was heard (docs/attention.md).
 Environment=LAMP_SECOND_LOOK=on
 # The lamp's name heard as a request begins: the model is told so beside what it hears (docs/attention.md).

@@ -288,10 +288,13 @@ can still be wrong; structural validation cannot prove meaning.
 
 `forget {id}` removes that record, its replacement chain in both
 directions, and all linked descendants. When the target is an observation,
-its source ancestors are removed too, preventing the same raw evidence
-from immediately recreating the forgotten observation. This can delete a
-whole exchange containing unrelated subjects. When the target is a raw
-exchange, unrelated ancestors are retained. No historical version is
+or a kept thing remembered with its conversation (#1693), the exchanges it
+was taken from are removed too, preventing the same raw evidence from
+immediately recreating the forgotten observation. This can delete a whole
+exchange containing unrelated subjects. It is one step back, the person's
+own exchanges only (#2003): an exchange's own sources are what its session
+was shown, so they, and the kept things and facts among them, are retained.
+When the target is a raw exchange, unrelated ancestors are retained. No historical version is
 reactivated after deletion.
 
 In the same transaction, deletion clears the affected person's stored

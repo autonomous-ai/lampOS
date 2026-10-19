@@ -545,6 +545,26 @@ pub fn called_by_name(heard: &str) -> bool {
     said_to || called_by_stand_in(&words)
 }
 
+/// Whether what was heard is the lamp's name alone, or a word written for
+/// it, with greetings at most: "Lamp.", "Hey Lamp,", "Hey, Lynn." A call cut
+/// off at a pause, the rest still to come ([`called_by_name`] reads it as a
+/// call).
+pub fn only_the_name(heard: &str) -> bool {
+    let is = |word: &str, list: &[&str]| list.iter().any(|known| word.eq_ignore_ascii_case(known));
+    let words: Vec<&str> = heard
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    words.iter().any(|word| !is(word, GREETINGS))
+        && words.iter().all(|word| {
+            is(word, GREETINGS)
+                || is(word, &["lamp", "lamb"])
+                || is(word, STAND_INS)
+                || is(word, STAND_ALONE_INS)
+        })
+        && called_by_name(heard)
+}
+
 /// What the service has written in the name's place, first or after a
 /// greeting ([`called`]).
 fn called_by_stand_in(words: &[&str]) -> bool {
@@ -560,6 +580,52 @@ fn called_by_stand_in(words: &[&str]) -> bool {
 /// what was heard and do nothing.
 pub fn answers(function: &str) -> bool {
     function != HEARD_MY_NAME && function != crate::tools::NOT_FOR_ME
+}
+
+/// The calls that withdraw the person's consent, done even when the rule
+/// holds their line's answer (the first builder on #1722, 16:44; #1683):
+/// today only [`crate::reports_stop::NAME`]. Each one only reduces what
+/// leaves the lamp and never adds to it. Done for a colleague's line, its
+/// cost is all of a stop's (`cloud.md`, "The person's choice"): every
+/// report waiting is deleted, one `stopped` is sent, and sharing stays off
+/// until the person turns it back on in the app. Since the answer is held,
+/// nobody is told at the time. If it were
+/// not done, a person who asks to stop sharing and is held would have to
+/// ask twice. Asked again at this cost (Third's read of #1880), the first
+/// builder kept it and made it visible (#1722, 18:44): `lamp-cloud` keeps
+/// the stop as the voice's, held, and when, for the app to show, and the
+/// voice tells it only when asked about reports
+/// ([`crate::reports_stop::STATE_NAME`]). A call that adds to what
+/// leaves the lamp, or changes the lamp, is never put here: it stays held
+/// with its answer. The answer itself stays held either way.
+pub const DONE_THOUGH_HELD: &[&str] = &[crate::reports_stop::NAME];
+
+/// Whether a call for this function is done though its line's answer is
+/// held ([`DONE_THOUGH_HELD`]).
+pub fn done_though_held(function: &str) -> bool {
+    DONE_THOUGH_HELD.contains(&function)
+}
+
+/// The words a held line must have, as whole words in any case, to be
+/// asked about [`DONE_THOUGH_HELD`] at all (the first builder on #1925,
+/// 21:32). A held line is talk the lamp judged not for it, in a busy room
+/// people talking to each other (37 such lines in 44 minutes on the first
+/// arm of 19 October), and asking means sending its words to the chat and
+/// paying a round. A stop names what is sent: "stop sending reports",
+/// "stop sharing", "don't send my data". A line with none of these is not
+/// asked and is sent nowhere, as before; a line with one is asked once and
+/// the model decides, so "report to your manager" is asked and the model
+/// calls nothing. Checked on the heard words before anything goes.
+pub const HELD_ASKED_WORDS: &[&str] = &["report", "reports", "sharing", "sending", "data"];
+
+/// Whether a held line's heard words have one of [`HELD_ASKED_WORDS`]
+/// as a whole word, in any case.
+pub fn held_line_names_reports(said: &str) -> bool {
+    said.split(|c: char| !c.is_alphanumeric()).any(|word| {
+        HELD_ASKED_WORDS
+            .iter()
+            .any(|w| word.eq_ignore_ascii_case(w))
+    })
 }
 
 /// Whether an answer is played, and why, for the record.
@@ -4112,5 +4178,66 @@ mod tests {
         attention.heard("Lamp");
         assert_eq!(attention.heard.len(), MOST_HEARD_BYTES);
         assert!(attention.heard.chars().all(|c| c == 'é'));
+    }
+
+    /// A stop to sharing names what is sent, so it is asked (#1925).
+    #[test]
+    fn a_stop_to_sharing_names_reports() {
+        for said in [
+            "Stop sending reports.",
+            "Lamp, stop sharing!",
+            "Don't send my data",
+            "STOP THE REPORTS",
+        ] {
+            assert!(held_line_names_reports(said), "{said}");
+        }
+    }
+
+    /// Busy-room talk with none of the words is not asked, and a part of a
+    /// word is not the word.
+    #[test]
+    fn busy_room_talk_without_the_words_is_not_asked() {
+        for said in [
+            "Send me the file.",
+            "Can you share your screen?",
+            "The reporter called back.",
+            "Is the database up?",
+            "",
+        ] {
+            assert!(!held_line_names_reports(said), "{said}");
+        }
+    }
+
+    /// "report to your manager" has `report`: it is asked once, and the
+    /// model decides, which is meant to call nothing.
+    #[test]
+    fn report_to_your_manager_is_asked_and_left_to_the_model() {
+        assert!(held_line_names_reports("Report to your manager first."));
+    }
+
+    /// #2002's P1: the piece a pause after the name leaves, heard as the
+    /// name alone, and nothing more.
+    #[test]
+    fn the_name_alone_is_told_from_a_line_with_it() {
+        for alone in [
+            "Lamp.",
+            "lamp",
+            "Hey Lamp,",
+            "Hey, Lynn.",
+            "Okay. Lamp?",
+            "Lamb.",
+        ] {
+            assert!(only_the_name(alone), "{alone}");
+        }
+        for not in [
+            "",
+            "Hey.",
+            "Lamp, what time is it?",
+            "Thank you, Lamp.",
+            "Line up the meetings.",
+            "The lamp.",
+        ] {
+            assert!(!only_the_name(not), "{not}");
+        }
     }
 }
