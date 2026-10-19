@@ -1,0 +1,38 @@
+{
+  "attempt": "rebased source-only gate after separating the parent image fixture",
+  "integration_base": "d9ba8d0f2a5070569fef3225a0924cdcdc005aba",
+  "commands": [
+    {
+      "stage": "fmt",
+      "command": "cargo fmt --all --check",
+      "exit_code": 0,
+      "seconds": 3.52,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "clippy",
+      "command": "cargo clippy -p lamp-body -p lamp-cloud -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+      "exit_code": 0,
+      "seconds": 91.59,
+      "log_sha256": "11cd70536a4501c0031c528a91b2701a6c651534bc347df4921b088d69ddc1a1"
+    },
+    {
+      "stage": "tests",
+      "command": "cargo test -p lamp-body -p lamp-cloud -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-skills -p lamp-voice -p lamp-voice-eval -- --test-threads=1",
+      "exit_code": 101,
+      "seconds": 514.22,
+      "log_sha256": "29a8971b83cb48a4ed6b741f14a60c01eecf9384fff4e79ad0545258b130d425"
+    }
+  ],
+  "test_totals": {
+    "passed": 3911,
+    "failed": 1,
+    "ignored": 19,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "failure": "lamp-voice-eval::hard_deadline_and_stop_grace_expire_at_their_original_boundaries timed out waiting for relay progress. The unchanged test reproduced intermittently in isolation on the host.",
+  "status": "Failed attempt preserved; subsequent successful gates, if any, are recorded separately.",
+  "diagnosis": "Scratch labels caught the host shell returning prob after the driver wrote probe\\n, at the second probe after SIGTERM while relay clock reads continued. The test and relay source remain byte-identical to the integration base.",
+  "public_report": "https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6259400709"
+}

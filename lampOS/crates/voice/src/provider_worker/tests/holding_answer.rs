@@ -95,10 +95,11 @@ async fn off_substantive_answers_and_transcript_overflow_emit_no_holding_observa
                 "The answer is four.".to_owned(),
             ],
         ),
+        (true, vec!["Let me see.".to_owned()]),
         (true, vec!["Give me a second opinion.".to_owned()]),
         (
             true,
-            vec!["Let me see".to_owned(), " ".repeat(256), ".".to_owned()],
+            vec!["Let me think".to_owned(), " ".repeat(256), ".".to_owned()],
         ),
     ] {
         let mut rig = LiveRig::start_with(quick_policy(), options(enabled));
@@ -177,7 +178,7 @@ async fn a_substantive_continuation_after_generation_end_prevents_a_holding_obse
     let mut rig = LiveRig::start_with(quick_policy(), options(true));
     let mut dial = rig.ready().await;
     let request = rig.speak(&mut dial, false, true).await;
-    dial.service.send(transcript("Let me see. ")).await;
+    dial.service.send(transcript("Let me think. ")).await;
     dial.service.send(json!({"serverContent":{"generationComplete":true,"turnComplete":true,"interactionStatus":"IN_PROGRESS"}})).await;
     dial.service.send(transcript("It is yellow.")).await;
     dial.service.send(idle_complete()).await;

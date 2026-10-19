@@ -24,6 +24,7 @@ enum Case {
     FailedBuffered,
     RefusalAfterEnded,
     OpenInput,
+    Holding { capture_gap: bool },
 }
 
 struct Peer {
@@ -40,6 +41,10 @@ struct Evidence {
     provider_starts: usize,
     provider_ends: usize,
     capture_blocks: u64,
+    written: Vec<(u64, u64, String)>,
+    retired_at_us: Option<u64>,
+    capture_gap_at_us: Option<u64>,
+    last_capture_us: Option<u64>,
 }
 
 fn ended() -> ProviderOutput {
@@ -59,6 +64,17 @@ fn run_with_notice_policy(
     notices: &FailureNotices,
     policy: TurnTaking,
 ) -> (SessionState, Evidence) {
+    let holding = matches!(case, Case::Holding { .. });
+    // The real loop reads this thread-local test switch, as it does for
+    // the misheard hum. Restore it even if a fixture assertion panics.
+    struct HoldingSwitch(bool);
+    impl Drop for HoldingSwitch {
+        fn drop(&mut self) {
+            TEST_HOLDING_ANSWER.with(|enabled| enabled.set(self.0));
+        }
+    }
+    let _holding_switch =
+        holding.then(|| HoldingSwitch(TEST_HOLDING_ANSWER.with(|enabled| enabled.replace(true))));
     let maximum_played = 480
         + notices.capability()["available"]["frames"]
             .as_u64()
@@ -117,6 +133,7 @@ fn run_with_notice_policy(
                 | Case::RefusalAfterEnded
                 | Case::CompleteBuffered
                 | Case::FailedBuffered
+                | Case::Holding { .. }
         ) {
             owner
                 .playback_ended(now(), reply.playback.take().unwrap())
@@ -155,6 +172,10 @@ fn run_with_notice_policy(
         provider_starts: 0,
         provider_ends: 0,
         capture_blocks: 0,
+        written: Vec::new(),
+        retired_at_us: None,
+        capture_gap_at_us: None,
+        last_capture_us: None,
     }));
     {
         let shared = shared.clone();
@@ -196,11 +217,24 @@ fn run_with_notice_policy(
                 });
             }
             Case::OpenInput => {}
+            Case::Holding { .. } => {
+                queued.push_back(provider_audio(1, vec![123; 480]));
+                queued.push_back(ProviderOutput::HoldingAnswer {
+                    request,
+                    session: 1,
+                });
+                queued.push_back(ProviderOutput::TurnComplete {
+                    request,
+                    idle: true,
+                });
+            }
         }
         let started = crate::scenario_clock::instant();
         let mut guard_sent = false;
         let mut terminal_sent = false;
         let mut capture_started = false;
+        let mut capture_epoch = 1;
+        let mut capture_sequence = 0;
         let mut next_capture = started;
         let mut next_privacy = started;
         let mut cursor = 0u64;
@@ -289,8 +323,43 @@ fn run_with_notice_policy(
                     "capture"
                         if capture_started && crate::scenario_clock::instant() >= next_capture =>
                     {
-                        evidence.capture_blocks += 1;
                         let at = monotonic_us();
+                        if matches!(case, Case::Holding { capture_gap: true })
+                            && evidence.capture_gap_at_us.is_none()
+                            && evidence
+                                .retired_at_us
+                                .is_some_and(|retired| at - retired >= 500_000)
+                        {
+                            // The live capture-control drain, then the next
+                            // loop's gap cancellation, must clear the promise.
+                            // Do not call Continuation::clear from the fixture.
+                            peer.channels
+                                .control
+                                .send(WorkerEvent::CaptureGap {
+                                    epoch: capture_epoch,
+                                    reason: "AuthorityExpired".into(),
+                                    closed_at_us: at,
+                                })
+                                .unwrap();
+                            capture_epoch += 1;
+                            capture_sequence = 0;
+                            let mut reopened = super::capture_started(NoiseSuppression::On);
+                            if let WorkerEvent::CaptureStarted {
+                                epoch,
+                                privacy_generation,
+                                ..
+                            } = &mut reopened
+                            {
+                                *epoch = capture_epoch;
+                                *privacy_generation =
+                                    peer.snapshot.unwrap().microphone_generation();
+                            }
+                            peer.channels.control.send(reopened).unwrap();
+                            evidence.capture_gap_at_us = Some(at);
+                        }
+                        evidence.capture_blocks += 1;
+                        capture_sequence += 1;
+                        evidence.last_capture_us = Some(at);
                         let probability =
                             if matches!(case, Case::OpenInput) && evidence.capture_blocks <= 16 {
                                 0.99
@@ -302,10 +371,10 @@ fn run_with_notice_policy(
                             .send(MicrophoneFrame {
                                 raw: None,
                                 linear: None,
-                                epoch: 1,
+                                epoch: capture_epoch,
                                 dsp_epoch: 1,
                                 privacy_generation: peer.snapshot.unwrap().microphone_generation(),
-                                frame_sequence: evidence.capture_blocks,
+                                frame_sequence: capture_sequence,
                                 read_completed_at_us: at,
                                 probability,
                                 echo: None,
@@ -348,6 +417,23 @@ fn run_with_notice_policy(
                                 Some(ProviderInput::Reminder { .. }) => {
                                     panic!("reminders are disabled in this fixture")
                                 }
+                                Some(ProviderInput::Written {
+                                    request,
+                                    session,
+                                    text,
+                                    ..
+                                }) if holding => {
+                                    evidence.written.push((request, session, text));
+                                    queued.push_back(ProviderOutput::Started {
+                                        request,
+                                        session,
+                                        waiting_for_barrier: false,
+                                    });
+                                    queued.push_back(ProviderOutput::TurnComplete {
+                                        request,
+                                        idle: true,
+                                    });
+                                }
                                 Some(
                                     ProviderInput::Audio { .. }
                                     | ProviderInput::Written { .. }
@@ -356,7 +442,17 @@ fn run_with_notice_policy(
                                 None => break,
                             }
                         }
-                        if !terminal_sent && !queued.is_empty() {
+                        // Keep the provider available through the holding
+                        // opportunity: 0.5 s to the gap, then over 1 s of
+                        // fresh quiet. Only afterwards end this service fixture.
+                        let holding_done = holding
+                            && evidence
+                                .retired_at_us
+                                .is_some_and(|retired| monotonic_us() - retired >= 1_600_000);
+                        if holding_done && !terminal_sent {
+                            queued.push_back(ended());
+                        }
+                        if !terminal_sent && !queued.is_empty() && (!holding || holding_done) {
                             let mut link = ready_link(2, 1);
                             link.state = ProviderLinkState::Terminal {
                                 reason: LinkFailure::NoResumableContext,
@@ -418,6 +514,7 @@ fn run_with_notice_policy(
                                 })
                                 .unwrap();
                             if chunk.end_of_speech {
+                                evidence.retired_at_us.get_or_insert(at);
                                 peer.channels
                                     .control
                                     .send(WorkerEvent::SpeechRetired {
@@ -434,7 +531,12 @@ fn run_with_notice_policy(
                 }
                 // An unchanged-source red run must finish with an explicit test
                 // fault rather than hang indefinitely after the service bug.
-                if !guard_sent && elapsed >= Duration::from_millis(1500) && peer.role == "privacy" {
+                let fault_after = if holding {
+                    Duration::from_secs(3)
+                } else {
+                    Duration::from_millis(1500)
+                };
+                if !guard_sent && elapsed >= fault_after && peer.role == "privacy" {
                     peer.channels
                         .control
                         .send(WorkerEvent::Fault {
@@ -511,6 +613,61 @@ fn completed_buffered_reply_is_fully_retired_before_service_error() {
     let (trace, evidence) = run(Case::CompleteBuffered);
     assert_eq!(evidence.played, vec![123; 480]);
     assert_outcome(&trace, "audio_written_unscored");
+}
+
+#[test]
+fn holding_continuation_is_cleared_by_the_live_capture_gap_path_after_retirement() {
+    for capture_gap in [false, true] {
+        let (trace, evidence) = run(Case::Holding { capture_gap });
+        assert_eq!(evidence.played, vec![123; 480]);
+        let finished = trace
+            .iter()
+            .position(|event| event["kind"] == "turn_finished" && event["turn"] == 1)
+            .unwrap();
+        assert_eq!(trace[finished]["outcome"], "audio_written_unscored");
+        let retired = evidence.retired_at_us.unwrap();
+        let nudges: Vec<_> = trace
+            .iter()
+            .filter(|event| event["kind"] == "holding_answer_nudged")
+            .collect();
+        if capture_gap {
+            let sent_gap = evidence.capture_gap_at_us.unwrap();
+            assert!((500_000..510_000).contains(&(sent_gap - retired)));
+            let closed = trace
+                .iter()
+                .position(|event| event["kind"] == "capture_gap_closed")
+                .unwrap();
+            let cancelled = trace
+                .iter()
+                .position(|event| {
+                    event["kind"] == "hand_control_cancel" && event["reason"] == "capture_gap"
+                })
+                .unwrap();
+            assert!(finished < closed && closed < cancelled);
+            let cancelled_at = trace[cancelled]["at_us"].as_u64().unwrap();
+            assert!(cancelled_at >= sent_gap);
+            assert!(evidence.last_capture_us.unwrap() - cancelled_at >= 1_000_000);
+            assert!(trace.iter().any(|event| {
+                event["kind"] == "capture_started" && event["details"]["epoch"] == 2
+            }));
+            assert!(
+                nudges.is_empty(),
+                "the live owner must clear the retired promise"
+            );
+            assert!(evidence.written.is_empty(), "nothing reaches the provider");
+        } else {
+            // Without the gap, this same retired reply and fresh silence
+            // must really queue the note. Otherwise the negative case could
+            // pass without ever having an eligible holding opportunity.
+            assert_eq!(nudges.len(), 1);
+            assert!(nudges[0]["at_us"].as_u64().unwrap() - retired >= 500_000);
+            assert_eq!(evidence.written.len(), 1);
+            let (_, session, text) = &evidence.written[0];
+            assert_eq!(*session, 1);
+            assert_eq!(text, crate::holding_answer::NOTE);
+            assert!(evidence.capture_gap_at_us.is_none());
+        }
+    }
 }
 
 #[test]

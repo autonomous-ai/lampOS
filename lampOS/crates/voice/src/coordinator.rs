@@ -2910,9 +2910,7 @@ fn provider_arguments(
     arguments.extend(crate::going_on_asks::arguments_from_environment());
     arguments.extend(crate::cut_in_told::arguments_from_environment());
     arguments.extend(crate::misheard_hum::arguments_from_environment());
-    if crate::holding_answer::on() {
-        arguments.push(crate::holding_answer::FLAG.to_owned());
-    }
+    arguments.extend(crate::holding_answer::arguments_from_environment());
     arguments.extend(crate::messages::arguments_from_environment());
     if let Some(camera) = camera {
         arguments.extend(camera.source.arguments());
@@ -3819,6 +3817,8 @@ thread_local! {
     static TEST_UNCLEAR_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_MISHEARD_HUM=on` (#828), as `TEST_FULL_LOOK`.
     static TEST_MISHEARD_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's `LAMP_HOLDING_ANSWER=on`, without changing process-wide flags.
+    static TEST_HOLDING_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4177,7 +4177,11 @@ fn conversation_with_gate(
     }
     let mut second_look =
         crate::second_look::SecondLook::default().with_the_note(crate::called::on());
-    let mut holding_answer = holding::Continuation::new(crate::holding_answer::on());
+    #[cfg(test)]
+    let holding_on = crate::holding_answer::on() || TEST_HOLDING_ANSWER.with(std::cell::Cell::get);
+    #[cfg(not(test))]
+    let holding_on = crate::holding_answer::on();
+    let mut holding_answer = holding::Continuation::new(holding_on);
     let policy_detector = match rig.turn_taking {
         // Duplex gates the scores this detector sees; its rule is unchanged.
         TurnTaking::V1Baseline | TurnTaking::Duplex => TurnDetector::v1_baseline(),
