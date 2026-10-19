@@ -60,7 +60,9 @@ const USAGE: &str = "usage:
       [--scenes DIR --date YYYY-MM-DD --utc-offset +HH:MM]
       (JOURNAL is `journalctl -u lamp-voice` text of the run alone; FROM and TO are
       HH:MM or HH:MM:SS by the lamp's clock; DIR holds the played test's scene files
-      and battery summaries; YYYY-MM-DD is the day the first arm begins)";
+      and battery summaries; YYYY-MM-DD is the day the first arm begins)
+  lamp-voice-eval mood-minute DIR
+      the numbers of Mood's lamp minute from the taps tools/mood-minute.sh wrote in DIR";
 
 fn main() {
     match run() {
@@ -319,6 +321,12 @@ fn run() -> Result<i32> {
     }
     let mut args = Args { values: all };
     match command.as_str() {
+        "mood-minute" => {
+            let dir = PathBuf::from(args.positional()?);
+            args.done()?;
+            lamp_voice_eval::mood_minute::run(&dir)?;
+            return Ok(0);
+        }
         "export" => {
             let options = lamp_voice_eval::export::ExportOptions {
                 since: args.take("--since")?.ok_or_else(|| invalid(USAGE))?,
