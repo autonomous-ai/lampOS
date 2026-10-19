@@ -146,6 +146,9 @@ struct SkillFile {
     still: Option<String>,
     /// Local hours when the skill never starts itself.
     quiet: Option<QuietFile>,
+    /// A search a person asked for (#1685): its looks, and what the model
+    /// is told past the last.
+    search: Option<SearchFile>,
     #[serde(rename = "do")]
     steps: Vec<StepFile>,
 }
@@ -192,6 +195,30 @@ struct FlagFile {
     name: String,
     about: String,
 }
+
+/// `[search]`: a tool's calls that are one search (#1685, "look for my
+/// keys"): at most `looks` of them, the first at the choice's default.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SearchFile {
+    looks: u32,
+    give_up: String,
+}
+
+/// A search a person asked for, as loaded: its calls are the looks of one
+/// run, the first starting it and the others made while it is under way.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Search {
+    /// The most looks of one search: one past them is refused with `give_up`.
+    pub looks: u32,
+    /// What the model is told, as an error, of a look past the last: to say
+    /// kindly that it cannot see the thing from here.
+    pub give_up: String,
+}
+
+/// The most looks a search may say it takes: a living thing looks at a few
+/// places and lets it go (CLAUDE.md's rule 8).
+pub const SEARCH_LOOKS_AT_MOST: u32 = 8;
 
 /// `[again]`: within `within` of the tool's last run, a call runs only if
 /// what was heard since asks for it.
@@ -647,6 +674,8 @@ pub struct Skill {
     flag: Option<FlagFile>,
     again: Option<Again>,
     still: String,
+    /// A search a person asked for (#1685): its calls are one run's looks.
+    pub search: Option<Search>,
     /// Local minutes of the day, from and to, when it never starts itself.
     quiet: Option<(u16, u16)>,
     /// Each step, and the runs it is made in when not every one: one
@@ -712,6 +741,31 @@ impl Skill {
             new
         });
         reads
+    }
+
+    /// The arguments a search's next look is made with, after `looked` of
+    /// its looks (#1685): the first at the choice's default (the desk, where
+    /// a thing is looked for first), whatever the call names; each after it
+    /// as asked; none past `looks`, the model told `give_up` instead. A
+    /// skill with no search takes every call as asked.
+    pub fn search_look(&self, args: &Value, looked: u32) -> Result<Value, String> {
+        let Some(search) = &self.search else {
+            return Ok(args.clone());
+        };
+        if looked >= search.looks {
+            return Err(search.give_up.clone());
+        }
+        let mut args = args.clone();
+        if looked == 0
+            && let Some(choice) = &self.choice
+            && let Some(default) = &choice.default
+        {
+            if !args.is_object() {
+                args = json!({});
+            }
+            args[&choice.name] = json!(default);
+        }
+        Ok(args)
     }
 
     /// Whether a step holds something until its trigger stops holding.
@@ -847,6 +901,9 @@ pub enum Call {
         mood: String,
         lasting_us: u64,
         toward: Option<f32>,
+        /// A search's pose (#1685): let go within a fifth of a second of the
+        /// voice listening to someone, and the run with it.
+        until_spoken: bool,
     },
     /// A colour, to the actions part's `light_colour`, then stepped to its
     /// level; held for its while in a run with no say. With `keep`, it is
@@ -947,10 +1004,14 @@ impl Call {
                 mood,
                 lasting_us,
                 toward,
+                until_spoken,
             } => {
                 let mut args = json!({ "mood": mood, "for_ms": lasting_us / 1_000 });
                 if let Some(toward) = toward {
                     args["toward"] = json!(toward);
+                }
+                if *until_spoken {
+                    args["until_spoken"] = json!(true);
                 }
                 ("body.mood", args)
             }
@@ -1566,6 +1627,8 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                         mood,
                         lasting_us,
                         toward: body.toward,
+                        // A search's poses end when someone speaks (#1685).
+                        until_spoken: file.search.is_some(),
                     }));
                 }
                 _ => return Err("a body mood goes with its for, and a for with a mood".into()),
@@ -1713,6 +1776,46 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         ));
     }
     file.permissions.check()?;
+    // A search is a person's ask (#1685): a tool alone starts it, each call
+    // is a look, and its first is at the choice's default (the desk).
+    let search = match file.search {
+        None => None,
+        Some(search) => {
+            if !asked_alone
+                || !steps
+                    .iter()
+                    .any(|(_, step)| *step == Step::Call(Call::Look))
+            {
+                return Err(
+                    "[search] is a tool's looks: in a skill started by its tool alone, with look = true"
+                        .into(),
+                );
+            }
+            if file
+                .choice
+                .as_ref()
+                .is_none_or(|choice| choice.default.is_none())
+            {
+                return Err(
+                    "[search] begins at its choice's default: a [choice] with a default".into(),
+                );
+            }
+            if !(1..=SEARCH_LOOKS_AT_MOST).contains(&search.looks) {
+                return Err(format!(
+                    "[search] looks is 1 to {SEARCH_LOOKS_AT_MOST}: a few places, then it lets it go"
+                ));
+            }
+            if search.give_up.trim().is_empty() || search.give_up.len() > 256 {
+                return Err(
+                    "[search] give_up is what the model is told, in at most 256 bytes".into(),
+                );
+            }
+            Some(Search {
+                looks: search.looks,
+                give_up: search.give_up,
+            })
+        }
+    };
     let skill = Skill {
         name,
         description,
@@ -1728,6 +1831,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         flag: file.flag,
         again,
         still,
+        search,
         quiet,
         steps,
     };

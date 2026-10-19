@@ -203,6 +203,14 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
          32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
     ),
+    // An installable skill (#1685): its owner puts it on; not in the
+    // product's install until it has been tried on a lamp.
+    (
+        "look-for-things",
+        "an installable skill, not yet tried on a lamp (#1685): its turns need a lamp-body with \
+         `toward` and the lamp's `--gaze`, and its function would put a product session past its \
+         32 without `LAMP_USE_SKILL=on`",
+    ),
 ];
 
 /// One file of a product skill, `lampOS/skills/SKILL/FILE`, and where

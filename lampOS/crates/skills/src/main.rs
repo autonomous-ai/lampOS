@@ -577,6 +577,7 @@ fn serve(
         ends: RefCell::new(HashMap::new()),
         local_time: options.local_time.clone(),
         permissions: RefCell::new(HashMap::new()),
+        looks: RefCell::new(HashMap::new()),
     };
     let (ask, asks) = mpsc::channel::<ToolAsk>();
     if let Some(tools) = tools {
@@ -912,6 +913,8 @@ struct Runner {
     /// By skill, what each loaded skill may use, as of the last load: a
     /// skill not loaded may use nothing.
     permissions: RefCell<HashMap<String, Permissions>>,
+    /// By skill, the looks its search under way has taken (#1685).
+    looks: RefCell<HashMap<String, u32>>,
 }
 
 impl Runner {
@@ -1167,6 +1170,34 @@ fn tool_call(
         eprintln!("lamp-skills: {name} with {args} not run: its run is under way");
         return refuse(still);
     }
+    // A search's look (#1685): its first at the desk, its looks counted,
+    // none past the last, the model told to give up kindly instead.
+    let searching = engine
+        .skills()
+        .iter()
+        .find(|skill| skill.tool.as_deref() == Some(name.as_str()))
+        .filter(|skill| skill.search.is_some())
+        .map(|skill| {
+            let looked = if busy.contains(&skill.name) {
+                runner.looks.borrow().get(&skill.name).copied().unwrap_or(0)
+            } else {
+                0
+            };
+            (skill.name.clone(), looked, skill.search_look(&args, looked))
+        });
+    let counted = searching
+        .as_ref()
+        .map(|(skill, looked, _)| (skill.clone(), *looked));
+    let args = match searching {
+        Some((_, looked, Err(give_up))) => {
+            eprintln!(
+                "lamp-skills: {name} with {args} not run: its search took its {looked} looks"
+            );
+            return refuse(&give_up);
+        }
+        Some((_, _, Ok(look))) => look,
+        None => args,
+    };
     let mut run = match engine.tool(&name, &args, clock::now_us()) {
         Ok(run) => run,
         Err(why) => {
@@ -1198,6 +1229,9 @@ fn tool_call(
     // The caller told it timed out: nothing is done.
     if !admission.commit() {
         return;
+    }
+    if let Some((skill, looked)) = counted {
+        runner.looks.borrow_mut().insert(skill, looked + 1);
     }
     // A call with a look is answered only once its body and light are made:
     // the voice asks the eyes as the answer's first audio plays, and by
@@ -1600,7 +1634,7 @@ fn perform(
                     );
                 }
             }
-            clock::sleep(Duration::from_micros(changed.lasting_us));
+            wait_out(skill, calls, bus, changed.lasting_us, &mut said);
         }
     }
     if let Some(last) = played.last.as_mut() {
@@ -1808,8 +1842,37 @@ fn show(
     format!("show {name}: {shown} frames shown")
 }
 
-/// How often a show looks whether it should stop.
+/// How often a show looks whether it should stop, and a search's pose
+/// whether someone speaks.
 const SHOW_LOOKS: Duration = Duration::from_millis(200);
+
+/// The run's while, slept out. A search's (its pose held until someone
+/// speaks, #1685) ends within a fifth of a second of the voice listening to
+/// someone: its pose is let go, and the light then given back.
+fn wait_out(skill: &str, calls: &[Call], bus: &Bus, lasting_us: u64, said: &mut Vec<String>) {
+    let until_spoken = calls.iter().any(|call| {
+        matches!(
+            call,
+            Call::Mood {
+                until_spoken: true,
+                ..
+            }
+        )
+    });
+    if !until_spoken {
+        clock::sleep(Duration::from_micros(lasting_us));
+        return;
+    }
+    let until = clock::now() + Duration::from_micros(lasting_us);
+    while clock::now() < until {
+        if voice_listening(bus) {
+            end_hold(skill);
+            said.push("someone spoke: the search ended".into());
+            return;
+        }
+        clock::sleep(SHOW_LOOKS.min(until.saturating_duration_since(clock::now())));
+    }
+}
 
 /// Why a show goes no further, if it should not: the body pushed, the lamp
 /// paused, or the voice listening to someone.
@@ -1827,9 +1890,12 @@ fn show_stopped(bus: &Bus) -> Option<String> {
     {
         return Some("the lamp was paused".into());
     }
-    (said_lately::<VoiceState>(bus, VoiceState::TOPIC).map(|now| now.state)
-        == Some(Voice::Listening))
-    .then(|| "the voice is listening to someone".into())
+    voice_listening(bus).then(|| "the voice is listening to someone".into())
+}
+
+/// Whether the voice is listening to someone now: a person speaks.
+fn voice_listening(bus: &Bus) -> bool {
+    said_lately::<VoiceState>(bus, VoiceState::TOPIC).map(|now| now.state) == Some(Voice::Listening)
 }
 
 /// Waits while the clip `sent` plays, until the body says on `body/gesture`
@@ -2129,6 +2195,7 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             mood,
             lasting_us,
             toward,
+            until_spoken,
         } => {
             // Said again every second, as the body needs it at least every
             // 1.5 s (#1011); when it stops being said, the body comes back.
@@ -2146,14 +2213,26 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
             };
             let first = tell(&what, text.clone(), &path);
             let until = clock::now() + Duration::from_micros(*lasting_us);
+            // A search's pose looks at the voice every fifth of a second and
+            // is let go once someone speaks (#1685); any other, each second.
+            let (until_spoken, bus) = (*until_spoken, bus.clone());
+            let looks = if until_spoken { SHOW_LOOKS } else { MOOD_EVERY };
             std::thread::spawn(move || {
-                while clock::now() + MOOD_EVERY < until {
-                    clock::sleep(MOOD_EVERY);
+                let mut next = clock::now() + MOOD_EVERY;
+                while next < until {
+                    clock::sleep(looks.min(next.saturating_duration_since(clock::now())));
                     if !holding(&skill, number) {
                         break;
                     }
-                    let _ = UnixDatagram::unbound()
-                        .and_then(|body| body.send_to(text.as_bytes(), &path));
+                    if until_spoken && voice_listening(&bus) {
+                        end_hold(&skill);
+                        break;
+                    }
+                    if clock::now() >= next {
+                        let _ = UnixDatagram::unbound()
+                            .and_then(|body| body.send_to(text.as_bytes(), &path));
+                        next += MOOD_EVERY;
+                    }
                 }
             });
             format!("{first}, held {} s", lasting_us / 1_000_000)
@@ -2260,6 +2339,7 @@ mod tests {
                 mood: "reading".into(),
                 lasting_us: 3_000_000,
                 toward: None,
+                until_spoken: false,
             },
         ];
         let (mut changed, mut played, mut glow, mut said) =
@@ -2357,6 +2437,7 @@ mod tests {
                     ..Permissions::default()
                 },
             )])),
+            looks: RefCell::default(),
         };
         let dance = runner.sockets_for("dance");
         assert_eq!(dance.may.skill, "dance");
