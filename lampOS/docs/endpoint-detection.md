@@ -232,8 +232,11 @@ Each `Activity::End` records an `EndpointDecision`:
     `reader_finished_after_us`. Durations are microseconds from the same spawn
     attempt (before launching the process), not wall-clock timestamps. These
     four fields reset when a replacement starts; `worker` identifies the
-    incarnation. Null means that receipt has not been observed. A kill request
-    does not prove signal delivery. `native_reaped: false` means the native
+    incarnation. Null means that receipt has not been observed; older records
+    omit these keys entirely. A kill request does not prove signal delivery.
+    The legacy status-query-error path requests a kill without incrementing
+    lifetime `kills`, so that counter and the kill receipt can differ.
+    `native_reaped: false` means the native
     wait returned an error, not that the process is known to be alive.
   - The native wait receipt is published before the reader drain. Thus
     `native_reaped: true` with no reader receipt distinguishes confirmed exit
