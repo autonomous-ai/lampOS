@@ -191,6 +191,54 @@ pads (First, #711):
 | `head_tap_min_ms` | 120 | qualify..499 | A tap is let go no sooner; just above the lone 117 ms edge lamp-4ace's journal showed at 19:25 with nobody known at the lamp |
 | `head_gap_ms` | 150 | 0..500 | Released acquisitions shorter than this do not end a hand |
 
+### Each lamp's own head pads (#711)
+
+Each unit's head pads rest and read differently (#1764): lamp-4ace's rest low
+and are held high by a hand; lamp-cb94's line 97 flipped at rest and read
+touched for 77 s with no hand on it, a stroke and a sleep from nobody; and
+lamp-c0a4's pulsed under a hand from a low rest, then a minute later rested
+high. So each lamp's factory step measures its pads' own baseline
+(`deploy/factory/steps.sh`, install.md) and writes it beside `head_pads`:
+
+    "head_rest": [
+      {"name": "head-1", "rest": "low", "reads": "pulses"},
+      {"name": "head-2", "rest": "low", "reads": "level"}
+    ]
+
+`rest` is the line with hands away, so a pad resting high is active-low;
+`reads` is how a touch showed on it. The names are the head pads', in their
+order; anything else refuses the file. Without `head_rest` every pad reads
+its level by its `active_low`, as before.
+
+- **`level`:** touched while the line is away from its rest, as before.
+- **`pulses`:** touched while the line keeps changing: two changes 20 to
+  250 ms apart are a pulse, and the pad stays touched until 250 ms after the
+  last (`PULSE_MIN_US`, `PULSE_GAP_US` in `src/touch.rs`). A single change
+  with none after it, a rest that flips, is never a touch; so the head arms
+  whichever way the line rests, and a hand resting on it reads the same from
+  either rest: a touch, a stroke at 1 s and a sleep at 3 s, and one or two
+  pulses a tap. The touch is seen at the pulse's second change, its width
+  later than on a level pad (40 ms in the tests; 50 to 100 ms on the
+  TTP223s, above), and a tap is let go 250 ms after its last pulse.
+
+`discover-head --rest-seconds R` measures it: after the 500 ms settle, R
+seconds of hands away, in which each line's changes are counted
+(`rest_changes`); then the touches, as before. A candidate whose longest
+pulse lasted 500 ms or more held its level (`reads: level`); one whose line
+made at least four changes each 20 to 250 ms after the one before
+(`fast_changes`, `BURST`) pulsed (`reads: pulses`); with neither, as two
+quick taps on a pad that holds its level, it says none (the reviewer on
+#1965), since `pulses` written for such a pad would never read a resting
+hand. The factory step refuses a pad with any change at rest, or with no
+`reads`, and asks again; it writes `head_rest` only from a report that
+measured both. Tests: `tests/head_rest.rs` (cb94's 77 s flip is nothing on a pulse
+pad and a touch, stroke and sleep on a level one; a resting hand from either
+rest; one or two pulses a tap; a bounce or a slow change nothing; a pulse pad
+arms on a line resting high), `tests/head_discovery.rs`
+(`the_hands_away_phase_*`, `two_quick_touches_on_a_level_pad_*`), `tests/touch_pins.rs` (`head_rest_*`) and
+`deploy/factory/steps-test.sh`. Not shown: any lamp's pads read this way;
+whether a pad whose rest drifts later, after the factory, is told.
+
 A lone short edge can therefore stop speech at 20 ms, as any touch does,
 but never asks the lamp to listen or wake. The contact's time,
 through such gaps, is `touch_state.held_us`, the countdown readers use;
@@ -429,10 +477,11 @@ First's on-lamp sequence is:
    file: step 3 below with `--seconds 600` and `--record`, hands off the lamp,
    then replay the record with the saved pins file. It must show no touch
    event. Verify any excluded pad does not cause a global chip fault.
-2. With hands away initially, run `lamp-controls discover-head --seconds 20`,
-   then touch and release each physical pad twice. It probes pull-down/up,
-   requires driven idle and two complete ≥20 ms pulses, prints candidate
-   polarity and installs nothing. A floating, untested or startup-held line
+2. With hands away initially, run `lamp-controls discover-head --seconds 30
+   --rest-seconds 10`, keep hands away 11 s, then touch and release each
+   physical pad twice. It probes pull-down/up, counts each line's changes at
+   rest, requires driven idle and two complete ≥20 ms pulses, prints
+   candidate polarity and how each reads, and installs nothing. A floating, untested or startup-held line
    is not a pad mapping. Set the actual observed candidates in the pins file;
    remove the nonexistent primary from lamp-4ace's configuration, not all lamps.
 3. Run `lamp-controls serve --touch --config <unit-controls.json>
@@ -553,8 +602,9 @@ V1 Automatic's 120 ms; ambiguous/moving contacts retain 120 ms. Spatial swipe
 actions and the full V1 directional recognizer are deliberately absent. This
 must be tried against real handoffs and noisy electrodes on the assembled base.
 
-Head pads are explicitly known installed pads. There is no probing or learning
-of candidate pins; V1's 20 ms LOW rule was for learning an unknown pad, not for
+Head pads are explicitly known installed pads: the factory step finds them
+once (`discover-head`, above), and Controls never probes or learns pins as it
+runs; V1's 20 ms LOW rule was for learning an unknown pad, not for
 every touch. Both edges extend the 200 ms contact timer, and each completed
 session restarts the 1.2 s decision timer. An isolated pulse resolves as Pet
 1.4 s after its last edge. Directional labels, early reversal classification,
