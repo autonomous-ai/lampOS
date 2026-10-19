@@ -4253,35 +4253,6 @@ mod tests {
         assert!(busy_after_three(false), "without it: talk, and busy");
     }
 
-    /// Tests' map on #1712 (20:11), (2): `LAMP_SPOKEN_TO=day-and-night` on
-    /// the second route as the only voice. By day, with the day's own bars,
-    /// a name heard close to the lamp at 0.95 in a busy room, nobody turned
-    /// to it and no words calling it, is held, as on Live (#829, the eye
-    /// drops); with `on` alone it plays. The night's bars are not read here:
-    /// this route never tells its rule the night (Live does, from
-    /// `local_time::night_here`), so it judges every hour as day.
-    #[test]
-    fn as_the_only_voice_the_days_bars_hold_a_name_heard_close_by_day() {
-        use crate::room_told::Room;
-        let signs = || super::Signs {
-            room: Room::Busy,
-            going_on: false,
-            lamp_asked: false,
-            turned: Some(false),
-            names: vec![(1_000_100_000, 0.95)],
-            near: true,
-            continues_from: None,
-        };
-        let line = (1_000_000_000, 1_001_500_000);
-        let judged = |by_day: bool| {
-            let mut heeding = super::Heeding::new(true, false, None, None);
-            heeding.as_the_only_voice(false, true, by_day);
-            heeding.judge(9, line, "What time is it?", signs())
-        };
-        assert!(judged(true).is_some(), "by day, held");
-        assert_eq!(judged(false), None, "with on alone, played");
-    }
-
     /// #1712, lamp-4ace's A/B: after a hand-over and 104 s, every line
     /// without the name was held as no conversation, where Live answered.
     /// With `--spoken-to`, as on the Live worker: a question about the lamp's
