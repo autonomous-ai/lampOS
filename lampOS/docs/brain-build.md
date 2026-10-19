@@ -113,6 +113,23 @@ Engineering:
     or fails the publisher.
 16. **No decision model on the spoken path** until it wins on recorded
     requests against the Live model's own tool call.
+17. **Everything is a skill** (the owner, 2026-10-19 06:4x and 07:2x): "do it
+    all no adhoc code everything is a skill", with "core skills and
+    installable skills ... core skills like core apple apps right always
+    installed on the phone and then installable skills like installable
+    apps". Built in, below the skills, stay only the conversation, reflexes
+    under 150 ms and system parts (setup, updates, health, the privacy
+    switch). Each V1 capability is decided against V2's direction before it
+    is built ([v1-verdicts.md](v1-verdicts.md), "The owner's scope
+    decisions, 2026-10-19").
+18. **No lamp has shipped, and updates carry every later version** (the
+    owner, 2026-10-19 07:1x). V2 is installed on the current lamps before
+    they ship. Nothing migrates from V1, and a shipped lamp must update in
+    place to V3, V4 and V5: the units, the models, the updater itself,
+    rollback, and every part's store read across versions (#1680).
+19. **Privacy is the physical switch** (the owner, 2026-10-19 07:2x): "when it
+    comes to privacy, the switch is definite". There is no camera-off or
+    mute by voice.
 
 ## How a request is decided
 
