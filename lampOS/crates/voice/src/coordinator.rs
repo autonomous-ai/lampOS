@@ -3798,6 +3798,9 @@ fn conversation_with_gate(
     let privacy_started = session_instant();
     let mut privacy_sequence = 0u64;
     let mut permitted = false;
+    // A privacy observation read stale before the microphone was first
+    // allowed: said once (lamp-4ace, 19 Oct 01:19).
+    let mut said_stale_at_start = false;
     let mut capture_requested = false;
     let mut capture_epoch = None;
     let mut last_capture = None;
@@ -4421,8 +4424,20 @@ fn conversation_with_gate(
                 io::Error::other(why).into()
             }
         };
+        // Before the microphone is first allowed, and within its first
+        // second, a privacy observation read stale (it waited in the queue
+        // while the voice started its workers) closes the gate and is waited
+        // past for a fresh one, instead of ending the voice (lamp-4ace, 19
+        // Oct 01:19: 0.7 s after a start, and back muted by the restart
+        // guard). The gate stays closed meanwhile: nothing is heard. A
+        // worker that never says anything still ends it at its freshness,
+        // and once the microphone has been allowed nothing changes.
+        let starting = !permitted
+            && session_instant().saturating_duration_since(privacy_started)
+                < Duration::from_micros(crate::privacy::PRIVACY_START_STALE_US);
         if lifetime.continuous()
             && privacy_sequence != 0
+            && !starting
             && gate.state(now()) == PrivacyState::Unavailable
         {
             return Err(lost(
@@ -4446,14 +4461,32 @@ fn conversation_with_gate(
                     privacy_sequence = privacy_sequence
                         .checked_add(1u64)
                         .ok_or_else(|| io::Error::other("privacy sequence overflow"))?;
+                    let read_at = now();
                     gate.observe(
                         privacy_sequence,
                         MonoTime::from_micros(acquired_at_us),
-                        now(),
+                        read_at,
                         muted,
                     );
+                    let stale = read_at
+                        .as_micros()
+                        .checked_sub(acquired_at_us)
+                        .is_some_and(|age| age >= gate.freshness_us());
                     if lifetime.continuous() {
                         match gate.state(now()) {
+                            PrivacyState::Unavailable if starting && stale => {
+                                if !said_stale_at_start {
+                                    said_stale_at_start = true;
+                                    eprintln!(
+                                        "lamp-voice: a privacy observation {} ms old was read as the voice started; the gate stays closed until a fresh one",
+                                        read_at.as_micros().saturating_sub(acquired_at_us) / 1_000
+                                    );
+                                    record(
+                                        trace,
+                                        json!({"kind":"privacy_stale_at_start","at_us":read_at.as_micros(),"acquired_at_us":acquired_at_us}),
+                                    )?;
+                                }
+                            }
                             PrivacyState::Unavailable => {
                                 return Err(lost(
                                     "invalid or stale service privacy observation".into(),
@@ -4491,9 +4524,10 @@ fn conversation_with_gate(
                     }));
                 }
                 PrivacyState::Unavailable
-                    if privacy_sequence != 0
-                        || session_instant().saturating_duration_since(privacy_started)
-                            >= Duration::from_micros(gate.freshness_us()) =>
+                    if (privacy_sequence != 0 && !starting)
+                        || (privacy_sequence == 0
+                            && session_instant().saturating_duration_since(privacy_started)
+                                >= Duration::from_micros(gate.freshness_us())) =>
                 {
                     return Err(lost("physical privacy unavailable; not a user mute".into()));
                 }
