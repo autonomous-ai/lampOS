@@ -388,6 +388,63 @@ Focused qualification needs these boundary cases:
 - Disabled startup without I/O, first attachment, full queues, a blocked
   publisher, expired output and bounded shutdown.
 
+## Mood on a lamp
+
+The rule for turning Mood on on a lamp, lamp-4ace first (the first builder on
+#1722, 21:36; the rule as posted on #1670, 21:5x):
+
+- **Builds:** lamp-voice and lamp-expression from a build with #1728 and
+  #1749, so the ring and Expression read Mood's breath, and `lamp-mood` from
+  the same build. lamp-4ace's Expression is pinned by hash, so it moves too.
+- **The switch:** `LAMP_MOOD=on` for `lamp-mood`, the product unit's drop-in
+  above, or on lamp-4ace (which has no `lamp-mood` unit of its own) the same
+  as `orangepi`. Nothing else: the ring and Expression read it whenever it
+  runs.
+- **Familiarity stays off** (`lamp-eyes --visits`): new data about a
+  person, the owner's decision. With it off, `familiar` is absent and nothing
+  else changes.
+
+**The lamp minute,** `lampOS/tools/mood-minute.sh`, run as root with the
+person away from the arm:
+
+```sh
+sudo MOOD_BIN=/opt/lampOS/mood/current/lamp-mood EVAL=/path/to/lamp-voice-eval \
+  lampOS/tools/mood-minute.sh [--clap] [--stop-at S]
+```
+
+It taps `expression/body` for 60 s with Mood off, then starts `lamp-mood` as
+a transient unit (`lamp-mood-check`, `LAMP_MOOD=on`, as `RUN_AS`, orangepi
+by default) and taps `expression/body` and `mood/state` for 60 s more. Then
+it stops Mood, with nothing installed. The shell only runs the minute: the
+numbers are `lamp-voice-eval mood-minute DIR`'s (`crates/voice-eval/src/mood_minute.rs`),
+reading the taps it wrote, with Mood's phase from `MoodState::breath_at` and
+the plain one from `plain_breath_phase`, the readers' own. Counts and numbers
+only:
+
+- **off:** the head's period (`period_s`, the plain 5.2 s) and its fit to
+  the plain breath (`fit_to_plain_breath`, R from 0 to 1);
+- **on:** `mood/state`'s checks (one session, sequences rising, the pace
+  within 0.7 to 1.25), the head's period, and its fit to Mood's breath. That
+  fit is the pitch against the sine and cosine of Mood's phase moved on to
+  each sample (`MoodState::breath_at`), and `in_step` means R ≥ 0.8;
+- `--clap`: "clap now" half way through, and whether Mood's pace went over
+  1.1 in the 10 s after;
+- `--stop-at S`: Mood stopped S s in, and the head's fit to the plain breath
+  from 3 s after;
+- each part's CPU, voice, Expression and Mood, from its cgroup's `cpu.stat`.
+
+The ring's frames aren't on the bus (`light/state` is its setting only), so
+the ring breathing with the head, and no flicker as Mood starts or stops, is
+watched by eye. Tests: `mood_minute`'s own (5: a tap line read, in step and
+not, the marks, an old state and too few samples), and
+`lampOS/tools/mood-minute-test.sh` (20), with
+stand-ins for `systemctl`, `systemd-run` and `lamp-bus`. A head that follows
+Mood's quicker breath is in step, with off's period 5.2 s and on's 4.34 s. A
+head that keeps the plain breath while Mood's is quicker is not. Mood is
+stopped after. It's refused, with nothing started, when a part is down, Mood
+already runs, a binary is missing or an option is wrong. Judging on's head
+against the plain breath instead of Mood's fails both cases.
+
 ## Replays and the future lamp trial
 
 The authored 24-hour fixture covers sleep through dawn/company/noise,
