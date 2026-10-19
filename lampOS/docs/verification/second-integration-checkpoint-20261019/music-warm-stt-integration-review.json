@@ -1,0 +1,26 @@
+{
+  "integration_head": "52a42b1eb5fca5d73c394fdc18637e7e3159585d",
+  "previous_integration_head": "e9d84fbee72731300594a0762eae7a9ba33040a5",
+  "music_preparation": "c44d66557bf6c7f8ac541ef4e4fc6498c07b9c65",
+  "merged_pr": 2002,
+  "review": "No concrete P1/P2 found in the read-only warm-STT/Music composition audit. Production-file blob merges are clean; shared test fixture fields require a union.",
+  "preserve": [
+    "Keep told_only/listened/closed fields with Music skipped.",
+    "Consume only an open spare matching privacy generation; expire only the matching spare number.",
+    "Retire request and invalidate microphone listeners while preserving camera-scope revocation.",
+    "Every Start creates fresh request identity and memory lease; the spare carries no Music grant.",
+    "Keep raw-final-word eligibility before carried words or synthetic Called fallback.",
+    "Retain shutdown_background; Stop must not await spare connection completion or expiry."
+  ],
+  "rehearsal_regressions": [
+    "Two Music requests: exact transcripts and distinct request/call identities.",
+    "Closed/expired/privacy-generation replacement: current words and grant identity with per-listener fixtures.",
+    "Warm/prepared final-admission checks; listener-count assertions for Written/Say isolation.",
+    "Stop with a pending spare connection and held Music RPC: unchanged 300 ms bound, revoked lease and no late offer."
+  ],
+  "limitations": [
+    "The existing closed/expired fixture checks completion/counts without asserting replacement transcript; the rehearsal will add exact-word coverage.",
+    "This record is static review, not a runtime qualification of composed source.",
+    "Private rehearsal starts on the merged integration head; final Music publication still follows actual Bedtime landing."
+  ]
+}

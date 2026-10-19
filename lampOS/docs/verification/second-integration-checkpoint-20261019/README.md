@@ -1,6 +1,6 @@
 # Second integration checkpoint, 2026-10-19
 
-Current status (18:02 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
+Current status (18:24 UTC): output caps [#1996](https://github.com/autonomous-ai/lampOS/pull/1996)
 passed automatic ARM64: **7,684 nextest (1 leaky), 48 skipped**, plus
 **4 doc and 12 separate harness tests**. [Native evidence](caps-foundation-arm64.json)
 records the exact head, base and merge checkout. The [host motion failure](caps-foundation-motion-failure.json)
@@ -22,10 +22,16 @@ hashes match. This remains a failed gate.
 changes only the private lookup fixture. [Full host evidence](policy-lookup-host.json):
 **264/0/2**, none filtered, formatting, strict Clippy and build passed;
 all 1,584 hashes match both copies. [Changed-name scan](policy-lookup-consumers.json)
-is confined to that module. Automatic ARM64 39298987458 is running.
+is confined to that module. [Automatic ARM64 39298987458](policy-lookup-arm64.json)
+passed **7,651 nextest (1 leaky), 48 skipped**, plus **4 doc and 12 harness
+tests**, at merge `2f942ada51` against `e9d84fbee7`; #2005 is ready for review.
 The [separate integration ARM64 record](integration-motion-amendment-arm64.json)
 qualifies the amended #1990 motion fixture at `3a66c1263b`: **7,641 nextest
 passed (1 leaky), 48 skipped**, plus **4 doc and 12 harness tests**.
+The [warm-STT integration review](music-warm-stt-integration-review.json)
+and [conditional peer review](music-conditional-integration-review.json)
+record the next Music regression requirements and the source-verified #2008
+activation P2. A private current-integration rehearsal is underway.
 The [work log](../../work-log.md) carries current integration status.
 
 Historical checkpoint (15:26 UTC): #1732 is published as `22c9c730bd` onto #1712.

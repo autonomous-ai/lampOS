@@ -1,0 +1,30 @@
+{
+  "foundation_head": "0bbbe5234d0df0d7b3cc99ab8c6a8195a638485f",
+  "foundation_parent": "e1fdc20374f638899e612ef0967d3d414c29708a",
+  "integration_head": "e9d84fbee72731300594a0762eae7a9ba33040a5",
+  "integration_comparison_base": "df722db2d0ee6cb9cd46640e8fc2554065333d13",
+  "overlapping_files": [
+    "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+    "lampOS/crates/voice/src/second_provider/tests.rs",
+    "lampOS/docs/switches.md"
+  ],
+  "source_sha256": {
+    "0bbbe5234d0df0d7b3cc99ab8c6a8195a638485f:lampOS/crates/voice/src/coordinator/tests/second_route.rs": "fb2a4b8281e5ced5573b0086fc63f69ab002db3827822df1ffaba397c859c93d",
+    "0bbbe5234d0df0d7b3cc99ab8c6a8195a638485f:lampOS/crates/voice/src/second_provider/tests.rs": "2edd107fdccc93a3834af078ab6145e6d0c0e9ee27bb2b4f58f7b54b7324e89d",
+    "0bbbe5234d0df0d7b3cc99ab8c6a8195a638485f:lampOS/docs/switches.md": "f97eefe7916eeb8bde79cbbad226f24e755edffb5fc0540866e410373dd78e38",
+    "e9d84fbee72731300594a0762eae7a9ba33040a5:lampOS/crates/voice/src/coordinator/tests/second_route.rs": "ea0602beff6060f842810aacfbac6d0cfc3f24efc8fe69945f17afdc6d19deff",
+    "e9d84fbee72731300594a0762eae7a9ba33040a5:lampOS/crates/voice/src/second_provider/tests.rs": "d7698bf6d7fef32ec196f748759ac95790a5c744b50a6365d19fd7d3af66bffc",
+    "e9d84fbee72731300594a0762eae7a9ba33040a5:lampOS/docs/switches.md": "cf8ba36bc3fc7145b507c0ef76220fd2b0bb75aeab515b505d4c178aabf4c3ab"
+  },
+  "review": "No new P1/P2 findings in the exact-head integration boundary. Independent stdout-only three-way checks preserved both sides without conflicts; no function names disappeared. Root independently checked the overlap list and key motion fixture constants.",
+  "preserve": [
+    "Separate per-topic collectors, amplitude 8000/422/760, loss diagnostics and nods >= 3; retain new Say, hum, expiry and quiet-gate cases.",
+    "Upstream held_consent, chat_only, policy-wait and admitted-scope tests; retain written-Say/reminder independence.",
+    "Current route/service defaults and both-route policy wording, output-caps row and default-off rest-requests row.",
+    "Upstream production Engine, worker, scoped context, units, updater and second_config files are outside the B delta."
+  ],
+  "limitations": [
+    "Read-only source and merge-output review only; this is not a compile or runtime gate on the combined source.",
+    "Voice integration consolidation #2000 was merged to lamp-voice, not this integration head."
+  ]
+}

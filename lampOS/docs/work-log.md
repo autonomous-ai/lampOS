@@ -21,7 +21,7 @@ Ready for integration: no (#1732 ARM64 is green; the authored skill is being spl
 
 Ready for integration: no (#1757 follows Bedtime; complete private host gate failed the unchanged Policy and motion fixtures)
 
-Ready for integration: no (#2005 Policy fixture repair passed the complete host gate; automatic ARM64 is running)
+Ready for integration: yes (#2005 Policy fixture repair passed host and automatic ARM64; reviewer merge pending)
 
 Completed: #1966 merged into #1712 at 16:15 UTC as `df722db2d0` after local and automatic ARM64 gates passed
 
@@ -35,7 +35,7 @@ The [14:30 UTC checkpoint](https://github.com/autonomous-ai/lampOS/issues/1722#i
 acknowledges the missed checkpoint and the new second-route requirement.
 The full Queue and all four own PR review threads were reread at 18:02 UTC
 (712 Queue comments; no reviews, inline comments or unresolved threads on
-#1732, #1757, #1996 or #2005). The current integration tip is `e9d84fbee7`;
+#1732, #1757, #1996 or #2005). The integration tip at that read was `e9d84fbee7`;
 #1925, the separate #1976 stress-bar fix, #1966 Tasks fix, #1990 motion
 fixture amendment and #1940 are merged. Foundation preparation starts at `df722db2d0`. The
 Bedtime publication is based on #1712's `b919291458`: Deepgram, DeepSeek and
@@ -304,8 +304,13 @@ Formatting **3.89 s**, strict all-target Policy Clippy **16.28 s**, and
 build **0.11 s** passed. [Changed-name grep](verification/second-integration-checkpoint-20261019/policy-lookup-consumers.json)
 matches only that private test module. All **1,584** frozen source hashes
 match both copies. [Automatic ARM64 39298987458](https://github.com/autonomous-ai/lampOS/actions/runs/39298987458)
-is running; #2005 remains draft until native qualification. This separate
-repair is not bundled into Music or a Bedtime foundation.
+completed successfully: **7,651 nextest passed (1 leaky), 48 skipped**,
+plus **4 doc and 12 separate harness tests**. [The native record](verification/second-integration-checkpoint-20261019/policy-lookup-arm64.json)
+identifies merge checkout `2f942ada51eebaf4ac387cde31852242be8348e7` against
+base `e9d84fbee72731300594a0762eae7a9ba33040a5`. Release, relay signals,
+binary hashes and artifact upload passed. Four inherited example filename
+collision warnings remain. #2005 is ready for review. This separate repair
+is not bundled into Music or a Bedtime foundation.
 
 The final Music port must also preserve the held-report scope correction.
 The [reported P2](https://github.com/autonomous-ai/lampOS/issues/1722#issuecomment-6273396615)
@@ -313,6 +318,35 @@ finds `done_though_held` using the sticky session's builder despite holding
 an admitted lease. First assigned the upstream repair and privacy review;
 the regression must use differing sticky and admitted people. The source
 call chain was verified statically; no device reproduction is claimed.
+
+The three later Bedtime boundaries were checked against `e9d84fbee7`:
+[Rest/Say](verification/second-integration-checkpoint-20261019/rest-integration-boundary.json),
+[scheduled Skills](verification/second-integration-checkpoint-20261019/routine-integration-boundary.json)
+and [authored Bedtime](verification/second-integration-checkpoint-20261019/authored-integration-boundary.json).
+Their overlapping files merge cleanly while retaining both sides' tests,
+the newer private `second.json` installation, current service defaults and
+disabled routine switches. These are textual/source checks, not new runtime
+gates on a combined head.
+
+The [conditional Music review](verification/second-integration-checkpoint-20261019/music-conditional-integration-review.json)
+checks the still-unmerged #2007 memory note and #2008 speaking-face heads.
+It found a separate [activation P2 in #2008](https://github.com/autonomous-ai/lampOS/pull/2008#issuecomment-6274090141):
+face narrowing can be enabled without the scoped chat builder, leaving
+personal memory/history in the prompt even after memory calls narrow to
+room scope. The owner has the finding and requested activation regression;
+no runtime reproduction or peer source change is claimed. Music has no
+pre-final offer on this path: prepared chat buffers events without running
+tools, and final admission uses the live lease. Conditional regression
+cases are recorded for whichever revisions actually land.
+
+At 18:18 UTC, the integration tip is `52a42b1eb5`, including #2002's warm
+STT connections. The [Music boundary review](verification/second-integration-checkpoint-20261019/music-warm-stt-integration-review.json)
+found no new P1/P2; the shared fixture needs both sets of fields. A private
+rehearsal on that tip applied all four Bedtime commits cleanly, retaining
+their 28/19/26/5-file scopes. Music's Engine, worker and test conflicts are
+being resolved there, with exact-transcript, fresh-request, typed-isolation
+and bounded-Stop regressions. This is preparation; publication still follows
+actual Bedtime landing and the final head's complete gates.
 
 Bedtime and Tasks have only their original automatic PR ARM64 run,
 following First's no-duplicate-dispatch direction. GitHub's [Actions incident](https://www.githubstatus.com/incidents/8tzbpcnl75jp)

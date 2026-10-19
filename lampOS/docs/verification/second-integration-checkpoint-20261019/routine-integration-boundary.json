@@ -1,0 +1,23 @@
+{
+  "head": "fd31d9c98e283089253b063d6181010846da2741",
+  "parent": "0bbbe5234d0df0d7b3cc99ab8c6a8195a638485f",
+  "integration_head": "e9d84fbee72731300594a0762eae7a9ba33040a5",
+  "integration_comparison_base": "df722db2d0ee6cb9cd46640e8fc2554065333d13",
+  "overlapping_files": [
+    "lampOS/crates/update/tests/install.rs",
+    "lampOS/docs/install.md",
+    "lampOS/docs/switches.md"
+  ],
+  "review": "No new P1/P2 findings or textual conflicts. Independent sequential three-way blob merges preserved A+B with integration, then C; all function bodies in the overlapping installer tests survived unchanged. Root verified the exact overlap list and product unit defaults.",
+  "preserve": [
+    "The private second.json install, pre-unit round placement and associated install/round tests.",
+    "The newer second-route Voice product defaults.",
+    "Scheduled Skills private state directory and --daily-state only; routine/rest/cap switches and --trust-clock stay unset.",
+    "All six existing installed skills retain their names and enabled defaults.",
+    "Both private second.json installation and daily-state/compatible-binary docs; updated integration switch rows plus routines row."
+  ],
+  "limitations": [
+    "Read-only source and textual merge review; automatic ARM64 must qualify the actual PR merge checkout.",
+    "No source edits, tests, device or provider access performed in this audit."
+  ]
+}
