@@ -1060,6 +1060,28 @@ This row's remaining levers are the shorter second reply after a light or
 volume change (`LAMP_SHORT_DONE`, #1520) and the Policy's wait on a held
 call.
 
+### The turn-end switches kept on lamp-4ace (19 Oct, #1608)
+
+Both of #1608's switches for the end-of-turn worker are on in lamp-4ace's
+unit and stay: `LAMP_TURN_END_NO_SPIN=on` (its ONNX Runtime threads do not
+spin while they wait) and `LAMP_TURN_END_PRIORITY=10` (it lowers itself to
+round-robin 10 under the voice's 20), so the voice's capture and `lamp-name`
+get their cores back from a verdict at once. The first builder's battery
+`mon-te-0840` on voice `5b8295c70` (`b2688bfd390e`), 08:40:59 to 08:56:50
++07 with both on, held against that morning's baseline (`base-0537`, both
+off):
+
+| | With both (`mon-te-0840`) | Baseline (`base-0537`) |
+|---|---|---|
+| Day lines answered | 12 of 12 | 11 of 12 |
+| Asked of the lamp, told | 4 of 4 | 3 of 4 |
+| Asked of the staff, handed over | 2 of 3 | 2 of 3 |
+| Follow-ups | 5 tool calls run, 0 refused | 5 tool calls run, 0 refused |
+
+That is a played battery, not the verdict-time bench each switch's row
+names (`switches.md`): no verdict times with each on and off are recorded
+here, and neither switch is in the product unit.
+
 ## What was not shown
 
 - **Nothing was timed.** No service was called, nothing ran on a lamp,
