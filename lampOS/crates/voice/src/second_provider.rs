@@ -226,6 +226,12 @@ impl Told {
 /// exchanges ([`Told::after`]): `on`, and nothing else (#1712, the first
 /// builder at 18:56).
 pub const STEADY_FIRST_ENVIRONMENT: &str = "LAMP_SECOND_STEADY_FIRST";
+
+/// Where the worker reads whether a spoken turn's chat is given only the
+/// functions a spoken turn mostly needs, and the rest behind one call
+/// (`worker::few_tools`): `on`, and nothing else (#1712, the first builder
+/// at 18:56).
+pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
 /// Whether a spoken turn's words were said to the lamp, judged before they
 /// are answered: `(request, (began_us, ended_us), heard)` to why it is not
 /// answered, or nothing. The window is the microphone's read time of the

@@ -1070,6 +1070,7 @@ fn second_route_worker_environment(
         crate::second_provider::PREPARED_ENVIRONMENT,
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
+        crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
         crate::second_provider::net::key_terms::ENVIRONMENT,
     ]
@@ -1110,6 +1111,7 @@ mod tests {
             crate::second_provider::net::key_terms::ENVIRONMENT,
             crate::second_config::FLUX_ENV,
             crate::second_provider::STEADY_FIRST_ENVIRONMENT,
+            crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         ] {
             let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
             assert_eq!(
@@ -1347,6 +1349,7 @@ mod tests {
                 } else if name == crate::second_provider::net::weather::ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
                     || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
+                    || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
                 {
                     "on"
                 } else if name == crate::second_provider::FIRST_WORDS_ENVIRONMENT {
@@ -1404,6 +1407,7 @@ mod tests {
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PLACE=Hanoi, Vietnam",
+                    "LAMP_SECOND_FEW_TOOLS=on",
                     "LAMP_SECOND_FIRST_WORDS=4",
                     "LAMP_SECOND_FLUX=on",
                     "LAMP_SECOND_GEMINI_BASE_URL=https://relay.example.invalid/v1beta",

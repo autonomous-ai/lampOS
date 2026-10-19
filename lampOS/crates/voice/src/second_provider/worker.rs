@@ -1035,6 +1035,19 @@ pub fn serve(
         credentials.as_deref(),
         spoken_declare,
     )?;
+    // A spoken turn's few functions, the rest behind one (#1712).
+    let net = if std::env::var(crate::second_provider::FEW_TOOLS_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on")
+    {
+        eprintln!(
+            "lamp-voice second: a spoken turn's chat is given its few functions, and the rest once it calls {MORE} (LAMP_SECOND_FEW_TOOLS)"
+        );
+        net.narrowing(Arc::new(few_tools))
+    } else {
+        net
+    };
     let thread = files.thread;
     let file = thread.clone();
     let clock = tools.clock;
@@ -1436,6 +1449,76 @@ pub(crate) fn scoped_tool_runner(
     })
 }
 
+/// The function a spoken turn calls for the rest of its functions, with
+/// `LAMP_SECOND_FEW_TOOLS=on` ([`few_tools`]).
+pub(crate) const MORE: &str = "more_functions";
+
+/// What a call of [`MORE`] is answered: the next round has them all.
+pub(crate) const MORE_GIVEN: &str =
+    "Every function is given to you now. Call the one this needs, as you would have.";
+
+/// Whether a spoken turn is given `name` at once with
+/// `LAMP_SECOND_FEW_TOOLS=on` (#1712, the first builder at 18:56: "light,
+/// volume, timer, search, look, tasks"): the light's and the volume's, the
+/// timer's and the reminders', the tasks', the web search's and its fetch,
+/// the look's, and the decline, the skills' one function and setup's walk,
+/// which a busy room, the skills' lines and a setup talk need at every turn.
+pub(crate) fn given_at_once(name: &str) -> bool {
+    name.starts_with("light_")
+        || name.starts_with("volume_")
+        || crate::tools::is_schedule_tool(name)
+        || crate::agent_tasks::is_tool(name)
+        || [
+            crate::tools::NOT_FOR_ME,
+            crate::use_skill::NAME,
+            crate::onboarding::STEP,
+            crate::onboarding::REDO,
+            crate::second_provider::net::search::NAME,
+            crate::second_provider::net::search::FETCH,
+            crate::second_provider::LOOK_CALL,
+        ]
+        .contains(&name)
+}
+
+/// The functions a spoken turn's request is given with
+/// `LAMP_SECOND_FEW_TOOLS=on` ([`crate::second_provider::net::Narrow`]):
+/// those [`given_at_once`], and [`MORE`], which names the rest; once the
+/// model has called [`MORE`] in the turn, every one. The first request is
+/// then smaller, and the same from turn to turn for a prompt cache; what
+/// it costs is a round for the rest (the memory's, the faces', the time
+/// elsewhere, a mark, a stop of reports).
+pub(crate) fn few_tools(
+    declared: Vec<lamp_gemini::Tool>,
+    messages: &[Message],
+) -> Vec<lamp_gemini::Tool> {
+    let asked = messages.iter().any(|message| {
+        message.tool_calls.iter().any(|call| {
+            call.pointer("/function/name")
+                .and_then(|name| name.as_str())
+                == Some(MORE)
+        })
+    });
+    if asked {
+        return declared;
+    }
+    let (mut given, rest): (Vec<_>, Vec<_>) = declared
+        .into_iter()
+        .partition(|tool| given_at_once(&tool.name));
+    if !rest.is_empty() {
+        let names: Vec<&str> = rest.iter().map(|tool| tool.name.as_str()).collect();
+        given.push(lamp_gemini::Tool {
+            name: MORE.into(),
+            description: format!(
+                "Your other functions, not given to you yet: {}. Call this first when what someone asks needs one of them, such as remembering or forgetting something; you are then given every function, and call the one it needs. Never for what the functions you have do.",
+                names.join(", ")
+            ),
+            parameters: None,
+            silent: false,
+        });
+    }
+    given
+}
+
 /// One call of the model's, as both runners run it.
 async fn run_call(
     settings: crate::tools::Settings,
@@ -1446,6 +1529,12 @@ async fn run_call(
     args: serde_json::Value,
     scope: Option<crate::memory_scope::ScopeLease>,
 ) -> serde_json::Value {
+    if name == MORE {
+        eprintln!(
+            "lamp-voice second: request {request} called {MORE}: its next round is given every function"
+        );
+        return serde_json::json!({"ok": true, "result": MORE_GIVEN});
+    }
     if let Some(search) = search.filter(|search| search.answers(&name)) {
         // The request's first search takes the one begun from its
         // words, if any (#1712).
@@ -2988,6 +3077,93 @@ mod tests {
 
     use super::*;
     use crate::second_provider::{Listener, Services, net};
+
+    /// #1712, the first builder at 18:56: with `LAMP_SECOND_FEW_TOOLS=on` a
+    /// spoken turn's request is given its few functions and one that names
+    /// the rest; once the model has called it, every function.
+    #[test]
+    fn a_spoken_turn_is_given_its_few_functions_and_the_rest_behind_one() {
+        let tool = |name: &str| lamp_gemini::Tool {
+            name: name.into(),
+            description: "A function.".into(),
+            parameters: None,
+            silent: false,
+        };
+        let declared: Vec<_> = [
+            "not_for_me",
+            "the_time",
+            "remember",
+            "light_on",
+            "volume_up",
+            "set_timer",
+            "start_agent_task",
+            "remember_my_face",
+            "use_skill",
+            "web_search",
+            "take_a_look",
+        ]
+        .map(tool)
+        .into();
+        let names = |tools: &[lamp_gemini::Tool]| -> Vec<String> {
+            tools.iter().map(|tool| tool.name.clone()).collect()
+        };
+        let asked = [
+            Message::system("You are a lamp."),
+            Message::user("Lights on."),
+        ];
+        let given = few_tools(declared.clone(), &asked);
+        assert_eq!(
+            names(&given),
+            [
+                "not_for_me",
+                "light_on",
+                "volume_up",
+                "set_timer",
+                "start_agent_task",
+                "use_skill",
+                "web_search",
+                "take_a_look",
+                MORE
+            ]
+        );
+        assert!(
+            given[8].description.starts_with(
+                "Your other functions, not given to you yet: the_time, remember, remember_my_face. "
+            ),
+            "{}",
+            given[8].description
+        );
+        // Called: the next round has every one, as declared.
+        let mut after = asked.to_vec();
+        after.push(Message::assistant_calls(
+            None,
+            &[net::ToolCall {
+                id: "c1".into(),
+                name: MORE.into(),
+                args: serde_json::json!({}),
+                extra: None,
+            }],
+        ));
+        after.push(Message::tool("c1", MORE_GIVEN));
+        assert_eq!(few_tools(declared.clone(), &after), declared);
+        // Nothing to put behind it: no such function.
+        let few: Vec<_> = declared
+            .iter()
+            .filter(|tool| given_at_once(&tool.name))
+            .cloned()
+            .collect();
+        assert_eq!(few_tools(few.clone(), &asked), few);
+    }
+
+    /// Its call is answered by the route itself, with nothing run.
+    #[tokio::test]
+    async fn the_call_for_the_rest_is_answered_by_the_route() {
+        let runner = tool_runner(crate::tools::Settings::default(), None, None);
+        assert_eq!(
+            runner(1, true, MORE.into(), serde_json::json!({})).await,
+            serde_json::json!({"ok": true, "result": MORE_GIVEN})
+        );
+    }
     use futures_util::{
         future::BoxFuture,
         stream::{self, BoxStream},

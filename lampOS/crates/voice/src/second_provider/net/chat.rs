@@ -147,6 +147,13 @@ fn functions(tools: &[lamp_gemini::Tool]) -> Vec<Value> {
 /// so the executive's come and go with the executive.
 pub type Declare = Arc<dyn Fn() -> Vec<lamp_gemini::Tool> + Send + Sync>;
 
+/// Of the tools declared now, those a request with these messages is given
+/// ([`Chat::narrowing`]): with `LAMP_SECOND_FEW_TOOLS=on`, a spoken turn's
+/// few until the model asks for the rest (#1712, the first builder at
+/// 18:56).
+pub type Narrow =
+    Arc<dyn Fn(Vec<lamp_gemini::Tool>, &[Message]) -> Vec<lamp_gemini::Tool> + Send + Sync>;
+
 /// How much Gemini thinks before it answers through its OpenAI-compatible
 /// endpoint: the floor, as thinking cannot be turned off on Gemini 3 (the
 /// research of 19 Oct; 0.80 to 0.83 s to the first token, published).
@@ -162,6 +169,8 @@ pub struct Chat {
     /// The model takes a look's picture.
     sees: bool,
     declare: Declare,
+    /// Which of the declared tools a request is given, if not all.
+    narrow: std::sync::OnceLock<Narrow>,
     /// When the last request went, for the journal: a connection idle past
     /// the client's pool keep (`http_client`, 90 s) is made anew.
     last_sent: std::sync::Mutex<Option<std::time::Instant>>,
@@ -310,6 +319,13 @@ impl Chat {
         self.sees
     }
 
+    /// Its requests are given only the tools `narrow` keeps of those
+    /// declared, for their messages. Set once: a second call changes
+    /// nothing.
+    pub fn narrowing(&self, narrow: Narrow) {
+        let _ = self.narrow.set(narrow);
+    }
+
     fn with(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
         Ok(Self {
             client: http_client()?,
@@ -319,15 +335,21 @@ impl Chat {
             extra: serde_json::Map::new(),
             sees: true,
             declare,
+            narrow: std::sync::OnceLock::new(),
             last_sent: std::sync::Mutex::new(None),
             last_prefix: std::sync::Mutex::new(None),
         })
     }
 
-    /// The request's body, with the tools declared now.
+    /// The request's body, with the tools declared now, as narrowed for
+    /// its messages.
     fn body(&self, messages: &[Message]) -> Value {
         let mut body = json!({"model": self.model, "stream": true, "messages": messages});
-        let tools = functions(&(self.declare)());
+        let mut declared = (self.declare)();
+        if let Some(narrow) = self.narrow.get() {
+            declared = narrow(declared, messages);
+        }
+        let tools = functions(&declared);
         if !tools.is_empty() {
             body["tools"] = Value::Array(tools);
         }
@@ -894,6 +916,44 @@ data: [DONE]
 
     /// An end without `[DONE]` is whole after a `finish_reason`, and cut
     /// before one.
+    /// #1712, the first builder at 18:56: a narrowed chat's request is
+    /// given the tools its narrow keeps for that request's messages.
+    #[test]
+    fn a_narrowed_chat_is_given_what_its_narrow_keeps_for_the_messages() {
+        let tool = |name: &str| lamp_gemini::Tool {
+            name: name.into(),
+            description: "A tool.".into(),
+            parameters: None,
+            silent: false,
+        };
+        let chat = Chat::with(
+            "http://127.0.0.1:9/v1/",
+            "m",
+            "k",
+            Arc::new(move || vec![tool("light_on"), tool("remember")]),
+        )
+        .unwrap();
+        let names = |body: Value| -> Vec<String> {
+            body["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|tool| tool["function"]["name"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let one = [Message::user("Lights on.")];
+        let two = [Message::user("Lights on."), Message::assistant("On.")];
+        assert_eq!(names(chat.body(&one)), ["light_on", "remember"]);
+        chat.narrowing(Arc::new(|declared, messages| {
+            declared.into_iter().take(messages.len()).collect()
+        }));
+        assert_eq!(names(chat.body(&one)), ["light_on"]);
+        assert_eq!(names(chat.body(&two)), ["light_on", "remember"]);
+        // Set once.
+        chat.narrowing(Arc::new(|_, _| Vec::new()));
+        assert_eq!(names(chat.body(&one)), ["light_on"]);
+    }
+
     #[test]
     fn a_stream_ended_without_done_is_whole_only_after_a_finish_reason() {
         let mut deltas = Deltas::default();
