@@ -648,11 +648,21 @@ fn signal_name(status: &str) -> Option<&'static str> {
         .find(|name| name.strip_prefix("SIG") == Some(bare))
 }
 
-/// The person's choice as kept: `share`, and since when.
+/// The person's choice as kept: `share`, since when, and who made it,
+/// with whether a voice's stop came from a held line (#1880, the first
+/// builder on #1722, 18:44: a held stop is made visible, never silent).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Consent {
     pub share: bool,
     pub since: Option<String>,
+    /// None for a choice kept before this was.
+    pub by: Option<lamp_msgs::ReportsBy>,
+    pub held: bool,
+}
+
+/// `by` as kept: only the three names.
+fn by_of(value: &Value) -> Option<lamp_msgs::ReportsBy> {
+    serde_json::from_value(value.clone()).ok()
 }
 
 /// A time this lamp wrote, as RFC 3339: digits, `-`, `:`, `T` and `Z` only.
@@ -684,9 +694,12 @@ fn read_json(path: &Path) -> Option<Value> {
 /// wording no newer than [`ASKED`]. Read at each send, never kept.
 pub fn consent(places: &Places) -> Consent {
     if let Some(own) = read_json(&places.own) {
+        let by = by_of(&own["by"]);
         return Consent {
             share: own["share"] == Value::Bool(true),
             since: when(&own["at"]),
+            held: by == Some(lamp_msgs::ReportsBy::Voice) && own["held"] == Value::Bool(true),
+            by,
         };
     }
     match read_json(&places.setup) {
@@ -697,6 +710,8 @@ pub fn consent(places: &Places) -> Consent {
             Consent {
                 share: true,
                 since: when(&setup["at"]),
+                by: Some(lamp_msgs::ReportsBy::Setup),
+                held: false,
             }
         }
         _ => Consent::default(),
@@ -828,18 +843,32 @@ impl Reports {
         consent(&self.places)
     }
 
-    /// What `reports/state` and `reports.get` say.
+    /// What `reports/state` says: whether they are sent, how many wait,
+    /// and how and when the newest choice was made.
     pub fn state(&self) -> lamp_msgs::ReportsState {
+        let consent = self.consent();
         lamp_msgs::ReportsState {
-            share: self.consent().share,
+            share: consent.share,
             queued: self.queue.len() as u32,
+            by: consent.by,
+            held: consent.held,
+            at_s: consent.since.as_deref().and_then(seconds_of),
         }
     }
 
-    /// `reports.get`'s and `reports.set`'s answer.
+    /// `reports.get`'s and `reports.set`'s answer: with `by` (`voice`,
+    /// `app`, `setup`, or null), `held` and `at`, when the newest choice
+    /// was made, so the app's row can say "Stopped by voice at 3 pm".
     pub fn answer(&self) -> Value {
         let consent = self.consent();
-        json!({"share": consent.share, "since": consent.since, "queued": self.queue.len()})
+        json!({
+            "share": consent.share,
+            "since": consent.since,
+            "queued": self.queue.len(),
+            "by": consent.by,
+            "held": consent.held,
+            "at": consent.since,
+        })
     }
 
     fn keep(&self) {
@@ -857,11 +886,25 @@ impl Reports {
     /// The app's `reports.set`: the person's own choice, from their
     /// account. A no deletes what waits and sends the last word.
     pub fn set(&mut self, share: bool, now_s: u64) -> io::Result<()> {
+        self.choose(share, now_s, lamp_msgs::ReportsBy::App, false)
+    }
+
+    /// A choice kept with who made it and when, and for the voice's stop
+    /// whether its line was held.
+    fn choose(
+        &mut self,
+        share: bool,
+        now_s: u64,
+        by: lamp_msgs::ReportsBy,
+        held: bool,
+    ) -> io::Result<()> {
         let at = crate::online::rfc3339(UNIX_EPOCH + Duration::from_secs(now_s));
         let was = self.consent().share;
         write_whole(
             &self.places.own,
-            json!({"share": share, "at": at}).to_string().as_bytes(),
+            json!({"share": share, "at": at, "by": by, "held": held})
+                .to_string()
+                .as_bytes(),
             0o600,
         )?;
         if was && !share {
@@ -884,9 +927,14 @@ impl Reports {
     }
 
     /// A no from the bus (`reports/request`, the voice): the same as the
-    /// app's, and only ever a no.
-    pub fn stop(&mut self, now_s: u64) -> io::Result<()> {
-        self.set(false, now_s)
+    /// app's, and only ever a no, kept as the voice's, with whether its
+    /// line was held. When reports are already off it changes nothing, so
+    /// the stop that stopped them is the one kept.
+    pub fn stop(&mut self, now_s: u64, held: bool) -> io::Result<()> {
+        if !self.consent().share {
+            return Ok(());
+        }
+        self.choose(false, now_s, lamp_msgs::ReportsBy::Voice, held)
     }
 
     /// Everything waiting deleted, its files too, and one `stopped` put in
@@ -1262,8 +1310,8 @@ pub trait Sources {
     }
     /// Whether the voice is resting (not in a turn); true when unknown.
     fn voice_resting(&mut self) -> bool;
-    /// Asks taken from `reports/request` since the last look: their `share`.
-    fn requests(&mut self) -> Vec<bool>;
+    /// Asks taken from `reports/request` since the last look.
+    fn requests(&mut self) -> Vec<lamp_msgs::ReportsRequest>;
     /// Says `reports/state`.
     fn tell(&mut self, state: &lamp_msgs::ReportsState);
 }
@@ -1303,11 +1351,18 @@ pub fn step(
     now_s: u64,
 ) -> bool {
     let mut put = false;
-    // Only a no is ever taken from the bus.
-    if sources.requests().into_iter().any(|share| !share) {
+    // Only a no is ever taken from the bus. It is kept as held only when
+    // every no taken was from a held line: one heard is the person's.
+    let noes: Vec<_> = sources
+        .requests()
+        .into_iter()
+        .filter(|request| !request.share)
+        .collect();
+    if !noes.is_empty() {
+        let held = noes.iter().all(|request| request.held);
         let stopped = shared.with(|reports| {
             let was = reports.consent().share;
-            let _ = reports.stop(now_s);
+            let _ = reports.stop(now_s, held);
             was
         });
         put |= stopped;
@@ -1460,7 +1515,7 @@ impl Sources for Lamp {
             .is_none_or(|(state, _)| state.state == lamp_msgs::Voice::Resting)
     }
 
-    fn requests(&mut self) -> Vec<bool> {
+    fn requests(&mut self) -> Vec<lamp_msgs::ReportsRequest> {
         if self.requests.is_none()
             && let Some(bus) = &self.bus
         {
@@ -1489,7 +1544,7 @@ impl Sources for Lamp {
         if let Some(requests) = self.requests.as_mut() {
             while let Ok(Some(message)) = requests.recv(Duration::ZERO) {
                 if let Ok(request) = message.parse::<lamp_msgs::ReportsRequest>() {
-                    asked.push(request.share);
+                    asked.push(request);
                 }
             }
         }
@@ -1529,7 +1584,7 @@ pub(crate) mod tests {
         fs::create_dir_all(&root).unwrap();
         let bus = lamp_bus::Bus::new(&root).unwrap();
         let mut lamp = Lamp::new(Some(bus.clone()));
-        assert_eq!(lamp.requests(), Vec::<bool>::new());
+        assert_eq!(lamp.requests(), Vec::new());
         assert!(lamp.requests.is_some(), "lamp-cloud took reports/request");
         let mut out = bus
             .publisher_declared(
@@ -1539,7 +1594,7 @@ pub(crate) mod tests {
             )
             .unwrap();
         let sent = out
-            .publish_json(1, &lamp_msgs::ReportsRequest { share: false })
+            .publish_json(1, &lamp_msgs::ReportsRequest::default())
             .unwrap();
         assert_eq!(sent.delivered, 1);
         let mut asked = Vec::new();
@@ -1550,7 +1605,7 @@ pub(crate) mod tests {
             }
             std::thread::sleep(Duration::from_millis(10));
         }
-        assert_eq!(asked, vec![false]);
+        assert_eq!(asked, vec![lamp_msgs::ReportsRequest::default()]);
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -1587,8 +1642,15 @@ pub(crate) mod tests {
                 "voice",
             )
             .unwrap();
+        // From a line whose answer was held (#1880).
         let sent = out
-            .publish_json(1, &lamp_msgs::ReportsRequest { share: false })
+            .publish_json(
+                1,
+                &lamp_msgs::ReportsRequest {
+                    share: false,
+                    held: true,
+                },
+            )
             .unwrap();
         assert_eq!(sent.delivered, 1, "lamp-cloud is listening");
         let mut at = first + Duration::from_secs(1);
@@ -1602,6 +1664,11 @@ pub(crate) mod tests {
         }
         assert!(!shared.with(|reports| reports.consent().share));
         assert_eq!(shared.with(sent_kinds), [json!("stopped")]);
+        let state = shared.with(|reports| reports.state());
+        assert_eq!(
+            (state.by, state.held, state.at_s),
+            (Some(lamp_msgs::ReportsBy::Voice), true, Some(NOW + 1))
+        );
         // The next 15 minutes: no health.
         step(
             &shared,
@@ -1836,7 +1903,7 @@ pub(crate) mod tests {
         forged.boot = "boot-1".into();
         reports.crash(NOW, None, &forged).unwrap();
         let mut bytes: Vec<String> = reports.due(ID).into_iter().map(|(_, b)| b).collect();
-        reports.stop(NOW + 1).unwrap();
+        reports.stop(NOW + 1, false).unwrap();
         bytes.extend(reports.due(ID).into_iter().map(|(_, b)| b));
         bytes.push(reports.answer().to_string());
         assert_eq!(bytes.len(), 4);
@@ -1905,7 +1972,7 @@ pub(crate) mod tests {
             .crash(NOW, None, &planted_note("lamp-air.service", 3))
             .unwrap();
         assert!(places.queue.join("2.json").exists());
-        reports.stop(NOW + 5).unwrap();
+        reports.stop(NOW + 5, false).unwrap();
         assert!(!places.queue.join("2.json").exists());
         let sent = sent(&mut reports);
         assert_eq!(sent.len(), 1);
@@ -1916,10 +1983,17 @@ pub(crate) mod tests {
         assert!(reports.due(ID).is_empty());
         assert_eq!(
             reports.answer(),
-            json!({"share": false, "since": "2026-10-18T04:00:05Z", "queued": 1})
+            json!({
+                "share": false,
+                "since": "2026-10-18T04:00:05Z",
+                "queued": 1,
+                "by": "voice",
+                "held": false,
+                "at": "2026-10-18T04:00:05Z",
+            })
         );
         // A second no says nothing more.
-        reports.stop(NOW + 7).unwrap();
+        reports.stop(NOW + 7, false).unwrap();
         assert!(reports.due(ID).is_empty());
         // The app's yes turns it on again, and a `stopped` through once
         // never comes after the new reports.
@@ -1949,7 +2023,7 @@ pub(crate) mod tests {
         let mut reports = Reports::open(places.clone());
         reports.health(NOW, None, &planted()).unwrap();
         // Offline: nothing is handed. The no is kept on flash.
-        reports.stop(NOW + 1).unwrap();
+        reports.stop(NOW + 1, false).unwrap();
         assert!(places.queue.join("2.json").exists());
         drop(reports);
         let mut reports = Reports::open(places.clone());
@@ -2004,9 +2078,10 @@ pub(crate) mod tests {
     #[test]
     fn the_bus_can_only_turn_reports_off() {
         struct Bus {
-            asked: Vec<bool>,
+            asked: Vec<lamp_msgs::ReportsRequest>,
             told: Vec<lamp_msgs::ReportsState>,
         }
+        let ask = |share, held| lamp_msgs::ReportsRequest { share, held };
         impl Sources for Bus {
             fn seen(&mut self) -> Seen {
                 Seen::default()
@@ -2014,7 +2089,7 @@ pub(crate) mod tests {
             fn voice_resting(&mut self) -> bool {
                 true
             }
-            fn requests(&mut self) -> Vec<bool> {
+            fn requests(&mut self) -> Vec<lamp_msgs::ReportsRequest> {
                 std::mem::take(&mut self.asked)
             }
             fn tell(&mut self, state: &lamp_msgs::ReportsState) {
@@ -2026,17 +2101,132 @@ pub(crate) mod tests {
         let now = Instant::now();
         let mut timing = Timing::new(now);
         let mut bus = Bus {
-            asked: vec![true],
+            asked: vec![ask(true, false)],
             told: Vec::new(),
         };
         step(&shared, &mut bus, &mut timing, None, now, NOW);
         assert!(!shared.with(|r| r.consent().share));
         assert_eq!(bus.told.last().map(|s| s.share), Some(false));
         yes(&places);
-        bus.asked = vec![true, false];
+        bus.asked = vec![ask(true, false), ask(false, true)];
         assert!(step(&shared, &mut bus, &mut timing, None, now, NOW + 1));
         assert!(!shared.with(|r| r.consent().share));
-        assert_eq!(bus.told.last().map(|s| s.share), Some(false));
+        // A held line's no is said on `reports/state` as the voice's, held,
+        // and when (#1880).
+        assert_eq!(
+            bus.told.last(),
+            Some(&lamp_msgs::ReportsState {
+                share: false,
+                queued: 1,
+                by: Some(lamp_msgs::ReportsBy::Voice),
+                held: true,
+                at_s: Some(NOW + 1),
+            })
+        );
+        // A held no beside one heard is the person's: not kept as held.
+        yes_again(&places);
+        bus.asked = vec![ask(false, true), ask(false, false)];
+        assert!(step(&shared, &mut bus, &mut timing, None, now, NOW + 2));
+        assert_eq!(
+            bus.told.last().map(|s| (s.by, s.held)),
+            Some((Some(lamp_msgs::ReportsBy::Voice), false))
+        );
+    }
+
+    /// A yes as the app would give it, over any choice kept before.
+    fn yes_again(places: &Places) {
+        let _ = fs::remove_file(&places.own);
+        yes(places);
+    }
+
+    /// The first builder on #1722, 18:44, on Third's read of #1880: how and
+    /// when reports were stopped is kept with the choice, said on
+    /// `reports/state`, and returned by `reports.get`, so a stop from a
+    /// held line is never one nobody can find.
+    #[test]
+    fn a_choice_is_kept_with_who_made_it_whether_held_and_when() {
+        let places = places("who");
+        yes(&places);
+        let mut reports = Reports::open(places.clone());
+        let state = reports.state();
+        assert_eq!(
+            (state.by, state.held, state.at_s),
+            (
+                Some(lamp_msgs::ReportsBy::Setup),
+                false,
+                seconds_of("2026-10-19T04:00:00Z")
+            )
+        );
+        // A held line's stop: the voice's, held.
+        reports.stop(NOW + 5, true).unwrap();
+        assert_eq!(
+            reports.consent(),
+            Consent {
+                share: false,
+                since: Some("2026-10-18T04:00:05Z".into()),
+                by: Some(lamp_msgs::ReportsBy::Voice),
+                held: true,
+            }
+        );
+        assert_eq!(
+            reports.state(),
+            lamp_msgs::ReportsState {
+                share: false,
+                queued: 1,
+                by: Some(lamp_msgs::ReportsBy::Voice),
+                held: true,
+                at_s: Some(NOW + 5),
+            }
+        );
+        let answer = reports.answer();
+        assert_eq!(
+            (&answer["by"], &answer["held"], &answer["at"]),
+            (
+                &json!("voice"),
+                &json!(true),
+                &json!("2026-10-18T04:00:05Z")
+            )
+        );
+        // Kept on flash: read again after a restart.
+        drop(reports);
+        let mut reports = Reports::open(places.clone());
+        assert_eq!(reports.consent().by, Some(lamp_msgs::ReportsBy::Voice));
+        assert!(reports.consent().held);
+        // A stop when already off changes nothing: the one that stopped them
+        // is kept.
+        reports.stop(NOW + 9, false).unwrap();
+        assert_eq!(reports.state().at_s, Some(NOW + 5));
+        assert!(reports.state().held);
+        // The app's yes and no are the app's, never held.
+        reports.set(true, NOW + 10).unwrap();
+        reports.set(false, NOW + 11).unwrap();
+        let state = reports.state();
+        assert_eq!(
+            (state.by, state.held, state.at_s),
+            (Some(lamp_msgs::ReportsBy::App), false, Some(NOW + 11))
+        );
+        let answer = reports.answer();
+        assert_eq!(
+            (&answer["by"], &answer["held"], &answer["at"]),
+            (&json!("app"), &json!(false), &json!("2026-10-18T04:00:11Z"))
+        );
+        // A choice kept before this was says nobody; `held` is only ever
+        // the voice's.
+        for (kept, by) in [
+            (r#"{"share":false,"at":"2026-10-18T04:00:00Z"}"#, None),
+            (
+                r#"{"share":false,"at":"2026-10-18T04:00:00Z","by":"app","held":true}"#,
+                Some(lamp_msgs::ReportsBy::App),
+            ),
+            (
+                r#"{"share":false,"at":"2026-10-18T04:00:00Z","by":"someone","held":true}"#,
+                None,
+            ),
+        ] {
+            fs::write(&places.own, kept).unwrap();
+            let consent = reports.consent();
+            assert_eq!((consent.by, consent.held), (by, false), "{kept}");
+        }
     }
 
     #[test]

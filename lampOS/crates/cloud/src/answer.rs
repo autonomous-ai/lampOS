@@ -392,7 +392,10 @@ pub mod tests {
         let got = answer(&mut lamp, "reports.get", &Value::Null)
             .unwrap()
             .unwrap();
-        assert_eq!(got, json!({"share": false, "since": null, "queued": 0}));
+        assert_eq!(
+            got,
+            json!({"share": false, "since": null, "queued": 0, "by": null, "held": false, "at": null})
+        );
         let on = answer(&mut lamp, "reports.set", &json!({"share": true}))
             .unwrap()
             .unwrap();
@@ -409,6 +412,10 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!((&off["share"], &off["queued"]), (&json!(false), &json!(1)));
+        // How and when, for the app's row: the app's own no, never held.
+        assert_eq!((&off["by"], &off["held"]), (&json!("app"), &json!(false)));
+        assert_eq!(off["at"], off["since"]);
+        assert!(off["at"].is_string());
     }
 
     /// #1722: the skills page is answered only with its switch, and
