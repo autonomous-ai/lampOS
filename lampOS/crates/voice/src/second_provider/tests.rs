@@ -40,6 +40,9 @@ struct Script {
     /// socket has closed ([`Listener::open`]).
     listened: AtomicUsize,
     closed: Arc<AtomicBool>,
+    /// Each listener's stream drops after this many samples sent, as a
+    /// connection lost mid-line does (#1844's D); `None`, never.
+    drops_after: Mutex<VecDeque<Option<usize>>>,
 }
 
 struct ScriptListener {
@@ -48,12 +51,18 @@ struct ScriptListener {
     early: Vec<net::Early>,
     finish_after: Option<Duration>,
     closed: Arc<AtomicBool>,
+    drops_after: Option<usize>,
+    sent: AtomicUsize,
 }
 impl Listener for ScriptListener {
     fn open(&self) -> bool {
         !self.closed.load(Ordering::Relaxed)
     }
     fn send(&self, samples: &[i16]) -> net::Result<()> {
+        let sent = self.sent.fetch_add(samples.len(), Ordering::Relaxed) + samples.len();
+        if self.drops_after.is_some_and(|after| sent > after) {
+            return Err(net::Error::Transport("speech-to-text stream"));
+        }
         self.samples.fetch_add(samples.len(), Ordering::Relaxed);
         Ok(())
     }
@@ -91,6 +100,8 @@ impl Services for Script {
                 early: self.early.lock().unwrap().pop_front().unwrap_or_default(),
                 finish_after: self.finish_after,
                 closed: self.closed.clone(),
+                drops_after: self.drops_after.lock().unwrap().pop_front().flatten(),
+                sent: AtomicUsize::new(0),
             }) as Box<dyn Listener>),
         };
         Box::pin(async move { result })
@@ -2212,6 +2223,58 @@ async fn each_failing_service_fails_the_turn_at_its_stage() {
             "said:This will FAIL.".into(),
             "failed:Responding:ServerUnavailable".into(),
         ]
+    );
+}
+
+/// #1844's D: speech to text's stream lost mid-line fails that turn where
+/// it was (`InputOpen`, `Transport`, which #1942's link check takes up), and
+/// the next line opens a stream of its own and is answered: nothing of the
+/// lost one is kept.
+#[tokio::test]
+async fn a_speech_to_text_stream_lost_mid_line_fails_that_turn_and_the_next_is_answered() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("never heard whole".to_owned()),
+                Ok("What time is it?".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new([vec![text("It is noon."), Ok(ChatEvent::Done)]].into()),
+        drops_after: Mutex::new([Some(lamp_audio::CAPTURE_SAMPLES), None].into()),
+        ..Script::default()
+    });
+    let (mut engine, _, _) = scripted(script.clone());
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(audio(1, 2));
+    engine.submit(audio(1, 3));
+    assert_eq!(
+        turn(&mut engine).await,
+        ["started:1", "failed:InputOpen:Transport"]
+    );
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let next = turn(&mut engine).await;
+    assert!(
+        next.contains(&"heard:What time is it?".to_owned()),
+        "{next:?}"
+    );
+    assert!(next.contains(&"said:It is noon.".to_owned()), "{next:?}");
+    assert!(
+        !next.iter().any(|label| label.starts_with("failed")),
+        "{next:?}"
+    );
+    assert!(
+        !script
+            .asked
+            .lock()
+            .unwrap()
+            .iter()
+            .flatten()
+            .any(|message| format!("{message:?}").contains("never heard whole")),
+        "nothing of the lost line is asked"
     );
 }
 
