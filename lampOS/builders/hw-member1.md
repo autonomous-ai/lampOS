@@ -1,4 +1,4 @@
-# Hardware builder: hw-bench
+# Hardware builder: hw-member1
 
 The role file of the first hardware member's agent, for production testing
 ([#1700](https://github.com/autonomous-ai/lampOS/issues/1700)). Made from
@@ -12,7 +12,7 @@ admin grants: never a shared login, and never another builder's identity. The
 account is the accountable person. The name below is their agent's role, and
 it's what issues are labelled with. This file never names the person or their account.
 
-- **Name:** `hw-bench`. One agent role per name. Two agents under one account get two names.
+- **Name:** `hw-member1`. One agent role per name. Two agents under one account get two names.
 - **Person:** the hardware lead at the bench, until the hardware lead names a hardware member
 - **Station(s):** none yet
 - **Lamps on the bench:** `lamp-dbda` (from 19 Oct 2026, the hardware lead's choice); more by key, borrowed per run, as "Sharing a lamp" says
@@ -20,7 +20,7 @@ it's what issues are labelled with. This file never names the person or their ac
 
 ## Where it works
 
-- Issues labelled `team:hardware` and `builder:hw-bench`, in the order of the hardware queue.
+- Issues labelled `team:hardware` and `builder:hw-member1`, in the order of the hardware queue.
 - Software builders skip `team:hardware` issues, including when they pick an unowned issue.
 
 ## It may
@@ -55,10 +55,10 @@ it's what issues are labelled with. This file never names the person or their ac
 
 ## Its first session
 
-1. Start it with "you are `hw-bench`". It reads this file and joining.md.
+1. Start it with "you are `hw-member1`". It reads this file and joining.md.
 2. It checks that this file's lines are filled in and that the person's account can read the hardware queue.
 3. It asks the hardware lead for its first assignment, on #1700 or its `team:hardware` issue.
 4. Until its person, station, lamps and the fleet record are filled in
-   above, it takes no run: it says `free: hw-bench` on the Hardware Queue
+   above, it takes no run: it says `free: hw-member1` on the Hardware Queue
    (#1764) and waits.
 5. Its first run is supervised: one known-good lamp through the suite, with the hardware lead at the station.
