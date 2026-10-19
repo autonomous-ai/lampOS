@@ -1,0 +1,9 @@
+# 10:00: asked to stop the water nudges a minute in ("off"), 100 minutes at
+# the desk: nothing.
+clock = "10:00"
+none = true
+
+[[call_tool]]
+name = "water_nudges"
+at = "1m"
+args = { how = "off" }

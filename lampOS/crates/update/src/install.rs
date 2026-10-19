@@ -220,6 +220,29 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "not yet tried on a lamp (#1679), and its function would put a product session past its \
          32 without `LAMP_USE_SKILL=on`, which the product doesn't run",
     ),
+    // #1685's four wellbeing nudges: installable skills their owner puts on,
+    // off until each has been seen on a lamp with a person.
+    (
+        "rest-your-eyes",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its tilt and \
+         softer light read as a cue to look away, not a fault, is for the lamp check",
+    ),
+    (
+        "sip-of-water",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its slow blue \
+         breath reads as a hint to drink, never a status light, is for the lamp check",
+    ),
+    (
+        "stand-up",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): whether its turn and \
+         tilt after a long sitting read as an invitation, never a nag, is for the lamp check",
+    ),
+    (
+        "wind-down",
+        "an installable wellbeing nudge, not yet tried on a lamp (#1685): its hours are the \
+         owner's own bedtime, and its hand-over to Bedtime and Morning (#1732) is for the lamp \
+         check",
+    ),
 ];
 
 /// One file of a product skill, `lampOS/skills/SKILL/FILE`, and where

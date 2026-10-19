@@ -1,0 +1,9 @@
+# 09:00: asked to snooze the eye rests a minute in, 100 minutes at the desk:
+# nothing that day.
+clock = "09:00"
+none = true
+
+[[call_tool]]
+name = "eye_rest_nudges"
+at = "1m"
+args = { how = "snooze" }

@@ -326,7 +326,14 @@ fn every_skill_folder_says_its_kind_and_version() {
     );
     assert_eq!(
         named(SkillKind::Installable),
-        ["desk-tutor", "desk-tutor-marks"]
+        [
+            "desk-tutor",
+            "desk-tutor-marks",
+            "rest-your-eyes",
+            "sip-of-water",
+            "stand-up",
+            "wind-down"
+        ]
     );
     for skill in &skills {
         assert_eq!(skill.version.as_deref(), Some("1.0.0"), "{}", skill.name);
@@ -7817,5 +7824,126 @@ fn the_program_forgets_a_snooze_at_a_restart() {
     assert!(
         air.nudged_within(Duration::from_secs(3)),
         "the snooze forgotten"
+    );
+}
+
+/// A haze at the desk, for the other member of a group: `air/state`'s
+/// PM2.5 above 100.
+fn hazy_skill(dir: &Path, name: &str, top: &str) -> lamp_skills::Skill {
+    load(&skill_with(
+        dir,
+        name,
+        &format!(
+            "{top}\n[trigger]\ntopic = \"air/state\"\nfield = \"pm2_5\"\nabove = 100\ncooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n[[do]]\nlight = {{ colour = \"warm\", for = \"5s\" }}\n"
+        ),
+    ))
+    .unwrap()
+}
+
+/// The skills a hazy reading at `at_ms` starts.
+fn hazy(engine: &mut Engine, at_ms: u64) -> Vec<String> {
+    engine
+        .observe("air/state", at_ms * 1_000, br#"{"pm2_5":150}"#, None)
+        .into_iter()
+        .filter(|run| !run.calls.is_empty())
+        .map(|run| run.skill)
+        .collect()
+}
+
+/// #1685: a group's hour goes first to the member that has waited for it
+/// longest and still waits, not to the first in folder order; one that has
+/// stopped waiting (held back for it no more within
+/// `BUDGET_WAIT_LIVE_US`) holds nobody back.
+#[test]
+fn a_groups_hour_goes_to_the_member_waiting_longest_while_it_waits() {
+    let dir = tempfile::tempdir().unwrap();
+    let group = "[budget]\ngroup = \"g\"\nper_hour = 1";
+    let skills = || {
+        vec![
+            nudge_skill(dir.path(), "a", group, "cooldown = \"1h\""),
+            hazy_skill(dir.path(), "b", group),
+        ]
+    };
+    let minute = 60_000;
+    let mut engine = Engine::new(skills(), true);
+    assert_eq!(stuffy(&mut engine, 0), ["a"]);
+    // B waits from minute 10, and still at 59.
+    assert!(hazy(&mut engine, 10 * minute).is_empty());
+    assert!(hazy(&mut engine, 59 * minute).is_empty());
+    // At 60 the hour is free and A is due again, first in order: B goes.
+    assert!(stuffy(&mut engine, 60 * minute).is_empty());
+    assert_eq!(hazy(&mut engine, 60 * minute), ["b"]);
+    // A waited from 60: its at 120.
+    assert_eq!(stuffy(&mut engine, 120 * minute), ["a"]);
+    // B held back at 10, then its air cleared: nothing waits at 60.
+    let mut engine = Engine::new(skills(), true);
+    assert_eq!(stuffy(&mut engine, 0), ["a"]);
+    assert!(hazy(&mut engine, 10 * minute).is_empty());
+    assert_eq!(stuffy(&mut engine, 60 * minute), ["a"]);
+}
+
+/// #1685: the four wellbeing skills as they are in `lampOS/skills/`, on one
+/// engine, through a five-hour sitting from 10:00 with someone moving now
+/// and then (each nudge noticed): one nudge an hour between them, each in
+/// the order it came due, and none of them a word. Rest your eyes at 45
+/// minutes; A sip of water due at 90, waiting to 105; Stand up due at 100,
+/// waiting to 165; then Rest your eyes, once an hour. Wind down is outside
+/// its hours.
+#[test]
+fn the_wellbeing_skills_share_one_nudge_an_hour_in_the_order_they_came_due() {
+    let names = ["rest-your-eyes", "sip-of-water", "stand-up", "wind-down"];
+    let skills: Vec<lamp_skills::Skill> = names
+        .iter()
+        .map(|name| load(&skills_root().join(name)).unwrap())
+        .collect();
+    for skill in &skills {
+        assert_eq!(
+            skill.budget,
+            Some(("wellbeing".to_owned(), 1)),
+            "{}",
+            skill.name
+        );
+        assert!(skill.most_a_day.is_some() && skill.rest.is_some() && skill.stop.is_some());
+        assert!(!skill.permissions.speak, "{}", skill.name);
+    }
+    let mut engine = Engine::new(skills, true);
+    // 10:00 local at 0 s.
+    engine.clock(0, 0, 36_000_000);
+    engine.observe("voice/state", 0, br#"{"state":"resting"}"#, None);
+    let mut nudged = Vec::new();
+    for half in 0..=600u64 {
+        let left = if half % 2 == 0 { 0.3 } else { 0.5 };
+        let faces = format!(
+            r#"{{"faces":[{{"id":"a1","xmin":{left},"ymin":0.2,"xmax":{},"ymax":0.6,"confidence":0.9}}]}}"#,
+            left + 0.3
+        );
+        for run in engine.observe(
+            "humans/faces/tracked",
+            half * 30_000_000,
+            faces.as_bytes(),
+            None,
+        ) {
+            if !run.calls.is_empty() {
+                assert!(
+                    !run.calls.iter().any(|call| matches!(call, Call::Say(_))),
+                    "{run:?}"
+                );
+                nudged.push((half / 2, run.skill));
+            }
+        }
+    }
+    let nudged: Vec<(u64, &str)> = nudged
+        .iter()
+        .map(|(minute, skill)| (*minute, skill.as_str()))
+        .collect();
+    assert_eq!(
+        nudged,
+        [
+            (45, "rest-your-eyes"),
+            (105, "sip-of-water"),
+            (165, "stand-up"),
+            (225, "rest-your-eyes"),
+            (285, "rest-your-eyes")
+        ]
     );
 }

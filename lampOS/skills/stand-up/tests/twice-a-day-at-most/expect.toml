@@ -1,0 +1,28 @@
+# 08:00, three sittings of 110 minutes, five minutes away between, moving
+# now and then (each noticed): at 100 and 215 minutes, not a third.
+clock = "08:00"
+
+[[expect]]
+at = "100m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "100m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }
+
+
+[[expect]]
+at = "215m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "215m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "curious" }

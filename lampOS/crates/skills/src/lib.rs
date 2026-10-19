@@ -201,6 +201,10 @@ pub const MORNING: u16 = 6 * 60;
 pub const NOTICED_MOVE: f32 = 0.15;
 pub const NOTICED_SIZE: f32 = 0.25;
 const HOUR_US: u64 = 3_600_000_000;
+/// How long a member's wait for its group's hour still counts after it was
+/// last held back for it: past that it is not waiting any more (its trigger
+/// ended, or something else holds it back).
+pub const BUDGET_WAIT_LIVE_US: u64 = 120_000_000;
 /// `[stop]`: the function by which a person snoozes what the skill starts
 /// itself, or turns it off or on again (#1685).
 #[derive(Deserialize)]
@@ -2652,6 +2656,9 @@ pub struct Engine {
     day_runs: HashMap<String, (i64, u32)>,
     /// When each group's runs began, within the last hour, by group.
     group_runs: HashMap<String, std::collections::VecDeque<u64>>,
+    /// By group, each member waiting for its hour: since when, and when it
+    /// was last held back for it.
+    budget_waits: HashMap<String, HashMap<String, (u64, u64)>>,
     /// Each resting skill's last nudge and how many in a row went unnoticed.
     nudges: HashMap<String, Nudge>,
     /// Until when each snoozed skill starts nothing itself, by skill: in
@@ -2777,6 +2784,7 @@ impl Engine {
             clock: None,
             day_runs: HashMap::new(),
             group_runs: HashMap::new(),
+            budget_waits: HashMap::new(),
             nudges: HashMap::new(),
             snoozed: HashMap::new(),
             off: BTreeSet::new(),
@@ -3496,11 +3504,24 @@ impl Engine {
                 {
                     continue;
                 }
-                // The nudges' limits (#1685). Outside its active hours, or
-                // with its group's hour spent, the chance is kept as in the
-                // quiet hours: taken at the trigger's first message once
-                // they allow it, while it still holds. Past the day's most,
-                // or resting after runs nobody noticed, it is spent.
+                // The nudges' limits (#1685). Past the day's most, or resting
+                // after runs nobody noticed, the chance is spent. Outside its
+                // active hours, or with its group's hour spent or another
+                // of the group waiting longer for it, the chance is kept as
+                // in the quiet hours: taken at the trigger's first message
+                // once they allow it, while it still holds.
+                let day = day_of(self.clock, now_us);
+                if skill.most_a_day.is_some_and(|most| {
+                    self.day_runs
+                        .get(&skill.name)
+                        .is_some_and(|(on, count)| *on == day && *count >= most)
+                }) || self
+                    .nudges
+                    .get(&skill.name)
+                    .is_some_and(|nudge| now_us < nudge.resting_until_us)
+                {
+                    continue;
+                }
                 let outside = skill
                     .active
                     .is_some_and(|active| minute.is_none_or(|minute| !within(minute, active)));
@@ -3521,24 +3542,38 @@ impl Engine {
                             >= u64::from(limit)
                     })
                 });
-                if outside || hour_spent {
+                // First come, first served: with the hour free, a member
+                // that has waited for it longer, and still waits, goes first,
+                // so the first of the group in folder order never takes
+                // every hour (#1685's wellbeing skills).
+                let behind = skill.budget.as_ref().is_some_and(|(group, _)| {
+                    self.budget_waits.get(group).is_some_and(|waits| {
+                        let mine = waits.get(&skill.name).map_or(now_us, |(first, _)| *first);
+                        waits.iter().any(|(name, (first, last))| {
+                            *name != skill.name
+                                && now_us.saturating_sub(*last) < BUDGET_WAIT_LIVE_US
+                                && *first < mine
+                        })
+                    })
+                });
+                if (hour_spent || behind)
+                    && !outside
+                    && let Some((group, _)) = &skill.budget
+                {
+                    let wait = self
+                        .budget_waits
+                        .entry(group.clone())
+                        .or_default()
+                        .entry(skill.name.clone())
+                        .or_insert((now_us, now_us));
+                    wait.1 = now_us;
+                }
+                if outside || hour_spent || behind {
                     if trigger.when != When::Appears {
                         watch.spent = false;
                         watch.disarmed = false;
                         watch.waiting_us = None;
                     }
-                    continue;
-                }
-                let day = day_of(self.clock, now_us);
-                if skill.most_a_day.is_some_and(|most| {
-                    self.day_runs
-                        .get(&skill.name)
-                        .is_some_and(|(on, count)| *on == day && *count >= most)
-                }) || self
-                    .nudges
-                    .get(&skill.name)
-                    .is_some_and(|nudge| now_us < nudge.resting_until_us)
-                {
                     continue;
                 }
                 if !Self::conditions_hold(&self.latest, &self.holding, skill, now_us) {
@@ -3581,6 +3616,12 @@ impl Engine {
                         let began = self.group_runs.entry(group.clone()).or_default();
                         began.retain(|at| now_us.saturating_sub(*at) < HOUR_US);
                         began.push_back(now_us);
+                        if let Some(waits) = self.budget_waits.get_mut(group) {
+                            waits.remove(&skill.name);
+                            waits.retain(|_, (_, last)| {
+                                now_us.saturating_sub(*last) < BUDGET_WAIT_LIVE_US
+                            });
+                        }
                     }
                     // Asked of the Policy, a run is watched for once it is
                     // made ([`Engine::made`]): a no shows nothing to ignore.
@@ -4117,16 +4158,18 @@ pub fn replay_with(
     clock: Option<&str>,
 ) -> Result<Vec<Made>, String> {
     let skill = load(dir)?;
-    // A name the skill's tool is not would make nothing and pass as a
-    // quiet case: it is refused.
-    if let Some(tool) = tools
-        .iter()
-        .find(|tool| skill.tool.as_deref() != Some(tool.name.as_str()))
-    {
+    // A name the skill's tool is not, nor its `[stop]` function's, would
+    // make nothing and pass as a quiet case: it is refused.
+    let stop = skill.stop.as_ref().map(|stop| stop.tool.clone());
+    if let Some(tool) = tools.iter().find(|tool| {
+        skill.tool.as_deref() != Some(tool.name.as_str())
+            && stop.as_deref() != Some(tool.name.as_str())
+    }) {
         return Err(format!(
-            "call_tool {:?}: this skill's tool is {:?}",
+            "call_tool {:?}: this skill's tool is {:?}, its [stop] function {:?}",
             tool.name,
-            skill.tool.as_deref().unwrap_or("none")
+            skill.tool.as_deref().unwrap_or("none"),
+            stop.as_deref().unwrap_or("none")
         ));
     }
     let mut engine = Engine::new(vec![skill], true);
@@ -4161,7 +4204,11 @@ pub fn replay_with(
         while let Some((at, name, args)) =
             calls.next_if(|(at, _, _)| until_us.is_none_or(|until| *at < until))
         {
-            if let Ok(run) = engine.tool(name, &args, first_us + at) {
+            // A `[stop]` call makes nothing: its words are the model's
+            // answer (#1685).
+            if let Ok(run) = engine.tool(name, &args, first_us + at)
+                && stop.as_deref() != Some(name)
+            {
                 keep(made, run.calls, at);
             }
         }

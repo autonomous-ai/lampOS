@@ -1,0 +1,21 @@
+# 22:00, 25 minutes at the desk, away five minutes, then 22 more: once, at
+# 20 minutes, the light given back as they leave; not again that evening
+# (once a day, and one an hour between the wellbeing skills).
+clock = "22:00"
+
+[[expect]]
+at = "20m"
+within = "1m"
+call = "body.gesture"
+args = { gesture = "sleepy" }
+
+[[expect]]
+at = "20m"
+within = "1m"
+call = "light"
+args = { dim = 1, until = "ends" }
+
+[[expect]]
+at = "27m"
+within = "1m"
+call = "ends"
