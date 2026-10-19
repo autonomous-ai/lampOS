@@ -1052,6 +1052,33 @@ record is written.
 - **Its exit ends the voice**, as Gemini's does (`coordinator::mandatory`):
   it is the only voice. A standby's exit is still dropped, and Gemini goes
   on.
+- **Its stop is Gemini's (#1620).** On a stop (SIGTERM, a mute, a fault)
+  `Rig::shutdown` sends it Stop with the other workers and holds it to the
+  same shared deadline, exit recheck, kill, reap and cleanup accounting
+  (`ForcedStop`/`WorkerExit` under its own role, `second`). Speech to text,
+  the chat and the voice are tasks inside this one process, not children of
+  their own; the endpoint is the session's, on either route. Tested
+  mid-request and for a worker that ignores Stop
+  (`second_route::a_stop_while_the_second_route_alone_is_mid_request_is_clean`,
+  `a_second_worker_that_ignores_stop_is_killed_and_named_as_geminis_is`).
+  A stop during a blocking call no longer holds it: `serve` ends its tokio
+  runtime with `worker::finish` (`shutdown_background()`), since a plain
+  drop waited, with no bound, for running `spawn_blocking` work (a tool
+  call, up to `tools::ASK_DEADLINE`, 1.5 s; a text's tool call; a DNS
+  lookup) and outlasted the shared 300 ms, so the worker was killed and
+  cleanup failed. The process exits right after; blocking work left
+  detached dies with it, as the Live worker's detached call threads do
+  (`a_stop_during_a_slow_tool_call_lets_the_second_worker_exit_within_its_deadline`:
+  1.50 s before, within 300 ms after).
+- **Its start never waits for a service (#1567).** The worker says its link
+  is Ready, session 1, as it starts (`worker::run`), before any service is
+  asked; speech to text and the chat connect per line. A refused or silent
+  Deepgram, DeepSeek or ElevenLabs fails each line (`TurnFailed`, with the
+  fault of `second_provider::fault`), never readiness, so the voice runs
+  past the 25 s budget with `LAMP_START_OFFLINE` on or off; the switch has
+  nothing to wait for here
+  (`the_second_route_alone_with_its_services_refused_stays_up_past_the_startup_budget`,
+  `the_second_workers_link_is_ready_before_any_service_is_asked`).
 - **No "My voice sounds a little different just now."** `--only-voice` turns
   the announcement off (`Engine::announcing`): there is no other voice to
   differ from, and it would be the first thing heard in every answer after
