@@ -581,6 +581,14 @@ pub struct Limits {
     /// on all five for two minutes, after which the lamp is taken up again
     /// slowly. Off: torque is never written off.
     pub overload_release: bool,
+    /// The factory's (#1682): a lamp asked to stop that got down, its head
+    /// home and its arm folded, is let go as a surprise lets go (torque off
+    /// on all five) once its last goals are written, so that it can be read
+    /// at rest afterwards. One that did not get down in time keeps holding;
+    /// a standing lamp folds first, as it always does. Off: a stop keeps
+    /// the lamp held. The product's unit never passes it.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub let_go_at_stop: bool,
     /// Let a lamp at rest take what Expression asks of the head, within
     /// [`REST_GLANCE_REACH`], and come back to rest once it runs out: a
     /// resting lamp lifts its head at a sudden sound. The arm is not
@@ -723,6 +731,7 @@ impl Limits {
         give_way: None,
         limp: false,
         overload_release: false,
+        let_go_at_stop: false,
         rest_glance: false,
         look_at_name: false,
         arbitration: false,
@@ -1040,6 +1049,9 @@ pub struct BodyReport {
     pub force: Option<u16>,
     /// It left its folded pose at least once.
     pub stood: bool,
+    /// Asked to stop, it was let go folded (`Limits::let_go_at_stop`).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub let_go_at_stop: bool,
     pub arm_peak_load: [u16; 2],
     pub arm_peak_temperature: [u8; 2],
     /// Each time the arm was sent back down, and why.
@@ -1221,6 +1233,12 @@ const ARM_WINDOW_MARGIN: u16 = 420;
 /// moves it a few counts, a gesture 21 (`GESTURE_STEP`), an arm let go by a
 /// hand goes back down at this.
 const ARM_GOAL_STEP: u16 = 50;
+/// How near home, and the arm its folded counts, a lamp asked to stop must
+/// be for `Limits::let_go_at_stop` to let it go: inside both the head's
+/// tracking bound (30) and the arm's goal step (50), past which the stop is
+/// already a surprise, so that an arm a little short of folded (40 counts
+/// up, say) keeps holding rather than dropping (the reviewer on #1776).
+const LET_GO_NEAR: u16 = 20;
 
 /// The most a position may move from the last good reading of its joint,
 /// per step (`TICK`) since that reading, unless it is this near the goal
@@ -2952,6 +2970,7 @@ fn run_on<P: PortIo, R: Runtime>(
         force_writes: 0,
         force: None,
         stood: false,
+        let_go_at_stop: false,
         arm_peak_load: [0; 2],
         arm_peak_temperature: [0; 2],
         retreats: Vec::new(),
@@ -5624,6 +5643,26 @@ fn run_on<P: PortIo, R: Runtime>(
             });
         } else if writes && bus.send_goals(home, standing.map(|_| arm_at)).is_ok() {
             report.goal_writes += 1;
+        }
+        // Only a lamp that is down is let go: the head within
+        // `LET_GO_NEAR` of home and the arm of its folded counts, so that
+        // nothing standing falls (the first builder on #1722, 19 Oct).
+        let down = report.last.is_some_and(|last| {
+            (0..3).all(|index| {
+                bus.left[COMMANDED[index].index()]
+                    || last[COMMANDED[index].index()]
+                        .position
+                        .abs_diff(home[index])
+                        <= LET_GO_NEAR
+            }) && standing.is_none_or(|up| {
+                (0..2).all(|index| {
+                    last[ARM[index].index()].position.abs_diff(up.folded[index]) <= LET_GO_NEAR
+                })
+            })
+        });
+        if limits.let_go_at_stop && stand <= 0.0 && off.is_none() && bus.refused.is_none() && down {
+            let_go_at_end(bus, &mut report);
+            report.let_go_at_stop = true;
         }
     } else if let Some(last) = report.last {
         // Stop pushing: each goal becomes where its joint is now, kept
