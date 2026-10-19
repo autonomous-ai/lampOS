@@ -111,8 +111,11 @@ validates the complete snapshot and quotes its JSON, retaining its identity,
 generation and source IDs; the inner note is capped at 1,200 bytes. A failed,
 invalidated, malformed or late snapshot gives an explicit unavailable-note
 instruction, with no stale-note fallback. Old sessions and failed opens
-are closed through the background queue, best effort; Memory's 32-session,
-24-hour limits cover lost closes. At the first Days session after a worker
+are closed through the background queue, best effort. At a worker's stop
+(the coordinator's `Stop`, on either route) the session it has open is
+closed straight to the memory within 150 ms (`remember::close_at_exit`), so a
+restart leaves none. Memory's 32-session limit, oldest closed first, and its
+24-hour limit cover lost closes. At the first Days session after a worker
 start, the restored conversation thread is discarded because the thread
 file contains no provenance.
 
@@ -370,8 +373,12 @@ examined. Opening the same session returns the same snapshot, even after
 new appends or observations; changing its cap is refused. Deletion returns
 the same snapshot identity with empty text/IDs and `invalidated:true`.
 There are at most 32 sessions per person, retained for at most 24 hours
-from opening. Close them promptly and use fresh unique names for new
-provider sessions; a reused name after expiry can create a new snapshot.
+from opening. A person at 32 has their oldest sessions closed when a new one
+opens, rather than the new one refused (#1722, D): a voice that stopped
+without closing its own left one behind, and enough restarts filled the
+room's, after which every session was told no note. Close them promptly and
+use fresh unique names for new provider sessions; a reused name after expiry
+can create a new snapshot.
 
 `Input` contains `job`, `person`, `generation`, `source_ids`, `records`
 and `previous`. Each evidence record has `id`, `at_unix_ms`, `kind`,

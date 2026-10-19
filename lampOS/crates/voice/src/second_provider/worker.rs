@@ -214,7 +214,11 @@ impl Gate {
         let mut drained = Drain::Deferred;
         for _ in 0..CONTROL_SLICE {
             match control.receive()? {
-                Some(Control::Stop) => return Ok(Drain::Stopped),
+                Some(Control::Stop) => {
+                    // Its Days session closed, so a restart leaves none (#1722, D).
+                    crate::remember::close_at_exit();
+                    return Ok(Drain::Stopped);
+                }
                 Some(Control::Authority { snapshot }) => {
                     self.install(monotonic_us(), snapshot, engine)?
                 }

@@ -721,11 +721,16 @@ impl Days {
             [person.as_str()],
             |r| r.get(0),
         )?;
+        // A person at the limit has their oldest sessions closed, not the
+        // new one refused (#1722, D): a voice that stops without closing
+        // its own leaves one behind, and enough restarts filled the room's,
+        // after which every session was told no note. A frozen note from a
+        // process that has gone is never read again.
         if count >= MAX_SESSIONS {
-            return Err(Error::new(
-                "full",
-                "close an old memory session before opening another",
-            ));
+            self.db.execute(
+                "DELETE FROM sessions WHERE rowid IN (SELECT rowid FROM sessions WHERE person=?1 ORDER BY opened_unix_ms,rowid LIMIT ?2)",
+                params![person.as_str(), count + 1 - MAX_SESSIONS],
+            )?;
         }
         let mut ids = vec![];
         let mut facts = vec![];
