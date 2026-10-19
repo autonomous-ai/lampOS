@@ -268,6 +268,16 @@ pub type AskAgain = Arc<dyn Fn(u64) -> Option<(&'static str, bool)> + Send + Syn
 /// Whether the link is back: any service host takes a bare connection
 /// (`link::any_answers`), for a line lost on the network ([`Engine::resending`]).
 pub type LinkBack = Arc<dyn Fn() -> BoxFuture<'static, bool> + Send + Sync>;
+/// A spoken line's sound as this route takes it, for the same-voice check
+/// (`LAMP_SAME_VOICE_MODEL`, `worker::Heeding::hear`): its start, said over
+/// the lamp's voice or not, its samples, and its end.
+pub enum Heard<'a> {
+    Began { over_the_lamps_voice: bool },
+    Samples(&'a [i16]),
+    Ended,
+}
+/// What hears each spoken line's sound, by its request.
+pub type Hearing = Arc<dyn Fn(u64, Heard<'_>) + Send + Sync>;
 /// Whether the lamp's own last line before `request` was a question, in a
 /// conversation going on (`worker::lamp_just_asked`): then a checked sound
 /// with a word in it is the person's answer, as on the Live route.
@@ -361,6 +371,7 @@ struct Shared {
     /// [`Engine::resending`]: a spoken line whose chat was lost on the
     /// network is asked once more when the link is back.
     resend: Option<LinkBack>,
+    hearing: Option<Hearing>,
     asked: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
@@ -778,6 +789,7 @@ impl Engine {
                 misheard_at_us: Mutex::new(None),
                 holding_answer: false,
                 resend: None,
+                hearing: None,
                 asked: None,
                 cues: None,
                 down: None,
@@ -1065,6 +1077,15 @@ impl Engine {
         self
     }
 
+    /// Each spoken line's sound is heard by `hearing` too, as the Live
+    /// worker gives it to the same-voice check. Before any turn only.
+    pub fn hearing(mut self, hearing: Hearing) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.hearing = Some(hearing);
+        }
+        self
+    }
+
     /// A spoken request whose words name one of the staff is asked with the
     /// Live route's note beside them (`LAMP_STAFF_NOTE=on`,
     /// `crate::staff_note`). Before any turn only.
@@ -1320,6 +1341,14 @@ impl Engine {
                         room.began_over_the_lamp(request);
                     }
                 });
+                if let Some(hearing) = &self.shared.hearing {
+                    hearing(
+                        request,
+                        Heard::Began {
+                            over_the_lamps_voice,
+                        },
+                    );
+                }
                 // The voice's connection opened while the person speaks, not
                 // by the answer's first sentence (#1712).
                 tokio::spawn(self.shared.services.warm());
@@ -1521,6 +1550,9 @@ impl Engine {
                     return;
                 };
                 room(|room| room.hearing(monotonic_us()));
+                if let Some(hearing) = &self.shared.hearing {
+                    hearing(request, Heard::Samples(&samples));
+                }
                 if let Ok(mut said) = turn.said.lock() {
                     if said.0 == 0 {
                         said.0 = read_completed_at_us;
@@ -1581,6 +1613,9 @@ impl Engine {
                     turn.sound.store(sound, Ordering::Release);
                     // Closing the queue is the end of input for the task.
                     turn.audio = None;
+                    if let Some(hearing) = &self.shared.hearing {
+                        hearing(request, Heard::Ended);
+                    }
                 }
             }
             ProviderInput::Written {
@@ -3406,6 +3441,9 @@ async fn answer(
                             "lamp-voice second: request {request} first answer audio {} ms after the words were heard",
                             began.elapsed().as_millis()
                         );
+                        if asked == Asker::Spoken {
+                            worker::name_sounded(request);
+                        }
                     }
                     if let Ok(mut at) = shared.answered_at.lock() {
                         *at = Some((shared.clock)());

@@ -435,7 +435,9 @@ it heard its name, through a function of the silent kind
 running session, and on none of the talk between two people. But having
 made that sign it said nothing else: 1 of those 7 questions was answered.
 A function of the ordinary kind would let it answer, about 0.7 s later.
-Neither is acceptable, and the switch is off.
+Neither is acceptable, and the switch is off. The second route offers the
+same function with the switch, and there it is of the ordinary kind: its
+call costs the answer a chat round ([second-voice.md](second-voice.md)).
 
 ## Hearing its name in its own sound: first measurement
 
@@ -671,7 +673,8 @@ nothing and the name was heard, and in this meeting it never came.
 
 ## Said to the lamp from close to it (#753)
 
-Off unless `LAMP_ADDRESSED=on`, and only with `LAMP_ATTENTION` set, since
+On both voice routes: the second route judges it as the Live worker does
+([second-voice.md](second-voice.md)). Off unless `LAMP_ADDRESSED=on`, and only with `LAMP_ATTENTION` set, since
 the rule is what follows each request, and `LAMP_BUS=on`, since the ears,
 the eyes and the topic are reached through the bus's root, which the
 coordinator gives the worker only then (`--bus-root`, `crates/voice/src/bus_out.rs`).
