@@ -1676,6 +1676,80 @@ fn shown(why: &'static str, sign: Option<&'static str>) -> &'static str {
     }
 }
 
+/// In a busy room a conversation goes on, on this route, only this long
+/// from the lamp's own last words (#1712, the first builder at 18:57: in
+/// ten minutes of a busy office on lamp-4ace, 15 lines were let out as the
+/// conversation going on, and about 10 of the 15 answers went to office
+/// talk; DeepSeek declines far less than Gemini). In a quiet room it goes
+/// on [`crate::thread::GOING_ON_FOR`], as on Live.
+pub(crate) const BUSY_GOING_ON_FOR: Duration = Duration::from_secs(15);
+/// Held in a busy room: let out only as the conversation going on, and
+/// neither a question, nor three words, nor an answer to the lamp's own
+/// question ("yes" to "Shall I start it?").
+pub(crate) const BUSY_SHORT: &str = "a busy room: a conversation going on carries only a question, three words or more, or an answer to the lamp's own question";
+/// Held in a busy room: let out only by someone turned to the lamp, and
+/// asking it nothing.
+pub(crate) const BUSY_TURNED: &str =
+    "a busy room: someone is turned to the lamp, but asks it nothing";
+
+/// Why a line let out in a busy room for `why` is held after all, if it is
+/// (#1712, the first builder at 18:57): one let out only as the
+/// conversation going on needs to be a question, or three words or more,
+/// or an answer to the lamp's own question (`lamp_asked`); one let out only
+/// by a face turned to the lamp needs to be a question. A line called by its
+/// name, its words, a tap, or said close to the lamp is let out as before.
+fn busy_bar(why: &str, heard: &str, lamp_asked: bool) -> Option<&'static str> {
+    let question = heard.trim_end().ends_with('?');
+    if why == crate::attention::GOING_ON {
+        (!(question || heard.split_whitespace().count() >= 3 || lamp_asked)).then_some(BUSY_SHORT)
+    } else if why == crate::attention::TURNED {
+        (!question).then_some(BUSY_TURNED)
+    } else {
+        None
+    }
+}
+
+/// `signs` as the turn is judged with them: in a busy room a conversation
+/// goes on only [`BUSY_GOING_ON_FOR`] from the lamp's last words (`said_ago`)
+/// or [`CALL_CARRIES_FOR`] from the person's call (`called_ago`). When none
+/// is going on, the journal says why, without words (#1712, the first
+/// builder at 16:16: which of these had held the owner's lines was not
+/// told).
+fn went_on_told(
+    request: u64,
+    mut signs: Signs,
+    said_ago: Option<Duration>,
+    called_ago: Option<Duration>,
+    left_alone: Option<usize>,
+) -> Signs {
+    let busy = signs.room == crate::room_told::Room::Busy;
+    if busy {
+        signs.going_on &= said_ago.is_some_and(|ago| ago <= BUSY_GOING_ON_FOR)
+            || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR);
+    }
+    if !signs.going_on {
+        let ago = |ago: Option<Duration>, what: &str| {
+            ago.map_or(format!("it was never {what}"), |ago| {
+                format!("it was last {what} {} s ago", ago.as_secs())
+            })
+        };
+        eprintln!(
+            "lamp-voice second: request {request}: no conversation going on: {}, {}{}{}",
+            ago(said_ago, "heard saying words"),
+            ago(called_ago, "called"),
+            left_alone.map_or(String::new(), |left| format!(
+                ", {left} lines left alone since it last spoke"
+            )),
+            if busy {
+                ", in a busy room, where it goes on 15 s"
+            } else {
+                ""
+            }
+        );
+    }
+    signs
+}
+
 /// How long a call let out carries the person's next lines when the lamp
 /// has said no word since (`Heeding::called_at`): the owner's lines on
 /// lamp-4ace came every 6 s. The lamp's own words carry them for
@@ -1966,26 +2040,9 @@ impl Heeding {
             left_alone = Some(room.left_alone_since_spoke());
             signs.going_on &= !room.talked_past_the_lamp();
         }
-        // Why no conversation is going on, without words (#1712, the first
-        // builder at 16:16: which of these had held the owner's lines was
-        // not told).
-        if !signs.going_on {
-            let ago = |ago: Option<Duration>, what: &str| {
-                ago.map_or(format!("it was never {what}"), |ago| {
-                    format!("it was last {what} {} s ago", ago.as_secs())
-                })
-            };
-            eprintln!(
-                "lamp-voice second: request {request}: no conversation going on: {}, {}{}",
-                ago(said_ago, "heard saying words"),
-                ago(called_ago, "called"),
-                left_alone.map_or(String::new(), |left| format!(
-                    ", {left} lines left alone since it last spoke"
-                ))
-            );
-        }
+        let ended = |signs: Signs| went_on_told(request, signs, said_ago, called_ago, left_alone);
         let Some((bus, names)) = &mut self.bus else {
-            return signs;
+            return ended(signs);
         };
         if !self.keeps_room {
             signs.room = crate::bus_out::room_now(bus);
@@ -2007,7 +2064,7 @@ impl Heeding {
                     .push((now_us.saturating_sub(ago_ms * 1_000), name.score));
             }
         }
-        signs
+        ended(signs)
     }
 
     /// The rule's verdict on a spoken turn: why it is not answered, or
@@ -2055,6 +2112,7 @@ impl Heeding {
         }
         attention.heard(heard);
         attention.lamp_asked(signs.lamp_asked);
+        let (busy, lamp_asked) = (signs.room == crate::room_told::Room::Busy, signs.lamp_asked);
         attention.set_near(signs.near);
         let turned = signs.turned.filter(|_| self.strict);
         let mut verdict =
@@ -2062,6 +2120,11 @@ impl Heeding {
         let alone = attention.played_on_the_conversation_alone();
         if alone && lone_words(heard) {
             verdict = Some(crate::attention::Verdict::Hold(LONE_WORDS));
+        }
+        if busy && let Some(crate::attention::Verdict::Play(why)) = verdict {
+            verdict = busy_bar(why, heard, lamp_asked)
+                .map(crate::attention::Verdict::Hold)
+                .or(verdict);
         }
         let played = matches!(verdict, Some(crate::attention::Verdict::Play(_)));
         let called = played && (attention.called_for_itself() || turned == Some(true));
@@ -2501,6 +2564,64 @@ mod tests {
             assert!(strict.judge(request, said, "And then?", busy()).is_some());
         }
         assert_eq!(strict.session, 2);
+    }
+
+    /// #1712, the first builder at 18:57: in a busy room, a line let out
+    /// only as the conversation going on is a question, three words or more,
+    /// or an answer to the lamp's own question; one let out only by a face
+    /// turned to the lamp asks something. Other signs let a line out as
+    /// before.
+    #[test]
+    fn a_busy_room_asks_more_of_a_line_going_on_or_a_turned_face() {
+        use crate::attention::{GOING_ON, TURNED};
+        assert_eq!(super::busy_bar(GOING_ON, "Yes.", false), Some(BUSY_SHORT));
+        assert_eq!(
+            super::busy_bar(GOING_ON, "Yes.", true),
+            None,
+            "the hand-over's yes"
+        );
+        assert_eq!(super::busy_bar(GOING_ON, "Okay?", false), None);
+        assert_eq!(super::busy_bar(GOING_ON, "Book the car.", false), None);
+        assert_eq!(
+            super::busy_bar(GOING_ON, "Okay sure.", false),
+            Some(BUSY_SHORT)
+        );
+        assert_eq!(
+            super::busy_bar(TURNED, "Okay sure, fine.", false),
+            Some(BUSY_TURNED)
+        );
+        assert_eq!(super::busy_bar(TURNED, "Is it raining?", false), None);
+        let named = "its name was heard plainly in the room's sound";
+        assert_eq!(super::busy_bar(named, "Okay.", false), None);
+    }
+
+    /// #1712, the first builder at 18:57: in a busy room a conversation goes
+    /// on 15 s from the lamp's last words; in a quiet one, Live's 45 s.
+    #[test]
+    fn a_busy_rooms_conversation_goes_on_fifteen_seconds() {
+        use crate::room_told::Room;
+        let signs = |room| Signs {
+            room,
+            going_on: true,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let s = Duration::from_secs;
+        let went = |room, said: u64, called: Option<u64>| {
+            super::went_on_told(1, signs(room), Some(s(said)), called.map(s), None).going_on
+        };
+        assert!(went(Room::Busy, 10, None));
+        assert!(!went(Room::Busy, 20, None));
+        assert!(!went(Room::Busy, 44, None));
+        assert!(
+            went(Room::Busy, 30, Some(10)),
+            "the person's call, 10 s ago"
+        );
+        assert!(went(Room::Quiet, 30, None));
+        assert!(went(Room::Unknown, 44, None));
     }
 
     /// #1712, the first builder at 17:49: the journal names the sign that
