@@ -541,6 +541,30 @@ numbers, not in kind.
   11 s after the kernel.
 - **Write down and sync** before any power test (above).
 
+## Hardware members (production testing, #1700, 19 Oct 2026)
+
+Hardware staff test lamps before they ship, each with their own agent. The
+production testing plan and its deliverables are
+[#1700](https://github.com/autonomous-ai/lampOS/issues/1700).
+
+- **Their own GitHub account.** Each hardware member joins with their own
+  account, which a repository admin grants (read the queue, comment, push
+  their own branches). Access is taken away the same way. Labels route work;
+  they don't control access.
+- **A role file** from [builders/HARDWARE-TEMPLATE.md](../builders/HARDWARE-TEMPLATE.md):
+  the agent's name, the person's role, the stations and bench lamps, and
+  where the fleet record lives. The person's account is mapped to the role in
+  the fleet record, never in this repository.
+- **A queue of their own.** Hardware issues are labelled `team:hardware` (a
+  label made when the hardware lead is named). Software builders skip them,
+  including when they look for an unowned issue.
+- **Issues** are still opened by the first builder: one for each confirmed
+  common failure, with the affected lamps and runs linked. Routine results
+  stay in the fleet record, never one issue per run.
+- **The hardware lead** (a person) approves the suite's limits, durations,
+  fixtures and stop conditions, and the shipment gate. A changed limit is a
+  versioned decision.
+
 ## What was not shown, and open questions
 
 - Builders with and without a lamp, and with different people, have
