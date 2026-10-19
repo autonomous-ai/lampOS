@@ -501,7 +501,9 @@ then use that person's scope:
   eyes' `humans/faces/tracked` (`LAMP_EYES_SPEAKING=on`), looked at every
   100 ms on the worker's own thread. A face *speaks through the line* when
   it reads `yes` in at least half of the looks between the line's start and
-  end (at least three looks).
+  end (at least three looks). Each of the eyes' frames counts once, however
+  often it is read, and their silence one empty look each 500 ms, so a short
+  line never passes on one frame.
   - **Only the known person's face** (its passing id is the eyes'
     `known-face`, and the known name is still the admitted person's): the
     line stays theirs.

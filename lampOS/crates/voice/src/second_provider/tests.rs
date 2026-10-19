@@ -4746,6 +4746,7 @@ async fn a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs
         let feeder = {
             let (eyes, done) = (eyes.clone(), done.clone());
             std::thread::spawn(move || {
+                let mut frame = 0u64;
                 while !done.load(Ordering::Acquire) {
                     let faces = lamp_msgs::Faces {
                         faces: ["f1", "f2"]
@@ -4770,7 +4771,8 @@ async fn a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs
                             })
                             .into(),
                     };
-                    eyes.look(Instant::now(), Some(&faces));
+                    frame += 1;
+                    eyes.look(Instant::now(), Some((("eyes", frame), &faces)));
                     std::thread::sleep(Duration::from_millis(2));
                 }
             })
@@ -4792,6 +4794,103 @@ async fn a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs
     assert_eq!(asked[1][0], room, "and so is its round after the call");
     assert_eq!(asked[2][0], a_told, "A's own face's line stays A's");
     assert_eq!(asked[4][0], room, "both faces' line is the room's");
+    std::fs::remove_file(known_face_of(&path)).unwrap();
+    std::fs::remove_file(path).unwrap();
+}
+
+/// The reviewer on #2008: the control for
+/// `a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs`.
+/// The same `f2` line, with the eyes seeing it, but without
+/// `LAMP_SECOND_SPEAKING_FACE` (no `seeing_who_speaks`), stays A's, as
+/// before: told for A, its memory call in A's scope.
+#[tokio::test]
+async fn without_the_switch_a_line_another_face_spoke_stays_the_known_persons() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    use crate::speaking_faces::{SpeakingFaces, known_face_of};
+    let path = std::env::temp_dir().join(format!(
+        "ten-speaking-face-off-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    std::fs::write(&path, "A").unwrap();
+    std::fs::write(known_face_of(&path), "f1\n").unwrap();
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Lamp, remember that my test code is 417.".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "m1",
+                        "remember",
+                        json!({"text":"my test code is 417"}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Got it."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let cache = Arc::new(FaceCache::default());
+    let scopes: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
+    let seen = scopes.clone();
+    let runner: ScopedToolRunner = Arc::new(move |_, _, _, _, lease: ScopeLease| {
+        seen.lock()
+            .unwrap()
+            .push(lease.scope().unwrap().person().map(str::to_owned));
+        Box::pin(async { json!({"ok":true}) })
+    });
+    let mut engine = engine
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([17; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            Some(Arc::new(|lease: &ScopeLease| {
+                Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+            })),
+        )
+        .announcing(false);
+    engine.memory_camera(true, 1);
+    cache.replace(
+        cache.begin_refresh(),
+        crate::known_faces::FaceObservation::read(&path),
+    );
+    // The eyes see f2 speaking all through the line; nothing reads them.
+    let eyes = SpeakingFaces::default();
+    let speaking = lamp_msgs::Faces {
+        faces: vec![lamp_msgs::Face {
+            id: "f2".into(),
+            xmin: 0.1,
+            ymin: 0.1,
+            xmax: 0.3,
+            ymax: 0.4,
+            confidence: 1.0,
+            yaw: None,
+            facing: None,
+            speaking: Some(lamp_msgs::Speaking {
+                state: lamp_msgs::SpeakingState::Yes,
+                score: 0.9,
+                from: None,
+            }),
+        }],
+    };
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    for frame in 0..10u64 {
+        eyes.look(Instant::now(), Some((("eyes", frame), &speaking)));
+        tokio::time::sleep(Duration::from_millis(4)).await;
+    }
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    let a = crate::remember::person_id("A");
+    assert_eq!(*scopes.lock().unwrap(), [Some(a.clone())]);
+    let asked = script.asked.lock().unwrap();
+    assert_eq!(
+        asked[0][0],
+        Message::system(format!("for {:?}", Some(a.as_str())))
+    );
     std::fs::remove_file(known_face_of(&path)).unwrap();
     std::fs::remove_file(path).unwrap();
 }
