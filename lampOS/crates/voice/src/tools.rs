@@ -810,7 +810,7 @@ pub fn keeps_out(route: &Route, name: &str) -> bool {
 /// [`run_call`]. Blocking: for a thread of its own. `not_for_me` itself is
 /// the route's to act on before this.
 pub fn answer(settings: &Settings, call: &ToolCall, request: u64, heard: bool) -> Value {
-    answer_with_scope(settings, call, request, heard, None)
+    answer_with_scope(settings, call, request, heard, None, false)
 }
 
 /// A spoken request's immutable memory identity, never the current face.
@@ -821,7 +821,22 @@ pub fn answer_scoped(
     heard: bool,
     lease: &crate::memory_scope::ScopeLease,
 ) -> Value {
-    answer_with_scope(settings, call, request, heard, Some(lease))
+    answer_with_scope(settings, call, request, heard, Some(lease), false)
+}
+
+/// [`answer`], or [`answer_scoped`] with a `lease`, for the second voice's
+/// spoken turns: a `check_agent_task` answer keeps its news key
+/// ([`crate::agent_tasks::NEWS_KEY`]), which the second route takes out of
+/// what its model is told and puts on the turn as `NewsAnswered`, as the
+/// Live worker does (#1390; the first builder's 20:15 on #1722).
+pub fn answer_keeping_news(
+    settings: &Settings,
+    call: &ToolCall,
+    request: u64,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Value {
+    answer_with_scope(settings, call, request, heard, lease, true)
 }
 
 fn answer_with_scope(
@@ -830,6 +845,7 @@ fn answer_with_scope(
     request: u64,
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
+    keep_news: bool,
 ) -> Value {
     if !scope_current(lease, request) {
         return unavailable();
@@ -848,10 +864,10 @@ fn answer_with_scope(
             let began = std::time::Instant::now();
             let (whom, (mut told, answered)) =
                 run_call_with_scope(&route, call, request, heard, lease);
-            // The second voice puts no news on its turns, so news asked about
-            // there leaves its harness open (#1390); the key is never the
-            // model's either way.
-            if matches!(route, Route::Tasks(_)) {
+            // Kept only for the second voice's spoken turn, which takes it
+            // out before its model reads the answer; the key is never a
+            // model's (#1390).
+            if !keep_news && matches!(route, Route::Tasks(_)) {
                 let _ = crate::agent_tasks::take_news_key(&mut told);
             }
             // Worded as the Live route's line, which is read on the lamp.
@@ -1421,6 +1437,7 @@ mod tests {
                 machine_names: false,
                 needs: None,
                 staff_note: false,
+                make_skill: false,
             }),
             schedule_tools: true,
             schedule_speak: true,
@@ -1654,6 +1671,7 @@ mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         };
         assert_eq!(
             settings,
@@ -2181,6 +2199,7 @@ mod tests {
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         };
         let with = Settings {
             tasks: Some(place.clone()),

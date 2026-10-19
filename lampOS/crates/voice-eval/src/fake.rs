@@ -139,6 +139,7 @@ impl FakeRuntime {
         runtime.emit(
             EventKind::RunStart {
                 provider_kind: Some(provider_kind.into()),
+                voice_route: None,
             },
             None,
         );

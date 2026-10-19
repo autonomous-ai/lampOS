@@ -34,6 +34,10 @@ pub enum EventSource {
 pub enum EventKind {
     RunStart {
         provider_kind: Option<String>,
+        /// `second` when the second route alone answered
+        /// (`LAMP_VOICE_ROUTE=second`); absent otherwise, as before.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        voice_route: Option<String>,
     },
     ListeningReady,
     /// A speech candidate before any destructive turn replacement.
@@ -253,6 +257,7 @@ pub fn from_trace(record: &Value) -> Option<RuntimeEvent> {
     let event = match kind {
         "run_start" => EventKind::RunStart {
             provider_kind: text("provider_kind"),
+            voice_route: text("voice_route"),
         },
         "listening_ready" => EventKind::ListeningReady,
         "input_candidate" => EventKind::InputCandidate {
@@ -603,8 +608,16 @@ impl Cue {
 pub fn to_trace(event: &RuntimeEvent, owner: Option<Value>) -> Value {
     let at = event.at_us.unwrap_or(0);
     let mut record = match &event.kind {
-        EventKind::RunStart { provider_kind } => {
-            json!({"kind":"run_start","provider_kind":provider_kind,"acoustic_score":null})
+        EventKind::RunStart {
+            provider_kind,
+            voice_route,
+        } => {
+            let mut record =
+                json!({"kind":"run_start","provider_kind":provider_kind,"acoustic_score":null});
+            if let Some(route) = voice_route {
+                record["voice_route"] = json!(route);
+            }
+            record
         }
         EventKind::ListeningReady => json!({"kind":"listening_ready"}),
         EventKind::InputCandidate { candidate } => {

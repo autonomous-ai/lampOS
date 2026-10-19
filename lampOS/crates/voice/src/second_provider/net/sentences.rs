@@ -67,6 +67,27 @@ impl Sentences {
         None
     }
 
+    /// The first `n` words written so far, once `n` have come whole (each
+    /// followed by whitespace): for a voice asked one request a piece, so
+    /// its first sound waits for neither a sentence nor a clause (#1712).
+    pub fn words(&mut self, n: usize) -> Option<String> {
+        let mut words = 0;
+        let mut in_word = false;
+        for (at, c) in self.text.char_indices() {
+            if !c.is_whitespace() {
+                in_word = true;
+            } else if std::mem::replace(&mut in_word, false) {
+                words += 1;
+                if words == n {
+                    let piece = self.text[..at].trim().to_owned();
+                    self.text.drain(..at);
+                    return Some(piece);
+                }
+            }
+        }
+        None
+    }
+
     /// Whatever is left when the text ends.
     pub fn finish(&mut self) -> Option<String> {
         let rest = std::mem::take(&mut self.text);
@@ -107,6 +128,24 @@ mod tests {
             Some("Well, it is about nine million,")
         );
         assert_eq!(sentences.finish().as_deref(), Some("give or take"));
+    }
+
+    /// #1712: the first words go once that many have come whole; the rest
+    /// of the sentence follows as a sentence.
+    #[test]
+    fn the_first_words_are_cut_once_they_have_come_whole() {
+        let mut sentences = Sentences::default();
+        assert!(sentences.push("Tomorrow will be ").is_empty());
+        assert_eq!(sentences.words(5), None);
+        assert!(sentences.push("hot, around").is_empty());
+        assert_eq!(sentences.words(5), None, "\"around\" may go on");
+        assert!(sentences.push(" 35 degrees.").is_empty());
+        assert_eq!(
+            sentences.words(5).as_deref(),
+            Some("Tomorrow will be hot, around")
+        );
+        assert_eq!(sentences.push(" Stay cool."), ["35 degrees."]);
+        assert_eq!(sentences.finish().as_deref(), Some("Stay cool."));
     }
 
     #[test]

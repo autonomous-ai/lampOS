@@ -40,12 +40,42 @@ fn reminder_quiet_uses_current_admission_time_after_new_capture_arrived_in_loop(
     ));
 }
 
+/// #1712, lamp-4ace 19 Oct 13:23: "Let me look that up" before a web search
+/// took a picture twice. Its words come in pieces, and "Let me look" alone
+/// is not yet a look: the next piece decides. A look only once the phrase
+/// closes.
+#[test]
+fn an_answer_that_looks_something_up_takes_no_picture() {
+    let look = |pieces: &[&str]| {
+        let mut opening = None;
+        let mut wanted = None;
+        let mut trace = SessionState::default();
+        for text in pieces {
+            record_look_intent(
+                true,
+                Some(7),
+                text,
+                None,
+                &mut opening,
+                &mut wanted,
+                &mut trace,
+            )
+            .unwrap();
+        }
+        wanted.map(|(turn, _)| turn)
+    };
+    assert_eq!(look(&["Let me look", " that up."]), None);
+    assert_eq!(look(&["Let me ", "look into", " it."]), None);
+    assert_eq!(look(&["Let me look", "."]), Some(7));
+    assert_eq!(look(&["Let me look."]), Some(7));
+}
+
 #[test]
 fn stored_reminder_words_cannot_start_a_camera_followup_even_when_transcript_is_late() {
     let mut opening = None;
     let mut wanted = None;
     let mut trace = SessionState::default();
-    for text in ["Let me ", "take a look"] {
+    for text in ["Let me ", "take a look."] {
         record_look_intent(
             true,
             Some(1),
@@ -60,7 +90,7 @@ fn stored_reminder_words_cannot_start_a_camera_followup_even_when_transcript_is_
     assert_eq!(wanted.map(|(turn, _)| turn), Some(1));
     assert_eq!(trace.len(), 1);
     wanted = None;
-    for text in ["Let me ", "take a look"] {
+    for text in ["Let me ", "take a look."] {
         record_look_intent(
             true,
             Some(2),
@@ -78,7 +108,7 @@ fn stored_reminder_words_cannot_start_a_camera_followup_even_when_transcript_is_
     record_look_intent(
         true,
         Some(3),
-        "Let me look",
+        "Let me look.",
         Some(2),
         &mut opening,
         &mut wanted,
@@ -92,7 +122,7 @@ fn stored_reminder_words_cannot_start_a_camera_followup_even_when_transcript_is_
         record_look_intent(
             true,
             Some(turn),
-            "Let me look",
+            "Let me look.",
             Some(2),
             &mut opening,
             &mut wanted,
@@ -319,7 +349,7 @@ fn reminder_waits_for_promised_look_after_final_pcm_and_delayed_provider_termina
     record_look_intent(
         true,
         Some(previous.turn()),
-        "Let me take a look",
+        "Let me take a look.",
         None,
         &mut opening,
         &mut wanted,

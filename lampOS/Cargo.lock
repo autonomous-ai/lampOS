@@ -2275,6 +2275,7 @@ dependencies = [
  "futures-util",
  "gpiocdev",
  "hound",
+ "hyper-util",
  "lamp-actions",
  "lamp-audio",
  "lamp-body",
@@ -2310,6 +2311,7 @@ dependencies = [
  "thread-priority",
  "tokio",
  "tokio-tungstenite",
+ "toml",
  "webpki-roots 1.0.9",
 ]
 
@@ -2322,6 +2324,7 @@ dependencies = [
  "lamp-expression",
  "lamp-ipc",
  "lamp-local-time",
+ "lamp-memory",
  "lamp-msgs",
  "lamp-observer",
  "lamp-policy",

@@ -617,6 +617,47 @@ A left-out bus message is counted under its topic only when the topic is one
 of lampOS's (`BUS_TOPICS`, held to every `TOPIC` in `crates/msgs` by a test),
 else as `other`; anything beside a payload's `faces` is left out and counted.
 
+## What a played test's arms cost: `cost`
+
+`lamp-voice-eval cost JOURNAL --prices FILE --arm NAME FROM TO...` prints what
+each arm of a played test cost, from `journalctl -u lamp-voice` alone (the first
+builder on #1722, 19 Oct 21:18: `cost-night1.py` as a subcommand). An arm is a
+stretch of the journal by the lamp's time of day, `HH:MM` or `HH:MM:SS`, as
+`score`'s arms are, and may run past midnight.
+
+- **Usage is read from the voice's own lines**, as counts only, never words
+  (`src/cost.rs` names each line):
+  - requests, by process and number;
+  - answered: the second route's `first answer audio`, and Live's answers
+    that began, less those held back. Live's begin with its first sound, which
+    it says only with `LAMP_NAME_SIGNAL`, or its answer judged played (`its
+    answer is played: …`), which it says whenever attention judges, as with
+    `LAMP_SPOKEN_TO`. Either switch counts them; with neither, Live's answered
+    reads 0;
+  - DeepSeek's prompt, cached and completion tokens from each `chat answer`.
+    One with "the cache not said" is priced as all uncached, the dearer, and one
+    with "no usage given" is counted, not priced;
+  - searches, `web_search` called or the chat's plugin searching;
+  - the sound sent to Deepgram, Nova-3's and Flux's lines each at their own price;
+  - the voice's characters from each request's summary of its pieces (#1935).
+    A piece whose first audio never came isn't in it, so this can read a little low;
+  - Live's text and audio tokens in and out from `provider: usage`.
+- **Prices are dollars in a JSON file**, with none in the code.
+  `fixtures/voice-eval-cost-prices.example.json` holds the list prices read on
+  19 Oct, until the team's own rates come. DeepSeek's tiers (peak, off-peak)
+  each give the second route's arms a row; Live's arms get one.
+- **No price for a voice the journal names refuses the run,** rather than
+  pricing that voice at nothing. So does an answered line with no summary of
+  its voice's pieces, as in a journal from before #1935, unless
+  `--voice-estimate VOICE N` is given. Those lines' characters are then
+  estimated as N a completion token, over the arm's share of such lines, as
+  `cost-night1.py` does (4), and the row says they're estimated.
+- **Each row:** requests, answered, the arm's minutes, and the cost per request,
+  per answered line and per "conversation minute". That's 5 requests at the
+  arm's own cost a request: the research's model of 4 answered and 1 not.
+- **Tests:** `src/cost.rs` (each line, each price, the three forms of a chat
+  answer's tokens) and `tests/cost.rs` (the command as it is run).
+
 ## The routes' table from the journal: `score`
 
 `lamp-voice-eval score JOURNAL --arm NAME FROM TO [--arm NAME FROM TO]...
@@ -737,8 +778,11 @@ owners are active, and such an attempt is retained as failed.
 ```
 
    Use `provider_config` (a private provider JSON on the Lamp) instead of the
-   fixture pair for Gemini, or `serve_config` for one long-lived serve runtime
-   per attempt (see [serve-session runner](voice-eval-serve.md)). For a direct-human cohort set `"stimulus_source":
+   fixture pair for a provider, or `serve_config` for one long-lived serve runtime
+   per attempt (see [serve-session runner](voice-eval-serve.md)). Either runs on
+   the second route unless the config names `"voice_route": "live"`, with the
+   second route's settings in `runtime_env` (the owner's 19 Oct 19:3x rule; the
+   serve page says how). For a direct-human cohort set `"stimulus_source":
    "direct_human"` and `"human_speaker": "person-1"` (a label, not a name); the
    console then shows each line to say at its trigger and nothing is played.
    Prompt-only timed attempts stay unscored until reviewed attribution is supplied.

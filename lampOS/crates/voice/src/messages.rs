@@ -144,6 +144,10 @@ impl Model for Chat {
                 match event {
                     ChatEvent::Text(piece) => text(&piece),
                     ChatEvent::ToolCalls(asked) => calls = asked,
+                    // Texts are asked of the configured chat, which neither
+                    // reasons aloud nor searches on its own (#1712's
+                    // OpenRouter and Gemini clients do, for spoken turns).
+                    ChatEvent::Reasoning(_) | ChatEvent::Searched => {}
                     ChatEvent::Done => break,
                 }
             }
@@ -657,6 +661,7 @@ mod tests {
             id: "c1".into(),
             name: "set_light".into(),
             args: json!({"colour": "blue"}),
+            extra: None,
         };
         let model = scripted(vec![
             (vec!["One moment. "], vec![call]),

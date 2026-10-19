@@ -77,7 +77,7 @@ const REMEMBERED_FOR: Duration = Duration::from_secs(600);
 /// then the newest exchange of the thread the next session was told, and
 /// the last of the five answered nine times in two minutes
 /// (`docs/conversation-thread.md`).
-const GOING_ON_FOR: Duration = Duration::from_secs(45);
+pub const GOING_ON_FOR: Duration = Duration::from_secs(45);
 /// A known person's session becomes the room's, once nobody known is at the
 /// lamp, only after this long with no exchange (first builder on #775:
 /// lamp-4ace stands sideways and seldom sees a face, so a person talking
@@ -726,6 +726,17 @@ impl Thread {
 
     /// Whether the lamp said something to someone so lately that a
     /// conversation may still be going on.
+    /// How long ago the lamp last said words in the thread's exchanges, as
+    /// [`Self::going_on`] counts them; `None` when it said none: for the
+    /// journal (#1712).
+    pub fn said_last_ago(&self, now: Instant) -> Option<Duration> {
+        self.exchanges
+            .iter()
+            .filter(|exchange| exchange.lamp.chars().any(char::is_alphanumeric))
+            .map(|exchange| now.saturating_duration_since(exchange.at))
+            .min()
+    }
+
     pub fn going_on(&self, now: Instant) -> bool {
         self.exchanges.iter().any(|exchange| {
             now.saturating_duration_since(exchange.at) <= GOING_ON_FOR

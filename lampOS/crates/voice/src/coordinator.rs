@@ -837,6 +837,10 @@ struct Rig {
     paused: KeeperPause,
     /// The standby voice route, when one is configured (`second.rs`).
     second: Option<second::Route>,
+    /// What the voice says of its timing for Expression, given rather than
+    /// taken from the environment (`LAMP_EXPRESSION_OUT`): a test's own bus.
+    /// `None` makes it from the environment, as the lamp does.
+    expression_out: Option<crate::expression_out::ExpressionOut>,
 }
 
 /// Whether the keeper has paused the lamp, asked once a loop.
@@ -1785,12 +1789,35 @@ const REFUSAL_WAIT: Duration = Duration::from_secs(120);
 
 pub fn run_serve(config: &Path, output: &Path, options: SessionOptions) -> Result<()> {
     options.validate_serve()?;
-    // Which route is the voice: refused here, before anything starts, when
-    // `LAMP_VOICE_ROUTE` is wrong or `second` lacks its configuration. Each
-    // run reads it again as it starts its workers (`spawn_rig`).
+    // Which route is the voice: refused here, before anything starts (the
+    // signal handler, the hand controls, the session folder, any worker),
+    // when `LAMP_VOICE_ROUTE` is wrong or `second` lacks its configuration,
+    // and so is a wrong `LAMP_SECOND_*` switch. Each run reads them again as
+    // it starts its workers (`spawn_rig`), after the session folder: this
+    // early refusal is held by `run_serve_refuses_a_wrong_route_before_anything_starts`.
+    // An update round brings this binary and the second route's unit but
+    // never `/etc/lampOS` (docs/updates.md), so the product's second.json is
+    // placed here when the unit asks for it at the product's path and it is
+    // not there (#1940). A failure is said, and the start goes on to refuse
+    // or run as before.
+    match crate::second_config::place_product_if_missing(
+        std::env::var_os(second::ROUTE_ENV).as_deref(),
+        std::env::var_os(crate::second_config::SECOND_CONFIG_ENV).as_deref(),
+    ) {
+        Ok(true) => eprintln!(
+            "lamp-voice: the second route's configuration was missing: placed the product's at {} (install's own)",
+            crate::second_config::PRODUCT_PATH
+        ),
+        Ok(false) => {}
+        Err(error) => eprintln!(
+            "lamp-voice: the product's second route configuration could not be placed at {}: {error}",
+            crate::second_config::PRODUCT_PATH
+        ),
+    }
     if let second::Routes::SecondOnly(_) = second::routes_from_environment(true)? {
         eprintln!("{}", second::SECOND_ONLY_LINE);
     }
+    second::route_flags_from_environment()?;
     let termination = Termination::install()?;
     let cues = options
         .cue_socket
@@ -1909,21 +1936,26 @@ fn run_source(
     } else {
         SessionState::finite()
     };
-    record(
-        &mut trace,
-        run_start_record(
-            &options,
-            lifetime,
-            camera_config.is_some(),
-            motor_options.is_some(),
-            fixture.as_ref(),
-            match source {
-                ProviderSource::Fixture { at_ms, .. } => at_ms,
-                ProviderSource::Gemini(_) => None,
-            },
-            cues.is_some(),
-        ),
-    )?;
+    let mut run_start = run_start_record(
+        &options,
+        lifetime,
+        camera_config.is_some(),
+        motor_options.is_some(),
+        fixture.as_ref(),
+        match source {
+            ProviderSource::Fixture { at_ms, .. } => at_ms,
+            ProviderSource::Gemini(_) => None,
+        },
+        cues.is_some(),
+    );
+    // Which route answers, when it is the second alone; a wrong value is
+    // refused when the workers start (`spawn_rig`).
+    if let Ok(routes) = second::routes_from_environment(
+        lifetime.continuous() && matches!(source, ProviderSource::Gemini(_)),
+    ) {
+        routes.mark(&mut run_start);
+    }
+    record(&mut trace, run_start)?;
     // Bounded local reads happen once before any capture/speaker worker.
     let notices = FailureNotices::load(notice_options);
     let mut motor_rearm = true;
@@ -2613,6 +2645,7 @@ fn observe_provider_output(
         // changes no request's delivery state.
         ProviderOutput::Ready { .. }
         | ProviderOutput::Transcript { .. }
+        | ProviderOutput::Stages { .. }
         | ProviderOutput::ReminderDeferred { .. }
         | ProviderOutput::InputDiscarded { .. } => {}
         // Only a provider configured to take a silent earlier response as
@@ -3008,11 +3041,7 @@ fn spawn_rig(
         role,
         arguments,
         standby: second_arguments,
-    } = routes.workers(
-        arguments,
-        crate::second_provider::worker::wait_cue_from_environment(),
-        crate::second_provider::worker::down_line_from_environment(),
-    )?;
+    } = routes.workers(arguments, second::route_flags_from_environment()?)?;
     let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
     let mut provider = Worker::spawn_with_boot_and_tick(
         &executable,
@@ -3239,6 +3268,7 @@ fn spawn_rig(
         }
     }
     Ok(Rig {
+        expression_out: None,
         provider,
         capture,
         speaker,
@@ -3861,6 +3891,15 @@ thread_local! {
     static TEST_MISHEARD_HUM: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// A loop test's `LAMP_HOLDING_ANSWER=on`, without changing process-wide flags.
     static TEST_HOLDING_ANSWER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's task news, in place of the tasks part, as
+    /// `TEST_FULL_LOOK`: taken by the loop as it starts.
+    static TEST_TASK_NEWS: std::cell::RefCell<Option<crate::task_news::TaskNews>> =
+        const { std::cell::RefCell::new(None) };
+    /// A loop test's `LAMP_TASK_NEWS_AT_PAUSE=on` (#560), as `TEST_FULL_LOOK`.
+    static TEST_NEWS_AT_PAUSE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// A loop test's say service (`LAMP_SAY=on`, #939), as `TEST_TASK_NEWS`.
+    static TEST_SAYS: std::cell::RefCell<Option<crate::say::Says>> =
+        const { std::cell::RefCell::new(None) };
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -4045,6 +4084,11 @@ fn conversation_with_gate(
     // The answer whose words are arriving, and whether any of them has been
     // a word yet.
     let mut answer_words: Option<(u64, bool)> = None;
+    // The turn whose first answer audio is recorded (`answer_first_audio`),
+    // and on the second route the turn whose words have begun: its answer's
+    // audio is what follows them, a wait cue or the down line before them
+    // being no answer (`AnswerAudio`).
+    let mut answer_audio = AnswerAudio::default();
     // Saying hello first to someone who comes and sits down, when the eyes
     // keep a presence file for it; and when anything was last said to the
     // lamp or by it.
@@ -4074,8 +4118,12 @@ fn conversation_with_gate(
     };
     // News from the work handed to agents on other computers, told
     // unasked at a good moment (`docs/tasks.md`).
+    #[cfg(test)]
+    let given_news = TEST_TASK_NEWS.with(|news| news.borrow_mut().take());
+    #[cfg(not(test))]
+    let given_news = None;
     let mut task_news = if lifetime.continuous() {
-        crate::task_news::TaskNews::from_environment()
+        given_news.or_else(crate::task_news::TaskNews::from_environment)
     } else {
         None
     };
@@ -4086,10 +4134,16 @@ fn conversation_with_gate(
             .ok()
             .as_deref(),
     );
+    #[cfg(test)]
+    let news_at_pause = news_at_pause || TEST_NEWS_AT_PAUSE.with(std::cell::Cell::get);
     // What other parts ask the voice to say, skills first (#939,
     // `LAMP_SAY=on`).
+    #[cfg(test)]
+    let given_says = TEST_SAYS.with(|says| says.borrow_mut().take());
+    #[cfg(not(test))]
+    let given_says = None;
     let mut says = if lifetime.continuous() {
-        crate::say::Says::from_environment()
+        given_says.or_else(crate::say::Says::from_environment)
     } else {
         None
     };
@@ -4160,7 +4214,10 @@ fn conversation_with_gate(
     let mut bus_out = crate::bus_out::BusOut::from_environment();
     // The voice's own timing, for the part that plans what the lamp shows
     // (docs/expression.md). Only if that is switched on.
-    let mut expression_out = crate::expression_out::ExpressionOut::from_environment();
+    let mut expression_out = rig
+        .expression_out
+        .take()
+        .or_else(crate::expression_out::ExpressionOut::from_environment);
     // And, only if someone switched it on, what the microphone hears, for
     // a part of the lamp that listens for itself.
     let mut mic_out = crate::bus_out::MicOut::from_environment(rig.microphone.as_str());
@@ -5102,6 +5159,16 @@ fn conversation_with_gate(
                             )?;
                             current.had_audio = true;
                         }
+                        let now_us = monotonic_us();
+                        if let Some(after) =
+                            answer_audio.audio(request, rig.provider.role == "second", now_us)
+                        {
+                            record(
+                                trace,
+                                json!({"kind":"answer_first_audio","turn":request,"at_us":now_us,
+                                "after_decision_ms":after}),
+                            )?;
+                        }
                         let received_frames = samples.len();
                         current.append_provider_audio(samples, received_at_us);
                         record(
@@ -5138,6 +5205,24 @@ fn conversation_with_gate(
                 }
                 // Put on its turn by `observe_provider_output`.
                 ProviderOutput::NewsAnswered { .. } => {}
+                // The second route's times for the request, recorded with the
+                // end of speech decision's time, for an A/B scored on each
+                // request's first answer audio (19 Oct).
+                ProviderOutput::Stages {
+                    request,
+                    words_ms,
+                    cue_ms,
+                    chat_ms,
+                    audio_ms,
+                } => {
+                    record(
+                        trace,
+                        json!({"kind":"answer_stages","turn":request,"at_us":monotonic_us(),
+                        "from":"line_end","decided_at_us":answer_audio.decided_at(request),
+                        "words_ms":words_ms,"cue_ms":cue_ms,"chat_first_ms":chat_ms,
+                        "first_answer_audio_ms":audio_ms}),
+                    )?;
+                }
                 ProviderOutput::LookAsked {
                     request,
                     session,
@@ -5175,6 +5260,9 @@ fn conversation_with_gate(
                     text,
                     finished,
                 } => {
+                    if let Some(turn) = request {
+                        answer_audio.words(turn);
+                    }
                     // Words for an answer whose end was sent early are not
                     // the lamp's until it is sure the person has finished:
                     // held, and said then, or dropped with the request.
@@ -6611,6 +6699,7 @@ fn conversation_with_gate(
                             took_over_turn == Some(current.owner.turn()),
                         )?;
                     }
+                    answer_audio.decided(current.owner.turn(), at);
                     let mut endpoint_record = json!({"kind":"local_endpoint","owner":current.owner,"turn":current.owner.turn(),"at_us":at,"last_block_host_read_us":input_end_us,
                         "includes_silence_wait_ms":detector.last_endpoint().map_or(detector.endpoint_silence_ms(), |decision| decision.silence_ms),
                         "acoustic_speech_end":null});
@@ -8716,6 +8805,54 @@ fn play_skill_sound(
         current.say = Some(ticket);
     }
     Ok(Some(snapshot))
+}
+
+/// When a turn's answer begins to be heard, for the session's records
+/// (`answer_first_audio`), so an A/B times the answer and never a cue (the
+/// first builder, 19 Oct: on the second route the "first sound" had been
+/// its wait cue, 1.5 s, and the answer came 4.0 to 4.5 s after the words).
+/// On the Live route the first audio of a turn is its answer. On the second
+/// route a wait cue, the down line and the announcement come with no words,
+/// and each sentence of the answer comes with its words before its audio:
+/// the answer's audio is the first after the turn's first words.
+#[derive(Default)]
+struct AnswerAudio {
+    worded: Option<u64>,
+    recorded: Option<u64>,
+    /// The turn whose end of speech was decided (`local_endpoint`), and when.
+    decided: Option<(u64, u64)>,
+}
+
+impl AnswerAudio {
+    /// The end of speech of `turn` was decided at `at_us`.
+    fn decided(&mut self, turn: u64, at_us: u64) {
+        self.decided = Some((turn, at_us));
+    }
+
+    /// The lamp's words for `turn` came.
+    fn words(&mut self, turn: u64) {
+        self.worded = Some(turn);
+    }
+
+    /// Audio for `turn` came at `now_us`, from the second route or not: when
+    /// it is the first of its answer, how long after the end of speech was
+    /// decided (`None` for a turn with no decision: the lamp's own).
+    fn audio(&mut self, turn: u64, second: bool, now_us: u64) -> Option<Option<u64>> {
+        if self.recorded == Some(turn) || (second && self.worded != Some(turn)) {
+            return None;
+        }
+        self.recorded = Some(turn);
+        Some(
+            self.decided
+                .filter(|(of, _)| *of == turn)
+                .map(|(_, at)| now_us.saturating_sub(at) / 1_000),
+        )
+    }
+
+    /// The decision for `turn`, when there was one.
+    fn decided_at(&self, turn: u64) -> Option<u64> {
+        self.decided.filter(|(of, _)| *of == turn).map(|(_, at)| at)
+    }
 }
 
 fn reminder_quiet(
@@ -10864,6 +11001,7 @@ mod tests {
         let (privacy, _privacy_peer) = Worker::sleeping_fixture(&directory.path, "privacy");
         let (ring, _ring_peer) = Worker::sleeping_fixture(&directory.path, "ring");
         let mut rig = Rig {
+            expression_out: None,
             second: None,
             end_silence_blocks: None,
             early_end_blocks: None,
@@ -11272,6 +11410,52 @@ mod tests {
             })
             .unwrap();
         assert!(startup.poll(&mut parent, "provider").is_err());
+    }
+
+    /// The reviewer on #1686: a wrong `LAMP_VOICE_ROUTE`, `second` without
+    /// its configuration, or a wrong `LAMP_SECOND_*` switch is refused by
+    /// `run_serve` before anything starts: no session folder is made (and so
+    /// no hand controls restored, no `run_start`, no worker), and the voice
+    /// never runs on Gemini in its place.
+    #[test]
+    fn run_serve_refuses_a_wrong_route_before_anything_starts() {
+        let dir = SessionDirectory::create().unwrap();
+        for (set, why) in [
+            (
+                vec![("LAMP_VOICE_ROUTE", "live")],
+                "LAMP_VOICE_ROUTE is gemini or second",
+            ),
+            (
+                vec![("LAMP_VOICE_ROUTE", "second")],
+                "LAMP_VOICE_ROUTE=second needs LAMP_VOICE_SECOND_CONFIG",
+            ),
+            (
+                vec![("LAMP_SECOND_CHAT", "on")],
+                "LAMP_SECOND_CHAT is gemini, openrouter, deepseek or nothing",
+            ),
+            (
+                vec![("LAMP_SECOND_SEARCH", "openrouter")],
+                "needs LAMP_SECOND_CHAT=openrouter",
+            ),
+        ] {
+            let output = dir.path.join("session");
+            second::TEST_ENVIRONMENT.with(|environment| {
+                *environment.borrow_mut() = Some(
+                    set.iter()
+                        .map(|(name, value)| (*name, std::ffi::OsString::from(*value)))
+                        .collect(),
+                )
+            });
+            let result = run_serve(
+                Path::new("/nonexistent/provider.json"),
+                &output,
+                SessionOptions::parse(&[]).unwrap(),
+            );
+            second::TEST_ENVIRONMENT.with(|environment| *environment.borrow_mut() = None);
+            let error = result.unwrap_err().to_string();
+            assert!(error.contains(why), "{error}");
+            assert!(!output.exists(), "{why}: a session folder was made");
+        }
     }
 
     /// With `LAMP_VOICE_ROUTE=second` the second route's worker starts in

@@ -18,6 +18,9 @@ pub struct Message {
     pub tool_calls: Vec<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
+    /// The model's reasoning for its calls, given back as it came.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_details: Option<Value>,
 }
 
 impl Message {
@@ -27,7 +30,20 @@ impl Message {
             content: content.map(Value::String),
             tool_calls: Vec::new(),
             tool_call_id: None,
+            reasoning_details: None,
         }
+    }
+
+    /// [`Message::assistant_calls`], with the reasoning the model gave for
+    /// them, if any ([`ChatEvent::Reasoning`]).
+    pub fn assistant_calls_with(
+        text: Option<String>,
+        calls: &[ToolCall],
+        reasoning: Option<Value>,
+    ) -> Self {
+        let mut message = Self::assistant_calls(text, calls);
+        message.reasoning_details = reasoning;
+        message
     }
     pub fn system(text: impl Into<String>) -> Self {
         Self::new("system", Some(text.into()))
@@ -55,11 +71,17 @@ impl Message {
         message.tool_calls = calls
             .iter()
             .map(|call| {
-                json!({
+                let mut asked = json!({
                     "id": call.id,
                     "type": "function",
                     "function": {"name": call.name, "arguments": call.args.to_string()},
-                })
+                });
+                // Given back as it came: Gemini's thought signature rides
+                // here, and a call sent back without it is refused.
+                if let Some(extra) = &call.extra {
+                    asked["extra_content"] = extra.clone();
+                }
+                asked
             })
             .collect();
         message
@@ -78,6 +100,10 @@ pub struct ToolCall {
     pub name: String,
     /// The arguments object; `{}` when the model sent none.
     pub args: Value,
+    /// The call's `extra_content`, as the service sent it: through Gemini's
+    /// OpenAI-compatible endpoint the model's thought signature, which the
+    /// next round must carry back with the call ([`Message::assistant_calls`]).
+    pub extra: Option<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -85,6 +111,13 @@ pub enum ChatEvent {
     Text(String),
     /// Every call of the turn, once the model has finished asking.
     ToolCalls(Vec<ToolCall>),
+    /// The model's `reasoning_details` for the calls of this round, given
+    /// back unchanged with them in the next ([`Message::assistant_calls_with`]),
+    /// as OpenRouter asks; before [`ChatEvent::ToolCalls`].
+    Reasoning(Value),
+    /// The service searched the web for this answer: the first chunk that
+    /// carried its results (`annotations`, OpenRouter's web plugin). Once.
+    Searched,
     Done,
 }
 
@@ -114,22 +147,210 @@ fn functions(tools: &[lamp_gemini::Tool]) -> Vec<Value> {
 /// so the executive's come and go with the executive.
 pub type Declare = Arc<dyn Fn() -> Vec<lamp_gemini::Tool> + Send + Sync>;
 
+/// Of the tools declared now, those a request with these messages is given
+/// ([`Chat::narrowing`]): with `LAMP_SECOND_FEW_TOOLS=on`, a spoken turn's
+/// few until the model asks for the rest (#1712, the first builder at
+/// 18:56).
+pub type Narrow =
+    Arc<dyn Fn(Vec<lamp_gemini::Tool>, &[Message]) -> Vec<lamp_gemini::Tool> + Send + Sync>;
+
+/// How much Gemini thinks before it answers through its OpenAI-compatible
+/// endpoint: the floor, as thinking cannot be turned off on Gemini 3 (the
+/// research of 19 Oct; 0.80 to 0.83 s to the first token, published).
+pub const GEMINI_REASONING: &str = "minimal";
+
+/// A chat connection idle this long is opened ahead as a line begins
+/// ([`Chat::warm`]): the client's pool keeps an idle one 90 s, and the
+/// service may close it sooner.
+pub const WARM_AFTER: std::time::Duration = std::time::Duration::from_secs(60);
+/// At most this much of the warming answer is read: enough to finish a
+/// models list, so its connection goes back to the pool.
+const WARM_BYTES: usize = 256 << 10;
+
 pub struct Chat {
     client: reqwest::Client,
     url: String,
     auth: String,
     model: String,
+    /// Fields the request also carries (`llm_extra`, or Gemini's reasoning).
+    extra: serde_json::Map<String, Value>,
+    /// The model takes a look's picture.
+    sees: bool,
     declare: Declare,
+    /// Which of the declared tools a request is given, if not all.
+    narrow: std::sync::OnceLock<Narrow>,
+    /// When the last request went, for the journal: a connection idle past
+    /// the client's pool keep (`http_client`, 90 s) is made anew.
+    last_sent: std::sync::Mutex<Option<std::time::Instant>>,
+    /// The last request's tools and first message, hashed, for the
+    /// journal: a service's prompt cache holds only a prefix that is the
+    /// same as before ([`Prefix`]).
+    last_prefix: std::sync::Mutex<Option<Prefix>>,
+}
+
+/// A request's tools and first message, hashed: what has to stay the same
+/// from one request to the next for a service's prompt cache to hold
+/// (#1712, the first builder at 18:56).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Prefix {
+    tools: u64,
+    first: u64,
+}
+
+impl Prefix {
+    fn of(body: &Value) -> Self {
+        let hash = |value: &Value| {
+            use std::hash::{Hash, Hasher};
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            value.to_string().hash(&mut hasher);
+            hasher.finish()
+        };
+        Self {
+            tools: hash(&body["tools"]),
+            first: hash(&body["messages"][0]),
+        }
+    }
 }
 
 impl Chat {
+    /// The configured OpenAI-compatible chat (`llm_*`, the relay on the
+    /// lamps), with `llm_extra`.
     pub fn new(config: &SecondConfig, declare: Declare) -> Result<Self> {
-        Self::with(
+        let mut chat = Self::with(
             &config.llm_base_url,
             &config.llm_model,
             config.llm_key.expose(),
             declare,
+        )?;
+        chat.extra = config.llm_extra.clone();
+        Ok(chat)
+    }
+
+    /// Gemini called directly, through its OpenAI-compatible endpoint
+    /// (`<base>/openai/chat/completions`, the key as a bearer token), with
+    /// thinking at [`GEMINI_REASONING`]. The lamp's tools and a look's
+    /// picture go as they go to the configured chat.
+    pub fn gemini(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
+        let mut chat = Self::with(
+            &format!("{}/openai", base_url.trim_end_matches('/')),
+            model,
+            key,
+            declare,
+        )?;
+        chat.extra
+            .insert("reasoning_effort".into(), json!(GEMINI_REASONING));
+        Ok(chat)
+    }
+
+    /// OpenRouter's OpenAI-compatible chat (`LAMP_SECOND_CHAT=openrouter`):
+    /// `model` a slug of its public list, its providers tried fastest first
+    /// (`provider.sort: "latency"`), thinking at `effort`
+    /// (`reasoning.effort`), and with `search` (`LAMP_SECOND_SEARCH=openrouter`)
+    /// its web plugin on Exa (`plugins`, the `instant` mode, three results),
+    /// which searches before every answer. Read from OpenRouter's docs on 19
+    /// Oct. The lamp's tools and a look's picture go as for the relay.
+    pub fn openrouter(
+        model: &str,
+        effort: &str,
+        key: &str,
+        declare: Declare,
+        search: bool,
+    ) -> Result<Self> {
+        Self::openrouter_at(
+            crate::second_config::OPENROUTER_BASE_URL,
+            model,
+            effort,
+            key,
+            declare,
+            search,
         )
+    }
+
+    pub(crate) fn openrouter_at(
+        base_url: &str,
+        model: &str,
+        effort: &str,
+        key: &str,
+        declare: Declare,
+        search: bool,
+    ) -> Result<Self> {
+        let mut chat = Self::with(base_url, model, key, declare)?;
+        chat.extra
+            .insert("provider".into(), json!({"sort": "latency"}));
+        chat.extra
+            .insert("reasoning".into(), json!({"effort": effort}));
+        if search {
+            chat.extra.insert(
+                "plugins".into(),
+                json!([{"id": "web", "engine": "exa", "mode": "instant", "max_results": 3}]),
+            );
+        }
+        Ok(chat)
+    }
+
+    /// DeepSeek's own OpenAI-compatible chat (`LAMP_SECOND_CHAT=deepseek`),
+    /// with thinking set, never left to its default (on): off for the lamp,
+    /// on only for the probe. A model that takes no picture
+    /// ([`crate::second_config::DEEPSEEK_TEXT_ONLY`]) is never sent one.
+    pub fn deepseek(model: &str, key: &str, declare: Declare, thinking: bool) -> Result<Self> {
+        Self::deepseek_at(
+            crate::second_config::DEEPSEEK_BASE_URL,
+            model,
+            key,
+            declare,
+            thinking,
+        )
+    }
+
+    pub(crate) fn deepseek_at(
+        base_url: &str,
+        model: &str,
+        key: &str,
+        declare: Declare,
+        thinking: bool,
+    ) -> Result<Self> {
+        let mut chat = Self::with(base_url, model, key, declare)?;
+        chat.extra.insert(
+            "thinking".into(),
+            json!({"type": if thinking { "enabled" } else { "disabled" }}),
+        );
+        chat.sees = !crate::second_config::DEEPSEEK_TEXT_ONLY.contains(&model);
+        // The answer's last chunk says how much of the prompt its cache held
+        // (`prompt_cache_hit_tokens`, #1712, the first builder at 18:56).
+        chat.extra
+            .insert("stream_options".into(), json!({"include_usage": true}));
+        Ok(chat)
+    }
+
+    /// Whether the model is sent a look's picture.
+    pub fn sees(&self) -> bool {
+        self.sees
+    }
+
+    /// The connection opened ahead, as a line begins, when no request went
+    /// in the last [`WARM_AFTER`] (`LAMP_SECOND_CHAT_WARM=on`, #1712): a GET
+    /// of the service's `models`, read whole, so the line's chat goes on a
+    /// connection already made. Its status and how long it took; `None`
+    /// when not due, or when it failed (the chat then connects as before).
+    pub async fn warm(&self) -> Option<(u16, std::time::Duration)> {
+        let models = self.url.replacen("/chat/completions", "/models", 1);
+        let (status, took, _) = super::warm_get(
+            &self.client,
+            &self.last_sent,
+            WARM_AFTER,
+            &models,
+            ("authorization", &self.auth),
+            WARM_BYTES,
+        )
+        .await?;
+        Some((status, took))
+    }
+
+    /// Its requests are given only the tools `narrow` keeps of those
+    /// declared, for their messages. Set once: a second call changes
+    /// nothing.
+    pub fn narrowing(&self, narrow: Narrow) {
+        let _ = self.narrow.set(narrow);
     }
 
     fn with(base_url: &str, model: &str, key: &str, declare: Declare) -> Result<Self> {
@@ -138,22 +359,68 @@ impl Chat {
             url: format!("{}/chat/completions", openai_base(base_url)),
             auth: format!("Bearer {key}"),
             model: model.to_owned(),
+            extra: serde_json::Map::new(),
+            sees: true,
             declare,
+            narrow: std::sync::OnceLock::new(),
+            last_sent: std::sync::Mutex::new(None),
+            last_prefix: std::sync::Mutex::new(None),
         })
     }
 
-    /// The request's body, with the tools declared now.
+    /// The request's body, with the tools declared now, as narrowed for
+    /// its messages.
+    #[cfg(test)]
     fn body(&self, messages: &[Message]) -> Value {
+        self.body_only(messages, None)
+    }
+
+    /// [`Self::body`], with only the tools named in `only` when given, and
+    /// then never narrowed: a held line's round is told those alone.
+    fn body_only(&self, messages: &[Message], only: Option<&[&str]>) -> Value {
         let mut body = json!({"model": self.model, "stream": true, "messages": messages});
-        let tools = functions(&(self.declare)());
+        let mut declared = (self.declare)();
+        if let Some(only) = only {
+            declared.retain(|tool| only.contains(&tool.name.as_str()));
+        } else if let Some(narrow) = self.narrow.get() {
+            declared = narrow(declared, messages);
+        }
+        let tools = functions(&declared);
         if !tools.is_empty() {
             body["tools"] = Value::Array(tools);
+        }
+        // The configuration refuses any of the request's own fields here.
+        for (field, value) in &self.extra {
+            if body.get(field).is_none() {
+                body[field] = value.clone();
+            }
         }
         body
     }
 
     pub async fn send(&self, messages: &[Message]) -> Result<ChatStream> {
-        let body = self.body(messages);
+        self.send_only(messages, None).await
+    }
+
+    /// [`Self::send`], told only the tools named in `only`, when given.
+    pub async fn send_only(
+        &self,
+        messages: &[Message],
+        only: Option<&[&str]>,
+    ) -> Result<ChatStream> {
+        let body = self.body_only(messages, only);
+        let asked = std::time::Instant::now();
+        let before = self
+            .last_sent
+            .lock()
+            .ok()
+            .and_then(|mut last| last.replace(asked));
+        let prefix = Prefix::of(&body);
+        let prefix_before = self
+            .last_prefix
+            .lock()
+            .ok()
+            .and_then(|mut last| last.replace(prefix));
         let response = post(
             &self.client,
             &self.url,
@@ -161,14 +428,118 @@ impl Chat {
             &body,
         )
         .await?;
+        // What was asked and how soon the service began to answer, without
+        // words (#1712, the first builder at 18:26: the chat's first event
+        // came in 0.9 to 1.9 s on lamp-4ace, 0.7 s from the probe).
+        eprintln!(
+            "lamp-voice second: {}",
+            asked_told(
+                &body,
+                asked.elapsed(),
+                before.map(|at| asked.duration_since(at))
+            ) + &prefix_told(prefix, prefix_before)
+        );
         Ok(ChatStream {
             response,
             lines: Lines::default(),
             deltas: Deltas::default(),
             ready: Vec::new(),
             done: false,
+            asked,
+            first: None,
         })
     }
+}
+
+/// A chat request in the journal's words: its size, its messages and tools,
+/// how soon its answer began (the response's headers), and how long before
+/// it the last request went, which says whether its connection was kept.
+fn asked_told(
+    body: &Value,
+    began: std::time::Duration,
+    since_last: Option<std::time::Duration>,
+) -> String {
+    let count = |field: &str| body[field].as_array().map_or(0, Vec::len);
+    format!(
+        "chat request {} bytes, {} messages, {} tools; its answer began in {} ms; {}",
+        body.to_string().len(),
+        count("messages"),
+        count("tools"),
+        began.as_millis(),
+        since_last.map_or(
+            "the first request of this client".to_owned(),
+            |since| format!("the last request {} s before", since.as_secs())
+        )
+    )
+}
+
+/// Whether a request's tools and first message are the last request's, for
+/// its journal line; nothing for a client's first request.
+fn prefix_told(now: Prefix, before: Option<Prefix>) -> String {
+    let Some(before) = before else {
+        return String::new();
+    };
+    match (now.tools == before.tools, now.first == before.first) {
+        (true, true) => "; its tools and first message as the last request's",
+        (true, false) => "; its tools as the last request's, its first message not",
+        (false, true) => "; its first message as the last request's, its tools not",
+        (false, false) => "; neither its tools nor its first message as the last request's",
+    }
+    .to_owned()
+}
+
+/// A `usage`'s prompt tokens and those the service's cache held:
+/// DeepSeek's `prompt_cache_hit_tokens`, or OpenAI's form,
+/// `prompt_tokens_details.cached_tokens`.
+pub fn cache_counts(usage: Option<&Value>) -> (Option<u64>, Option<u64>) {
+    let count = |pointer: &str| usage?.pointer(pointer)?.as_u64();
+    (
+        count("/prompt_tokens"),
+        count("/prompt_cache_hit_tokens").or_else(|| count("/prompt_tokens_details/cached_tokens")),
+    )
+}
+
+/// An answer in the journal's words, when it has ended (#1712, the first
+/// builder at 18:56): when its first words or call came and when it ended,
+/// after the request went, and the service's count of its tokens, with how
+/// many of the prompt's its cache held. DeepSeek says that as
+/// `prompt_cache_hit_tokens`, OpenAI's form as
+/// `prompt_tokens_details.cached_tokens`. Never its words.
+fn answer_told(
+    usage: Option<&Value>,
+    first: Option<std::time::Duration>,
+    ended: std::time::Duration,
+) -> String {
+    let first = first.map_or("no words or call".to_owned(), |first| {
+        format!("its first words or call {} ms", first.as_millis())
+    });
+    let tokens = match usage {
+        None => "no usage given".to_owned(),
+        Some(usage) => {
+            let count = |pointer: &str| usage.pointer(pointer).and_then(Value::as_u64);
+            let (prompt, cached) = cache_counts(Some(usage));
+            let missed =
+                count("/prompt_cache_miss_tokens").or_else(|| prompt?.checked_sub(cached?));
+            let said = |count: Option<u64>| count.map_or("?".to_owned(), |n| n.to_string());
+            match cached {
+                Some(cached) => format!(
+                    "{} prompt tokens, {cached} from the cache, {} not; {} completion tokens",
+                    said(prompt),
+                    said(missed),
+                    said(count("/completion_tokens"))
+                ),
+                None => format!(
+                    "{} prompt tokens, the cache not said; {} completion tokens",
+                    said(prompt),
+                    said(count("/completion_tokens"))
+                ),
+            }
+        }
+    };
+    format!(
+        "chat answer: {first} and its end {} ms after it was asked; {tokens}",
+        ended.as_millis()
+    )
 }
 
 pub struct ChatStream {
@@ -178,9 +549,19 @@ pub struct ChatStream {
     /// Decoded events not yet handed out, newest last.
     ready: Vec<ChatEvent>,
     done: bool,
+    /// When the request went, and how long after it the first words or
+    /// call came, for [`answer_told`].
+    asked: std::time::Instant,
+    first: Option<std::time::Duration>,
 }
 
 impl ChatStream {
+    /// The service's count of the answer's tokens, once the chunk that
+    /// carries it has come (the last, with DeepSeek's `include_usage`).
+    pub fn usage(&self) -> Option<&Value> {
+        self.deltas.usage.as_ref()
+    }
+
     /// The next event; `None` after `Done`. Each wait for the service is
     /// bounded by the client's stall limit.
     pub async fn next(&mut self) -> Result<Option<ChatEvent>> {
@@ -202,7 +583,21 @@ impl ChatStream {
                 }
                 None => self.ready.extend(self.deltas.end()?),
             }
-            self.done |= self.ready.last() == Some(&ChatEvent::Done);
+            if self.first.is_none()
+                && self
+                    .ready
+                    .iter()
+                    .any(|event| matches!(event, ChatEvent::Text(_) | ChatEvent::ToolCalls(_)))
+            {
+                self.first = Some(self.asked.elapsed());
+            }
+            if self.ready.last() == Some(&ChatEvent::Done) {
+                self.done = true;
+                eprintln!(
+                    "lamp-voice second: {}",
+                    answer_told(self.deltas.usage.as_ref(), self.first, self.asked.elapsed())
+                );
+            }
         }
     }
 }
@@ -217,6 +612,11 @@ pub(crate) struct Lines {
 }
 
 impl Lines {
+    /// Bytes of a line not yet ended.
+    pub fn pending(&self) -> usize {
+        self.partial.len()
+    }
+
     pub fn push(&mut self, bytes: &[u8]) -> Vec<String> {
         self.partial.extend_from_slice(bytes);
         let mut out = Vec::new();
@@ -236,6 +636,7 @@ struct Pending {
     id: String,
     name: String,
     arguments: String,
+    extra: Option<Value>,
 }
 
 /// Chunks of the completion to events. Tool calls arrive in fragments
@@ -245,6 +646,13 @@ pub(crate) struct Deltas {
     calls: Vec<Pending>,
     /// A chunk said why the completion stopped (`finish_reason`).
     finished: bool,
+    /// `reasoning_details` as they came, in order.
+    reasoning: Vec<Value>,
+    /// A chunk carried the web search's results.
+    searched: bool,
+    /// The service's count of the answer's tokens (`usage`), from the chunk
+    /// that carried it: the last, with DeepSeek's `include_usage`.
+    usage: Option<Value>,
 }
 
 impl Deltas {
@@ -263,6 +671,11 @@ impl Deltas {
         if data == "[DONE]" {
             let mut out = Vec::new();
             if !self.calls.is_empty() {
+                if !self.reasoning.is_empty() {
+                    out.push(ChatEvent::Reasoning(Value::Array(std::mem::take(
+                        &mut self.reasoning,
+                    ))));
+                }
                 out.push(ChatEvent::ToolCalls(self.take_calls()?));
             }
             out.push(ChatEvent::Done);
@@ -274,14 +687,43 @@ impl Deltas {
         self.finished |= chunk
             .pointer("/choices/0/finish_reason")
             .is_some_and(Value::is_string);
+        if let Some(usage) = chunk.get("usage").filter(|usage| usage.is_object()) {
+            self.usage = Some(usage.clone());
+        }
         let Some(delta) = chunk.pointer("/choices/0/delta") else {
             return Ok(out);
         };
+        if !self.searched
+            && delta["annotations"]
+                .as_array()
+                .is_some_and(|annotations| !annotations.is_empty())
+        {
+            self.searched = true;
+            out.push(ChatEvent::Searched);
+        }
+        if let Some(details) = delta["reasoning_details"].as_array() {
+            if self.reasoning.len() + details.len() > 256 {
+                return Err(Error::Protocol("reasoning details"));
+            }
+            self.reasoning.extend(details.iter().cloned());
+        }
         if let Some(text) = delta["content"].as_str().filter(|t| !t.is_empty()) {
             out.push(ChatEvent::Text(text.to_owned()));
         }
         for call in delta["tool_calls"].as_array().into_iter().flatten() {
-            let index = call["index"].as_u64().unwrap_or(0) as usize;
+            let id = call["id"].as_str().filter(|id| !id.is_empty());
+            let mut index = call["index"].as_u64().unwrap_or(0) as usize;
+            // A whole new call at an index already taken by another (a
+            // service that sends each call whole, without its own index) is
+            // the next call, not more of that one.
+            if let Some(id) = id
+                && self
+                    .calls
+                    .get(index)
+                    .is_some_and(|pending| !pending.id.is_empty() && pending.id != id)
+            {
+                index = self.calls.len();
+            }
             if index >= 64 {
                 return Err(Error::Protocol("tool call index"));
             }
@@ -289,8 +731,11 @@ impl Deltas {
                 self.calls.resize_with(index + 1, Pending::default);
             }
             let pending = &mut self.calls[index];
-            if let Some(id) = call["id"].as_str() {
+            if let Some(id) = id {
                 pending.id = id.to_owned();
+            }
+            if let Some(extra) = call.get("extra_content").filter(|extra| extra.is_object()) {
+                pending.extra = Some(extra.clone());
             }
             if let Some(name) = call.pointer("/function/name").and_then(Value::as_str) {
                 pending.name.push_str(name);
@@ -306,7 +751,8 @@ impl Deltas {
         std::mem::take(&mut self.calls)
             .into_iter()
             .filter(|call| !call.name.is_empty())
-            .map(|call| {
+            .enumerate()
+            .map(|(index, call)| {
                 let args = if call.arguments.trim().is_empty() {
                     json!({})
                 } else {
@@ -314,9 +760,16 @@ impl Deltas {
                         .map_err(|_| Error::Protocol("tool call arguments"))?
                 };
                 Ok(ToolCall {
-                    id: call.id,
+                    // Its result is matched to it by id: one is made for a
+                    // call that came without.
+                    id: if call.id.is_empty() {
+                        format!("call_{index}")
+                    } else {
+                        call.id
+                    },
                     name: call.name,
                     args,
+                    extra: call.extra,
                 })
             })
             .collect()
@@ -326,6 +779,153 @@ impl Deltas {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #1712: as a line begins, a chat idle past `WARM_AFTER` opens its
+    /// connection with a GET of `models`; one used lately, or warmed just
+    /// now, is not asked again.
+    #[tokio::test]
+    async fn an_idle_chat_opens_its_connection_ahead_and_a_busy_one_does_not() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let seen = asked.clone();
+        let server = tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut read = vec![0; 4096];
+            let n = socket.read(&mut read).await.unwrap();
+            let head = String::from_utf8_lossy(&read[..n]).to_string();
+            seen.lock()
+                .unwrap()
+                .push(head.lines().next().unwrap_or_default().to_owned());
+            assert!(head.contains("authorization: Bearer k"), "{head}");
+            let body = r#"{"data":[]}"#;
+            socket
+                .write_all(
+                    format!(
+                        "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{body}",
+                        body.len()
+                    )
+                    .as_bytes(),
+                )
+                .await
+                .unwrap();
+        });
+        let chat = Chat::with(
+            &format!("http://{address}/v1"),
+            "m",
+            "k",
+            Arc::new(Vec::new),
+        )
+        .unwrap();
+        let (status, _) = chat.warm().await.expect("warmed");
+        assert_eq!(status, 200);
+        assert_eq!(*asked.lock().unwrap(), ["GET /v1/models HTTP/1.1"]);
+        // Just warmed: not asked again.
+        assert!(chat.warm().await.is_none());
+        server.await.unwrap();
+    }
+
+    /// #1712, the first builder at 18:26: a chat request is journaled by its
+    /// size and counts, how soon its answer began, and the gap since the
+    /// last request; never its words.
+    #[test]
+    fn a_chat_request_is_journaled_without_words() {
+        let body = json!({
+            "model": "m",
+            "messages": [{"role": "user", "content": "secret words"}],
+            "tools": [{"type": "function"}, {"type": "function"}],
+        });
+        let told = asked_told(
+            &body,
+            std::time::Duration::from_millis(412),
+            Some(std::time::Duration::from_secs(95)),
+        );
+        assert_eq!(
+            told,
+            format!(
+                "chat request {} bytes, 1 messages, 2 tools; its answer began in 412 ms; the last request 95 s before",
+                body.to_string().len()
+            )
+        );
+        assert!(!told.contains("secret"));
+        assert!(
+            asked_told(&json!({}), std::time::Duration::ZERO, None)
+                .ends_with("the first request of this client")
+        );
+    }
+
+    /// #1712, the first builder at 18:56: a request's line says whether its
+    /// tools and first message are the last request's, which a prompt
+    /// cache needs; never its words.
+    #[test]
+    fn a_requests_line_says_whether_its_tools_and_first_message_are_the_last_ones() {
+        let body = |first: &str, tool: &str| {
+            json!({
+                "messages": [{"role": "system", "content": first}, {"role": "user", "content": "secret words"}],
+                "tools": [{"type": "function", "function": {"name": tool}}],
+            })
+        };
+        let before = Prefix::of(&body("You are Lamp.", "light_on"));
+        assert_eq!(prefix_told(before, None), "");
+        assert_eq!(
+            prefix_told(Prefix::of(&body("You are Lamp.", "light_on")), Some(before)),
+            "; its tools and first message as the last request's"
+        );
+        assert_eq!(
+            prefix_told(Prefix::of(&body("It is noon.", "light_on")), Some(before)),
+            "; its tools as the last request's, its first message not"
+        );
+        assert_eq!(
+            prefix_told(
+                Prefix::of(&body("You are Lamp.", "light_off")),
+                Some(before)
+            ),
+            "; its first message as the last request's, its tools not"
+        );
+        assert_eq!(
+            prefix_told(Prefix::of(&body("It is noon.", "light_off")), Some(before)),
+            "; neither its tools nor its first message as the last request's"
+        );
+        // Another user message changes neither.
+        let mut later = body("You are Lamp.", "light_on");
+        later["messages"][1]["content"] = json!("other words");
+        assert_eq!(Prefix::of(&later), before);
+    }
+
+    /// #1712, the first builder at 18:56: the answer's usage is kept from
+    /// the chunk that carries it, which has no choices, and told with the
+    /// cache's part, as DeepSeek or OpenAI's form says it.
+    #[test]
+    fn an_answers_usage_is_kept_and_told_with_the_caches_part() {
+        let mut deltas = Deltas::default();
+        let mut events = deltas
+            .data(r#"{"choices":[{"delta":{"content":"Hi."},"finish_reason":"stop"}]}"#)
+            .unwrap();
+        events.extend(
+            deltas
+                .data(r#"{"choices":[],"usage":{"prompt_tokens":8123,"completion_tokens":42,"prompt_cache_hit_tokens":7936,"prompt_cache_miss_tokens":187}}"#)
+                .unwrap(),
+        );
+        events.extend(deltas.data("[DONE]").unwrap());
+        assert_eq!(events, [ChatEvent::Text("Hi.".into()), ChatEvent::Done]);
+        let ms = std::time::Duration::from_millis;
+        assert_eq!(
+            answer_told(deltas.usage.as_ref(), Some(ms(812)), ms(1430)),
+            "chat answer: its first words or call 812 ms and its end 1430 ms after it was asked; 8123 prompt tokens, 7936 from the cache, 187 not; 42 completion tokens"
+        );
+        let openai = json!({"prompt_tokens": 900, "completion_tokens": 5, "prompt_tokens_details": {"cached_tokens": 768}});
+        assert!(
+            answer_told(Some(&openai), Some(ms(5)), ms(9))
+                .ends_with("; 900 prompt tokens, 768 from the cache, 132 not; 5 completion tokens")
+        );
+        assert!(
+            answer_told(Some(&json!({"prompt_tokens": 900})), None, ms(9)).ends_with(
+                "no words or call and its end 9 ms after it was asked; 900 prompt tokens, the cache not said; ? completion tokens"
+            )
+        );
+        assert!(answer_told(None, None, ms(9)).ends_with("; no usage given"));
+    }
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     /// Feed recorded bytes cut at every `|`.
@@ -379,11 +979,13 @@ data: [DONE]
                         id: "call_a".into(),
                         name: "the_time".into(),
                         args: json!({}),
+                        extra: None,
                     },
                     ToolCall {
                         id: "call_b".into(),
                         name: "remember".into(),
                         args: json!({"fact": "likes tea"}),
+                        extra: None,
                     },
                 ]),
                 ChatEvent::Done
@@ -418,6 +1020,84 @@ data: [DONE]
         assert!(chat.body(&asked).get("tools").is_none());
     }
 
+    /// A held line's round is told only the functions done though its
+    /// answer is held, never narrowed: none, when the
+    /// lamp has none of them.
+    #[test]
+    fn a_round_told_only_some_functions_declares_those_alone() {
+        let offered: Vec<lamp_gemini::Tool> = serde_json::from_value(json!([
+            {"name": "dance", "description": "Dance."},
+            {"name": "reports_stop", "description": "Stop the reports."}
+        ]))
+        .unwrap();
+        let chat = Chat::with(
+            "http://127.0.0.1:9/v1/",
+            "m",
+            "k",
+            Arc::new(move || offered.clone()),
+        )
+        .unwrap();
+        // A narrow that keeps nothing: the held round is not narrowed.
+        chat.narrowing(Arc::new(|_, _| Vec::new()));
+        let asked = [Message::user("Stop sending reports.")];
+        let names = |body: Value| -> Vec<String> {
+            body["tools"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|tool| tool["function"]["name"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        assert!(names(chat.body(&asked)).is_empty());
+        assert_eq!(
+            names(chat.body_only(&asked, Some(&["reports_stop"]))),
+            ["reports_stop"]
+        );
+        assert!(
+            chat.body_only(&asked, Some(&["remember"]))
+                .get("tools")
+                .is_none()
+        );
+    }
+
+    /// #1712, the first builder at 18:56: a narrowed chat's request is
+    /// given the tools its narrow keeps for that request's messages.
+    #[test]
+    fn a_narrowed_chat_is_given_what_its_narrow_keeps_for_the_messages() {
+        let tool = |name: &str| lamp_gemini::Tool {
+            name: name.into(),
+            description: "A tool.".into(),
+            parameters: None,
+            silent: false,
+        };
+        let chat = Chat::with(
+            "http://127.0.0.1:9/v1/",
+            "m",
+            "k",
+            Arc::new(move || vec![tool("light_on"), tool("remember")]),
+        )
+        .unwrap();
+        let names = |body: Value| -> Vec<String> {
+            body["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|tool| tool["function"]["name"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let one = [Message::user("Lights on.")];
+        let two = [Message::user("Lights on."), Message::assistant("On.")];
+        assert_eq!(names(chat.body(&one)), ["light_on", "remember"]);
+        chat.narrowing(Arc::new(|declared, messages| {
+            declared.into_iter().take(messages.len()).collect()
+        }));
+        assert_eq!(names(chat.body(&one)), ["light_on"]);
+        assert_eq!(names(chat.body(&two)), ["light_on", "remember"]);
+        // Set once.
+        chat.narrowing(Arc::new(|_, _| Vec::new()));
+        assert_eq!(names(chat.body(&one)), ["light_on"]);
+    }
+
     /// An end without `[DONE]` is whole after a `finish_reason`, and cut
     /// before one.
     #[test]
@@ -440,6 +1120,202 @@ data: [DONE]
         assert_eq!(deltas.end().unwrap(), [ChatEvent::Done]);
     }
 
+    /// `LAMP_SECOND_CHAT=gemini`: Google's OpenAI-compatible endpoint, the
+    /// key as a bearer token, thinking at its floor, the lamp's tools and a
+    /// look's picture as an image part, as the configured chat sends them.
+    #[test]
+    fn gemini_is_asked_at_its_openai_endpoint_with_minimal_thinking() {
+        let tools: Vec<lamp_gemini::Tool> = serde_json::from_value(json!([
+            {"name": "light_on", "description": "Light on."}
+        ]))
+        .unwrap();
+        let chat = Chat::gemini(
+            "https://generativelanguage.googleapis.com/v1beta/",
+            "gemini-3.6-flash",
+            "g-key",
+            Arc::new(move || tools.clone()),
+        )
+        .unwrap();
+        assert_eq!(
+            chat.url,
+            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        );
+        assert_eq!(chat.auth, "Bearer g-key");
+        let body = chat.body(&[Message::user_seeing("What is this?", &[0xff, 0xd8])]);
+        assert_eq!(body["model"], "gemini-3.6-flash");
+        assert_eq!(body["reasoning_effort"], "minimal");
+        assert_eq!(body["stream"], true);
+        assert_eq!(body["tools"][0]["function"]["name"], "light_on");
+        assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+        assert_eq!(
+            body["messages"][0]["content"][1]["image_url"]["url"],
+            "data:image/jpeg;base64,/9g="
+        );
+    }
+
+    /// `llm_extra` rides on the configured chat's request (an endpoint's own
+    /// reasoning setting), and never replaces the request's own fields.
+    #[test]
+    fn the_configured_chat_carries_its_extra_fields() {
+        let mut chat = Chat::with(
+            "https://relay.example.invalid/v1",
+            "m",
+            "k",
+            Arc::new(Vec::new),
+        )
+        .unwrap();
+        chat.extra =
+            serde_json::from_value(json!({"thinking": {"type": "disabled"}, "model": "not this"}))
+                .unwrap();
+        let body = chat.body(&[Message::user("Hi.")]);
+        assert_eq!(body["thinking"], json!({"type": "disabled"}));
+        assert_eq!(body["model"], "m");
+    }
+
+    /// Gemini's OpenAI-compatible stream gives each call whole, its thought
+    /// signature in `extra_content`; two calls may come at the same index.
+    /// Each is its own call, and the signature goes back with it.
+    #[test]
+    fn whole_calls_keep_their_signatures_and_go_back_with_them() {
+        let recorded = r#"data: {"choices":[{"delta":{"role":"assistant","tool_calls":[{"extra_content":{"google":{"thought_signature":"c2ln"}},"function":{"arguments":"{\"level\":30}","name":"set_brightness"},"id":"function-call-1","type":"function"}]},"index":0}]}
+
+data: {"choices":[{"delta":{"tool_calls":[{"function":{"arguments":"{}","name":"the_time"},"id":"function-call-2","type":"function"}]},"index":0,"finish_reason":"tool_calls"}]}
+
+data: [DONE]
+"#;
+        let got = events(recorded);
+        let ChatEvent::ToolCalls(calls) = &got[0] else {
+            panic!("{got:?}")
+        };
+        assert_eq!(calls.len(), 2, "{calls:?}");
+        assert_eq!(calls[0].name, "set_brightness");
+        assert_eq!(calls[0].args, json!({"level": 30}));
+        assert_eq!(
+            calls[0].extra,
+            Some(json!({"google": {"thought_signature": "c2ln"}}))
+        );
+        assert_eq!(calls[1].name, "the_time");
+        assert_eq!(calls[1].extra, None);
+        let back = serde_json::to_value(Message::assistant_calls(None, calls)).unwrap();
+        assert_eq!(
+            back["tool_calls"][0]["extra_content"],
+            json!({"google": {"thought_signature": "c2ln"}})
+        );
+        assert!(back["tool_calls"][1].get("extra_content").is_none());
+    }
+
+    /// `LAMP_SECOND_CHAT=openrouter`: OpenRouter's chat, the pinned model,
+    /// its providers tried fastest first, thinking at the effort given, and
+    /// its web plugin on Exa only with the search switch; the lamp's tools
+    /// and a look's picture as an image part.
+    #[test]
+    fn openrouter_is_asked_for_the_fastest_provider_and_searches_only_when_switched() {
+        let tools: Vec<lamp_gemini::Tool> = serde_json::from_value(json!([
+            {"name": "light_on", "description": "Light on."}
+        ]))
+        .unwrap();
+        let declare: Declare = Arc::new(move || tools.clone());
+        let plain = Chat::openrouter(
+            "deepseek/deepseek-v4.1-flash-1017",
+            "none",
+            "or-key",
+            declare.clone(),
+            false,
+        )
+        .unwrap();
+        assert_eq!(plain.url, "https://openrouter.ai/api/v1/chat/completions");
+        assert_eq!(plain.auth, "Bearer or-key");
+        let body = plain.body(&[Message::user_seeing("What is this?", &[0xff, 0xd8])]);
+        assert_eq!(body["model"], "deepseek/deepseek-v4.1-flash-1017");
+        assert_eq!(body["provider"], json!({"sort": "latency"}));
+        assert_eq!(body["reasoning"], json!({"effort": "none"}));
+        assert_eq!(body["tools"][0]["function"]["name"], "light_on");
+        assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+        assert!(body.get("plugins").is_none());
+        let searching = Chat::openrouter(
+            "google/gemini-3.6-flash",
+            "minimal",
+            "or-key",
+            declare,
+            true,
+        )
+        .unwrap();
+        let body = searching.body(&[Message::user("Any news?")]);
+        assert_eq!(
+            body["plugins"],
+            json!([{"id": "web", "engine": "exa", "mode": "instant", "max_results": 3}])
+        );
+        assert_eq!(body["reasoning"], json!({"effort": "minimal"}));
+        assert!(searching.sees());
+    }
+
+    /// `LAMP_SECOND_CHAT=deepseek`: DeepSeek's own chat, thinking always set,
+    /// off unless the probe asks; its text-only model is never sent a picture.
+    #[test]
+    fn deepseek_is_asked_with_thinking_set_and_its_text_only_model_sees_nothing() {
+        let off = Chat::deepseek("deepseek-flash", "ds-key", Arc::new(Vec::new), false).unwrap();
+        assert_eq!(off.url, "https://api.deepseek.com/chat/completions");
+        assert_eq!(off.auth, "Bearer ds-key");
+        let body = off.body(&[Message::user("Hi.")]);
+        assert_eq!(body["model"], "deepseek-flash");
+        assert_eq!(body["thinking"], json!({"type": "disabled"}));
+        assert_eq!(body["stream_options"], json!({"include_usage": true}));
+        assert!(off.sees());
+        let on = Chat::deepseek("deepseek-v4-pro", "ds-key", Arc::new(Vec::new), true).unwrap();
+        assert_eq!(on.body(&[])["thinking"], json!({"type": "enabled"}));
+        assert!(!on.sees());
+    }
+
+    /// OpenRouter's reasoning for a round's calls comes back with them, as
+    /// it came; its web search's results are seen once, when they come.
+    #[test]
+    fn reasoning_goes_back_with_the_calls_and_a_search_is_seen_once() {
+        let recorded = r#"data: {"choices":[{"delta":{"annotations":[{"type":"url_citation","url_citation":{"url":"https://a.invalid","title":"A"}}]}}]}
+
+data: {"choices":[{"delta":{"reasoning_details":[{"type":"reasoning.encrypted","data":"c2ln","format":"google-gemini-v1","index":0}]}}]}
+
+data: {"choices":[{"delta":{"annotations":[{"type":"url_citation","url_citation":{"url":"https://b.invalid","title":"B"}}],"tool_calls":[{"index":0,"id":"tool_1","type":"function","function":{"name":"the_time","arguments":"{}"}}]}}]}
+
+data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}
+
+data: [DONE]
+"#;
+        let got = events(recorded);
+        assert_eq!(got[0], ChatEvent::Searched);
+        let details = json!([{"type": "reasoning.encrypted", "data": "c2ln", "format": "google-gemini-v1", "index": 0}]);
+        assert_eq!(got[1], ChatEvent::Reasoning(details.clone()));
+        let ChatEvent::ToolCalls(calls) = &got[2] else {
+            panic!("{got:?}")
+        };
+        assert_eq!(calls[0].name, "the_time");
+        assert_eq!(got[3], ChatEvent::Done);
+        assert_eq!(got.len(), 4);
+        let back = serde_json::to_value(Message::assistant_calls_with(
+            None,
+            calls,
+            Some(details.clone()),
+        ))
+        .unwrap();
+        assert_eq!(back["reasoning_details"], details);
+        let plain = serde_json::to_value(Message::assistant_calls(None, calls)).unwrap();
+        assert!(plain.get("reasoning_details").is_none());
+    }
+
+    /// A call that came without an id is given one, so its result can be
+    /// matched to it.
+    #[test]
+    fn a_call_without_an_id_is_given_one() {
+        let mut deltas = Deltas::default();
+        deltas
+            .data(r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"the_time","arguments":"{}"}}]}}]}"#)
+            .unwrap();
+        let got = deltas.data("[DONE]").unwrap();
+        let ChatEvent::ToolCalls(calls) = &got[0] else {
+            panic!("{got:?}")
+        };
+        assert_eq!(calls[0].id, "call_0");
+    }
+
     #[test]
     fn broken_arguments_are_an_error() {
         let mut deltas = Deltas::default();
@@ -458,6 +1334,7 @@ data: [DONE]
             id: "call_a".into(),
             name: "the_time".into(),
             args: json!({"zone": "local"}),
+            extra: None,
         };
         let messages = [
             Message::assistant_calls(Some(String::new()), std::slice::from_ref(&call)),

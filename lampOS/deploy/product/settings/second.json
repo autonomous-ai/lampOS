@@ -1,0 +1,6 @@
+{
+  "llm_base_url": "https://campaign-api.autonomous.ai/api/v1/ai",
+  "llm_model": "gpt-4.1-mini",
+  "llm_credential_file": "/etc/lampOS/voice/credential",
+  "tts_provider": "elevenlabs"
+}

@@ -881,6 +881,7 @@ async fn reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn
             machine_names: false,
             needs: None,
             staff_note: false,
+            make_skill: false,
         }),
         schedule_tools: true,
         schedule_speak: true,

@@ -887,6 +887,10 @@ fn worker_command(
             role,
             var(crate::remember::FORGET_ALL_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_observe_worker_environment(
+            role,
+            var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
+        ))
         .envs(kernel_clock_worker_environment(
             role,
             var(crate::local_time::KERNEL_CLOCK_ENVIRONMENT).as_deref(),
@@ -919,6 +923,11 @@ fn worker_command(
             role,
             var(crate::person::ENVIRONMENT).as_deref(),
         ))
+        .envs(credentials_worker_environment(
+            role,
+            var(crate::second_config::CREDENTIALS_ENV).as_deref(),
+        ))
+        .envs(second_route_worker_environment(role, &var))
         .envs(second_scoped_context_worker_environment(
             role,
             var(crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT).as_deref(),
@@ -953,32 +962,48 @@ fn second_scoped_context_worker_environment(
 }
 
 // The rules' switch (#813), passed the same narrow way: the exact `on`, to
-// the provider only.
+// the two routes that offer the memory's functions (twelve-P2): the second
+// route keeps and lists rules through the same Days client.
 fn memory_rules_worker_environment(
     role: &str,
     value: Option<&std::ffi::OsStr>,
 ) -> Option<(&'static str, &'static str)> {
-    (role == "provider" && value == Some(std::ffi::OsStr::new("on")))
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::rules::ENVIRONMENT, "on"))
 }
 
 // Forgetting that reaches everything (#1693), passed the same narrow way:
-// the exact `on`, to the provider only, which offers the memory's functions.
+// the exact `on`, to the two routes that offer the memory's functions, as the
+// Days store's own switch is. The second route starts the same Days client;
+// without it there, "forget that" and "forget everything" ran as before
+// #1723 on the new flow (twelve-P2).
 fn memory_forget_all_worker_environment(
     role: &str,
     value: Option<&std::ffi::OsStr>,
 ) -> Option<(&'static str, &'static str)> {
-    (role == "provider" && value == Some(std::ffi::OsStr::new("on")))
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::FORGET_ALL_ENVIRONMENT, "on"))
 }
 
+// The observation pass's switch (#1693 (2)), passed the same narrow way:
+// the exact `on`, to the second route alone, the one worker with a model's
+// credential (`credentials_worker_environment`) to ask.
+fn memory_observe_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::OBSERVE_ENVIRONMENT, "on"))
+}
+
 // The open threads' switch (#1693 (3)), passed the same narrow way: the
-// exact `on`, to the provider only, which opens the sessions told of them.
+// exact `on`, to the two routes that open the sessions told of them (each
+// through `remember::told_for_session`; twelve-P2).
 fn memory_threads_worker_environment(
     role: &str,
     value: Option<&std::ffi::OsStr>,
 ) -> Option<(&'static str, &'static str)> {
-    (role == "provider" && value == Some(std::ffi::OsStr::new("on")))
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::THREADS_ENVIRONMENT, "on"))
 }
 
@@ -1066,9 +1091,122 @@ fn person_name_worker_environment(
         .map(|path| (crate::person::ENVIRONMENT, path.to_owned()))
 }
 
+// The voice unit's credentials (`LoadCredential=`, systemd's
+// `CREDENTIALS_DIRECTORY`), to the one worker that reads them: the second
+// route's, for OpenRouter's and DeepSeek's keys. A path, passed only when
+// absolute; the keys themselves never travel in an environment.
+fn credentials_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, std::ffi::OsString)> {
+    value
+        .filter(|path| role == "second" && Path::new(path).is_absolute())
+        .map(|path| (crate::second_config::CREDENTIALS_ENV, path.to_owned()))
+}
+
+// The second route's Gemini endpoint and voice, its key terms and the
+// lamp's place (#1712), and whether it listens for the names the lamp knows
+// (#753), to its worker only, as set: the worker checks them, and says so.
+fn second_route_worker_environment(
+    role: &str,
+    var: impl Fn(&str) -> Option<std::ffi::OsString>,
+) -> Vec<(&'static str, std::ffi::OsString)> {
+    [
+        crate::second_config::GEMINI_BASE_URL_ENV,
+        crate::second_config::DEEPSEEK_BASE_URL_ENV,
+        crate::second_config::SPEECH_MODEL_ENV,
+        crate::second_config::KEY_TERMS_ENV,
+        crate::local_time::PLACE_ENVIRONMENT,
+        crate::second_provider::net::weather::ENVIRONMENT,
+        crate::second_provider::PREPARED_ENVIRONMENT,
+        crate::second_provider::STT_WARM_ENVIRONMENT,
+        crate::second_provider::FIRST_WORDS_ENVIRONMENT,
+        crate::second_provider::CHAT_WARM_ENVIRONMENT,
+        crate::second_provider::SPEECH_WARM_ENVIRONMENT,
+        crate::second_provider::STEADY_FIRST_ENVIRONMENT,
+        crate::second_provider::FEW_TOOLS_ENVIRONMENT,
+        crate::speaking_faces::ENVIRONMENT,
+        crate::second_config::FLUX_ENV,
+        crate::second_provider::net::key_terms::ENVIRONMENT,
+    ]
+    .into_iter()
+    .filter(|_| role == "second")
+    .filter_map(|name| var(name).map(|value| (name, value)))
+    .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #1712: the Gemini endpoint and voice go to the second route's worker
+    /// only.
+    #[test]
+    fn the_second_routes_settings_reach_only_its_worker() {
+        let var = |name: &str| {
+            (name == crate::second_config::SPEECH_MODEL_ENV)
+                .then(|| std::ffi::OsString::from("gemini-3.8-flash-lite-tts"))
+        };
+        assert_eq!(
+            second_route_worker_environment("second", var),
+            [(
+                crate::second_config::SPEECH_MODEL_ENV,
+                std::ffi::OsString::from("gemini-3.8-flash-lite-tts")
+            )]
+        );
+        assert!(second_route_worker_environment("provider", var).is_empty());
+        assert!(second_route_worker_environment("second", |_| None).is_empty());
+    }
+
+    /// #753: whether the second route listens for the names the lamp knows
+    /// goes to its worker only.
+    #[test]
+    fn the_known_names_switch_reaches_only_the_second_route() {
+        for name in [
+            crate::second_provider::net::key_terms::ENVIRONMENT,
+            crate::second_config::FLUX_ENV,
+            crate::second_provider::STEADY_FIRST_ENVIRONMENT,
+            crate::second_provider::FEW_TOOLS_ENVIRONMENT,
+            crate::speaking_faces::ENVIRONMENT,
+        ] {
+            let var = |asked: &str| (asked == name).then(|| std::ffi::OsString::from("on"));
+            assert_eq!(
+                second_route_worker_environment("second", var),
+                [(name, std::ffi::OsString::from("on"))]
+            );
+            for role in ["provider", "capture", "speaker"] {
+                assert!(
+                    second_route_worker_environment(role, var).is_empty(),
+                    "{role}"
+                );
+            }
+        }
+    }
+
+    /// The voice unit's credentials' directory goes to the second route's
+    /// worker only, and only as an absolute path.
+    #[test]
+    fn the_units_credentials_reach_only_the_second_route() {
+        let absolute = std::ffi::OsStr::new("/run/credentials/lamp-voice.service");
+        assert_eq!(
+            credentials_worker_environment("second", Some(absolute)),
+            Some(("CREDENTIALS_DIRECTORY", absolute.to_owned()))
+        );
+        assert_eq!(credentials_worker_environment("second", None), None);
+        assert_eq!(
+            credentials_worker_environment("second", Some(std::ffi::OsStr::new("run/x"))),
+            None
+        );
+        for role in [
+            "provider", "capture", "speaker", "privacy", "ring", "camera", "unknown",
+        ] {
+            assert_eq!(
+                credentials_worker_environment(role, Some(absolute)),
+                None,
+                "{role}"
+            );
+        }
+    }
 
     /// #753: this home's near bar reaches the two routes' workers, which
     /// judge a call with it, and only as the exact `on`.
@@ -1125,23 +1263,30 @@ mod tests {
                         "LAMP_SECOND_SCOPED_CONTEXT",
                         ["second"].as_slice(),
                     ),
-                    // Rules reach the Live provider only.
+                    // Rules reach both routes too (twelve-P2).
                     (
                         memory_rules_worker_environment,
                         "LAMP_MEMORY_RULES",
-                        ["provider"].as_slice(),
+                        ["provider", "second"].as_slice(),
                     ),
-                    // So do the open threads (#1693 (3)).
+                    // The open threads (#1693 (3)) reach both routes, as the
+                    // Days store does (twelve-P2).
                     (
                         memory_threads_worker_environment,
                         "LAMP_MEMORY_THREADS",
-                        ["provider"].as_slice(),
+                        ["provider", "second"].as_slice(),
                     ),
                     // So does forgetting everything (#1693).
                     (
                         memory_forget_all_worker_environment,
                         "LAMP_MEMORY_FORGET_ALL",
-                        ["provider"].as_slice(),
+                        ["provider", "second"].as_slice(),
+                    ),
+                    // The observation pass, the route with a model (#1693 (2)).
+                    (
+                        memory_observe_worker_environment,
+                        "LAMP_MEMORY_OBSERVE",
+                        ["second"].as_slice(),
                     ),
                     // The clock's switch, the two that tell the time.
                     (
@@ -1271,8 +1416,11 @@ mod tests {
                     crate::rules::ENVIRONMENT,
                     crate::remember::FORGET_ALL_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
+                    crate::remember::OBSERVE_ENVIRONMENT,
                     crate::local_time::KERNEL_CLOCK_ENVIRONMENT,
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
+                    crate::second_provider::net::key_terms::ENVIRONMENT,
+                    crate::second_config::FLUX_ENV,
                     crate::attention::NEAR_CALIBRATED_ENVIRONMENT,
                     crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                 ]
@@ -1285,6 +1433,30 @@ mod tests {
                     "6-7"
                 } else if name == crate::person::ENVIRONMENT {
                     "/etc/lampOS/person/name"
+                } else if name == crate::second_config::CREDENTIALS_ENV {
+                    "/run/credentials/lamp-voice.service"
+                } else if name == crate::second_config::GEMINI_BASE_URL_ENV {
+                    "https://relay.example.invalid/v1beta"
+                } else if name == crate::second_config::DEEPSEEK_BASE_URL_ENV {
+                    "https://relay.example.invalid/deepseek"
+                } else if name == crate::second_config::SPEECH_MODEL_ENV {
+                    "gemini-3.8-flash-lite-tts"
+                } else if name == crate::second_config::KEY_TERMS_ENV {
+                    "Hanoi"
+                } else if name == crate::local_time::PLACE_ENVIRONMENT {
+                    "Hanoi, Vietnam"
+                } else if name == crate::second_provider::net::weather::ENVIRONMENT
+                    || name == crate::second_provider::PREPARED_ENVIRONMENT
+                    || name == crate::second_provider::STT_WARM_ENVIRONMENT
+                    || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
+                    || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
+                    || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
+                    || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
+                    || name == crate::speaking_faces::ENVIRONMENT
+                {
+                    "on"
+                } else if name == crate::second_provider::FIRST_WORDS_ENVIRONMENT {
+                    "4"
                 } else {
                     "a-secret"
                 },
@@ -1334,11 +1506,32 @@ mod tests {
             (
                 "second",
                 vec![
+                    "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
+                    "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_OBSERVE=on",
+                    "LAMP_MEMORY_RULES=on",
+                    "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
+                    "LAMP_PLACE=Hanoi, Vietnam",
+                    "LAMP_SECOND_CHAT_WARM=on",
+                    "LAMP_SECOND_DEEPSEEK_BASE_URL=https://relay.example.invalid/deepseek",
+                    "LAMP_SECOND_FEW_TOOLS=on",
+                    "LAMP_SECOND_FIRST_WORDS=4",
+                    "LAMP_SECOND_FLUX=on",
+                    "LAMP_SECOND_GEMINI_BASE_URL=https://relay.example.invalid/v1beta",
+                    "LAMP_SECOND_KEY_TERMS=Hanoi",
+                    "LAMP_SECOND_KNOWN_NAMES=on",
+                    "LAMP_SECOND_PREPARED=on",
                     "LAMP_SECOND_SCOPED_CONTEXT=on",
+                    "LAMP_SECOND_SPEAKING_FACE=on",
+                    "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
+                    "LAMP_SECOND_SPEECH_WARM=on",
+                    "LAMP_SECOND_STEADY_FIRST=on",
+                    "LAMP_SECOND_STT_WARM=on",
+                    "LAMP_SECOND_WEATHER=on",
                 ],
             ),
             (

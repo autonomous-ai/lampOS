@@ -259,6 +259,9 @@ order; it does not return observations. New operations are:
 These are shapes, not an ordered script: IDs must come from successful
 responses in the same person's store. `search` returns ranked records with
 their provenance; `forget` returns a count after removal and index checks.
+The base `remember` may also name the person's own exchanges it came from,
+`{"op":"remember",…,"source_ids":[3]}` (#1693); forgetting it then removes
+them, one step back. The legacy store ignores them.
 `session_open` returns a frozen `snapshot`; default `conversation_end`
 returns bounded model `input`, without invoking a model. With `submit:true`,
 the current build validates references and returns
@@ -333,7 +336,8 @@ the unchanged legacy client, used unless the new Days client is selected.
   came from. The opt-in store supports those links and transitive deletion;
   the legacy client does not send them or use frozen snapshots.
 - **Forgetting that reaches everything** (#1693 (1),
-  `LAMP_MEMORY_FORGET_ALL=on`, with the Days client only; off unless set).
+  `LAMP_MEMORY_FORGET_ALL=on`, with the Days client only; off unless set;
+  both voice routes, Live and the second, since twelve-P2).
   - `forget {source_id}` forgets something recall gave, by the
     `source_id` it showed. The id must be one this session was shown, in
     the scope it was shown from: the person's own when someone known is at
@@ -341,7 +345,8 @@ the unchanged legacy client, used unless the new Days client is selected.
     known person can't forget the room's for everyone. The store's
     `forget {id}` removes it with its replacement chain, everything linked
     from it (later exchanges in which it was shown, observations), and for
-    an observation its sources.
+    an observation the exchanges it was taken from: one step back, never
+    what those were shown (#2003).
   - `forget_everything {}`, asked once and said yes to, is for **someone
     known only**: it sends `forget_all` for their own scope (never `null`,
     which would be everyone's), and for their rules' scope (`r-<person>`)
@@ -352,16 +357,92 @@ the unchanged legacy client, used unless the new Days client is selected.
     the TV must never empty it (the reviewer on #1723).
   - Both clear the conversation thread and stop journalling until a fresh
     worker starts, as `forget` does. `forget` with nothing is as before.
-  - Still not covered: earlier turns of the same conversation, said before
-    the thing was kept, aren't linked to it, so `forget {source_id}` leaves
-    them until they are 30 days old. `forget_everything` removes them.
+  - **The conversation it came up in** (#1693, the first builder's 23:57):
+    - **What's sent:** at `remember`, the voice sends the exchanges of the
+      conversation it's in. That's the person's own, journalled so far,
+      since the writer's last 45 s gap or change of person. They go as
+      `source_ids`, and the store keeps them as where the thing came from
+      (`remember_from`: only the person's own exchanges).
+    - **What `forget` removes:** "Forget that" on it removes those turns
+      too: one step back, exchanges only. It doesn't remove what those
+      turns were shown, or another conversation.
+    - **Never waited for:** a writer busy at that moment leaves it kept as
+      before.
+    - **After a forget** ("forget that" or "forget everything"), the
+      conversation's turns are dropped from what the next `remember` sends,
+      since they may be gone and journalling has stopped. So a thing
+      remembered next is kept, not refused for ids the store no longer has
+      (Second on #2003;
+      `voice_forget::after_forgetting_the_next_thing_remembered_is_kept`).
+    - **Unchanged:** without the switch, `remember` is as before, and so is
+      the room's rule: `forget_everything` empties only the known person's
+      own scope, never the room's (#1723).
+    - **Tests:** `days::a_kept_thing_goes_with_the_conversation_it_came_up_in_and_nothing_else`
+      and `voice_forget::forget_that_removes_the_conversation_a_kept_thing_came_up_in`
+      (the voice's client against the real store: the turn goes, an earlier
+      conversation stays).
   - Tests: `remember::tests::with_the_switch_what_recall_gave_and_everything_can_be_forgotten`
     (requests and scopes, the switch off), and `crates/memory/tests/voice_forget.rs`
     (through the voice's Days client against the real store: what recall
     gave goes and something else stays; everything goes, journal included).
 
+- **Kept without being asked** (#1693 (2), `LAMP_MEMORY_OBSERVE=on`,
+  with the Days client, on the second route only; off unless set).
+  - **When:** at each conversation's end (45 s idle, or another person),
+    the voice's Days writer asks for the memory's frozen job
+    (`conversation_end` without `submit`, its answer read up to 48 KiB) and
+    hands it to one observation thread, never on a turn's path.
+  - **The model:** the second route's own DeepSeek model, thinking off, on
+    the relay or DeepSeek's own API as the route has it, so a person's
+    conversations go to one outside model. It is asked with
+    `remember::OBSERVE_PROMPT` (`memory-days.md`'s instruction, plus never
+    to keep health, money or other people's private matters unasked),
+    within 30 s.
+  - **What is kept:** its JSON goes to the memory as `tidy_apply`, which
+    checks it with `tidy.rs`'s own validators and the store's (cited
+    sources from this conversation only, eight at most, 300 bytes each,
+    supersedes only a current one of the same category).
+  - **Nothing, refused, or busy:** a model that fails, gives nothing usable
+    or takes too long, a proposal the memory refuses, or a second job while
+    two wait, closes the job with nothing kept (`tidy_apply` with an empty
+    list), so jobs never wait out their day and fill the memory's queue.
+  - **The journal** says counts and milliseconds only: proposed, kept, or
+    refused and why.
+  - **Privacy:** with it on, each conversation's text leaves the lamp once
+    more, to the same model ([service-privacy.md](service-privacy.md)).
+  - **Tests:** `crates/memory/tests/voice_observe.rs` (the voice's client,
+    the real store, a scripted model: kept, then closed with nothing);
+    `days::an_empty_result_closes_the_job_with_nothing_kept_and_frees_its_place`;
+    `remember::tests::the_observation_pass_reads_only_the_models_one_json_object`;
+    `second_provider::worker::memory_observer` (DeepSeek asked without
+    thinking, a streamed answer read).
+  - **Before it's on: the dry run** (#1693 (4)), against the first builder's
+    bar (under 1 in 10 kept wrongly, none intrusive). It's run on the Mac
+    doing the labelling, on a copy of a lamp's store, with the person's yes:
+    ```sh
+    lamp-voice-eval observe-dry --store memory-days.sqlite3 --out NEW_DIR --key-file deepseek.key
+    ```
+    - **The copy:** it copies the store (with its `-wal` and `-shm`) into
+      `NEW_DIR/store`, never opening the given one for writing.
+    - **The conversations:** it cuts the journal as the voice does (45 s
+      apart, another person, or 64 sources). Each goes through the lamp's own
+      path: the store's `conversation_end`, the pass's prompt and DeepSeek
+      client (`second_provider::worker::observer_at`), and the store's
+      `tidy_apply`, which keeps or refuses as on the lamp.
+    - **What it prints:** counts (conversations, proposed, kept by category,
+      refused by code, the model giving nothing) and the model's median and
+      p90 ms. It prints no words.
+    - **The labels:** what was said and proposed goes only to
+      `NEW_DIR/labels.jsonl` (0600), one line per conversation, each proposal
+      with `"mark": "right | wrong | intrusive"` for a person to fill in.
+    - **Afterwards:** the copy is removed at the end.
+    - **Tests:** `observe_dry::tests`: the cut, a whole run on a seeded copy
+      with a scripted model, kept and nothing, and the given store byte for
+      byte unchanged.
+
 - **Once, at a natural moment** (#1693 (3), `LAMP_MEMORY_THREADS=on`,
-  with the Days client only; off unless set). A session opened for someone
+  with the Days client only; off unless set; both voice routes since
+  twelve-P2). A session opened for someone
   known asks the memory `follow_up` within the note's 300 ms. The memory
   gives at most one open `thread` or `promise` observation of theirs, at
   least 6 hours old (not the same conversation) and at most 14 days old,
@@ -410,6 +491,33 @@ then use that person's scope:
   and links records within one person; a different person at the lamp ends
   the conversation being collected, which is sent to `conversation_end` in
   its own scope.
+- **Seeing someone speak** (`LAMP_SECOND_SPEAKING_FACE=on`, the second
+  route only, off unless set; `crates/voice/src/speaking_faces.rs`). It needs
+  `LAMP_SECOND_SCOPED_CONTEXT=on` too, which tells and files each turn for
+  its lease; without it the worker says "seeing who speaks is not on" and
+  nothing changes. A heard
+  line's scope is admitted as above, when its sound begins. When its words
+  are final, before anything is told with them, one more input is read: the
+  eyes' `humans/faces/tracked` (`LAMP_EYES_SPEAKING=on`), looked at every
+  100 ms on the worker's own thread. A face *speaks through the line* when
+  it reads `yes` in at least half of the looks between the line's start and
+  end (at least three looks).
+  - **Only the known person's face** (its passing id is the eyes'
+    `known-face`, and the known name is still the admitted person's): the
+    line stays theirs.
+  - **Any other face, alone or with theirs:** the line may be someone
+    else's, and its lease narrows to the room (`ScopeLease::narrow_to_room`).
+    The chat is told the room's note and exchanges, its memory calls run in
+    the room's scope, and its exchange is filed in the room's thread, so
+    the journal takes it as the room's too. A chat already begun on its
+    early words (`LAMP_SECOND_PREPARED`) is dropped and asked again. The
+    answer is not held up, and the narrowing is one way: nothing widens a
+    scope again. Both faces speaking narrows on purpose (Third on #2008):
+    at worst the known person's own line loses their context once.
+  - **No face,** or too few looks: nothing changes.
+  - **Nothing new is kept:** the looks are passing ids and states, in memory
+    only and dropped after 30 s, and each reading is used for its line and
+    gone.
 - **The session note**, for a session opened while someone is known: the
   room's note, then what they asked to keep. Legacy reads theirs then, in
   300 ms at most; Days opens a second frozen snapshot in their scope within
@@ -535,9 +643,9 @@ have no task 29 lamp measurements.
 
 ### What a person teaches and corrects (#813)
 
-Off unless set: the provider worker needs `LAMP_MEMORY_RULES=on` beside
+Off unless set: the provider worker, and since twelve-P2 the second route's, needs `LAMP_MEMORY_RULES=on` beside
 `LAMP_MEMORY_DAYS=on` (the coordinator passes both exact values through
-its cleared worker environment, to the provider only). With the legacy
+its cleared worker environment, to the provider and the second route). With the legacy
 memory, or without the switch, the model is told of no new function, the
 memory is asked nothing new and every session note is the same bytes
 (`remember::tests::without_the_rules_switch_nothing_changes`).
@@ -784,7 +892,11 @@ admission. The face file's original three-second freshness deadline is preserved
 across cache refreshes. Admission reads a nonblocking cache; a missing, expired,
 or contended observation uses the room scope. It does not fall back to a sticky
 conversation owner or a shadow voice candidate. The Second route refreshes off
-its input loop, with at most one filesystem read outstanding.
+its input loop, with at most one filesystem read outstanding. Its scoped calls
+run as its plain ones do (`second_provider::worker::run_call`): a web search's
+functions, the search begun from the words, and the journal lines for the
+battery and the room come first, then the lamp's own call within the request's
+scope (`tools::answer_scoped`).
 
 The request owner holds revocable authority identified by worker, session and
 request. Ending microphone input keeps this authority alive for the answer;
@@ -813,13 +925,19 @@ exchanges for that person, the room's for a room request, never the sticky
 session owner's or those of whoever is in view when the chat begins. The Days
 note is asked for that scope and asked again when the scope differs from the
 previous turn's. A request revoked while its context was built is not asked.
+A held line's one round for `reports_stop` (with `LAMP_REPORTS=on`) is told
+for its admitted scope in the same way (`told`), never for the sticky session
+owner (Second's P2 on #1925). The unscoped builder is used only for a request
+with no lease, or with this switch off.
 The lamp's answer is kept under the same scope (`Thread::lamp_for`), and a
 written request's note is kept as the room's, as it is admitted. The context is
 still built on the turn's task, so a slow memory service delays that turn's
 first round as before; nothing new is read on the input path.
 
 Off, a turn is told and kept as before, for the person the session was opened
-for. ### Live route session scope
+for.
+
+### Live route session scope
 
 With `LAMP_LIVE_SCOPED_SESSION=on` (off unless set), a spoken line on the Live
 route goes only into a session opened for the person it was admitted for

@@ -26,14 +26,18 @@ use std::{
     collections::BTreeSet,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
 };
 
 const PACKET: usize = crate::provider_flow::PACKET_SAMPLES;
 const LIVE: i16 = 1_000;
 const SECOND: i16 = 2_000;
+/// The second route's wait cue, played before its words.
+const CUE: i16 = 500;
 const LIMIT: Duration = Duration::from_secs(12);
+/// The clock the run's `ExpressionOut` stamps with (`Script::expression`).
+const EXPRESSION_CLOCK: &str = "second-route-boot";
 
 /// What the Live peer does with one request, by Start order.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -64,6 +68,9 @@ enum Live {
     /// A skill's tool answered with a look, then as `FailThenLate`: the
     /// second route takes the turn.
     LookFail(Fault, usize),
+    /// `packets` of a holding phrase ("One moment."), then `HoldingAnswer`
+    /// for session 1 before completion (`LAMP_HOLDING_ANSWER`).
+    Holding(usize),
 }
 
 /// How the Live route answers a turn the lamp wrote itself (a "Sorry?").
@@ -98,6 +105,8 @@ struct Script {
     second_packets: usize,
     /// The second route's answers open with these words.
     second_says: Option<&'static str>,
+    /// Packets of a wait cue the second route plays before its words.
+    second_cue: usize,
     /// What the second route heard the person say, as its recogniser
     /// gives it before the answer: a transcript with no request (#1670).
     second_hears: Option<&'static str>,
@@ -132,6 +141,22 @@ struct Script {
     /// Privacy reports muted at this capture frame, whatever has settled:
     /// for a run whose turns go on past the person's (the lamp's own).
     mute_at_frame: Option<u64>,
+    /// The second route's answer packet by packet: its sample value, so its
+    /// level rises and falls as speech does (#933). `None`: `SECOND`.
+    second_shape: Option<fn(usize) -> i16>,
+    /// Give the voice an `ExpressionOut` on a bus of the run's own, and keep
+    /// what it says for Expression (`voice/progress`, `voice/sound`).
+    expression: bool,
+    /// The second route answers nothing at End: its chat is still
+    /// streaming (#1620 on the second route).
+    second_holds: bool,
+    /// The second route fails each turn before any audio, as its worker
+    /// does when its speech to text or chat cannot be reached.
+    second_fails: Option<Fault>,
+    /// This peer reads Stop and keeps its process running (#1620).
+    ignores_stop: Option<&'static str>,
+    /// The scenario's own bound, past which capture reports a fault.
+    limit: Duration,
 }
 
 impl Script {
@@ -142,6 +167,7 @@ impl Script {
             live: vec![live],
             second_packets: 12,
             second_says: None,
+            second_cue: 0,
             second_hears: None,
             speak_again: None,
             turns: 1,
@@ -156,6 +182,12 @@ impl Script {
             turn_taking: TurnTaking::V1Baseline,
             written: Written::Ignore,
             mute_at_frame: None,
+            second_shape: None,
+            expression: false,
+            second_holds: false,
+            second_fails: None,
+            ignores_stop: None,
+            limit: LIMIT,
         }
     }
 }
@@ -183,6 +215,9 @@ struct Run {
     trace: Vec<Value>,
     seen: Seen,
     exits: Vec<(&'static str, bool)>,
+    /// What the voice said for Expression, as Expression takes it, in the
+    /// order it was said (`Script::expression`).
+    expression: Vec<lamp_expression::Input>,
 }
 
 fn dedup<T: PartialEq + Clone>(items: &[T]) -> Vec<T> {
@@ -485,6 +520,12 @@ impl Peers {
                         })
                         .unwrap();
                 }
+                Ok(Some(Control::Stop)) if self.script.ignores_stop == Some(role) => {
+                    // Read, and its process goes on: only a kill ends it.
+                    self.peers[index].stopped = true;
+                    self.seen.lock().unwrap().stopped.push(role);
+                    return Ok(());
+                }
                 Ok(Some(Control::Stop)) => {
                     if role == "ring" {
                         let at = monotonic_us();
@@ -651,7 +692,8 @@ impl Peers {
                 ProviderInput::Start {
                     request, session, ..
                 } => {
-                    if live {
+                    // Alone, the second route's requests are the script's.
+                    if live || self.script.only {
                         self.live_requests.push(request);
                     }
                     self.peers[index].queued.push_back(ProviderOutput::Started {
@@ -660,9 +702,11 @@ impl Peers {
                         waiting_for_barrier: false,
                     });
                 }
+                // Alone, the second route answers the lamp's own turns as
+                // the Live route would, with its own samples.
                 ProviderInput::Written {
                     request, session, ..
-                } if live => {
+                } if live || self.script.only => {
                     let queued = &mut self.peers[index].queued;
                     let started = ProviderOutput::Started {
                         request,
@@ -686,14 +730,71 @@ impl Peers {
                         }
                         Written::Said(packets) => {
                             queued.push_back(started);
-                            self.audio(index, request, packets, LIVE);
+                            self.audio(index, request, packets, if live { LIVE } else { SECOND });
                             self.finish(index, request);
                         }
                     }
                 }
                 ProviderInput::End { request, .. } => {
                     self.ended.insert(request);
+                    if !live && self.script.second_holds {
+                        continue;
+                    }
+                    if !live && let Some(reason) = self.script.second_fails {
+                        self.peers[index]
+                            .queued
+                            .push_back(ProviderOutput::TurnFailed {
+                                request,
+                                stage: FailedStage::AwaitingResponse,
+                                reason,
+                            });
+                        continue;
+                    }
+                    // Alone, a holding phrase is answered as the second worker
+                    // answers one (the holding answers, #1722).
+                    if !live
+                        && self.script.only
+                        && let Some(Live::Holding(packets)) = self
+                            .live_requests
+                            .iter()
+                            .position(|&r| r == request)
+                            .and_then(|p| self.script.live.get(p).copied())
+                    {
+                        self.audio(index, request, packets, SECOND);
+                        self.peers[index]
+                            .queued
+                            .push_back(ProviderOutput::HoldingAnswer {
+                                request,
+                                session: 1,
+                            });
+                        self.finish(index, request);
+                        continue;
+                    }
                     if !live {
+                        // Alone, a line the script makes unclear is held
+                        // as the second worker holds one (the hums, #828).
+                        let unclear = self
+                            .live_requests
+                            .iter()
+                            .position(|&r| r == request)
+                            .and_then(|p| self.script.live.get(p).copied())
+                            .filter(|answer| {
+                                self.script.only
+                                    && matches!(answer, Live::Unclear | Live::UnclearCutIn)
+                            });
+                        if let Some(answer) = unclear {
+                            self.peers[index].queued.push_back(ProviderOutput::Unclear {
+                                request,
+                                why: "fixture".into(),
+                                cut_in: answer == Live::UnclearCutIn,
+                            });
+                            self.finish(index, request);
+                            continue;
+                        }
+                        // A wait cue first: audio with no words.
+                        if self.script.second_cue > 0 {
+                            self.audio(index, request, self.script.second_cue, CUE);
+                        }
                         if let Some(text) = self.script.second_hears {
                             self.peers[index]
                                 .queued
@@ -712,7 +813,14 @@ impl Peers {
                                     finished: true,
                                 });
                         }
-                        self.audio(index, request, self.script.second_packets, SECOND);
+                        match self.script.second_shape {
+                            Some(shape) => {
+                                for packet in 0..self.script.second_packets {
+                                    self.audio(index, request, 1, shape(packet));
+                                }
+                            }
+                            None => self.audio(index, request, self.script.second_packets, SECOND),
+                        }
                         self.finish(index, request);
                         continue;
                     }
@@ -751,6 +859,16 @@ impl Peers {
                                     dropped: None,
                                 });
                             self.audio(index, request, packets, LIVE);
+                            self.finish(index, request);
+                        }
+                        Live::Holding(packets) => {
+                            self.audio(index, request, packets, LIVE);
+                            self.peers[index]
+                                .queued
+                                .push_back(ProviderOutput::HoldingAnswer {
+                                    request,
+                                    session: 1,
+                                });
                             self.finish(index, request);
                         }
                         Live::Unclear | Live::UnclearCutIn => {
@@ -945,9 +1063,13 @@ fn run(script: Script) -> Run {
         }
     };
     let workers = routes
-        .workers(vec!["/etc/provider.json".to_owned()], false, false)
+        .workers(
+            vec!["/etc/provider.json".to_owned()],
+            second::RouteFlags::default(),
+        )
         .unwrap();
     let mut rig = Rig {
+        expression_out: None,
         second: None,
         call_wait_blocks: None,
         cut_keeps_name: false,
@@ -978,9 +1100,67 @@ fn run(script: Script) -> Run {
         let worker = spawn("second");
         rig.second = Some(second::Route::standing_by(worker, ready_link(1, 1)));
     }
+    // What the voice says for Expression, on a bus of the run's own, kept by
+    // a thread as it comes so that no subscriber's queue fills.
+    let expression = script.expression.then(|| {
+        use lamp_msgs::{VoiceProgress, VoiceSound};
+        static RUNS: AtomicU64 = AtomicU64::new(0);
+        let root = PathBuf::from(format!(
+            "/tmp/lv-route-expr-{}-{}",
+            std::process::id(),
+            RUNS.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        rig.expression_out = Some(
+            crate::expression_out::ExpressionOut::on(&bus, EXPRESSION_CLOCK, "voice-route")
+                .unwrap(),
+        );
+        let progress = bus
+            .subscribe_typed(VoiceProgress::TOPIC, "test", VoiceProgress::TYPE)
+            .unwrap();
+        let sound = bus
+            .subscribe_typed(VoiceSound::TOPIC, "test", VoiceSound::TYPE)
+            .unwrap();
+        let done = Arc::new(AtomicBool::new(false));
+        // One thread for each topic, so that neither waits on the other: a
+        // Linux socket holds about ten datagrams, and the bus drops one sent
+        // to a full queue, so a keeper busy with progress lost sound pieces
+        // (Second's read on #1722, 20 Oct 00:01; Eighth's 4 of 6 on Linux).
+        let keep = |stop: Arc<AtomicBool>,
+                    mut subscriber: lamp_bus::Subscriber,
+                    input: fn(lamp_bus::Message) -> lamp_expression::Input| {
+            std::thread::spawn(move || {
+                let mut kept = Vec::new();
+                loop {
+                    let stopping = stop.load(Ordering::Acquire);
+                    while let Ok(Some(message)) = subscriber.recv(Duration::from_millis(5)) {
+                        kept.push(input(message));
+                    }
+                    if stopping {
+                        return kept;
+                    }
+                }
+            })
+        };
+        let progress = keep(done.clone(), progress, |message| {
+            lamp_expression::Input::Progress(message.parse().unwrap())
+        });
+        let sound = keep(done.clone(), sound, |message| {
+            lamp_expression::Input::Sound(message.parse().unwrap())
+        });
+        let keeper = std::thread::spawn(move || {
+            let mut kept = progress.join().unwrap();
+            kept.extend(sound.join().unwrap());
+            kept
+        });
+        (root, done, keeper)
+    });
     // The clock starts once every child has crossed its startup barrier;
     // the coordinator and the peers share it from here.
-    let clock_scope = crate::scenario_clock::Scope::enter(LIMIT * 2).unwrap();
+    let limit = script.limit;
+    let clock_scope = crate::scenario_clock::Scope::enter(limit * 2).unwrap();
     let mut owner = Controller::new(new_boot().unwrap(), now());
     let boot = owner.snapshot(now()).unwrap().boot();
     let mut startup = StartupEvents::default();
@@ -1031,7 +1211,7 @@ fn run(script: Script) -> Run {
                 crate::scenario_clock::Phase::Run => Instant::now() + Duration::from_millis(300),
                 crate::scenario_clock::Phase::Shutdown { deadline } => deadline,
             };
-            if crate::scenario_clock::instant() - started > LIMIT && !reported {
+            if crate::scenario_clock::instant() - started > limit && !reported {
                 reported = true;
                 if let Some(index) = state.index("capture") {
                     let _ = state.peers[index]
@@ -1082,21 +1262,31 @@ fn run(script: Script) -> Run {
         exits.push((role, matches!(worker.try_exit(), Ok(Some(_)))));
     }
     drop(clock_scope);
+    let expression = expression.map_or_else(Vec::new, |(root, done, keeper)| {
+        done.store(true, Ordering::Release);
+        let kept = keeper.join().unwrap();
+        let _ = std::fs::remove_dir_all(&root);
+        kept
+    });
     let seen = std::mem::take(&mut *seen.lock().unwrap());
     Run {
         result,
         trace: trace.iter().cloned().collect(),
         seen,
         exits,
+        expression,
     }
 }
 
 /// The records whose kinds and fields are compared across runs: what a turn
 /// leaves, with neither timing nor the route's own records.
 fn shape(run: &Run) -> BTreeSet<(String, Vec<String>)> {
+    // Nor when an answer began to be heard: on the second route that needs
+    // its words, which these peers send only when a script asks
+    // (`the_answers_first_audio_is_recorded_after_a_wait_cue_never_at_it`).
     run.trace
         .iter()
-        .filter(|e| e["kind"] != "voice_route_switched")
+        .filter(|e| e["kind"] != "voice_route_switched" && e["kind"] != "answer_first_audio")
         .map(|e| {
             let mut keys: Vec<String> = e.as_object().unwrap().keys().cloned().collect();
             keys.sort();
@@ -1714,6 +1904,54 @@ fn the_second_route_alone_answers_a_spoken_request_and_no_gemini_worker_starts()
     assert!(dedup(&alone.seen.phases).contains(&RingPhase::Speaking));
 }
 
+/// The first builder, 19 Oct: on the second route the first sound had been
+/// its wait cue, not its answer. The session's records say when each turn's
+/// answer began to be heard (`answer_first_audio`): on the second route the
+/// first audio after its words, a cue before them being no answer; on the
+/// Live route its first audio.
+#[test]
+fn the_answers_first_audio_is_recorded_after_a_wait_cue_never_at_it() {
+    let _one = super::pilot_faults::one_session();
+    let order = |run: &Run| -> Vec<&'static str> {
+        run.trace
+            .iter()
+            .filter_map(|e| match e["kind"].as_str() {
+                Some("provider_first_audio") if e["turn"] == 1 => Some("provider_first_audio"),
+                Some("answer_first_audio") if e["turn"] == 1 => Some("answer_first_audio"),
+                Some("transcript") if e["turn"] == 1 => Some("words"),
+                _ => None,
+            })
+            .collect()
+    };
+    let alone = run(Script {
+        second: false,
+        only: true,
+        second_cue: 4,
+        second_says: Some("Sure."),
+        ..Script::question(Live::Answer(12))
+    });
+    alone.assert_clean();
+    assert_eq!(
+        order(&alone),
+        ["provider_first_audio", "words", "answer_first_audio"],
+        "{}",
+        alone.summary()
+    );
+    assert_eq!(alone.events("answer_first_audio").len(), 1);
+    let gemini = run(Script {
+        second: false,
+        ..Script::question(Live::Answer(12))
+    });
+    gemini.assert_clean();
+    let at = |run: &Run, kind: &str| run.events(kind)[0]["at_us"].as_u64().unwrap();
+    assert_eq!(gemini.events("answer_first_audio").len(), 1);
+    assert!(at(&gemini, "answer_first_audio") >= at(&gemini, "provider_first_audio"));
+    assert_eq!(
+        order(&gemini),
+        ["provider_first_audio", "answer_first_audio"]
+    );
+}
+
 /// Alone, the second route's worker is the lamp's only voice: its exit
 /// ends the voice (and the service is restarted), as Gemini's does, where a
 /// standby's is dropped and the voice goes on with Gemini.
@@ -1730,6 +1968,193 @@ fn the_second_route_alone_exiting_ends_the_voice_as_gemini_does() {
     assert!(error.contains("second worker exited"), "{}", run.summary());
     assert!(run.events("voice_route_dropped").is_empty());
     assert!(run.seen.live.is_empty());
+}
+
+/// The first builder's 20:15 on #1722: a task's news told unasked on the
+/// second route alone is said once, at the next quiet moment, as on Live.
+/// After the person's question is answered, the news waiting is begun as
+/// the lamp's own turn at the first pause (`LAMP_TASK_NEWS_AT_PAUSE=on`),
+/// sent to the voice that answers, said whole, and only then handed on as
+/// heard; it is never sent again.
+#[test]
+fn news_is_told_once_at_the_next_quiet_moment_on_the_second_route_as_on_live() {
+    let _one = super::pilot_faults::one_session();
+    const NOTE: &str = "Claude Code just finished the story you asked for.";
+    let told = |only: bool| {
+        let (news, heard) = crate::task_news::TaskNews::waiting_for_test_heard(
+            crate::task_news::News {
+                key: "s1:2:4".into(),
+                note: NOTE.into(),
+                until: None,
+                progress: None,
+                finished: None,
+                also: Vec::new(),
+            },
+            Duration::from_secs(30),
+        );
+        TEST_TASK_NEWS.with(|given| *given.borrow_mut() = Some(news));
+        TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(true));
+        let run = run(Script {
+            second: false,
+            only,
+            written: Written::Said(12),
+            mute_at_frame: Some(800),
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_NEWS_AT_PAUSE.with(|at_pause| at_pause.set(false));
+        TEST_TASK_NEWS.with(|given| given.borrow_mut().take());
+        (run, heard.try_iter().collect::<Vec<_>>())
+    };
+    for (only, voice) in [(false, LIVE), (true, SECOND)] {
+        let (run, heard) = told(only);
+        run.assert_clean();
+        let sent = if only {
+            &run.seen.second
+        } else {
+            &run.seen.live
+        };
+        let notes: Vec<u64> = sent
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::Written { request, text, .. } if text == NOTE => Some(*request),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(notes, [2], "only {only}: {}", run.summary());
+        assert_eq!(run.events("task_news").len(), 1, "only {only}");
+        assert_eq!(run.events("task_news")[0]["key"], "s1:2:4");
+        // At the first pause after the answer, not after 15 s with no turn.
+        let since = run.events("task_news")[0]["since_turn_ms"]
+            .as_u64()
+            .unwrap();
+        assert!(
+            (crate::task_news::PAUSE_US / 1_000..crate::task_news::QUIET_US / 1_000)
+                .contains(&since),
+            "only {only}: {since} ms"
+        );
+        assert_eq!(run.played(1), vec![voice; 48], "only {only}");
+        assert_eq!(run.played(2), vec![voice; 48], "only {only}");
+        assert_eq!(heard, ["s1:2:4"], "only {only}: {}", run.summary());
+        if only {
+            assert!(run.seen.live.is_empty(), "{:?}", run.seen.live);
+        }
+    }
+}
+
+/// `LAMP_SAY` (#939) on the second route alone, as on Live: a skill's say
+/// is begun as the lamp's own turn once the person's answer is over and the
+/// room is quiet, sent to the voice that answers, said whole, and its asker
+/// told `begun` and then `spoken`, once.
+#[test]
+fn a_skills_say_is_said_and_answered_spoken_on_the_second_route_as_on_live() {
+    use crate::say::{Answer, Outcome};
+    let _one = super::pilot_faults::one_session();
+    const NOTE: &str = "Remind the person to stretch.";
+    let said = |only: bool| {
+        let (says, answered) =
+            crate::say::Says::note_for_test("stretch", NOTE, crate::say::URGENT_FROM);
+        TEST_SAYS.with(|given| *given.borrow_mut() = Some(says));
+        let run = run(Script {
+            second: false,
+            only,
+            written: Written::Said(12),
+            mute_at_frame: Some(800),
+            ..Script::question(Live::Answer(12))
+        });
+        TEST_SAYS.with(|given| given.borrow_mut().take());
+        (run, answered.try_iter().collect::<Vec<_>>())
+    };
+    for (only, voice) in [(false, LIVE), (true, SECOND)] {
+        let (run, answered) = said(only);
+        run.assert_clean();
+        let sent = if only {
+            &run.seen.second
+        } else {
+            &run.seen.live
+        };
+        let notes: Vec<u64> = sent
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::Written { request, text, .. } if text == NOTE => Some(*request),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(notes.len(), 1, "only {only}: {}", run.summary());
+        let turn = notes[0];
+        assert_eq!(run.played(turn), vec![voice; 48], "only {only}");
+        assert!(
+            matches!(
+                answered.as_slice(),
+                [Answer::Begun(_), Answer::Done(Outcome::Spoken)]
+            ),
+            "only {only}: {answered:?}"
+        );
+        if only {
+            assert!(run.seen.live.is_empty(), "{:?}", run.seen.live);
+        }
+    }
+}
+
+/// The holding answers on the second route (the first builder's 22:54 on
+/// #1722), as on Live: with `LAMP_HOLDING_ANSWER=on`, an answer that only
+/// asked the person to wait is followed, once the room is quiet, by one
+/// written turn of `holding_answer::NOTE` to the same voice, which says it.
+/// Without the switch, nothing follows.
+#[test]
+fn a_holding_answer_is_asked_to_go_on_once_on_the_second_route_as_on_live() {
+    let _one = super::pilot_faults::one_session();
+    let with = |on: bool, only: bool| {
+        TEST_HOLDING_ANSWER.with(|holding| holding.set(on));
+        let run = run(Script {
+            second: false,
+            only,
+            written: Written::Said(12),
+            mute_at_frame: Some(900),
+            ..Script::question(Live::Holding(12))
+        });
+        TEST_HOLDING_ANSWER.with(|holding| holding.set(false));
+        run
+    };
+    for (only, voice) in [(false, LIVE), (true, SECOND)] {
+        let run = with(true, only);
+        run.assert_clean();
+        let sent = if only {
+            &run.seen.second
+        } else {
+            &run.seen.live
+        };
+        let notes: Vec<u64> = sent
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::Written { request, text, .. }
+                    if text == crate::holding_answer::NOTE =>
+                {
+                    Some(*request)
+                }
+                _ => None,
+            })
+            .collect();
+        assert_eq!(notes.len(), 1, "only {only}: {}", run.summary());
+        assert_eq!(run.events("holding_answer_nudged").len(), 1, "only {only}");
+        assert_eq!(run.played(1), vec![voice; 48], "only {only}");
+        assert_eq!(run.played(notes[0]), vec![voice; 48], "only {only}");
+        assert_eq!(run.seen.live.is_empty(), only, "only {only}");
+
+        let off = with(false, only);
+        off.assert_clean();
+        let sent = if only {
+            &off.seen.second
+        } else {
+            &off.seen.live
+        };
+        assert!(
+            !sent
+                .iter()
+                .any(|input| matches!(input, ProviderInput::Written { .. })),
+            "only {only}: nothing follows without the switch"
+        );
+        assert!(off.events("holding_answer_nudged").is_empty());
+    }
 }
 
 /// (p) #960, lamp-4ace (`server_go_away`): Gemini's link drops with no turn
@@ -1765,102 +2190,108 @@ fn a_question_during_a_reconnect_at_rest_waits_for_gemini() {
 #[test]
 fn an_empty_sorry_in_the_loop_hums_with_the_switch_and_only_then() {
     let _one = super::pilot_faults::one_session();
-    let with = |on: bool, written| {
-        TEST_UNCLEAR_HUM.with(|hum| hum.set(on));
-        let run = run(Script {
+    // On Live and on the second route alone (the hums, #1722).
+    for only in [false, true] {
+        let with = |on: bool, written| {
+            TEST_UNCLEAR_HUM.with(|hum| hum.set(on));
+            let run = run(Script {
+                second: false,
+                only,
+                written,
+                mute_at_frame: Some(900),
+                ..Script::question(Live::Unclear)
+            });
+            TEST_UNCLEAR_HUM.with(|hum| hum.set(false));
+            run
+        };
+        let rows = |run: &Run, kind: &str| -> Vec<Value> {
+            run.trace
+                .iter()
+                .filter(|event| event["kind"] == kind)
+                .cloned()
+                .collect()
+        };
+        let asked = |run: &Run| {
+            run.trace
+                .iter()
+                .filter(|event| {
+                    event["kind"] == "input_admitted" && event["admission_basis"] == "asked_again"
+                })
+                .count()
+        };
+
+        // The transcript's two ends, then the hum, played to the speaker.
+        let silent = with(true, Written::Silent);
+        assert_eq!(silent.seen.live.is_empty(), only, "only {only}");
+        assert_eq!(rows(&silent, "provider_turn_unclear").len(), 1);
+        assert_eq!(asked(&silent), 1, "the lamp asked Sorry?");
+        let owed = rows(&silent, "unclear_hum_owed");
+        assert_eq!(owed.len(), 1, "{:?}", rows(&silent, "turn_finished"));
+        let played = rows(&silent, "unclear_hum");
+        assert_eq!(played.len(), 1);
+        assert_eq!(played[0]["plays"], true, "{played:?}");
+        assert_eq!(rows(&silent, "unclear_hum_attempted").len(), 1);
+        assert!(rows(&silent, "head_tap_cue_attempted").is_empty());
+        // Its ring frames show the listening face, every one of them while its
+        // turn lasts, as the tap's hum's do (the Seventh's P3 on #1421): the
+        // first is set in the pass that admits it, the rest by the ring's own
+        // reading of the turn (`tell_ring_of_turn`).
+        let hum = rows(&silent, "input_admitted")
+            .into_iter()
+            .find(|row| row["admission_basis"] == "unclear_hum")
+            .expect("the hum's own turn");
+        let faces: Vec<bool> = rows(&silent, "ring_requested")
+            .iter()
+            .filter(|row| row["owner"] == hum["owner"])
+            .map(|row| row["frame"]["listening"] == true)
+            .collect();
+        assert!(faces.len() > 1, "{faces:?}");
+        assert!(faces.iter().all(|listening| *listening), "{faces:?}");
+
+        // The switch off: asked the same, and silence, as before.
+        let off = with(false, Written::Silent);
+        assert_eq!(asked(&off), 1);
+        assert!(rows(&off, "unclear_hum_owed").is_empty());
+        assert!(rows(&off, "unclear_hum").is_empty());
+        assert!(rows(&off, "unclear_hum_attempted").is_empty());
+
+        // "..." is nothing said: cut as such, and the hum owed after it.
+        let dots = with(true, Written::Dots);
+        let owed = rows(&dots, "unclear_hum_owed");
+        assert_eq!(owed.len(), 1);
+        assert_eq!(owed[0]["after"], "nothing_said");
+        assert_eq!(rows(&dots, "unclear_hum")[0]["plays"], true);
+
+        // A "Sorry?" the model said: nothing owed, nothing hummed.
+        let said = with(true, Written::Said(6));
+        assert_eq!(asked(&said), 1);
+        assert!(rows(&said, "unclear_hum_owed").is_empty());
+        assert!(rows(&said, "unclear_hum").is_empty());
+
+        // Said again once the first "hm?" plays, heard as unclear again, and
+        // the second empty "Sorry?" hums too, well inside the tap's 30 s: it
+        // answers the person's words, so it doesn't go blank the second time
+        // (the Seventh's P2 on #1421).
+        TEST_UNCLEAR_HUM.with(|hum| hum.set(true));
+        let again = run(Script {
             second: false,
-            written,
-            mute_at_frame: Some(900),
+            only,
+            written: Written::Silent,
+            live: vec![Live::Unclear, Live::Unclear],
+            speak_again: Some(When::Accepted(1)),
+            mute_at_frame: Some(1_100),
             ..Script::question(Live::Unclear)
         });
         TEST_UNCLEAR_HUM.with(|hum| hum.set(false));
-        run
-    };
-    let rows = |run: &Run, kind: &str| -> Vec<Value> {
-        run.trace
+        assert_eq!(rows(&again, "provider_turn_unclear").len(), 2);
+        assert_eq!(asked(&again), 2);
+        let hums: Vec<bool> = rows(&again, "unclear_hum")
             .iter()
-            .filter(|event| event["kind"] == kind)
-            .cloned()
-            .collect()
-    };
-    let asked = |run: &Run| {
-        run.trace
-            .iter()
-            .filter(|event| {
-                event["kind"] == "input_admitted" && event["admission_basis"] == "asked_again"
-            })
-            .count()
-    };
-
-    // The transcript's two ends, then the hum, played to the speaker.
-    let silent = with(true, Written::Silent);
-    assert_eq!(rows(&silent, "provider_turn_unclear").len(), 1);
-    assert_eq!(asked(&silent), 1, "the lamp asked Sorry?");
-    let owed = rows(&silent, "unclear_hum_owed");
-    assert_eq!(owed.len(), 1, "{:?}", rows(&silent, "turn_finished"));
-    let played = rows(&silent, "unclear_hum");
-    assert_eq!(played.len(), 1);
-    assert_eq!(played[0]["plays"], true, "{played:?}");
-    assert_eq!(rows(&silent, "unclear_hum_attempted").len(), 1);
-    assert!(rows(&silent, "head_tap_cue_attempted").is_empty());
-    // Its ring frames show the listening face, every one of them while its
-    // turn lasts, as the tap's hum's do (the Seventh's P3 on #1421): the
-    // first is set in the pass that admits it, the rest by the ring's own
-    // reading of the turn (`tell_ring_of_turn`).
-    let hum = rows(&silent, "input_admitted")
-        .into_iter()
-        .find(|row| row["admission_basis"] == "unclear_hum")
-        .expect("the hum's own turn");
-    let faces: Vec<bool> = rows(&silent, "ring_requested")
-        .iter()
-        .filter(|row| row["owner"] == hum["owner"])
-        .map(|row| row["frame"]["listening"] == true)
-        .collect();
-    assert!(faces.len() > 1, "{faces:?}");
-    assert!(faces.iter().all(|listening| *listening), "{faces:?}");
-
-    // The switch off: asked the same, and silence, as before.
-    let off = with(false, Written::Silent);
-    assert_eq!(asked(&off), 1);
-    assert!(rows(&off, "unclear_hum_owed").is_empty());
-    assert!(rows(&off, "unclear_hum").is_empty());
-    assert!(rows(&off, "unclear_hum_attempted").is_empty());
-
-    // "..." is nothing said: cut as such, and the hum owed after it.
-    let dots = with(true, Written::Dots);
-    let owed = rows(&dots, "unclear_hum_owed");
-    assert_eq!(owed.len(), 1);
-    assert_eq!(owed[0]["after"], "nothing_said");
-    assert_eq!(rows(&dots, "unclear_hum")[0]["plays"], true);
-
-    // A "Sorry?" the model said: nothing owed, nothing hummed.
-    let said = with(true, Written::Said(6));
-    assert_eq!(asked(&said), 1);
-    assert!(rows(&said, "unclear_hum_owed").is_empty());
-    assert!(rows(&said, "unclear_hum").is_empty());
-
-    // Said again once the first "hm?" plays, heard as unclear again, and
-    // the second empty "Sorry?" hums too, well inside the tap's 30 s: it
-    // answers the person's words, so it doesn't go blank the second time
-    // (the Seventh's P2 on #1421).
-    TEST_UNCLEAR_HUM.with(|hum| hum.set(true));
-    let again = run(Script {
-        second: false,
-        written: Written::Silent,
-        live: vec![Live::Unclear, Live::Unclear],
-        speak_again: Some(When::Accepted(1)),
-        mute_at_frame: Some(1_100),
-        ..Script::question(Live::Unclear)
-    });
-    TEST_UNCLEAR_HUM.with(|hum| hum.set(false));
-    assert_eq!(rows(&again, "provider_turn_unclear").len(), 2);
-    assert_eq!(asked(&again), 2);
-    let hums: Vec<bool> = rows(&again, "unclear_hum")
-        .iter()
-        .map(|row| row["plays"] == true)
-        .collect();
-    assert_eq!(hums, [true, true], "{:?}", rows(&again, "unclear_hum"));
-    assert_eq!(rows(&again, "unclear_hum_attempted").len(), 2);
+            .map(|row| row["plays"] == true)
+            .collect();
+        assert_eq!(hums, [true, true], "{:?}", rows(&again, "unclear_hum"));
+        assert_eq!(rows(&again, "unclear_hum_attempted").len(), 2);
+    }
 }
 
 /// #828, the first builder at 05:07 on 19 October: with
@@ -1872,76 +2303,479 @@ fn an_empty_sorry_in_the_loop_hums_with_the_switch_and_only_then() {
 #[test]
 fn with_the_switch_a_misheard_cut_in_hums_and_sends_no_model_turn() {
     let _one = super::pilot_faults::one_session();
-    let with = |on: bool, live: Live| {
-        TEST_MISHEARD_HUM.with(|hum| hum.set(on));
-        let run = run(Script {
-            second: false,
-            written: Written::Said(6),
-            mute_at_frame: Some(900),
-            ..Script::question(live)
-        });
-        TEST_MISHEARD_HUM.with(|hum| hum.set(false));
-        run
-    };
-    let rows = |run: &Run, kind: &str| -> Vec<Value> {
-        run.trace
+    // On Live and on the second route alone (the hums, #1722).
+    for only in [false, true] {
+        let with = |on: bool, live: Live| {
+            TEST_MISHEARD_HUM.with(|hum| hum.set(on));
+            let run = run(Script {
+                second: false,
+                only,
+                written: Written::Said(6),
+                mute_at_frame: Some(900),
+                ..Script::question(live)
+            });
+            TEST_MISHEARD_HUM.with(|hum| hum.set(false));
+            run
+        };
+        let rows = |run: &Run, kind: &str| -> Vec<Value> {
+            run.trace
+                .iter()
+                .filter(|event| event["kind"] == kind)
+                .cloned()
+                .collect()
+        };
+        let asked = |run: &Run| {
+            run.trace
+                .iter()
+                .filter(|event| {
+                    event["kind"] == "input_admitted" && event["admission_basis"] == "asked_again"
+                })
+                .count()
+        };
+
+        let hummed = with(true, Live::UnclearCutIn);
+        assert_eq!(hummed.seen.live.is_empty(), only, "only {only}");
+        let unclear = rows(&hummed, "provider_turn_unclear");
+        assert_eq!(unclear.len(), 1);
+        assert_eq!(unclear[0]["hum"], true, "{unclear:?}");
+        assert_eq!(asked(&hummed), 0, "no model turn for the misheard line");
+        let owed = rows(&hummed, "unclear_hum_owed");
+        assert_eq!(owed.len(), 1, "{owed:?}");
+        assert_eq!(owed[0]["after"], "misheard_cut_in");
+        let played = rows(&hummed, "unclear_hum");
+        assert_eq!(played.len(), 1, "{played:?}");
+        assert_eq!(played[0]["plays"], true, "{played:?}");
+        assert_eq!(played[0]["misheard_turn"], unclear[0]["turn"]);
+        let held_us = unclear[0]["at_us"].as_u64().unwrap();
+        let hum_us = played[0]["at_us"].as_u64().unwrap();
+        assert!(
+            hum_us.saturating_sub(held_us) < 100_000,
+            "the hum {} us after the hold",
+            hum_us.saturating_sub(held_us)
+        );
+        // Its ring frames show the listening face, as the empty Sorry?'s hum's do.
+        let hum = rows(&hummed, "input_admitted")
+            .into_iter()
+            .find(|row| row["admission_basis"] == "unclear_hum")
+            .expect("the hum's own turn");
+        let faces: Vec<bool> = rows(&hummed, "ring_requested")
             .iter()
-            .filter(|event| event["kind"] == kind)
-            .cloned()
-            .collect()
+            .filter(|row| row["owner"] == hum["owner"])
+            .map(|row| row["frame"]["listening"] == true)
+            .collect();
+        assert!(faces.len() > 1, "{faces:?}");
+        assert!(faces.iter().all(|listening| *listening), "{faces:?}");
+
+        // A line held as unclear that was no cut-in: asked again, as before.
+        let other = with(true, Live::Unclear);
+        assert_eq!(asked(&other), 1);
+        assert!(rows(&other, "unclear_hum_owed").is_empty());
+        assert!(rows(&other, "unclear_hum").is_empty());
+
+        // The switch off: the misheard cut-in is asked again, as before.
+        let off = with(false, Live::UnclearCutIn);
+        assert_eq!(asked(&off), 1);
+        assert!(rows(&off, "unclear_hum_owed").is_empty());
+        assert!(rows(&off, "unclear_hum").is_empty());
+    }
+}
+
+/// #933 on the second route (the first builder, 19:48 on #1722): an answer
+/// spoken by the second route alone, its level rising on stressed words and
+/// falling between sentences, makes the head nod and sway. What the voice
+/// says for Expression (`voice/progress`, `voice/sound`) comes from the loop,
+/// whichever route answers, so this is the whole path: the second route's
+/// audio, the speaker, `expression_out`, and Expression's planner with the
+/// product's `speaking` section.
+#[test]
+fn the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken() {
+    let _one = super::pilot_faults::one_session();
+    // 40 ms packets: a stressed word about every 1.1 s, syllables between,
+    // and a half-second pause every 3 s. On the meter's scale (-48 to -14
+    // dBFS, `ring_face::level_of`) the syllables read about 0.3 and 0.45 and a
+    // stressed word 1.0, so each stressed word stands out, as in speech. (At
+    // 3,000 and 11,000 the syllables filled the meter too, so only a
+    // sentence's onset could nod, and a slow start that lost one failed the
+    // count: Seventh and Eighth on #1722, 19 Oct.)
+    fn shape(packet: usize) -> i16 {
+        let into = (packet * 40) % 3_000;
+        if into >= 2_500 {
+            0
+        } else if into % 1_100 < 120 {
+            8_000
+        } else if packet.is_multiple_of(3) {
+            422
+        } else {
+            760
+        }
+    }
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_packets: 200,
+        second_shape: Some(shape),
+        expression: true,
+        ..Script::question(Live::Answer(12))
+    });
+    run.assert_clean();
+    let sounds = run
+        .expression
+        .iter()
+        .filter(|input| matches!(input, lamp_expression::Input::Sound(_)))
+        .count();
+    assert!(sounds > 100, "{sounds} pieces of sound said for Expression");
+    // Pieces lost between the voice and this test, by their stamps'
+    // sequence: said with the counts below, so a loss is told from the
+    // planner.
+    let mut sequences: Vec<u64> = run
+        .expression
+        .iter()
+        .filter_map(|input| match input {
+            lamp_expression::Input::Sound(sound) => Some(sound.playout.stamp.sequence),
+            _ => None,
+        })
+        .collect();
+    sequences.sort_unstable();
+    let lost = sequences.windows(2).map(|w| w[1] - w[0] - 1).sum::<u64>();
+    // Through Expression's planner, with the product's speaking section.
+    let mut catalogue = lamp_expression::Catalogue::from_json(include_str!(
+        "../../../../../deploy/product/settings/expression.json"
+    ))
+    .unwrap();
+    catalogue.timing.body_lag_us = Some(0);
+    if catalogue.speaking.is_none() {
+        catalogue.speaking = lamp_expression::Catalogue::from_json(include_str!(
+            "../../../../expression/alive-behaviours.json"
+        ))
+        .unwrap()
+        .speaking;
+    }
+    let mut engine = lamp_expression::Engine::new(catalogue, true, EXPRESSION_CLOCK).unwrap();
+    let at_of = |input: &lamp_expression::Input| match input {
+        lamp_expression::Input::Progress(p) => p.timing.stamp.at_us,
+        lamp_expression::Input::Sound(s) => s.playout.stamp.at_us,
+        _ => 0,
     };
-    let asked = |run: &Run| {
-        run.trace
-            .iter()
-            .filter(|event| {
-                event["kind"] == "input_admitted" && event["admission_basis"] == "asked_again"
-            })
+    let mut inputs = run.expression.clone();
+    inputs.sort_by_key(at_of);
+    let (first, last) = (at_of(&inputs[0]), at_of(inputs.last().unwrap()));
+    let mut behaviours: Vec<Vec<String>> = Vec::new();
+    let mut next = inputs.into_iter().peekable();
+    let mut sequence = 0;
+    let mut at = first;
+    while at <= last + 1_500_000 {
+        if at % 100_000 < 20_000 {
+            sequence += 1;
+            for context in [
+                serde_json::json!({"kind":"room","stamp":{"clock_id":EXPRESSION_CLOCK,"at_us":at,"sequence":sequence},"value":{"state":"quiet"}}),
+                serde_json::json!({"kind":"light","stamp":{"clock_id":EXPRESSION_CLOCK,"at_us":at,"sequence":sequence},"value":{"on":true,"colour":"warm","level":3}}),
+                serde_json::json!({"kind":"joints","stamp":{"clock_id":EXPRESSION_CLOCK,"at_us":at,"sequence":sequence},
+                    "value":{"name":["base_yaw","shoulder","elbow","head_roll","head_pitch"],"position":[0,0,0,0,0],"velocity":[],"effort":[],"commanded":[]}}),
+            ] {
+                engine
+                    .ingest(at, serde_json::from_value(context).unwrap())
+                    .unwrap();
+            }
+        }
+        while next.peek().is_some_and(|input| at_of(input) <= at) {
+            let input = next.next().unwrap();
+            // A piece the planner refuses (out of its turn) is not a fault here.
+            let _ = engine.ingest(at, input);
+        }
+        behaviours.push(engine.tick(at).state.behaviours);
+        at += 20_000;
+    }
+    let starts = |name: &str| {
+        behaviours
+            .windows(2)
+            .filter(|w| !w[0].iter().any(|b| b == name) && w[1].iter().any(|b| b == name))
             .count()
     };
+    let nods = starts("nodding on a stressed word");
+    let sways = starts("swaying between sentences");
+    // A stressed word about every 1.1 s over 8 s, a nod for most of them:
+    // even a start that loses the first sentence nods more than a flat answer
+    // (`second_shape: None`), which nods once, at its onset, and never sways.
+    assert!(nods >= 3, "{nods} nods ({sounds} pieces, {lost} lost)");
+    assert!(sways >= 1, "{sways} sways ({sounds} pieces, {lost} lost)");
+}
 
-    let hummed = with(true, Live::UnclearCutIn);
-    let unclear = rows(&hummed, "provider_turn_unclear");
-    assert_eq!(unclear.len(), 1);
-    assert_eq!(unclear[0]["hum"], true, "{unclear:?}");
-    assert_eq!(asked(&hummed), 0, "no model turn for the misheard line");
-    let owed = rows(&hummed, "unclear_hum_owed");
-    assert_eq!(owed.len(), 1, "{owed:?}");
-    assert_eq!(owed[0]["after"], "misheard_cut_in");
-    let played = rows(&hummed, "unclear_hum");
-    assert_eq!(played.len(), 1, "{played:?}");
-    assert_eq!(played[0]["plays"], true, "{played:?}");
-    assert_eq!(played[0]["misheard_turn"], unclear[0]["turn"]);
-    let held_us = unclear[0]["at_us"].as_u64().unwrap();
-    let hum_us = played[0]["at_us"].as_u64().unwrap();
+/// #1620 on the second route (`LAMP_VOICE_ROUTE=second`, the owner, 19 Oct:
+/// every voice feature on it). The voice is muted while the second route's
+/// worker holds the request, its chat still streaming: the worker is sent
+/// Stop with the others, reads it and is reaped inside the shared deadline,
+/// and nothing is forced, failed or left behind, as on Live.
+#[test]
+fn a_stop_while_the_second_route_alone_is_mid_request_is_clean() {
+    let _one = super::pilot_faults::one_session();
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_holds: true,
+        mute_at_frame: Some(300),
+        ..Script::question(Live::Answer(12))
+    });
+    run.assert_clean();
+    assert!(run.exits.contains(&("second", true)), "{:?}", run.exits);
+    assert!(run.seen.stopped.contains(&"second"));
+    // The whole line reached it and nothing came back before the stop.
+    whole_line(&run.seen.second, 1);
+    assert!(run.played(1).is_empty(), "{}", run.summary());
+    assert!(run.events("worker_exit_failed").is_empty());
+    assert!(run.events("stop_delivery_error").is_empty());
+}
+
+/// #1620 on the second route: a worker that reads Stop and goes on running
+/// is killed at the shared deadline, reaped, and named as the cleanup's
+/// cause (`ForcedStop`, its own role), exactly as Gemini's worker is. The
+/// rest of the rig still stops cleanly, and the conversation's own end
+/// (the mute) is kept beside the cleanup failure.
+#[test]
+fn a_second_worker_that_ignores_stop_is_killed_and_named_as_geminis_is() {
+    let _one = super::pilot_faults::one_session();
+    for (only, role) in [(false, "provider"), (true, "second")] {
+        let run = run(Script {
+            second: false,
+            only,
+            ignores_stop: Some(role),
+            ..Script::question(Live::Answer(12))
+        });
+        eprintln!("{}", run.summary());
+        let error = run.result.as_ref().unwrap_err().to_string();
+        let forced = run.events("worker_forced_shutdown");
+        assert_eq!(forced.len(), 1, "{role}: {}", run.summary());
+        assert_eq!(forced[0]["worker"], role);
+        let cause = forced[0]["error"].as_str().unwrap();
+        for said in [
+            format!("{role} worker did not stop within shared 300 ms deadline"),
+            "forced termination required; reaped with".to_owned(),
+        ] {
+            assert!(cause.contains(&said), "{role}: {cause}");
+            assert!(error.contains(&said), "{role}: {error}");
+        }
+        assert!(
+            error.contains("PhysicalMute") || error.contains("mute"),
+            "{role}: {error}"
+        );
+        for (exited_role, exited) in &run.exits {
+            assert!(exited, "{exited_role} child was not reaped ({role})");
+            assert!(
+                run.seen.stopped.contains(exited_role),
+                "{exited_role} never saw Stop"
+            );
+        }
+        assert!(run.exits.contains(&(role, true)), "{:?}", run.exits);
+    }
+}
+
+/// #1567/#1864 on the second route: its worker says its link is Ready as
+/// it starts, before any service is asked
+/// (`the_second_workers_link_is_ready_before_any_service_is_asked`), so a
+/// speech to text, chat or voice that refuses or does not answer can never
+/// hold the voice's readiness. Each line then fails on its own
+/// (`TurnFailed`, before any audio), and a service runs past the 25 s
+/// startup budget to its mute, with `LAMP_START_OFFLINE` on or off; nothing
+/// waits for a link.
+#[test]
+fn the_second_route_alone_with_its_services_refused_stays_up_past_the_startup_budget() {
+    let _one = super::pilot_faults::one_session();
+    let past = INPUT_READINESS_TIMEOUT + Duration::from_secs(3);
+    for start_offline in [true, false] {
+        crate::session_lifetime::set_start_offline_for_test(Some(start_offline));
+        let run = run(Script {
+            second: false,
+            only: true,
+            second_fails: Some(Fault::Transport),
+            mute_at_frame: Some(past.as_millis() as u64 / 10),
+            limit: past + Duration::from_secs(5),
+            ..Script::question(Live::Answer(12))
+        });
+        crate::session_lifetime::set_start_offline_for_test(None);
+        run.assert_clean();
+        let error = run.result.as_ref().unwrap_err().to_string();
+        assert!(!error.contains("never became ready"), "{error}");
+        assert!(run.events("waiting_for_link").is_empty());
+        assert_eq!(
+            run.finished(1)["outcome"],
+            "provider_failed",
+            "{}",
+            run.summary()
+        );
+        // Muted past the budget, not ended at it.
+        let at = |kind: &str| run.events(kind)[0]["at_us"].as_u64().unwrap();
+        assert!(
+            at("physical_mute") - at("capture_started")
+                >= INPUT_READINESS_TIMEOUT.as_micros() as u64,
+            "{}",
+            run.summary()
+        );
+        whole_line(&run.seen.second, 1);
+        assert!(run.played(1).is_empty());
+    }
+}
+
+/// Services that refuse every call, and count each.
+#[derive(Default)]
+struct Refusing {
+    asked: std::sync::atomic::AtomicUsize,
+}
+
+impl crate::second_provider::Services for Refusing {
+    fn listen(
+        &self,
+    ) -> futures_util::future::BoxFuture<
+        'static,
+        crate::second_provider::net::Result<Box<dyn crate::second_provider::Listener>>,
+    > {
+        self.asked.fetch_add(1, Ordering::SeqCst);
+        Box::pin(async {
+            Err(crate::second_provider::net::Error::Transport(
+                "speech to text",
+            ))
+        })
+    }
+    fn chat(
+        &self,
+        _: Vec<crate::second_provider::net::Message>,
+    ) -> futures_util::stream::BoxStream<
+        'static,
+        crate::second_provider::net::Result<crate::second_provider::net::ChatEvent>,
+    > {
+        use futures_util::StreamExt;
+        self.asked.fetch_add(1, Ordering::SeqCst);
+        futures_util::stream::once(async {
+            Err(crate::second_provider::net::Error::Transport("chat"))
+        })
+        .boxed()
+    }
+    fn speak(
+        &self,
+        _: String,
+    ) -> futures_util::stream::BoxStream<'static, crate::second_provider::net::Result<Vec<i16>>>
+    {
+        use futures_util::StreamExt;
+        self.asked.fetch_add(1, Ordering::SeqCst);
+        futures_util::stream::once(async {
+            Err(crate::second_provider::net::Error::Transport("speech"))
+        })
+        .boxed()
+    }
+}
+
+/// The worker side of
+/// `the_second_route_alone_with_its_services_refused_stays_up_past_the_startup_budget`,
+/// through the second route's own `run`: it says Ready and its link Ready
+/// (session 1, `Initial`) before any service is asked, and returns at once,
+/// cleanly, on Stop.
+#[test]
+fn the_second_workers_link_is_ready_before_any_service_is_asked() {
+    let directory = SessionDirectory::create().unwrap();
+    let (mut parent, worker) = super::pair(&directory, "second");
+    let services = Arc::new(Refusing::default());
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    parent.control.send(Control::Stop).unwrap();
+    let started = Instant::now();
+    let engine_services = services.clone();
+    runtime
+        .block_on(async move {
+            let engine = crate::second_provider::Engine::new(
+                engine_services,
+                || crate::second_provider::Told::from(String::new()),
+                Arc::new(|_, _, _, _| Box::pin(async { serde_json::json!({}) })),
+            );
+            crate::second_provider::worker::run(worker, new_boot().unwrap(), engine, None, None)
+                .await
+        })
+        .unwrap();
+    assert!(started.elapsed() < Duration::from_millis(300));
+    assert!(matches!(
+        parent.control.receive::<WorkerEvent>().unwrap(),
+        Some(WorkerEvent::Ready)
+    ));
+    match parent.control.receive::<WorkerEvent>().unwrap() {
+        Some(WorkerEvent::ProviderLink { link }) => {
+            assert_eq!(link.session, 1);
+            assert!(matches!(
+                link.state,
+                ProviderLinkState::Ready {
+                    context: crate::provider_link::LinkContext::Initial,
+                    ..
+                }
+            ));
+        }
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(services.asked.load(Ordering::SeqCst), 0);
+}
+
+/// #1620 on the second route, the gap this closes: the second worker's
+/// process (`worker::serve`) runs on a current-thread tokio runtime, ended
+/// when `run` returns on Stop. Its async network I/O (the
+/// chat's stream, the voice's download, speech to text's socket) is
+/// dropped with it at once, but tokio's drop waits, with no bound, for
+/// every `spawn_blocking` still running (a plain drop): each tool call (`run_call`, up to
+/// `tools::ASK_DEADLINE`, 1.5 s, for the executive and the skills, longer
+/// for the tasks part), a text's tool call (`texts_ends`), and a DNS lookup
+/// (hyper-util's and tokio's resolvers both use the blocking pool). A stop
+/// during one holds the worker past the shared 300 ms (750 ms with
+/// diagnostics), so it is killed and the run's cleanup fails, which keeps
+/// the restart guard's mute, #1620's symptom. The Live worker runs its
+/// calls on detached threads, which never hold its exit.
+///
+/// Built as `serve` builds its runtime and ended by `serve`'s own
+/// `worker::finish`, with the real `tool_runner` asking an executive that
+/// takes the call and does not answer. With a plain drop it took 1.50 s.
+#[test]
+fn a_stop_during_a_slow_tool_call_lets_the_second_worker_exit_within_its_deadline() {
+    use std::os::unix::net::UnixListener;
+    let directory = SessionDirectory::create().unwrap();
+    let executive = UnixListener::bind(directory.path.join(crate::tools::CALL_SOCKET)).unwrap();
+    // A chat stream that has said nothing yet, as DeepSeek thinking.
+    let chat = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let chat_at = chat.local_addr().unwrap();
+    let settings = crate::tools::Settings {
+        exec: Some(directory.path.clone()),
+        ..Default::default()
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let (taken, held) = std::sync::mpsc::channel();
+    let holder = std::thread::spawn(move || {
+        let (call, _) = executive.accept().unwrap();
+        let (stream, _) = chat.accept().unwrap();
+        taken.send(()).unwrap();
+        // Held open, unanswered, until the test ends.
+        std::thread::sleep(Duration::from_secs(3));
+        drop((call, stream));
+    });
+    runtime.block_on(async move {
+        let runner = crate::second_provider::worker::tool_runner(settings, None, None);
+        tokio::spawn(runner(1, false, "light_on".into(), serde_json::json!({})));
+        tokio::spawn(async move {
+            use tokio::io::AsyncReadExt;
+            let mut stream = tokio::net::TcpStream::connect(chat_at).await.unwrap();
+            let _ = stream.read(&mut [0; 16]).await;
+        });
+        // Both are in flight: the call in the blocking pool, the stream
+        // waiting for its first byte. Then `run` returns on Stop.
+        tokio::task::spawn_blocking(move || held.recv_timeout(Duration::from_secs(5)))
+            .await
+            .unwrap()
+            .unwrap();
+    });
+    let stopped = Instant::now();
+    crate::second_provider::worker::finish(runtime);
+    let took = stopped.elapsed();
+    holder.join().unwrap();
     assert!(
-        hum_us.saturating_sub(held_us) < 100_000,
-        "the hum {} us after the hold",
-        hum_us.saturating_sub(held_us)
+        took < Duration::from_millis(300),
+        "the second worker's runtime took {took:?} to end after Stop"
     );
-    // Its ring frames show the listening face, as the empty Sorry?'s hum's do.
-    let hum = rows(&hummed, "input_admitted")
-        .into_iter()
-        .find(|row| row["admission_basis"] == "unclear_hum")
-        .expect("the hum's own turn");
-    let faces: Vec<bool> = rows(&hummed, "ring_requested")
-        .iter()
-        .filter(|row| row["owner"] == hum["owner"])
-        .map(|row| row["frame"]["listening"] == true)
-        .collect();
-    assert!(faces.len() > 1, "{faces:?}");
-    assert!(faces.iter().all(|listening| *listening), "{faces:?}");
-
-    // A line held as unclear that was no cut-in: asked again, as before.
-    let other = with(true, Live::Unclear);
-    assert_eq!(asked(&other), 1);
-    assert!(rows(&other, "unclear_hum_owed").is_empty());
-    assert!(rows(&other, "unclear_hum").is_empty());
-
-    // The switch off: the misheard cut-in is asked again, as before.
-    let off = with(false, Live::UnclearCutIn);
-    assert_eq!(asked(&off), 1);
-    assert!(rows(&off, "unclear_hum_owed").is_empty());
-    assert!(rows(&off, "unclear_hum").is_empty());
 }
 
 /// #1670, the owner's rule of 19 Oct (a voice feature works on the second

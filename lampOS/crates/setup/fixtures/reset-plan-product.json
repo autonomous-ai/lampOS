@@ -23,6 +23,7 @@
     "/var/lib/lampOS/voice/first-output",
     "/var/lib/lampOS/voice/tasks-told",
     "/var/lib/lampOS/voice/near-call.json",
+    "/var/lib/lampOS/voice/made-skills",
     "/var/lib/lampOS/light",
     "/run/lampos-voice/thread.json",
     "/etc/lampOS/voice/credential",

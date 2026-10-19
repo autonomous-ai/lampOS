@@ -13,7 +13,7 @@ use lamp_voice_eval::{
             FakePlayerFault, FakePreparedRoomPlayer, HumanPrompter, LampMode, ObserverPlayer,
             PhysicalBackend, PhysicalConfig, Player,
         },
-        session::{self, RuntimeFlags, SessionOptions},
+        session::{self, RuntimeFlags, SessionOptions, VoiceRoute},
     },
     plan::{LoadedPlan, SERVE_PLAN},
     record::{AttemptRecord, StimulusSource},
@@ -22,6 +22,8 @@ use lamp_voice_eval::{
     stimulus::{AssetIndex, StimulusCatalog},
 };
 use serde::Deserialize;
+
+mod observe_dry;
 use serde_json::{Value, json};
 use std::{
     collections::BTreeSet,
@@ -31,6 +33,8 @@ use std::{
 };
 
 const USAGE: &str = "usage:
+  lamp-voice-eval observe-dry --store FILE --out NEW_DIR --key-file FILE [--base URL] [--model NAME]
+      [--gap-seconds N] [--limit N]
   lamp-voice-eval list | validate | self-test [--plan FILE]
   lamp-voice-eval fake-run --out NEW_DIR [--profile ID] [--scenario ID]... [--repetitions N]
       [--seed N] [--no-shuffle] [--attempt-seed N] [--cache DIR --manifest FILE...] [--plan FILE]
@@ -53,6 +57,10 @@ const USAGE: &str = "usage:
   lamp-voice-eval waiting-cuts [--since 'YYYY-MM-DD HH:MM[:SS]'] [--until ...] [--sessions DIR] [--json]
       < journal (`journalctl -u lamp-voice -o short-iso`); --since/--until filter its own stamps;
       the counts need the session records too (DIR, default /var/lib/lampOS/voice/sessions, root's)
+  lamp-voice-eval cost JOURNAL --prices FILE --arm NAME FROM TO... [--voice-estimate VOICE N]
+      (what each arm of a played test cost, from `journalctl -u lamp-voice`; FROM and TO are
+      HH:MM or HH:MM:SS by the lamp's clock; the prices are dollars, in a JSON file;
+      --voice-estimate prices answered lines with no voice line at N chars a completion token)
   lamp-voice-eval lamp-session --runtime LAMP_LIVE --work NEW_ABS_DIR --seconds N
       (--fixture-reply WAV --fixture-sha256 SHA | --provider-config FILE | --serve-config FILE)
       [--noise-suppression on|off] [--diagnostics] [--allowance-seconds N]
@@ -63,6 +71,67 @@ const USAGE: &str = "usage:
       and battery summaries; YYYY-MM-DD is the day the first arm begins)
   lamp-voice-eval mood-minute DIR
       the numbers of Mood's lamp minute from the taps tools/mood-minute.sh wrote in DIR";
+
+/// `cost JOURNAL --prices FILE --arm NAME FROM TO ... [--voice-estimate
+/// VOICE N]`: what each arm cost, printed (the first builder on #1722, 19
+/// Oct 21:18).
+fn cost(all: &[String]) -> Result<i32> {
+    let (journal, mut rest) = all.split_first().ok_or_else(|| invalid(USAGE))?;
+    let mut arms = Vec::new();
+    let mut prices = None;
+    let mut estimate = None;
+    loop {
+        match rest {
+            [flag, voice, per_token, more @ ..] if flag == "--voice-estimate" => {
+                let chars_per_token = per_token
+                    .parse::<f64>()
+                    .ok()
+                    .filter(|n| n.is_finite() && *n > 0.0)
+                    .ok_or_else(|| {
+                        invalid(&format!("--voice-estimate {voice} {per_token:?}: no number of characters above 0"))
+                    })?;
+                estimate = Some(lamp_voice_eval::cost::VoiceEstimate {
+                    voice: voice.clone(),
+                    chars_per_token,
+                });
+                rest = more;
+            }
+            [flag, name, from, to, more @ ..] if flag == "--arm" => {
+                arms.push(
+                    lamp_voice_eval::cost::Arm::parse(name, from, to)
+                        .map_err(|why| invalid(&why))?,
+                );
+                rest = more;
+            }
+            [flag, file, more @ ..] if flag == "--prices" => {
+                let text =
+                    std::fs::read(file).map_err(|error| invalid(&format!("{file}: {error}")))?;
+                prices = Some(
+                    serde_json::from_slice::<lamp_voice_eval::cost::Prices>(&text)
+                        .map_err(|error| invalid(&format!("{file}: {error}")))?,
+                );
+                rest = more;
+            }
+            [] => break,
+            _ => return Err(invalid(USAGE)),
+        }
+    }
+    let prices =
+        prices.ok_or_else(|| invalid("cost needs --prices FILE: no price is in the code"))?;
+    if arms.is_empty() {
+        return Err(invalid(USAGE));
+    }
+    let text = std::fs::read(journal).map_err(|error| invalid(&format!("{journal}: {error}")))?;
+    let table = lamp_voice_eval::cost::cost(
+        &String::from_utf8_lossy(&text),
+        &arms,
+        &prices,
+        estimate.as_ref(),
+    )
+    .map_err(|why| invalid(&why))?;
+    print!("{table}");
+    Ok(0)
+}
 
 fn main() {
     match run() {
@@ -307,6 +376,7 @@ fn run() -> Result<i32> {
             let stdout = std::io::stdout();
             return session::run(&options, std::io::stdin(), &mut stdout.lock());
         }
+        "observe-dry" => return observe_dry::run(&all),
         "fake-lamp-voice" => return fake_lamp::run(&all),
         "fake-clock-lamp-voice" => return fixture_commands::runtime(all),
         "fake-clock-session" => return fixture_commands::relay(all),
@@ -316,6 +386,7 @@ fn run() -> Result<i32> {
         "fake-clock-slow-transport" => return fixture_commands::slow_transport(all),
         "fake-room-recorder" => return fake_lamp::room_recorder(&all),
         "fake-slow-transport" => return fake_lamp::slow_transport(&all),
+        "cost" => return cost(&all),
         "score" => return score(&all),
         _ => {}
     }
@@ -893,6 +964,16 @@ struct PhysicalFile {
     /// Opt-in end-of-turn experiment (`smart-turn`); absent is the default.
     #[serde(default)]
     endpoint: Option<String>,
+    /// The voice route of a `directed` or `serve` run: "second" (the
+    /// default, the owner's 19 Oct 19:3x rule) or "live", only for a
+    /// comparison the first builder names on #1712.
+    #[serde(default)]
+    voice_route: Option<String>,
+    /// `LAMP_*` settings for the runtime's environment, copied from the
+    /// lamp's voice unit: the second route needs `LAMP_VOICE_SECOND_CONFIG`
+    /// and takes its `LAMP_SECOND_` switches from here.
+    #[serde(default)]
+    runtime_env: std::collections::BTreeMap<String, String>,
 }
 fn default_source() -> StimulusSource {
     StimulusSource::LoudspeakerSynthetic
@@ -932,6 +1013,25 @@ impl PhysicalFile {
                 self.diagnostics && self.serve_config.is_none(),
             )?;
         }
+        if self.fixture_reply.is_some() {
+            if self.voice_route.is_some() || !self.runtime_env.is_empty() {
+                return Err(invalid(
+                    "voice_route and runtime_env need provider_config or serve_config",
+                ));
+            }
+            return Ok(flags);
+        }
+        // Named in every directed or serve run, so its record says which.
+        flags.take(
+            VoiceRoute::FLAG,
+            self.voice_route
+                .as_deref()
+                .unwrap_or(VoiceRoute::Second.as_str()),
+        )?;
+        for (name, value) in &self.runtime_env {
+            flags.take("--runtime-env", &format!("{name}={value}"))?;
+        }
+        flags.validate_route()?;
         Ok(flags)
     }
     fn into_config(self) -> Result<(PhysicalConfig, Box<dyn Player>)> {

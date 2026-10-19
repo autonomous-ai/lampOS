@@ -20,6 +20,7 @@ fn fixture_with_command(directory: &SessionDirectory, command: &str) -> (Rig, Pe
     let (ring, ring_peer) = Worker::command_fixture(&directory.path, "ring", command);
     (
         Rig {
+            expression_out: None,
             second: None,
             microphone: crate::options::Microphone::Mic2,
             end_silence_blocks: None,

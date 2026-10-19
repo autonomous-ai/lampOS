@@ -768,7 +768,8 @@ impl StopWords {
 /// recording made for the purpose, never a person's: the words heard are
 /// printed.
 pub fn stt_check(config: &std::path::Path, wav: &std::path::Path) -> io::Result<()> {
-    let config = crate::second_config::load_from_path(config)?;
+    let config = crate::second_config::load_from_path(config)?
+        .with_environment(|name| std::env::var_os(name))?;
     let mut reader = hound::WavReader::open(wav).map_err(io::Error::other)?;
     let spec = reader.spec();
     if (

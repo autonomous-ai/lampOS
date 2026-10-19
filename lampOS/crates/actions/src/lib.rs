@@ -385,6 +385,23 @@ mod tests {
         assert!(said("volume_down").contains("Not for \"softer\" alone: that is your light"));
     }
 
+    /// #1712, lamp-4ace 19 Oct: "turn yourself down" and "turn yourself back
+    /// up" were taken for the light on the second route, both times; Live
+    /// took them for the voice. "Yourself" turned down or up is the voice.
+    #[test]
+    fn turning_yourself_down_or_up_is_the_voice_not_the_light() {
+        let all = catalog(true, true);
+        let said = |name: &str| all.iter().find(|f| f.name == name).unwrap().description;
+        assert!(said("volume_down").contains("turn yourself down"));
+        assert!(said("volume_up").contains("turn yourself up"));
+        assert!(
+            said("light_dimmer").contains("Not for \"turn yourself down\": that is your voice")
+        );
+        assert!(
+            said("light_brighter").contains("Not for \"turn yourself up\": that is your voice")
+        );
+    }
+
     /// lamp-4ace, 19 Oct (the batteries at 11:10 and 13:03, #1712): the
     /// DeepSeek route took "turn yourself down a bit" and "turn yourself
     /// back up" for the light both times, where Gemini Live turned the

@@ -1452,12 +1452,19 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             let tall = picture.filled.1.max(1) as f32;
                             let heights: Vec<f32> =
                                 faces.iter().map(|face| face.height / tall).collect();
-                            let print = faces
+                            let near = faces
                                 .iter()
                                 .zip(&heights)
-                                .filter(|(_, height)| **height >= NEAR_ENOUGH)
-                                .max_by(|a, b| a.1.total_cmp(b.1))
-                                .and_then(|(face, _)| align(&picture, &face.marks))
+                                .enumerate()
+                                .filter(|(_, (_, height))| **height >= NEAR_ENOUGH)
+                                .max_by(|a, b| a.1.1.total_cmp(b.1.1));
+                            // That face's passing id, while speaking is
+                            // judged: whose mouth the known name goes with.
+                            let near_id = near.and_then(|(index, _)| {
+                                bus_out.as_ref().and_then(|bus| bus.speaking_id(index))
+                            });
+                            let print = near
+                                .and_then(|(_, (face, _))| align(&picture, &face.marks))
                                 .and_then(|aligned| who.recogniser.print(&aligned).ok());
                             if let Some((taking, _)) = who.taking.as_mut() {
                                 taking.look(&heights, print);
@@ -1483,15 +1490,16 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     }
                                 }
                                 if let Some(path) = &arguments.known_file {
-                                    keep_known(
+                                    lamp_eyes::who::keep_known(
                                         path,
                                         who.known.as_ref().map(|known| known.0.as_str()),
+                                        near_id.as_deref(),
                                     );
                                 }
                             } else {
                                 // Nobody near: nobody known at the lamp.
                                 if let Some(path) = &arguments.known_file {
-                                    keep_known(path, None);
+                                    lamp_eyes::who::keep_known(path, None, None);
                                 }
                                 if who.visits
                                     && let Some(bus) = bus_out.as_mut()

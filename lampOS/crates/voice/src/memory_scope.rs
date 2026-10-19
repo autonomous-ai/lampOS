@@ -1,5 +1,6 @@
 //! Caller-owned face observations and immutable per-request memory scope.
-//! No global registry, polling, speaker inference, or session authorization.
+//! No global registry, polling, speaker inference, or session authorization;
+//! a lease is only ever narrowed to the room, never widened.
 use crate::known_faces::FaceObservation;
 use lamp_turn_owner::BootId;
 use std::{
@@ -123,6 +124,10 @@ pub struct RequestKey {
 struct RequestContext {
     key: RequestKey,
     scope: ScopeSnapshot,
+    /// Set once the line is found to be someone else's
+    /// ([`ScopeLease::narrow_to_room`]): the room from then on, never wider.
+    narrowed: AtomicBool,
+    room: ScopeSnapshot,
     active: AtomicBool,
 }
 
@@ -137,6 +142,8 @@ impl RequestScope {
             context: Arc::new(RequestContext {
                 key,
                 scope,
+                narrowed: AtomicBool::new(false),
+                room: ScopeSnapshot::room(),
                 active: AtomicBool::new(true),
             }),
         }
@@ -170,7 +177,20 @@ impl ScopeLease {
     /// None means revoked, NOT room. A borrowed snapshot is not an ongoing
     /// grant: recheck is_current at each RPC/output boundary after slow work.
     pub fn scope(&self) -> Option<&ScopeSnapshot> {
-        self.is_current().then_some(&self.context.scope)
+        self.is_current().then(|| {
+            if self.context.narrowed.load(Ordering::Acquire) {
+                &self.context.room
+            } else {
+                &self.context.scope
+            }
+        })
+    }
+    /// The line turned out to be someone else's (a face seen speaking
+    /// through it that is not the known person's, `crate::speaking_faces`):
+    /// every later boundary reads the room. One way only; nothing widens a
+    /// scope again.
+    pub fn narrow_to_room(&self) {
+        self.context.narrowed.store(true, Ordering::Release);
     }
 }
 
@@ -278,6 +298,26 @@ mod tests {
         cache.invalidate();
         assert!(!cache.replace(cache.begin_refresh(), None));
         assert_eq!(cache.snapshot(now), ScopeSnapshot::room());
+    }
+
+    /// A line found to be someone else's narrows every lease of it to the
+    /// room, those already handed out too, and nothing widens it again; a
+    /// revoked one stays revoked.
+    #[test]
+    fn a_narrowed_lease_reads_the_room_at_every_later_boundary() {
+        let person = ScopeSnapshot {
+            person: Some(Arc::from("p-0123456789abcdef")),
+        };
+        let owner = RequestScope::new(key(1), person.clone());
+        let handed = owner.lease();
+        assert_eq!(handed.scope(), Some(&person));
+        owner.lease().narrow_to_room();
+        assert_eq!(handed.scope(), Some(&ScopeSnapshot::room()));
+        assert_eq!(owner.lease().scope(), Some(&ScopeSnapshot::room()));
+        handed.narrow_to_room();
+        assert_eq!(handed.scope(), Some(&ScopeSnapshot::room()));
+        drop(owner);
+        assert!(handed.scope().is_none());
     }
 
     #[test]

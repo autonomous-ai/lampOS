@@ -430,6 +430,11 @@ It runs in a request whose answer the attention rule holds too, its
 answer still held: the one call that does (`DONE_THOUGH_HELD`,
 [attention.md](attention.md), "What happens to an answer that is held
 back"). It then asks with `held: true`, which `lamp-cloud` keeps.
+On the second route a line whose answer is held is asked about
+`reports_stop` only when its heard words name `report`, `reports`,
+`sharing`, `sending` or `data` (whole words, any case;
+`attention::HELD_ASKED_WORDS`, #1925, [attention.md](attention.md)); any
+other held line is sent nowhere.
 There is no function to turn reports on: that is the person's own screen.
 
 Beside it, `reports_state`, with no arguments, which the model is to call

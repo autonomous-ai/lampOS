@@ -375,6 +375,31 @@ impl Days {
         self.add(person, at, &heard, &said, "", sources, rules)
     }
     pub fn remember(&mut self, person: &Person, at: u64, text: &str) -> Result<u64> {
+        self.remember_from(person, at, text, &[])
+    }
+
+    /// [`Self::remember`], with the exchanges of the conversation it came up
+    /// in (`from`, the person's own, at most 64): forgetting it then removes
+    /// them too (#1693, `LAMP_MEMORY_FORGET_ALL`).
+    pub fn remember_from(
+        &mut self,
+        person: &Person,
+        at: u64,
+        text: &str,
+        from: &[u64],
+    ) -> Result<u64> {
+        for id in from {
+            let exchange: bool = self.db.query_row(
+                "SELECT EXISTS(SELECT 1 FROM entries WHERE person=? AND id=? AND kind='exchange')",
+                params![person.as_str(), id],
+                |r| r.get(0),
+            )?;
+            if !exchange {
+                return Err(bad(
+                    "a kept thing comes only from the person's own exchanges",
+                ));
+            }
+        }
         let text = store::tidy(text, store::TEXT_BYTES);
         if text.is_empty() {
             return Err(Error::new("empty", "there is no text to remember"));
@@ -390,7 +415,7 @@ impl Days {
                 "the kept list is full; nothing was removed",
             ));
         }
-        self.add(person, at, "", "", &text, &[], &[])
+        self.add(person, at, "", "", &text, from, &[])
     }
     // The one private writer of an exchange or a kept entry: each argument
     // is a column or its links.
@@ -580,12 +605,16 @@ impl Days {
         )?;
         versions(&tx)?;
         // Forgetting an extracted fact also removes its evidence, otherwise a
-        // later tidy pass could simply extract the same fact again. This can
-        // remove an entire exchange containing more than one subject.
-        if record.kind == "observation" {
-            // Only the person's own evidence: a rule the exchange followed,
-            // in the scope beside theirs, is not evidence of the fact.
-            tx.execute("WITH RECURSIVE roots(rid) AS (SELECT rid FROM doomed UNION SELECT s.parent FROM sources s JOIN roots r ON s.child=r.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1) INSERT OR IGNORE INTO doomed SELECT rid FROM roots",[person.as_str()])?;
+        // later tidy pass could simply extract the same fact again; and a
+        // kept thing goes with the conversation it came up in (#1693,
+        // `remember_from`). This can remove an entire exchange containing
+        // more than one subject. One step back, the person's own exchanges
+        // only: an exchange's own sources are what its session was shown,
+        // not where the fact came from, so climbing them removed kept things
+        // that were only shown (#2003). A rule the exchange followed, in the
+        // scope beside theirs, is not evidence either.
+        if record.kind == "observation" || record.kind == "kept" {
+            tx.execute("INSERT OR IGNORE INTO doomed SELECT s.parent FROM sources s JOIN doomed d ON s.child=d.rid JOIN entries e ON e.rid=s.parent WHERE e.person=?1 AND e.kind='exchange'",[person.as_str()])?;
         }
         descendants(&tx, true)?;
         let count = erase(&tx)?;
@@ -881,6 +910,31 @@ impl Days {
         Ok(())
     }
 
+    /// Every journal exchange, oldest first: whose, its id and when. For
+    /// the observation pass's dry run on a copy of a lamp's store
+    /// (`lamp-voice-eval observe-dry`, #1693 (4)), which cuts the journal
+    /// into conversations as the voice does. Ids and times only.
+    pub fn exchanges(&self) -> Result<Vec<(Person, u64, u64)>> {
+        let mut statement = self.db.prepare(
+            "SELECT person,id,at_unix_ms FROM entries WHERE kind='exchange' ORDER BY at_unix_ms,id",
+        )?;
+        let rows = statement.query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, u64>(1)?,
+                r.get::<_, u64>(2)?,
+            ))
+        })?;
+        let mut found = vec![];
+        for row in rows {
+            let (person, id, at) = row?;
+            if let Some(person) = Person::new(&person) {
+                found.push((person, id, at));
+            }
+        }
+        Ok(found)
+    }
+
     pub fn conversation_end_with(
         &mut self,
         person: &Person,
@@ -1065,6 +1119,17 @@ impl Days {
                 "stale",
                 "memory changed while the model was working",
             ));
+        }
+        // Nothing worth keeping, or a pass that failed (#1693 (2)): the job
+        // is done with nothing kept, so it neither waits out its day nor
+        // counts towards `busy`. A retry finds it done, as for any result.
+        if output.observations.is_empty() {
+            tx.execute(
+                "UPDATE jobs SET state='done',input='',result='[]' WHERE job=?",
+                [job],
+            )?;
+            tx.commit()?;
+            return Ok(vec![]);
         }
         let input: tidy::Input =
             serde_json::from_str(&input).map_err(|_| bad("stored tidy input is invalid"))?;

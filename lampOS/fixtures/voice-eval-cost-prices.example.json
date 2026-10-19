@@ -1,0 +1,11 @@
+{
+  "note": "List prices read on 19 Oct 2026 (cost-night1.py, the research's cost2.py), in dollars, until the team's own rates come. ElevenLabs eleven_v4_turbo's own price was not read: Flash's is taken. Speech to text is Nova-3 with key terms, and Flux.",
+  "deepseek": {
+    "peak": {"uncached_in": 0.30, "cached_in": 0.006, "out": 1.20},
+    "off-peak": {"uncached_in": 0.15, "cached_in": 0.003, "out": 0.60}
+  },
+  "search_per_call": 0.00075,
+  "speech_to_text_per_minute": {"nova-3": 0.009, "flux": 0.0065},
+  "voice_per_character": {"ElevenLabs": 0.00004},
+  "live_per_million": {"text_in": 0.75, "audio_in": 3.00, "text_out": 4.50, "audio_out": 12.00}
+}

@@ -157,7 +157,7 @@ impl Tracker {
 
 /// Whole phrases only. Punctuation and whitespace may surround a short
 /// holding phrase; extra words, an answer, or a quotation never qualify.
-fn holding_only(text: &str) -> bool {
+pub(crate) fn holding_only(text: &str) -> bool {
     let normalized = text
         .trim_matches(|c: char| c.is_whitespace() || matches!(c, '.' | '!' | '?' | '…'))
         .split_whitespace()

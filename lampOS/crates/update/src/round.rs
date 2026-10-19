@@ -942,6 +942,57 @@ impl Run<'_, '_> {
     }
 
     /// Writes each unit's text, and reloads.
+    /// `install::SECOND` at `install::SECOND_PATH`, as `install` writes its
+    /// private settings (`install::settings_with_mode`, 0600, the same
+    /// records): written when missing or still install's own and not the
+    /// build's, and a lamp's own kept. Only when the build's voice unit
+    /// names that file.
+    fn place_second(&mut self, state: &mut State, changes: &[Change]) -> Result<(), String> {
+        let named = changes.iter().any(|change| {
+            change.unit == VOICE_UNIT
+                && unit::environment(&change.after, crate::install::SECOND_CONFIG_ENV).as_deref()
+                    == Some(crate::install::SECOND_PATH)
+        });
+        if !named {
+            return Ok(());
+        }
+        let install = crate::install::Install {
+            root: self.config.root.clone(),
+            channel: self.config.channel.clone(),
+            channel_url: self.config.channel_url.clone(),
+            key: self.config.key,
+            records: self.config.records.clone(),
+            setup: false,
+            models: Vec::new(),
+        };
+        let mut changed = Vec::new();
+        let mut said = Vec::new();
+        let records = &self.records;
+        crate::install::settings_with_mode(
+            &install,
+            &[(crate::install::SECOND_PATH, crate::install::SECOND)],
+            0o600,
+            state,
+            &mut changed,
+            &mut |line| said.push(line.to_owned()),
+            &mut |state| {
+                records
+                    .save_state(state)
+                    .map_err(|error| format!("the records cannot be written: {error}"))
+            },
+        )
+        .map_err(|why| {
+            format!(
+                "{} cannot be placed, so no unit is written: {why}",
+                crate::install::SECOND_PATH
+            )
+        })?;
+        for line in changed.iter().chain(&said) {
+            self.say(line);
+        }
+        Ok(())
+    }
+
     fn write_units<'t>(
         &mut self,
         units: impl Iterator<Item = (&'t str, &'t str)>,
@@ -1023,6 +1074,15 @@ impl Run<'_, '_> {
                 }),
             })
             .collect();
+        // The second route's services, when the build's voice unit names
+        // them, placed as install places them before any unit is written
+        // (#1940, the reviewer's P1 and the first builder's 00:11): a voice
+        // unit that asks for `second.json` with none there would not start,
+        // and the round would put everything back and refuse the build. A
+        // round that cannot place it writes nothing.
+        if let Err(why) = self.place_second(state, &changes) {
+            return Outcome::Failed(why);
+        }
         // The units as they were, and each moved link with the build it
         // named: the way back by hand (docs/updates.md).
         let mut previous: Vec<(String, String)> = backs
