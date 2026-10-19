@@ -185,8 +185,10 @@ struct Kind {
 
 /// The engines `lamp-tasks` takes. "Cloud" and "codecs" are what the issue
 /// (#733) expects the model to hear for Claude and Codex; none of these
-/// forms is close to another engine's.
-const KINDS: [Kind; 3] = [
+/// forms is close to another engine's. Devin (#1854) may come as "Devon" or
+/// "Kevin"; "Kevin" is said to the model as a mishearing, never taken as
+/// Devin's own name, since it is a person's name too.
+const KINDS: [Kind; 4] = [
     Kind {
         engine: "claude",
         name: CLAUDE_CODE,
@@ -204,6 +206,12 @@ const KINDS: [Kind; 3] = [
         name: "OpenCode",
         sounds: "\"OpenCode\" or \"Open Code\"",
         close: &["opencode"],
+    },
+    Kind {
+        engine: "devin",
+        name: "Devin",
+        sounds: "\"Devin\", which can sound like \"Devon\" or \"Kevin\"",
+        close: &["devin", "devon"],
     },
 ];
 
@@ -478,10 +486,14 @@ const CHOSE: &str = "The person chose who does it: never do the work yourself in
 /// (`every_description_fits_the_service_whatever_the_switches`).
 const CHOSE_NOTED: &str = "The person chose who does it (a note may name them): never do the work yourself, never begin it, nor offer to.";
 
-/// "\"ask Claude Code to …\", \"get Codex to …\"" for the staff.
+/// "\"ask Claude Code to …\", \"get Codex to …\"" for the staff. With all
+/// four of them (Devin, #1854) only the first two: the list beside it names
+/// all four, and the description must stay inside the service's 1,024 bytes
+/// (it came to 1,048 with four examples, the lead-in and the staff's note).
 fn examples(staff: &[Member]) -> String {
+    let shown = if staff.len() > 3 { 2 } else { staff.len() };
     let mut said: Vec<String> = Vec::new();
-    for (index, member) in staff.iter().enumerate() {
+    for (index, member) in staff.iter().take(shown).enumerate() {
         let name = member.kind.name;
         said.push(match index % 3 {
             0 => format!("\"ask {name} to …\""),
@@ -3301,8 +3313,10 @@ pub(crate) mod tests {
             member("office-codex", "codex"),
             member("office-opencode", "opencode"),
         ];
+        // All four the tasks part takes, Devin among them (#1854).
+        let four = [three.clone(), vec![member("office-devin", "devin")]].concat();
         let mut refused = Vec::new();
-        for staff in [Vec::new(), two(), three] {
+        for staff in [Vec::new(), two(), three, four] {
             for (((asked, lead_in), noted), accounts) in
                 [(false, false), (false, true), (true, false), (true, true)]
                     .into_iter()
@@ -3370,6 +3384,38 @@ pub(crate) mod tests {
             handed_over("on-office", true, Some(&office), named),
             (sent, told)
         );
+    }
+
+    /// #1854: Devin is one of the staff the person may name, heard as
+    /// "Devin" or "Devon", and the work goes to Devin's own target; the
+    /// model is told it may also sound like "Kevin".
+    #[test]
+    fn the_person_may_hand_work_to_devin_by_name() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let staff = [
+            member("office-claude", "claude"),
+            member("office-devin", "devin"),
+        ];
+        let on = place(Path::new("/run/t"), true);
+        let told = declared(&on, &staff);
+        let who = &told[0].parameters.as_ref().unwrap()["properties"]["who"];
+        assert_eq!(who["enum"], json!(["Claude Code", "Devin"]));
+        let hint = who["description"].as_str().unwrap();
+        for heard in ["\"Devon\"", "\"Kevin\""] {
+            assert!(hint.contains(heard), "{hint}");
+        }
+        for (tag, said) in [("devin", "Devin"), ("devon", "devon")] {
+            let (sent, told) = handed_over(
+                tag,
+                true,
+                Some(&staff),
+                json!({"task":"Write hello.txt","who":said}),
+            );
+            assert_eq!(sent[1]["target"], "office-devin", "{tag}");
+            assert_eq!(told[0]["where"], "Devin on the office computer", "{tag}");
+        }
     }
 
     #[test]

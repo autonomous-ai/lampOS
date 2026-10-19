@@ -2359,6 +2359,15 @@ mod tests {
         }
         write_targets(&path, &targets());
         assert_eq!(read_targets_or_newer(&path).unwrap().unwrap().len(), 1);
+        // Devin is this build's (#1854), not a later engine's.
+        write_targets(
+            &path,
+            &json!({"version":1,"targets":{"devin":{"machine_id":"11111111111111111111111111111111","project":"project","engine":"devin"}}}),
+        );
+        assert_eq!(
+            read_targets(&path).unwrap()["devin"].engine,
+            EngineKind::Devin
+        );
     }
 
     #[test]
