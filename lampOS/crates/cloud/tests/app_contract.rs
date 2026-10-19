@@ -162,6 +162,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         texts: Texts::default(),
         reports: None,
         skills: None,
+        changes: None,
     };
     let me = Identity {
         device: "lamp".into(),

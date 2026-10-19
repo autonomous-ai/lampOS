@@ -2113,6 +2113,7 @@ dependencies = [
  "lamp-local-time",
  "lamp-msgs",
  "lamp-ring",
+ "lamp-update",
  "rustix",
  "rustls",
  "serde",

@@ -63,6 +63,10 @@ pub fn reply(
             if answered.is_ok() && QUIET_WHEN_DONE.contains(&kind.as_str()) {
                 return None;
             }
+            // A change after setup (#1959): taken now, its result later.
+            if answered.is_ok() && crate::settings::KINDS.contains(&kind.as_str()) {
+                return Some(identity.starting(now, &kind).to_string());
+            }
             identity.data(now, &kind, &answered)
         }
         Command::Other(cmd) => identity.refused(now, &cmd),
@@ -247,16 +251,25 @@ async fn session(
         // One `poll` is kept until it ends, and the tick runs beside it, only
         // while texts are taken.
         let texting = lamp.texting();
+        // Changes after setup (#1959): their results are looked for on the
+        // same tick, only with their switch.
+        let changes = lamp.changes();
         let poll = events.poll();
         tokio::pin!(poll);
         let polled = loop {
             tokio::select! {
                 polled = &mut poll => break polled,
-                _ = tick.tick(), if texting => {
+                _ = tick.tick(), if texting || changes.is_some() => {
                     let me = identity.borrow().clone();
-                    for data in lamp.chat_events(crate::chat::now_ms()) {
-                        let event = me.data(&now(), "chat.event", &Ok(Some(data))).to_string();
-                        handed.publish(&client, account.fd_channel.as_str(), event, None);
+                    if texting {
+                        for data in lamp.chat_events(crate::chat::now_ms()) {
+                            let event = me.data(&now(), "chat.event", &Ok(Some(data))).to_string();
+                            handed.publish(&client, account.fd_channel.as_str(), event, None);
+                        }
+                    }
+                    for (kind, result) in changes.as_ref().map(|c| c.take()).unwrap_or_default() {
+                        let reply = me.data(&now(), &kind, &result).to_string();
+                        handed.publish(&client, account.fd_channel.as_str(), reply, None);
                     }
                 }
                 () = woken(&reports), if connected => {
@@ -570,6 +583,69 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    /// #1959: a change after setup is acked `starting` on `fd_channel` at
+    /// once, and its result goes out after it as the same kind, from the
+    /// broker's own loop.
+    #[tokio::test]
+    async fn a_change_is_acked_starting_and_its_result_follows_on_the_channel() {
+        let socket = std::env::temp_dir().join(format!("lco-{}-change.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let helper = std::thread::spawn(move || {
+            use std::io::{BufRead, Write};
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            std::io::BufReader::new(stream.try_clone().unwrap())
+                .read_line(&mut line)
+                .unwrap();
+            stream
+                .write_all(b"{\"done\":{\"name\":\"Desk lamp\"}}\n")
+                .unwrap();
+            line
+        });
+        let (port, seen) = broker(
+            Broker::Takes,
+            vec![r#"{"cmd":"data","kind":"device.rename","data":{"name":"Desk lamp"}}"#],
+        )
+        .await;
+        let (accounts_tx, accounts) = watch::channel(Some(account(port)));
+        let (_identity_tx, me) = watch::channel(identity());
+        let changes = crate::settings::Changes::new(&socket, Duration::from_secs(5));
+        let lamp = tokio::spawn(async move {
+            let mut lamp = Fake {
+                changes: Some(changes),
+                ..Fake::default()
+            };
+            let mut say = |_: &str| {};
+            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+        });
+        let renames = |seen: &[Seen]| {
+            publishes(seen)
+                .into_iter()
+                .filter(|(_, reply)| reply["kind"] == "device.rename")
+                .collect::<Vec<_>>()
+        };
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        while renames(&seen.lock().unwrap()).len() < 2 && tokio::time::Instant::now() < deadline {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        drop(accounts_tx);
+        lamp.await.unwrap();
+        assert_eq!(helper.join().unwrap(), "{\"display_name\":\"Desk lamp\"}\n");
+        let replies = renames(&seen.lock().unwrap());
+        assert_eq!(replies.len(), 2);
+        assert_eq!(replies[0].0, "fd/d-42");
+        assert_eq!(replies[0].1["status"], "starting");
+        assert_eq!(
+            (&replies[1].1["status"], &replies[1].1["data"]["name"]),
+            (
+                &serde_json::json!("success"),
+                &serde_json::json!("Desk lamp")
+            )
+        );
+        let _ = std::fs::remove_file(&socket);
     }
 
     /// #1673: with texts taken, a `chat.send` on `fa_channel` is acked on

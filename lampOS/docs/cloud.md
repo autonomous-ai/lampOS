@@ -70,7 +70,7 @@ routes are not served. Each kind is carried out by the part that owns it.
 | `skills.list` | with `LAMP_SKILLS_PAGE=on` (#1722, "The skills page" below): `{"version", "skills", "left_out"}`, every skill on the lamp as `lamp-skills` loads it, each with its group (`core`, `installed`, `made_here`), whether it can be removed or turned off, and what it may use in plain words. Read only. Without the switch, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
-| `device.rename` | refused for now; step 2, through setup's record |
+| `timezone.set` (`{"timezone": "Asia/Ho_Chi_Minh"}`), `person.name.set` (`{"name"}`, `""` removes it), `device.rename` (`{"name"}`, 1 to 64 characters) | with `LAMP_SETTINGS_CHANGE=on` (#1959, "Changed after setup" below): V1's `starting` at once, then `success` with what was kept (`{"timezone"}` or `{"name"}`), or `failure` with why. Without the switch, V1's "not on this lamp" |
 | anything else (`add_channel`, the other `skills.*`, `face.*`, `tts.*`, the other `led.*`, `system.reboot`, …) | V1's `failure`, `"not on this lamp: <kind>"` |
 
 ### The light: V1's colours on this lamp's
@@ -131,6 +131,10 @@ is the same light. Two differences from V1 the page should know:
   `backend.json` before the marker. So a Lamp 2 set up from the app shows
   online straight away, and again after a reboot, with no `cloud-on.sh`.
   To keep it off on a lamp, mask it (`systemctl mask lamp-cloud`).
+- **The lamp's name in the app**, `/etc/lampOS/setup/display-name`, root's,
+  0644, one line, written only by root's helper after a `device.rename`
+  (#1959). `system.info`'s `host.device_name` is it, else the host's name as
+  before. The reset removes it.
 - **Never printed:** the broker's password and the key appear in no journal
   line and on no bus topic; the account's debug form hides them.
 - **The reset** empties `/var/lib/lampos-cloud` (with the reports' queue and
@@ -501,6 +505,39 @@ updates this section in the same pull request.
   while the backend restarts can be lost after the broker has taken it;
   that is why `stopped` is sent once more on the next connection.
 
+## Changed after setup (#1959)
+
+The person changes a name or the lamp's time zone from the app, without a
+reset. Off unless `LAMP_SETTINGS_CHANGE=on`, with `LAMP_CLOUD=on`.
+
+- **The kinds:** `timezone.set {"timezone"}` (V1's own kind and shapes),
+  `person.name.set {"name"}` (the person's name setup asks for; `""` removes
+  it) and `device.rename {"name"}` (the lamp's name in the app).
+  - **The lamp's name in the app never changes what the lamp answers to.**
+    The wake word stays "Lamp"; only `host.device_name` reads it.
+- **The ack at once, the result after:** the reply is `starting` as soon as
+  the request is read, before anything is written. The result goes out as a
+  second reply of the same kind, looked for every 50 ms on the loop texts use,
+  once root's helper has answered (10 s at most, else `failure`, "the lamp's
+  settings did not answer in time").
+- **Who writes: root's helper, never `lamp-cloud`.** `lamp-cloud` stays
+  `lampos` and `ProtectSystem=strict`, with no new writable path. It sends one
+  line (`{"timezone": …}`, `{"person_name": …}` or `{"display_name": …}`) to
+  `/run/lampos-setup-change/change.sock` and reads one back, on a thread of its
+  own so the broker's loop never waits. The socket is systemd's
+  (`lamp-setup-change.socket`: root's, group `lampos`, 0660, `Accept=yes`, 4
+  connections at most), and each connection starts `lamp-setup change` as root
+  (`lamp-setup-change@.service`). The helper checks every request itself
+  (`setup.md`, "Changed after setup").
+- **Refusals** are the helper's words, never the value asked: `name must be at
+  most 64 characters on one line`, `name must be 1 to 64 characters` (a rename
+  to nothing), `timezone must be a zone the lamp knows, such as
+  Asia/Ho_Chi_Minh`, and `the lamp's settings are not running` when the
+  socket is not there.
+- **Not yet:** the helper's two units are in `deploy/product/` but not in
+  `lamp-update`'s install list, so no lamp has them until their lamp check.
+  Wi-Fi (`wifi.set`) is #1959's second piece.
+
 ## Not yet known, for the backend (#1396)
 
 - Whether the backend's `connected` comes from MQTT, the ping, or both, and
@@ -547,6 +584,13 @@ permission's line and the privacy switch's; a skill that does not load, with
 why; `[stop]` and the off file; the bounds; a folder that can't be read; the
 switch's two gates and the refusal's exact words. `tests/skills_contract.rs`
 pins the fields as sent.
+
+Changes after setup (#1959): the switch's two words; each kind refused as
+one this lamp lacks without it, `device.rename` included; each kind's line for
+the helper; the ack `starting` within 100 ms while a stand-in helper takes
+300 ms, then its result; a refusal, a helper not running and one that never
+answers; through the test broker, `starting` then `success` on `fd_channel`;
+and `host.device_name` from the helper's file, the host's name without one.
 
 `tests/app_contract.rs` holds the fields the Autonomous app's device page
 reads, by name and type (Fourth on #1396): `versions.firmware`,

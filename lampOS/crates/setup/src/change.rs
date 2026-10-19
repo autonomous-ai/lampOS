@@ -1,0 +1,306 @@
+//! A name or the time zone changed after setup, without a reset (#1959,
+//! `docs/setup.md`, "Changed after setup").
+//!
+//! `lamp-cloud` runs as `lampos` with no write access, so it asks root's
+//! helper, `lamp-setup change`, one line each way on a socket systemd holds
+//! (`lamp-setup-change.socket`). The helper checks every request itself,
+//! whoever connects, and writes with setup's own writers ([`crate::serve::Files`]),
+//! so a change leaves the files as a setup with the new value would.
+//!
+//! What reads each value, and how it follows:
+//! - the person's name (`/etc/lampOS/person/name`): the voice reads it again
+//!   at each hello and each new session, so nothing restarts;
+//! - the lamp's name in the app (`/etc/lampOS/setup/display-name`):
+//!   `lamp-cloud` reads it at each answer. It never changes what the lamp
+//!   answers to: the wake word stays "Lamp";
+//! - the zone (`/etc/localtime`, `/etc/timezone`, `/etc/lampOS/zone.env`):
+//!   the voice, memory, Expression and skills follow `/etc/localtime` at each
+//!   reading. `lamp-schedule` takes `LAMP_ZONE` from `zone.env` at start, so
+//!   it is restarted, once the lamp is quiet ([`wait_for_quiet`]). Reminders
+//!   already set keep the zone they were set in.
+use crate::serve::{Config, Files, Save};
+use lamp_update::quiet::{Heard, QUIET, Quiet};
+use serde_json::{Value, json};
+use std::{fs, io, path::Path, time::Duration};
+
+/// The switch on `lamp-cloud`: `on` takes the kinds below from the app.
+/// Anything else, and they are refused as kinds this lamp lacks.
+pub const ENVIRONMENT: &str = "LAMP_SETTINGS_CHANGE";
+
+/// The longest name kept, in characters: setup's and the voice's own bound.
+pub const NAME_MOST: usize = 64;
+/// The longest request line read, in bytes.
+pub const LINE_MOST: usize = 4_096;
+/// How long a zone change waits for the lamp to be quiet before it leaves
+/// `lamp-schedule` on the old zone until its next start.
+pub const QUIET_MOST: Duration = Duration::from_secs(30 * 60);
+/// The unit restarted after a zone change.
+pub const SCHEDULE_UNIT: &str = "lamp-schedule.service";
+
+/// One change, checked.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Change {
+    /// The person's name; `None` removes it.
+    PersonName(Option<String>),
+    /// The lamp's name in the app.
+    DisplayName(String),
+    /// An IANA zone the lamp's zone data and the parts' both have.
+    Zone(String),
+}
+
+/// A control character, a line or paragraph separator, or a mark that turns
+/// the text's direction: none belongs in a name (the voice's own rule,
+/// `crates/voice/src/person.rs`).
+fn breaks_or_turns(c: char) -> bool {
+    c.is_control()
+        || matches!(c, '\u{2028}' | '\u{2029}' | '\u{200e}' | '\u{200f}')
+        || ('\u{202a}'..='\u{202e}').contains(&c)
+        || ('\u{2066}'..='\u{2069}').contains(&c)
+}
+
+/// A name trimmed, or why it can't be kept. Never echoes it.
+pub fn fit_name(name: &str) -> Result<String, &'static str> {
+    let name = name.trim();
+    if name.chars().count() > NAME_MOST || name.chars().any(breaks_or_turns) {
+        return Err("name must be at most 64 characters on one line");
+    }
+    Ok(name.to_owned())
+}
+
+/// The one line `lamp-cloud` sends, checked against `config`: exactly
+/// `{"person_name": s}`, `{"display_name": s}` or `{"timezone": s}`.
+pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
+    if line.len() > LINE_MOST {
+        return Err("the request is too long".into());
+    }
+    let value: Value = serde_json::from_str(line).map_err(|_| "the request is not JSON")?;
+    let object = value.as_object().ok_or("the request is not an object")?;
+    if object.len() != 1 {
+        return Err("the request holds one change".into());
+    }
+    let (key, given) = object.iter().next().ok_or("the request holds one change")?;
+    let text = given.as_str();
+    match key.as_str() {
+        "person_name" => {
+            let name = fit_name(text.ok_or("name must be text")?)?;
+            Ok(Change::PersonName((!name.is_empty()).then_some(name)))
+        }
+        "display_name" => {
+            let name = fit_name(text.ok_or("name must be text")?)?;
+            if name.is_empty() {
+                return Err("name must be 1 to 64 characters".into());
+            }
+            Ok(Change::DisplayName(name))
+        }
+        "timezone" => {
+            let zone = text.ok_or("timezone must be text")?.trim();
+            if !crate::serve::zone_known(zone, &config.zoneinfo)
+                || lamp_local_time::LocalTime::zone(zone).is_err()
+            {
+                return Err(
+                    "timezone must be a zone the lamp knows, such as Asia/Ho_Chi_Minh".into(),
+                );
+            }
+            Ok(Change::Zone(zone.to_owned()))
+        }
+        _ => Err("the request names no change this lamp makes".into()),
+    }
+}
+
+/// What a change wrote, for the reply and for what follows it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Done {
+    /// The reply's `data`.
+    pub data: Value,
+    /// `lamp-schedule` must take the new zone: `zone.env` changed.
+    pub restart_schedule: bool,
+    /// The journal's line: what changed, never a name.
+    pub said: String,
+}
+
+/// Remove `path`, durably; one that is not there is removed already.
+fn remove(path: &Path) -> io::Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    }
+    if let Some(parent) = path.parent() {
+        fs::File::open(parent)?.sync_all()?;
+    }
+    Ok(())
+}
+
+/// Make `change` with setup's writers on the files `config` names.
+pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
+    let mut files = Files(config);
+    match change {
+        Change::PersonName(Some(name)) => {
+            files.name(name)?;
+            Ok(Done {
+                data: json!({"name": name}),
+                restart_schedule: false,
+                said: format!(
+                    "the person's name was changed ({} characters)",
+                    name.chars().count()
+                ),
+            })
+        }
+        Change::PersonName(None) => {
+            remove(&config.name)?;
+            Ok(Done {
+                data: json!({"name": ""}),
+                restart_schedule: false,
+                said: "the person's name was removed".into(),
+            })
+        }
+        Change::DisplayName(name) => {
+            files.display_name(name)?;
+            Ok(Done {
+                data: json!({"name": name}),
+                restart_schedule: false,
+                said: format!(
+                    "the lamp's name in the app was changed ({} characters)",
+                    name.chars().count()
+                ),
+            })
+        }
+        Change::Zone(zone) => {
+            let before = fs::read(&config.zone_env).ok();
+            files.timezone(zone)?;
+            let after = fs::read(&config.zone_env).ok();
+            Ok(Done {
+                data: json!({"timezone": zone}),
+                restart_schedule: before != after,
+                // A zone is no one's name: said, as setup's own line says it.
+                said: format!("the time zone is now {zone}"),
+            })
+        }
+    }
+}
+
+/// The helper's reply line to one request: `{"done": data}` or
+/// `{"refused": why}`. A refusal never holds what was asked.
+pub fn answer(line: &str, config: &Config, enabled: bool) -> (Value, Option<Done>) {
+    if !enabled {
+        return (json!({"refused": "changes after setup are off"}), None);
+    }
+    let change = match parse(line.trim_end_matches(['\n', '\r']), config) {
+        Ok(change) => change,
+        Err(why) => return (json!({"refused": why}), None),
+    };
+    match apply(&change, config) {
+        Ok(done) => (json!({"done": done.data}), Some(done)),
+        Err(error) => (
+            json!({"refused": format!("the change could not be saved: {}", error.kind())}),
+            None,
+        ),
+    }
+}
+
+/// What the voice says on the bus, for [`wait_for_quiet`]. Injected for tests.
+pub trait Ears {
+    /// What the voice said in the next `wait`, which this takes.
+    fn listen(&mut self, wait: Duration) -> Vec<Heard>;
+    /// Monotonic milliseconds.
+    fn now_ms(&mut self) -> u64;
+}
+
+/// Wait until the lamp is quiet as an update judges it before it restarts
+/// the voice (`lamp_update::quiet`): the voice resting, nobody heard and
+/// nothing said for 45 s. At most `most`; why not, when it never was.
+pub fn wait_for_quiet(ears: &mut impl Ears, most: Duration) -> Result<(), String> {
+    let started = ears.now_ms();
+    let mut quiet = Quiet::new(started);
+    loop {
+        let now = ears.now_ms();
+        if quiet.for_at_least(QUIET, now).is_ok() {
+            return Ok(());
+        }
+        if now.saturating_sub(started) >= most.as_millis() as u64 {
+            return Err(quiet
+                .for_at_least(QUIET, now)
+                .err()
+                .unwrap_or_else(|| "never quiet".into()));
+        }
+        for heard in ears.listen(Duration::from_secs(1)) {
+            let at = ears.now_ms();
+            quiet.hear(heard, at);
+        }
+    }
+}
+
+/// The real bus: `voice/state`, `voice/heard` and `voice/said`.
+pub struct BusEars {
+    state: Option<lamp_bus::Subscriber>,
+    speech: Vec<lamp_bus::Subscriber>,
+    started: std::time::Instant,
+}
+
+impl BusEars {
+    /// Subscribes under `setup-change`; a topic that can't be subscribed to
+    /// is said and left out, and quiet then cannot be judged.
+    pub fn new(bus: &lamp_bus::Bus, say: &mut dyn FnMut(&str)) -> Self {
+        use lamp_msgs::{Speech, VoiceState};
+        let mut subscribe = |topic: &str, type_name: &str| match bus.subscribe_typed(
+            topic,
+            "setup-change",
+            type_name,
+        ) {
+            Ok(subscriber) => Some(subscriber),
+            Err(error) => {
+                say(&format!("{topic} cannot be subscribed to: {error}"));
+                None
+            }
+        };
+        let state = subscribe(VoiceState::TOPIC, VoiceState::TYPE);
+        let speech = Speech::TOPICS
+            .iter()
+            .filter_map(|topic| subscribe(topic, Speech::TYPE))
+            .collect();
+        Self {
+            state,
+            speech,
+            started: std::time::Instant::now(),
+        }
+    }
+}
+
+impl Ears for BusEars {
+    fn listen(&mut self, wait: Duration) -> Vec<Heard> {
+        let until = std::time::Instant::now() + wait;
+        let mut heard = Vec::new();
+        loop {
+            let left = until.saturating_duration_since(std::time::Instant::now());
+            match &mut self.state {
+                Some(state) => {
+                    if let Ok(Some(message)) = state.recv(left.min(Duration::from_millis(250))) {
+                        let now = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map_or(0, |since| since.as_millis() as u64);
+                        // The kept value of a voice that stopped says nothing of now.
+                        if now.saturating_sub(message.header.at_unix_ms)
+                            <= lamp_update::quiet::STATE_LASTS.as_millis() as u64
+                            && let Ok(said) = message.parse::<lamp_msgs::VoiceState>()
+                        {
+                            heard.push(Heard::State(said.state));
+                        }
+                    }
+                }
+                None => std::thread::sleep(left.min(Duration::from_millis(250))),
+            }
+            for speech in &mut self.speech {
+                while let Ok(Some(_)) = speech.recv(Duration::ZERO) {
+                    heard.push(Heard::Speech);
+                }
+            }
+            if std::time::Instant::now() >= until {
+                return heard;
+            }
+        }
+    }
+
+    fn now_ms(&mut self) -> u64 {
+        self.started.elapsed().as_millis() as u64
+    }
+}

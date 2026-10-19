@@ -1,0 +1,20 @@
+# lampOS changes after setup (#1959, lampOS/docs/setup.md, "Changed after setup"): the socket
+# lamp-cloud asks root's helper on, for the person's name, the lamp's name in the app and the time
+# zone, without a reset. lamp-cloud stays lampos and read-only; the helper checks every request
+# itself. Nothing reaches it unless lamp-cloud has LAMP_SETTINGS_CHANGE=on.
+[Unit]
+Description=lampOS changes after setup: the socket lamp-cloud asks on
+PartOf=lampos.target
+ConditionPathExists=/var/lib/lampos-setup/done
+
+[Socket]
+ListenStream=/run/lampos-setup-change/change.sock
+SocketUser=root
+SocketGroup=lampos
+SocketMode=0660
+DirectoryMode=0755
+Accept=yes
+MaxConnections=4
+
+[Install]
+WantedBy=lampos.target
