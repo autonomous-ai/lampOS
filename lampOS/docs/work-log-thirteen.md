@@ -108,3 +108,5 @@ list".
   - **thirteen-P3** (concentration shouldn't zero the lamp's own speaking moves). P2 withdrawn: resumable voice takes `voice/sound` by design.
 - `speaking-ab.sh`: `--arms`, staging in `/var/lib`, and it now counts voice levels and Expression's offsets (13/13 tests).
 - **#1744 merged** by the first builder as `09108bad1` (step 1 run on c0a4; head pads with the hardware lead on #1764).
+- **reviewer-two** (from #1814, merged 18:15): read #1779, #1821, #1826, #1860 and #1861; handed back #1783, #1795, #1846 and #1901 (outside the lane). **Merged #1891** (`e64f66fc3`, the base strip off unless set) and **#1887** (`461cb2549`, lamp-station, with my P3 taken). #1807 waits for its rebase.
+- Own: **#1867** (thirteen-P1, gaze off without `--gaze`; reviewed, Fifth's peer read, folded `2b0c7b91f`), **#1868** (thirteen-P3), **#1898** (`steps.sh` skips the strip calibration while the strip is off). #1867 and #1868 wait for a c0a4 person window.
