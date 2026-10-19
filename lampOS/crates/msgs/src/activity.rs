@@ -18,14 +18,11 @@ pub enum Activity {
     AtDesk,
     /// The face bigger than it sat: closer to the lamp.
     LeaningIn,
-    /// The face smaller than it sat, still turned to the lamp.
-    LeaningBack,
-    /// The face lower and the nose low between the eyes and mouth: reading,
-    /// writing or a phone held low, not told apart.
+    /// The nose low between the eyes and mouth: reading, writing or a phone
+    /// held low, not told apart. Leaning back and sitting low were tried at
+    /// lamp-75c9 and could not be seen from its place: they come back only
+    /// if a lamp in front of a person shows them.
     HeadDown,
-    /// The face well lower than it sat, not looking down: the nearest
-    /// honest name for slumped.
-    SittingLow,
 }
 
 /// What the person at the lamp is doing, said by the eyes.
@@ -37,8 +34,8 @@ pub struct RoomActivity {
     /// How long this sitting has lasted, from its first face, a gap under
     /// [`RoomActivity::SITTING_GAP_S`] forgiven; 0 while away.
     pub sitting_s: u32,
-    /// Whether the sitting's baseline is in, so that the leaning and lower
-    /// states can be said at all.
+    /// Whether the sitting's baseline is in, so that leaning in and head
+    /// down can be said at all.
     pub baseline: bool,
 }
 
@@ -58,7 +55,7 @@ impl RoomActivity {
             .lasting(Self::LASTS)
     }
 
-    /// Away has no sitting, and a leaning or lower state needs the baseline.
+    /// Away has no sitting, and leaning in or head down needs the baseline.
     pub fn check(&self) -> Result<(), Invalid> {
         if self.state == Activity::Away && self.sitting_s != 0 {
             return Err(Invalid(format!(

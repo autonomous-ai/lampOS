@@ -363,7 +363,7 @@ of each, and its kind and period as a declaration, are in
 | `lamp/online` | Whether the lamp can reach the internet, worked out from the parts' links | latched | Health, with `--online on` (#830) | Once a second |
 | `room/state` | Quiet or busy | latched | Voice, later the situation | When it changes, and once a second |
 | `room/presence` | Whether anyone is at the lamp: someone (a face or a voice within 20 s), or nobody for how long (#1677, [presence.md](presence.md)) | latched | Eyes, with `LAMP_PRESENCE=on` | Once a second while they look, and when someone comes or goes; each good for 3 s |
-| `room/activity` | What the face at the desk shows: at the desk, leaning in or back, head down, sitting low, or away, with how long and the sitting's length (#1678, [eyes.md](eyes.md)) | latched | Eyes, with `LAMP_ACTIVITY=on` | Once a second while they look, and on a change; each good for 3 s |
+| `room/activity` | What the face at the desk shows: at the desk, leaning in, head down, or away, with how long and the sitting's length (#1678, [eyes.md](eyes.md)) | latched | Eyes, with `LAMP_ACTIVITY=on` | Once a second while they look, and on a change; each good for 3 s |
 | `room/stood_up` | Someone at the desk stood up and left, and the sitting's length (#1678) | event | Eyes, with `LAMP_ACTIVITY=on` | Once each time |
 | `light/command`, `light/state` | The light asked for, and the light shown | latched | The executive and `lamp-cloud` (the app's Light row); the ring's owner | When it changes, and once a second |
 | `light/test`, `light/drawn` | A self-test's colour, shown for 2 s at most; the light the ring actually drew | latched | The self-test; the ring's owner | Asked once a colour; drawn when it changes, and once a second |
