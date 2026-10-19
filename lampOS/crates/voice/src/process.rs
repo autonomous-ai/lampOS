@@ -938,32 +938,37 @@ fn memory_days_worker_environment(
 }
 
 // The rules' switch (#813), passed the same narrow way: the exact `on`, to
-// the provider only.
+// the two routes that offer the memory's functions (twelve-P2): the second
+// route keeps and lists rules through the same Days client.
 fn memory_rules_worker_environment(
     role: &str,
     value: Option<&std::ffi::OsStr>,
 ) -> Option<(&'static str, &'static str)> {
-    (role == "provider" && value == Some(std::ffi::OsStr::new("on")))
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::rules::ENVIRONMENT, "on"))
 }
 
 // Forgetting that reaches everything (#1693), passed the same narrow way:
-// the exact `on`, to the provider only, which offers the memory's functions.
+// the exact `on`, to the two routes that offer the memory's functions, as the
+// Days store's own switch is. The second route starts the same Days client;
+// without it there, "forget that" and "forget everything" ran as before
+// #1723 on the new flow (twelve-P2).
 fn memory_forget_all_worker_environment(
     role: &str,
     value: Option<&std::ffi::OsStr>,
 ) -> Option<(&'static str, &'static str)> {
-    (role == "provider" && value == Some(std::ffi::OsStr::new("on")))
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::FORGET_ALL_ENVIRONMENT, "on"))
 }
 
 // The open threads' switch (#1693 (3)), passed the same narrow way: the
-// exact `on`, to the provider only, which opens the sessions told of them.
+// exact `on`, to the two routes that open the sessions told of them (each
+// through `remember::told_for_session`; twelve-P2).
 fn memory_threads_worker_environment(
     role: &str,
     value: Option<&std::ffi::OsStr>,
 ) -> Option<(&'static str, &'static str)> {
-    (role == "provider" && value == Some(std::ffi::OsStr::new("on")))
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::THREADS_ENVIRONMENT, "on"))
 }
 
@@ -1063,6 +1068,7 @@ fn second_route_worker_environment(
 ) -> Vec<(&'static str, std::ffi::OsString)> {
     [
         crate::second_config::GEMINI_BASE_URL_ENV,
+        crate::second_config::DEEPSEEK_BASE_URL_ENV,
         crate::second_config::SPEECH_MODEL_ENV,
         crate::second_config::KEY_TERMS_ENV,
         crate::local_time::PLACE_ENVIRONMENT,
@@ -1070,6 +1076,7 @@ fn second_route_worker_environment(
         crate::second_provider::PREPARED_ENVIRONMENT,
         crate::second_provider::FIRST_WORDS_ENVIRONMENT,
         crate::second_provider::CHAT_WARM_ENVIRONMENT,
+        crate::second_provider::SPEECH_WARM_ENVIRONMENT,
         crate::second_provider::STEADY_FIRST_ENVIRONMENT,
         crate::second_provider::FEW_TOOLS_ENVIRONMENT,
         crate::second_config::FLUX_ENV,
@@ -1178,23 +1185,24 @@ mod tests {
                         "LAMP_MEMORY_DAYS",
                         ["provider", "second"].as_slice(),
                     ),
-                    // Rules reach the Live provider only.
+                    // Rules reach both routes too (twelve-P2).
                     (
                         memory_rules_worker_environment,
                         "LAMP_MEMORY_RULES",
-                        ["provider"].as_slice(),
+                        ["provider", "second"].as_slice(),
                     ),
-                    // So do the open threads (#1693 (3)).
+                    // The open threads (#1693 (3)) reach both routes, as the
+                    // Days store does (twelve-P2).
                     (
                         memory_threads_worker_environment,
                         "LAMP_MEMORY_THREADS",
-                        ["provider"].as_slice(),
+                        ["provider", "second"].as_slice(),
                     ),
                     // So does forgetting everything (#1693).
                     (
                         memory_forget_all_worker_environment,
                         "LAMP_MEMORY_FORGET_ALL",
-                        ["provider"].as_slice(),
+                        ["provider", "second"].as_slice(),
                     ),
                     // The clock's switch, the two that tell the time.
                     (
@@ -1341,6 +1349,8 @@ mod tests {
                     "/run/credentials/lamp-voice.service"
                 } else if name == crate::second_config::GEMINI_BASE_URL_ENV {
                     "https://relay.example.invalid/v1beta"
+                } else if name == crate::second_config::DEEPSEEK_BASE_URL_ENV {
+                    "https://relay.example.invalid/deepseek"
                 } else if name == crate::second_config::SPEECH_MODEL_ENV {
                     "gemini-3.8-flash-lite-tts"
                 } else if name == crate::second_config::KEY_TERMS_ENV {
@@ -1350,6 +1360,7 @@ mod tests {
                 } else if name == crate::second_provider::net::weather::ENVIRONMENT
                     || name == crate::second_provider::PREPARED_ENVIRONMENT
                     || name == crate::second_provider::CHAT_WARM_ENVIRONMENT
+                    || name == crate::second_provider::SPEECH_WARM_ENVIRONMENT
                     || name == crate::second_provider::STEADY_FIRST_ENVIRONMENT
                     || name == crate::second_provider::FEW_TOOLS_ENVIRONMENT
                 {
@@ -1407,9 +1418,13 @@ mod tests {
                     "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
+                    "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_RULES=on",
+                    "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PLACE=Hanoi, Vietnam",
                     "LAMP_SECOND_CHAT_WARM=on",
+                    "LAMP_SECOND_DEEPSEEK_BASE_URL=https://relay.example.invalid/deepseek",
                     "LAMP_SECOND_FEW_TOOLS=on",
                     "LAMP_SECOND_FIRST_WORDS=4",
                     "LAMP_SECOND_FLUX=on",
@@ -1418,6 +1433,7 @@ mod tests {
                     "LAMP_SECOND_KNOWN_NAMES=on",
                     "LAMP_SECOND_PREPARED=on",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
+                    "LAMP_SECOND_SPEECH_WARM=on",
                     "LAMP_SECOND_STEADY_FIRST=on",
                     "LAMP_SECOND_WEATHER=on",
                 ],

@@ -264,6 +264,9 @@ async fn turn(engine: &mut Engine) -> Vec<String> {
             ProviderOutput::ReminderDeferred { reason, .. } => {
                 (format!("deferred:{reason:?}"), true)
             }
+            ProviderOutput::NewsAnswered { request, key } => {
+                (format!("news:{request}:{key}"), false)
+            }
             other => panic!("the second route never sends {other:?}"),
         };
         if labels.last() != Some(&label) || !label.starts_with("audio:") {
@@ -510,6 +513,139 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
         (&told["prepared"], &told["task"]),
         (&json!(true), &json!(task))
     );
+}
+
+/// #1390 on the second route (the first builder's 20:15 on #1722): news the
+/// person asks about (`check_agent_task`) is put on the turn it was
+/// answered in, as `NewsAnswered`, and its key is never the model's. A key
+/// in another function's answer is not news: only the tasks part's is.
+#[tokio::test]
+async fn news_asked_about_rides_on_its_turn_and_its_key_is_never_the_models() {
+    let checked = call("c1", crate::agent_tasks::CHECK, json!({}));
+    let timer = call("c2", "set_timer", json!({"minutes": 5}));
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("How is that task going?".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![checked.clone(), timer.clone()])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Claude Code has finished it."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let tools: ToolRunner = Arc::new(|_, _, name, _| {
+        Box::pin(async move {
+            if name == crate::agent_tasks::CHECK {
+                json!({"answer": "done", crate::agent_tasks::NEWS_KEY: "s1:2:4"})
+            } else {
+                json!({"ok": true, crate::agent_tasks::NEWS_KEY: "not-news"})
+            }
+        })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let labels = turn(&mut engine).await;
+    assert_eq!(
+        labels
+            .iter()
+            .filter(|label| label.starts_with("news:"))
+            .collect::<Vec<_>>(),
+        ["news:1:s1:2:4"],
+        "{labels:?}"
+    );
+    assert_eq!(
+        labels[labels.len() - 4..],
+        [
+            "said:Claude Code has finished it.",
+            "audio:28",
+            "generated",
+            "complete"
+        ]
+    );
+    let asked_again = &script.asked.lock().unwrap()[1];
+    assert_eq!(
+        asked_again[asked_again.len() - 2..],
+        [
+            Message::tool("c1", r#"{"answer":"done"}"#),
+            Message::tool("c2", r#"{"news_key":"not-news","ok":true}"#),
+        ]
+    );
+}
+
+/// The same through this route's own runner (`worker::tool_runner`, as
+/// `serve` builds it) to the tasks part: a finished task's news asked about
+/// by voice is answered to the model without its key and put on the turn.
+#[test]
+fn news_asked_by_voice_through_this_route_is_put_on_the_turn() {
+    let _one = crate::agent_tasks::tests::ONE_AT_A_TIME
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let directory = std::env::temp_dir().join(format!("second-news-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&directory);
+    std::fs::create_dir_all(&directory).unwrap();
+    let (place, _seen) =
+        crate::agent_tasks::tests::serving(&directory, "idle", "Lumi, Sunny and Archie.", false);
+    let settings = crate::tools::Settings {
+        tasks: Some(place),
+        ..crate::tools::Settings::default()
+    };
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("How is that story going?".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c1",
+                        crate::agent_tasks::CHECK,
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("It's done."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        worker::tool_runner(settings, None, None),
+        Arc::new(Instant::now),
+    )
+    .announcing(false);
+    let labels = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            turn(&mut engine).await
+        });
+    let _ = std::fs::remove_dir_all(&directory);
+    assert!(labels.contains(&"news:1:s1:2:4".to_owned()), "{labels:?}");
+    let told = script.asked.lock().unwrap()[1]
+        .iter()
+        .find(|message| message.role == "tool")
+        .and_then(|message| message.content.as_ref()?.as_str())
+        .and_then(|content| serde_json::from_str::<Value>(content).ok())
+        .expect("the model is told the news");
+    assert!(told.get(crate::agent_tasks::NEWS_KEY).is_none(), "{told}");
+    assert_eq!(told["answer"], "Lumi, Sunny and Archie.");
 }
 
 #[tokio::test]
@@ -2258,6 +2394,69 @@ async fn a_chat_that_never_begins_says_the_down_line_at_most_once_a_minute() {
     assert!(on[4].contains(&line), "{on:?}");
     let off = turns(false).await;
     assert!(off[1..].iter().all(|turn| turn == &["complete"]), "{off:?}");
+}
+
+/// #1844's B: a chat that refuses before any word (429, 401, a 5xx) says the
+/// down line as a chat that never begins does, at most once a minute, then
+/// fails the turn as before; a written turn never says it; with it off,
+/// nothing.
+#[tokio::test(start_paused = true)]
+async fn a_chat_refused_before_any_word_says_the_down_line_at_most_once_a_minute() {
+    async fn turns(on: bool) -> Vec<Vec<String>> {
+        let refused = |status| vec![Err(net::Error::Status(status))];
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                    .take(5)
+                    .collect(),
+            ),
+            chats: Mutex::new(
+                [
+                    vec![text("It is noon."), Ok(ChatEvent::Done)],
+                    refused(429),
+                    refused(401),
+                    refused(401),
+                    refused(503),
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script);
+        let mut engine = engine.saying_when_down(on);
+        let mut heard = Vec::new();
+        for (request, wait, spoken) in [
+            (1, 0, true),
+            (2, 1, true),
+            (3, 1, false),
+            (4, 1, true),
+            (5, 61, true),
+        ] {
+            tokio::time::sleep(Duration::from_secs(wait)).await;
+            if spoken {
+                engine.submit(start(request));
+                engine.submit(audio(request, 1));
+                engine.submit(end(request));
+            } else {
+                engine.submit(written(request, "Say hello."));
+            }
+            heard.push(sent(&mut engine).await);
+        }
+        heard
+    }
+    let line = format!("audio:{}", DOWN_LINE.len());
+    let on = turns(true).await;
+    assert!(!on[0].contains(&line), "{on:?}");
+    assert!(on[1].contains(&line), "the first refusal: {on:?}");
+    assert!(
+        on[1].iter().any(|event| event == "failed"),
+        "still a failed turn: {on:?}"
+    );
+    assert!(!on[2].contains(&line), "a written turn: {on:?}");
+    assert!(!on[3].contains(&line), "within the minute: {on:?}");
+    assert!(on[4].contains(&line), "past the minute: {on:?}");
+    let off = turns(false).await;
+    assert!(off.iter().all(|turn| !turn.contains(&line)), "{off:?}");
 }
 
 /// The rule is told which request a turn goes on from (`continues`): the one

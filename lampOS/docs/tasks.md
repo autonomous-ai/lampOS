@@ -344,8 +344,15 @@ started once its answer is told:
       told unasked, on the same proof. Told before or not: a telling unasked
       may have been cut short. Only the tasks part's own answer can carry a
       key.
-      The second voice's model isn't given the key either, but it puts no
-      news on its turns, so news asked about there leaves its harness open.
+      The second voice does the same (the first builder's 20:15 on #1722):
+      its spoken turn's runner leaves the key in the answer
+      (`tools::answer_keeping_news`), and the turn takes it out before its
+      model reads the answer and sends `NewsAnswered` for that request
+      (`second_provider`'s
+      `news_asked_about_rides_on_its_turn_and_its_key_is_never_the_models`).
+      Before this it put no news on its turns, so news asked about there left
+      its harness open. A text from the app (`tools::answer_typed`) still
+      takes the key out and keeps nothing.
     - Before this, on lamp-4ace on 18 Oct, task 147 was told and never
       closed: the news path never said so.
   - **Or by a speech claim:** its telling played, or isn't known to have

@@ -775,10 +775,18 @@ impl TaskNews {
     /// For a test of the voice's turn: `news` waiting, come in `ago`.
     #[cfg(test)]
     pub(crate) fn waiting_for_test(news: News, ago: Duration) -> Self {
+        Self::waiting_for_test_heard(news, ago).0
+    }
+
+    /// [`Self::waiting_for_test`], with what the voice says was heard
+    /// ([`Self::heard`]) coming out of the receiver.
+    #[cfg(test)]
+    pub(crate) fn waiting_for_test_heard(news: News, ago: Duration) -> (Self, Receiver<String>) {
+        let (heard, heard_out) = mpsc::channel();
         let came = Instant::now()
             .checked_sub(ago)
             .expect("a clock that has run that long");
-        Self {
+        let news = Self {
             offered: mpsc::channel().1,
             told: mpsc::channel().0,
             found: BTreeMap::from([(news.key.clone(), came)]),
@@ -786,8 +794,9 @@ impl TaskNews {
             told_already: Arc::new(Mutex::new(BTreeSet::new())),
             stopping: Arc::new(AtomicBool::new(false)),
             status: Arc::new(Mutex::new(None)),
-            heard: mpsc::channel().0,
-        }
+            heard,
+        };
+        (news, heard_out)
     }
 
     /// Take the news waiting, as it is being told: it is not offered again.

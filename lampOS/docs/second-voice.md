@@ -66,10 +66,22 @@ refused (unknown fields are refused).
 | `openrouter_model` | no | the slug `LAMP_SECOND_CHAT=openrouter` asks, from OpenRouter's public model list; absent: `deepseek/deepseek-v4.1-flash-1017` |
 | `openrouter_reasoning_effort` | no | `none`, `minimal`, `low`, `medium` or `high`; absent: `minimal` for a `google/` model, `none` for any other |
 | `deepseek_model` | no | the model `LAMP_SECOND_CHAT=deepseek` asks of DeepSeek's own API; absent: `deepseek-flash` (DeepSeek-V4.1-Flash-1017). DeepSeek's peak hours, 01:00–04:00 and 06:00–10:00 UTC on weekdays, cost double; no switch for them |
+| `deepseek_base_url` | no | the relay `LAMP_SECOND_CHAT=deepseek` and `LAMP_SECOND_SEARCH=deepseek` go through instead of DeepSeek's own API (#1934): `<base>/chat/completions`, `<base>/v1/tools/search` and `/v1/tools/fetch`, with the relay's credential (`llm_credential_file`) as the bearer, and no `deepseek.key`; absent: DeepSeek's own API with `deepseek.key`. `LAMP_SECOND_DEEPSEEK_BASE_URL` in the unit's environment goes over it |
 
 OpenRouter's and DeepSeek's keys are not in this file: they are the voice
 unit's systemd credentials, `openrouter.key` and `deepseek.key` in its
-`CREDENTIALS_DIRECTORY` ("OpenRouter and DeepSeek", below).
+`CREDENTIALS_DIRECTORY` ("OpenRouter and DeepSeek", below). With
+`deepseek_base_url`, DeepSeek's chat and search take the relay's credential
+instead, so a lamp with only its relay key runs them (#1934, the lead's
+task: lamps carry no provider keys). The journal then says DeepSeek is asked
+"through the relay with its credential", with no URL or key, and
+`probe-cascade` times `chat=deepseek-relay(…)` beside the direct one. The
+relay's base is `https://campaign-api.autonomous.ai/api/v1/ai/v1/deepseek`,
+with DeepSeek's own paths under it and the relay key as the bearer. It
+passes the bodies and streams through unchanged, and answers `GET
+<base>/models` for `LAMP_SECOND_CHAT_WARM`. A missing key is 401 and past
+the lamp's limit 429. Search and fetch are 5 calls a second for the whole
+relay (the backend on #1934, 21:0x).
 
 The fallback is V1's: an empty or absent STT or TTS URL or key is the LLM's.
 A Gemini model name is letters, digits, `-`, `.` and `_` only: it goes into
@@ -277,7 +289,9 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   turn never makes one. On lamp-4ace on 2026-10-16, 9 of 10 backup turns
   waited past 1.5 s.
   With `LAMP_SECOND_DOWN_LINE=on`, a spoken turn whose first round has not
-  begun within its bound says "I can't think right now; give me a minute."
+  begun within its bound, or whose chat refuses it before any word (a
+  status: 401, 402, 429, a 5xx; #1844's B, then the turn fails as before),
+  says "I can't think right now; give me a minute."
   (`DOWN_LINE`) instead of nothing, at most once a minute
   (`DOWN_LINE_EVERY`; the journal: `said it can't think right now`). The
   line is said once by this route's own voice after the first turn is out,
@@ -394,6 +408,21 @@ order is kept. A written turn is the same from the chat on.
   headers. A gap over the client's 90 s pool keep means a new connection
   (the first builder at 18:26: the first event came in 0.9 to 1.9 s on
   lamp-4ace, 0.7 s from the probe).
+  Each piece asked of the configured voice (OpenAI's or ElevenLabs) is
+  journaled at its first audio byte, without words: `request R ElevenLabs
+  piece K: C chars, sent S ms after the words were heard on a reused|new
+  connection; its first audio byte A ms after it went`. C counts the text
+  sent; A is from the request's going to the body's first byte. At the
+  turn's end, one line for its pieces: `request R ElevenLabs: B of N pieces
+  began, U on a reused connection, C chars; the first piece's first audio
+  byte A ms after it went, the slowest M ms` (`never came` when the first
+  never began). "Reused" is read, not guessed: the response's local socket
+  (hyper's `HttpInfo`) is one an earlier response or warming came on (the
+  last 8 kept). The client speaks HTTP/1.1 only, so pieces asked while one
+  still downloads each open their own connection. Gemini's voice is not
+  journaled this way (#1712, the first builder at 19:57: `eleven_v4_turbo`'s
+  first sound came about 690 ms after its first piece went on lamp-4ace,
+  request 2: 2185 to 2875 ms after the words; Flash 306 ms from the probe).
   After the first request, the line also says whether its tools and its
   first message are the last request's, hashed: `; its tools and first
   message as the last request's`, or which of the two is not. A service's
@@ -453,6 +482,23 @@ order is kept. A written turn is the same from the chat on.
   paid for the handshake (the first builder at 18:26: the chat's first
   event 0.9 to 1.9 s on lamp-4ace, 0.7 s from the probe). A warming that
   fails changes nothing; the chat connects as before.
+- **With `LAMP_SECOND_SPEECH_WARM=on` the configured voice's connection is
+  opened as a line begins** (off unless set, as the chat's switch is; its
+  own switch, since `LAMP_SECOND_CHAT_WARM` names the chat), when no piece
+  or warming went in the last 60 s (`tts::WARM_AFTER`, the chat's). Only
+  when the configured voice is the lamp's one voice; Gemini's is warmed
+  whenever it is. It's a GET of `<base>/models` with the key
+  (ElevenLabs: `<base>/elevenlabs/models` on the proxy, `/v1/models`
+  direct), read whole (at most 256 KiB), so the answer's first piece goes
+  on a connection already made. No text is sent, so no characters are
+  billed: ElevenLabs bills the text of speech requests, and `GET
+  /v1/models` lists models. The Autonomous proxy has no route for it (404,
+  `Cannot GET …`, read from the Mac on 19 Oct) and keeps the connection
+  open after it, so the warming still opens it. The journal says
+  `ElevenLabs: the speech connection opened ahead in T ms (HTTP S)`, and the
+  first piece's line says `reused`. A warming runs beside the line and
+  never holds a piece up: a piece asked while it is in flight opens its own
+  connection, and one that fails changes nothing.
 - **The answer's first piece goes after a few words** if no clause or
   sentence ended sooner: 4 with the configured voice
   (`CONFIGURED_FIRST_WORDS`; the first builder at 18:26: a 9-word first
@@ -1004,6 +1050,29 @@ notes, the tools declared, and the voice state, Expression and the ring on
 the bus. Nothing is held, replayed or switched, and no `voice_route_*`
 record is written.
 
+- **The link, when it is the only voice** (#1844, the first builder's yes,
+  19 Oct; `second_provider/link.rs`). Before, it said Ready once at start
+  and never again, so with the Wi-Fi off every turn failed in silence and
+  `lamp/online` stayed true. Now a turn that fails on the network (a
+  connection refused or reset, a connect that timed out, an answer that
+  never came: `Transport`, `ConnectTimeout`, `ResponseTimeout`, at any of the
+  three services) checks whether the services' hosts answer at all: a bare
+  TCP connection to the chat's, the speech's, speech to text's and Gemini's
+  host at once, nothing sent, any answering within 2 s enough
+  (`PROBE_WITHIN`). One answering: a service was slow or refused, and
+  nothing changes (a status, 401, 429 or 5xx, never checks: the service
+  answered). None: the link is Unavailable with the turn's fault, and the
+  check runs every 30 s (`PROBE_EVERY_US`, as `--reach-probe`) until one
+  answers, when it is Ready again in a new session. The journal says
+  `lamp-voice second: no service host answers after a turn failed on the
+  network: the link is down, checked every 30 s` and `… a service host
+  answers again: the link is back`. So the offline logic follows it as it
+  follows Gemini's ([offline.md](offline.md)): with `LAMP_OFFLINE_VOICE=on`
+  the offline line once and the breath, `lamp/online` false from health and
+  Expression's offline face, and "I'm back online." after; offline speech is
+  a local-only turn that never reaches this worker, which is why the check
+  runs on its own. The first turn of an outage still fails as before (it is
+  what finds it). A standby's link is unchanged.
 - **Its exit ends the voice**, as Gemini's does (`coordinator::mandatory`):
   it is the only voice. A standby's exit is still dropped, and Gemini goes
   on.
@@ -1021,6 +1090,19 @@ record is written.
   (`ReminderDeferral::Disabled`), for Gemini to say once it is back. The
   journal: `lamp-voice second: due reminders are said on this route, the
   lamp's only voice`.
+- **The voice's own sayings are said**, as on Live (the first builder's
+  20:15 on #1722): task news told unasked and progress news (each a
+  written turn of the news's note, at the same quiet moment), a skill's say
+  (`LAMP_SAY`, answered `spoken` on the same proof), and news asked about
+  (`check_agent_task`), whose key the turn takes out of the answer before
+  its model reads it and sends as `NewsAnswered` (`docs/tasks.md`). So the
+  tasks part is told a finished task was heard once its turn is heard
+  whole, and closes its harness, as on Live. Tests:
+  `coordinator::tests::second_route::news_is_told_once_at_the_next_quiet_moment_on_the_second_route_as_on_live`
+  and `a_skills_say_is_said_and_answered_spoken_on_the_second_route_as_on_live`
+  (the loop, both routes), and `second_provider`'s
+  `news_asked_about_rides_on_its_turn_and_its_key_is_never_the_models` and
+  `news_asked_by_voice_through_this_route_is_put_on_the_turn`.
 - **Its input is taken late**, in order and from the parent's boot, as the
   Live worker's is since 40de19327 (`WorkerChannels::taking_late_input`): its
   input is checked against fresh authority when used, and its end would end
@@ -1140,7 +1222,9 @@ after a take-over, but now for every turn:
   place's time (`worker::time_elsewhere`): with `LAMP_TIME_PLACES` it is
   told `worker::TIME_ELSEWHERE` and needs its place; without it, it is
   not given. Whether DeepSeek then answers with no call is not yet shown
-  on a lamp.
+  on a lamp. All this is with `LAMP_CLOCK` on; with it off, the request is
+  told the time as a Live session without it is, roughly
+  (`local_time::told`), as before (the first builder on #1921).
 - **The lamp's place** (`LAMP_PLACE`, "Hanoi, Vietnam"): told beside the
   time, "You are in Hanoi, Vietnam. When someone asks about the weather,
   the news or anything nearby without naming a place, they mean Hanoi,
@@ -1252,7 +1336,9 @@ after a take-over, but now for every turn:
   and `--addressed` for whom it answers, sight, camera and air facts, and
   `LAMP_MEMORY_RULES`, which reaches Gemini's worker only (`process.rs`).
 - **`voice/link`** (`LAMP_VOICE_LINK`) is this route's link, Ready from its
-  start: a relay outage shows only as failed turns.
+  start. As a standby it stays Ready: an outage shows only as failed turns.
+  As the only voice it goes down and back with the network (below, "The
+  link, when it is the only voice").
 - With `--camera-config` the camera worker still starts for Gemini's picture
   context, which nothing reads here. lamp-4ace's unit sets none.
 
@@ -1569,6 +1655,48 @@ systemd-run --pty --wait \
   -p LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key \
   /opt/lampOS/voice/current/lamp-voice probe-cache \
   /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 3
+```
+
+### Which function each follow-up line calls (`probe-tools`)
+
+`lamp-voice probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS]` (1 to 20, 3 by
+default; `second_provider/probe/tools.rs`). It was built for one fault the
+four-arm test found (the first builder on #1722, 20:22). On lamp-4ace at
+20:08 and 09:12, after "make your light a little dimmer" and "a little
+dimmer still", DeepSeek answered "Hey Lamp, turn yourself down a bit." with
+`light_dimmer`, then "turn yourself back up a little" with `volume_up`: the
+lamp ended 20 steps louder. Live calls `volume_down`, then `volume_up`.
+
+- **The conversation:** the character and a turn's changing part, then
+  `followups.sh`'s five lines as played (`LINES`): the four above and "Hey
+  Lamp, make your light a little brighter." (`light_brighter`), which checks
+  that the note doesn't push a light line onto the volume.
+  Each line is asked with the lines before it as right history: the right
+  call, the actions part's short answer to it (`LAMP_SHORT_DONE=on`, as on
+  the lamps), and a word or two. So each line is judged on its own.
+- **The functions:** the voice's own, as `probe-cache` declares them, and
+  the actions part's from its catalog in `LAMP_ACTIONS_DIR`
+  (`/run/lampos-actions`), the way the voice reads them. On a lamp that's
+  the light and volume with their installed descriptions. Without them it
+  refuses to run.
+- **The arms**, on DeepSeek's own API (`hosted.deepseek_model`, thinking
+  off, the unit's `deepseek.key`):
+  - `today`: every function;
+  - `few`: narrowed as `LAMP_SECOND_FEW_TOOLS=on` narrows a spoken turn's;
+  - `note`: today's, with one sentence after the changing part (`NOTE`):
+    "'Turn yourself up' or 'turn yourself down' always means your voice
+    (volume_up, volume_down), whatever was said about your light before."
+
+It prints, for each arm and line, how many requests called each function
+first (`none` for an answer in words) and how many were right. Then it names
+the arms that were right every time on every line. Counts only, no words.
+Run it like `probe-cache`, where lamp-actions runs:
+
+```sh
+systemd-run --pty --wait \
+  -p LoadCredential=deepseek.key:/etc/lampOS/voice/deepseek.key \
+  /opt/lampOS/voice/current/lamp-voice probe-tools \
+  /etc/lampOS/voice/provider.json /etc/lampOS/voice/second.json 20
 ```
 
 ## Not done

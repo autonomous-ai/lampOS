@@ -4,6 +4,13 @@
     "--runtime", "/opt/lampOS/voice-eval/BUILD/lamp-voice"],
   "lamp_work_root": "/var/lib/lampOS/voice-eval-runs",
   "serve_config": "/etc/lampOS/pilot-4ace/provider.json",
+  "voice_route": "second",
+  "runtime_env": {
+    "LAMP_VOICE_SECOND_CONFIG": "/etc/lampOS/voice/second.json",
+    "LAMP_SECOND_CHAT": "deepseek",
+    "LAMP_SECOND_SEARCH": "deepseek",
+    "LAMP_SECOND_SPEECH": "elevenlabs"
+  },
   "noise_suppression": "off",
   "turn_taking": "duplex",
   "reference_clock": "capture",

@@ -497,6 +497,32 @@ impl Says {
         (says, answered)
     }
 
+    /// For a test of the voice's loop: one skill's say with a `note` at
+    /// `priority`, waiting, and where its answer goes.
+    #[cfg(test)]
+    pub(crate) fn note_for_test(
+        skill: &str,
+        note: &str,
+        priority: u8,
+    ) -> (Self, mpsc::Receiver<Answer>) {
+        let (mut says, ask) = Self::by_hand();
+        let (answer, answered) = mpsc::channel();
+        ask.send(Asked {
+            request: Request {
+                skill: skill.into(),
+                words: Words::Note(note.into()),
+                priority,
+                expires_in_ms: 60_000,
+                task: None,
+            },
+            answer,
+            expires_at_us: u64::MAX,
+        })
+        .unwrap();
+        says.poll(0);
+        (says, answered)
+    }
+
     /// For a test: asks are put in by hand.
     #[cfg(test)]
     fn by_hand() -> (Self, mpsc::Sender<Asked>) {

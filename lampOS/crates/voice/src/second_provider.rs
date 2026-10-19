@@ -56,12 +56,13 @@ use tokio::{
     task::{JoinHandle, JoinSet},
 };
 
+pub mod link;
 pub mod net;
 pub mod probe;
 mod services;
 pub mod worker;
 
-pub use services::{CHAT_WARM_ENVIRONMENT, Listener, Net, Services};
+pub use services::{CHAT_WARM_ENVIRONMENT, Listener, Net, SPEECH_WARM_ENVIRONMENT, Services};
 
 #[cfg(test)]
 mod tests;
@@ -1457,6 +1458,24 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
 }
 
 /// The closest provider fault for a client error. No text is carried.
+/// The down line ("I can't think right now; give me a minute."), when it
+/// is switched on, due and kept: as audio only, so it is no answer in the
+/// thread. Only to someone who spoke: a lamp's own turn (a hello, a skill's
+/// say) never says it (the reviewer on #1195).
+async fn say_down(shared: &Shared, request: u64, heard: bool) -> Result<(), Stop> {
+    if let Some((down, clip)) = shared
+        .down
+        .as_ref()
+        .filter(|_| heard)
+        .and_then(|down| Some((down, down.due()?)))
+    {
+        cue(shared, request, clip).await?;
+        down.said();
+        eprintln!("lamp-voice second: request {request} said it can't think right now");
+    }
+    Ok(())
+}
+
 pub fn fault(error: &net::Error) -> Fault {
     match error {
         net::Error::Url => Fault::Local,
@@ -2041,10 +2060,17 @@ async fn answer(
     let (request, scope) = context;
     let heard = asked == Asker::Spoken;
     let looking = asked == Asker::Written { looking: true };
+    let heard_at = Instant::now();
     // Started now, with the chat request, so it is ready first.
     let mut speech = JoinSet::new();
-    let announcement = (shared.announce && shared.announcement_due())
-        .then(|| start_speech(shared, &mut speech, ANNOUNCEMENT.to_owned()));
+    let announcement = (shared.announce && shared.announcement_due()).then(|| {
+        start_speech(
+            shared,
+            &mut speech,
+            ANNOUNCEMENT.to_owned(),
+            net::Turn { request, heard_at },
+        )
+    });
     let (sentences, mut queued) = mpsc::channel(SENTENCES_AHEAD);
     let spoke = AtomicBool::new(false);
     // The answer's own first audio went (not the announcement's).
@@ -2056,7 +2082,7 @@ async fn answer(
         sentences,
         started: false,
         request,
-        heard_at: Instant::now(),
+        heard_at,
     };
     let began = Instant::now();
     // The bounds below are on the runtime's clock, which a test can step.
@@ -2168,23 +2194,7 @@ async fn answer(
                                 "lamp-voice second: request {request} chat round {round} had not begun in {} ms; the turn ends unanswered",
                                 began.elapsed().as_millis()
                             );
-                            // Not nothing, when switched on: the line, as
-                            // audio only, so it is no answer in the thread.
-                            // Only to someone who spoke: a lamp's own turn
-                            // (a hello, a skill's say) never says it (the
-                            // reviewer on #1195).
-                            if let Some((down, clip)) = shared
-                                .down
-                                .as_ref()
-                                .filter(|_| heard)
-                                .and_then(|down| Some((down, down.due()?)))
-                            {
-                                cue(shared, request, clip).await?;
-                                down.said();
-                                eprintln!(
-                                    "lamp-voice second: request {request} said it can't think right now"
-                                );
-                            }
+                            say_down(shared, request, heard).await?;
                             return Err(Stop::GaveUp);
                         }
                     }
@@ -2205,10 +2215,20 @@ async fn answer(
                         refused = true;
                         break;
                     }
-                    event => event.map_err(|error| {
-                        eprintln!("lamp-voice second: request {request} chat round {round} failed after {} ms: {error}", began.elapsed().as_millis());
-                        Stop::Failed(fault(&error))
-                    })?,
+                    Ok(event) => event,
+                    Err(error) => {
+                        eprintln!(
+                            "lamp-voice second: request {request} chat round {round} failed after {} ms: {error}",
+                            began.elapsed().as_millis()
+                        );
+                        // A chat that answers with a refusal before any word
+                        // (401, 429, a 5xx) is as down as one that never
+                        // begins: the line, not silence (#1844's B).
+                        if first && round == 1 && matches!(error, net::Error::Status(_)) {
+                            say_down(shared, request, heard).await?;
+                        }
+                        return Err(Stop::Failed(fault(&error)));
+                    }
                 };
                 if first {
                     first = false;
@@ -2350,7 +2370,7 @@ async fn answer(
                 {
                     did(Did::Worked(monotonic_us()));
                 }
-                let result = match (&shared.scoped_tools, &scope) {
+                let mut result = match (&shared.scoped_tools, &scope) {
                     (Some(run), Some(scope)) => {
                         run(
                             request,
@@ -2368,6 +2388,23 @@ async fn answer(
                 };
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
+                }
+                // A finished task's news asked about (`check_agent_task`):
+                // its key is never the model's, and the coordinator puts it
+                // on this turn, so the tasks part is told it was heard once
+                // the turn is heard whole, as on the Live route (#1390).
+                if crate::agent_tasks::is_tool(&call.name)
+                    && let Some(key) = crate::agent_tasks::take_news_key(&mut result)
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} was answered the news ({key}); it rides on the turn"
+                    );
+                    if !shared
+                        .emit(ProviderOutput::NewsAnswered { request, key })
+                        .await
+                    {
+                        return Err(Stop::Gone);
+                    }
                 }
                 messages.push(Message::tool(call.id.clone(), result.to_string()));
             }
@@ -2476,6 +2513,8 @@ async fn answer(
         Ok(())
     };
     let ended = tokio::try_join!(writing, saying);
+    // The voice's line on the turn's pieces (#1712).
+    shared.services.spoken(request);
     let gave_up = matches!(ended, Err(Stop::GaveUp));
     let last = match ended {
         Ok(_) => {
@@ -2541,9 +2580,14 @@ type Packets = mpsc::Receiver<net::Result<Vec<i16>>>;
 
 /// Speech of `text` downloading into its own queue, in the turn's set so
 /// that it stops with the turn.
-fn start_speech(shared: &Shared, speech: &mut JoinSet<()>, text: String) -> Packets {
+fn start_speech(
+    shared: &Shared,
+    speech: &mut JoinSet<()>,
+    text: String,
+    turn: net::Turn,
+) -> Packets {
     let (packets, queued) = mpsc::channel(SENTENCE_PACKETS);
-    let mut stream = shared.services.speak(text);
+    let mut stream = shared.services.speak_for(text, turn);
     speech.spawn(async move {
         while let Some(packet) = stream.next().await {
             let failed = packet.is_err();
@@ -2604,7 +2648,11 @@ impl Queue<'_> {
             );
         }
         self.started = true;
-        let packets = start_speech(self.shared, self.speech, text.clone());
+        let turn = net::Turn {
+            request: self.request,
+            heard_at: self.heard_at,
+        };
+        let packets = start_speech(self.shared, self.speech, text.clone(), turn);
         self.send(text, packets).await
     }
 

@@ -8,7 +8,9 @@
 //!   OpenRouter, DeepSeek V4.1 Flash's 17 October snapshot and Gemini 3.6
 //!   Flash (and `openrouter_model` if it is another), each thinking least;
 //!   and on DeepSeek's own API each model its `/models` lists, thinking off
-//!   and on. The character of `provider.json` and one fixed question; with
+//!   and on; and with `deepseek_base_url` (or `LAMP_SECOND_DEEPSEEK_BASE_URL`),
+//!   DeepSeek through the relay with the relay's credential, thinking off
+//!   (#1934). The character of `provider.json` and one fixed question; with
 //!   `--look`, once more with that JPEG as the question's picture (an image
 //!   part, as a look sends it), to each model that takes one. No tools are
 //!   declared.
@@ -32,6 +34,7 @@
 use super::net::{self, Chat, ChatEvent, GeminiTts, Message, Sentences, Tts, search::Search};
 
 pub mod cache;
+pub mod tools;
 use crate::second_config::{
     CREDENTIALS_ENV, DEEPSEEK_CREDENTIAL, DEEPSEEK_TEXT_ONLY, OPENROUTER_CREDENTIAL,
     OPENROUTER_MODEL, OPENROUTER_SECOND_MODEL, least_effort, unit_credential,
@@ -268,7 +271,10 @@ pub async fn run(
 ) -> io::Result<()> {
     let provider = crate::config::ProviderConfig::load(provider_config)?;
     let character = provider.instruction(false)?;
-    let config = crate::second_config::load_from_path(second_config)?;
+    // The unit's environment over the file, as the worker reads it: a
+    // drop-in's LAMP_SECOND_DEEPSEEK_BASE_URL is then probed too (#1934).
+    let config = crate::second_config::load_from_path(second_config)?
+        .with_environment(|name| std::env::var_os(name))?;
     let picture = look
         .map(|path| {
             let picture = std::fs::read(path)?;
@@ -407,6 +413,20 @@ pub async fn run(
             deepseek_search = Some(Search::deepseek(key.expose()).map_err(io::Error::other)?);
         }
         Err(error) => left_out("deepseek", &error),
+    }
+    // DeepSeek through the relay, with the relay's credential, as the
+    // route asks it with `deepseek_base_url` (#1934): its first token beside
+    // the direct one's, in the same runs.
+    if let Some(base) = &config.hosted.deepseek_base_url {
+        let model = &config.hosted.deepseek_model;
+        chats.push((
+            format!("chat=deepseek-relay({model},thinking-off)"),
+            Arc::new(
+                Chat::deepseek_at(base, model, config.llm_key.expose(), none.clone(), false)
+                    .map_err(io::Error::other)?,
+            ),
+            !DEEPSEEK_TEXT_ONLY.contains(&model.as_str()),
+        ));
     }
     let mut asks: Vec<(String, Arc<Chat>, Vec<Message>)> = Vec::new();
     for (name, chat, sees) in &chats {

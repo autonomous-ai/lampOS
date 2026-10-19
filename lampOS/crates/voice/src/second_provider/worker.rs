@@ -14,7 +14,6 @@ use super::{
 };
 use crate::{
     provider_flow::OutputSender,
-    provider_link::{LinkContext, ProviderLink, ProviderLinkState},
     provider_worker::{ProviderInput, ProviderOutput},
     transport::{Channel, WorkerChannels},
     wire::{Control, WorkerEvent},
@@ -515,6 +514,29 @@ pub fn gemini_key(
     }
 }
 
+/// DeepSeek's key for its chat and search: the relay's credential
+/// (`llm_credential_file`) when they go through the relay
+/// (`deepseek_base_url`, #1934), else the voice unit's `deepseek.key`.
+pub fn deepseek_key(
+    config: &crate::second_config::SecondConfig,
+    credentials: Option<&std::ffi::OsStr>,
+) -> io::Result<crate::second_config::Key> {
+    use crate::second_config::{DEEPSEEK_CREDENTIAL, unit_credential};
+    match config.hosted.deepseek_base_url {
+        Some(_) => Ok(config.llm_key.clone()),
+        None => unit_credential(credentials, DEEPSEEK_CREDENTIAL),
+    }
+}
+
+/// How the journal names where DeepSeek is asked: never a URL.
+fn deepseek_where(hosted: &crate::second_config::Hosted) -> &'static str {
+    if hosted.deepseek_base_url.is_some() {
+        "through the relay with its credential (deepseek_base_url, LAMP_SECOND_DEEPSEEK_BASE_URL)"
+    } else {
+        "on DeepSeek's own API"
+    }
+}
+
 /// The real services as `route` sets them: the configured chat and voice,
 /// or Gemini's, OpenRouter's or DeepSeek's in their place, each saying so in
 /// the journal once. OpenRouter's and DeepSeek's keys are the voice unit's
@@ -526,8 +548,11 @@ pub fn services(
     credentials: Option<&std::ffi::OsStr>,
     declare: super::net::Declare,
 ) -> io::Result<Net> {
-    use crate::second_config::{DEEPSEEK_CREDENTIAL, OPENROUTER_CREDENTIAL, unit_credential};
+    use crate::second_config::{OPENROUTER_CREDENTIAL, unit_credential};
     let gemini = config.gemini.clone();
+    let deepseek = (route.chat == Some(ChatRoute::DeepSeek))
+        .then(|| deepseek_key(&config, credentials))
+        .transpose()?;
     let hosted = config.hosted.clone();
     // The lamp's one voice (#1712). A provider chosen over the configured
     // one takes its own default voice: a configured voice's name is that
@@ -584,13 +609,15 @@ pub fn services(
             );
         }
         Some(ChatRoute::DeepSeek) => {
-            let key = unit_credential(credentials, DEEPSEEK_CREDENTIAL)?;
-            net = net
-                .chatting_with_deepseek(key.expose())
-                .map_err(io::Error::other)?;
+            if let Some(key) = &deepseek {
+                net = net
+                    .chatting_with_deepseek(key.expose())
+                    .map_err(io::Error::other)?;
+            }
             eprintln!(
-                "lamp-voice second: the text model is DeepSeek's {} on DeepSeek's own API, thinking off (LAMP_SECOND_CHAT=deepseek)",
-                hosted.deepseek_model
+                "lamp-voice second: the text model is DeepSeek's {} {}, thinking off (LAMP_SECOND_CHAT=deepseek)",
+                hosted.deepseek_model,
+                deepseek_where(&hosted)
             );
         }
     }
@@ -621,7 +648,17 @@ pub fn services(
             "lamp-voice second: the chat's connection is opened as a line begins (LAMP_SECOND_CHAT_WARM)"
         );
     }
-    Ok(net.warming_the_chat(warm))
+    // The configured voice's connection opened as a line begins (#1712).
+    let warm_speech = std::env::var(super::services::SPEECH_WARM_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if warm_speech {
+        eprintln!(
+            "lamp-voice second: the configured voice's connection is opened as a line begins (LAMP_SECOND_SPEECH_WARM)"
+        );
+    }
+    Ok(net.warming_the_chat(warm).warming_the_speech(warm_speech))
 }
 
 /// The web search the model may call as its own functions, as `route` sets
@@ -632,12 +669,20 @@ pub fn search_for(
     route: RouteFlags,
     credentials: Option<&std::ffi::OsStr>,
 ) -> io::Result<Option<Search>> {
-    use crate::second_config::{DEEPSEEK_CREDENTIAL, unit_credential};
     let search = match route.search {
         None | Some(SearchRoute::OpenRouter) => return Ok(None),
         Some(SearchRoute::DeepSeek) => {
-            let key = unit_credential(credentials, DEEPSEEK_CREDENTIAL)?;
-            Search::deepseek(key.expose())
+            let key = deepseek_key(config, credentials)?;
+            let base = config
+                .hosted
+                .deepseek_base_url
+                .as_deref()
+                .unwrap_or(crate::second_config::DEEPSEEK_BASE_URL);
+            eprintln!(
+                "lamp-voice second: DeepSeek's search {}",
+                deepseek_where(&config.hosted)
+            );
+            Search::deepseek_at(base, key.expose())
         }
         Some(SearchRoute::Exa) => {
             let service = config.search.as_ref().ok_or_else(|| {
@@ -1013,6 +1058,9 @@ pub fn serve(
     // The unit's Gemini endpoint and voice over the file's (#1712).
     let config = crate::second_config::load_from_path(second_config)?
         .with_environment(|name| std::env::var_os(name))?;
+    // As the lamp's only voice, its link follows whether the services'
+    // hosts answer (#1844, `link.rs`): the hosts checked.
+    let probe_targets = route.only_voice.then(|| probe_targets(&config));
     if config.gemini.base_url != crate::second_config::GEMINI_BASE_URL {
         eprintln!(
             "lamp-voice second: Gemini at {}, voice {}",
@@ -1055,7 +1103,8 @@ pub fn serve(
         .unwrap_or_default();
     let declared = tools.clone();
     // The time here is told in every request; the_time is for elsewhere.
-    let places = tools.clock && tools.places;
+    let clock = tools.clock;
+    let places = clock && tools.places;
     // With `use_skill` the skills' lines are told after the character, as
     // the Live route tells them (#1668).
     let skills_told = tools.clone();
@@ -1188,7 +1237,7 @@ pub fn serve(
         // The lamp's own place, with `LAMP_PLACE`, beside its time (#1712),
         // and the weather there while it is fresh.
         let time = with_place(
-            crate::local_time::told_asked_here(places),
+            crate::local_time::told_asked_here(clock, places),
             crate::local_time::place_told(place.as_deref()),
         );
         let time = with_place(
@@ -1461,7 +1510,7 @@ pub fn serve(
                 }
             })
         });
-        let result = run(channels, boot, engine, thread).await;
+        let result = run(channels, boot, engine, thread, probe_targets).await;
         if let Some(refresh) = refresh {
             refresh.abort();
         }
@@ -1647,10 +1696,9 @@ async fn run_call(
         {
             room.answered_by_a_call(request, monotonic_us());
         }
-        match &scope {
-            Some(scope) => crate::tools::answer_scoped(&settings, &call, request, heard, scope),
-            None => crate::tools::answer(&settings, &call, request, heard),
-        }
+        // A news key stays in the answer: the turn takes it out before
+        // its model reads it, and tells the coordinator (#1390).
+        crate::tools::answer_keeping_news(&settings, &call, request, heard, scope.as_ref())
     })
     .await
     .unwrap_or_else(|_| crate::tools::unavailable())
@@ -1795,6 +1843,10 @@ pub(crate) fn facts(session: bool, room: Option<crate::room_told::Room>) -> Stri
 pub(crate) struct Heeding {
     attention: crate::attention::Attention,
     strict: bool,
+    /// Whether it is night here, read before each verdict with the day's
+    /// own bars (`LAMP_SPOKEN_TO=day-and-night`), as the Live worker reads
+    /// it: [`crate::local_time::night_here`], or a test's.
+    night: fn() -> bool,
     /// The bus, and the name's hearings on it since the last turn.
     bus: Option<(lamp_bus::Bus, lamp_bus::Subscriber)>,
     thread: Option<PathBuf>,
@@ -2013,6 +2065,7 @@ impl Heeding {
         Self {
             attention,
             strict,
+            night: crate::local_time::night_here,
             bus,
             thread,
             levels: None,
@@ -2315,6 +2368,13 @@ impl Heeding {
         attention.lamp_asked(signs.lamp_asked);
         let (busy, lamp_asked) = (signs.room == crate::room_told::Room::Busy, signs.lamp_asked);
         attention.set_near(signs.near);
+        // The night's bars, as the Live worker reads them before each
+        // verdict (`provider_worker.rs`): only with the day's own bars, and
+        // otherwise every hour was judged as day (Tests and the first
+        // builder on #1712, 20:22 and 20:29).
+        if attention.judges_by_day() {
+            attention.set_night((self.night)());
+        }
         let turned = signs.turned.filter(|_| self.strict);
         let mut verdict =
             attention.first_output_busy(request, signs.room, signs.going_on, self.strict, turned);
@@ -2545,7 +2605,7 @@ pub(crate) fn texts_ends(
         texts_system_message(
             &character,
             crate::agent_tasks::noted(
-                crate::local_time::told_asked_here(told.clock && told.places),
+                crate::local_time::told_asked_here(told.clock, told.places),
                 told.tasks.as_ref(),
             )
             .as_deref(),
@@ -2681,32 +2741,44 @@ fn save(file: Option<&Path>) {
     }
 }
 
+/// The hosts a down link checks (#1844): the chat's, the speech's, speech
+/// to text's and Gemini's, any answering enough.
+fn probe_targets(config: &crate::second_config::SecondConfig) -> Vec<String> {
+    let stt = match &config.stt {
+        crate::second_config::Stt::Deepgram { .. } => "wss://api.deepgram.com/v1/listen",
+        crate::second_config::Stt::Autonomous { base_url, .. } => base_url.as_str(),
+    };
+    let mut targets: Vec<String> = [
+        config.llm_base_url.as_str(),
+        config.tts_base_url.as_str(),
+        stt,
+        config.gemini.base_url.as_str(),
+    ]
+    .into_iter()
+    .filter_map(super::link::target)
+    .collect();
+    targets.sort();
+    targets.dedup();
+    targets
+}
+
 /// Run the engine as a provider worker until Stop. Readiness is the
 /// fixture's: `Ready`, then one `ProviderLink` Ready on the control plane.
-/// ponytail: the services are not probed first; the link says Ready and a
-/// service that cannot be reached fails that turn. A probe at startup if a
-/// dead key should show as an unavailable link.
+/// The services are not probed first: a service that cannot be reached
+/// fails that turn. With `probe_targets` (the lamp's only voice, #1844) a
+/// turn failed on the network checks whether any of them answers, and none
+/// answering is the link Unavailable until a check every 30 s finds one
+/// (`link.rs`); without, the link stays Ready, as a standby's always has.
 pub async fn run(
     mut channels: WorkerChannels,
     boot: BootId,
     mut engine: Engine,
     thread: Option<PathBuf>,
+    probe_targets: Option<Vec<String>>,
 ) -> io::Result<()> {
     let started_us = monotonic_us();
     channels.control.send(WorkerEvent::Ready)?;
-    let ready = ProviderLink {
-        revision: 1,
-        session: 1,
-        observed_at_us: started_us,
-        source_clock: None,
-        state: ProviderLinkState::Ready {
-            setup_us: monotonic_us() - started_us,
-            attempts: 1,
-            context: LinkContext::Initial,
-            outage_started_at_us: None,
-            after: None,
-        },
-    };
+    let (mut link, ready) = super::link::Watch::new(probe_targets, started_us, monotonic_us());
     ready.validate(monotonic_us())?;
     channels
         .control
@@ -2769,6 +2841,24 @@ pub async fn run(
             if let Some(event) = &pending {
                 keep(event, thread.as_deref());
             }
+            if let Some(event) = &pending {
+                link.output(monotonic_us(), event);
+            }
+        }
+        // The lamp's only voice tells the coordinator its link (#1844).
+        if let Some((changed, was_down)) = link.tick(monotonic_us()).await {
+            changed.validate(monotonic_us())?;
+            if was_down {
+                eprintln!("lamp-voice second: a service host answers again: the link is back");
+            } else {
+                eprintln!(
+                    "lamp-voice second: no service host answers after a turn failed on the network: the link is down, checked every {} s",
+                    super::link::PROBE_EVERY_US / 1_000_000
+                );
+            }
+            channels
+                .control
+                .send(WorkerEvent::ProviderLink { link: changed })?;
         }
         if let Some(event) = pending.take() {
             gate.may_send(monotonic_us(), &event)?;
@@ -3458,6 +3548,181 @@ mod tests {
         assert_eq!(spoken, [Message::user("Hi."), Message::assistant("Hello.")]);
     }
 
+    /// Tests' map on #1712 (20:11), (2): the task switches
+    /// (`LAMP_TASKS_WHO`, `_ASKED`, `_ACCOUNTS`, `_MACHINE_NAMES` and
+    /// `LAMP_TOOL_LEAD_IN`) reach the second worker as Live's do. The
+    /// coordinator gives it the Live worker's flags (`coordinator/second.rs`,
+    /// `arguments`), and it parses them with the same parser into its tools'
+    /// place. What each one does is `agent_tasks`', the same code on either
+    /// route.
+    #[test]
+    fn the_second_worker_takes_the_task_switches_as_live_does() {
+        let dir = Path::new("/run/lamp-voice");
+        let (_, _, files, _) = parse_flags(
+            dir,
+            &strings(&[
+                "--tools",
+                crate::agent_tasks::FLAG,
+                "/run/lampos-tasks",
+                crate::agent_tasks::WHO_FLAG,
+                crate::agent_tasks::LEAD_IN_FLAG,
+                crate::agent_tasks::ASKED_FLAG,
+                crate::agent_tasks::ACCOUNTS_FLAG,
+                crate::agent_tasks::NAMES_FLAG,
+            ]),
+        )
+        .unwrap();
+        let place = files.tools.tasks.expect("the tasks part");
+        assert_eq!(place.directory, Path::new("/run/lampos-tasks"));
+        assert!(place.who && place.lead_in && place.asked);
+        assert!(place.accounts && place.machine_names);
+        let (_, _, files, _) = parse_flags(
+            dir,
+            &strings(&["--tools", crate::agent_tasks::FLAG, "/run/lampos-tasks"]),
+        )
+        .unwrap();
+        let place = files.tools.tasks.expect("the tasks part");
+        assert!(!place.who && !place.lead_in && !place.asked);
+        assert!(!place.accounts && !place.machine_names);
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_MEMORY_DAYS` on the second
+    /// route. The voice hands it to this worker (`process.rs`, the table of
+    /// worker environments: `provider` and `second`). With it, the memory's
+    /// note is asked once a session, by that session's number, and kept for
+    /// the session's turns (`Sessions::frozen`), as a Live session is told
+    /// it once; a new session, or someone else at the lamp, asks again with
+    /// the next number. Without it every turn asks, as session 0, and
+    /// `frozen` is not used.
+    #[test]
+    fn with_memory_days_the_note_is_asked_once_a_session_and_kept_for_its_turns() {
+        let mut sessions = Sessions::default();
+        let mut asked = Vec::new();
+        let mut note = |changed: bool| {
+            sessions.frozen(changed, |session| {
+                asked.push(session);
+                format!("note {session}")
+            })
+        };
+        assert_eq!(note(false), "note 1", "the first turn asks");
+        assert_eq!(note(false), "note 1", "the same session keeps it");
+        assert_eq!(note(true), "note 2", "a new session asks again");
+        assert_eq!(note(false), "note 2");
+        assert_eq!(asked, [1, 2]);
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_ROOM_FILE` on the second route
+    /// as the only voice. The room this route keeps (`keeping_room`) goes to
+    /// its file at the worker's tick, and the next worker in the same boot
+    /// starts from it: a busy room is still busy. The room is kept under the
+    /// machine's boot (`room_told::MACHINE_BOOT_FILE`), which only Linux has,
+    /// so elsewhere this says so and checks nothing; on Linux the file must be
+    /// there. In tests the room is
+    /// the thread's own, so each worker is a thread of its own.
+    #[test]
+    fn as_the_only_voice_the_room_goes_to_its_file_and_the_next_worker_starts_from_it() {
+        // Skipped by the system, not by the file: on Linux a missing boot
+        // file fails here, so a pass there means this ran.
+        if !cfg!(target_os = "linux") {
+            eprintln!("not Linux: no machine boot file, the room is not kept, nothing checked");
+            return;
+        }
+        assert!(
+            Path::new(crate::room_told::MACHINE_BOOT_FILE).exists(),
+            "Linux has {}",
+            crate::room_told::MACHINE_BOOT_FILE
+        );
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-second-room-file-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("room.json");
+        let first = path.clone();
+        std::thread::spawn(move || {
+            let mut tick = super::keeping_room(false, false, Some(&first), None);
+            let now = monotonic_us();
+            {
+                let mut room = crate::room_told::room().lock().unwrap();
+                for request in 1..=3 {
+                    room.heard(request, now);
+                    room.ended(request, now);
+                    room.unanswered(request, now);
+                }
+                assert_eq!(room.at(now), crate::room_told::Room::Busy);
+            }
+            tick(now);
+        })
+        .join()
+        .unwrap();
+        assert!(path.exists(), "the room went to its file");
+        let second = path.clone();
+        let taken = std::thread::spawn(move || {
+            let _tick = super::keeping_room(false, false, Some(&second), None);
+            let mut room = crate::room_told::room().lock().unwrap();
+            room.at(monotonic_us())
+        })
+        .join()
+        .unwrap();
+        assert_eq!(
+            taken,
+            crate::room_told::Room::Busy,
+            "the next worker's room"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_ATTENTION=busy-near` on the
+    /// second route. With `--attention-near` this route samples the room
+    /// microphone's rise over its quiet from the bus (`ears/level`,
+    /// `hear_levels`, every 100 ms), and a line during which it rose
+    /// `NEAR_RISE_DB` or more is near (`signs`). One whose rise was the
+    /// lamp's own voice is not, nor one in a quiet room. On the real clock,
+    /// about a second.
+    #[test]
+    fn with_attention_near_the_rooms_rise_on_the_bus_makes_a_line_near() {
+        // A short root: a Unix socket's address holds 103 bytes.
+        let root = std::path::PathBuf::from(format!("/tmp/lsn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut ears = bus
+            .publisher_declared(
+                lamp_msgs::RoomSound::TOPIC,
+                &lamp_msgs::RoomSound::declaration(),
+                "ears",
+            )
+            .unwrap();
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        heeding.hear_levels(&root);
+        let floor = -50.0;
+        // A line begins once its first level is the bus's newest, so no
+        // sample taken in it can be the line's before.
+        let mut line = |rise: f32, own_voice: bool| {
+            let level = lamp_msgs::RoomSound {
+                level_db: floor + rise,
+                floor_db: Some(floor),
+                own_voice,
+            };
+            ears.publish_json(monotonic_us(), &level).unwrap();
+            let began = monotonic_us();
+            for _ in 0..8 {
+                std::thread::sleep(Duration::from_millis(60));
+                ears.publish_json(monotonic_us(), &level).unwrap();
+            }
+            (began, monotonic_us())
+        };
+        let near = line(crate::attention::NEAR_RISE_DB + 3.0, false);
+        let own = line(crate::attention::NEAR_RISE_DB + 3.0, true);
+        let quiet = line(1.0, false);
+        assert!(heeding.signs(9, near).near, "risen: near");
+        assert!(!heeding.signs(10, own).near, "its own voice: not near");
+        assert!(!heeding.signs(11, quiet).near, "quiet: not near");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[test]
     fn the_second_worker_takes_the_live_workers_flags_but_keep_link() {
         let dir = Path::new("/run/lamp-voice");
@@ -3687,8 +3952,20 @@ mod tests {
         assert!(!told.text.contains("spare key"), "{}", told.text);
         assert!(told.text.starts_with("You are a lamp."), "{}", told.text);
         assert!(told.history.is_empty());
-        // Told the time as it is asked (#1712), where this machine has one.
+        // Told the time as it is asked (#1712) with `LAMP_CLOCK`, and as
+        // before without it (the first builder on #1921), where this
+        // machine has one.
         if crate::local_time::offset_here().is_some() {
+            assert!(told.text.contains("give it roughly"), "{}", told.text);
+            assert!(!told.text.contains("as you were asked"), "{}", told.text);
+            let (texts, _) = texts_ends(
+                "You are a lamp.".into(),
+                crate::tools::Settings {
+                    clock: true,
+                    ..Default::default()
+                },
+            );
+            let told = texts();
             assert!(
                 told.text.contains("Your clock read this as you were asked"),
                 "{}",
@@ -3859,6 +4136,38 @@ mod tests {
         assert_eq!(heeding.signs(9, (0, 0)).room, crate::room_told::Room::Busy);
     }
 
+    /// #1712 (Tests 20:22, the first builder 20:29):
+    /// `LAMP_SPOKEN_TO=day-and-night` on the second route as the only voice
+    /// reads the night as the Live worker does. With the day's own bars, a
+    /// name heard close to the lamp at 0.95 in a busy room, nobody turned to
+    /// it and no words calling it, is held by day (#829's eye drops) and
+    /// plays at night; with `on` alone it plays either way. Before, this
+    /// route never told its rule the night, and held it at night too.
+    #[test]
+    fn as_the_only_voice_the_day_and_the_night_bars_are_read_as_on_live() {
+        use crate::room_told::Room;
+        let signs = || super::Signs {
+            room: Room::Busy,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(false),
+            names: vec![(1_000_100_000, 0.95)],
+            near: true,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let judged = |by_day: bool, night: bool| {
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, by_day);
+            heeding.night = if night { || true } else { || false };
+            heeding.judge(9, line, "What time is it?", signs())
+        };
+        assert!(judged(true, false).is_some(), "by day, held");
+        assert_eq!(judged(true, true), None, "at night, played");
+        assert_eq!(judged(false, false), None, "with on alone, by day");
+        assert_eq!(judged(false, true), None, "with on alone, at night");
+    }
+
     /// #1712: the name note, as the Live route gives it: the model is told
     /// when the lamp's name was heard as the line began or during it, not
     /// for a hearing long before; in a busy room, with `needs_face`, only
@@ -3951,6 +4260,110 @@ mod tests {
             .and_then(|ms| ms.parse::<u64>().ok());
         assert_eq!(counted, Some(0), "the battery's pattern reads it");
         assert!(super::run_after(&crate::tools::Route::Clock, "the_time", 7).is_none());
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_REMARKS` on the second
+    /// route as the lamp's only voice. In a busy room a remark to the room,
+    /// let out only as the conversation going on, is held as on Live (#829,
+    /// the umbrella and the car); what calls the lamp plays; without the
+    /// switch the remark plays. With `--attention` busy or not, and with
+    /// `--spoken-to` or not.
+    #[test]
+    fn as_the_only_voice_a_remark_to_the_room_is_held_with_the_switch() {
+        use crate::room_told::Room;
+        let signs = || super::Signs {
+            room: Room::Busy,
+            going_on: true,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let remarks = [
+            "I should bring an umbrella then.",
+            "Okay, I will book the car for eight.",
+        ];
+        for strict in [false, true] {
+            for spoken_to in [false, true] {
+                let judged = |held_back: bool, heard: &str| {
+                    let mut heeding = super::Heeding::new(strict, false, None, None);
+                    heeding.as_the_only_voice(held_back, spoken_to, false);
+                    heeding.judge(9, line, heard, signs())
+                };
+                for remark in remarks {
+                    assert_eq!(
+                        judged(true, remark),
+                        Some(crate::remarks::REMARK),
+                        "{remark}, strict {strict}, spoken_to {spoken_to}"
+                    );
+                    assert_eq!(judged(false, remark), None, "{remark} without the switch");
+                }
+                assert_eq!(judged(true, "Lamp, and tomorrow?"), None, "called");
+            }
+        }
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_CUT_INS_NOT_TALK` on the second
+    /// route as the only voice. The room this route keeps (`keeping_room`)
+    /// leaves lines said over the lamp's own answer out of its talk, as the
+    /// Live worker's room does: three such lines left alone do not make it
+    /// busy; without the switch they do. The engine marks such a line at its
+    /// Start (`over_the_lamps_voice`, `second_provider.rs`). In tests the room
+    /// is the thread's own, so each case runs on a thread of its own.
+    #[test]
+    fn as_the_only_voice_lines_said_over_the_lamp_are_not_talk_with_the_switch() {
+        let busy_after_three = |cut_ins_not_talk: bool| {
+            std::thread::spawn(move || {
+                let _tick = super::keeping_room(false, cut_ins_not_talk, None, None);
+                let mut room = crate::room_told::room().lock().unwrap();
+                let now = monotonic_us();
+                for request in 1..=3 {
+                    room.heard(request, now);
+                    room.began_over_the_lamp(request);
+                    room.ended(request, now);
+                    room.unanswered(request, now);
+                }
+                room.at(now) == crate::room_told::Room::Busy
+            })
+            .join()
+            .unwrap()
+        };
+        assert!(!busy_after_three(true), "with the switch: not talk");
+        assert!(busy_after_three(false), "without it: talk, and busy");
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_SPOKEN_TO=day-and-night` on
+    /// the second route as the only voice. By day, with the day's own bars,
+    /// a name heard close to the lamp at 0.95 in a busy room, nobody turned
+    /// to it and no words calling it, is held, as on Live (#829, the eye
+    /// drops); with `on` alone it plays. The night's bars are not read here:
+    /// this route never tells its rule the night (Live does, from
+    /// `local_time::night_here`), so it judges every hour as day.
+    #[test]
+    fn as_the_only_voice_the_days_bars_hold_a_name_heard_close_by_day() {
+        use crate::room_told::Room;
+        let signs = || super::Signs {
+            room: Room::Busy,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(false),
+            names: vec![(1_000_100_000, 0.95)],
+            near: true,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let judged = |by_day: bool| {
+            let mut heeding = super::Heeding::new(true, false, None, None);
+            heeding.as_the_only_voice(false, true, by_day);
+            // By day, whatever the hour the test runs at (Third on #1712,
+            // 21:36: from 21:00 it failed once #1928 read the night).
+            heeding.night = || false;
+            heeding.judge(9, line, "What time is it?", signs())
+        };
+        assert!(judged(true).is_some(), "by day, held");
+        assert_eq!(judged(false), None, "with on alone, played");
     }
 
     /// #1712, lamp-4ace's A/B: after a hand-over and 104 s, every line
@@ -4526,6 +4939,138 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// #1934: with `deepseek_base_url`, DeepSeek's chat and search go to the
+    /// relay with the relay's credential (`llm_credential_file`), and a lamp
+    /// with no `deepseek.key`, nor any unit credential at all, runs. The
+    /// chat's request is DeepSeek's (`/chat/completions`, thinking off),
+    /// the search's DeepSeek's (`/v1/tools/search`), each with the relay
+    /// key as its bearer.
+    #[tokio::test]
+    async fn through_the_relay_deepseek_takes_the_relay_key_and_needs_no_deepseek_key() {
+        use super::super::services::Services;
+        use super::{ChatRoute, RouteFlags, SearchRoute};
+        use futures_util::StreamExt;
+        use std::os::unix::fs::PermissionsExt;
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-second-relay-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let private = |path: std::path::PathBuf, text: &str| {
+            std::fs::write(&path, text).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            path
+        };
+        let llm = private(dir.join("llm.key"), "relay-key");
+        let second = private(
+            dir.join("second.json"),
+            &format!(
+                r#"{{"llm_base_url":"https://relay.example.invalid/v1","llm_model":"m","llm_credential_file":"{}","deepseek_base_url":"https://relay.example.invalid/deepseek"}}"#,
+                llm.display()
+            ),
+        );
+        let loaded = crate::second_config::load_from_path(&second).unwrap();
+        assert_eq!(
+            loaded.hosted.deepseek_base_url.as_deref(),
+            Some("https://relay.example.invalid/deepseek")
+        );
+        assert_eq!(
+            super::deepseek_key(&loaded, None).unwrap().expose(),
+            "relay-key"
+        );
+        // A local server stands in for the relay: each request's first line,
+        // its bearer and its body.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let mut seen = Vec::new();
+            for answer in [
+                "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\ndata: {\"choices\":[{\"delta\":{\"content\":\"Hi.\"}}]}\n\ndata: [DONE]\n\n",
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\nconnection: close\r\ncontent-length: 14\r\n\r\n{\"results\":[]}",
+            ] {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut request = Vec::new();
+                let mut buffer = [0; 65_536];
+                loop {
+                    let n = socket.read(&mut buffer).await.unwrap();
+                    request.extend_from_slice(&buffer[..n]);
+                    let text = String::from_utf8_lossy(&request).to_string();
+                    if let Some((head, body)) = text.split_once("\r\n\r\n") {
+                        let length: usize = head
+                            .lines()
+                            .find_map(|line| {
+                                line.to_lowercase()
+                                    .strip_prefix("content-length: ")
+                                    .map(|n| n.trim().parse().unwrap())
+                            })
+                            .unwrap_or(0);
+                        if body.len() >= length {
+                            break;
+                        }
+                    }
+                }
+                seen.push(String::from_utf8(request).unwrap());
+                socket.write_all(answer.as_bytes()).await.unwrap();
+            }
+            seen
+        });
+        let mut config = loaded;
+        config.hosted.deepseek_base_url = Some(format!("http://{address}/deepseek"));
+        let provider: crate::config::ProviderConfig = serde_json::from_str(&format!(
+            r#"{{"endpoint":"wss://relay.example.invalid/ws","model":"m","voice":"Kore","credential_file":"{}"}}"#,
+            llm.display()
+        ))
+        .unwrap();
+        let none: super::super::net::Declare = std::sync::Arc::new(Vec::new);
+        let chat_route = RouteFlags {
+            chat: Some(ChatRoute::DeepSeek),
+            ..RouteFlags::default()
+        };
+        // No unit credentials at all: no deepseek.key is asked for.
+        let net = super::services(config.clone(), &provider, chat_route, None, none).unwrap();
+        let events: Vec<_> = net
+            .chat(vec![super::super::net::Message::user("hello")])
+            .collect()
+            .await;
+        assert!(events.iter().all(Result::is_ok), "{events:?}");
+        let search_route = RouteFlags {
+            search: Some(SearchRoute::DeepSeek),
+            ..RouteFlags::default()
+        };
+        let search = super::search_for(&config, search_route, None)
+            .unwrap()
+            .unwrap();
+        search
+            .answer(
+                super::super::net::search::NAME,
+                &serde_json::json!({"query": "rain in Hanoi"}),
+            )
+            .await;
+        let seen = server.await.unwrap();
+        let chat = seen[0].to_lowercase();
+        assert!(
+            chat.starts_with("post /deepseek/chat/completions http/1.1"),
+            "{chat}"
+        );
+        assert!(chat.contains("authorization: bearer relay-key"));
+        assert!(chat.contains(r#""thinking":{"type":"disabled"}"#));
+        let searched = seen[1].to_lowercase();
+        assert!(
+            searched.starts_with("post /deepseek/v1/tools/search http/1.1"),
+            "{searched}"
+        );
+        assert!(searched.contains("authorization: bearer relay-key"));
+        // Without a base URL, DeepSeek's own API still needs deepseek.key.
+        let mut own = config;
+        own.hosted.deepseek_base_url = None;
+        let error = super::deepseek_key(&own, None).err().unwrap().to_string();
+        assert!(error.contains("CREDENTIALS_DIRECTORY"), "{error}");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     /// The search's functions go beside the lamp's within Live's bound of
     /// 32: the search before a skill's last function, the fetch only with
     /// room left.
@@ -4608,5 +5153,198 @@ mod tests {
             )),
             others(crate::tools::declared(&settings(false)))
         );
+    }
+}
+
+/// twelve-P2 (#1693, the first builder at 21:14 on #1930): with the memory's
+/// switches on, the second route offers and runs what the Live route does,
+/// through its own calls: `remember::start` as its worker starts it,
+/// `tools::declared` as it declares, `tools::answer_keeping_news` as it
+/// answers a call within a turn's memory scope, and `remember::told_for_session`
+/// as it opens a person's session. In a child process: the memory, its
+/// switches and the Days client are this process's globals.
+#[cfg(test)]
+mod memory_switches {
+    use crate::memory_scope::{FaceCache, RequestKey, RequestScope};
+    use lamp_gemini::ToolCall;
+    use serde_json::{Value, json};
+    use std::{
+        io::{BufRead, BufReader, Write},
+        sync::{Arc, Mutex},
+        time::Instant,
+    };
+
+    const CHILD: &str = "LAMP_SECOND_MEMORY_SWITCHES_TEST_CHILD";
+    const NAME: &str =
+        "with_the_memorys_switches_the_second_route_forgets_tells_a_thread_and_lists_rules";
+
+    fn call(name: &str) -> ToolCall {
+        ToolCall {
+            id: format!("c-{name}"),
+            name: name.into(),
+            args: json!({}),
+        }
+    }
+
+    /// The memory part, as much of it as these calls ask: every request
+    /// line kept, and each answered as `lamp-memory` answers it.
+    fn memory(socket: &std::path::Path) -> Arc<Mutex<Vec<Value>>> {
+        let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
+        let read = Arc::new(Mutex::new(Vec::new()));
+        let kept = read.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let kept = kept.clone();
+                std::thread::spawn(move || {
+                    let mut lines = BufReader::new(stream.try_clone().unwrap()).lines();
+                    while let Some(Ok(line)) = lines.next() {
+                        let request: Value = serde_json::from_str(&line).unwrap();
+                        let answer = match request["op"].as_str() {
+                            // A person's frozen note (`remember::PERSON_SCOPE`).
+                            Some("session_open") => json!({"ok":true,"snapshot":{
+                                "session":request["session"],"opened_unix_ms":1,"generation":1,
+                                "invalidated":false,"source_ids":[7],
+                                "note":json!({"scope":"caller-supplied person; identity not verified",
+                                    "untrusted":true,"facts":[{"id":7,"kind":"preference","text":"tea"}]})
+                                    .to_string()}}),
+                            Some("follow_up") => json!({"ok":true,"follow_up":
+                                {"id":12,"category":"thread","text":"Sister's wedding is on Saturday"}}),
+                            Some("forget_all") => json!({"ok":true,"removed":5}),
+                            Some("kept") => json!({"ok":true,"entries":[]}),
+                            _ => json!({"ok":true}),
+                        };
+                        kept.lock().unwrap().push(request);
+                        if writeln!(stream, "{answer}").is_err() {
+                            return;
+                        }
+                    }
+                });
+            }
+        });
+        read
+    }
+
+    #[test]
+    fn with_the_memorys_switches_the_second_route_forgets_tells_a_thread_and_lists_rules() {
+        if std::env::var(CHILD).ok().as_deref() != Some("1") {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    &format!("second_provider::worker::memory_switches::{NAME}"),
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .env(crate::remember::DAYS_ENVIRONMENT, "on")
+                .env(crate::remember::FORGET_ALL_ENVIRONMENT, "on")
+                .env(crate::remember::THREADS_ENVIRONMENT, "on")
+                .env(crate::rules::ENVIRONMENT, "on")
+                .output()
+                .unwrap();
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(
+                output.status.success() && stdout.contains("1 passed"),
+                "{stdout}\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("lv-second-memory-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        let socket = dir.join("memory.sock");
+        let read = memory(&socket);
+        // As the second worker starts its memory, declares and answers.
+        crate::remember::start(socket.clone(), None);
+        let settings = crate::tools::Settings {
+            memory: Some(socket.clone()),
+            ..crate::tools::Settings::default()
+        };
+        let declared: Vec<String> = crate::tools::declared(&settings)
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect();
+        for name in [
+            crate::remember::FORGET_EVERYTHING,
+            crate::rules::LIST_RULES,
+            crate::rules::KEEP_RULE,
+        ] {
+            assert!(declared.iter().any(|declared| declared == name), "{name}");
+        }
+        // Someone known at the lamp, bound to the turn as its engine binds it.
+        let known = dir.join("known");
+        std::fs::write(&known, "A").unwrap();
+        let faces = FaceCache::default();
+        faces.replace(
+            faces.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&known),
+        );
+        let request = 5;
+        let scope = RequestScope::new(
+            RequestKey {
+                worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            faces.snapshot(Instant::now()),
+        );
+        let lease = scope.lease();
+        let person = crate::remember::person_id("A");
+        assert_eq!(lease.scope().unwrap().person(), Some(person.as_str()));
+
+        // "Forget everything about me" reaches the memory and is answered.
+        let told = crate::tools::answer_keeping_news(
+            &settings,
+            &call(crate::remember::FORGET_EVERYTHING),
+            request,
+            true,
+            Some(&lease),
+        );
+        assert_eq!(told["forgotten"], true, "{told}");
+        assert_eq!(told["everything"], true, "{told}");
+        assert!(
+            read.lock()
+                .unwrap()
+                .iter()
+                .any(|line| line["op"] == "forget_all" && line["person"] == person.as_str()),
+            "{:?}",
+            read.lock().unwrap()
+        );
+
+        // A session opened for them is told the one open thread.
+        let note = crate::remember::told_for_session(&socket, 2, Some(&person));
+        assert!(
+            note.contains("\"Sister's wedding is on Saturday\""),
+            "{note}"
+        );
+        assert!(
+            read.lock()
+                .unwrap()
+                .iter()
+                .any(|line| line["op"] == "follow_up" && line["person"] == person.as_str())
+        );
+
+        // Their rules are listed from the memory too.
+        let before = read.lock().unwrap().len();
+        let listed = crate::tools::answer_keeping_news(
+            &settings,
+            &call(crate::rules::LIST_RULES),
+            request,
+            true,
+            Some(&lease),
+        );
+        assert!(listed.get("error").is_none(), "{listed}");
+        assert!(
+            read.lock().unwrap()[before..]
+                .iter()
+                .any(|line| line["op"] == "kept"
+                    && line["person"]
+                        .as_str()
+                        .is_some_and(|scope| scope.starts_with("r-"))),
+            "{:?}",
+            read.lock().unwrap()
+        );
+        drop(scope);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

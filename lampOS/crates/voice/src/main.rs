@@ -672,6 +672,18 @@ fn run() -> Result<()> {
                 lamp_voice::second_provider::probe::cache::run(Path::new(provider_config), Path::new(second_config), runs),
             )?;
         }
+        // probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS]
+        [command, provider_config, second_config, rest @ ..] if command == "probe-tools" => {
+            let usage = || io::Error::other("usage: probe-tools PROVIDER_CONFIG SECOND_CONFIG [RUNS of 1 to 20]");
+            let runs = match rest {
+                [] => 3,
+                [runs] => runs.parse().ok().filter(|runs| (1..=20).contains(runs)).ok_or_else(usage)?,
+                _ => return Err(usage().into()),
+            };
+            tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(
+                lamp_voice::second_provider::probe::tools::run(Path::new(provider_config), Path::new(second_config), runs),
+            )?;
+        }
         // probe-cascade PROVIDER_CONFIG SECOND_CONFIG [RUNS] [--look JPEG]
         [command, provider_config, second_config, rest @ ..] if command == "probe-cascade" => {
             let (runs, look) = probe_options(rest)?;

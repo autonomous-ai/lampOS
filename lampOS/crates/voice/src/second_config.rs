@@ -68,6 +68,12 @@ struct Raw {
     /// absent: [`DEEPSEEK_MODEL`].
     #[serde(default)]
     deepseek_model: Option<String>,
+    /// Where `LAMP_SECOND_CHAT=deepseek` and `LAMP_SECOND_SEARCH=deepseek`
+    /// go instead of DeepSeek's own API: the Autonomous relay (#1934), with
+    /// the relay's credential (`llm_credential_file`) in place of the unit's
+    /// `deepseek.key`. Absent: DeepSeek's own, as before.
+    #[serde(default)]
+    deepseek_base_url: Option<String>,
 }
 
 /// OpenRouter's OpenAI-compatible API.
@@ -99,6 +105,9 @@ pub struct Hosted {
     pub openrouter_model: String,
     pub openrouter_effort: String,
     pub deepseek_model: String,
+    /// The relay DeepSeek's chat and search go through, if not DeepSeek's
+    /// own API ([`DEEPSEEK_BASE_URL_ENV`] over `deepseek_base_url`).
+    pub deepseek_base_url: Option<String>,
 }
 
 /// A web search service the model may call, as `second.json` names it.
@@ -123,6 +132,9 @@ pub const GEMINI_SPEECH_MODEL: &str = "gemini-3.8-flash-lite-tts";
 /// the owner's, a unit's drop-in the battery's). Passed to the second
 /// route's worker alone (`process.rs`), checked as the file's are.
 pub const GEMINI_BASE_URL_ENV: &str = "LAMP_SECOND_GEMINI_BASE_URL";
+/// The same for DeepSeek's chat and search through the relay (#1934): over
+/// `second.json`'s `deepseek_base_url`.
+pub const DEEPSEEK_BASE_URL_ENV: &str = "LAMP_SECOND_DEEPSEEK_BASE_URL";
 pub const SPEECH_MODEL_ENV: &str = "LAMP_SECOND_SPEECH_MODEL";
 /// Words speech to text is told to expect, beside the lamp's name, from the
 /// voice unit's environment, comma-separated: the places people here ask
@@ -343,6 +355,7 @@ pub fn load_from_path(path: &Path) -> io::Result<SecondConfig> {
         openrouter_model,
         openrouter_effort,
         deepseek_model: slug(raw.deepseek_model, DEEPSEEK_MODEL)?,
+        deepseek_base_url: given(raw.deepseek_base_url).map(checked_url).transpose()?,
     };
     Ok(SecondConfig {
         search,
@@ -479,7 +492,7 @@ fn gemini_model(name: String) -> io::Result<String> {
 }
 
 impl SecondConfig {
-    /// With [`GEMINI_BASE_URL_ENV`], [`SPEECH_MODEL_ENV`] and
+    /// With [`GEMINI_BASE_URL_ENV`], [`DEEPSEEK_BASE_URL_ENV`], [`SPEECH_MODEL_ENV`] and
     /// [`KEY_TERMS_ENV`] as `var` gives them, over the file's; unset or
     /// empty, the file's stay. Refused as the file's fields are, naming the
     /// variable. [`FLUX_ENV`] is on for `on` alone.
@@ -502,6 +515,10 @@ impl SecondConfig {
         }
         if let Some(url) = given(GEMINI_BASE_URL_ENV)? {
             self.gemini.base_url = checked_url(url).map_err(named(GEMINI_BASE_URL_ENV))?;
+        }
+        if let Some(url) = given(DEEPSEEK_BASE_URL_ENV)? {
+            self.hosted.deepseek_base_url =
+                Some(checked_url(url).map_err(named(DEEPSEEK_BASE_URL_ENV))?);
         }
         // The chosen voice's model: Gemini's, or the configured voice's
         // (ElevenLabs, OpenAI); only the voice in use reads its own (#1712:
@@ -749,6 +766,11 @@ mod tests {
         for (name, value) in [
             (GEMINI_BASE_URL_ENV, "http://plain.example.invalid"),
             (GEMINI_BASE_URL_ENV, "https://relay.example.invalid/?key=1"),
+            (DEEPSEEK_BASE_URL_ENV, "http://plain.example.invalid"),
+            (
+                DEEPSEEK_BASE_URL_ENV,
+                "https://relay.example.invalid/?key=1",
+            ),
             (SPEECH_MODEL_ENV, "tts/../chat"),
             (KEY_TERMS_ENV, "Hanoi,,Hue"),
             (KEY_TERMS_ENV, "Hanoi&keyterm=x"),
@@ -774,6 +796,7 @@ mod tests {
                 openrouter_model: "deepseek/deepseek-v4.1-flash-1017".into(),
                 openrouter_effort: "none".into(),
                 deepseek_model: "deepseek-flash".into(),
+                deepseek_base_url: None,
             }
         );
         let (_, config) = written(

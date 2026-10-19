@@ -1484,6 +1484,7 @@ mod tests {
             cloud.observe(link(1, true), monotonic_us()).unwrap();
             Self {
                 rig: Rig {
+                    expression_out: None,
                     second: Some(route),
                     microphone: crate::options::Microphone::Mic2,
                     end_silence_blocks: None,
