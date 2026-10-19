@@ -423,6 +423,15 @@ const NOT_NAMES_OPENING: &[&str] = &[
 /// lamp's, nor a word the service writes in its place, nor one that opens a
 /// sentence of its own ("Okay,").
 pub fn addresses_someone_else(heard: &str) -> bool {
+    addresses_someone_else_on(heard, false)
+}
+
+/// [`addresses_someone_else`], with the words written for the lamp's name
+/// standing alone ([`STAND_ALONE_INS`]) taken as the lamp's, never as a
+/// person's name, when `stand_alone_ins`: on the second route only
+/// ([`Attention::count_stand_alone_ins`]).
+pub fn addresses_someone_else_on(heard: &str, stand_alone_ins: bool) -> bool {
+    let alone = stand_alone(stand_alone_ins);
     let is_name = |word: &str| {
         word.chars().next().is_some_and(char::is_uppercase)
             && word.chars().all(char::is_alphabetic)
@@ -432,7 +441,7 @@ pub fn addresses_someone_else(heard: &str) -> bool {
                 .any(|not| word.eq_ignore_ascii_case(not))
             && !STAND_INS
                 .iter()
-                .chain(STAND_ALONE_INS)
+                .chain(alone)
                 .any(|not| word.eq_ignore_ascii_case(not))
     };
     let words: Vec<&str> = heard.split_whitespace().collect();
@@ -556,9 +565,19 @@ const STAND_INS: &[&str] = &[
 /// else; "Len", "Palin" and "Palan" on lamp-52e6 on 15 Oct; "Land" and
 /// "Line" in the first builder's trials; "Lin" and "Lump" as the first
 /// builder asked). "Line up the meetings" is no call.
+///
+/// On the second route only (#1973, the first builder at 22:38): Deepgram
+/// writes "Lamp" so, Gemini's transcript doesn't, and Linh and Lin are
+/// common names, so "Lin, pass me that." between people stays held on a
+/// Live lamp.
 const STAND_ALONE_INS: &[&str] = &[
     "lynn", "len", "lin", "lump", "land", "line", "palin", "palan",
 ];
+
+/// [`STAND_ALONE_INS`] when they count, else none.
+fn stand_alone(counted: bool) -> &'static [&'static str] {
+    if counted { STAND_ALONE_INS } else { &[] }
+}
 
 /// Greetings that may come before the name of a call ("Hey Lamp,").
 const GREETINGS: &[&str] = &["hey", "hi", "ok", "okay", "oh", "hello"];
@@ -571,6 +590,14 @@ const GREETINGS: &[&str] = &["hey", "hi", "ok", "okay", "oh", "hello"];
 /// writes in the name's place is read as [`called`] reads it: first, or
 /// after a greeting.
 pub fn called_by_name(heard: &str) -> bool {
+    called_by_name_on(heard, false)
+}
+
+/// [`called_by_name`], with the words written for the lamp's name standing
+/// alone ([`STAND_ALONE_INS`]) counted as its call when `stand_alone_ins`:
+/// on the second route only ([`Attention::count_stand_alone_ins`]).
+pub fn called_by_name_on(heard: &str, stand_alone_ins: bool) -> bool {
+    let alone = stand_alone(stand_alone_ins);
     // Words, and the punctuation between them that marks a sentence's start
     // or a comma.
     #[derive(Clone, Copy, PartialEq)]
@@ -605,7 +632,7 @@ pub fn called_by_name(heard: &str) -> bool {
         };
         // The name, or a word written for it set off as a name is: nothing
         // after it but a comma, a stop or the line's end.
-        let standing_alone = is(word, STAND_ALONE_INS)
+        let standing_alone = is(word, alone)
             && matches!(
                 tokens.get(at + 1),
                 None | Some(Token::Comma) | Some(Token::Stop)
@@ -831,6 +858,9 @@ fn decide_called(
 /// What the worker keeps for the request in hand.
 #[derive(Default)]
 pub struct Attention {
+    /// The words written for the lamp's name standing alone count as its
+    /// call ([`STAND_ALONE_INS`]): the second route's rule only.
+    stand_alone_ins: bool,
     request: u64,
     /// The session the request began on, and how many requests that were
     /// heard have begun on it. A turn the lamp wrote itself is not one:
@@ -1092,7 +1122,7 @@ impl Attention {
                 .ended_us
                 .or(self.began_us)
                 .is_some_and(|end| end.saturating_add(ANOTHER_REPLY_US) >= now_us)
-            && addresses_someone_else(&self.heard);
+            && addresses_someone_else_on(&self.heard, self.stand_alone_ins);
         // The line before, if it was a question the lamp left unanswered
         // and ended just now (#829, 15:40).
         let after_question = self.spoken_to
@@ -1162,10 +1192,10 @@ impl Attention {
     /// reviewer on #1158). The eyes are not read for a bare call, so only
     /// its words or a sure hearing show it then.
     fn call_shown(&self) -> bool {
-        !addresses_someone_else(&self.heard)
+        !addresses_someone_else_on(&self.heard, self.stand_alone_ins)
             && (self.named_sure
                 || self.near && self.best_score >= NEAR_SCORE && !self.day_bars()
-                || called_by_name(&self.heard))
+                || called_by_name_on(&self.heard, self.stand_alone_ins))
     }
 
     /// A request began on `session` at `now_us` that continues the one in
@@ -1298,6 +1328,13 @@ impl Attention {
         if request == self.request {
             self.cut_in = true;
         }
+    }
+
+    /// Count the words written for the lamp's name standing alone as its
+    /// call ([`STAND_ALONE_INS`]), as the second route's rule does (#1973,
+    /// the first builder at 22:38). Off, as the Live worker's rule is.
+    pub fn count_stand_alone_ins(&mut self, on: bool) {
+        self.stand_alone_ins = on;
     }
 
     /// Whether the lamp's last line was a question, for the next judgement.
@@ -1448,7 +1485,7 @@ impl Attention {
             return Some(verdict);
         }
         let called_in_text = if self.name_in_passing_ignored {
-            called_by_name(&self.heard)
+            called_by_name_on(&self.heard, self.stand_alone_ins)
         } else {
             called(&self.heard)
         };
@@ -1537,7 +1574,9 @@ impl Attention {
         // its own words calling it by name. On lamp-4ace on 16 October at
         // 17:08, request 169 played on the near rule alone and answered
         // colleagues talking about eye drops beside it.
-        let near_shows = !self.day_bars() || turned == Some(true) || called_by_name(&self.heard);
+        let near_shows = !self.day_bars()
+            || turned == Some(true)
+            || called_by_name_on(&self.heard, self.stand_alone_ins);
         if strict && room == Room::Busy && self.near && self.best_score >= NEAR_SCORE && near_shows
         {
             let verdict = Verdict::Play(NAMED_NEAR);
@@ -1686,7 +1725,7 @@ impl Attention {
     /// 17:49: such lines were journaled as let out by trust).
     pub fn sign(&self, turned: Option<bool>) -> Option<&'static str> {
         let called_in_text = if self.name_in_passing_ignored {
-            called_by_name(&self.heard)
+            called_by_name_on(&self.heard, self.stand_alone_ins)
         } else {
             called(&self.heard)
         };
@@ -1735,7 +1774,7 @@ impl Attention {
         self.named
             || self.tapped
             || if self.name_in_passing_ignored {
-                called_by_name(&self.heard)
+                called_by_name_on(&self.heard, self.stand_alone_ins)
             } else {
                 called(&self.heard)
             }
@@ -1752,7 +1791,9 @@ impl Attention {
             None
         } else if self.after_another {
             Some(ANSWERING_ANOTHER)
-        } else if addresses_someone_else(&self.heard) && self.heard.contains('?') {
+        } else if addresses_someone_else_on(&self.heard, self.stand_alone_ins)
+            && self.heard.contains('?')
+        {
             // Only a question put to that person: a request that opens
             // with a word and a comma is the lamp's (Second on #1090).
             Some(TO_ANOTHER)
@@ -3533,8 +3574,8 @@ mod tests {
         ] {
             assert!(addresses_someone_else(calls), "{calls}");
         }
-        // #1712: the words written for the lamp's name are not someone
-        // else's, and standing alone they call the lamp.
+        // #1712: on the second route the words written for the lamp's name
+        // are not someone else's, and standing alone they call the lamp.
         for heard in [
             "Hey, Lynn. How are you today?",
             "Hey Lynn, how are you today?",
@@ -3543,16 +3584,28 @@ mod tests {
             "Thank you. Lynn.",
             "Palin, set a timer for five minutes.",
             "Len, what's the weather?",
+            "Lin, what time is it?",
         ] {
-            assert!(!addresses_someone_else(heard), "{heard}");
-            assert!(called_by_name(heard), "{heard}");
+            assert!(!addresses_someone_else_on(heard, true), "{heard}");
+            assert!(called_by_name_on(heard, true), "{heard}");
         }
         for heard in [
             "Line up the meetings for me.",
             "We should land the plan soon.",
         ] {
+            assert!(!called_by_name_on(heard, true), "{heard}");
+        }
+        // #1973, the first builder at 22:38: on Live they are people's
+        // names, as before.
+        for heard in [
+            "Lin, pass me that.",
+            "Lynn, what time is it?",
+            "Thank you, Lin.",
+        ] {
             assert!(!called_by_name(heard), "{heard}");
         }
+        assert!(addresses_someone_else("Lin, are you coming?"));
+        assert!(!addresses_someone_else_on("Lin, are you coming?", true));
         for not in [
             "Lamp, what time is it?",
             "Hey Lamp, tell me a story.",
@@ -3566,6 +3619,41 @@ mod tests {
             "",
         ] {
             assert!(!addresses_someone_else(not), "{not}");
+        }
+    }
+
+    /// #1973, the first builder at 22:38: on Live "Lin, pass me that."
+    /// between people is held, as before, since "Lin" is a person's name
+    /// there; with the second route's stand-ins, "Lin, what time is it?"
+    /// calls the lamp, in a busy room too.
+    #[test]
+    fn the_names_stand_ins_call_the_lamp_on_the_second_route_only() {
+        const S: u64 = 1_000_000;
+        let judged = |heard: &str, stand_alone: bool, room: Room| {
+            // As the units run it: the name in passing ignored.
+            let mut attention = Attention::default();
+            attention.speak_when_spoken_to(true);
+            attention.ignore_name_in_passing(true);
+            attention.count_stand_alone_ins(stand_alone);
+            attention.began_at(60, 7, 10 * S);
+            attention.heard(heard);
+            attention.first_output_busy(60, room, false, false, None)
+        };
+        for room in [Room::Quiet, Room::Busy] {
+            assert!(
+                matches!(
+                    judged("Lin, pass me that.", false, room),
+                    Some(Verdict::Hold(_))
+                ),
+                "Live, {room:?}"
+            );
+            assert!(
+                matches!(
+                    judged("Lin, what time is it?", true, room),
+                    Some(Verdict::Play(_))
+                ),
+                "the second route, {room:?}"
+            );
         }
     }
 

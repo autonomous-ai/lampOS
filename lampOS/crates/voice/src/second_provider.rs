@@ -2039,7 +2039,7 @@ impl Prepared {
     fn misfit(&self, base: &[Message], notes: &[String], said: &str) -> Option<&'static str> {
         let asked = &self.messages[..self.messages.len().saturating_sub(1)];
         let asked = asked.get(..asked.len().saturating_sub(self.notes.len()));
-        let named = crate::attention::called_by_name(said);
+        let named = crate::attention::called_by_name_on(said, true);
         let told = notes.iter().filter(|note| {
             !(named && [crate::called::NOTE, crate::called::NOTE_HEARD_AS].contains(&note.as_str()))
         });

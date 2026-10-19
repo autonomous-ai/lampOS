@@ -203,10 +203,16 @@ With the name heard in the sound it was one, and "Helen" is now among the
 words the text may show a call by (with "Mom", "Amen" and "Weiland", each
 written for the lamp's name at least once in its records).
 
-More words the service writes for the name ("Lynn", "Len", "Lin", "Lump",
+**On the second route only** (#1973, the first builder at 22:38), more
+words the service writes for the name ("Lynn", "Len", "Lin", "Lump",
 "Land", "Line", "Palin", "Palan", `attention::STAND_ALONE_INS`) are never
 taken for someone else's name, and call the lamp only standing alone, set
-off as a name is: "Hey, Lynn. How are you today?", "Lynn, what time is
+off as a name is. Its worker's rule counts them
+(`Attention::count_stand_alone_ins`, `called_by_name_on`). Deepgram writes
+"Lamp" so; Gemini's transcript doesn't, and Linh and Lin are common names.
+So on Live they are people's names as before, and "Lin, pass me that."
+between people stays held (`the_names_stand_ins_call_the_lamp_on_the_second_route_only`).
+On the second route: "Hey, Lynn. How are you today?", "Lynn, what time is
 it?", "Thank you, Lynn." are its calls, "Line up the meetings" is not
 (`called_by_name`). On lamp-4ace on 19 Oct, on the second route, "Hey Lamp,
 how are you today?" and "Lamp, what time is it?" came back with "Lynn" and

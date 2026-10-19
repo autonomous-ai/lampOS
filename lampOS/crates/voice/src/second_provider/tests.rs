@@ -3737,7 +3737,9 @@ async fn each_spoken_line_is_asked_with_its_call_note() {
     });
     let (engine, _, _) = scripted(script.clone());
     let mut engine = engine.noting_whether_called(Arc::new(|_, words| {
-        Some(worker::call_note(crate::attention::called_by_name(words)))
+        Some(worker::call_note(crate::attention::called_by_name_on(
+            words, true,
+        )))
     }));
     for request in 1..=2 {
         engine.submit(start(request));

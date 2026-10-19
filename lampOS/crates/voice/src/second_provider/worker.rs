@@ -1514,7 +1514,7 @@ pub fn serve(
     // Without the rule, a line's own words say whether it called the lamp.
     if !files.attention {
         engine = engine.noting_whether_called(Arc::new(|_, words| {
-            Some(call_note(crate::attention::called_by_name(words)))
+            Some(call_note(crate::attention::called_by_name_on(words, true)))
         }));
     }
     // Each judged turn's verdict on the bus, for the Policy's hello (#1155).
@@ -2127,6 +2127,8 @@ impl Heeding {
     ) -> Self {
         let mut attention = crate::attention::Attention::default();
         attention.ignore_name_in_passing(name_in_passing_ignored);
+        // Deepgram's "Lynn" and "Lin" for "Lamp" call it here, never on Live.
+        attention.count_stand_alone_ins(true);
         let bus = bus_root.and_then(|root| {
             let bus = lamp_bus::Bus::new(root).ok()?;
             let names = bus
