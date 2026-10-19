@@ -671,6 +671,7 @@ const BUS_TOPICS: &[&str] = &[
     "expression/light",
     "expression/state",
     "humans/faces/tracked",
+    "humans/familiar",
     "lamp/health",
     "lamp/online",
     "lamp/pause",

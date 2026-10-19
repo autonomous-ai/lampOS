@@ -90,6 +90,8 @@ mod presence;
 pub use presence::*;
 mod reports;
 pub use reports::*;
+mod familiar;
+pub use familiar::*;
 
 /// Why a message is not one its type allows, in words.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1327,6 +1329,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(chat_topics())
         .chain(presence_topics())
         .chain(reports_topics())
+        .chain(familiar_topics())
         .find_map(|(name, declaration)| (name == topic).then_some(declaration))
 }
 

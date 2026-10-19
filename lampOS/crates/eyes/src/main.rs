@@ -7,7 +7,7 @@
 
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-eyes --device ABSOLUTE_PATH --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --usb VENDOR:PRODUCT@TOPOLOGY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there. With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the journal says how open the largest\nface's mouth is each look, and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\n";
+const USAGE: &str = "lamp-eyes --device ABSOLUTE_PATH --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --usb VENDOR:PRODUCT@TOPOLOGY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). Each look\nsends one datagram to --body-socket: {\"face\":{\"x\":..,\"y\":..,\"size\":..,\"turned\":..}} or\n{\"face\":null}. The camera is open only while {\"camera\":true} keeps arriving on\n--permit-socket, at least every 1.5 s; {\"camera\":false} closes it at once. Without\n--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the\nnewest frame, and only that one, is kept in that file (mode 0600) while the camera is\nopen and removed when it closes: it is what the voice service shows the model. With\n--presence-file one line, the near face's height as a share of the picture's, is kept\nfresh in that file while there is a face: no picture, only that number. With\n--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember\na face when the voice service asks ({\"remember\":\"NAME\"} on the socket), forget it\n({\"forget\":\"NAME\"}), list the names ({\"list\":true}) and say whose face is at the\nlamp ({\"who\":true}). Only the prints of people who asked are kept, in --people\n(mode 0600); no picture. With --known-file, the name of the one known at the lamp is\nkept fresh in that file while they are there. With --visits on, each remembered person\nhas one familiarity number, rising once a day they are seen and halving every 14 days,\nwith no date or time of a visit kept, and with LAMP_BUS=on the level of the one at the\nlamp is said on humans/familiar, with no name (off unless given). With --leave-still-faces on, a face at a place\nwhere faces have come from for half an hour, every one small (under 0.14 of the height)\nand faint (scored under 0.8), is not a person: it is left out of what the body is told,\nthe bus and recognition (off unless given). With --full-look and --full-look-file the\ncamera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {\"look_full\":ID} on\n--permit-socket asks for one still: taken once the head has settled\n(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with\n{\"look_full\":ID,\"side\":PIXELS} at most that side across and 184 KiB, marked\nwith the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).\nWith --full-look-movement on the head settles on movement only: the camera's aim, the arm's\njoints with the head's, and never a joint's distance to its goal (off unless given).\nWith --mouth-model (the pinned Face Mesh V2), the journal says how open the largest\nface's mouth is each look, and with LAMP_EYES_SPEAKING=on that face's speaking reads it\n(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a\nline (voice/heard on the bus, from its first words until 2 s after it ends).\nWith --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),\nthe mesh runs under ONNX Runtime on one thread instead of tract.\n";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct Usb {
@@ -31,6 +31,9 @@ struct Arguments {
     who: Option<(PathBuf, PathBuf, PathBuf)>,
     /// The name of whoever known is at the lamp, kept fresh while they are.
     known_file: Option<PathBuf>,
+    /// How often each remembered person comes by is counted, and the level
+    /// of the one at the lamp said (`--visits on`, #1670). Off unless set.
+    visits: bool,
     /// Leave out a face that never moves (#763).
     leave_still: bool,
     /// Look half as often while one face sits still (#705).
@@ -108,6 +111,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     let (mut recogniser, mut people, mut who_socket, mut known_file) = (None, None, None, None);
     let (mut leave_still, mut full_look, mut full_look_file) = (None, None, None);
     let (mut steady_rate, mut full_look_movement, mut look_on_change) = (None, None, None);
+    let mut visits = None;
     let (mut mouth_model, mut mouth_on_heard, mut mouth_runtime) = (None, None, None);
     while let Some(key) = args.next() {
         if key == "--help" {
@@ -125,6 +129,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                 && known_file.is_none()
                 && leave_still.is_none()
                 && steady_rate.is_none()
+                && visits.is_none()
                 && look_on_change.is_none()
                 && full_look_movement.is_none()
                 && full_look.is_none()
@@ -167,6 +172,13 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
                     Some("on") => true,
                     Some("off") => false,
                     _ => return Err("--leave-still-faces is on or off"),
+                });
+            }
+            Some("--visits") if visits.is_none() => {
+                visits = Some(match value.to_str() {
+                    Some("on") => true,
+                    Some("off") => false,
+                    _ => return Err("--visits is on or off"),
                 });
             }
             Some("--steady-rate") if steady_rate.is_none() => {
@@ -237,6 +249,7 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         known_file,
         leave_still: leave_still.unwrap_or(false),
         steady_rate: steady_rate.unwrap_or(false),
+        visits: visits.unwrap_or(false),
         look_on_change: look_on_change.unwrap_or(false),
         full_look,
         full_look_file,
@@ -252,6 +265,9 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
     }
     if result.known_file.is_some() && result.who.is_none() {
         return Err("--known-file needs --recogniser, --people and --who-socket");
+    }
+    if result.visits && result.who.is_none() {
+        return Err("--visits needs --recogniser, --people and --who-socket");
     }
     if result.mouth_on_heard && result.mouth_model.is_none() {
         return Err("--mouth-on-heard needs --mouth-model");
@@ -380,6 +396,31 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
         known: Option<(String, f32, Instant)>,
         looked_for: Option<Instant>,
         taking: Option<(Taking, UnixStream)>,
+        /// How often each remembered person comes by is counted
+        /// (`--visits on`, #1670).
+        visits: bool,
+        /// When the day's visits were last looked at for writing.
+        scored_looked: Option<Instant>,
+        /// The lamp's zone, for the hour the day's visits are written.
+        zone: Option<lamp_local_time::LocalTime>,
+    }
+    /// Counts the remembered person recognised at the lamp, at most once in
+    /// sixteen hours, and says how familiar they are (#1670). A count that
+    /// cannot be written is said and the level read as it was.
+    fn familiar(
+        people: &mut People,
+        known: Option<&(String, f32, Instant)>,
+    ) -> Option<lamp_msgs::FamiliarLevel> {
+        let (name, _, _) = known?;
+        let now_unix_s = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs());
+        people.seen(name, now_unix_s);
+        people.familiar(name, now_unix_s).map(|level| match level {
+            lamp_eyes::who::Familiar::New => lamp_msgs::FamiliarLevel::New,
+            lamp_eyes::who::Familiar::Regular => lamp_msgs::FamiliarLevel::Regular,
+            lamp_eyes::who::Familiar::Close => lamp_msgs::FamiliarLevel::Close,
+        })
     }
     /// The name of the one known at the lamp, replaced whole, or no file.
     fn keep_known(path: &std::path::Path, name: Option<&str>) {
@@ -448,6 +489,20 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 known: None,
                 looked_for: None,
                 taking: None,
+                visits: arguments.visits,
+                scored_looked: None,
+                zone: arguments
+                    .visits
+                    .then(|| match lamp_local_time::LocalTime::zone("system") {
+                        Ok(zone) => Some(zone),
+                        Err(error) => {
+                            eprintln!(
+                                "lamp-eyes: the lamp's zone can't be read ({error}); visits are written at 03:00 UTC"
+                            );
+                            None
+                        }
+                    })
+                    .flatten(),
             })
         }
         None => None,
@@ -509,7 +564,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     let (mut frames_all, mut newest) = (0u64, 0usize);
     let mut presence = arguments.presence_file.clone().map(Presence::new);
     // The faces in view, for whoever listens on the lamp's bus.
-    let mut bus_out = lamp_eyes::bus_out::BusOut::from_environment();
+    let mut bus_out = lamp_eyes::bus_out::BusOut::from_environment(arguments.visits);
     // Faces that never move, left out when asked.
     let mut still = arguments.leave_still.then(lamp_eyes::still::Still::default);
     let mut epoch = 0u64;
@@ -581,6 +636,28 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 aside_counted = Some(Instant::now());
             }
             bus.report(camera, aside, now);
+        }
+        // Visits counted today reach the file once a UTC day begins, whoever
+        // is at the lamp (#1670), looked at once a minute.
+        if let Some(who) = who.as_mut()
+            && who.visits
+            && who
+                .scored_looked
+                .is_none_or(|at| at.elapsed() >= Duration::from_secs(60))
+        {
+            who.scored_looked = Some(Instant::now());
+            let now_unix_s = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_secs());
+            // At 03:00 in the lamp's own zone, followed as it changes; a
+            // zone that can't be read is UTC, said once.
+            let offset_s = match who.zone.as_ref() {
+                Some(zone) => i64::from(zone.offset_minutes_at(now_unix_s * 1_000)) * 60,
+                None => 0,
+            };
+            if let Err(error) = who.people.score(now_unix_s, offset_s) {
+                eprintln!("lamp-eyes: the day's visits were not written: {error}");
+            }
         }
         // What the voice service asks: one line. Remembering is answered
         // once the prints are taken.
@@ -685,7 +762,13 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 "lamp-eyes: remembered a face; {} people known",
                                 who.people.names().len()
                             );
-                            serde_json::json!({"remembered": name})
+                            // With visits counted, the voice tells them so in
+                            // one line (the first builder on #1670, 12:19).
+                            if who.visits {
+                                serde_json::json!({"remembered": name, "visits": true})
+                            } else {
+                                serde_json::json!({"remembered": name})
+                            }
                         }
                         // The face is known by another name: the voice asks
                         // the person before it is replaced.
@@ -1105,15 +1188,28 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                     .people
                                     .who(&print)
                                     .map(|(name, likeness)| (name, likeness, Instant::now()));
+                                if who.visits {
+                                    let level = familiar(&mut who.people, who.known.as_ref());
+                                    if let Some(bus) = bus_out.as_mut() {
+                                        bus.familiar(level, lamp_ipc::monotonic_us());
+                                    }
+                                }
                                 if let Some(path) = &arguments.known_file {
                                     keep_known(
                                         path,
                                         who.known.as_ref().map(|known| known.0.as_str()),
                                     );
                                 }
-                            } else if let Some(path) = &arguments.known_file {
+                            } else {
                                 // Nobody near: nobody known at the lamp.
-                                keep_known(path, None);
+                                if let Some(path) = &arguments.known_file {
+                                    keep_known(path, None);
+                                }
+                                if who.visits
+                                    && let Some(bus) = bus_out.as_mut()
+                                {
+                                    bus.familiar(None, lamp_ipc::monotonic_us());
+                                }
                             }
                         }
                         let sight = choose(&faces, picture.filled);
@@ -1330,6 +1426,19 @@ mod tests {
         let keeping = [&FULL[..], &["--steady-rate", "off"]].concat();
         assert!(!parse(args(&keeping)).unwrap().unwrap().steady_rate);
         assert!(parse(args(&[&FULL[..], &["--steady-rate", "yes"]].concat())).is_err());
+        // #1670: visits are counted only when asked for, and only where
+        // faces are recognised.
+        assert!(!value.visits);
+        let counting = [&FULL[..], &["--visits", "on"]].concat();
+        match parse(args(&counting)) {
+            Ok(Some(counted)) => assert!(counted.visits && counted.who.is_some()),
+            Ok(None) => panic!("not help"),
+            Err(error) => assert_eq!(
+                error,
+                "--visits needs --recogniser, --people and --who-socket"
+            ),
+        }
+        assert!(parse(args(&[&FULL[..], &["--visits", "yes"]].concat())).is_err());
         // Every glance is detected unless looking on change is asked for.
         assert!(!value.look_on_change);
         let on = [&FULL[..], &["--look-on-change", "on"]].concat();
