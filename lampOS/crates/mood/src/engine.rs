@@ -1,6 +1,6 @@
 //! A deterministic, temporary inner state. Time and observations are supplied
 //! by the caller; this module performs no I/O and owns no output permission.
-use lamp_msgs::{AttentionTarget, ClockStamp, Familiarity, MoodState};
+use lamp_msgs::{AttentionTarget, ClockStamp, FamiliarLevel, Familiarity, MoodState};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -26,7 +26,7 @@ const WARMTH_CAP: f64 = 0.85;
 const AIR_REDUCTION: f64 = 0.08;
 const SLEEP_THRESHOLD: f64 = 0.25;
 const CHANGE_DELTA: f64 = 0.01;
-const EVENT_STREAMS: usize = 11;
+const EVENT_STREAMS: usize = 12;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FaceTarget {
@@ -58,7 +58,9 @@ impl FaceTarget {
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
 pub enum EventKind {
     Name,
-    Touch { kind: bool },
+    Touch {
+        kind: bool,
+    },
     UserReminder,
     Sleep,
     SuddenSound,
@@ -68,6 +70,9 @@ pub enum EventKind {
     Voice(bool),
     Heard,
     Air(Option<u16>),
+    /// How familiar the remembered person at the lamp is, or nobody
+    /// remembered (#1670, the eyes' `humans/familiar`).
+    Familiar(Option<FamiliarLevel>),
 }
 
 impl EventKind {
@@ -84,6 +89,7 @@ impl EventKind {
             Self::Voice(_) => 8,
             Self::Heard => 9,
             Self::Air(_) => 10,
+            Self::Familiar(_) => 11,
         }
     }
 }
@@ -188,6 +194,9 @@ pub struct Engine {
     face: Option<FaceTarget>,
     attention: Option<Focus>,
     air: Option<Air>,
+    /// The level the eyes last said for the remembered person at the lamp,
+    /// held only until its lease ends: no one's history (#1670).
+    familiar: Option<(FamiliarLevel, u64)>,
     last_observed: [Option<u64>; EVENT_STREAMS],
     last_sudden_us: Option<u64>,
     last_warmth_us: Option<u64>,
@@ -220,6 +229,7 @@ impl Engine {
             face: None,
             attention: None,
             air: None,
+            familiar: None,
             last_observed: [None; EVENT_STREAMS],
             last_sudden_us: None,
             last_warmth_us: None,
@@ -299,6 +309,7 @@ impl Engine {
             asleep: self.asleep,
             attention: self.attention.as_ref().map(|focus| focus.target.clone()),
             familiarity: Familiarity::Unknown,
+            familiar: self.familiar_at(now_us),
         };
         state.check().map_err(|_| Reject::InvalidSnapshot)?;
         Ok(state)
@@ -310,6 +321,13 @@ impl Engine {
         } else {
             Ok(())
         }
+    }
+
+    /// The familiar level while its lease holds.
+    fn familiar_at(&self, now_us: u64) -> Option<FamiliarLevel> {
+        self.familiar
+            .filter(|(_, until_us)| now_us < *until_us)
+            .map(|(level, _)| level)
     }
 
     fn energy(&self) -> f64 {
@@ -327,6 +345,7 @@ impl Engine {
             || (self.awake - next.awake).abs() >= CHANGE_DELTA
             || (self.energy() - next.energy()).abs() >= CHANGE_DELTA
             || (self.warmth() - next.warmth()).abs() >= CHANGE_DELTA
+            || self.familiar_at(self.now_us) != next.familiar_at(next.now_us)
     }
 
     fn activity(&mut self, observed_us: u64) {
@@ -453,6 +472,9 @@ impl Engine {
             EventKind::Heard => {
                 self.company[2] = lease;
                 self.activity(observed);
+            }
+            EventKind::Familiar(level) => {
+                self.familiar = level.map(|level| (level, event.valid_until_us));
             }
             EventKind::Air(co2) => {
                 let high_since_us = co2.filter(|ppm| *ppm >= 1_200).map(|_| {

@@ -64,6 +64,11 @@ pub struct MoodState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attention: Option<AttentionTarget>,
     pub familiarity: Familiarity,
+    /// How familiar the remembered person at the lamp is, while the eyes
+    /// say they are there (#1670, `humans/familiar`): a level only, no name.
+    /// Optional, beside `familiarity: unknown`, which stays for v1 readers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub familiar: Option<crate::FamiliarLevel>,
 }
 
 impl MoodState {
