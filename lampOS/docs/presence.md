@@ -53,6 +53,19 @@ Expression counts nobody for its sleep (`alive.rs`). `room/state` says how
 the room sounds and `attention/addressed` one request at a time, so neither
 carries this.
 
+**Only a voice said to the lamp (`LAMP_PRESENCE_VOICE=addressed`, part 2,
+the first builder's yes on 19 Oct).** By default every finished line on
+`voice/heard` is someone for 20 s, so in an office chatter near the lamp
+keeps the light on. With `LAMP_PRESENCE_VOICE=addressed` in the eyes' unit,
+a voice counts only on a `voice/turn` the voice answered as said to the lamp
+(`answered`, #1155), at that verdict's time; a turn it held back as not said
+to it, and a line only heard, are nobody. `by` is still `voice`. The cost:
+the verdict comes after the voice has judged the line, about 1 to 3 s after
+the words end, so the light coming back on a voice alone, from out of view,
+is that much slower; a face brings it back at once, and "Hey Lamp" from a
+dark doorway is still answered. Off unless set: unset, it is `voice/heard`
+as before.
+
 **Never "nobody" when it is not known.** Nothing is said while the eyes are
 not looking: the camera closed by the privacy switch, a mute or the voice
 gone, or no look for 5 s (`away::BLIND_AFTER_US`, Expression's
@@ -159,7 +172,9 @@ heard, so `someone` comes back and the skill's ask ends with it.
 - `crates/eyes`: `away.rs`'s judge (someone within 20 s, nobody counted from
   the last face or voice, nothing when the eyes stop, the count begun again
   after), and `bus_out.rs`'s `room/presence` on a real bus from looks and
-  `voice/heard`.
+  `voice/heard`; with `addressed`, a line heard and a turn held back nobody
+  and an answered turn someone by voice
+  (`with_addressed_only_an_answered_turn_is_someone`).
 - `crates/voice`: the face fading into a light slowly, no frame falling by a
   tenth, a turn over it as quick as ever, the wake in about half a second
   (`ring_face.rs`); the ring giving the shown request's fade to the face,
