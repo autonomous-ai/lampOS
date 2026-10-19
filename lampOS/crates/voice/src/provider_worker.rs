@@ -90,6 +90,8 @@ static SESSION_FACT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBo
 static ROOM_FACTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether a stuffy room is told beside what a person says.
 static AIR_FACTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Whether an unwell part is told beside what a person says.
+static HEALTH_FACTS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 /// Whether the model is told, while a person is still speaking, that the
 /// lamp's name was heard (`crate::called`).
 static NAME_NOTE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -137,6 +139,9 @@ pub struct Files {
     /// Whether a stuffy room is told beside what a person says
     /// (`--air-facts`, `crate::air_told`).
     pub air_facts: bool,
+    /// Whether an unwell part is told beside what a person says
+    /// (`--health-facts`, `crate::health_told`).
+    pub health_facts: bool,
     /// Whether the link is never given up (`--keep-link`).
     pub keep_link: bool,
     /// Whether input waits for room in the link's queue (`--wait-for-room`).
@@ -294,6 +299,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (cut_ins_not_talk, flags) = crate::room_told::take_cut_ins(flags);
     let (room_file, flags) = crate::room_told::take_file(flags)?;
     let (air_facts, flags) = crate::air_told::take(flags);
+    let (health_facts, flags) = crate::health_told::take(flags);
     let (keep_link, flags) = take_keep_link(flags);
     let (wait_for_room, flags) = take_wait_for_room(flags);
     let (mut tools, flags) = crate::tools::take(flags)?;
@@ -340,6 +346,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         cut_ins_not_talk,
         room_file,
         air_facts,
+        health_facts,
         keep_link,
         wait_for_room,
         tools,
@@ -1120,6 +1127,7 @@ pub async fn run_with_continuation(
         room.leave_cut_ins_out(files.cut_ins_not_talk);
     }
     AIR_FACTS.store(files.air_facts, std::sync::atomic::Ordering::Relaxed);
+    HEALTH_FACTS.store(files.health_facts, std::sync::atomic::Ordering::Relaxed);
     NAME_NOTE.store(files.name_note, std::sync::atomic::Ordering::Relaxed);
     HEAD_TOUCH.store(files.head_touch, std::sync::atomic::Ordering::Relaxed);
     NAME_NOTE_BUSY_FACE.store(
@@ -1400,6 +1408,13 @@ async fn serve_with_visual<C: Connect>(
         .filter(|_| AIR_FACTS.load(std::sync::atomic::Ordering::Relaxed))
         .and_then(|root| lamp_bus::Bus::new(root).ok());
     let mut air_told = crate::air_told::AirTold::default();
+    // The lamp's health, read from the bus every five seconds when it is told.
+    let health_bus = BUS_ROOT
+        .get()
+        .filter(|_| HEALTH_FACTS.load(std::sync::atomic::Ordering::Relaxed))
+        .and_then(|root| lamp_bus::Bus::new(root).ok());
+    let mut health_told = crate::health_told::HealthTold::default();
+    let mut health_read_at: Option<Instant> = None;
     // Someone who asked the lamp to know their face, at the lamp: the eyes'
     // file beside their socket, read twice a second; told once a session.
     let known_file = options
@@ -2002,6 +2017,28 @@ async fn serve_with_visual<C: Connect>(
                         air_told.told(now);
                         eprintln!(
                             "lamp-voice provider: request {}: told the session inside it that the air is stuffy",
+                            open.request.get()
+                        );
+                    }
+                }
+                // The lamp's health: read every five seconds, the kept value
+                // only; an unwell part is told beside what a person is saying
+                // to the lamp, once a session for each set of parts, to be
+                // said only if asked (`crate::health_told`, #1681).
+                if let Some(bus) = health_bus.as_ref() {
+                    if health_read_at.is_none_or(|at| at.elapsed() >= Duration::from_secs(5)) {
+                        health_read_at = Some(Instant::now());
+                        health_told.seen(crate::health_told::read(bus).as_ref(), monotonic_us());
+                    }
+                    if let Some(live) = provider.live_session()
+                        && let Some(open) = intake.handoff.visual_turn()
+                        && open.session == live
+                        && let Some(note) = health_told.due(&live)
+                        && add_note(&provider, &mut intake.handoff.noted, open.request, &note).is_ok()
+                    {
+                        health_told.told(live);
+                        eprintln!(
+                            "lamp-voice provider: request {}: told the session inside it how its parts are",
                             open.request.get()
                         );
                     }

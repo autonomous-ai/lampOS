@@ -26,6 +26,9 @@ lamp-controls = { path = "../controls" }
 lamp-schedule = { path = "../schedule" }
 # The lamp's own zone, as every other part reads it (#820).
 lamp-local-time = { path = "../local-time" }
+# The names a person knows the lamp's parts by, for the health told to
+# the model (`health_told`, #1681): its library only.
+lamp-health = { path = "../health" }
 tokio = { version = "=1.53.1", features = ["rt", "time", "macros", "net", "sync", "io-util"] }
 # The second voice route's clients: the same pins and TLS setup (ring,
 # webpki roots) as `lamp-gemini` and `lamp-surround`, so no new package.

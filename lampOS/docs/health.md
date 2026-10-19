@@ -27,6 +27,30 @@ a part reports whether or not anybody listens. The skill Not feeling well
 `lamp/health` has said nothing for its 15 s. It is not in the product's
 install yet (`install::NOT_PRODUCT_SKILLS`).
 
+The voice can say which part is unwell, when asked (#1681). Behind
+`LAMP_HEALTH_FACTS=on` in the voice's unit (off unless set;
+`crates/voice/src/health_told.rs`), the provider worker reads
+`lamp/health`'s kept value every 5 s, outside any turn, and tells the
+model one short line beside what a person is saying to the lamp:
+"(For you to know, not to answer: not working right in you now: camera,
+arm and head. Say so only if someone asks how you are or what's wrong;
+never bring it up yourself.)" The parts are named by `show::known_as`
+(below), and those the self-test found failed by its own names
+(`parts::part_known_as`, "the SD card" said as "SD card"); at most four,
+then "and N more". A part counts when it has been `error` for 30 s, or
+`stale` for 5 minutes while `quiet_ms` is 5 minutes or more. It is told
+once a session for each set of parts; when the set empties after it was
+told, the session is told "all your parts are working again". Nothing is
+told when all is well, and nothing when no `lamp/health` newer than 15 s
+is kept (not knowing is not well): the 30 s starts again. A turn never
+waits for it: the note comes from the last read, and is queued with the
+turn's input. On the second route (`LAMP_VOICE_SECOND_CONFIG`), whose
+turns each start with nothing, a thread of its own reads `lamp/health`
+every 5 s (`health_told::watch`) and the same line, without "all well
+again", is in every turn's system message while a part counts; the turn
+reads only what that thread keeps. Whether the model keeps quiet unasked
+has not been measured.
+
 ## The commands
 
     lamp-health serve [--bus-root ABSOLUTE_DIR] [--expect NAME]... [--stale-ms N] [--judge-zone BEGINNING]... [--proc DIR] [--sys DIR] [--run DIR] [--disk PATH] [--clock timesync|kernel] [--online on|off] [--reach-probe on|off] [--needs NAME=PATH]...
