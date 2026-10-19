@@ -4738,6 +4738,27 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **Checkpoints:** #828 and #829 were closed on mine at 14:51, and #1808 and #1809 carry their rest.
 - **#753:** #1823 (`lamp-near-call`) merged at 15:36. The consumer (`LAMP_ATTENTION_NEAR_CALIBRATED`) is written, with Seventh's two points: a kept try's score is checked, and the reset wipes the file. It goes up after #1855's gate.
 
+## 2026-10-19, 17:56 ICT: the owner's DeepSeek route picks up their lines; #1855 and #1869 merged; #1875 up; the speed list begun
+
+- **#1855 merged into #1712 (17:11):** item 3 widened. The owner's ten lines through the route's own engine reproduced the lamp's hold of 209, "a busy room, nothing shows it was called". The cause had two parts:
+  - the office's talk left alone still counted, since only the lamp speaking resets that count;
+  - 5 of the 10 answers never got a word out before the next line.
+
+  The fix:
+  - one session, as Live's;
+  - a call let out carries the next lines and ends that count (`RoomTold::called`);
+  - the journal says why no conversation is going on.
+
+  The replay test fails without the fix.
+- **The speed list (the first builder, 17:02; the bar is a median first word under 2.0 s, Live 2.4 s):**
+  - **Item 3:** `probe-cascade` already measured it, run by the first builder at 17:27. DeepSeek's first clause is about 0.9 s, ElevenLabs' first audio about 0.3 s.
+  - **Item 2, #1869 (merged 17:31):** `LAMP_SECOND_PREPARED`, with Nova-3's last interim at the line's end beginning round 1 at once, kept only when the final words are those. In the host test, the first audio came at 600 ms against 1,000 ms.
+  - **On lamp-4ace at 17:42:** Third's pieces fix with #1869 off brought the line end to first sound to a median of 2,177 ms, from 3,300 ms.
+- **The owner's "speaks randomly" (17:26):** traced to the owner's own face turned to the lamp letting the office's short lines out. The journal had named trust instead. The first builder's call (17:53): keep the face rule, and make the model decline (Third).
+  - **#1875 (mine):** the journal names the real sign; a call the lamp never answered carries for 15 s; and #1869's follow-up, so a resumed turn drops the prepared round. Gating now.
+- **Item 1, Flux's eager end on the prepared round:** built locally, with 14 Flux tests and the resumed test. It goes up after #1875, replacing #1841.
+- **A slip:** I pushed #1869's follow-up after #1869 had merged. My check printed the state but didn't stop the push. The commit went on as part of #1875, and the rule is in memory.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
