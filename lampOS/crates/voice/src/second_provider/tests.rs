@@ -277,6 +277,11 @@ async fn turn(engine: &mut Engine) -> Vec<String> {
             ProviderOutput::ReminderDeferred { reason, .. } => {
                 (format!("deferred:{reason:?}"), true)
             }
+            ProviderOutput::Unclear {
+                request,
+                why,
+                cut_in,
+            } => (format!("unclear:{request}:{why}:{cut_in}"), false),
             ProviderOutput::NewsAnswered { request, key } => {
                 (format!("news:{request}:{key}"), false)
             }
@@ -731,6 +736,87 @@ async fn words_the_heed_holds_end_the_turn_unanswered() {
     );
     assert!(script.asked.lock().unwrap().is_empty());
     assert!(calls.lock().unwrap().is_empty());
+}
+
+/// The first builder's 21:51 on #1722, the hums on the second route: a line
+/// the rule held as unclear is told to the coordinator as `Unclear`, before
+/// the turn completes and with no chat asked, as the Live worker tells it;
+/// a cut-in is told to the rule before it judges. Hummed for as a misheard
+/// cut-in, the next request is asked with the note that the lamp did not
+/// catch it (`misheard_hum::NOTE`), once.
+#[tokio::test]
+async fn a_line_held_as_unclear_is_told_and_a_misheard_cut_in_is_noted_next() {
+    use crate::not_speech::CUT_IN_FRAGMENT;
+    let misheard = "Venga, nos vemos luego.";
+    let again = "Can you say that again?";
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok(misheard.to_owned()),
+                Ok(again.to_owned()),
+                Ok(again.to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                vec![text("Of course."), Ok(ChatEvent::Done)],
+                vec![text("Sure."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let cut_ins: Arc<Mutex<Vec<u64>>> = Arc::default();
+    let told = cut_ins.clone();
+    let mut engine = engine
+        .announcing(false)
+        .heeding(Arc::new(|request, _, _, _| {
+            (request == 1).then_some(CUT_IN_FRAGMENT)
+        }))
+        .asking_again(
+            Arc::new(move |request| told.lock().unwrap().push(request)),
+            Arc::new(|request| (request == 1).then_some((CUT_IN_FRAGMENT, true))),
+        );
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(ProviderInput::End {
+        request: 1,
+        privacy_generation: 1,
+        sound: false,
+        cut_in: true,
+    });
+    assert_eq!(
+        turn(&mut engine).await,
+        [
+            "started:1".to_owned(),
+            format!("heard:{misheard}"),
+            format!("unclear:1:{CUT_IN_FRAGMENT}:true"),
+            "complete".to_owned()
+        ]
+    );
+    assert_eq!(*cut_ins.lock().unwrap(), [1]);
+    assert!(script.asked.lock().unwrap().is_empty(), "no chat for it");
+    for request in [2, 3] {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        let labels = turn(&mut engine).await;
+        assert!(
+            !labels.iter().any(|label| label.starts_with("unclear:")),
+            "{labels:?}"
+        );
+    }
+    let asked = script.asked.lock().unwrap();
+    let note = Message::system(crate::misheard_hum::NOTE);
+    assert_eq!(
+        asked[0][asked[0].len() - 2..],
+        [note.clone(), Message::user(again)],
+        "the next request is told"
+    );
+    assert!(!asked[1].contains(&note), "once");
+    assert_eq!(*cut_ins.lock().unwrap(), [1]);
 }
 
 /// A chat that has not begun within `BEGIN_WITHIN` of the words is given

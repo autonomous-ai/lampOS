@@ -1580,6 +1580,24 @@ pub fn serve(
                 files.spoken_to_by_day,
             );
         }
+        // Asked again, or hummed for, as on the Live route
+        // (`LAMP_OTHER_LANGUAGE=sorry`, `LAMP_MISHEARD_HUM`; the first
+        // builder's 21:51 on #1722).
+        if files.ask_unclear {
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.asking_again(files.misheard_hum);
+            }
+            let told = heeding.clone();
+            let asked = heeding.clone();
+            engine = engine.asking_again(
+                Arc::new(move |request| {
+                    if let Ok(mut heeding) = told.lock() {
+                        heeding.ended_as_cut_in(request);
+                    }
+                }),
+                Arc::new(move |request| asked.lock().ok()?.unclear(request)),
+            );
+        }
         engine = engine.heeding(Arc::new(move |request, said, heard, from| {
             heeding
                 .lock()
@@ -2030,6 +2048,11 @@ pub(crate) struct Heeding {
     /// When the lamp's words sent will have been played
     /// ([`crate::second_provider::Did::Said`]), on the monotonic clock.
     said_until_us: Option<u64>,
+    /// The lamp hums for a misheard cut-in (`LAMP_MISHEARD_HUM`,
+    /// [`Self::asking_again`]).
+    misheard_hum: bool,
+    /// The request last ended as a cut-in over the lamp's answer.
+    cut_in: Option<u64>,
 }
 
 /// What let a line out, as the journal says it: the sign itself where the
@@ -2223,7 +2246,31 @@ impl Heeding {
             renewed_at: None,
             called_at: None,
             said_until_us: None,
+            misheard_hum: false,
+            cut_in: None,
         }
+    }
+
+    /// Ask again rather than answer a line of a conversation heard in
+    /// another script, as a number alone, or as a cut-in with no English
+    /// word (`--ask-unclear`, `LAMP_OTHER_LANGUAGE=sorry`, #926), as the Live
+    /// worker's rule does; with `misheard_hum` (`LAMP_MISHEARD_HUM`, #828) a
+    /// misheard cut-in is hummed for instead.
+    pub(crate) fn asking_again(&mut self, misheard_hum: bool) {
+        self.attention.ask_again_when_unclear(true);
+        self.misheard_hum = misheard_hum;
+    }
+
+    /// `request` ended as a cut-in over the lamp's answer: judged as one.
+    pub(crate) fn ended_as_cut_in(&mut self, request: u64) {
+        self.cut_in = Some(request);
+    }
+
+    /// Why `request` was held as unclear, if it was, and whether the lamp
+    /// hums for it: a cut-in, with the switch (as `misheard_held` on Live).
+    pub(crate) fn unclear(&self, request: u64) -> Option<(&'static str, bool)> {
+        let why = self.attention.unclear(request)?;
+        Some((why, self.misheard_hum && self.cut_in == Some(request)))
     }
 
     /// The model is told beside a line that the lamp's name was heard as it
@@ -2503,6 +2550,9 @@ impl Heeding {
         };
         self.judged = Some((request, session, heard.to_owned()));
         attention.ended(request, ended_us);
+        if self.cut_in == Some(request) {
+            attention.ended_as_cut_in(request);
+        }
         for (at_us, score) in signs.names {
             attention.name_heard_scored(at_us, score);
         }
@@ -3078,6 +3128,58 @@ mod tests {
     /// one session's, as a Live session's, so in a busy room one past the
     /// session's first two is trusted when the rule is not strict. Before,
     /// each line was a session's first. Eight held in a row begin a new one.
+    /// The first builder's 21:51 on #1722, the hums on the second route: with
+    /// `--ask-unclear` the route's rule holds a line of a conversation heard
+    /// in another script, or a cut-in with no English word, as the Live rule
+    /// does, and says why; the lamp hums only for the cut-in, and only with
+    /// `LAMP_MISHEARD_HUM`. Without the switch neither is held as unclear.
+    #[test]
+    fn a_line_heard_as_nothing_the_conversation_means_is_held_as_unclear() {
+        use crate::not_speech::{CUT_IN_FRAGMENT, OTHER_SCRIPT};
+        use crate::room_told::Room;
+        let going_on = || Signs {
+            room: Room::Quiet,
+            going_on: true,
+            lamp_asked: false,
+            turned: None,
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let said = (10_000_000, 11_000_000);
+        let hindi = "नमस्ते, आप कैसे हैं?";
+        let spanish = "Venga, nos vemos luego.";
+        for hum in [false, true] {
+            let mut heeding = Heeding::new(false, true, None, None);
+            heeding.asking_again(hum);
+            assert_eq!(
+                heeding.judge(1, said, hindi, going_on()),
+                Some(OTHER_SCRIPT)
+            );
+            assert_eq!(heeding.unclear(1), Some((OTHER_SCRIPT, false)));
+            heeding.ended_as_cut_in(2);
+            assert_eq!(
+                heeding.judge(2, said, spanish, going_on()),
+                Some(CUT_IN_FRAGMENT)
+            );
+            assert_eq!(heeding.unclear(2), Some((CUT_IN_FRAGMENT, hum)));
+            // Not a cut-in: some Spanish is no fault of its own.
+            assert_ne!(
+                heeding.judge(3, said, spanish, going_on()),
+                Some(CUT_IN_FRAGMENT)
+            );
+            assert_eq!(heeding.unclear(3), None);
+        }
+        let mut off = Heeding::new(false, true, None, None);
+        off.ended_as_cut_in(2);
+        assert_ne!(off.judge(1, said, hindi, going_on()), Some(OTHER_SCRIPT));
+        assert_ne!(
+            off.judge(2, said, spanish, going_on()),
+            Some(CUT_IN_FRAGMENT)
+        );
+        assert_eq!((off.unclear(1), off.unclear(2)), (None, None));
+    }
+
     #[test]
     fn the_routes_lines_are_one_sessions_and_eight_held_renew_it() {
         use crate::room_told::Room;

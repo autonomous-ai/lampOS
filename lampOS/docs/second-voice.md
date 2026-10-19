@@ -1144,6 +1144,26 @@ record is written.
   (the loop, both routes), and `second_provider`'s
   `news_asked_about_rides_on_its_turn_and_its_key_is_never_the_models` and
   `news_asked_by_voice_through_this_route_is_put_on_the_turn`.
+- **The hums, as on Live** (the first builder's 21:51 on #1722). With
+  `LAMP_OTHER_LANGUAGE=sorry` (`--ask-unclear`) the route's rule
+  (`worker::Heeding`, the Live rule's own `crate::attention`) holds a line
+  of a conversation heard mostly in another script, as a number alone, or
+  as a cut-in over the lamp's answer with no English word
+  (`End { cut_in }`, told to the rule before it judges). The turn then sends
+  `ProviderOutput::Unclear` before its `TurnComplete`, with no chat asked
+  (`Engine::asking_again`). So the coordinator asks "Sorry?" in writing, and
+  hums for an empty one with `LAMP_UNCLEAR_HUM=on`, as for Live. With
+  `LAMP_MISHEARD_HUM=on` a misheard cut-in is sent with `cut_in: true`: the
+  lamp hums its "hm?" with no model turn, and the first request asked within
+  10 s is told it wasn't caught (`misheard_hum::NOTE`), once. Journal:
+  `lamp-voice second: request N was held as unclear (why): …`. Tests:
+  `worker::tests::a_line_heard_as_nothing_the_conversation_means_is_held_as_unclear`,
+  `second_provider`'s
+  `a_line_held_as_unclear_is_told_and_a_misheard_cut_in_is_noted_next`, and
+  the loop's
+  `an_empty_sorry_in_the_loop_hums_with_the_switch_and_only_then` and
+  `with_the_switch_a_misheard_cut_in_hums_and_sends_no_model_turn`, each run
+  on Live and on the second route alone.
 - **Its input is taken late**, in order and from the parent's boot, as the
   Live worker's is since 40de19327 (`WorkerChannels::taking_late_input`): its
   input is checked against fresh authority when used, and its end would end

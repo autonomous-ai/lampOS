@@ -257,6 +257,13 @@ pub const FEW_TOOLS_ENVIRONMENT: &str = "LAMP_SECOND_FEW_TOOLS";
 /// begun just before it, in the same session.
 pub type Heed =
     Arc<dyn Fn(u64, (u64, u64), &str, Option<u64>) -> Option<&'static str> + Send + Sync>;
+/// Told that `request` ended as a cut-in over the lamp's answer
+/// (`ProviderInput::End { cut_in: true }`), before the rule judges it.
+pub type CutIn = Arc<dyn Fn(u64) + Send + Sync>;
+/// After the rule held `request`: why it was held as unclear, if it was, and
+/// whether the lamp hums for it (a misheard cut-in, `LAMP_MISHEARD_HUM`), as
+/// the Live worker tells the coordinator (`ProviderOutput::Unclear`, #926).
+pub type AskAgain = Arc<dyn Fn(u64) -> Option<(&'static str, bool)> + Send + Sync>;
 /// Whether the lamp's own last line before `request` was a question, in a
 /// conversation going on (`worker::lamp_just_asked`): then a checked sound
 /// with a word in it is the person's answer, as on the Live route.
@@ -326,6 +333,12 @@ struct Shared {
     sequence: AtomicU64,
     out: mpsc::Sender<ProviderOutput>,
     heed: Option<Heed>,
+    /// [`Engine::asking_again`]: told of cut-ins, and asked after a hold.
+    ask_again: Option<(CutIn, AskAgain)>,
+    /// When a cut-in was last held as misheard with the lamp's hum: the
+    /// first request asked within `misheard_hum::NOTE_WITHIN_US` of it is
+    /// told so ([`crate::misheard_hum::NOTE`]), once.
+    misheard_at_us: Mutex<Option<u64>>,
     asked: Option<Asked>,
     /// The sounds made while a first round is awaited, when switched on.
     cues: Option<Arc<Cues>>,
@@ -698,6 +711,8 @@ impl Engine {
                 sequence: AtomicU64::new(0),
                 out,
                 heed: None,
+                ask_again: None,
+                misheard_at_us: Mutex::new(None),
                 asked: None,
                 cues: None,
                 down: None,
@@ -868,6 +883,20 @@ impl Engine {
     pub fn heeding(mut self, heed: Heed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.heed = Some(heed);
+        }
+        self
+    }
+
+    /// A line the rule held as unclear (another script, a number alone, a
+    /// cut-in with no English word) is told to the coordinator as
+    /// `ProviderOutput::Unclear`, before its `TurnComplete`, as the Live
+    /// worker tells it (#926, `LAMP_OTHER_LANGUAGE=sorry`): the coordinator
+    /// asks again, or hums (`LAMP_UNCLEAR_HUM`, `LAMP_MISHEARD_HUM`). A
+    /// misheard cut-in hummed for has the next request told so
+    /// ([`crate::misheard_hum::NOTE`]). Before any turn only.
+    pub fn asking_again(mut self, cut_in: CutIn, ask: AskAgain) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.ask_again = Some((cut_in, ask));
         }
         self
     }
@@ -1309,7 +1338,17 @@ impl Engine {
                     turn.marks.called.store(true, Ordering::Release);
                 }
             }
-            ProviderInput::End { request, sound, .. } => {
+            ProviderInput::End {
+                request,
+                sound,
+                cut_in,
+                ..
+            } => {
+                // Before the rule judges the line: a cut-in over the lamp's
+                // answer is judged as one (#828).
+                if cut_in && let Some((told, _)) = &self.shared.ask_again {
+                    told(request);
+                }
                 if let Some(kept) = self.kept.as_mut().filter(|kept| kept.request == request) {
                     kept.ended = Some((self.shared.clock)());
                 }
@@ -1874,6 +1913,32 @@ async fn spoken(
             return;
         }
         though_held.await;
+        // Held as unclear: the coordinator asks again, or hums, as for the
+        // Live route (#926, #828). Told once, before the turn completes.
+        if heeded.is_some()
+            && let Some((_, ask)) = &shared.ask_again
+            && let Some((why, cut_in)) = ask(request)
+        {
+            eprintln!(
+                "lamp-voice second: request {request} was held as unclear ({why}): {}",
+                if cut_in {
+                    "the lamp hums, and the next request is told it was not caught"
+                } else {
+                    "the coordinator asks again"
+                }
+            );
+            if cut_in && let Ok(mut at) = shared.misheard_at_us.lock() {
+                *at = Some(monotonic_us());
+            }
+            let unclear = ProviderOutput::Unclear {
+                request,
+                why: why.to_owned(),
+                cut_in,
+            };
+            if !shared.emit(unclear).await {
+                return;
+            }
+        }
         if shared.stages(request, &times).await {
             shared
                 .emit(ProviderOutput::TurnComplete {
@@ -1884,6 +1949,16 @@ async fn spoken(
         }
         return;
     }
+    // The first request answered after a misheard cut-in was hummed for,
+    // within `NOTE_WITHIN_US`: the model is told it did not catch it, as the
+    // Live worker tells it (`LAMP_MISHEARD_HUM`, #828). Once.
+    let misheard = shared
+        .misheard_at_us
+        .lock()
+        .ok()
+        .and_then(|mut at| at.take())
+        .filter(|held| crate::misheard_hum::answers_the_hum(*held, monotonic_us()))
+        .map(|_| crate::misheard_hum::NOTE.to_owned());
     // The first request asked after a hand or the head stopped the lamp: the
     // model is told so, as Gemini is (`STOPPED_NOTE`, #1148), so the story
     // that was stopped is not begun again.
@@ -1957,6 +2032,7 @@ async fn spoken(
     let notes = stopped
         .into_iter()
         .chain(cut_in)
+        .chain(misheard)
         .chain(staff)
         .chain(named)
         .chain(call)
