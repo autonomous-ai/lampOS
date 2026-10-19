@@ -12,7 +12,7 @@ use lamp_msgs::{
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     fs,
     path::{Path, PathBuf},
 };
@@ -159,6 +159,8 @@ struct SkillFile {
     /// A search a person asked for (#1685): its looks, and what the model
     /// is told past the last.
     search: Option<SearchFile>,
+    /// A function the model calls to snooze the skill or turn it off.
+    stop: Option<StopFile>,
     #[serde(rename = "do")]
     steps: Vec<StepFile>,
 }
@@ -195,13 +197,39 @@ pub const PER_HOUR_AT_MOST: u32 = 6;
 /// How long after a run a look or a movement counts as noticing it, when
 /// `[rest]` names no `within`.
 pub const NOTICED_WITHIN_US: u64 = 60_000_000;
-/// The morning a rest lasts until, local minutes of the day: 06:00.
+/// The morning a rest or a snooze lasts until, local minutes of the day: 06:00.
 pub const MORNING: u16 = 6 * 60;
 /// A face that moved this share of the picture across or down since the
 /// run, or grew or shrank by this share of its height, has moved.
 pub const NOTICED_MOVE: f32 = 0.15;
 pub const NOTICED_SIZE: f32 = 0.25;
 const HOUR_US: u64 = 3_600_000_000;
+/// `[stop]`: the function by which a person snoozes what the skill starts
+/// itself, or turns it off or on again (#1685).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StopFile {
+    tool: String,
+    about: String,
+}
+
+/// `[stop]` as loaded: the function's name and when to call it, as the
+/// model is told.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Stop {
+    pub tool: String,
+    pub about: String,
+}
+
+/// The one argument of a `[stop]` function, and its values: `snooze` until
+/// the next local morning, `off` until it is asked for again, `on` again.
+pub const STOP_CHOICE: &str = "how";
+pub const STOP_WAYS: [&str; 3] = ["snooze", "off", "on"];
+/// The most a `[stop]`'s `about` may say.
+pub const STOP_ABOUT_MOST_BYTES: usize = 512;
+/// The file in `--state-dir` that keeps the skills turned off: one line
+/// each, the skill's name, and nothing else.
+pub const OFF_FILE: &str = "off";
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -827,6 +855,8 @@ pub struct Skill {
     pub budget: Option<(String, u32)>,
     /// When it rests after runs nobody noticed.
     pub rest: Option<Rest>,
+    /// The function that snoozes it or turns it off (#1685).
+    pub stop: Option<Stop>,
     /// Each step, and the runs it is made in when not every one: one
     /// trigger's, or a call's that chose one of its values.
     steps: Vec<(Option<Only>, Step)>,
@@ -1852,6 +1882,41 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
             })
         }
     };
+    // What a person stops is what the lamp starts itself, so only in a
+    // skill with a trigger, and not with an each trigger, whose items' runs
+    // are news they asked for (chosen, as `[quiet]` is not with one).
+    let stop = match file.stop {
+        None => None,
+        Some(_) if triggers.is_empty() || triggers.iter().any(|trigger| trigger.each.is_some()) => {
+            return Err(
+                "[stop] stops what a skill starts itself: in a skill with a trigger, not an each trigger"
+                    .into(),
+            );
+        }
+        Some(stop) => {
+            if !function_name(&stop.tool) {
+                return Err(format!(
+                    "[stop] tool {:?}: a lowercase letter, then at most 47 lowercase letters, digits and _",
+                    stop.tool
+                ));
+            }
+            if file.tool.as_deref() == Some(stop.tool.as_str()) {
+                return Err("[stop] tool is a function of its own, not the skill's tool".into());
+            }
+            if stop.about.trim().is_empty()
+                || stop.about.len() > STOP_ABOUT_MOST_BYTES
+                || stop.about.chars().any(char::is_control)
+            {
+                return Err(format!(
+                    "[stop] about is 1 to {STOP_ABOUT_MOST_BYTES} bytes, with no control characters: when the model calls it"
+                ));
+            }
+            Some(Stop {
+                tool: stop.tool,
+                about: stop.about,
+            })
+        }
+    };
     let names: Vec<&String> = triggers
         .iter()
         .filter_map(|trigger| trigger.name.as_ref())
@@ -2257,6 +2322,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         active,
         budget,
         rest,
+        stop,
         steps,
     };
     // Least privilege: every read and every step within what it declares,
@@ -2595,20 +2661,28 @@ pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
     for kind in [SkillKind::Core, SkillKind::Installable] {
         for (_, result) in &mut loaded {
             let Ok(skill) = result else { continue };
-            let Some(tool) = skill.tool.clone().filter(|_| skill.kind == kind) else {
+            if skill.kind != kind {
                 continue;
-            };
-            match taken.get(&tool) {
-                Some((owner, owner_kind)) => {
-                    *result = Err(format!(
-                        "its tool {tool:?} is the {} skill {owner}'s: a function the model calls is one skill's, \
-                         a core skill's first",
-                        owner_kind.name()
-                    ));
-                }
-                None => {
-                    taken.insert(tool, (skill.name.clone(), kind));
-                }
+            }
+            let functions: Vec<String> = skill
+                .tool
+                .iter()
+                .chain(skill.stop.as_ref().map(|stop| &stop.tool))
+                .cloned()
+                .collect();
+            if let Some((tool, (owner, owner_kind))) = functions
+                .iter()
+                .find_map(|tool| taken.get(tool).map(|owner| (tool, owner)))
+            {
+                *result = Err(format!(
+                    "its tool {tool:?} is the {} skill {owner}'s: a function the model calls is one skill's, \
+                     a core skill's first",
+                    owner_kind.name()
+                ));
+                continue;
+            }
+            for tool in functions {
+                taken.insert(tool, (skill.name.clone(), kind));
             }
         }
     }
@@ -2686,6 +2760,13 @@ pub struct Engine {
     group_runs: HashMap<String, std::collections::VecDeque<u64>>,
     /// Each resting skill's last nudge and how many in a row went unnoticed.
     nudges: HashMap<String, Nudge>,
+    /// Until when each snoozed skill starts nothing itself, by skill: in
+    /// memory only, so a restart forgets it (#1685).
+    snoozed: HashMap<String, u64>,
+    /// The skills turned off, by name, until they are asked for again.
+    off: BTreeSet<String>,
+    /// Where `off` is kept across a restart ([`OFF_FILE`]), if anywhere.
+    off_file: Option<PathBuf>,
 }
 
 /// A skill's last run, for `[rest]`: when it began, whether anyone noticed
@@ -2803,7 +2884,126 @@ impl Engine {
             day_runs: HashMap::new(),
             group_runs: HashMap::new(),
             nudges: HashMap::new(),
+            snoozed: HashMap::new(),
+            off: BTreeSet::new(),
+            off_file: None,
         }
+    }
+
+    /// The skills turned off are kept in `dir` (`--state-dir`), one line
+    /// each in [`OFF_FILE`], its skill's name and nothing else, and read
+    /// from it now: off stays off across a restart, a snooze does not. A
+    /// line that is not a skill's name is passed over, and the names read
+    /// returned. Without it, off lasts until the program stops.
+    pub fn keep_off_in(&mut self, dir: &Path) -> Result<Vec<String>, String> {
+        let file = dir.join(OFF_FILE);
+        let text = match fs::read_to_string(&file) {
+            Ok(text) => text,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(error) => return Err(format!("{}: {error}", file.display())),
+        };
+        self.off = text
+            .lines()
+            .map(str::trim)
+            .filter(|name| plain_name(name))
+            .map(str::to_owned)
+            .collect();
+        self.off_file = Some(file);
+        Ok(self.off.iter().cloned().collect())
+    }
+
+    /// The skills turned off, written whole where they are kept: a file
+    /// beside it, synced, then moved over it, and the folder synced, so a
+    /// power cut leaves the old file or the new one whole, never an empty
+    /// one, and the move itself holds (the reviewer's P3 on #1837, as
+    /// #1732's daily journal does). False when they are not kept, or could
+    /// not be.
+    fn keep_off(&self) -> bool {
+        let Some(file) = &self.off_file else {
+            return false;
+        };
+        let lines: String = self.off.iter().map(|name| format!("{name}\n")).collect();
+        let new = file.with_extension("new");
+        let kept = (|| -> std::io::Result<()> {
+            let mut out = fs::File::create(&new)?;
+            std::io::Write::write_all(&mut out, lines.as_bytes())?;
+            out.sync_all()?;
+            fs::rename(&new, file)?;
+            if let Some(folder) = file.parent() {
+                fs::File::open(folder)?.sync_all()?;
+            }
+            Ok(())
+        })();
+        if let Err(error) = &kept {
+            eprintln!(
+                "lamp-skills: the skills off not kept in {}: {error}",
+                file.display()
+            );
+        }
+        kept.is_ok()
+    }
+
+    /// Whether `skill` is snoozed at `now_us` or turned off.
+    pub fn stopped(&self, skill: &str, now_us: u64) -> bool {
+        self.off.contains(skill) || self.snoozed.get(skill).is_some_and(|until| now_us < *until)
+    }
+
+    /// A call of a `[stop]` function: `snooze`, `off` or `on` for `skill`,
+    /// and the words for the model to pass on, as the note of a tool's say.
+    fn stop(
+        &mut self,
+        skill: &str,
+        function: &str,
+        args: &Value,
+        now_us: u64,
+    ) -> Result<Run, String> {
+        const HOW: &str = "Say how: snooze, off or on.";
+        let how = match args {
+            Value::Object(given) if given.keys().all(|key| key == STOP_CHOICE) => {
+                given.get(STOP_CHOICE).and_then(Value::as_str)
+            }
+            _ => None,
+        };
+        let note = match how {
+            Some("snooze") => {
+                self.snoozed
+                    .insert(skill.to_owned(), next_morning_us(self.clock, now_us));
+                "Done: none of these until tomorrow morning. Tell them so in a few words."
+                    .to_owned()
+            }
+            Some("off") => {
+                self.snoozed.remove(skill);
+                self.off.insert(skill.to_owned());
+                if self.keep_off() {
+                    "Done: none of these until they ask for them again. Tell them so in a few words."
+                        .to_owned()
+                } else {
+                    "Done, but only until the lamp restarts: none of these until then, or until they ask for them again. Tell them so in a few words."
+                        .to_owned()
+                }
+            }
+            Some("on") => {
+                self.snoozed.remove(skill);
+                if self.off.remove(skill) {
+                    self.keep_off();
+                }
+                "Done: these come again as before. Tell them so in a few words.".to_owned()
+            }
+            _ => return Err(HOW.into()),
+        };
+        Ok(Run {
+            skill: skill.to_owned(),
+            events: vec![event(
+                skill,
+                SkillStage::Triggered,
+                format!("the model called {function} with {args}"),
+                None,
+            )],
+            calls: vec![Call::Say(note)],
+            ask: None,
+            queue: false,
+            from: None,
+        })
     }
 
     /// Ask the Policy's gate (#958, `lamp-policy --gate`) on `skills/ask`
@@ -3392,6 +3592,16 @@ impl Engine {
                     }
                     continue;
                 }
+                // Snoozed or turned off by a person (#1685): the chance is
+                // spent, so nothing waits to come when it ends.
+                if self.off.contains(&skill.name)
+                    || self
+                        .snoozed
+                        .get(&skill.name)
+                        .is_some_and(|until| now_us < *until)
+                {
+                    continue;
+                }
                 // The nudges' limits (#1685). Outside its active hours, or
                 // with its group's hour spent, the chance is kept as in the
                 // quiet hours: taken at the trigger's first message once
@@ -3525,6 +3735,14 @@ impl Engine {
     /// of the newest thing heard (its pieces joined, as the voice joins
     /// them) if it began after that run began; the model reads its `told`.
     pub fn tool(&mut self, name: &str, args: &Value, now_us: u64) -> Result<Run, String> {
+        if let Some(skill) = self
+            .skills
+            .iter()
+            .find(|skill| skill.stop.as_ref().is_some_and(|stop| stop.tool == name))
+        {
+            let skill = skill.name.clone();
+            return self.stop(&skill, name, args, now_us);
+        }
         let skill = self
             .skills
             .iter()
@@ -3837,6 +4055,22 @@ pub fn tools_file(skills: &[Skill]) -> Value {
                 tool["parameters"] = json!({"type": "object", "properties": properties});
             }
             tools.push(tool);
+        }
+        // One function a skill to snooze it or turn it off (#1685): counted
+        // as any skill's against a session's 32, and reached through
+        // `use_skill` with `LAMP_USE_SKILL=on`.
+        if let Some(stop) = &skill.stop
+            && !tools.iter().any(|tool| tool["name"] == *stop.tool)
+        {
+            tools.push(json!({
+                "name": stop.tool,
+                "description": stop.about,
+                "parameters": {"type": "object", "properties": {STOP_CHOICE: {
+                    "type": "string",
+                    "enum": STOP_WAYS,
+                    "description": "snooze: none until tomorrow morning; off: none until they ask for them again; on: as before again"
+                }}}
+            }));
         }
     }
     if moving.is_empty() {
