@@ -454,26 +454,6 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
             lamp_eyes::who::Familiar::Close => lamp_msgs::FamiliarLevel::Close,
         })
     }
-    /// The name of the one known at the lamp, replaced whole, or no file.
-    fn keep_known(path: &std::path::Path, name: Option<&str>) {
-        use std::os::unix::fs::OpenOptionsExt;
-        let Some(name) = name else {
-            let _ = std::fs::remove_file(path);
-            return;
-        };
-        let mut temporary = path.as_os_str().to_owned();
-        temporary.push(".new");
-        let written = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&temporary)
-            .and_then(|mut file| writeln!(file, "{name}"));
-        if written.is_ok() {
-            let _ = std::fs::rename(&temporary, path);
-        }
-    }
     // What a remembering answers, said in the journal with no name: the
     // name kept, or why not.
     fn kept_reply(
