@@ -4759,6 +4759,18 @@ A usage limit paused me from about 00:40 to 06:2x.
 - **Item 1, Flux's eager end on the prepared round:** built locally, with 14 Flux tests and the resumed test. It goes up after #1875, replacing #1841.
 - **A slip:** I pushed #1869's follow-up after #1869 had merged. My check printed the state but didn't stop the push. The commit went on as part of #1875, and the rule is in memory.
 
+## 2026-10-19, 18:46 ICT: #1875, #1881, #1883 and #1894 merged into #1712; #1892 and #1896 up
+
+- **Merged into #1712's branch this hour:**
+  - **#1875:** the route's journal names the sign that let a line out. The owner's face turned to the lamp had let the office's short lines out, and the journal had blamed the session's trust. A call the lamp never answered now carries for 15 s, not 45. The fold also carries #1869's follow-up.
+  - **#1881:** Flux through the proxy, its eager turn end beginning the prepared chat. It's off on lamp-4ace until tonight's three-arm test.
+  - **#1883:** the first piece to the voice, journaled.
+  - **#1894:** each chat request journaled by size, start and gap. The configured voice's first piece is cut at 4 words.
+- **On the lamp:** at 17:42, with #1869 off, line end to first sound was a median of 2,177 ms. At 18:45, on the build with Third's named-line note, it was 3.8 s, with `words done` 1.5 to 2 s after the line. My reading is the carried sound sent at once, which makes Nova-3 fall back to `CloseStream`. I've told the first builder which journal fields settle it.
+- **Up:**
+  - **#1892 (lamp-voice):** the near bar's consumer, gated 2958/0. The reviewer found nothing, and it merges on ARM64.
+  - **#1896:** the chat's connection warmed as a line begins, off unless set, ready if #1894's lines show a cold connection.
+
 ## Not shown
 
 No lamp access or deployment, physical power-loss test,
