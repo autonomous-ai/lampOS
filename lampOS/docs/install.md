@@ -430,7 +430,9 @@ units stopped:
    but **that half is skipped while the base strip is off**: V2 doesn't use
    the strip, at the project lead's decision (19 Oct), and `lamp-controls`
    reads it only with `LAMP_CONTROLS_STRIP=on` ([controls.md](controls.md),
-   "The base strip is off"). `install` keeps a pins file changed on the lamp.
+   "The base strip is off"); `deploy/factory/steps.sh` then skips it, reading
+   the switch from `lamp-controls`' own environment, and finds the head pads
+   as on any lamp. `install` keeps a pins file changed on the lamp.
 3. **The update key**, `/etc/lampOS/update/key.pub`: the public half of the
    owner's signing key ([updates.md](updates.md)). `install` refuses to run
    without it (step 1 below), and setup never writes it.
