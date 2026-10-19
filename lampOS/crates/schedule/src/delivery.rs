@@ -1058,11 +1058,18 @@ enum ItemState {
     WaitingForClock,
 }
 #[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ItemKind {
+    Timer,
+    Reminder,
+}
+#[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ItemReply {
     id: u64,
     delivery: u64,
     text: String,
+    kind: ItemKind,
     request_id: String,
     state: ItemState,
     due_unix_ms: i64,
@@ -1096,7 +1103,7 @@ impl ItemReply {
             return Err(error("invalid_evidence"));
         }
         // These fields are parsed strictly but have no delivery-ledger policy.
-        let _ = (&self.repeat, self.snoozed);
+        let _ = (&self.repeat, self.snoozed, &self.kind);
         Ok(())
     }
 }

@@ -71,13 +71,13 @@ pub fn catalog() -> Vec<Function> {
         ),
         function(
             NAMES[3],
-            "Read one bounded page of active timers and reminders. To say what is set, or to find one to cancel, leave pending_only out. If next_after_id is present, use it as after_id to read more; never describe an incomplete page as the whole list. If not_yet_due, how many are set and not yet due in all, is more than 0, timers or reminders are set: list again without pending_only before saying none are.",
+            "Read one bounded page of active timers and reminders, oldest first. Each item's kind is timer (set with set_timer) or reminder. To say what is set, or to find one to cancel, leave pending_only out. If next_after_id is present, use it as after_id to read more; never describe an incomplete page as the whole list. If not_yet_due, how many are set and not yet due in all, is more than 0, timers or reminders are set: list again without pending_only before saying none are.",
             json!({"pending_only":{"type":"boolean","description":"true lists only items that are due now and not yet said; leave it out to list everything that is set."},"after_id":{"type":"integer","minimum":0}}),
             json!([]),
         ),
         function(
             NAMES[4],
-            "Cancel the selected timer or whole reminder series only when asked. Use an ID from the current list, read without pending_only.",
+            "Cancel the selected timer or whole reminder series only when asked. Use an ID from the current list, read without pending_only. For a timer, cancel only an item whose kind is timer; for a reminder, only one whose kind is reminder.",
             json!({"id":id}),
             json!(["id"]),
         ),
@@ -578,6 +578,7 @@ struct Item {
     id: u64,
     delivery: u64,
     text: String,
+    kind: String,
     state: String,
     due_unix_ms: i64,
     local: String,
@@ -593,6 +594,7 @@ fn item(value: &Value) -> Result<Item, Failure> {
     if item.id == 0
         || item.delivery == 0
         || !valid_text(&item.text)
+        || !matches!(item.kind.as_str(), "timer" | "reminder")
         || !matches!(
             item.state.as_str(),
             "pending" | "scheduled" | "waiting_for_clock"
@@ -632,7 +634,7 @@ fn page(reply: &Value, after_id: u64, pending_only: bool) -> Result<Value, Failu
             return Err(Failure::Unavailable);
         }
         previous = i.id;
-        checked.push(json!({"id":i.id,"text":i.text,"state":i.state,"local":i.local,"due_unix_ms":i.due_unix_ms,"repeat":i.repeat,"snoozed":i.snoozed,"late":i.late}));
+        checked.push(json!({"id":i.id,"kind":i.kind,"text":i.text,"state":i.state,"local":i.local,"due_unix_ms":i.due_unix_ms,"repeat":i.repeat,"snoozed":i.snoozed,"late":i.late}));
     }
     if server_next.is_some_and(|n| values.is_empty() || n != previous) {
         return Err(Failure::Unavailable);

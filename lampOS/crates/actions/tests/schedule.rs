@@ -566,7 +566,7 @@ fn incorrect_success_identity_revision_or_deadline_never_becomes_confirmation() 
 
 fn listed(id: u64, text: String) -> Value {
     let c = commit(id);
-    json!({"id":id,"delivery":1,"text":text,"state":"scheduled","due_unix_ms":c["due_unix_ms"],"local":c["local"],"repeat":null,"snoozed":false,"late":false})
+    json!({"id":id,"delivery":1,"text":text,"kind":"reminder","state":"scheduled","due_unix_ms":c["due_unix_ms"],"local":c["local"],"repeat":null,"snoozed":false,"late":false})
 }
 
 #[test]
@@ -836,6 +836,73 @@ fn a_just_set_timer_is_listed_counted_beside_a_due_only_list_and_cancelled_for_g
         .find(|f| f.name == "cancel_reminder")
         .unwrap();
     assert!(cancel.description.contains("without pending_only"));
+}
+
+/// #1595, its last part (First, 11:39 on 19 Oct): each listed item says its
+/// kind, so "cancel my timer" with a timer and a reminder both due picks the
+/// timer and leaves the reminder. A snoozed timer is still a timer.
+#[test]
+fn cancel_my_timer_with_a_reminder_also_due_cancels_only_the_timer() {
+    let schedule = Schedule::new();
+    let actions = Actions::new(Some(Adapter::new(schedule.socket.clone()).unwrap()));
+    let timer = actions.call("set_timer", json!({"text":"Pasta","seconds":60}));
+    let reminder = actions.call(
+        "set_reminder",
+        json!({"text":"Call the plumber","time":"08:02","day":"today","zone":"Etc/UTC"}),
+    );
+    let (timer, reminder) = (
+        timer["result"]["id"].as_u64().unwrap(),
+        reminder["result"]["id"].as_u64().unwrap(),
+    );
+    *schedule.clock.0.lock().unwrap() = sample(130_000);
+    wait(|| ask(&schedule.socket, json!({"op":"status"}))["pending"] == 2);
+    let due = actions.call("list_reminders", json!({"pending_only":true}));
+    let kinds: Vec<_> = due["result"]["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| (i["id"].as_u64().unwrap(), i["kind"].clone()))
+        .collect();
+    assert_eq!(
+        kinds,
+        [(timer, json!("timer")), (reminder, json!("reminder"))],
+        "{due}"
+    );
+    // What the model does for "cancel my timer": the item whose kind is timer.
+    let picked = kinds.iter().find(|(_, k)| k == "timer").unwrap().0;
+    assert_eq!(
+        actions.call("cancel_reminder", json!({"id":picked}))["result"]["cancelled"],
+        true
+    );
+    let left = actions.call("list_reminders", json!({}));
+    assert_eq!(
+        left["result"]["items"].as_array().unwrap().len(),
+        1,
+        "{left}"
+    );
+    assert_eq!(left["result"]["items"][0]["id"], reminder);
+    assert_eq!(left["result"]["items"][0]["kind"], "reminder");
+    assert_eq!(left["result"]["items"][0]["state"], "pending");
+    // A snoozed timer keeps its kind.
+    let again = actions.call("set_timer", json!({"text":"Eggs","seconds":60}));
+    let again = again["result"]["id"].as_u64().unwrap();
+    *schedule.clock.0.lock().unwrap() = sample(200_000);
+    wait(|| ask(&schedule.socket, json!({"op":"status"}))["pending"] == 2);
+    let snoozed = actions.call("snooze_reminder", json!({"id":again,"seconds":60}));
+    assert_eq!(snoozed["result"]["snoozed"], true, "{snoozed}");
+    let all = actions.call("list_reminders", json!({}));
+    let eggs = all["result"]["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == again)
+        .unwrap();
+    assert_eq!(eggs["kind"], "timer", "{all}");
+    let cancel = catalog()
+        .into_iter()
+        .find(|f| f.name == "cancel_reminder")
+        .unwrap();
+    assert!(cancel.description.contains("kind is timer"));
 }
 
 /// The reviewer's P3 on #1603: a `pending_only` page kept full of long due

@@ -358,8 +358,10 @@ default zone, wall trust, capacity, and `last_receipt`. The latter is either
 is the original committed result, and may carry an older revision than current
 status. It does not include the original reminder text.
 
-`get` returns an `item` with its `id`, current `delivery`, text, creating
-`request_id`, state (`scheduled`, `pending`, or `waiting_for_clock`), effective
+`get` returns an `item` with its `id`, current `delivery`, text, `kind`
+(`timer` for a duration from now, set as `after`; `reminder` for a clock time,
+daily or weekly; taken from the stored deadline, so a snoozed timer stays a
+timer and no store format changed, #1595), creating `request_id`, state (`scheduled`, `pending`, or `waiting_for_clock`), effective
 and original due instants, canonical local time, recurrence, snoozed flag,
 remaining milliseconds, and lateness. `list` returns the same item views and
 `next_after_id`. Use that cursor until it is null. A page contains at most eight
@@ -528,6 +530,10 @@ are set (`lamp_actions::schedule::NOT_YET_DUE`). The count is best effort: a
 `Status` that can't be read leaves the list as it was. Test:
 `a_just_set_timer_is_listed_counted_beside_a_due_only_list_and_cancelled_for_good`
 (`crates/actions/tests/schedule.rs`, against the real Schedule service).
+Each listed item also says its `kind`, and `cancel_reminder` says to cancel
+only an item of the kind asked for, so "cancel my timer" with a reminder also
+due cancels only the timer. The list stays oldest first. Test:
+`cancel_my_timer_with_a_reminder_also_due_cancels_only_the_timer`.
 
 The declarations use Gemini's small `parameters` schema subset, omitting
 `additionalProperties`, `maxLength`, and regex patterns. Runtime validation
