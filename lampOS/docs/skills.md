@@ -783,9 +783,18 @@ mark = { colour = "blue", level = 1 }   # a faint light while on: level 1 or 2, 
   begins, ends or is texted, and `skills/events` says so; from the moment
   it is turned on too, so a ring that never answers never has anyone
   watched without a sign (reviewer-two on #1937,
-  `nothing_is_taken_until_the_ring_first_shows_its_mark`). A case's
-  recording says the ring's word as `light_reached.jsonl` (and
-  `light_outranked.jsonl`), taken as the program takes it. The first
+  `nothing_is_taken_until_the_ring_first_shows_its_mark`). The ring says a
+  shown mark again after each renewal (every 10 s); with no such word for
+  30 s (`watch::CONFIRMED_WITHIN_US`: the ring worker stopped, or it forgot
+  the claim), the mark is taken as hidden, `skills/events` says "its mark
+  has not been confirmed for 30 s: no visit counted", and the ring's next
+  word counts again (Third's privacy read on #1963,
+  `a_mark_the_ring_has_not_confirmed_for_thirty_seconds_counts_nothing`,
+  `guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s`).
+  A case's recording says the ring's word as `light_reached.jsonl` (and
+  `light_outranked.jsonl`), taken as the program takes it; a replay looks
+  at no time between messages, so the 30 s rule and `most` are not
+  replayed. The first
   builder's four rules for when the ring says it is outranked
   (`light/outranked`), each pinned by a test (#1937):
   1. **The person's own light over it pauses the watch** ("turn the light

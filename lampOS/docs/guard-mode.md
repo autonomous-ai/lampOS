@@ -39,7 +39,16 @@ relay delivers it (mobile-P1; [messages.md](messages.md), "Unasked texts").
   and the journal and `skills/events` say so. That holds from the moment
   it's turned on, before the ring's first word, so a ring that never
   answers (no ring worker, the voice down) never has anyone watched
-  without a sign (reviewer-two on #1937). When the ring says the mark
+  without a sign (reviewer-two on #1937). It holds later too: the ring
+  says the mark shows again after each renewal, about every 10 s, and
+  when it has said nothing for 30 s (the ring worker stopped, or it forgot
+  the claim, with no word that the mark is outranked), the mark is taken
+  as hidden. The journal and `skills/events` say "its mark has not been
+  confirmed for 30 s: no visit counted", and it counts again at the
+  ring's next word (Third's privacy read on #1963). The ring says nothing
+  inside a turn, whose face has colours of its own, so a turn longer than
+  30 s pauses the counting the same way until the next renewal after it.
+  When the ring says the mark
   is outranked (`light/outranked`), the first builder's four rules (#1937):
   1. **Your own light over it pauses it.** Say "turn the light off" on the
      way out, and the lamp makes no claim over your light and counts
@@ -148,16 +157,26 @@ don't know" or "someone", and ends only when you say stop.
   not texted; the face of the person who asked ending it, only after they
   left, and nobody else's; known or not, never a name; the privacy switch's
   one line, and nothing about the desk taken while it is closed; off when
-  asked.
-- `skills/guard-mode/tests/`: eight written cases replayed through the
-  watch ([tests/README.md](../skills/guard-mode/tests/README.md)).
+  asked; nothing counted once the ring hasn't confirmed the mark for 30 s,
+  and counting again at its next word
+  (`a_mark_the_ring_has_not_confirmed_for_thirty_seconds_counts_nothing`).
+- `skills/guard-mode/tests/`: nine written cases replayed through the
+  watch ([tests/README.md](../skills/guard-mode/tests/README.md)). A
+  replay looks at no time between messages, so one `light/reached` holds
+  there: the 30 s rule and the 12 hours are the program's, tested in
+  `watch.rs` and `skills.rs`.
 - `crates/skills/tests/skills.rs`: the loader's refusals for a watch (a
   trigger, a choice other than on and off, a missing permission or topic, a
   mark that isn't faint and steady, a `[[do]]`, an unknown key such as
   `picture`), and the program on a bus of its own: a call with nothing
   heard refused, the mark on `light/request`, a visit's text on
   `messages/out`, and the asker's face back in the known file ending it and
-  giving the mark back.
+  giving the mark back; and the ring going quiet while the mark is renewed:
+  after 30 s a visit isn't counted or texted, and the ring's next word
+  counts again
+  (`guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s`).
+  The program tests' stand-in ring says the mark still shows after each
+  skip of the clock past 30 s, as a ring does after each renewal.
 - `lamp_msgs::chat::tests::a_text_sent_unasked_is_one_short_line_from_its_sender`.
 
 ## Not shown, and open

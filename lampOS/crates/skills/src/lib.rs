@@ -4851,7 +4851,7 @@ pub fn replay_watch(
             Event::Message(message) => match ring_said(message) {
                 Some((source, shown, by)) => match source.strip_prefix("skill:") {
                     Some(name) if name == skill.name => watches
-                        .ring_said(name, shown, by.as_deref())
+                        .ring_said(name, shown, by.as_deref(), at)
                         .into_iter()
                         .map(|(_, out)| out)
                         .collect(),
