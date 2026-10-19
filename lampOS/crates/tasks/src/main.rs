@@ -1,5 +1,6 @@
 use lamp_tasks::runtime::{
-    Config, SET_UP_LOOK_EVERY, SetUpLater, SystemClock, read_targets_or_newer, request, serve,
+    Config, REPORT_EVERY, SET_UP_LOOK_EVERY, SetUpLater, SystemClock, read_targets_or_newer,
+    request, serve,
 };
 use std::{
     io::{self, Read},
@@ -150,6 +151,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             targets: targets_path,
             every: SET_UP_LOOK_EVERY,
         }),
+        report_every: REPORT_EVERY,
     };
     let clock = SystemClock::new(boot_id.as_deref())?;
     let executable = executable.ok_or("--harness is required")?;

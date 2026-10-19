@@ -39,6 +39,9 @@ pub const READ_DEADLINE: Duration = Duration::from_millis(300);
 pub const REQUEST_DEADLINE: Duration = Duration::from_millis(1100);
 pub const CLIENT_DEADLINE: Duration = Duration::from_millis(1200);
 pub const STALE_AFTER: Duration = Duration::from_millis(1500);
+/// How often the part says how it is on `diagnostics` while nothing changes
+/// ([`Config::report_every`] on a lamp).
+pub const REPORT_EVERY: Duration = Duration::from_secs(1);
 pub const WORKERS: usize = 4;
 pub const CLIENT_QUEUE: usize = 4;
 pub const REQUEST_QUEUE: usize = 16;
@@ -140,6 +143,11 @@ pub struct Config {
     /// `serve --set-up-later`: the part runs before the lamp is set up for
     /// hand-overs, and says why they are off (#1676). Off unless set.
     pub set_up_later: Option<SetUpLater>,
+    /// How often the part says how it is on `diagnostics` while nothing
+    /// changes: [`REPORT_EVERY`] on a lamp. A change in readiness is said
+    /// at once, whatever this is. Tests pass less, so a test that reads the
+    /// report waits a fraction of a second rather than one (#1128).
+    pub report_every: Duration,
 }
 
 /// What `serve --set-up-later` looks at again, and how often.
@@ -1470,7 +1478,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
             let ready = report.updated.elapsed() <= STALE_AFTER
                 && !owner.is_finished()
                 && !cli.is_finished();
-            if last_publish.is_none_or(|last| last.elapsed() >= Duration::from_secs(1))
+            if last_publish.is_none_or(|last| last.elapsed() >= config.report_every)
                 || last_ready != Some(ready)
             {
                 // The newest hand-over did not reach Harness: with no
@@ -1977,6 +1985,7 @@ mod tests {
             close_told: false,
             targets_newer: None,
             set_up_later: None,
+            report_every: REPORT_EVERY,
         };
         serve_with_adapter::<_, Never>(config, Never, Arc::new(AtomicBool::new(false)), |_| {
             panic!("adapter configured while disabled")

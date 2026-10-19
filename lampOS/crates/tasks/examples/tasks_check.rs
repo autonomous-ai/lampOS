@@ -6,7 +6,7 @@ mod scripted;
 
 use lamp_tasks::{
     harness::{Cli, CliConfig, EngineKind, Target},
-    runtime::{Config, SystemClock, request, serve_with_adapter},
+    runtime::{Config, REPORT_EVERY, SystemClock, request, serve_with_adapter},
 };
 use serde_json::{Value, json};
 use std::{
@@ -79,6 +79,7 @@ impl Running {
             close_told: false,
             targets_newer: None,
             set_up_later: None,
+            report_every: REPORT_EVERY,
         };
         let mut running = Self {
             config,

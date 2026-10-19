@@ -263,6 +263,9 @@ impl Running {
             close_told,
             targets_newer: None,
             set_up_later: None,
+            // Its report every 50 ms, not each second: a test reading it
+            // waits a fraction of a second (#1128).
+            report_every: Duration::from_millis(50),
         };
         let mut running = Self {
             root,

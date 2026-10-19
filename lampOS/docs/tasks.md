@@ -459,7 +459,7 @@ started once its answer is told:
 | Push (`--push-wait`) | One `wait` held per machine with watched tasks, on at most 64 agents, 600 s each (killed at 630 s), beside the CLI worker; the next on a machine no sooner than 3 s after one came back with an end, 30 s after one failed; a pushed task left out until the watch reads it again; 64 KiB stdout |
 | Private persistence | 8 MiB snapshot, 32 MiB database, 40 MiB journal; 4,096-byte pages |
 | SQLite | DELETE journal, FULL sync, fullfsync requested, 2 MiB cache, 50 ms busy wait, no mmap/WAL |
-| Diagnostics | Once a second, with early readiness changes; owner stale after 1,500 ms |
+| Diagnostics | Once a second (`report_every`; tests pass less), with early readiness changes; owner stale after 1,500 ms |
 
 There are seven service threads including main: four clients, the storage
 owner and the CLI worker. Clients never run Harness. The CLI worker never
