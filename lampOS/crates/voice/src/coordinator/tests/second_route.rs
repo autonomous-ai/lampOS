@@ -141,6 +141,16 @@ struct Script {
     /// Give the voice an `ExpressionOut` on a bus of the run's own, and keep
     /// what it says for Expression (`voice/progress`, `voice/sound`).
     expression: bool,
+    /// The second route answers nothing at End: its chat is still
+    /// streaming (#1620 on the second route).
+    second_holds: bool,
+    /// The second route fails each turn before any audio, as its worker
+    /// does when its speech to text or chat cannot be reached.
+    second_fails: Option<Fault>,
+    /// This peer reads Stop and keeps its process running (#1620).
+    ignores_stop: Option<&'static str>,
+    /// The scenario's own bound, past which capture reports a fault.
+    limit: Duration,
 }
 
 impl Script {
@@ -167,6 +177,10 @@ impl Script {
             mute_at_frame: None,
             second_shape: None,
             expression: false,
+            second_holds: false,
+            second_fails: None,
+            ignores_stop: None,
+            limit: LIMIT,
         }
     }
 }
@@ -499,6 +513,12 @@ impl Peers {
                         })
                         .unwrap();
                 }
+                Ok(Some(Control::Stop)) if self.script.ignores_stop == Some(role) => {
+                    // Read, and its process goes on: only a kill ends it.
+                    self.peers[index].stopped = true;
+                    self.seen.lock().unwrap().stopped.push(role);
+                    return Ok(());
+                }
                 Ok(Some(Control::Stop)) => {
                     if role == "ring" {
                         let at = monotonic_us();
@@ -709,6 +729,19 @@ impl Peers {
                 }
                 ProviderInput::End { request, .. } => {
                     self.ended.insert(request);
+                    if !live && self.script.second_holds {
+                        continue;
+                    }
+                    if !live && let Some(reason) = self.script.second_fails {
+                        self.peers[index]
+                            .queued
+                            .push_back(ProviderOutput::TurnFailed {
+                                request,
+                                stage: FailedStage::AwaitingResponse,
+                                reason,
+                            });
+                        continue;
+                    }
                     if !live {
                         // A wait cue first: audio with no words.
                         if self.script.second_cue > 0 {
@@ -1045,7 +1078,8 @@ fn run(script: Script) -> Run {
     });
     // The clock starts once every child has crossed its startup barrier;
     // the coordinator and the peers share it from here.
-    let clock_scope = crate::scenario_clock::Scope::enter(LIMIT * 2).unwrap();
+    let limit = script.limit;
+    let clock_scope = crate::scenario_clock::Scope::enter(limit * 2).unwrap();
     let mut owner = Controller::new(new_boot().unwrap(), now());
     let boot = owner.snapshot(now()).unwrap().boot();
     let mut startup = StartupEvents::default();
@@ -1096,7 +1130,7 @@ fn run(script: Script) -> Run {
                 crate::scenario_clock::Phase::Run => Instant::now() + Duration::from_millis(300),
                 crate::scenario_clock::Phase::Shutdown { deadline } => deadline,
             };
-            if crate::scenario_clock::instant() - started > LIMIT && !reported {
+            if crate::scenario_clock::instant() - started > limit && !reported {
                 reported = true;
                 if let Some(index) = state.index("capture") {
                     let _ = state.peers[index]
@@ -2291,4 +2325,282 @@ fn the_second_routes_answer_nods_and_sways_the_head_as_it_is_spoken() {
     // answer (`second_shape: None`) gave 1 nod (its onset) and no sway.
     assert!(nods >= 2, "{nods} nods");
     assert!(sways >= 1, "{sways} sways");
+}
+
+/// #1620 on the second route (`LAMP_VOICE_ROUTE=second`, the owner, 19 Oct:
+/// every voice feature on it). The voice is muted while the second route's
+/// worker holds the request, its chat still streaming: the worker is sent
+/// Stop with the others, reads it and is reaped inside the shared deadline,
+/// and nothing is forced, failed or left behind, as on Live.
+#[test]
+fn a_stop_while_the_second_route_alone_is_mid_request_is_clean() {
+    let _one = super::pilot_faults::one_session();
+    let run = run(Script {
+        second: false,
+        only: true,
+        second_holds: true,
+        mute_at_frame: Some(300),
+        ..Script::question(Live::Answer(12))
+    });
+    run.assert_clean();
+    assert!(run.exits.contains(&("second", true)), "{:?}", run.exits);
+    assert!(run.seen.stopped.contains(&"second"));
+    // The whole line reached it and nothing came back before the stop.
+    whole_line(&run.seen.second, 1);
+    assert!(run.played(1).is_empty(), "{}", run.summary());
+    assert!(run.events("worker_exit_failed").is_empty());
+    assert!(run.events("stop_delivery_error").is_empty());
+}
+
+/// #1620 on the second route: a worker that reads Stop and goes on running
+/// is killed at the shared deadline, reaped, and named as the cleanup's
+/// cause (`ForcedStop`, its own role), exactly as Gemini's worker is. The
+/// rest of the rig still stops cleanly, and the conversation's own end
+/// (the mute) is kept beside the cleanup failure.
+#[test]
+fn a_second_worker_that_ignores_stop_is_killed_and_named_as_geminis_is() {
+    let _one = super::pilot_faults::one_session();
+    for (only, role) in [(false, "provider"), (true, "second")] {
+        let run = run(Script {
+            second: false,
+            only,
+            ignores_stop: Some(role),
+            ..Script::question(Live::Answer(12))
+        });
+        eprintln!("{}", run.summary());
+        let error = run.result.as_ref().unwrap_err().to_string();
+        let forced = run.events("worker_forced_shutdown");
+        assert_eq!(forced.len(), 1, "{role}: {}", run.summary());
+        assert_eq!(forced[0]["worker"], role);
+        let cause = forced[0]["error"].as_str().unwrap();
+        for said in [
+            format!("{role} worker did not stop within shared 300 ms deadline"),
+            "forced termination required; reaped with".to_owned(),
+        ] {
+            assert!(cause.contains(&said), "{role}: {cause}");
+            assert!(error.contains(&said), "{role}: {error}");
+        }
+        assert!(
+            error.contains("PhysicalMute") || error.contains("mute"),
+            "{role}: {error}"
+        );
+        for (exited_role, exited) in &run.exits {
+            assert!(exited, "{exited_role} child was not reaped ({role})");
+            assert!(
+                run.seen.stopped.contains(exited_role),
+                "{exited_role} never saw Stop"
+            );
+        }
+        assert!(run.exits.contains(&(role, true)), "{:?}", run.exits);
+    }
+}
+
+/// #1567/#1864 on the second route: its worker says its link is Ready as
+/// it starts, before any service is asked
+/// (`the_second_workers_link_is_ready_before_any_service_is_asked`), so a
+/// speech to text, chat or voice that refuses or does not answer can never
+/// hold the voice's readiness. Each line then fails on its own
+/// (`TurnFailed`, before any audio), and a service runs past the 25 s
+/// startup budget to its mute, with `LAMP_START_OFFLINE` on or off; nothing
+/// waits for a link.
+#[test]
+fn the_second_route_alone_with_its_services_refused_stays_up_past_the_startup_budget() {
+    let _one = super::pilot_faults::one_session();
+    let past = INPUT_READINESS_TIMEOUT + Duration::from_secs(3);
+    for start_offline in [true, false] {
+        crate::session_lifetime::set_start_offline_for_test(Some(start_offline));
+        let run = run(Script {
+            second: false,
+            only: true,
+            second_fails: Some(Fault::Transport),
+            mute_at_frame: Some(past.as_millis() as u64 / 10),
+            limit: past + Duration::from_secs(5),
+            ..Script::question(Live::Answer(12))
+        });
+        crate::session_lifetime::set_start_offline_for_test(None);
+        run.assert_clean();
+        let error = run.result.as_ref().unwrap_err().to_string();
+        assert!(!error.contains("never became ready"), "{error}");
+        assert!(run.events("waiting_for_link").is_empty());
+        assert_eq!(
+            run.finished(1)["outcome"],
+            "provider_failed",
+            "{}",
+            run.summary()
+        );
+        // Muted past the budget, not ended at it.
+        let at = |kind: &str| run.events(kind)[0]["at_us"].as_u64().unwrap();
+        assert!(
+            at("physical_mute") - at("capture_started")
+                >= INPUT_READINESS_TIMEOUT.as_micros() as u64,
+            "{}",
+            run.summary()
+        );
+        whole_line(&run.seen.second, 1);
+        assert!(run.played(1).is_empty());
+    }
+}
+
+/// Services that refuse every call, and count each.
+#[derive(Default)]
+struct Refusing {
+    asked: std::sync::atomic::AtomicUsize,
+}
+
+impl crate::second_provider::Services for Refusing {
+    fn listen(
+        &self,
+    ) -> futures_util::future::BoxFuture<
+        'static,
+        crate::second_provider::net::Result<Box<dyn crate::second_provider::Listener>>,
+    > {
+        self.asked.fetch_add(1, Ordering::SeqCst);
+        Box::pin(async {
+            Err(crate::second_provider::net::Error::Transport(
+                "speech to text",
+            ))
+        })
+    }
+    fn chat(
+        &self,
+        _: Vec<crate::second_provider::net::Message>,
+    ) -> futures_util::stream::BoxStream<
+        'static,
+        crate::second_provider::net::Result<crate::second_provider::net::ChatEvent>,
+    > {
+        use futures_util::StreamExt;
+        self.asked.fetch_add(1, Ordering::SeqCst);
+        futures_util::stream::once(async {
+            Err(crate::second_provider::net::Error::Transport("chat"))
+        })
+        .boxed()
+    }
+    fn speak(
+        &self,
+        _: String,
+    ) -> futures_util::stream::BoxStream<'static, crate::second_provider::net::Result<Vec<i16>>>
+    {
+        use futures_util::StreamExt;
+        self.asked.fetch_add(1, Ordering::SeqCst);
+        futures_util::stream::once(async {
+            Err(crate::second_provider::net::Error::Transport("speech"))
+        })
+        .boxed()
+    }
+}
+
+/// The worker side of
+/// `the_second_route_alone_with_its_services_refused_stays_up_past_the_startup_budget`,
+/// through the second route's own `run`: it says Ready and its link Ready
+/// (session 1, `Initial`) before any service is asked, and returns at once,
+/// cleanly, on Stop.
+#[test]
+fn the_second_workers_link_is_ready_before_any_service_is_asked() {
+    let directory = SessionDirectory::create().unwrap();
+    let (mut parent, worker) = super::pair(&directory, "second");
+    let services = Arc::new(Refusing::default());
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    parent.control.send(Control::Stop).unwrap();
+    let started = Instant::now();
+    let engine_services = services.clone();
+    runtime
+        .block_on(async move {
+            let engine = crate::second_provider::Engine::new(
+                engine_services,
+                || crate::second_provider::Told::from(String::new()),
+                Arc::new(|_, _, _, _| Box::pin(async { serde_json::json!({}) })),
+            );
+            crate::second_provider::worker::run(worker, new_boot().unwrap(), engine, None, None)
+                .await
+        })
+        .unwrap();
+    assert!(started.elapsed() < Duration::from_millis(300));
+    assert!(matches!(
+        parent.control.receive::<WorkerEvent>().unwrap(),
+        Some(WorkerEvent::Ready)
+    ));
+    match parent.control.receive::<WorkerEvent>().unwrap() {
+        Some(WorkerEvent::ProviderLink { link }) => {
+            assert_eq!(link.session, 1);
+            assert!(matches!(
+                link.state,
+                ProviderLinkState::Ready {
+                    context: crate::provider_link::LinkContext::Initial,
+                    ..
+                }
+            ));
+        }
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(services.asked.load(Ordering::SeqCst), 0);
+}
+
+/// #1620 on the second route, the gap this closes: the second worker's
+/// process (`worker::serve`) runs on a current-thread tokio runtime, ended
+/// when `run` returns on Stop. Its async network I/O (the
+/// chat's stream, the voice's download, speech to text's socket) is
+/// dropped with it at once, but tokio's drop waits, with no bound, for
+/// every `spawn_blocking` still running (a plain drop): each tool call (`run_call`, up to
+/// `tools::ASK_DEADLINE`, 1.5 s, for the executive and the skills, longer
+/// for the tasks part), a text's tool call (`texts_ends`), and a DNS lookup
+/// (hyper-util's and tokio's resolvers both use the blocking pool). A stop
+/// during one holds the worker past the shared 300 ms (750 ms with
+/// diagnostics), so it is killed and the run's cleanup fails, which keeps
+/// the restart guard's mute, #1620's symptom. The Live worker runs its
+/// calls on detached threads, which never hold its exit.
+///
+/// Built as `serve` builds its runtime and ended by `serve`'s own
+/// `worker::finish`, with the real `tool_runner` asking an executive that
+/// takes the call and does not answer. With a plain drop it took 1.50 s.
+#[test]
+fn a_stop_during_a_slow_tool_call_lets_the_second_worker_exit_within_its_deadline() {
+    use std::os::unix::net::UnixListener;
+    let directory = SessionDirectory::create().unwrap();
+    let executive = UnixListener::bind(directory.path.join(crate::tools::CALL_SOCKET)).unwrap();
+    // A chat stream that has said nothing yet, as DeepSeek thinking.
+    let chat = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let chat_at = chat.local_addr().unwrap();
+    let settings = crate::tools::Settings {
+        exec: Some(directory.path.clone()),
+        ..Default::default()
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let (taken, held) = std::sync::mpsc::channel();
+    let holder = std::thread::spawn(move || {
+        let (call, _) = executive.accept().unwrap();
+        let (stream, _) = chat.accept().unwrap();
+        taken.send(()).unwrap();
+        // Held open, unanswered, until the test ends.
+        std::thread::sleep(Duration::from_secs(3));
+        drop((call, stream));
+    });
+    runtime.block_on(async move {
+        let runner = crate::second_provider::worker::tool_runner(settings, None, None);
+        tokio::spawn(runner(1, false, "light_on".into(), serde_json::json!({})));
+        tokio::spawn(async move {
+            use tokio::io::AsyncReadExt;
+            let mut stream = tokio::net::TcpStream::connect(chat_at).await.unwrap();
+            let _ = stream.read(&mut [0; 16]).await;
+        });
+        // Both are in flight: the call in the blocking pool, the stream
+        // waiting for its first byte. Then `run` returns on Stop.
+        tokio::task::spawn_blocking(move || held.recv_timeout(Duration::from_secs(5)))
+            .await
+            .unwrap()
+            .unwrap();
+    });
+    let stopped = Instant::now();
+    crate::second_provider::worker::finish(runtime);
+    let took = stopped.elapsed();
+    holder.join().unwrap();
+    assert!(
+        took < Duration::from_millis(300),
+        "the second worker's runtime took {took:?} to end after Stop"
+    );
 }

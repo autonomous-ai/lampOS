@@ -1532,7 +1532,7 @@ pub fn serve(
         let (character, tools) = texts_from;
         runtime.spawn(texts_task(chat, character, tools, root));
     }
-    runtime.block_on(async move {
+    let result = runtime.block_on(async move {
         // At most one filesystem read is outstanding; admission only reads the
         // nonblocking cache. Aborting the refresh prevents any later poll.
         let refresh = scope_file.map(|path| {
@@ -1558,7 +1558,19 @@ pub fn serve(
             refresh.abort();
         }
         result
-    })
+    });
+    finish(runtime);
+    result
+}
+
+/// Ends the worker's runtime once `run` has returned on Stop (#1620). A
+/// plain drop waits, with no bound, for every `spawn_blocking` still
+/// running: a tool call (up to `tools::ASK_DEADLINE`, 1.5 s), a text's tool
+/// call or a DNS lookup would hold the worker past its stop deadline, so it
+/// is killed and the run's cleanup fails. The process exits right after, so
+/// blocking work left detached here dies with it.
+pub(crate) fn finish(runtime: tokio::runtime::Runtime) {
+    runtime.shutdown_background();
 }
 
 /// The second route's tool calls: a web search's functions answered by the
