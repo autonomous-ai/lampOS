@@ -1,5 +1,7 @@
 //! The engine against scripted services: no network.
 use super::*;
+
+mod held_consent;
 use futures_util::stream::{self, BoxStream};
 use net::ToolCall;
 use serde_json::json;
@@ -32,6 +34,8 @@ struct Script {
     /// The final words come this long after the line's end, as `Finalize`'s
     /// answer does.
     finish_after: Option<Duration>,
+    /// The functions each chat told only some was told ([`Services::chat_only`]).
+    told_only: Mutex<Vec<&'static [&'static str]>>,
 }
 
 struct ScriptListener {
@@ -98,6 +102,15 @@ impl Services for Script {
         } else {
             scripted.boxed()
         }
+    }
+
+    fn chat_only(
+        &self,
+        messages: Vec<Message>,
+        only: &'static [&'static str],
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.told_only.lock().unwrap().push(only);
+        self.chat(messages)
     }
 
     fn speak(&self, text: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
@@ -1034,6 +1047,7 @@ fn early_words_stand_only_for_the_same_line_asked_the_same_way() {
     drop(early);
     let prepared = Prepared {
         words: "lamp what time is it".to_owned(),
+        notes: Vec::new(),
         messages: vec![
             Message::system("SYSTEM".to_owned()),
             Message::user("lamp what time is it".to_owned()),
@@ -3126,6 +3140,9 @@ async fn memory_scope_is_bound_before_answer_and_revoked_with_the_turn() {
         lamp_turn_owner::BootId::new([9; 16]).unwrap(),
         cache.clone(),
         runner,
+        Some(Arc::new(|_: &crate::memory_scope::ScopeLease| {
+            Told::from("SYSTEM".to_owned())
+        })),
     );
     engine.memory_camera(true, 1);
     cache.replace(
@@ -3193,6 +3210,9 @@ async fn dropping_engine_revokes_memory_scope_even_when_task_holds_a_lease() {
         lamp_turn_owner::BootId::new([10; 16]).unwrap(),
         Arc::default(),
         runner,
+        Some(Arc::new(|_: &crate::memory_scope::ScopeLease| {
+            Told::from("SYSTEM".to_owned())
+        })),
     );
     engine.submit(start(1));
     let lease = engine
@@ -3246,6 +3266,9 @@ async fn revoked_tool_result_is_not_sent_to_another_chat_round() {
             lamp_turn_owner::BootId::new([11; 16]).unwrap(),
             Arc::default(),
             runner,
+            Some(Arc::new(|_: &crate::memory_scope::ScopeLease| {
+                Told::from("SYSTEM".to_owned())
+            })),
         )
         .announcing(false);
     engine.submit(start(1));
@@ -3660,4 +3683,394 @@ async fn a_wordless_piece_with_the_name_heard_lends_its_time_not_its_sound() {
         (3 * frame, Some(1_000), vec![1_000]),
         "no name heard: its sound goes again"
     );
+}
+
+/// A Start marked as the coordinator marks it: begun over the lamp's
+/// audible answer, the first after a stop, soon after the lamp spoke.
+fn start_marked(
+    request: u64,
+    over_the_voice: bool,
+    after_stop: bool,
+    follows_on: bool,
+) -> ProviderInput {
+    ProviderInput::Start {
+        request,
+        session: 1,
+        privacy_generation: 1,
+        continues: false,
+        continues_cut_off: false,
+        over_the_lamp: over_the_voice,
+        after_stop,
+        follows_on,
+        over_the_lamps_voice: over_the_voice,
+    }
+}
+
+/// One spoken line heard as `words` and its chat's messages, with `marks`
+/// sent as the coordinator sends them, before its audio and End.
+async fn asked_with(
+    words: &str,
+    engine: impl FnOnce(Engine) -> Engine,
+    start: ProviderInput,
+    called: bool,
+    sound: bool,
+) -> Vec<Vec<Message>> {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(words.to_owned())].into()),
+        chats: Mutex::new([vec![text("Yes?"), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (built, _, _) = scripted(script.clone());
+    let mut engine = engine(built);
+    engine.submit(start);
+    engine.submit(audio(1, 1));
+    if called {
+        engine.submit(ProviderInput::Called {
+            request: 1,
+            privacy_generation: 1,
+        });
+    }
+    engine.submit(ProviderInput::End {
+        request: 1,
+        privacy_generation: 1,
+        sound,
+        cut_in: false,
+    });
+    turn(&mut engine).await;
+    script.asked.lock().unwrap().clone()
+}
+
+/// #1712, item 4 of the first builder's 20:15 (`LAMP_CUT_IN_TOLD`): a line
+/// begun over the lamp's audible answer is told it cut in, beside its
+/// words, as the Live route tells it; not without the switch, and the
+/// first after a stop is told the stop instead.
+#[tokio::test]
+async fn a_line_begun_over_the_lamps_answer_is_told_it_cut_in() {
+    let cut_in = Message::system(crate::cut_in_told::NOTE);
+    let stopped = Message::system(crate::provider_worker::STOPPED_NOTE);
+    let told = asked_with(
+        "Okay, that is enough",
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert_eq!(told[0][told[0].len() - 2], cut_in, "{:?}", told[0]);
+    assert_eq!(told[0].last(), Some(&Message::user("Okay, that is enough")));
+    let off = asked_with(
+        "Okay, that is enough",
+        |engine| engine,
+        start_marked(1, true, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert!(!off[0].contains(&cut_in), "{:?}", off[0]);
+    let quiet = asked_with(
+        "Okay, that is enough",
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, false, false, false),
+        false,
+        false,
+    )
+    .await;
+    assert!(!quiet[0].contains(&cut_in), "{:?}", quiet[0]);
+    let after_stop = asked_with(
+        "Okay, that is enough",
+        |engine| engine.telling_cut_ins(true),
+        start_marked(1, true, true, false),
+        false,
+        false,
+    )
+    .await;
+    assert!(!after_stop[0].contains(&cut_in), "{:?}", after_stop[0]);
+    assert!(after_stop[0].contains(&stopped), "{:?}", after_stop[0]);
+}
+
+/// #1712, item 4 (`LAMP_FOLLOWS_ON`): a line begun soon after the lamp's
+/// words finished is told it may follow on from them, as the Live route
+/// tells it; not when its End marks a sound, nor when it was judged in a
+/// busy room.
+#[tokio::test]
+async fn a_line_soon_after_the_lamp_spoke_is_told_it_may_follow_on() {
+    let follows = Message::system(crate::follows_on::NOTE);
+    let told = asked_with(
+        "And what do you like about it",
+        |engine| engine,
+        start_marked(1, false, false, true),
+        false,
+        false,
+    )
+    .await;
+    assert_eq!(told[0][told[0].len() - 2], follows, "{:?}", told[0]);
+    let unmarked = asked_with(
+        "And what do you like about it",
+        |engine| engine,
+        start(1),
+        false,
+        false,
+    )
+    .await;
+    assert!(!unmarked[0].contains(&follows), "{:?}", unmarked[0]);
+    let sound = asked_with(
+        "And what do you like about it",
+        |engine| engine,
+        start_marked(1, false, false, true),
+        false,
+        true,
+    )
+    .await;
+    assert!(!sound[0].contains(&follows), "{:?}", sound[0]);
+    let busy = asked_with(
+        "And what do you like about it",
+        |engine| engine.judging_busy(Arc::new(|request| request == 1)),
+        start_marked(1, false, false, true),
+        false,
+        false,
+    )
+    .await;
+    assert!(!busy[0].contains(&follows), "{:?}", busy[0]);
+    let quiet = asked_with(
+        "And what do you like about it",
+        |engine| engine.judging_busy(Arc::new(|_| false)),
+        start_marked(1, false, false, true),
+        false,
+        false,
+    )
+    .await;
+    assert!(quiet[0].contains(&follows), "{:?}", quiet[0]);
+}
+
+/// #1712, item 4 (`ProviderInput::Called`, which this route dropped): a line
+/// that was only the lamp's name, its call's wait run out, is told so, as
+/// Gemini's model is; with no words of it back, as a lone name often has,
+/// it is asked as the name, not left as a sound. Without `Called`, no words
+/// are still no line.
+#[tokio::test]
+async fn only_the_lamps_name_is_told_so_and_asked_as_the_name_with_no_words() {
+    let called = Message::system(crate::provider_worker::CALLED_NOTE);
+    let told = asked_with("Lamp", |engine| engine, start(1), true, false).await;
+    assert_eq!(told[0][told[0].len() - 2], called, "{:?}", told[0]);
+    assert_eq!(told[0].last(), Some(&Message::user("Lamp")));
+    let wordless = asked_with("", |engine| engine, start(1), true, false).await;
+    assert_eq!(
+        wordless[0][wordless[0].len() - 2],
+        called,
+        "{:?}",
+        wordless[0]
+    );
+    assert_eq!(
+        wordless[0].last(),
+        Some(&Message::user(super::CALLED_WORDS))
+    );
+    let not_called = asked_with("Lamp", |engine| engine, start(1), false, false).await;
+    assert!(!not_called[0].contains(&called), "{:?}", not_called[0]);
+    assert!(
+        asked_with("", |engine| engine, start(1), false, false)
+            .await
+            .is_empty()
+    );
+}
+
+/// #1712, item 4, with `LAMP_SECOND_PREPARED`: a chat begun on a cut-in's
+/// early words is asked with its note, so it is kept, not dropped as "a
+/// note goes beside the words"; a note known only at the End (`Called`)
+/// still drops it.
+#[tokio::test(start_paused = true)]
+async fn a_chat_begun_on_a_cut_ins_early_words_carries_its_note() {
+    for (called, asked) in [(false, 1), (true, 2)] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Okay, that is enough".to_owned())].into()),
+            early: Mutex::new([vec![net::Early::Words("okay that is enough".to_owned())]].into()),
+            finish_after: Some(Duration::from_millis(400)),
+            first_event_after: Some(Duration::from_millis(600)),
+            chats: Mutex::new(
+                [
+                    vec![text("Of course."), Ok(ChatEvent::Done)],
+                    vec![text("Of course."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.preparing(true).telling_cut_ins(true);
+        engine.submit(start_marked(1, true, false, false));
+        engine.submit(audio(1, 1));
+        if called {
+            engine.submit(ProviderInput::Called {
+                request: 1,
+                privacy_generation: 1,
+            });
+        }
+        engine.submit(end(1));
+        loop {
+            let event = tokio::time::timeout(Duration::from_secs(5), engine.next())
+                .await
+                .expect("the turn ends");
+            if matches!(event, ProviderOutput::TurnComplete { .. }) {
+                break;
+            }
+        }
+        let chats = script.asked.lock().unwrap();
+        assert_eq!(chats.len(), asked, "called {called}: {chats:?}");
+        let cut_in = Message::system(crate::cut_in_told::NOTE);
+        assert!(chats.iter().all(|chat| chat.contains(&cut_in)), "{chats:?}");
+    }
+}
+
+/// #1675: a scoped turn is told for its admitted person, not for whoever the
+/// eyes see when its chat begins; a written turn is told as the room's.
+#[tokio::test]
+async fn scoped_system_is_built_for_the_admitted_scope_not_the_face_in_view() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    let path = std::env::temp_dir().join(format!(
+        "sixth-scoped-system-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    let observe = |cache: &FaceCache, name: &str| {
+        std::fs::write(&path, name).unwrap();
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&path),
+        );
+    };
+    let cache = Arc::new(FaceCache::default());
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("What is on my list?".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![text("Tea."), Ok(ChatEvent::Done)],
+                vec![text("Noted."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let runner: ScopedToolRunner =
+        Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+    let mut engine = engine
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([12; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            Some(Arc::new(|lease: &ScopeLease| {
+                Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+            })),
+        )
+        .announcing(false);
+    engine.memory_camera(true, 1);
+    observe(&cache, "A");
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    // B steps in front of the lamp before the chat is asked.
+    observe(&cache, "B");
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    engine.submit(written(2, "Remind me later."));
+    turn(&mut engine).await;
+    let asked = script.asked.lock().unwrap();
+    let a = crate::remember::person_id("A");
+    assert_eq!(
+        asked[0][0],
+        Message::system(format!("for {:?}", Some(a.as_str())))
+    );
+    assert_eq!(asked[1][0], Message::system("for None"));
+    std::fs::remove_file(path).unwrap();
+}
+
+/// #1895 on the second route (the first builder, 19:49): B's first line,
+/// said just after A's while the eyes' count would still say A, reaches
+/// the memory as B's. Its memory call runs with B's admitted scope and its
+/// chat is told for B, never for A. Deepgram and DeepSeek are the script.
+#[tokio::test]
+async fn b_first_line_after_a_reaches_the_memory_as_bs() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    let path = std::env::temp_dir().join(format!(
+        "sixth-b-first-line-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    let observe = |cache: &FaceCache, name: &str| {
+        std::fs::write(&path, name).unwrap();
+        cache.replace(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&path),
+        );
+    };
+    let remember = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "m1",
+                "remember",
+                json!({"text":"my test code is 2580"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            [
+                Ok("Lamp, remember that my test code is 417.".to_owned()),
+                Ok("Lamp, remember that my test code is 2580.".to_owned()),
+            ]
+            .into(),
+        ),
+        chats: Mutex::new(
+            [
+                remember(),
+                vec![text("Got it."), Ok(ChatEvent::Done)],
+                remember(),
+                vec![text("Got it."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let cache = Arc::new(FaceCache::default());
+    let scopes: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
+    let seen = scopes.clone();
+    let runner: ScopedToolRunner = Arc::new(move |_, _, name, _, lease: ScopeLease| {
+        assert_eq!(name, "remember");
+        seen.lock()
+            .unwrap()
+            .push(lease.scope().unwrap().person().map(str::to_owned));
+        Box::pin(async { json!({"ok":true}) })
+    });
+    let mut engine = engine
+        .with_memory_scope(
+            lamp_turn_owner::BootId::new([13; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            Some(Arc::new(|lease: &ScopeLease| {
+                Told::from(format!("for {:?}", lease.scope().unwrap().person()))
+            })),
+        )
+        .announcing(false);
+    engine.memory_camera(true, 1);
+    observe(&cache, "A");
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    turn(&mut engine).await;
+    // B steps in; A's line is just over.
+    observe(&cache, "B");
+    engine.submit(start(2));
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    turn(&mut engine).await;
+    let a = crate::remember::person_id("A");
+    let b = crate::remember::person_id("B");
+    assert_eq!(*scopes.lock().unwrap(), [Some(a.clone()), Some(b.clone())]);
+    let asked = script.asked.lock().unwrap();
+    let b_told = Message::system(format!("for {:?}", Some(b.as_str())));
+    let a_told = Message::system(format!("for {:?}", Some(a.as_str())));
+    assert_eq!(asked[2][0], b_told, "B's first round is told for B");
+    assert_eq!(asked[3][0], b_told, "and so is its round after the call");
+    assert!(asked[2..].iter().all(|messages| messages[0] != a_told));
+    std::fs::remove_file(path).unwrap();
 }

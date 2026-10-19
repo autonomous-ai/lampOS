@@ -1,0 +1,82 @@
+{
+  "head": "b919291458c3618838c5f4b56520cf3b2cd739a5",
+  "integration_base": "b919291458c3618838c5f4b56520cf3b2cd739a5",
+  "build_environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "2"
+  },
+  "source_only": true,
+  "source_file_count": 1577,
+  "source_tree_sha256": "6c33f01b8eb9c8475687bd4e0da5a962e91e28f25b52c490bc49621dcce8f82d",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 3.66,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summaries": []
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "-p",
+        "lamp-tasks",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 13.33,
+      "log_sha256": "8591e2431e59152cb48686fd32229406ea0bbbae81e8f3a8d75a8e88c7931b73",
+      "summaries": []
+    },
+    {
+      "stage": "tasks",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "lamp-tasks",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 39.94,
+      "log_sha256": "819e503065a2185bd97284e57dce432da323bb9899ccae8dee65ce44311599a0",
+      "summaries": [
+        "test result: ok. 93 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.16s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.62s",
+        "test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.94s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.44s",
+        "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.24s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    }
+  ],
+  "scope": "Complete lamp-tasks suite for a test-only synchronization correction. No runtime behavior changes.",
+  "uncommitted_paths": [
+    "lampOS/crates/tasks/tests/runtime.rs"
+  ],
+  "all_source_hashes_still_match": true,
+  "changed_and_reference_source_sha256": {
+    "lampOS/crates/tasks/tests/runtime.rs": "a74b06a9ef42410f5898c1ef314ca8728c55a592f7ded1558d2ecda0201f7e77",
+    "lampOS/crates/tasks/src/runtime.rs": "66d2492488b3081bd141035fe8762e820f8f3226af0995840b8ef524beab5cd2",
+    "lampOS/crates/tasks/Cargo.toml": "bca60458e6a227ecd037caab2d4db20008e1c7a6e7c271a833872fffc225bdc9",
+    "lampOS/Cargo.toml": "b90661f970cfb72c442078e9caa4b7c322556631895751e29c5efdfd0923c6bb",
+    "lampOS/Cargo.lock": "41be22d8a1943392849be46e55f0d04f9725f90b6ffe874c75d3479420ff208d"
+  },
+  "full_source_validation": "All 1577 non-document source hashes matched after the gate; the complete tree digest is above. Only changed and reference file hashes are expanded here."
+}

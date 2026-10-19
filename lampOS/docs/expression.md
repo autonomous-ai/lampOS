@@ -239,6 +239,18 @@ concentrating, asleep, or once someone has cut in, and nothing is owed after.
   `settle_us` (0.6 s) when an answer of at least `settle_after_us` (1.5 s)
   ends, then rest.
 
+The levels above (0.35, 0.06 and 0.12) are for a voice whose pieces with
+sound average 0.34, as Gemini Live's do in the engine test. Each turn keeps
+the voice's own running level: the mean of its first pieces with sound
+(level 0.01 or more), then a 2 s follow, never pulled down by a pause. The
+three bars scale by that level over 0.34, between 0.25 and 3 times, and
+never fall under 0.015, 0.03 and 0.06. The stress bar never rises over
+0.9 (or the catalogue's own `stress_level`, if higher): the voice's meter
+stops at 1.0, so a voice that fills it would otherwise never nod, where the
+fixed bars nodded as each sentence began (Seventh on #1722, 22:25). So a quieter voice, such as the
+second route's ElevenLabs (#1712), nods and sways as Live's does, and a
+hiss is still no word. `stress_rise` was relative already.
+
 What moved the head with one answer ends at the fences that end it (#955
 review): a new session, turn or audio generation, a hold or resume, a
 cancellation, an interruption or a fault forgets every nod, sway and settle
@@ -267,6 +279,12 @@ same answer plans none of it. It also checks the fences: a new turn, or a
 cancelled answer, carries none of the old answer's motion (the offsets equal
 a catalogue without speaking on every tick), and a finished answer is
 settled after.
+The same answer from a voice a third as loud (0.33 times), and a fifth
+louder (1.2 times), gives 5 to 8 nods, a sway and the settle alike. On the
+old fixed bars the quiet one failed. At 0.01 times, all hiss, it nods and
+sways never. A voice that fills the meter (1.0 through every sentence) nods as
+each of its three sentences begins, where without the ceiling it nodded
+never.
 
 Not shown: how it looks on a lamp, and the body's own smoothing and speed
 limits on these offsets.

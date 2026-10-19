@@ -233,6 +233,16 @@ impl Gate {
     }
 }
 
+/// Whether a turn is told and kept for its admitted memory scope (#1675):
+/// its recall, history, Days note and answer that person's or the room's,
+/// never the sticky session owner's. `on` only; otherwise as before.
+pub const SCOPED_CONTEXT_ENVIRONMENT: &str = "LAMP_SECOND_SCOPED_CONTEXT";
+
+/// Whether the service's environment says `LAMP_SECOND_SCOPED_CONTEXT=on`.
+pub fn scoped_context_from_environment() -> bool {
+    std::env::var(SCOPED_CONTEXT_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
 /// Where the coordinator reads whether a slow first round makes a sound
 /// (sixth-P3, [`super::CUE_AFTER`]). `on` only.
 pub const WAIT_CUE_ENVIRONMENT: &str = "LAMP_SECOND_WAIT_CUE";
@@ -526,6 +536,70 @@ pub fn deepseek_key(
         Some(_) => Ok(config.llm_key.clone()),
         None => unit_credential(credentials, DEEPSEEK_CREDENTIAL),
     }
+}
+
+/// The memory's observation pass (#1693 (2), `LAMP_MEMORY_OBSERVE`): this
+/// route's DeepSeek model, thinking off, on the relay or DeepSeek's own API
+/// as the route has it, so a person's conversations go to one outside model
+/// (the first builder on #1693). Asked once per conversation, on the
+/// memory's observation thread with a runtime of its own, within
+/// [`crate::remember::OBSERVE_DEADLINE`]; never on a turn's path.
+fn memory_observer(
+    config: &crate::second_config::SecondConfig,
+    credentials: Option<&std::ffi::OsStr>,
+) -> io::Result<crate::remember::Observer> {
+    let key = deepseek_key(config, credentials)?;
+    let base = config
+        .hosted
+        .deepseek_base_url
+        .clone()
+        .unwrap_or_else(|| crate::second_config::DEEPSEEK_BASE_URL.to_owned());
+    let chat = crate::second_provider::net::Chat::deepseek_at(
+        &base,
+        &config.hosted.deepseek_model,
+        key.expose(),
+        Arc::new(Vec::new),
+        false,
+    )
+    .map_err(|error| io::Error::other(error.to_string()))?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    Ok(Box::new(move |input| {
+        runtime.block_on(async {
+            tokio::time::timeout(
+                crate::remember::OBSERVE_DEADLINE,
+                ask_observations(&chat, input),
+            )
+            .await
+            .ok()
+            .flatten()
+        })
+    }))
+}
+
+/// One observation pass: the prompt, the job as quoted data, and the
+/// model's whole answer read as [`crate::remember::observe_output`].
+async fn ask_observations(
+    chat: &crate::second_provider::net::Chat,
+    input: &serde_json::Value,
+) -> Option<serde_json::Value> {
+    let mut stream = chat
+        .send(&[
+            Message::system(crate::remember::OBSERVE_PROMPT),
+            Message::user(input.to_string()),
+        ])
+        .await
+        .ok()?;
+    let mut text = String::new();
+    while let Some(event) = stream.next().await.ok()? {
+        match event {
+            crate::second_provider::net::ChatEvent::Text(piece) => text.push_str(&piece),
+            crate::second_provider::net::ChatEvent::Done => break,
+            _ => {}
+        }
+    }
+    crate::remember::observe_output(&text)
 }
 
 /// How the journal names where DeepSeek is asked: never a URL.
@@ -1094,6 +1168,22 @@ pub fn serve(
     // The voice unit's credentials (`LoadCredential=`), passed to this
     // worker alone (`process.rs`).
     let credentials = std::env::var_os(crate::second_config::CREDENTIALS_ENV);
+    // The memory's observation pass (#1693 (2)), with this route's model.
+    if crate::remember::observe_on() && tools.memory.is_some() {
+        match memory_observer(&config, credentials.as_deref()) {
+            Ok(observer) => {
+                crate::remember::observe_with(observer);
+                eprintln!(
+                    "lamp-voice second: at each conversation's end the memory's observation pass asks {} {} (LAMP_MEMORY_OBSERVE)",
+                    config.hosted.deepseek_model,
+                    deepseek_where(&config.hosted)
+                );
+            }
+            Err(error) => eprintln!(
+                "lamp-voice second: no observation pass, the memory keeps only what it is asked to: {error}"
+            ),
+        }
+    }
     // A web search as functions of its own, with LAMP_SECOND_SEARCH:
     // declared beside the lamp's tools and answered here.
     let search = search_for(&config, route, credentials.as_deref())?.map(Arc::new);
@@ -1211,12 +1301,25 @@ pub fn serve(
             "lamp-voice second: a spoken turn's request begins with the character and the skills, and the memory, the time, the room and the thread go after the exchanges (LAMP_SECOND_STEADY_FIRST)"
         );
     }
-    let system = move || {
+    // With a lease, the turn is told for its admitted scope alone: that
+    // person's (or the room's) Days note and exchanges, never those of the
+    // person the eyes or the sticky session name when its chat begins.
+    let told_for = move |lease: Option<&crate::memory_scope::ScopeLease>| {
         let now = Instant::now();
         let Ok(mut sessions) = sessions.lock() else {
             return Told::default();
         };
-        let (changed, person) = sessions.open(who.as_deref(), now);
+        let (opened, person) = sessions.open(who.as_deref(), now);
+        let (changed, person) = match lease {
+            None => (opened, person),
+            Some(lease) => {
+                let Some(scope) = lease.scope() else {
+                    return Told::default();
+                };
+                let person = scope.person().map(str::to_owned);
+                (sessions.told_for(&person), person)
+            }
+        };
         let memory = match &socket {
             Some(socket) if days => sessions.frozen(changed, |session| {
                 crate::remember::told_for_session(socket, session, person.as_deref())
@@ -1254,6 +1357,7 @@ pub fn serve(
                 format!("{character}{skills}"),
                 &format!("{memory}{}{facts}", time.as_deref().unwrap_or_default()),
                 file.as_deref(),
+                person.as_deref(),
             )
         } else {
             system_message(
@@ -1261,9 +1365,17 @@ pub fn serve(
                 time.as_deref(),
                 &(memory + &facts + &skills),
                 file.as_deref(),
+                person.as_deref(),
             )
         }
     };
+    let told_for = Arc::new(told_for);
+    let scoped_system = scoped_context_from_environment().then(|| {
+        let told_for = told_for.clone();
+        Arc::new(move |lease: &crate::memory_scope::ScopeLease| told_for(Some(lease)))
+            as crate::second_provider::ScopedSystem
+    });
+    let system = move || told_for(None);
     let staff = tools
         .tasks
         .clone()
@@ -1275,6 +1387,9 @@ pub fn serve(
     // its search from the words heard, while the model's first round runs
     // (#1712).
     let early = search.as_ref().map(|_| Arc::new(Early::default()));
+    // A held line's `reports_stop` is done, its answer kept held, as on the
+    // Live route (`crate::attention::DONE_THOUGH_HELD`), with LAMP_REPORTS=on.
+    let though_held = tools.reports_stop;
     let runner = tool_runner(tools, search.clone(), early.clone());
     // The same calls with the admitted request's memory authority (#1794).
     let scoped_runner = scoped_tool_runner(scoped_settings, search.clone(), early.clone());
@@ -1287,10 +1402,12 @@ pub fn serve(
         },
         runner.clone(),
     )
-    .with_memory_scope(boot, face_cache.clone(), scoped_runner)
+    .with_memory_scope(boot, face_cache.clone(), scoped_runner, scoped_system)
     .checking_sounds(checked)
+    .telling_cut_ins(files.cut_in_told)
     .waiting_with_a_sound(route.wait_cue)
     .saying_when_down(route.down_line)
+    .doing_though_held(though_held)
     .announcing(!route.only_voice)
     .saying_reminders(reminders);
     if let Some(staff) = staff {
@@ -1431,6 +1548,16 @@ pub fn serve(
                 heeding.lock().ok()?.conversation_note_for(request)
             }));
         }
+        // A line that may follow on from the lamp is not told so in a busy
+        // room, as the rule judged it (#1712).
+        {
+            let heeding = heeding.clone();
+            engine = engine.judging_busy(Arc::new(move |request| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.judged_busy(request))
+            }));
+        }
         {
             let heeding = heeding.clone();
             engine = engine.telling_what_it_did(Arc::new(move |did| {
@@ -1489,7 +1616,7 @@ pub fn serve(
         let (character, tools) = texts_from;
         runtime.spawn(texts_task(chat, character, tools, root));
     }
-    runtime.block_on(async move {
+    let result = runtime.block_on(async move {
         // At most one filesystem read is outstanding; admission only reads the
         // nonblocking cache. Aborting the refresh prevents any later poll.
         let refresh = scope_file.map(|path| {
@@ -1515,7 +1642,19 @@ pub fn serve(
             refresh.abort();
         }
         result
-    })
+    });
+    finish(runtime);
+    result
+}
+
+/// Ends the worker's runtime once `run` has returned on Stop (#1620). A
+/// plain drop waits, with no bound, for every `spawn_blocking` still
+/// running: a tool call (up to `tools::ASK_DEADLINE`, 1.5 s), a text's tool
+/// call or a DNS lookup would hold the worker past its stop deadline, so it
+/// is killed and the run's cleanup fails. The process exits right after, so
+/// blocking work left detached here dies with it.
+pub(crate) fn finish(runtime: tokio::runtime::Runtime) {
+    runtime.shutdown_background();
 }
 
 /// The second route's tool calls: a web search's functions answered by the
@@ -1868,6 +2007,8 @@ pub(crate) struct Heeding {
     noted: Option<(u64, Option<&'static str>)>,
     /// The request last let out only as the conversation going on.
     alone: Option<u64>,
+    /// The request last judged in a busy room ([`Self::judged_busy`]).
+    busy: Option<u64>,
     /// The request last let out because its words or the lamp's name heard
     /// in its sound called the lamp.
     by_name: Option<u64>,
@@ -2074,6 +2215,7 @@ impl Heeding {
             name_note: None,
             noted: None,
             alone: None,
+            busy: None,
             by_name: None,
             session: 1,
             session_for: None,
@@ -2399,6 +2541,7 @@ impl Heeding {
         }
         self.alone = (alone && matches!(verdict, Some(crate::attention::Verdict::Play(_))))
             .then_some(request);
+        self.busy = busy.then_some(request);
         // Its words or the name heard called the lamp, not a face alone.
         self.by_name = (played && attention.called_for_itself()).then_some(request);
         // A call let out: the conversation goes on from it.
@@ -2478,6 +2621,13 @@ impl Heeding {
     pub(crate) fn conversation_note_for(&self, request: u64) -> Option<&'static str> {
         (self.alone == Some(request)).then_some(CONVERSATION_ALONE)
     }
+
+    /// Whether `request` was judged in a busy room: a line that may follow
+    /// on from the lamp is not told so there (`LAMP_FOLLOWS_ON`), as on the
+    /// Live route.
+    pub(crate) fn judged_busy(&self, request: u64) -> bool {
+        self.busy == Some(request)
+    }
 }
 
 fn unix_ms(at: SystemTime) -> u64 {
@@ -2493,6 +2643,8 @@ struct Sessions {
     /// Runs of turns opened so far: the Days session number.
     opened: u64,
     note: Option<String>,
+    /// The admitted scope the Days note was last asked for.
+    scoped: Option<Option<String>>,
 }
 impl Sessions {
     /// Open the thread for whoever is at the lamp now ([`Thread::opening`]):
@@ -2515,6 +2667,13 @@ impl Sessions {
         (changed, thread.opened_for().map(str::to_owned))
     }
 
+    /// Whether `person`'s admitted scope differs from the last turn's.
+    fn told_for(&mut self, person: &Option<String>) -> bool {
+        let changed = self.scoped.as_ref() != Some(person);
+        self.scoped = Some(person.clone());
+        changed
+    }
+
     /// The Days note for this run of turns, asked anew when the person changed.
     fn frozen(&mut self, changed: bool, ask: impl FnOnce(u64) -> String) -> String {
         if changed || self.note.is_none() {
@@ -2535,14 +2694,16 @@ impl Sessions {
 /// its own, and "and how many live there?" needs the one before. Taken
 /// from the thread under the same lock as the recall, after the thread's
 /// forgetting and reload, so a forgotten exchange is never given back.
+/// Only `whose` exchanges are given: a person's memory id, or none for the room.
 pub(crate) fn system_message(
     character: &str,
     time: Option<&str>,
     memory: &str,
     file: Option<&Path>,
+    whose: Option<&str>,
 ) -> Told {
     let told = format!("{character}{}{memory}", time.unwrap_or_default());
-    let (thread, history) = thread_and_history(told.len(), file);
+    let (thread, history) = thread_and_history(told.len(), file, whose);
     Told {
         text: told + &thread,
         after: None,
@@ -2557,8 +2718,13 @@ pub(crate) fn system_message(
 /// thread, after the exchanges ([`Told::after`]). A service's prompt cache
 /// then holds the character, the tools and the exchanges from one request
 /// to the next; the time alone changes every minute.
-pub(crate) fn steady_first_message(steady: String, changing: &str, file: Option<&Path>) -> Told {
-    let (thread, history) = thread_and_history(steady.len() + changing.len(), file);
+pub(crate) fn steady_first_message(
+    steady: String,
+    changing: &str,
+    file: Option<&Path>,
+    whose: Option<&str>,
+) -> Told {
+    let (thread, history) = thread_and_history(steady.len() + changing.len(), file, whose);
     let after = format!("{changing}{thread}").trim_start().to_owned();
     Told {
         text: steady,
@@ -2568,14 +2734,18 @@ pub(crate) fn steady_first_message(steady: String, changing: &str, file: Option<
 }
 
 /// The thread in the room `used` bytes of the system message leave it,
-/// and the exchanges as messages, both under the thread's one lock.
-fn thread_and_history(used: usize, file: Option<&Path>) -> (String, Vec<Message>) {
+/// and `whose` exchanges as messages, both under the thread's one lock.
+fn thread_and_history(
+    used: usize,
+    file: Option<&Path>,
+    whose: Option<&str>,
+) -> (String, Vec<Message>) {
     let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(used);
     let now = Instant::now();
     let (thread, recent) = crate::thread::current(file, |thread| {
         (
-            thread.recall(now, room),
-            thread.recent(now, HISTORY_WITHIN, HISTORY_EXCHANGES),
+            thread.recall_for(whose, now, room),
+            thread.recent_for(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES),
         )
     })
     .unwrap_or_default();
@@ -2690,7 +2860,19 @@ pub const HISTORY_WITHIN: Duration = Duration::from_secs(300);
 /// its transcripts: the person's words, the lamp's (not the announcement),
 /// and at the turn's end the exchange to the memory's journal and the
 /// thread to its file.
+#[cfg(test)]
 pub(crate) fn keep(event: &ProviderOutput, file: Option<&Path>) {
+    keep_scoped(event, file, None)
+}
+
+fn keep_scoped(
+    event: &ProviderOutput,
+    file: Option<&Path>,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) {
+    if lease.is_some_and(|lease| !lease.is_current()) {
+        return;
+    }
     let now = Instant::now();
     match event {
         ProviderOutput::Transcript {
@@ -2713,7 +2895,19 @@ pub(crate) fn keep(event: &ProviderOutput, file: Option<&Path>) {
             if !text.is_empty()
                 && let Ok(mut thread) = crate::thread::THREAD.lock()
             {
-                thread.lamp(*request, &format!("{} ", text.trim_start()), now);
+                let text = format!("{} ", text.trim_start());
+                match lease {
+                    Some(lease) => {
+                        if lease.key().request != *request {
+                            return;
+                        }
+                        let Some(scope) = lease.scope() else {
+                            return;
+                        };
+                        thread.lamp_for(*request, &text, now, scope.person());
+                    }
+                    None => thread.lamp(*request, &text, now),
+                }
             }
         }
         ProviderOutput::TurnComplete { request, .. } => {
@@ -2823,7 +3017,12 @@ pub async fn run(
                 if let ProviderInput::Written { request, text, .. } = &command
                     && let Ok(mut thread) = crate::thread::THREAD.lock()
                 {
-                    thread.written(*request, text);
+                    // A written request is admitted as the room's.
+                    if engine.scopes_context() {
+                        thread.written_for(*request, text, None);
+                    } else {
+                        thread.written(*request, text);
+                    }
                 }
                 engine.submit(command);
             }
@@ -2839,7 +3038,11 @@ pub async fn run(
         if pending.is_none() {
             pending = engine.try_output();
             if let Some(event) = &pending {
-                keep(event, thread.as_deref());
+                let lease = engine
+                    .scopes_context()
+                    .then(|| engine.memory_lease())
+                    .flatten();
+                keep_scoped(event, thread.as_deref(), lease.as_ref());
             }
             if let Some(event) = &pending {
                 link.output(monotonic_us(), event);
@@ -3860,6 +4063,7 @@ mod tests {
             Some(" It is noon."),
             &crate::remember::told(),
             Some(&file),
+            None,
         );
         assert!(
             told.text
@@ -3884,6 +4088,7 @@ mod tests {
             "You are a lamp.".into(),
             &format!("{} It is noon.", crate::remember::told()),
             Some(&file),
+            None,
         );
         assert_eq!(steady.text, "You are a lamp.");
         let after = steady.after.clone().unwrap_or_default();
@@ -3899,12 +4104,12 @@ mod tests {
             thread.at_lamp(whose.map(str::to_owned));
             thread.opening(Instant::now());
         }
-        let told = system_message("You are a lamp.", None, "", Some(&file));
+        let told = system_message("You are a lamp.", None, "", Some(&file), None);
         assert!(told.history.is_empty(), "{:?}", told.history);
         assert!(!told.text.contains("Try some tea"), "{}", told.text);
         // Nothing changing and no thread: no message after the exchanges.
         assert_eq!(
-            steady_first_message("You are a lamp.".into(), "", Some(&file)).after,
+            steady_first_message("You are a lamp.".into(), "", Some(&file), None).after,
             None
         );
         std::fs::remove_dir_all(&dir).unwrap();
@@ -3935,7 +4140,7 @@ mod tests {
         ] {
             keep(&event, None);
         }
-        let spoken = system_message("You are a lamp.", Some(" It is noon."), "", None);
+        let spoken = system_message("You are a lamp.", Some(" It is noon."), "", None, None);
         assert!(
             spoken.text.contains("Under the blue mat."),
             "{}",
@@ -4364,6 +4569,29 @@ mod tests {
         };
         assert!(judged(true).is_some(), "by day, held");
         assert_eq!(judged(false), None, "with on alone, played");
+    }
+
+    /// #1712, item 4 (`LAMP_FOLLOWS_ON`): the rule knows which line it
+    /// judged in a busy room, so that line is not told it may follow on.
+    #[test]
+    fn a_line_judged_in_a_busy_room_is_known_as_judged_busy() {
+        use crate::room_told::Room;
+        let signs = |room| super::Signs {
+            room,
+            going_on: false,
+            lamp_asked: false,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let line = (1_000_000_000, 1_001_500_000);
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        heeding.judge(9, line, "Lamp, what time is it?", signs(Room::Busy));
+        assert!(heeding.judged_busy(9));
+        assert!(!heeding.judged_busy(8));
+        heeding.judge(10, line, "Lamp, what time is it?", signs(Room::Quiet));
+        assert!(!heeding.judged_busy(10) && !heeding.judged_busy(9));
     }
 
     /// #1712, lamp-4ace's A/B: after a hand-over and 104 s, every line
@@ -5346,5 +5574,66 @@ mod memory_switches {
         );
         drop(scope);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+}
+
+/// #1693 (2): one observation pass asks this route's DeepSeek model with
+/// thinking off, the prompt as the system message and the job as quoted
+/// data, and reads its streamed answer as one JSON object.
+#[cfg(test)]
+mod memory_observer {
+    use serde_json::json;
+    use std::sync::Arc;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[tokio::test]
+    async fn a_pass_asks_deepseek_without_thinking_and_reads_its_streamed_json() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0; 8192];
+            while !String::from_utf8_lossy(&request).contains("\"stream\":true") {
+                let n = socket.read(&mut buffer).await.unwrap();
+                request.extend_from_slice(&buffer[..n]);
+            }
+            socket
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n\
+                      data: {\"choices\":[{\"delta\":{\"content\":\"{\\\"observations\\\":[{\\\"text\\\":\\\"Tea, \"}}]}\n\n\
+                      data: {\"choices\":[{\"delta\":{\"content\":\"no sugar\\\",\\\"category\\\":\\\"preference\\\",\\\"source_ids\\\":[3],\\\"supersedes\\\":null}]}\"}}]}\n\n\
+                      data: [DONE]\n\n",
+                )
+                .await
+                .unwrap();
+            String::from_utf8(request).unwrap()
+        });
+        let chat = crate::second_provider::net::Chat::deepseek_at(
+            &format!("http://{address}"),
+            "deepseek-flash",
+            "secret",
+            Arc::new(Vec::new),
+            false,
+        )
+        .unwrap();
+        let input = json!({"job":"j7","source_ids":[3],"records":[{"id":3,"heard":"synthetic: tea, no sugar"}]});
+        let output = super::ask_observations(&chat, &input).await.unwrap();
+        assert_eq!(
+            output,
+            json!({"observations":[{"text":"Tea, no sugar","category":"preference","source_ids":[3],"supersedes":null}]})
+        );
+        let request = server.await.unwrap();
+        assert!(
+            request.contains("\"model\":\"deepseek-flash\""),
+            "{request}"
+        );
+        assert!(
+            request.contains("\"thinking\":{\"type\":\"disabled\"}"),
+            "{request}"
+        );
+        assert!(request.contains("untrusted history"), "{request}");
+        assert!(request.contains("\\\"job\\\":\\\"j7\\\""), "{request}");
+        assert!(!request.contains("\"tools\""), "{request}");
     }
 }

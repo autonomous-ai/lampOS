@@ -143,7 +143,12 @@ look's picture with them unless the model takes none, and the answer's text
 to speech (ElevenLabs or OpenAI's voice, or Google's with
 `LAMP_SECOND_SPEECH=gemini`); with `LAMP_SECOND_SEARCH` the model's queries
 go to DeepSeek's search, OpenRouter's (Exa), or the service `search_url`
-names, and a page it asks to read to DeepSeek's fetch. A mute or a privacy change ends a line there
+names, and a page it asks to read to DeepSeek's fetch. With `LAMP_MEMORY_OBSERVE=on`
+(#1693 (2), off unless set), at the end of each conversation its exchanges'
+text (what was heard and said, up to 32 KiB, with their ids and earlier
+observations; no audio or picture) go once more to the same DeepSeek model,
+on the relay or DeepSeek's own API as the route has it, for the memory's
+observation pass ([memory.md](memory.md)). A mute or a privacy change ends a line there
 too: an authority with no owner retires the request, which closes its
 speech-to-text socket (the reviewer on #1686).
 

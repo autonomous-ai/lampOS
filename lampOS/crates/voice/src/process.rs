@@ -887,6 +887,10 @@ fn worker_command(
             role,
             var(crate::remember::FORGET_ALL_ENVIRONMENT).as_deref(),
         ))
+        .envs(memory_observe_worker_environment(
+            role,
+            var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
+        ))
         .envs(kernel_clock_worker_environment(
             role,
             var(crate::local_time::KERNEL_CLOCK_ENVIRONMENT).as_deref(),
@@ -920,6 +924,10 @@ fn worker_command(
             var(crate::second_config::CREDENTIALS_ENV).as_deref(),
         ))
         .envs(second_route_worker_environment(role, &var))
+        .envs(second_scoped_context_worker_environment(
+            role,
+            var(crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT).as_deref(),
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit());
@@ -935,6 +943,18 @@ fn memory_days_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some(("LAMP_MEMORY_DAYS", "on"))
+}
+
+// The second route's scoped context (#1675, #1839), passed the same narrow
+// way: the exact `on`, to the second route only, which reads it.
+fn second_scoped_context_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on"))).then_some((
+        crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
+        "on",
+    ))
 }
 
 // The rules' switch (#813), passed the same narrow way: the exact `on`, to
@@ -959,6 +979,17 @@ fn memory_forget_all_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::remember::FORGET_ALL_ENVIRONMENT, "on"))
+}
+
+// The observation pass's switch (#1693 (2)), passed the same narrow way:
+// the exact `on`, to the second route alone, the one worker with a model's
+// credential (`credentials_worker_environment`) to ask.
+fn memory_observe_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::remember::OBSERVE_ENVIRONMENT, "on"))
 }
 
 // The open threads' switch (#1693 (3)), passed the same narrow way: the
@@ -1185,6 +1216,12 @@ mod tests {
                         "LAMP_MEMORY_DAYS",
                         ["provider", "second"].as_slice(),
                     ),
+                    // The second route's scoped context reaches it alone.
+                    (
+                        second_scoped_context_worker_environment,
+                        "LAMP_SECOND_SCOPED_CONTEXT",
+                        ["second"].as_slice(),
+                    ),
                     // Rules reach both routes too (twelve-P2).
                     (
                         memory_rules_worker_environment,
@@ -1203,6 +1240,12 @@ mod tests {
                         memory_forget_all_worker_environment,
                         "LAMP_MEMORY_FORGET_ALL",
                         ["provider", "second"].as_slice(),
+                    ),
+                    // The observation pass, the route with a model (#1693 (2)).
+                    (
+                        memory_observe_worker_environment,
+                        "LAMP_MEMORY_OBSERVE",
+                        ["second"].as_slice(),
                     ),
                     // The clock's switch, the two that tell the time.
                     (
@@ -1311,7 +1354,8 @@ mod tests {
     /// command it is started with. A script in the worker's place writes
     /// the environment it got: the provider has the memory's two switches,
     /// the clock and the typed name's file, the second route the memory's
-    /// days, the clock and the name's file (#1323), and capture the quiet
+    /// days, the clock, the name's file (#1323) and its scoped context
+    /// (#1839), and capture the quiet
     /// evidence switch (#1285) and the detector's input (#828). With every other variable set to a secret,
     /// nothing else reaches any of them but the shell's own.
     #[test]
@@ -1331,10 +1375,12 @@ mod tests {
                     crate::rules::ENVIRONMENT,
                     crate::remember::FORGET_ALL_ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
+                    crate::remember::OBSERVE_ENVIRONMENT,
                     crate::local_time::KERNEL_CLOCK_ENVIRONMENT,
                     crate::quiet_pace::EVIDENCE_ENVIRONMENT,
                     crate::second_provider::net::key_terms::ENVIRONMENT,
                     crate::second_config::FLUX_ENV,
+                    crate::second_provider::worker::SCOPED_CONTEXT_ENVIRONMENT,
                 ]
                 .contains(&name)
                 {
@@ -1419,6 +1465,7 @@ mod tests {
                     "LAMP_KERNEL_CLOCK=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_FORGET_ALL=on",
+                    "LAMP_MEMORY_OBSERVE=on",
                     "LAMP_MEMORY_RULES=on",
                     "LAMP_MEMORY_THREADS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
@@ -1432,6 +1479,7 @@ mod tests {
                     "LAMP_SECOND_KEY_TERMS=Hanoi",
                     "LAMP_SECOND_KNOWN_NAMES=on",
                     "LAMP_SECOND_PREPARED=on",
+                    "LAMP_SECOND_SCOPED_CONTEXT=on",
                     "LAMP_SECOND_SPEECH_MODEL=gemini-3.8-flash-lite-tts",
                     "LAMP_SECOND_SPEECH_WARM=on",
                     "LAMP_SECOND_STEADY_FIRST=on",

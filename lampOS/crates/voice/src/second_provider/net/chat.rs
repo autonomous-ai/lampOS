@@ -370,10 +370,19 @@ impl Chat {
 
     /// The request's body, with the tools declared now, as narrowed for
     /// its messages.
+    #[cfg(test)]
     fn body(&self, messages: &[Message]) -> Value {
+        self.body_only(messages, None)
+    }
+
+    /// [`Self::body`], with only the tools named in `only` when given, and
+    /// then never narrowed: a held line's round is told those alone.
+    fn body_only(&self, messages: &[Message], only: Option<&[&str]>) -> Value {
         let mut body = json!({"model": self.model, "stream": true, "messages": messages});
         let mut declared = (self.declare)();
-        if let Some(narrow) = self.narrow.get() {
+        if let Some(only) = only {
+            declared.retain(|tool| only.contains(&tool.name.as_str()));
+        } else if let Some(narrow) = self.narrow.get() {
             declared = narrow(declared, messages);
         }
         let tools = functions(&declared);
@@ -390,7 +399,16 @@ impl Chat {
     }
 
     pub async fn send(&self, messages: &[Message]) -> Result<ChatStream> {
-        let body = self.body(messages);
+        self.send_only(messages, None).await
+    }
+
+    /// [`Self::send`], told only the tools named in `only`, when given.
+    pub async fn send_only(
+        &self,
+        messages: &[Message],
+        only: Option<&[&str]>,
+    ) -> Result<ChatStream> {
+        let body = self.body_only(messages, only);
         let asked = std::time::Instant::now();
         let before = self
             .last_sent
@@ -1000,6 +1018,46 @@ data: [DONE]
         );
         offered.lock().unwrap().clear();
         assert!(chat.body(&asked).get("tools").is_none());
+    }
+
+    /// A held line's round is told only the functions done though its
+    /// answer is held, never narrowed: none, when the
+    /// lamp has none of them.
+    #[test]
+    fn a_round_told_only_some_functions_declares_those_alone() {
+        let offered: Vec<lamp_gemini::Tool> = serde_json::from_value(json!([
+            {"name": "dance", "description": "Dance."},
+            {"name": "reports_stop", "description": "Stop the reports."}
+        ]))
+        .unwrap();
+        let chat = Chat::with(
+            "http://127.0.0.1:9/v1/",
+            "m",
+            "k",
+            Arc::new(move || offered.clone()),
+        )
+        .unwrap();
+        // A narrow that keeps nothing: the held round is not narrowed.
+        chat.narrowing(Arc::new(|_, _| Vec::new()));
+        let asked = [Message::user("Stop sending reports.")];
+        let names = |body: Value| -> Vec<String> {
+            body["tools"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|tool| tool["function"]["name"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        assert!(names(chat.body(&asked)).is_empty());
+        assert_eq!(
+            names(chat.body_only(&asked, Some(&["reports_stop"]))),
+            ["reports_stop"]
+        );
+        assert!(
+            chat.body_only(&asked, Some(&["remember"]))
+                .get("tools")
+                .is_none()
+        );
     }
 
     /// An end without `[DONE]` is whole after a `finish_reason`, and cut
