@@ -1360,7 +1360,11 @@ the battery's counters read both routes alike.
   (`Heeding::holds_call`), before the gate is asked.
 - **The wait is in the turn's own task.** The call looks for its decision
   every 20 ms (`policy::LOOK_EVERY`) for at most 2 s, and nothing else
-  waits. A newer turn ends the task, and with it the call, which is not
+  waits. A round's calls are put to the gate together, so the round waits
+  2 s at most however many it holds, as Live parks a round's calls at once.
+  Before this, three actions with the Policy down took 6.04 s, one wait
+  after another (the peer read on #1984,
+  `a_rounds_held_calls_wait_for_the_policy_together`). A newer turn ends the task, and with it the call, which is not
   run (`its turn ended while it waited for the Policy's decision; not
   run`). Calls the route answers itself (the web search's, `more_functions`)
   and the lamp's own turns are never held.

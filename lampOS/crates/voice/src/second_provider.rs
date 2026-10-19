@@ -1191,7 +1191,8 @@ impl Engine {
 
     /// With `LAMP_POLICY_HOLDS_ACTIONS=on` (#800, #1712): each call of a
     /// spoken turn is put to `gate` before it runs, which waits for the
-    /// Policy's decision about the turn. One it holds is not run: the model
+    /// Policy's decision about the turn; a round's calls together, so the
+    /// round waits `policy_holds::WAIT` at most. One it holds is not run: the model
     /// is told it was not done ([`crate::policy_holds::HELD`]), the round's
     /// other calls run as they would, and the turn ends there in silence,
     /// as `not_for_me` ends it: nothing more is said, and the model is not
@@ -3150,12 +3151,40 @@ async fn answer(
             ));
             // A call the Policy held ends the turn after this round.
             let mut policy_held = false;
-            for call in &calls {
-                if shared
-                    .hold
-                    .as_ref()
-                    .is_some_and(|hold| hold(request, &call.name))
-                {
+            let held_by_rule: Vec<bool> = calls
+                .iter()
+                .map(|call| {
+                    shared
+                        .hold
+                        .as_ref()
+                        .is_some_and(|hold| hold(request, &call.name))
+                })
+                .collect();
+            // The Policy's decisions about a spoken turn's calls (#800,
+            // #1712), waited for together: one `policy_holds::WAIT` for the
+            // round, as the Live route parks a round's calls at once, never
+            // one wait after another (the peer read on #1984: three actions
+            // with the Policy down took 6 s). The lamp's own turns, and calls
+            // the rule holds, are never put to it.
+            let policed: Vec<Policed> = match &shared.policy {
+                Some(gate) if heard => {
+                    let waits = calls.iter().zip(&held_by_rule).map(|(call, held)| {
+                        if *held {
+                            Box::pin(async { Policed::Run }) as BoxFuture<'static, Policed>
+                        } else {
+                            gate(request, call.name.clone())
+                        }
+                    });
+                    let policed = futures_util::future::join_all(waits).await;
+                    if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                        return Err(Stop::Gone);
+                    }
+                    policed
+                }
+                _ => vec![Policed::Run; calls.len()],
+            };
+            for ((call, held), policed) in calls.iter().zip(held_by_rule).zip(policed) {
+                if held {
                     eprintln!(
                         "lamp-voice second: request {request} asked for {}: held, nothing shows it was said to the lamp",
                         call.name
@@ -3166,21 +3195,13 @@ async fn answer(
                     ));
                     continue;
                 }
-                // The Policy's decision about a spoken turn, for the calls it
-                // holds (#800, #1712); the lamp's own turns are never held.
-                if heard && let Some(gate) = &shared.policy {
-                    let policed = gate(request, call.name.clone()).await;
-                    if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
-                        return Err(Stop::Gone);
-                    }
-                    if policed == Policed::Held {
-                        policy_held = true;
-                        messages.push(Message::tool(
-                            call.id.clone(),
-                            crate::policy_holds::held().to_string(),
-                        ));
-                        continue;
-                    }
+                if policed == Policed::Held {
+                    policy_held = true;
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        crate::policy_holds::held().to_string(),
+                    ));
+                    continue;
                 }
                 // The lamp's own work, for a question about it later, as the
                 // Live worker marks it for any turn not held (#829).

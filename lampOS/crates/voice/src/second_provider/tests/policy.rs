@@ -436,6 +436,113 @@ async fn a_held_light_never_reaches_the_executive_and_a_taken_one_does() {
     assert_eq!(bench.ran(), ["light_on"]);
 }
 
+/// The peer read's P2 on #1984: a round's held calls wait for the Policy
+/// together, one `policy_holds::WAIT` for the round, as the Live route parks
+/// them at once. "Light on, louder, and a timer." with the Policy down: all
+/// three run once the one wait has passed, not one wait after another
+/// (6.04 s before).
+#[tokio::test]
+async fn a_rounds_held_calls_wait_for_the_policy_together() {
+    let bench = Bench::new("round");
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Light on, louder, and a timer.".to_owned())].into()),
+        chats: Mutex::new(
+            [
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![
+                        call("c1", "light_on", json!({})),
+                        call("c2", "volume_up", json!({})),
+                        call("c3", "set_timer", json!({"minutes": 5})),
+                    ])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Done."), Ok(ChatEvent::Done)],
+            ]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let mut engine = bench.engine(script);
+    let began = Instant::now();
+    spoken(&mut engine, 1);
+    let labels = turn_within(&mut engine, crate::policy_holds::WAIT * 2).await;
+    let took = began.elapsed();
+    assert!(
+        labels
+            .last()
+            .is_some_and(|last| last.starts_with("TurnComplete")),
+        "{labels:?}"
+    );
+    let mut ran = bench.ran();
+    ran.sort();
+    assert_eq!(ran, ["light_on", "set_timer", "volume_up"]);
+    assert!(
+        took >= crate::policy_holds::WAIT
+            && took
+                < crate::policy_holds::WAIT
+                    + 2 * crate::second_provider::policy::LOOK_EVERY
+                    + Duration::from_millis(300),
+        "one wait for the round, not three: {took:?}"
+    );
+}
+
+/// The peer read's P3 on #1984, after #1925: `reports_stop` beside a held
+/// `light_on` in one round still runs. The Policy never holds it
+/// (`Route::ReportsStop`), so a person stopping the reports is heard
+/// whatever the Policy thinks of the turn, and the light isn't run.
+#[tokio::test]
+async fn a_reports_stop_beside_a_held_light_still_runs() {
+    let mut bench = Bench::new("stop");
+    let settings = crate::tools::Settings {
+        reports_stop: true,
+        ..bench.settings()
+    };
+    let desk = Desk::new(
+        bench.decided(),
+        settings,
+        false,
+        Arc::new(|_| Turn::default()),
+        crate::second_provider::worker::answered_here(None),
+    );
+    let ran: Arc<Mutex<Vec<String>>> = Arc::default();
+    let seen = ran.clone();
+    let tools: ToolRunner = Arc::new(move |_, _, name, _| {
+        seen.lock().unwrap().push(name);
+        Box::pin(async { json!({"ok": true}) })
+    });
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Stop the reports, and the light.".to_owned())].into()),
+        chats: Mutex::new(
+            [vec![
+                Ok(ChatEvent::ToolCalls(vec![
+                    call("c1", "light_on", json!({})),
+                    call("c2", crate::reports_stop::NAME, json!({})),
+                ])),
+                Ok(ChatEvent::Done),
+            ]]
+            .into(),
+        ),
+        ..Script::default()
+    });
+    let mut engine = Engine::with_clock(
+        script,
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .holding_for_the_policy(Arc::new(desk).gate());
+    bench.decide(1, "stay_quiet");
+    spoken(&mut engine, 1);
+    let labels = turn(&mut engine).await;
+    assert_eq!(
+        labels.last().map(String::as_str),
+        Some("complete"),
+        "{labels:?}"
+    );
+    assert_eq!(*ran.lock().unwrap(), [crate::reports_stop::NAME]);
+}
+
 /// The p-th share (0 to 1) of `waits`, sorted.
 fn share(waits: &mut [Duration], p: f64) -> Duration {
     waits.sort();
