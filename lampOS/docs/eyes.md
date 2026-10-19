@@ -655,12 +655,20 @@ this room" until someone asks to be recognised.
   - `{"forget":"Minh"}` answers `{"forgot":true}` once the file no longer
     has it, nor any set-aside file with a list of people (#1505: each is
     rewritten 0600, or removed when nothing is left in it). A set-aside
-    file that cannot be searched might hold the face, so the answer is then
-    `{"error":"storage"}`, never `{"forgot":false}`: one with no list of
-    people, or with a person whose `name` is no plain string. A rewrite's
-    temporary file a crash left there (`….json.new`) is neither searched nor
-    counted, and a `set-aside` that is a link is never followed (`forget`
-    refuses, health counts it as one).
+    file that cannot be searched might hold the face: one with no list of
+    people, or with a person whose `name` is no plain string. **Then the
+    forget waits for it** (#1586): the answer is `{"forgot":…,
+    "unsearched":N}`, never "not known" and never a fault, and the name,
+    hashed (SHA-256 of its lower case, never the name itself), is kept in
+    `set-aside/forgets-pending` (0600). At each start and each forget, a
+    face of a waiting name read back into the people file is dropped at
+    once, and a set-aside file that can be searched now is searched for it.
+    Once nothing is left that cannot be searched, the forgets are done and
+    the file goes. It's never counted or searched as anyone's records, and
+    the reset empties it with the folder. A rewrite's temporary file a
+    crash left there (`….json.new`) is neither searched nor counted, and a
+    `set-aside` that is a link is never followed (`forget` refuses with
+    `{"error":"storage"}`, health counts it as one).
   - `{"list":true}` answers the names.
   - `{"who":true}` answers who is at the lamp now, or `null`.
   - Remembering someone already known replaces their prints.
@@ -672,6 +680,12 @@ this room" until someone asks to be recognised.
   `LAMP_EYES_WHO_SOCKET` names the socket):
   - The model has two functions, `remember_my_face` and `forget_my_face`,
     each with the name. They are called only when the person asks.
+  - A forget that waits for set-aside files (#1586) is told as what it is,
+    never "My eye could not do that just now": forgotten, or not known by
+    that name, and that a few old face records the lamp couldn't read are
+    kept apart, forgotten in too if they ever come back, and cleared by a
+    factory reset (`known_faces::FORGOTTEN_SOME_KEPT_APART`,
+    `NOT_KNOWN_SOME_KEPT_APART`).
   - The hello for someone known is by name. With no known face, it is by
     the name typed at setup, when `LAMP_PERSON_NAME` gives one
     ([speaking-first.md](speaking-first.md), #806).
