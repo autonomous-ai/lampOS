@@ -2577,6 +2577,37 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
+    /// #1880 on the second route (`LAMP_VOICE_ROUTE=second`), whose runner
+    /// is [`answer`]: `reports_state` is answered there at once, from the
+    /// bus's state, as on the Live route, and only for its own call; off,
+    /// it is nobody's. Asked by a text, it is answered the same.
+    #[test]
+    fn reports_state_is_answered_on_the_second_route_only_when_called() {
+        let call = ToolCall {
+            id: "c".into(),
+            name: crate::reports_stop::STATE_NAME.into(),
+            args: json!({}),
+        };
+        assert_eq!(answer(&Settings::default(), &call, 7, true), unavailable());
+        let on = Settings {
+            reports_stop: true,
+            ..Default::default()
+        };
+        // Whatever the bus says now (a test of the Live worker may have put
+        // its own state there): one of the state's answers, never "not
+        // running" as a call nobody here runs is told.
+        let told = answer(&on, &call, 7, true);
+        assert_ne!(told, unavailable());
+        assert!(
+            told.get("say").is_some()
+                || told
+                    == json!({"error": "The part of me that sends reports is not running, so nothing is being sent now."}),
+            "{told}"
+        );
+        let texted = answer_typed(&on, &call, crate::messages::REQUESTS_FROM + 1);
+        assert_ne!(texted, unavailable());
+    }
+
     /// The reviewer on #1706: the setup line's two notes with `use_skill`,
     /// the skills past its bound and its lines named alone or left out.
     #[test]
