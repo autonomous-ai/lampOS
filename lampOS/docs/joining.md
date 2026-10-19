@@ -580,9 +580,18 @@ production testing plan and its deliverables are
 - **A queue of their own.** Hardware issues are labelled `team:hardware` (a
   label made when the hardware lead is named). Software builders skip them,
   including when they look for an unowned issue.
-- **Issues** are still opened by the first builder: one for each confirmed
-  common failure, with the affected lamps and runs linked. Routine results
-  stay in the fleet record, never one issue per run.
+- **The hardware queue is the hardware lead's** (the project lead, 19 Oct
+  2026, #1711), the same shape as the software side: a builder proposes, an
+  approver decides. Hardware builders post proposals and faults
+  (`<name>-P<n>`, `Found by <name>`) on #1700 or their hardware issue. The
+  hardware lead (or the hardware lead's agent) approves or declines them,
+  and opens, labels, assigns and closes `team:hardware` issues: one for each
+  confirmed common failure, with the affected lamps and runs linked.
+  Routine results stay in the fleet record, never one issue per run. A
+  defect closes on repair evidence plus a verified retest.
+- **The first builder comes in only for software:** when a hardware finding
+  needs a software change, the hardware lead posts a linked proposal on the
+  Queue (#1722) and the first builder assigns it to a software builder.
 - **The hardware lead** (a person) approves the suite's limits, durations,
   fixtures and stop conditions, and the shipment gate. A changed limit is a
   versioned decision.
