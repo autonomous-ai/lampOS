@@ -86,6 +86,11 @@ profile's exclusion:
   reviewer's P3 on 2026-10-19): it skips the program's clock for the run
   itself, but waits up to 20 s of real time for the program to start and
   subscribe, and once missed that under a load of about 30;
+- two more of `lamp-skills::skills`, named exactly, that start the real
+  program twice on the host's clock, a restart between, and wait 800 ms of
+  real time for a nudge that must not come (#1837):
+  `the_program_keeps_a_skill_off_across_a_restart` and
+  `the_program_forgets_a_snooze_at_a_restart`;
 - tests with a real-clock bound that a loaded runner misses: none now. A
   test goes here only until it gets its own time; the bound the lamp runs
   with is never raised for it. `lamp-voice`'s `coordinator::motor::tests::native_head`
