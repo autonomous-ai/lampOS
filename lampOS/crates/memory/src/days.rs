@@ -21,6 +21,12 @@ use std::{
 };
 
 pub const DATABASE: &str = "memory-days.sqlite3";
+/// A follow-up's observation is at least this old: not the same conversation.
+pub const FOLLOW_UP_AFTER_MS: u64 = 6 * 3_600_000;
+/// And at most this old: a wedding three weeks ago isn't asked about.
+pub const FOLLOW_UP_WITHIN_MS: u64 = 14 * 86_400_000;
+/// At most one follow-up a day for a person, so open threads never nag.
+pub const FOLLOW_UP_EVERY_MS: u64 = 86_400_000;
 pub const NOTE_BYTES: usize = 1200;
 pub const UNUSED_DAYS: u64 = 30;
 pub const MAX_RECORDS: u64 = 50_000;
@@ -753,6 +759,56 @@ impl Days {
             )
             .transpose()
     }
+    /// At most one open `thread` or `promise` observation of a known
+    /// person's to ask about once, unprompted, at a new conversation's start
+    /// (#1693 (3)): at least [`FOLLOW_UP_AFTER_MS`] old, so not the same
+    /// conversation, and at most [`FOLLOW_UP_WITHIN_MS`], newest first, never
+    /// one given before, and none when one was given to them within
+    /// [`FOLLOW_UP_EVERY_MS`]. The one given is recorded as given in the
+    /// same transaction: once, even if the moment never comes. The room's
+    /// scope and a rules scope have none: a lamp that can't tell who is
+    /// there never asks one person about another's week.
+    pub fn follow_up(&mut self, person: &Person) -> Result<Option<serde_json::Value>> {
+        if person.as_str() == Person::EVERYONE || person.as_str().starts_with("r-") {
+            return Err(Error::new(
+                "bad_person",
+                "a follow-up is for someone known, never the room's",
+            ));
+        }
+        let now = self.now;
+        let tx = self.db.transaction()?;
+        let lately: Option<u64> = tx.query_row(
+            "SELECT max(asked_unix_ms) FROM follow_ups WHERE person=?",
+            [person.as_str()],
+            |r| r.get(0),
+        )?;
+        if lately.is_some_and(|at| now.saturating_sub(at) < FOLLOW_UP_EVERY_MS) {
+            return Ok(None);
+        }
+        let found: Option<(i64, u64, String, String)> = tx
+            .query_row(
+                "SELECT e.rid,e.id,e.text,e.category FROM entries e WHERE e.person=?1 AND e.kind='observation' AND e.active=1 AND e.category IN ('thread','promise') AND e.at_unix_ms<=?2 AND e.at_unix_ms>=?3 AND NOT EXISTS (SELECT 1 FROM follow_ups f WHERE f.rid=e.rid) ORDER BY e.at_unix_ms DESC,e.id DESC LIMIT 1",
+                params![
+                    person.as_str(),
+                    now.saturating_sub(FOLLOW_UP_AFTER_MS),
+                    now.saturating_sub(FOLLOW_UP_WITHIN_MS)
+                ],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )
+            .optional()?;
+        let Some((rid, id, text, category)) = found else {
+            return Ok(None);
+        };
+        tx.execute(
+            "INSERT INTO follow_ups(rid,person,asked_unix_ms) VALUES(?1,?2,?3)",
+            params![rid, person.as_str(), now],
+        )?;
+        tx.commit()?;
+        Ok(Some(
+            serde_json::json!({"id":id,"category":category,"text":text}),
+        ))
+    }
+
     pub fn session_close(&mut self, person: &Person, session: &str) -> Result<()> {
         identifier(session)?;
         self.db.execute(
