@@ -1449,6 +1449,12 @@ impl DaysClient {
             // Already-delivered provider context cannot be retracted here.
             // Do not let later prose recreate forgotten material unlinked.
             context.journal_inhibited = true;
+            // The conversation's turns may be gone with it, and journalling
+            // has stopped: a later "remember …" names none of them, or the
+            // store refuses it for ids it no longer has (Second on #2003).
+            if let Ok(mut current) = self.current.lock() {
+                *current = Current::default();
+            }
         }
         for (whose, id) in ids {
             context.include(whose.as_deref(), &[id]);

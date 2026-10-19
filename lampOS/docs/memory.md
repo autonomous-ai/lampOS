@@ -368,6 +368,12 @@ the unchanged legacy client, used unless the new Days client is selected.
       turns were shown, or another conversation.
     - **Never waited for:** a writer busy at that moment leaves it kept as
       before.
+    - **After a forget** ("forget that" or "forget everything"), the
+      conversation's turns are dropped from what the next `remember` sends,
+      since they may be gone and journalling has stopped. So a thing
+      remembered next is kept, not refused for ids the store no longer has
+      (Second on #2003;
+      `voice_forget::after_forgetting_the_next_thing_remembered_is_kept`).
     - **Unchanged:** without the switch, `remember` is as before, and so is
       the room's rule: `forget_everything` empties only the known person's
       own scope, never the room's (#1723).
