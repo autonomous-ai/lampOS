@@ -25,6 +25,7 @@ What is one lamp's own is outside them:
 | `settings/` | What no build carries and every lamp shares: Expression's catalogue (from lamp-4ace's `expression-alive-name-speech`) and the controls' two files, installed in `/etc/lampOS/<part>/` |
 | `lamp-<part>.service` | Each part, `PartOf=` and `WantedBy=lampos.target`, in keeper.md's order |
 | `lamp-update.service` | Outside the target; `--apply on`; the channel on GitHub |
+| `lamp-update-back.service`, `lamp-update-back.timer` | Outside the target (#1680): lamp-update's own previous build put back, from the fixed path `/usr/local/lib/lampos/lamp-update-back`, when a switch of its own (`LAMP_UPDATE_SELF=on`) is not confirmed; started by `lamp-update.service`'s `OnFailure=` and every 2 min by the timer. The service has no `[Install]` |
 | `lamp-records.service`, `lamp-records.timer` | Hourly, outside the target |
 | `lamp-selftest.service`, `lamp-selftest.timer` | The passive self-test (#812): the timer is in the target and waits for setup's marker; it runs the service 5 min after the lamp starts and every 6 h. The service has no `[Install]` |
 | `lamp-setup.service` | First boot only: while the marker is missing and setup's settings exist (#806, #811) |

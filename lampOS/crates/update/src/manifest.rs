@@ -26,6 +26,60 @@ use std::fmt::Write as _;
 pub const FORMAT: &str = "lampos-update/1";
 /// The manifest's schema: what this program reads.
 pub const SCHEMA: u32 = 1;
+/// This updater's own level: raised whenever the updater learns to apply
+/// something an older one cannot. A manifest whose `min_updater` is above
+/// it is refused whole, before anything is fetched or written. 2: the
+/// build's `models` (#1680). 3: its `settings` (#1680). 4: the image's
+/// own files, `image` (#1369).
+pub const UPDATER: u64 = 4;
+/// The level a build that carries models needs: an updater below it does
+/// not read the field.
+pub const MODELS_UPDATER: u64 = 2;
+/// The level a build that carries settings needs.
+pub const SETTINGS_UPDATER: u64 = 3;
+/// The level a build that carries the image's files needs.
+pub const IMAGE_UPDATER: u64 = 4;
+/// The image's own files a build may carry (#1369): those of
+/// `robots/lamp/rootfs/` and its overrides that are the product's to keep
+/// up to date after a lamp ships. Not V1's HAL (`/opt/hal`, the LED boot
+/// units, `hal.service`'s drop-in), and never a drop-in a lamp or a person
+/// made: only these paths.
+pub const IMAGE_FILES: &[&str] = &[
+    "/etc/asound.conf",
+    "/etc/systemd/system/lamp-cmedia-speaker.service",
+    "/etc/systemd/system/respeaker-lite-softvol.service",
+    "/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf",
+    "/etc/systemd/journald.conf.d/zz-lamp-journal.conf",
+    "/etc/udev/rules.d/90-respeaker-lite.rules",
+    "/etc/udev/rules.d/91-pulseaudio-hal-ignore.rules",
+    "/etc/udev/rules.d/99-lamp-device.rules",
+    "/usr/local/libexec/lamp-ramlog-postrotate",
+];
+/// At most this many of the image's files in one build, all variants.
+pub const MOST_IMAGE: usize = 64;
+/// At most this many SHA-256s the image has shipped, for one file.
+pub const MOST_SHIPPED: usize = 64;
+/// At most this many settings in one build, and this many bytes of them in
+/// all: today's are 14 files and about 40 KB.
+pub const MOST_SETTINGS: usize = 128;
+pub const MOST_SETTINGS_BYTES: usize = 160 * 1024;
+/// The settings a build may carry: these files, and any file under these
+/// folders. Never a key, setup's answers, the lamp's own poses or the
+/// update key: those are the person's or the lamp's (docs/updates.md).
+pub const SETTING_FILES: &[&str] = &["/etc/lampOS/records.json", "/etc/tmpfiles.d/lampos.conf"];
+pub const SETTING_FOLDERS: &[&str] = &[
+    "/etc/lampOS/expression/",
+    "/etc/lampOS/controls/",
+    "/var/lib/lampOS/skills/",
+];
+/// The modes a setting may have.
+pub const SETTING_MODES: &[&str] = &["0644", "0600"];
+/// At most this many models in one build.
+pub const MOST_MODELS: usize = 64;
+/// Where models live: their paths are under it, and its `models/` is the
+/// store, each model named by its SHA-256.
+pub const MODELS_ROOT: &str = "/opt/lampOS/";
+pub const STORE: &str = "/opt/lampOS/models/";
 /// The envelope's name in a channel's folder.
 pub const ENVELOPE: &str = "lampos-manifest.json";
 /// The largest envelope read: a manifest of every binary and every lamp's
@@ -87,6 +141,351 @@ pub struct Manifest {
     pub files_url: String,
     pub files: Vec<File>,
     pub units: Vec<Unit>,
+    /// The oldest updater ([`UPDATER`]) that can apply this build. Left
+    /// out, any can, and it is not written: the manifest is then byte for
+    /// byte what an updater before the field reads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_updater: Option<u64>,
+    /// The models the build's parts read, which no binary carries (#1680):
+    /// fetched from their own URL, checked, and switched with the parts.
+    /// Left out when there are none, and not written: the manifest is then
+    /// byte for byte what an updater before the field reads.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub models: Vec<Model>,
+    /// The product's settings and tmpfiles, inline (#1680): written by
+    /// `lamp-update-apply` at the switch, each only where the lamp has not
+    /// changed it. Left out when there are none, and not written.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub settings: Vec<Setting>,
+    /// The image's own files (#1369), for each variant of the lamp: written
+    /// by `lamp-update-apply` only where the lamp has one the image shipped.
+    /// Not in `settings`, which a `lamp-update-back` older than the field
+    /// would refuse whole: one that old ignores this field. Left out when
+    /// there are none, and not written.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub image: Vec<ImageFile>,
+}
+
+/// One of the image's own files, for one variant of the lamp
+/// (`/etc/autonomous/hardware-profile`, none being `standard`). Read by
+/// `lamp-update-apply`, so it is a contract for good, as [`Setting`] is.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImageFile {
+    pub variant: String,
+    pub path: String,
+    pub text: String,
+    pub sha256: String,
+    /// Every SHA-256 the image has shipped at this path for this variant:
+    /// a lamp's file that is one of them is the image's, never the lamp's
+    /// own, since install never recorded these.
+    #[serde(default)]
+    pub shipped: Vec<String>,
+}
+
+impl ImageFile {
+    /// As a setting: what the three-way rule reads.
+    pub fn setting(&self) -> Setting {
+        Setting {
+            path: self.path.clone(),
+            text: Some(self.text.clone()),
+            sha256: Some(self.sha256.clone()),
+            mode: Some("0644".to_owned()),
+            removed: false,
+        }
+    }
+}
+
+/// A variant's name: what `apply-overrides.py` reads, plain.
+pub fn is_variant(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
+/// The image's files checked: a path of [`IMAGE_FILES`] and a variant, once
+/// each pair; the text's SHA-256; every shipped SHA-256 a hash.
+pub fn check_image(image: &[ImageFile]) -> Result<(), Refused> {
+    if image.len() > MOST_IMAGE {
+        return Err(refused(format!(
+            "more than {MOST_IMAGE} of the image's files"
+        )));
+    }
+    let mut pairs = std::collections::BTreeSet::new();
+    let mut bytes = 0;
+    for file in image {
+        if !IMAGE_FILES.contains(&file.path.as_str()) {
+            return Err(refused(format!(
+                "{:?} is not one of the image's files a build may carry",
+                file.path
+            )));
+        }
+        if !is_variant(&file.variant) {
+            return Err(refused(format!(
+                "{:?} is not a variant's name",
+                file.variant
+            )));
+        }
+        if !pairs.insert((file.variant.as_str(), file.path.as_str())) {
+            return Err(refused(format!(
+                "{} of {} is listed twice",
+                file.path, file.variant
+            )));
+        }
+        if sha256_hex(file.text.as_bytes()) != file.sha256 {
+            return Err(refused(format!(
+                "{} of {}: its text is not its SHA-256",
+                file.path, file.variant
+            )));
+        }
+        if file.shipped.len() > MOST_SHIPPED
+            || file
+                .shipped
+                .iter()
+                .any(|sha| sha.len() != 64 || !is_lower_hex(sha))
+        {
+            return Err(refused(format!(
+                "{} of {}: its shipped SHA-256s are not up to {MOST_SHIPPED} hashes",
+                file.path, file.variant
+            )));
+        }
+        bytes += file.text.len();
+    }
+    if bytes > MOST_SETTINGS_BYTES {
+        return Err(refused(format!(
+            "the image's files are more than {MOST_SETTINGS_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
+/// A setting a build carries: its path, and its text, SHA-256 and mode; or
+/// `removed`, without them. Read by `lamp-update-apply`, a copy only
+/// `install` writes, so it is a contract for good: these fields keep their
+/// meaning, and one it does not know is ignored, never refused.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Setting {
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    /// `0644` or `0600`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    /// The build no longer has it: removed where it is still the build's.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub removed: bool,
+}
+
+impl Setting {
+    /// A setting with this text, 0644.
+    pub fn new(path: &str, text: &str) -> Self {
+        Self {
+            path: path.to_owned(),
+            text: Some(text.to_owned()),
+            sha256: Some(sha256_hex(text.as_bytes())),
+            mode: Some("0644".to_owned()),
+            removed: false,
+        }
+    }
+
+    /// Its mode as a number.
+    pub fn mode_bits(&self) -> u32 {
+        self.mode
+            .as_deref()
+            .and_then(|mode| u32::from_str_radix(mode, 8).ok())
+            .unwrap_or(0o644)
+    }
+}
+
+/// A setting's path: one of [`SETTING_FILES`], or a file under one of
+/// [`SETTING_FOLDERS`] whose parts are plain.
+pub fn is_setting_path(path: &str) -> bool {
+    if SETTING_FILES.contains(&path) {
+        return true;
+    }
+    path.len() < 512
+        && !path.ends_with('/')
+        && SETTING_FOLDERS.iter().any(|folder| {
+            path.strip_prefix(folder).is_some_and(|rest| {
+                rest.split('/').all(|part| {
+                    !part.is_empty()
+                        && !part.starts_with('.')
+                        && part
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte))
+                })
+            })
+        })
+}
+
+/// Each setting checked: a path it may have, once; its text with its
+/// SHA-256 and a mode it may have, or `removed` with neither.
+pub fn check_settings(settings: &[Setting]) -> Result<(), Refused> {
+    if settings.len() > MOST_SETTINGS {
+        return Err(refused(format!("more than {MOST_SETTINGS} settings")));
+    }
+    let mut paths = std::collections::BTreeSet::new();
+    let mut bytes = 0;
+    for setting in settings {
+        if !is_setting_path(&setting.path) {
+            return Err(refused(format!(
+                "{:?} is not a path a build's settings may have",
+                setting.path
+            )));
+        }
+        if !paths.insert(setting.path.as_str()) {
+            return Err(refused(format!("{} is listed twice", setting.path)));
+        }
+        if setting.removed {
+            if setting.text.is_some() || setting.sha256.is_some() || setting.mode.is_some() {
+                return Err(refused(format!(
+                    "{} is removed, and has a text, SHA-256 or mode",
+                    setting.path
+                )));
+            }
+            continue;
+        }
+        let (Some(text), Some(sha256)) = (&setting.text, &setting.sha256) else {
+            return Err(refused(format!("{} has no text or SHA-256", setting.path)));
+        };
+        if sha256_hex(text.as_bytes()) != *sha256 {
+            return Err(refused(format!(
+                "{} does not match its SHA-256",
+                setting.path
+            )));
+        }
+        if !setting
+            .mode
+            .as_deref()
+            .is_some_and(|mode| SETTING_MODES.contains(&mode))
+        {
+            return Err(refused(format!(
+                "{}'s mode is not one of {}",
+                setting.path,
+                SETTING_MODES.join(", ")
+            )));
+        }
+        bytes += text.len();
+    }
+    if bytes > MOST_SETTINGS_BYTES {
+        return Err(refused(format!(
+            "the settings are {bytes} bytes, and at most {MOST_SETTINGS_BYTES}"
+        )));
+    }
+    Ok(())
+}
+
+/// A model a part reads: where it goes on the lamp, where it is fetched
+/// from, and its size and SHA-256 (`deploy/product/models.json`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Model {
+    pub path: String,
+    pub url: String,
+    pub bytes: u64,
+    pub sha256: String,
+    /// The file is one member of a gzipped tar at `url`, itself pinned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archive: Option<Archive>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Archive {
+    pub bytes: u64,
+    pub sha256: String,
+    pub member: String,
+}
+
+impl Model {
+    /// What fetching it costs on the disk: the model, and its archive
+    /// beside it while it is taken out.
+    pub fn fetch_bytes(&self) -> u64 {
+        self.bytes
+            .saturating_add(self.archive.as_ref().map_or(0, |archive| archive.bytes))
+    }
+}
+
+/// The little of a manifest read before the rest, leniently: what a newer
+/// manifest must keep readable to an older updater, so that it says why it
+/// refuses and can find the updater the build carries.
+#[derive(Deserialize)]
+struct Needs {
+    #[serde(default)]
+    channel: Option<String>,
+    #[serde(default)]
+    sequence: Option<u64>,
+    #[serde(default)]
+    min_updater: Option<u64>,
+    #[serde(default)]
+    files_url: Option<String>,
+    #[serde(default)]
+    files: Vec<serde_json::Value>,
+}
+
+/// A signed build that needs a newer updater than this one.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TooOld {
+    /// Its channel, when it is a plain name, and its sequence.
+    pub channel: Option<String>,
+    pub sequence: Option<u64>,
+    /// Its `min_updater`.
+    pub needed: u64,
+    /// This updater's level.
+    pub updater: u64,
+    /// Where its files are, and the `lamp-update` it carries, if it names
+    /// one plainly.
+    pub files_url: Option<String>,
+    pub carried: Option<File>,
+}
+
+impl TooOld {
+    /// Why the build is refused, for a person.
+    pub fn why(&self) -> String {
+        let build = self
+            .sequence
+            .map_or_else(|| "the build".to_owned(), |n| format!("build {n}"));
+        let wait = if self.carried.is_some() {
+            "waiting for a newer updater"
+        } else {
+            "it carries no lamp-update, so waiting for a build that does"
+        };
+        format!(
+            "{build} needs updater {} or newer, and this is updater {}; {wait}",
+            self.needed, self.updater
+        )
+    }
+}
+
+/// The manifest bytes' need for a newer updater than `updater`, read before
+/// anything else of them, so a build for a newer updater is refused for
+/// that reason whatever else it carries.
+pub fn too_old(manifest: &[u8], updater: u64) -> Option<TooOld> {
+    let needs: Needs = serde_json::from_slice(manifest).ok()?;
+    let needed = needs.min_updater?;
+    if needed <= updater {
+        return None;
+    }
+    let carried = needs
+        .files
+        .into_iter()
+        .filter_map(|file| serde_json::from_value::<File>(file).ok())
+        .find(|file| {
+            file.name == "lamp-update"
+                && check_hash_and_size(&file.name, &file.sha256, file.size, MOST_FILE_BYTES).is_ok()
+        });
+    let files_url = needs.files_url.filter(|url| is_folder_url(url));
+    Some(TooOld {
+        channel: needs.channel.filter(|channel| is_token(channel)),
+        sequence: needs.sequence.filter(|sequence| *sequence > 0),
+        needed,
+        updater,
+        carried: carried.filter(|_| files_url.is_some()),
+        files_url,
+    })
 }
 
 /// What is wrong with an envelope or a manifest. Said to a person.
@@ -166,6 +565,12 @@ pub fn public_key_text(key: &Ed25519KeyPair) -> String {
 /// checked first, so nothing that a lamp would refuse is ever signed.
 pub fn seal(manifest: &[u8], key: &Ed25519KeyPair) -> Result<Vec<u8>, Refused> {
     parse(manifest)?;
+    seal_unchecked(manifest, key)
+}
+
+/// [`seal`] without the check: what a publisher with the key but not this
+/// program could sign, for tests of what a lamp refuses.
+pub(crate) fn seal_unchecked(manifest: &[u8], key: &Ed25519KeyPair) -> Result<Vec<u8>, Refused> {
     let public: [u8; 32] = key
         .public_key()
         .as_ref()
@@ -186,6 +591,35 @@ pub fn seal(manifest: &[u8], key: &Ed25519KeyPair) -> Result<Vec<u8>, Refused> {
 /// manifest this program can install from. The manifest's own bytes are
 /// returned beside it: they are what is kept.
 pub fn open(envelope: &[u8], key: &[u8; 32]) -> Result<(Manifest, Vec<u8>), Refused> {
+    open_as(envelope, key, UPDATER)
+}
+
+/// [`open`], by an updater of level `updater`. Its `min_updater` is read
+/// after the signature and before anything else, so a build for a newer
+/// updater, whatever else it carries, is refused for that reason.
+pub fn open_as(
+    envelope: &[u8],
+    key: &[u8; 32],
+    updater: u64,
+) -> Result<(Manifest, Vec<u8>), Refused> {
+    match open_or_too_old(envelope, key, updater)? {
+        Opened::Manifest(manifest, bytes) => Ok((manifest, bytes)),
+        Opened::TooOld(too_old) => Err(refused(too_old.why())),
+    }
+}
+
+/// A signed envelope, opened by an updater of level `updater`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Opened {
+    /// A manifest it can apply, and its bytes.
+    Manifest(Manifest, Vec<u8>),
+    /// Signed, and for a newer updater: what of it could be read.
+    TooOld(TooOld),
+}
+
+/// The manifest's bytes alone, once their signature with `key` is checked:
+/// what `lamp-update-apply` reads, whatever updater the build needs.
+pub fn signed(envelope: &[u8], key: &[u8; 32]) -> Result<Vec<u8>, Refused> {
     if envelope.len() as u64 > MOST_ENVELOPE_BYTES {
         return Err(refused("the envelope is too large"));
     }
@@ -213,8 +647,18 @@ pub fn open(envelope: &[u8], key: &[u8; 32]) -> Result<(Manifest, Vec<u8>), Refu
     UnparsedPublicKey::new(&ED25519, key)
         .verify(&manifest, &signature)
         .map_err(|_| refused("the signature does not match the manifest"))?;
+    Ok(manifest)
+}
+
+/// [`open_as`], with a build for a newer updater told apart: a round may
+/// still take the newer `lamp-update` it carries, and only that (#1680).
+pub fn open_or_too_old(envelope: &[u8], key: &[u8; 32], updater: u64) -> Result<Opened, Refused> {
+    let manifest = signed(envelope, key)?;
+    if let Some(too_old) = too_old(&manifest, updater) {
+        return Ok(Opened::TooOld(too_old));
+    }
     let parsed = parse(&manifest)?;
-    Ok((parsed, manifest))
+    Ok(Opened::Manifest(parsed, manifest))
 }
 
 /// A manifest from its bytes, checked: every name plain, every hash a hash,
@@ -241,6 +685,9 @@ fn check(manifest: &Manifest) -> Result<(), Refused> {
     }
     if manifest.sequence == 0 {
         return Err(refused("the sequence is 0"));
+    }
+    if manifest.min_updater == Some(0) {
+        return Err(refused("min_updater is 0: leave it out instead"));
     }
     if manifest.commit.len() != 40 || !is_lower_hex(&manifest.commit) {
         return Err(refused("the commit is not 40 hex characters"));
@@ -285,7 +732,113 @@ fn check(manifest: &Manifest) -> Result<(), Refused> {
         }
         check_hash_and_size(&unit.file_name(), &unit.sha256, unit.size, MOST_UNIT_BYTES)?;
     }
+    check_models(manifest)?;
+    if !manifest.settings.is_empty() && manifest.min_updater.unwrap_or(1) < SETTINGS_UPDATER {
+        return Err(refused(format!(
+            "a build with settings needs min_updater {SETTINGS_UPDATER} or more"
+        )));
+    }
+    check_settings(&manifest.settings)?;
+    if !manifest.image.is_empty() && manifest.min_updater.unwrap_or(1) < IMAGE_UPDATER {
+        return Err(refused(format!(
+            "a build with the image's files needs min_updater {IMAGE_UPDATER} or more"
+        )));
+    }
+    if let Some(file) = manifest.image.iter().find(|file| {
+        manifest
+            .settings
+            .iter()
+            .any(|setting| setting.path == file.path)
+    }) {
+        return Err(refused(format!(
+            "{} is both a setting and the image's",
+            file.path
+        )));
+    }
+    check_image(&manifest.image)
+}
+
+fn check_models(manifest: &Manifest) -> Result<(), Refused> {
+    if manifest.models.is_empty() {
+        return Ok(());
+    }
+    if manifest.models.len() > MOST_MODELS {
+        return Err(refused(format!("more than {MOST_MODELS} models")));
+    }
+    if manifest.min_updater.unwrap_or(1) < MODELS_UPDATER {
+        return Err(refused(format!(
+            "a build with models needs min_updater {MODELS_UPDATER} or more"
+        )));
+    }
+    let mut paths = std::collections::BTreeSet::new();
+    for model in &manifest.models {
+        if !is_model_path(&model.path) {
+            return Err(refused(format!(
+                "{:?} is not a model's path under {MODELS_ROOT}",
+                model.path
+            )));
+        }
+        if !paths.insert(model.path.as_str()) {
+            return Err(refused(format!("{} is listed twice", model.path)));
+        }
+        if !is_file_url(&model.url) {
+            return Err(refused(format!(
+                "{}'s URL is not an https:// or file:/// URL",
+                model.path
+            )));
+        }
+        check_hash_and_size(&model.path, &model.sha256, model.bytes, MOST_FILE_BYTES)?;
+        if let Some(archive) = &model.archive {
+            check_hash_and_size(&model.url, &archive.sha256, archive.bytes, MOST_FILE_BYTES)?;
+            if archive.member.is_empty()
+                || archive.member.starts_with(['/', '-'])
+                || archive.member.split('/').any(|part| part == "..")
+            {
+                return Err(refused(format!(
+                    "{}'s archive member is not a plain path",
+                    model.path
+                )));
+            }
+        }
+    }
     Ok(())
+}
+
+/// A model's path: absolute, under [`MODELS_ROOT`], neither the store nor
+/// in it, nor in a build's folder (a part with a build's 64-hex name) nor a
+/// `current` link itself; plain parts, a file's name at the end.
+pub fn is_model_path(path: &str) -> bool {
+    let Some(rest) = path.strip_prefix(MODELS_ROOT) else {
+        return false;
+    };
+    path.len() < 512
+        && !path.starts_with(STORE)
+        && path != STORE.trim_end_matches('/')
+        && !rest.is_empty()
+        && !path.ends_with('/')
+        && rest.rsplit('/').next() != Some(crate::unit::CURRENT)
+        && rest.split('/').all(|part| {
+            !part.is_empty()
+                && part != "."
+                && part != ".."
+                && !part.starts_with('.')
+                && !(part.len() == 64 && is_lower_hex(part))
+                && part
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte))
+        })
+}
+
+fn is_file_url(url: &str) -> bool {
+    let rest = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("file:///"));
+    rest.is_some_and(|rest| {
+        !url.ends_with('/')
+            && !rest.contains("..")
+            && !rest.contains(['?', '#', '\\', ' ', '@'])
+            && rest.len() < 1024
+    })
 }
 
 fn check_hash_and_size(name: &str, sha256: &str, size: u64, most: u64) -> Result<(), Refused> {
@@ -345,6 +898,41 @@ mod tests {
     use super::*;
     use ring::rand::SystemRandom;
 
+    /// The reviewer on #1945, 21:43: the image's files' one guard on what
+    /// may be written as root, and its other refusals.
+    #[test]
+    fn an_image_file_outside_the_list_listed_twice_or_not_its_sha_is_refused() {
+        let good = ImageFile {
+            variant: "standard".into(),
+            path: "/etc/asound.conf".into(),
+            text: "asound".into(),
+            sha256: sha256_hex(b"asound"),
+            shipped: Vec::new(),
+        };
+        assert_eq!(check_image(std::slice::from_ref(&good)), Ok(()));
+        let refused = |image: &[ImageFile]| check_image(image).unwrap_err().0;
+        for path in [
+            "/etc/sudoers.d/lamp",
+            "/etc/asound.conf.d/x",
+            "/etc/../etc/asound.conf",
+        ] {
+            let outside = ImageFile {
+                path: path.into(),
+                ..good.clone()
+            };
+            assert!(
+                refused(&[outside]).contains("is not one of the image's files"),
+                "{path}"
+            );
+        }
+        assert!(refused(&[good.clone(), good.clone()]).contains("listed twice"));
+        let wrong = ImageFile {
+            sha256: sha256_hex(b"other"),
+            ..good.clone()
+        };
+        assert!(refused(&[wrong]).contains("its text is not its SHA-256"));
+    }
+
     /// A key made for this test and thrown away with it.
     pub(crate) fn throwaway() -> Ed25519KeyPair {
         let document = Ed25519KeyPair::generate_pkcs8(&SystemRandom::new()).unwrap();
@@ -375,6 +963,10 @@ mod tests {
                 sha256: sha256_hex(b"[Service]\n"),
                 size: 10,
             }],
+            min_updater: None,
+            models: Vec::new(),
+            settings: Vec::new(),
+            image: Vec::new(),
         }
     }
 
@@ -421,6 +1013,132 @@ mod tests {
     }
 
     #[test]
+    fn models_are_read_only_with_the_updater_they_need_and_plain_paths() {
+        // None: not written, the manifest as before the field.
+        let bytes = serde_json::to_vec(&manifest()).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("models"));
+        let model = Model {
+            path: "/opt/lampOS/eyes/models/face.onnx".into(),
+            url: "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/face.onnx"
+                .into(),
+            bytes: 4,
+            sha256: sha256_hex(b"face"),
+            archive: None,
+        };
+        let mut with = manifest();
+        with.models = vec![model.clone()];
+        let why = parse(&serde_json::to_vec(&with).unwrap()).unwrap_err().0;
+        assert!(why.contains("min_updater 2"), "{why}");
+        with.min_updater = Some(MODELS_UPDATER);
+        let bytes = serde_json::to_vec(&with).unwrap();
+        assert_eq!(parse(&bytes).unwrap(), with);
+        // An updater before the field climbs instead of reading it.
+        assert!(too_old(&bytes, 1).is_some());
+        let in_a_build = format!("/opt/lampOS/eyes/{}/face.onnx", "a".repeat(64));
+        for path in [
+            "/etc/passwd",
+            "/opt/lampOS/models/abc",
+            "/opt/lampOS/models",
+            in_a_build.as_str(),
+            "/opt/lampOS/eyes/current",
+            "/opt/lampOS/eyes/../../etc/passwd",
+            "/opt/lampOS/eyes/models/",
+            "opt/lampOS/eyes/face.onnx",
+        ] {
+            let mut bad = with.clone();
+            bad.models[0].path = path.into();
+            assert!(parse(&serde_json::to_vec(&bad).unwrap()).is_err(), "{path}");
+        }
+        let mut twice = with.clone();
+        twice.models.push(model);
+        assert!(parse(&serde_json::to_vec(&twice).unwrap()).is_err());
+    }
+
+    #[test]
+    fn settings_are_read_only_with_the_updater_they_need_and_their_own_paths() {
+        let plain = serde_json::to_vec(&manifest()).unwrap();
+        assert!(!String::from_utf8_lossy(&plain).contains("settings"));
+        let setting = Setting::new("/etc/lampOS/expression/expression.json", "{}\n");
+        let mut with = manifest();
+        with.settings = vec![setting.clone()];
+        let why = parse(&serde_json::to_vec(&with).unwrap()).unwrap_err().0;
+        assert!(why.contains("min_updater 3"), "{why}");
+        with.min_updater = Some(SETTINGS_UPDATER);
+        assert_eq!(parse(&serde_json::to_vec(&with).unwrap()).unwrap(), with);
+        for path in [
+            "/etc/lampOS/records.json",
+            "/etc/tmpfiles.d/lampos.conf",
+            "/etc/lampOS/controls/controls-pins.json",
+            "/var/lib/lampOS/skills/welcome-back/lights/warm_glow.toml",
+        ] {
+            assert!(is_setting_path(path), "{path}");
+        }
+        // Never a key, setup's answers, the lamp's own poses, the update key,
+        // nor a path out of its folder.
+        for path in [
+            "/etc/lampOS/voice/credential",
+            "/etc/lampOS/voice/provider.json",
+            "/etc/lampOS/policy/jev.key",
+            "/etc/lampOS/update/key.pub",
+            "/etc/lampOS/zone.env",
+            "/etc/lampOS/setup/serve.json",
+            "/etc/lampOS/body/lamp.env",
+            "/etc/lampOS/person/name",
+            "/etc/lampOS/controls/../update/key.pub",
+            "/etc/lampOS/controls/.hidden",
+            "/etc/lampOS/controls/",
+            "/etc/tmpfiles.d/other.conf",
+            "/etc/passwd",
+        ] {
+            assert!(!is_setting_path(path), "{path}");
+            let mut bad = with.clone();
+            bad.settings[0].path = path.into();
+            assert!(parse(&serde_json::to_vec(&bad).unwrap()).is_err(), "{path}");
+        }
+        let mut wrong = with.clone();
+        wrong.settings[0].text = Some("{\"other\":1}".into());
+        assert!(parse(&serde_json::to_vec(&wrong).unwrap()).is_err());
+        let mut open = with.clone();
+        open.settings[0].mode = Some("0666".into());
+        assert!(parse(&serde_json::to_vec(&open).unwrap()).is_err());
+        let mut gone = with.clone();
+        gone.settings[0] = Setting {
+            path: setting.path.clone(),
+            text: None,
+            sha256: None,
+            mode: None,
+            removed: true,
+        };
+        assert!(parse(&serde_json::to_vec(&gone).unwrap()).is_ok());
+        let mut twice = with.clone();
+        twice.settings.push(setting);
+        assert!(parse(&serde_json::to_vec(&twice).unwrap()).is_err());
+    }
+
+    /// `lamp-update-apply` is as old as the lamp's install: it reads a
+    /// setting with a field it does not know, and the signed bytes of a
+    /// build for any updater.
+    #[test]
+    fn a_setting_with_a_field_it_does_not_know_is_still_read() {
+        let text = r#"{"path":"/etc/lampOS/records.json","text":"x","sha256":"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881","mode":"0644","owner":"lampos"}"#;
+        let setting: Setting = serde_json::from_str(text).unwrap();
+        assert_eq!(setting.text.as_deref(), Some("x"));
+        assert!(check_settings(&[setting]).is_ok());
+        let key = throwaway();
+        let mut newer = manifest();
+        newer.min_updater = Some(UPDATER + 5);
+        newer.files.push(File {
+            name: "lamp-update".into(),
+            sha256: sha256_hex(b"u"),
+            size: 1,
+        });
+        let bytes = serde_json::to_vec(&newer).unwrap();
+        let envelope = seal(&bytes, &key).unwrap();
+        assert_eq!(signed(&envelope, &public(&key)).unwrap(), bytes);
+        assert!(signed(&envelope, &public(&throwaway())).is_err());
+    }
+
+    #[test]
     fn a_key_made_by_openssl_signs_as_well() {
         // `openssl genpkey -algorithm ed25519 -outform DER` writes PKCS#8
         // version 1: this fixed prefix, then the 32-byte seed.
@@ -447,6 +1165,7 @@ mod tests {
         let cases: Vec<(&str, Wrong)> = vec![
             ("schema", Box::new(|m| m.schema = 2)),
             ("sequence", Box::new(|m| m.sequence = 0)),
+            ("min_updater", Box::new(|m| m.min_updater = Some(0))),
             ("commit", Box::new(|m| m.commit = "main".into())),
             (
                 "folder",
@@ -490,6 +1209,168 @@ mod tests {
         let mut value = serde_json::to_value(manifest()).unwrap();
         value["requires"] = "something".into();
         assert!(parse(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+
+    #[test]
+    fn a_build_for_a_newer_updater_is_refused_by_an_older_one_only() {
+        let key = throwaway();
+        let mut needing = manifest();
+        needing.min_updater = Some(3);
+        let bytes = serde_json::to_vec(&needing).unwrap();
+        let envelope = seal(&bytes, &key).unwrap();
+        let why = open_as(&envelope, &public(&key), 2).unwrap_err().0;
+        assert_eq!(
+            why,
+            "build 145 needs updater 3 or newer, and this is updater 2; \
+             it carries no lamp-update, so waiting for a build that does"
+        );
+        // One that carries an updater says so, and names it.
+        let mut carrying = needing.clone();
+        let updater = File {
+            name: "lamp-update".into(),
+            sha256: sha256_hex(b"update 3"),
+            size: 8,
+        };
+        carrying.files.push(updater.clone());
+        let bytes_carrying = serde_json::to_vec(&carrying).unwrap();
+        let found = too_old(&bytes_carrying, 2).unwrap();
+        assert_eq!(found.carried, Some(updater));
+        assert_eq!(
+            found.files_url.as_deref(),
+            Some(carrying.files_url.as_str())
+        );
+        assert!(
+            found.why().ends_with("; waiting for a newer updater"),
+            "{}",
+            found.why()
+        );
+        assert_eq!(too_old(&bytes_carrying, 3), None);
+        // An updater as new or newer takes it, as it is.
+        for updater in [3, 4] {
+            let (opened, kept) = open_as(&envelope, &public(&key), updater).unwrap();
+            assert_eq!(opened, needing);
+            assert_eq!(kept, bytes);
+        }
+        // Without the field, any updater takes it.
+        let envelope = seal(&serde_json::to_vec(&manifest()).unwrap(), &key).unwrap();
+        assert!(open_as(&envelope, &public(&key), 1).is_ok());
+        assert!(open(&envelope, &public(&key)).is_ok());
+    }
+
+    #[test]
+    fn a_newer_manifest_this_updater_cannot_read_is_refused_for_its_updater() {
+        // What a later schema may carry: refused for the updater it needs,
+        // not for its schema or its new fields. Signed by hand, since seal
+        // checks it is a manifest this program reads.
+        let key = throwaway();
+        let mut value = serde_json::to_value(manifest()).unwrap();
+        value["schema"] = 2.into();
+        value["product_units"] = serde_json::json!([]);
+        value["min_updater"] = (UPDATER + 1).into();
+        let bytes = serde_json::to_vec(&value).unwrap();
+        let envelope = serde_json::json!({
+            "format": FORMAT,
+            "key": fingerprint(&public(&key)),
+            "manifest": STANDARD.encode(&bytes),
+            "signature": STANDARD.encode(key.sign(&bytes).as_ref()),
+        });
+        let why = open(&serde_json::to_vec(&envelope).unwrap(), &public(&key))
+            .unwrap_err()
+            .0;
+        assert!(
+            why.contains(&format!("needs updater {}", UPDATER + 1)),
+            "{why}"
+        );
+    }
+
+    #[test]
+    fn min_updater_is_signed_with_the_rest() {
+        let key = throwaway();
+        let mut needing = manifest();
+        needing.min_updater = Some(UPDATER + 1);
+        let bytes = serde_json::to_vec(&needing).unwrap();
+        let envelope = seal(&bytes, &key).unwrap();
+        // Lowered on the way, under the same signature: refused, and not
+        // as a build this updater could apply.
+        let lowered = String::from_utf8(bytes)
+            .unwrap()
+            .replace(
+                &format!("\"min_updater\":{}", UPDATER + 1),
+                &format!("\"min_updater\":{UPDATER}"),
+            )
+            .into_bytes();
+        let mut parsed: serde_json::Value = serde_json::from_slice(&envelope).unwrap();
+        parsed["manifest"] = STANDARD.encode(&lowered).into();
+        let why = open(&serde_json::to_vec(&parsed).unwrap(), &public(&key))
+            .unwrap_err()
+            .0;
+        assert_eq!(why, "the signature does not match the manifest");
+        // Taken out, likewise.
+        let mut value: serde_json::Value = serde_json::from_slice(&lowered).unwrap();
+        value.as_object_mut().unwrap().remove("min_updater");
+        parsed["manifest"] = STANDARD.encode(serde_json::to_vec(&value).unwrap()).into();
+        let why = open(&serde_json::to_vec(&parsed).unwrap(), &public(&key))
+            .unwrap_err()
+            .0;
+        assert_eq!(why, "the signature does not match the manifest");
+    }
+
+    #[test]
+    fn min_updater_raised_under_the_same_signature_is_a_bad_signature() {
+        // The case that matters: a build signed for this updater, then
+        // marked for a newer one on the way. The field is read only after
+        // the signature, so it is refused as tampered, not climbed.
+        let key = throwaway();
+        let signed_without = serde_json::to_vec(&manifest()).unwrap();
+        let mut at_this = manifest();
+        at_this.min_updater = Some(UPDATER);
+        let signed_at_this = serde_json::to_vec(&at_this).unwrap();
+        for signed in [signed_without, signed_at_this] {
+            let envelope = seal(&signed, &key).unwrap();
+            let mut raised: serde_json::Value = serde_json::from_slice(&signed).unwrap();
+            raised["min_updater"] = (UPDATER + 1).into();
+            let raised = serde_json::to_vec(&raised).unwrap();
+            assert!(too_old(&raised, UPDATER).is_some());
+            let mut parsed: serde_json::Value = serde_json::from_slice(&envelope).unwrap();
+            parsed["manifest"] = STANDARD.encode(&raised).into();
+            let tampered = serde_json::to_vec(&parsed).unwrap();
+            assert_eq!(
+                open_or_too_old(&tampered, &public(&key), UPDATER)
+                    .unwrap_err()
+                    .0,
+                "the signature does not match the manifest"
+            );
+            assert_eq!(
+                open(&tampered, &public(&key)).unwrap_err().0,
+                "the signature does not match the manifest"
+            );
+        }
+    }
+
+    #[test]
+    fn a_manifest_without_min_updater_is_written_and_read_as_before() {
+        let bytes = serde_json::to_vec(&manifest()).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("min_updater"));
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let keys: Vec<&str> = value
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                "channel",
+                "commit",
+                "files",
+                "files_url",
+                "schema",
+                "sequence",
+                "units"
+            ]
+        );
+        assert_eq!(parse(&bytes).unwrap().min_updater, None);
     }
 
     #[test]

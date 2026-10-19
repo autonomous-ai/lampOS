@@ -154,6 +154,8 @@ const PARTS: &[&str] = &[
     "lamp-skills",
     "lamp-tasks",
     "lamp-update",
+    "lamp-update-apply",
+    "lamp-update-back",
     "lamp-voice",
     "lamp-waking",
 ];
