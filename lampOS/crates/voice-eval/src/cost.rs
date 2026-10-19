@@ -21,7 +21,9 @@
 //! - **the voice:** the characters in each request's summary of its pieces
 //!   (`request N ElevenLabs: … C chars;`, #1935), by the voice named there.
 //!   A piece whose first audio never came is not in it, so this can read a
-//!   little low;
+//!   little low. An answered line with no such summary (a journal from
+//!   before #1935) refuses the run, unless an estimate is asked for
+//!   ([`VoiceEstimate`]), so the voice is never priced at nothing;
 //! - **Live:** each `provider: usage …`: text in (`prompt` less
 //!   `prompt_audio`), audio in, text out (`response` less `response_audio`)
 //!   and audio out.
@@ -119,6 +121,16 @@ pub struct Live {
     pub audio_out: f64,
 }
 
+/// For answered lines with no summary of their pieces (a journal from
+/// before #1935): their voice's characters estimated as `chars_per_token`
+/// a completion token, over the arm's share of such lines, as
+/// `cost-night1.py` estimates them, and said as estimated.
+#[derive(Clone, Debug, PartialEq)]
+pub struct VoiceEstimate {
+    pub voice: String,
+    pub chars_per_token: f64,
+}
+
 /// A request: its route (second or Live), its process and its number.
 type Request = (bool, u64, u64);
 
@@ -139,6 +151,8 @@ struct Usage {
     nova_ms: u64,
     flux_ms: u64,
     characters: BTreeMap<String, u64>,
+    /// The second route's requests with a summary of their pieces.
+    voiced: BTreeSet<Request>,
     /// Text in, audio in, text out, audio out.
     live: [u64; 4],
     live_generations: u64,
@@ -197,6 +211,9 @@ impl Usage {
         }
         if let Some((voice, characters)) = voice_characters(line) {
             *self.characters.entry(voice).or_default() += characters;
+            if let Some(number) = request {
+                self.voiced.insert((true, process, number));
+            }
         }
         if live && line.contains("provider: usage total=") {
             let some = |name: &str| number_after(line, &format!(" {name}=Some(")).unwrap_or(0);
@@ -319,9 +336,15 @@ fn number_after(text: &str, before: &str) -> Option<u64> {
 }
 
 /// The table: a row for each arm and price tier, with what it is made of.
-/// Every voice the journal names must have a price; one without is said,
-/// not priced at nothing.
-pub fn cost(journal: &str, arms: &[Arm], prices: &Prices) -> Result<String, String> {
+/// Every voice the journal names must have a price, and every answered
+/// line its voice's characters or `estimate`; one without is said, not
+/// priced at nothing.
+pub fn cost(
+    journal: &str,
+    arms: &[Arm],
+    prices: &Prices,
+    estimate: Option<&VoiceEstimate>,
+) -> Result<String, String> {
     let mut usage: Vec<Usage> = arms.iter().map(|_| Usage::default()).collect();
     for line in journal.lines() {
         let Some(at) = time_of_day(line) else {
@@ -366,6 +389,35 @@ pub fn cost(journal: &str, arms: &[Arm], prices: &Prices) -> Result<String, Stri
                 parts.push(format!(
                     "{name} {characters} chars ${:.4}",
                     *characters as f64 * rate
+                ));
+            }
+            let unvoiced = used.answered.difference(&used.voiced).count();
+            if unvoiced > 0 {
+                let answered = used.answered.len();
+                let estimate = estimate.ok_or_else(|| {
+                    format!(
+                        "{}: {unvoiced} of {answered} answered lines have no summary of their \
+                         voice's pieces (a journal from before #1935), so their voice can't be \
+                         priced: give --voice-estimate VOICE CHARS_PER_TOKEN to estimate it",
+                        arm.name
+                    )
+                })?;
+                let rate = prices
+                    .voice_per_character
+                    .get(&estimate.voice)
+                    .ok_or_else(|| {
+                        format!("no price for {}'s characters in the prices", estimate.voice)
+                    })?;
+                let characters =
+                    used.completion as f64 * estimate.chars_per_token * unvoiced as f64
+                        / answered as f64;
+                voice += characters * rate;
+                parts.push(format!(
+                    "{} about {characters:.0} chars estimated for {unvoiced} of {answered} answered \
+                     lines with no voice line, at {} a completion token ${:.4}",
+                    estimate.voice,
+                    estimate.chars_per_token,
+                    characters * rate
                 ));
             }
             let search = used.searches as f64 * prices.search_per_call;
@@ -449,6 +501,7 @@ mod tests {
 2026-10-19T20:30:01+0700 lamp-4ace lamp-voice[200]: lamp-voice second: request 1 chat round 1 searched the web in 640 ms
 2026-10-19T20:30:01+0700 lamp-4ace lamp-voice[200]: lamp-voice second: chat answer: its first words or call 700 ms and its end 1200 ms after it was asked; 4000 prompt tokens, 4000 from the cache, 0 not; 50 completion tokens
 2026-10-19T20:30:02+0700 lamp-4ace lamp-voice[200]: lamp-voice second: request 1 first answer audio 800 ms after its words
+2026-10-19T20:30:03+0700 lamp-4ace lamp-voice[200]: lamp-voice second: request 1 ElevenLabs: 1 of 1 pieces began, 0 on a reused connection, 100 chars; the first piece's first audio byte 280 ms after it went, the slowest 280 ms
 2026-10-19T21:00:01+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 1 began
 2026-10-19T21:00:02+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: request 1: first sound 640 ms after the line ended
 2026-10-19T21:00:03+0700 lamp-4ace lamp-voice[300]: lamp-voice provider: usage total=Some(1500) prompt=Some(1000) prompt_audio=Some(400) response=Some(500) response_audio=Some(300) thoughts=None cached=None
@@ -478,7 +531,7 @@ mod tests {
 
     #[test]
     fn each_arm_costs_what_its_journal_lines_used_at_the_files_prices() {
-        let table = cost(JOURNAL, &arms(), &prices()).unwrap();
+        let table = cost(JOURNAL, &arms(), &prices(), None).unwrap();
         // Nova-3 3.6 s, DeepSeek peak 2000 not cached, 6000 cached and 100
         // out, one search and 400 ElevenLabs characters, over two
         // requests, one answered.
@@ -500,7 +553,8 @@ mod tests {
             nova + (2000.0 * 0.15 + 6000.0 * 0.003 + 100.0 * 0.60) / 1e6 + 0.00075 + 0.016;
         assert_eq!(off_peak[5], format!("${:.5}", cheaper / 2.0));
         // Flux's sound at Flux's price, and the plugin's search counted.
-        let flux = 3.0 / 60.0 * 0.0065 + (4000.0 * 0.006 + 50.0 * 1.20) / 1e6 + 0.00075;
+        let flux =
+            3.0 / 60.0 * 0.0065 + (4000.0 * 0.006 + 50.0 * 1.20) / 1e6 + 0.00075 + 100.0 * 0.00004;
         let flux_row = row(&table, "flux", "peak");
         assert_eq!(&flux_row[2..4], ["1", "1"], "{table}");
         assert_eq!(flux_row[5], format!("${flux:.5}"));
@@ -528,8 +582,62 @@ mod tests {
     fn a_voice_with_no_price_is_said_not_priced_at_nothing() {
         let mut prices = prices();
         prices.voice_per_character.clear();
-        let refused = cost(JOURNAL, &arms(), &prices).unwrap_err();
+        let refused = cost(JOURNAL, &arms(), &prices, None).unwrap_err();
         assert!(refused.contains("no price for ElevenLabs"), "{refused}");
+    }
+
+    /// Tonight's journal (19 Oct) is from before #1935: answered lines with
+    /// no summary of their voice's pieces. Without an estimate that refuses
+    /// the run, never prices the voice at nothing; with one, those lines'
+    /// share of the completion tokens is priced, and said as estimated.
+    #[test]
+    fn an_answered_line_with_no_voice_line_is_refused_or_estimated() {
+        let journal = "\
+2026-10-19T20:00:05+0700 lamp-4ace lamp-voice[100]: lamp-voice second: request 1 heard 6 words, the last 210 ms after the line ended
+2026-10-19T20:00:06+0700 lamp-4ace lamp-voice[100]: lamp-voice second: chat answer: its first words or call 812 ms and its end 1430 ms after it was asked; 1000 prompt tokens, 0 from the cache, 1000 not; 100 completion tokens
+2026-10-19T20:00:07+0700 lamp-4ace lamp-voice[100]: lamp-voice second: request 1 first answer audio 900 ms after its words
+2026-10-19T20:01:05+0700 lamp-4ace lamp-voice[100]: lamp-voice second: request 2 heard 3 words, the last 200 ms after the line ended
+2026-10-19T20:01:06+0700 lamp-4ace lamp-voice[100]: lamp-voice second: chat answer: its first words or call 700 ms and its end 1100 ms after it was asked; 1000 prompt tokens, 0 from the cache, 1000 not; 100 completion tokens
+2026-10-19T20:01:07+0700 lamp-4ace lamp-voice[100]: lamp-voice second: request 2 first answer audio 850 ms after its words
+";
+        let arm = [Arm::parse("deepgram", "20:00", "20:15").unwrap()];
+        let refused = cost(journal, &arm, &prices(), None).unwrap_err();
+        assert!(
+            refused.contains("2 of 2 answered lines") && refused.contains("--voice-estimate"),
+            "{refused}"
+        );
+        let four = VoiceEstimate {
+            voice: "ElevenLabs".into(),
+            chars_per_token: 4.0,
+        };
+        let table = cost(journal, &arm, &prices(), Some(&four)).unwrap();
+        let llm = (2000.0 * 0.30 + 200.0 * 1.20) / 1e6;
+        let peak = row(&table, "deepgram", "peak");
+        assert_eq!(peak[6], format!("${:.5}", (llm + 800.0 * 0.00004) / 2.0));
+        assert!(
+            peak[8].contains("ElevenLabs about 800 chars estimated for 2 of 2 answered lines"),
+            "{table}"
+        );
+        // One line with its own summary: only the other's share is estimated.
+        let half = journal.replace(
+            "request 2 first answer audio 850 ms after its words\n",
+            "request 2 first answer audio 850 ms after its words\n2026-10-19T20:01:08+0700 lamp-4ace lamp-voice[100]: lamp-voice second: request 2 ElevenLabs: 1 of 1 pieces began, 0 on a reused connection, 300 chars; the first piece's first audio byte 280 ms after it went, the slowest 280 ms\n",
+        );
+        let table = cost(&half, &arm, &prices(), Some(&four)).unwrap();
+        let peak = row(&table, "deepgram", "peak");
+        assert_eq!(peak[6], format!("${:.5}", (llm + 700.0 * 0.00004) / 2.0));
+        assert!(
+            peak[8].contains("ElevenLabs 300 chars")
+                && peak[8].contains("about 400 chars estimated for 1 of 2 answered lines"),
+            "{table}"
+        );
+        // An estimate in a voice the prices don't have is refused too.
+        let unpriced = VoiceEstimate {
+            voice: "Gemini".into(),
+            chars_per_token: 4.0,
+        };
+        let refused = cost(journal, &arm, &prices(), Some(&unpriced)).unwrap_err();
+        assert!(refused.contains("no price for Gemini"), "{refused}");
     }
 
     #[test]

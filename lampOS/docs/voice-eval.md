@@ -630,7 +630,11 @@ stretch of the journal by the lamp's time of day, `HH:MM` or `HH:MM:SS`, as
   19 Oct, until the team's own rates come. DeepSeek's tiers (peak, off-peak)
   each give the second route's arms a row; Live's arms get one.
 - **No price for a voice the journal names refuses the run,** rather than
-  pricing that voice at nothing.
+  pricing that voice at nothing. So does an answered line with no summary of
+  its voice's pieces, as in a journal from before #1935, unless
+  `--voice-estimate VOICE N` is given. Those lines' characters are then
+  estimated as N a completion token, over the arm's share of such lines, as
+  `cost-night1.py` does (4), and the row says they're estimated.
 - **Each row:** requests, answered, the arm's minutes, and the cost per request,
   per answered line and per "conversation minute". That's 5 requests at the
   arm's own cost a request: the research's model of 4 answered and 1 not.

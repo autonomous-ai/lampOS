@@ -110,3 +110,55 @@ fn without_prices_or_with_a_voice_it_has_no_price_for_it_does_not_run() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+/// A journal from before #1935 has no summary of the voice's pieces: the
+/// run is refused, and runs with `--voice-estimate`, said as estimated.
+#[test]
+fn a_journal_with_no_voice_lines_runs_only_with_an_estimate() {
+    let path = std::env::temp_dir().join(format!("lamp-cost-unvoiced-{}.log", std::process::id()));
+    let source = journal("unvoiced-source");
+    let full = std::fs::read_to_string(&source).unwrap();
+    let _ = std::fs::remove_file(&source);
+    let unvoiced: String = full
+        .lines()
+        .filter(|line| !line.contains(" ElevenLabs: "))
+        .map(|line| format!("{line}\n"))
+        .collect();
+    std::fs::write(&path, unvoiced).unwrap();
+    let prices = format!("{FIXTURES}/voice-eval-cost-prices.example.json");
+    let args = |estimate: &[&'static str]| {
+        let mut args = vec![
+            path.to_str().unwrap().to_owned(),
+            "--prices".into(),
+            prices.clone(),
+            "--arm".into(),
+            "deepgram".into(),
+            "20:00".into(),
+            "20:15".into(),
+        ];
+        args.extend(estimate.iter().map(|arg| (*arg).to_owned()));
+        args
+    };
+    let refused = run(&args(&[]).iter().map(String::as_str).collect::<Vec<_>>());
+    let estimated = run(&args(&["--voice-estimate", "ElevenLabs", "4"])
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>());
+    let _ = std::fs::remove_file(&path);
+    assert!(!refused.status.success());
+    assert!(
+        String::from_utf8_lossy(&refused.stderr).contains("--voice-estimate"),
+        "{}",
+        String::from_utf8_lossy(&refused.stderr)
+    );
+    assert!(
+        estimated.status.success(),
+        "{}",
+        String::from_utf8_lossy(&estimated.stderr)
+    );
+    let table = String::from_utf8(estimated.stdout).unwrap();
+    assert!(
+        table.contains("ElevenLabs about 400 chars estimated for 1 of 1 answered lines"),
+        "{table}"
+    );
+}
