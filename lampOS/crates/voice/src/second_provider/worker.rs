@@ -3479,6 +3479,181 @@ mod tests {
         assert_eq!(spoken, [Message::user("Hi."), Message::assistant("Hello.")]);
     }
 
+    /// Tests' map on #1712 (20:11), (2): the task switches
+    /// (`LAMP_TASKS_WHO`, `_ASKED`, `_ACCOUNTS`, `_MACHINE_NAMES` and
+    /// `LAMP_TOOL_LEAD_IN`) reach the second worker as Live's do. The
+    /// coordinator gives it the Live worker's flags (`coordinator/second.rs`,
+    /// `arguments`), and it parses them with the same parser into its tools'
+    /// place. What each one does is `agent_tasks`', the same code on either
+    /// route.
+    #[test]
+    fn the_second_worker_takes_the_task_switches_as_live_does() {
+        let dir = Path::new("/run/lamp-voice");
+        let (_, _, files, _) = parse_flags(
+            dir,
+            &strings(&[
+                "--tools",
+                crate::agent_tasks::FLAG,
+                "/run/lampos-tasks",
+                crate::agent_tasks::WHO_FLAG,
+                crate::agent_tasks::LEAD_IN_FLAG,
+                crate::agent_tasks::ASKED_FLAG,
+                crate::agent_tasks::ACCOUNTS_FLAG,
+                crate::agent_tasks::NAMES_FLAG,
+            ]),
+        )
+        .unwrap();
+        let place = files.tools.tasks.expect("the tasks part");
+        assert_eq!(place.directory, Path::new("/run/lampos-tasks"));
+        assert!(place.who && place.lead_in && place.asked);
+        assert!(place.accounts && place.machine_names);
+        let (_, _, files, _) = parse_flags(
+            dir,
+            &strings(&["--tools", crate::agent_tasks::FLAG, "/run/lampos-tasks"]),
+        )
+        .unwrap();
+        let place = files.tools.tasks.expect("the tasks part");
+        assert!(!place.who && !place.lead_in && !place.asked);
+        assert!(!place.accounts && !place.machine_names);
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_MEMORY_DAYS` on the second
+    /// route. The voice hands it to this worker (`process.rs`, the table of
+    /// worker environments: `provider` and `second`). With it, the memory's
+    /// note is asked once a session, by that session's number, and kept for
+    /// the session's turns (`Sessions::frozen`), as a Live session is told
+    /// it once; a new session, or someone else at the lamp, asks again with
+    /// the next number. Without it every turn asks, as session 0, and
+    /// `frozen` is not used.
+    #[test]
+    fn with_memory_days_the_note_is_asked_once_a_session_and_kept_for_its_turns() {
+        let mut sessions = Sessions::default();
+        let mut asked = Vec::new();
+        let mut note = |changed: bool| {
+            sessions.frozen(changed, |session| {
+                asked.push(session);
+                format!("note {session}")
+            })
+        };
+        assert_eq!(note(false), "note 1", "the first turn asks");
+        assert_eq!(note(false), "note 1", "the same session keeps it");
+        assert_eq!(note(true), "note 2", "a new session asks again");
+        assert_eq!(note(false), "note 2");
+        assert_eq!(asked, [1, 2]);
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_ROOM_FILE` on the second route
+    /// as the only voice. The room this route keeps (`keeping_room`) goes to
+    /// its file at the worker's tick, and the next worker in the same boot
+    /// starts from it: a busy room is still busy. The room is kept under the
+    /// machine's boot (`room_told::MACHINE_BOOT_FILE`), which only Linux has,
+    /// so elsewhere this says so and checks nothing; on Linux the file must be
+    /// there. In tests the room is
+    /// the thread's own, so each worker is a thread of its own.
+    #[test]
+    fn as_the_only_voice_the_room_goes_to_its_file_and_the_next_worker_starts_from_it() {
+        // Skipped by the system, not by the file: on Linux a missing boot
+        // file fails here, so a pass there means this ran.
+        if !cfg!(target_os = "linux") {
+            eprintln!("not Linux: no machine boot file, the room is not kept, nothing checked");
+            return;
+        }
+        assert!(
+            Path::new(crate::room_told::MACHINE_BOOT_FILE).exists(),
+            "Linux has {}",
+            crate::room_told::MACHINE_BOOT_FILE
+        );
+        let dir = std::env::temp_dir().join(format!(
+            "lamp-second-room-file-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("room.json");
+        let first = path.clone();
+        std::thread::spawn(move || {
+            let mut tick = super::keeping_room(false, false, Some(&first), None);
+            let now = monotonic_us();
+            {
+                let mut room = crate::room_told::room().lock().unwrap();
+                for request in 1..=3 {
+                    room.heard(request, now);
+                    room.ended(request, now);
+                    room.unanswered(request, now);
+                }
+                assert_eq!(room.at(now), crate::room_told::Room::Busy);
+            }
+            tick(now);
+        })
+        .join()
+        .unwrap();
+        assert!(path.exists(), "the room went to its file");
+        let second = path.clone();
+        let taken = std::thread::spawn(move || {
+            let _tick = super::keeping_room(false, false, Some(&second), None);
+            let mut room = crate::room_told::room().lock().unwrap();
+            room.at(monotonic_us())
+        })
+        .join()
+        .unwrap();
+        assert_eq!(
+            taken,
+            crate::room_told::Room::Busy,
+            "the next worker's room"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Tests' map on #1712 (20:11), (2): `LAMP_ATTENTION=busy-near` on the
+    /// second route. With `--attention-near` this route samples the room
+    /// microphone's rise over its quiet from the bus (`ears/level`,
+    /// `hear_levels`, every 100 ms), and a line during which it rose
+    /// `NEAR_RISE_DB` or more is near (`signs`). One whose rise was the
+    /// lamp's own voice is not, nor one in a quiet room. On the real clock,
+    /// about a second.
+    #[test]
+    fn with_attention_near_the_rooms_rise_on_the_bus_makes_a_line_near() {
+        // A short root: a Unix socket's address holds 103 bytes.
+        let root = std::path::PathBuf::from(format!("/tmp/lsn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut ears = bus
+            .publisher_declared(
+                lamp_msgs::RoomSound::TOPIC,
+                &lamp_msgs::RoomSound::declaration(),
+                "ears",
+            )
+            .unwrap();
+        let mut heeding = super::Heeding::new(true, false, None, None);
+        heeding.hear_levels(&root);
+        let floor = -50.0;
+        // A line begins once its first level is the bus's newest, so no
+        // sample taken in it can be the line's before.
+        let mut line = |rise: f32, own_voice: bool| {
+            let level = lamp_msgs::RoomSound {
+                level_db: floor + rise,
+                floor_db: Some(floor),
+                own_voice,
+            };
+            ears.publish_json(monotonic_us(), &level).unwrap();
+            let began = monotonic_us();
+            for _ in 0..8 {
+                std::thread::sleep(Duration::from_millis(60));
+                ears.publish_json(monotonic_us(), &level).unwrap();
+            }
+            (began, monotonic_us())
+        };
+        let near = line(crate::attention::NEAR_RISE_DB + 3.0, false);
+        let own = line(crate::attention::NEAR_RISE_DB + 3.0, true);
+        let quiet = line(1.0, false);
+        assert!(heeding.signs(9, near).near, "risen: near");
+        assert!(!heeding.signs(10, own).near, "its own voice: not near");
+        assert!(!heeding.signs(11, quiet).near, "quiet: not near");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     #[test]
     fn the_second_worker_takes_the_live_workers_flags_but_keep_link() {
         let dir = Path::new("/run/lamp-voice");
