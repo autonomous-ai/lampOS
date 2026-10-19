@@ -125,13 +125,28 @@ the room's Live session or the speaker.
 - **Not taken:** `speak` is carried and ignored, never said aloud; photos and
   files are refused before they reach the voice.
 
-## News when you're away (later)
+## News when you're away
 
-When the tasks part has a task's news and nobody is at the lamp (no face and
-no voice for 5 minutes, one presence signal shared with #1677), the news goes
-to the app as `task_news` instead of into an empty room. That one event is
-new on the wire: the backend relays a device-started event, and the app
-shows it (#1673's app and backend half, after #1396).
+- **Given with the next text** (built, off with the rest): news of work
+  handed over that the lamp hasn't told aloud is given with the answer to
+  the person's next text, once. That's work finished, stopped, waiting for
+  the person, or a hand-over that failed; not progress.
+  - The second route's worker reads the tasks part on a thread of its own
+    every 10 s (`task_news::ForTexts`, with the worker's own tasks part), so
+    a text never waits on it.
+  - Up to 3 pieces go in the text's system message after
+    `messages::NEWS`, each note without its spoken "(Nobody has spoken."
+    opening (`messages::typed`).
+  - Only once the whole reply has gone are they kept in the voice's file
+    of what was told (`LAMP_TASKS_TOLD`), so the voice doesn't tell them
+    aloud after: its own reader reads that file at each pass. Within one
+    pass of it (10 s), both can still tell the same news. The tasks part is
+    told so once, which closes the harness with `--close-told`. A fault
+    gives none, and the news waits.
+- **Unasked, when nobody's at the lamp (later):** news the lamp starts can't
+  reach the phone yet. Delivering it needs a change outside lampOS (#1673
+  has the pointer). When it can, the presence topic (#1677, #1721) says
+  when nobody's there.
 
 ## Tests
 
@@ -170,6 +185,13 @@ shows it (#1673's app and backend half, after #1396).
   model is never sent a line said at the lamp.
 - `tools::tests::a_face_is_kept_or_forgotten_only_on_words_heard_at_the_lamp`:
   an unheard face call never reaches the eyes; a heard one does.
+- `messages::tests::news_waiting_is_given_with_the_next_texts_answer_once`:
+  the next text's answer is given the news, typed, and keeps it as given;
+  the text after has none; a model that can't answer gives none.
+- `task_news::tests::news_for_texts_is_read_beside_them_and_kept_told_once_given`:
+  through a stand-in tasks part, the news is read beside the texts, its note
+  typed without the spoken opening, and once given it is in the file of
+  what was told, so the voice's own reader doesn't offer it aloud.
 - `crates/voice/tests/typed_memory.rs`: with Sam in view, a spoken
   `remember` is kept as Sam's, and a typed `remember` and `recall` ask the
   room's memory alone.

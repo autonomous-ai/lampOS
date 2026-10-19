@@ -422,6 +422,111 @@ fn read_told(file: &Path) -> BTreeSet<String> {
         .unwrap_or_default()
 }
 
+/// News for the answers to texts from the Autonomous app (#1673,
+/// `crate::messages`): what there is now that the file says was not told,
+/// read on a thread of its own every [`READ_EVERY`], so that a text never
+/// waits on the tasks part. A reply that gives it keeps it as told, and the
+/// voice's own reader, which reads the file at each pass, then lets it go
+/// rather than telling it aloud after. Within one pass of that reader the
+/// two can still both tell it.
+pub struct ForTexts {
+    directory: PathBuf,
+    told_file: PathBuf,
+    read: Arc<Mutex<Vec<News>>>,
+    stopping: Arc<AtomicBool>,
+}
+
+impl Drop for ForTexts {
+    fn drop(&mut self) {
+        self.stopping.store(true, Ordering::Relaxed);
+    }
+}
+
+impl ForTexts {
+    /// For the tasks part in `directory` (`agent_tasks::Place`), keeping
+    /// what is given in the voice's file of what was told; none if its
+    /// thread can't start.
+    pub fn for_tasks(directory: &Path) -> Option<Self> {
+        Self::start(directory, told_file(), boot_clock)
+    }
+
+    /// Read the tasks part in `directory`, keeping what is given in
+    /// `told_file`, on the clock `clock` reads.
+    pub fn start(
+        directory: &Path,
+        told_file: PathBuf,
+        clock: fn() -> Option<BootClock>,
+    ) -> Option<Self> {
+        let read = Arc::new(Mutex::new(Vec::new()));
+        let stopping = Arc::new(AtomicBool::new(false));
+        {
+            let socket = directory.join("request.sock");
+            let (file, read, stopping) = (told_file.clone(), read.clone(), stopping.clone());
+            std::thread::Builder::new()
+                .name("lamp-voice-text-news".into())
+                .spawn(move || {
+                    while !stopping.load(Ordering::Relaxed) {
+                        if let Some(now) = clock() {
+                            let news =
+                                read_once(&socket, &now, &read_told(&file), &BTreeSet::new());
+                            if let Ok(mut read) = read.lock() {
+                                *read = news;
+                            }
+                        }
+                        // In short steps, so that letting this go ends it soon.
+                        let next = Instant::now() + READ_EVERY;
+                        while Instant::now() < next && !stopping.load(Ordering::Relaxed) {
+                            std::thread::sleep(Duration::from_millis(100));
+                        }
+                    }
+                })
+                .ok()?;
+        }
+        Some(Self {
+            directory: directory.to_path_buf(),
+            told_file,
+            read,
+            stopping,
+        })
+    }
+
+    /// The news not told yet, at most [`TOGETHER_MOST`]: the last read,
+    /// less what the file says was told since. Never waits on the tasks
+    /// part.
+    pub fn untold(&self) -> Vec<News> {
+        let told = read_told(&self.told_file);
+        let Ok(read) = self.read.lock() else {
+            return Vec::new();
+        };
+        read.iter()
+            .filter(|news| !told.contains(&news.key))
+            .take(TOGETHER_MOST)
+            .cloned()
+            .collect()
+    }
+
+    /// The news `keys`, given in a reply: kept as told at once, and the
+    /// tasks part told so once, on a thread of its own (with
+    /// `lamp-tasks serve --close-told` the harness its task started is then
+    /// closed, as for news heard, #1390).
+    pub fn given(&self, keys: &[String]) {
+        for key in keys {
+            keep_told(&self.told_file, key);
+        }
+        if let Ok(mut read) = self.read.lock() {
+            read.retain(|news| !keys.contains(&news.key));
+        }
+        let (directory, keys) = (self.directory.clone(), keys.to_vec());
+        let _ = std::thread::Builder::new()
+            .name("lamp-voice-text-news-told".into())
+            .spawn(move || {
+                for key in keys {
+                    let _ = send_told(&directory, &key);
+                }
+            });
+    }
+}
+
 impl TaskNews {
     /// Reading starts on a thread of its own when the tasks part is set,
     /// woken by a task newly settled on the lamp's bus (#560); progress
@@ -1903,6 +2008,68 @@ mod tests {
             ms: NOW + OLDEST_MS,
         };
         assert!(read_once(&socket, &late, &BTreeSet::new(), &BTreeSet::new()).is_empty());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    fn test_clock() -> Option<BootClock> {
+        Some(now())
+    }
+
+    /// #1673: the news for texts is read beside them, a typed answer is
+    /// given it without the spoken opening, and once given it is kept as
+    /// told: neither the texts nor the voice's own reader take it again.
+    #[test]
+    fn news_for_texts_is_read_beside_them_and_kept_told_once_given() {
+        let root = std::env::temp_dir().join(format!("task-news-texts-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let socket = root.join("request.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let mut stream = stream.unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let asked: Value = serde_json::from_str(&line).unwrap();
+                let answer = match (asked["op"].as_str().unwrap(), asked["id"].as_u64()) {
+                    ("list", _) => {
+                        json!({"ok":true,"store_id":"s1","items":[{"id":1,"observations":1}]})
+                    }
+                    ("get_task", Some(1)) => {
+                        task("claude", json!([seen(1, "idle", "boot-a", NOW - 1_000)]))
+                    }
+                    ("get_observation", Some(1)) => {
+                        json!({"ok":true,"data":{"state":"idle","answer":"Lumi, Sunny and Archie.","truncated":false}})
+                    }
+                    _ => json!({"ok":false}),
+                };
+                writeln!(stream, "{answer}").unwrap();
+            }
+        });
+        let told = root.join("told");
+        let texts = ForTexts::start(&root, told.clone(), test_clock).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while texts.untold().is_empty() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let untold = texts.untold();
+        assert_eq!(untold.len(), 1);
+        assert_eq!(untold[0].key, "s1:1:1");
+        assert!(
+            untold[0].note.starts_with("(Nobody has spoken. "),
+            "{}",
+            untold[0].note
+        );
+        let typed = crate::messages::typed(&untold[0].note);
+        assert!(!typed.contains("Nobody has spoken"), "{typed}");
+        assert!(typed.starts_with("(News from work"), "{typed}");
+        assert!(typed.contains("Lumi, Sunny and Archie."), "{typed}");
+        texts.given(&["s1:1:1".to_owned()]);
+        assert!(texts.untold().is_empty());
+        assert!(was_told(&told, "s1:1:1"));
+        // The voice's reader reads the same file: it is not offered aloud.
+        assert!(read_once(&socket, &now(), &read_told(&told), &BTreeSet::new()).is_empty());
+        drop(texts);
         std::fs::remove_dir_all(root).unwrap();
     }
 
