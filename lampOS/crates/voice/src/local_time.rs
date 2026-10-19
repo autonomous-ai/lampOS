@@ -452,6 +452,17 @@ pub fn place_told(place: Option<&str>) -> Option<String> {
     })
 }
 
+/// The month and year where the lamp stands ("October 2026"), for a search
+/// of what is new (#1712); `None` when the clock is not set or not known.
+pub fn month_and_year_here() -> Option<String> {
+    if unset_here() {
+        return None;
+    }
+    let (file, now) = here()?;
+    let (_, _, month, year, ..) = words(&file, now)?;
+    Some(format!("{month} {year}"))
+}
+
 /// A zone's place as people say it: its last part, underscores as spaces
 /// (`America/New_York` is "New York").
 pub fn place_name(zone: &str) -> String {

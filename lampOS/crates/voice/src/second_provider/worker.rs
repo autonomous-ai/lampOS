@@ -642,6 +642,125 @@ fn spoken_character(character: &str) -> String {
     format!("{character}{SPOKEN_NOTE}")
 }
 
+/// A search begun from a request's words before the model asks (#1712):
+/// the last request's, until its first `web_search` takes it.
+#[derive(Default)]
+pub(crate) struct Early {
+    begun: Mutex<Option<EarlySearch>>,
+}
+
+/// One search begun early: its request, when, and its answer to come.
+type EarlySearch = (
+    u64,
+    Instant,
+    futures_util::future::Shared<futures_util::future::BoxFuture<'static, serde_json::Value>>,
+);
+
+impl Early {
+    /// Begin `search` for `request`, in place of any earlier one. Driven on
+    /// its own task, so it runs while the model's first round does.
+    pub(crate) fn begin(
+        &self,
+        request: u64,
+        search: futures_util::future::BoxFuture<'static, serde_json::Value>,
+    ) {
+        use futures_util::FutureExt;
+        let shared = search.shared();
+        tokio::spawn(shared.clone());
+        if let Ok(mut begun) = self.begun.lock() {
+            *begun = Some((request, Instant::now(), shared));
+        }
+    }
+
+    /// The search begun for `request`, once: when it began, and its answer.
+    pub(crate) fn take(
+        &self,
+        request: u64,
+    ) -> Option<(
+        Instant,
+        futures_util::future::Shared<futures_util::future::BoxFuture<'static, serde_json::Value>>,
+    )> {
+        let mut begun = self.begun.lock().ok()?;
+        match begun.take() {
+            Some((of, at, answer)) if of == request => Some((at, answer)),
+            other => {
+                *begun = other;
+                None
+            }
+        }
+    }
+}
+
+/// The words of a plain ask for something new (news, a score or result, a
+/// price or rate, opening hours, the weather) as a search's query, with the
+/// lamp's name left off and the month and year after them; `None` for
+/// anything else. A question, or a request to tell, check or look up.
+pub(crate) fn early_query(heard: &str, month_and_year: Option<String>) -> Option<String> {
+    let lower = heard.to_lowercase();
+    let words: Vec<&str> = lower
+        .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+        .filter(|word| !word.is_empty())
+        .collect();
+    let has = |word: &str| words.contains(&word);
+    let phrase = |phrase: &str| lower.contains(phrase);
+    let new = [
+        "news",
+        "headline",
+        "headlines",
+        "score",
+        "scores",
+        "result",
+        "results",
+        "price",
+        "prices",
+        "weather",
+        "forecast",
+        "temperature",
+        "bitcoin",
+        "stock",
+        "stocks",
+    ]
+    .iter()
+    .any(|word| has(word))
+        || [
+            "who won",
+            "how much is",
+            "exchange rate",
+            "opening hours",
+            "open today",
+            "is it open",
+            "latest",
+            "newest",
+        ]
+        .iter()
+        .any(|said| phrase(said));
+    let asks = heard.contains('?')
+        || ["tell me", "check", "look up", "find out", "search"]
+            .iter()
+            .any(|said| {
+                lower
+                    .trim_start_matches(|c: char| !c.is_alphanumeric())
+                    .starts_with(said)
+                    || phrase(&format!("lamp, {said}"))
+            });
+    if !(new && asks) {
+        return None;
+    }
+    // The name the person called it by is no part of the query.
+    let mut rest = heard.trim();
+    for name in ["hey lamp", "hi lamp", "ok lamp", "okay lamp", "lamp"] {
+        if rest.to_lowercase().starts_with(name) {
+            rest = rest[name.len()..].trim_start_matches(|c: char| !c.is_alphanumeric());
+            break;
+        }
+    }
+    let query = match month_and_year {
+        Some(when) => format!("{} {when}", rest.trim_end_matches(['?', '.', '!'])),
+        None => rest.to_owned(),
+    };
+    (!query.is_empty() && query.chars().count() <= 128).then_some(query)
+}
+
 /// What the model is told of the time, with the lamp's place after it
 /// ([`crate::local_time::place_told`]); the place alone when the time is not
 /// known.
@@ -801,7 +920,11 @@ pub fn serve(
         .map(staff_noting);
     let has_tasks = tools.tasks.is_some();
     let declines = tools.decline;
-    let runner = tool_runner(tools, search);
+    // A plain ask for news, a score, a price, hours or the weather starts
+    // its search from the words heard, while the model's first round runs
+    // (#1712).
+    let early = search.as_ref().map(|_| Arc::new(Early::default()));
+    let runner = tool_runner(tools, search.clone(), early.clone());
     let system: crate::second_provider::System = Arc::new(system);
     let mut engine = Engine::new(
         Arc::new(net),
@@ -818,6 +941,29 @@ pub fn serve(
     .saying_reminders(reminders);
     if let Some(staff) = staff {
         engine = engine.noting_staff(staff);
+    }
+    if let (Some(early), Some(search)) = (early, search) {
+        engine = engine.hearing_words(Arc::new(move |request, heard| {
+            let Some(query) = early_query(heard, crate::local_time::month_and_year_here()) else {
+                return;
+            };
+            eprintln!(
+                "lamp-voice second: request {request}: a search begins from the words heard ({} characters)",
+                query.chars().count()
+            );
+            let search = search.clone();
+            early.begin(
+                request,
+                Box::pin(async move {
+                    search
+                        .answer(
+                            crate::second_provider::net::search::NAME,
+                            &serde_json::json!({ "query": query }),
+                        )
+                        .await
+                }),
+            );
+        }));
     }
     // Gemini's speech is asked a piece at a time: its first piece goes after
     // a few words, not the whole first sentence (#1712).
@@ -947,12 +1093,25 @@ pub fn serve(
 pub(crate) fn tool_runner(
     tools: crate::tools::Settings,
     search: Option<Arc<Search>>,
+    early: Option<Arc<Early>>,
 ) -> ToolRunner {
     Arc::new(move |request, heard, name, args| {
         let settings = tools.clone();
         let search = search.clone();
+        let early = early.clone();
         Box::pin(async move {
             if let Some(search) = search.filter(|search| search.answers(&name)) {
+                // The request's first search takes the one begun from its
+                // words, if any (#1712).
+                if name == crate::second_provider::net::search::NAME
+                    && let Some((begun, answer)) = early.and_then(|early| early.take(request))
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} web_search answered by the search begun {} ms before the call",
+                        begun.elapsed().as_millis()
+                    );
+                    return answer.await;
+                }
                 return search.answer(&name, &args).await;
             }
             let call = lamp_gemini::ToolCall {
@@ -2835,6 +2994,77 @@ mod tests {
         assert!(told.contains("ask back only when you cannot guess at all"));
         assert!(told.contains("for the time of day it is now"));
         assert!(told.contains("at least four lines"));
+    }
+
+    /// #1712: a plain ask for something new is searched as heard, the name
+    /// left off and the month and year after it; anything else is not.
+    #[test]
+    fn a_plain_ask_for_something_new_is_searched_from_its_words() {
+        let when = || Some("October 2026".to_owned());
+        assert_eq!(
+            super::early_query("Hey Lamp, who won the last Formula One race?", when()).as_deref(),
+            Some("who won the last Formula One race October 2026")
+        );
+        assert_eq!(
+            super::early_query("What's the price of gold today?", None).as_deref(),
+            Some("What's the price of gold today?")
+        );
+        assert_eq!(
+            super::early_query("Lamp, check the weather in Da Nang.", when()).as_deref(),
+            Some("check the weather in Da Nang October 2026")
+        );
+        for heard in [
+            "What time is it?",
+            "Tell me a story about a fox.",
+            "I saw the news this morning.",
+            "Make your light a little warmer.",
+            "",
+        ] {
+            assert_eq!(super::early_query(heard, when()), None, "{heard}");
+        }
+    }
+
+    /// #1712: the request's first search takes the one begun early, once;
+    /// another request's search does not.
+    #[tokio::test]
+    async fn the_search_begun_early_is_taken_once_by_its_request() {
+        let early = super::Early::default();
+        early.begin(
+            7,
+            Box::pin(async { serde_json::json!({"results": ["early"]}) }),
+        );
+        assert!(early.take(8).is_none(), "another request's");
+        let (_, answer) = early.take(7).unwrap();
+        assert_eq!(answer.await, serde_json::json!({"results": ["early"]}));
+        assert!(early.take(7).is_none(), "taken once");
+    }
+
+    /// #1712: the request's first `web_search` is answered by the search
+    /// begun early, whatever its query; a later one goes to the service
+    /// (here a closed port, so it fails).
+    #[tokio::test]
+    async fn a_requests_first_search_takes_the_one_begun_early() {
+        let search = Arc::new(
+            crate::second_provider::net::search::Search::deepseek_at("http://127.0.0.1:9", "k")
+                .unwrap(),
+        );
+        let early = Arc::new(super::Early::default());
+        let runner = super::tool_runner(
+            crate::tools::Settings::default(),
+            Some(search),
+            Some(early.clone()),
+        );
+        early.begin(
+            5,
+            Box::pin(async { serde_json::json!({"results": ["early"]}) }),
+        );
+        let args = serde_json::json!({"query": "who won the race"});
+        assert_eq!(
+            runner(5, true, "web_search".into(), args.clone()).await,
+            serde_json::json!({"results": ["early"]})
+        );
+        let again = runner(5, true, "web_search".into(), args).await;
+        assert!(again.get("error").is_some(), "{again}");
     }
 
     /// #1712: the lamp's place follows its time, or stands alone.

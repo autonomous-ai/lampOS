@@ -203,6 +203,9 @@ pub enum Did {
 }
 /// Where the engine says what the lamp did.
 pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
+/// Told a spoken request's words once they are heard and it is to be
+/// answered, before its chat begins ([`Engine::hearing_words`]).
+pub type WordsHeard = Arc<dyn Fn(u64, &str) + Send + Sync>;
 /// Whether a call, by its request and name, is held as not said to the
 /// lamp ([`Engine::holding_calls`]).
 pub type CallHold = Arc<dyn Fn(u64, &str) -> bool + Send + Sync>;
@@ -244,6 +247,8 @@ struct Shared {
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
     hold: Option<CallHold>,
+    /// Told a spoken request's words before its chat ([`Engine::hearing_words`]).
+    words_heard: Option<WordsHeard>,
     /// The answer's first piece goes once this many words have come
     /// ([`Engine::cutting_first_words`]).
     first_words: Option<usize>,
@@ -495,6 +500,7 @@ impl Engine {
                 task_waiting: None,
                 did: None,
                 hold: None,
+                words_heard: None,
                 first_words: None,
             }),
             output,
@@ -603,6 +609,16 @@ impl Engine {
     pub fn cutting_first_words(mut self, words: usize) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.first_words = Some(words);
+        }
+        self
+    }
+
+    /// `heard` is told each spoken request's words once they are in and it
+    /// is to be answered, before its chat begins: a search can start while
+    /// the model's first round runs (#1712). Before any turn only.
+    pub fn hearing_words(mut self, heard: WordsHeard) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.words_heard = Some(heard);
         }
         self
     }
@@ -1250,6 +1266,9 @@ async fn spoken(
         .chain(alone)
         .chain(waiting)
         .collect();
+    if let Some(heard) = &shared.words_heard {
+        heard(request, &text);
+    }
     answer(&shared, request, text, Asker::Spoken, None, notes, times).await;
 }
 

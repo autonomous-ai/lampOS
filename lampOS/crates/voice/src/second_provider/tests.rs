@@ -433,7 +433,7 @@ fn a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route() {
     let mut engine = Engine::with_clock(
         script.clone(),
         Arc::new(|| "SYSTEM".to_owned().into()),
-        worker::tool_runner(settings, None),
+        worker::tool_runner(settings, None, None),
         Arc::new(Instant::now),
     )
     .announcing(false)
@@ -2122,7 +2122,7 @@ fn a_yes_after_a_hand_over_on_this_route_starts_it() {
     let mut engine = Engine::with_clock(
         script.clone(),
         Arc::new(|| "SYSTEM".to_owned().into()),
-        worker::tool_runner(settings, None),
+        worker::tool_runner(settings, None, None),
         Arc::new(Instant::now),
     )
     .announcing(false)
@@ -2392,4 +2392,34 @@ async fn the_first_words_are_said_before_the_first_sentence_ends() {
         .filter(|label| label.starts_with("said:"))
         .collect();
     assert_eq!(said, ["said:It is warm and sunny in Hanoi today."]);
+}
+
+/// #1712: a spoken request's words are told once heard, before its chat
+/// begins, so a search can start beside the model's first round.
+#[tokio::test]
+async fn the_words_heard_are_told_before_the_chat_begins() {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok("Who won the race?".to_owned())].into()),
+        chats: Mutex::new([vec![text("Max did."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let told: Arc<Mutex<Vec<(u64, String, usize)>>> = Arc::default();
+    let seen = told.clone();
+    let asked = script.clone();
+    let mut engine = engine.hearing_words(Arc::new(move |request, heard| {
+        let chats = asked.asked.lock().unwrap().len();
+        seen.lock()
+            .unwrap()
+            .push((request, heard.to_owned(), chats));
+    }));
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+    assert_eq!(
+        *told.lock().unwrap(),
+        [(1, "Who won the race?".to_owned(), 0)],
+        "told once, before any chat"
+    );
 }

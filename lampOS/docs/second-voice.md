@@ -1001,6 +1001,20 @@ configuration; a configuration that still names it is refused by name, so
 it is moved, not left behind. No key is written in a log, a test or this
 page.
 
+**A search begun from the words.** With a search on, a spoken request that
+plainly asks for something new (news, a score or result, a price or rate,
+opening hours, the weather: a question, or "tell me", "check", "look up")
+starts its search from the words heard, the lamp's name left off and the
+month and year after them, as its chat begins (`worker::early_query`,
+`Engine::hearing_words`). The request's first `web_search` takes that
+search's answer, whatever query the model gives (`worker::Early`); a
+later one runs as asked. The journal says `request N: a search begins
+from the words heard (<n> characters)` and `request N web_search answered
+by the search begun <ms> ms before the call`. So the search runs while
+the model's first round does, which took 0.74 to 0.92 s to its first
+event on lamp-4ace on 19 Oct; the search test's first audio was 2.6 to
+4.4 s.
+
 **A dated search.** The search function's description (`net::search::DESCRIPTION`)
 asks for the month and year the model was told in a query for news,
 results and prices: on lamp-4ace on 19 Oct "Who won the last Formula One
