@@ -5,10 +5,13 @@ use std::{
     time::Duration,
 };
 
+/// The product's switch: `on` is as `--enable`; anything else is off.
+const ENVIRONMENT: &str = "LAMP_MOOD";
+
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
     if args.next().as_deref() != Some("serve") {
-        return Err("usage: lamp-mood serve [--enable] [--zone IANA] [--bus-root ABS] [--clock-id TEST_ID] [--run-for-ms N]".into());
+        return Err("usage: lamp-mood serve [--enable] [--zone IANA|system] [--bus-root ABS] [--clock-id TEST_ID] [--run-for-ms N] (LAMP_MOOD=on is --enable)".into());
     }
     let mut config = Config::default();
     let mut seen = std::collections::BTreeSet::new();
@@ -38,6 +41,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             _ => return Err("unknown option".into()),
         }
+    }
+    // The product unit is off unless a drop-in sets `LAMP_MOOD=on` (#1670),
+    // as `--enable` is for a run by hand.
+    if std::env::var(ENVIRONMENT).as_deref() == Ok("on") {
+        config.enabled = true;
     }
     // Disabled invocation does not read the clock, resolve a zone, open files,
     // install signal handlers, start threads, subscribe or publish.

@@ -57,11 +57,27 @@ A call for something to be done in a held request is answered and not run
 consent is done though its line is held (the first builder on #1722,
 16:44; #1683). The list is `DONE_THOUGH_HELD` in `attention.rs`, and today
 it holds only `reports_stop`. Such a call only reduces what leaves the lamp,
-never adds to it: done for a colleague's line, it costs one report not
-sent, while a person who asks to stop sharing and is held has to ask
-twice, the worse failure. The answer stays held: the model is told the
-call's result, and none of what it says after it is played. The room is
-told nothing of it, as of any held line. The journal says
+never adds to it. Done for a colleague's line, it costs all that a stop
+does ([cloud.md](cloud.md), "The person's choice"):
+
+- every report waiting is deleted;
+- one `stopped` is sent;
+- sharing stays off until the person turns it back on in the app;
+- since the answer is held, nobody is told at the time: before #1880's
+  follow-up only the journal knew.
+
+If it were not done, a person who asks to stop sharing and is held would
+have to ask twice. The first builder ruled at 16:44 on the cost of one
+report not sent. Asked again at the real cost (Third's read of #1880,
+18:39), the first builder kept it at 18:44 and made it visible: the stop is
+kept by `lamp-cloud` as the voice's, held, and when; the app's reports row
+shows it; and the voice says it only when asked about reports
+(`reports_state`, [tools.md](tools.md)), never unasked. Turning reports
+back on is the app's ([cloud.md](cloud.md), "The person's choice").
+
+The answer stays held: the model is told the call's result, and none of
+what it says after it is played. The room is told nothing of it, as of any
+held line: the call does not count as the lamp answering. The journal says
 `request N: reports_stop done though the answer was held (consent
 withdrawn)`. Every other call, the light, the volume, the schedule, memory,
 skills, stays held as before. A call that adds to what leaves the lamp is
@@ -591,7 +607,7 @@ What was changed, each behind a switch, 1 to 5 on lamp-4ace since 11:52 the same
 | 2 | When the room changes and no quiet moment comes, it is told inside the request being heard, beside what is said, as the name is; a request's name and room go as one note | `LAMP_ROOM_FACTS=on`, as before |
 | 3 | In a busy room the name note is given only when the eyes' newest look, under two seconds old, has a face turned to the lamp (`humans/faces/tracked`, [eyes.md](eyes.md)); otherwise it is held and the journal says why | `LAMP_NAME_NOTE_BUSY=face`, beside `LAMP_NAME_NOTE=on` |
 | 4 | The model asks the lamp's clock for the time ([tools.md](tools.md), "`the_time`") | `LAMP_CLOCK=on` |
-| 6 | The rule is decided at a call for something to be done, too, and a held request's call is answered and not run: at 11:57, with the busy form on, the model asked for the light during the table's talk and the light was switched on while the answer's sound was held. On the lamp since 12:10 (`46403ffbd`) | `LAMP_ATTENTION=on` or `busy` |
+| 6 | The rule is decided at a call for something to be done, too, and a held request's call is answered and not run, except a call that withdraws consent, today only `reports_stop`, which is done though its answer stays held ("What happens to an answer that is held back", since `90c66e1bf`): at 11:57, with the busy form on, the model asked for the light during the table's talk and the light was switched on while the answer's sound was held. On the lamp since 12:10 (`46403ffbd`) | `LAMP_ATTENTION=on` or `busy` |
 | 5 | The rule's busy form: in a busy room every answer is held, not only a new session's first two, unless a conversation with the lamp is going on, the text shows it was called, or the eyes' newest fresh look has someone turned to the lamp; the name heard in the sound counts only with someone turned to it | `LAMP_ATTENTION=busy` in place of `on` |
 
 Against this meeting, by its records: with 1 the room would have been busy

@@ -976,3 +976,38 @@ fn the_familiar_level_is_held_only_for_its_lease() {
     );
     assert_eq!(state(&mood).familiar, None);
 }
+
+/// #1670: Mood keeps the lamp's one breath. It begins where the plain
+/// breath is, goes on at the pace (the plain pace calm by day, quicker
+/// after a bang), never jumps when the state changes, and a reader moving
+/// it on from the last state said lands where Mood itself does.
+#[test]
+fn the_breath_goes_on_at_the_pace_and_never_jumps() {
+    use lamp_msgs::{MOOD_BREATH_US, MOOD_PACE_SLOWEST, plain_breath_phase};
+    let phase = |engine: &Engine| f64::from(state(engine).breath.unwrap().phase);
+    let pace = |engine: &Engine| state(engine).breath.unwrap().pace;
+    let mut mood = Engine::new("host-boot".into(), 7 * SECOND_US, DAY).unwrap();
+    assert!((phase(&mood) - plain_breath_phase(7 * SECOND_US)).abs() < 1e-6);
+    assert_eq!(pace(&mood), 1.0);
+    // Calm by day: a second is a 5.2th of a breath.
+    let before = state(&mood);
+    mood.advance(8 * SECOND_US, DAY).unwrap();
+    let step = SECOND_US as f64 / MOOD_BREATH_US as f64;
+    let moved = (phase(&mood) - f64::from(before.breath.unwrap().phase)).rem_euclid(1.0);
+    assert!((moved - step).abs() < 1e-5, "{moved}");
+    // A reader moving the earlier state on a second lands there too.
+    let (read, _) = before.breath_at(before.stamp.at_us + SECOND_US).unwrap();
+    assert!((read - phase(&mood)).abs() < 1e-5, "{read}");
+    // A bang: energy up, the pace quicker, and the breath where it was.
+    let at_bang = phase(&mood);
+    send(&mut mood, 8 * SECOND_US, EventKind::SuddenSound);
+    assert!((phase(&mood) - at_bang).abs() < 1e-6);
+    let quick = pace(&mood);
+    assert!(quick > 1.1, "{quick}");
+    mood.advance(9 * SECOND_US, DAY).unwrap();
+    let moved = (phase(&mood) - at_bang).rem_euclid(1.0);
+    assert!((moved - step * f64::from(quick)).abs() < 1e-5, "{moved}");
+    // Asleep at night: the slowest.
+    let night = Engine::new("host-boot".into(), 0, NIGHT).unwrap();
+    assert_eq!(pace(&night), MOOD_PACE_SLOWEST);
+}

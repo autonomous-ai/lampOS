@@ -650,11 +650,19 @@ pub fn answers(function: &str) -> bool {
 /// The calls that withdraw the person's consent, done even when the rule
 /// holds their line's answer (the first builder on #1722, 16:44; #1683):
 /// today only [`crate::reports_stop::NAME`]. Each one only reduces what
-/// leaves the lamp and never adds to it, so done for a colleague's line it
-/// costs one report not sent, while a person who asks to stop sharing and
-/// is not heard has to ask twice, the worse failure. A call that adds to
-/// what leaves the lamp, or changes the lamp, is never put here: it stays
-/// held with its answer. The answer itself stays held either way.
+/// leaves the lamp and never adds to it. Done for a colleague's line, its
+/// cost is all of a stop's (`cloud.md`, "The person's choice"): every
+/// report waiting is deleted, one `stopped` is sent, and sharing stays off
+/// until the person turns it back on in the app. Since the answer is held,
+/// nobody is told at the time. If it were
+/// not done, a person who asks to stop sharing and is held would have to
+/// ask twice. Asked again at this cost (Third's read of #1880), the first
+/// builder kept it and made it visible (#1722, 18:44): `lamp-cloud` keeps
+/// the stop as the voice's, held, and when, for the app to show, and the
+/// voice tells it only when asked about reports
+/// ([`crate::reports_stop::STATE_NAME`]). A call that adds to what
+/// leaves the lamp, or changes the lamp, is never put here: it stays held
+/// with its answer. The answer itself stays held either way.
 pub const DONE_THOUGH_HELD: &[&str] = &[crate::reports_stop::NAME];
 
 /// Whether a call for this function is done though its line's answer is

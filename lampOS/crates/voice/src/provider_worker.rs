@@ -3112,8 +3112,11 @@ impl ToolDesk {
         if held
             && crate::attention::done_though_held(&call.name)
             && self.waiting < lamp_gemini::MAX_TOOL_CALLS
-            && let route @ Route::ReportsStop = crate::tools::route(&self.settings, &call.name)
+            && let Route::ReportsStop(_) = crate::tools::route(&self.settings, &call.name)
         {
+            // Kept by `lamp-cloud` as a held line's stop, shown in the app
+            // and told when asked (the first builder on #1722, 18:44).
+            let route = Route::ReportsStop(true);
             self.run(provider, lineage, call, route, called_us, memory, true);
             return;
         }
@@ -3130,7 +3133,7 @@ impl ToolDesk {
                     | Route::Faces(..)
                     | Route::Mark(_)
                     | Route::Onboarding(_)
-                    | Route::ReportsStop
+                    | Route::ReportsStop(_)
             )
         {
             let (sent, sent_us) = tell(&crate::tools::declined());
@@ -3200,6 +3203,25 @@ impl ToolDesk {
             return;
         }
         match crate::tools::route(&self.settings, &call.name) {
+            Route::ReportsState => {
+                // A lookup, answered at once: only when the model was asked
+                // about reports, never said unasked (#1880).
+                let told =
+                    crate::reports_stop::state_now(&mut crate::reports_stop::Bus::of_the_lamp());
+                let (sent, sent_us) = tell(&told);
+                self.line(
+                    lineage.session,
+                    request,
+                    &call.name,
+                    called_us,
+                    sent_us,
+                    true,
+                    sent,
+                );
+                eprintln!(
+                    "lamp-voice provider: request {request}: the model asked about reports; told whether they are sent"
+                );
+            }
             Route::Clock => {
                 let told = crate::tools::time_now_for(self.settings.places, &call.args);
                 let (sent, sent_us) = tell(&told);
@@ -3258,7 +3280,7 @@ impl ToolDesk {
             | Route::Faces(..)
             | Route::Mark(_)
             | Route::Onboarding(_)
-            | Route::ReportsStop)
+            | Route::ReportsStop(_))
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
                 self.run(provider, lineage, call, route, called_us, memory, false);
@@ -3271,7 +3293,7 @@ impl ToolDesk {
             | Route::Faces(..)
             | Route::Mark(_)
             | Route::Onboarding(_)
-            | Route::ReportsStop
+            | Route::ReportsStop(_)
             | Route::Nobody => {
                 let (sent, sent_us) = tell(&crate::tools::unavailable());
                 self.line(
@@ -3321,10 +3343,12 @@ impl ToolDesk {
                     | Route::Tasks(_)
                     | Route::Faces(..)
                     | Route::Mark(_)
-                    | Route::ReportsStop
+                    | Route::ReportsStop(_)
             )
         {
             self.acted = Some(request);
+            #[cfg(test)]
+            seen_in_tests::told_answered(&call.id);
             // Something done is the lamp answering, words or none (#829,
             // the sixth on #1029). A lookup, an action the Policy held and
             // a held request never come here (the reviewer on #1069).
@@ -3606,10 +3630,13 @@ impl ToolDesk {
                 );
                 if done.held {
                     if done.answered {
-                        eprintln!(
-                            "lamp-voice provider: request {}: {} done though the answer was held (consent withdrawn)",
+                        let line = format!(
+                            "request {}: {} done though the answer was held (consent withdrawn)",
                             done.request, done.call.name
                         );
+                        eprintln!("lamp-voice provider: {line}");
+                        #[cfg(test)]
+                        seen_in_tests::held_done(&done.call.id, line);
                     } else {
                         eprintln!(
                             "lamp-voice provider: request {}: {} asked though the answer was held (consent withdrawn); not shown done",
@@ -5818,6 +5845,52 @@ fn push_text(
         text,
         finished,
     });
+}
+
+/// What a test reads of what the worker did with a call, which the room's
+/// state and the journal do not show it: the ids of calls the room was
+/// told answered their line ([`ToolDesk::run`]), and each journal line for
+/// a call done though its answer was held, by call id (Third's read of
+/// #1880: flipping a held run to unheld had left every test passing).
+#[cfg(test)]
+pub(crate) mod seen_in_tests {
+    use std::sync::Mutex;
+
+    static TOLD_ANSWERED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    static HELD_DONE: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+
+    pub(super) fn told_answered(id: &str) {
+        if let Ok(mut ids) = TOLD_ANSWERED.lock() {
+            ids.push(id.to_owned());
+        }
+    }
+
+    pub(super) fn held_done(id: &str, line: String) {
+        if let Ok(mut lines) = HELD_DONE.lock() {
+            lines.push((id.to_owned(), line));
+        }
+    }
+
+    /// Whether the room was told a call with this id answered its line.
+    pub(crate) fn was_told_answered(id: &str) -> bool {
+        TOLD_ANSWERED
+            .lock()
+            .is_ok_and(|ids| ids.iter().any(|told| told == id))
+    }
+
+    /// The journal lines for a held call with this id.
+    pub(crate) fn held_done_lines(id: &str) -> Vec<String> {
+        HELD_DONE.lock().map_or_else(
+            |_| Vec::new(),
+            |lines| {
+                lines
+                    .iter()
+                    .filter(|(of, _)| of == id)
+                    .map(|(_, line)| line.clone())
+                    .collect()
+            },
+        )
+    }
 }
 
 #[cfg(test)]

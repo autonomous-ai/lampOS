@@ -631,6 +631,14 @@ impl Engine {
         self.offline = offline;
     }
 
+    /// The lamp's one breath's phase now, from 0 to 1, where Mood keeps it
+    /// (#1670), or `None` for the plain breath on the boot clock.
+    pub fn set_mood_breath(&mut self, phase: Option<f64>) {
+        if let Some(life) = &mut self.life {
+            life.set_mood_breath(phase);
+        }
+    }
+
     /// Whether the privacy switch is closed, as `voice/privacy` says at a
     /// request from the head (#711): a tap then gets no look up.
     pub fn set_privacy_muted(&mut self, muted: bool) {

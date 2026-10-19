@@ -544,6 +544,7 @@ fn core_tools(settings: &Settings) -> Vec<Tool> {
     // named on the setup line (#1706).
     if settings.reports_stop {
         tools.push(crate::reports_stop::tool());
+        tools.push(crate::reports_stop::state_tool());
     }
     if let Some(directory) = &settings.exec {
         let room = lamp_gemini::MAX_TOOLS - tools.len();
@@ -608,6 +609,7 @@ fn voices_own(name: &str) -> bool {
         || crate::onboarding::is_tool(name)
         || name == crate::use_skill::NAME
         || crate::reports_stop::is_tool(name)
+        || crate::reports_stop::is_state_tool(name)
 }
 
 /// The skills' folder that runs `name`, when the executive does not.
@@ -692,8 +694,13 @@ pub enum Route {
     Mark(PathBuf),
     /// A step of the first meeting reported, through this onboarding file.
     Onboarding(PathBuf),
-    /// Health and crash reports stopped, through `lamp-cloud` on the bus.
-    ReportsStop,
+    /// Health and crash reports stopped, through `lamp-cloud` on the bus;
+    /// `true` when the line's answer is held, as `lamp-cloud` keeps it
+    /// (#1880).
+    ReportsStop(bool),
+    /// Whether reports are sent, and who stopped them and when, read from
+    /// `lamp-cloud`'s `reports/state`: answered here, at once.
+    ReportsState,
     /// A skill named in a call of `use_skill` ([`crate::use_skill`]), with
     /// the settings that find it: made the skill's own call when it is run.
     UseSkill(Box<Settings>),
@@ -744,7 +751,14 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     }
     if crate::reports_stop::is_tool(name) {
         return if settings.reports_stop {
-            Route::ReportsStop
+            Route::ReportsStop(false)
+        } else {
+            Route::Nobody
+        };
+    }
+    if crate::reports_stop::is_state_tool(name) {
+        return if settings.reports_stop {
+            Route::ReportsState
         } else {
             Route::Nobody
         };
@@ -805,6 +819,9 @@ fn answer_with_scope(
     }
     match route(settings, &call.name) {
         Route::Clock => time_now_for(settings.places, &call.args),
+        Route::ReportsState => {
+            crate::reports_stop::state_now(&mut crate::reports_stop::Bus::of_the_lamp())
+        }
         Route::Decline => declined(),
         Route::Nobody => unavailable(),
         route => {
@@ -1000,11 +1017,12 @@ fn run_call_with_scope(
         }
         Route::Mark(session) => ("the marks", crate::marked::run(session, call, heard)),
         Route::Onboarding(file) => ("the onboarding", crate::onboarding::run(file, call)),
-        Route::ReportsStop => (
+        Route::ReportsStop(held) => (
             "the reports",
             crate::reports_stop::run(
                 &mut crate::reports_stop::Bus::of_the_lamp(),
                 heard,
+                *held,
                 crate::reports_stop::ANSWER_WITHIN,
             ),
         ),
@@ -1024,7 +1042,9 @@ fn run_call_with_scope(
                 Err(told) => (crate::use_skill::NAME, (told, true)),
             }
         }
-        Route::Decline | Route::Clock | Route::Nobody => ("nobody", (unavailable(), false)),
+        Route::Decline | Route::Clock | Route::ReportsState | Route::Nobody => {
+            ("nobody", (unavailable(), false))
+        }
     };
     if scope_current(lease, request) {
         result
@@ -2467,9 +2487,14 @@ mod tests {
         assert!(
             declared(&plain)
                 .iter()
-                .all(|tool| tool.name != crate::reports_stop::NAME)
+                .all(|tool| tool.name != crate::reports_stop::NAME
+                    && tool.name != crate::reports_stop::STATE_NAME)
         );
         assert_eq!(route(&plain, crate::reports_stop::NAME), Route::Nobody);
+        assert_eq!(
+            route(&plain, crate::reports_stop::STATE_NAME),
+            Route::Nobody
+        );
         let mut flags = crate::use_skill::arguments(Some("on"));
         flags.extend(crate::reports_stop::arguments(Some("on")));
         flags.push("rest".into());
@@ -2481,8 +2506,20 @@ mod tests {
             names.contains(&crate::reports_stop::NAME.to_owned()),
             "{names:?}"
         );
-        assert_eq!(route(&on, crate::reports_stop::NAME), Route::ReportsStop);
+        assert!(
+            names.contains(&crate::reports_stop::STATE_NAME.to_owned()),
+            "{names:?}"
+        );
+        assert_eq!(
+            route(&on, crate::reports_stop::NAME),
+            Route::ReportsStop(false)
+        );
+        assert_eq!(
+            route(&on, crate::reports_stop::STATE_NAME),
+            Route::ReportsState
+        );
         assert!(voices_own(crate::reports_stop::NAME));
+        assert!(voices_own(crate::reports_stop::STATE_NAME));
         // Off, the flag is never given.
         assert!(crate::reports_stop::arguments(None).is_empty());
     }

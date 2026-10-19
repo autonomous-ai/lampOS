@@ -359,6 +359,9 @@ pub struct Service {
     /// Reads `lamp/online` once a second for the listening face
     /// (`--offline-face`, #830), and when it last did.
     online: Option<(Bus, Option<u64>)>,
+    /// Mood's last state, read four times a second, for the lamp's one
+    /// breath (#1670), and when it was last looked for.
+    mood: Option<(Bus, Option<u64>, Option<lamp_bus::Message>)>,
     /// With `--head-touch`, where `voice/privacy` is read at each request
     /// from the head: a closed privacy switch is no look up (#711).
     privacy: Option<Bus>,
@@ -423,6 +426,7 @@ impl Service {
             last_daytime: None,
             clock_set: None,
             online: None,
+            mood: None,
             privacy: None,
             clock_unset: false,
             pause: lamp_body::pause_in::PauseIn::on(bus.clone()),
@@ -459,6 +463,15 @@ impl Service {
         self
     }
 
+    /// Breathes the head with the lamp's one breath where Mood keeps it
+    /// (#1670, `mood/state`): the same phase the ring's resting breath takes
+    /// ([`lamp_msgs::MoodState::breath_in`]). With no fresh mood, the plain
+    /// breath on the boot clock, as before.
+    pub fn with_mood_breath(mut self, bus: &Bus) -> Self {
+        self.mood = Some((bus.clone(), None, None));
+        self
+    }
+
     /// Draws listening as not ready while `lamp/online` says the internet
     /// cannot be reached (#830). A value gone stale, or none, is online.
     pub fn with_offline_face(mut self, bus: &Bus) -> Self {
@@ -484,6 +497,18 @@ impl Service {
             *looked = Some(began);
             let offline = offline_in(bus.latest(lamp_msgs::Online::TOPIC).ok().flatten());
             self.engine.set_offline(offline);
+        }
+        if let Some((bus, looked, state)) = self.mood.as_mut() {
+            if looked.is_none_or(|at| began.saturating_sub(at) >= 250_000) {
+                *looked = Some(began);
+                // A bus that cannot be read is no mood.
+                *state = bus.latest(lamp_msgs::MoodState::TOPIC).ok().flatten();
+            }
+            let phase = state
+                .as_ref()
+                .and_then(|message| lamp_msgs::MoodState::breath_in(message, began))
+                .map(|(phase, _)| phase);
+            self.engine.set_mood_breath(phase);
         }
         // The zone or offset given, and a minute since the last (#820).
         let due = self.local.is_some()

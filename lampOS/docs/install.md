@@ -90,6 +90,7 @@ differs. Folders are what the unit makes or names.
 | air | `lamp-air` | orangepi, `/dev/i2c-0` | none | none | the bus |
 | air's bus clock | `lamp-air limit-clock --bus-number 0` (a oneshot, before air and controls) | root | none | none | I2C bus 0's `device/freq` |
 | tasks | `lamp-tasks serve` | orangepi | `/var/lib/lampos-tasks/` (0700); `/run/lampos-tasks/` (0700) | `targets.json` in its state folder; the Harness program in the user's home | `request.sock`, `voice.sock` |
+| mood | `lamp-mood serve --zone system` (off unless `LAMP_MOOD=on`, `mood.md`) | lampos | none | the lamp's zone, `/etc/localtime` | the bus (`mood/state`) |
 | cloud | `lamp-cloud --bus-root /run/lampos-bus` (off unless `LAMP_CLOUD=on`, `cloud.md`) | lampos | `/var/lib/lampos-cloud/` (0700, its `StateDirectory`) | setup's `backend.json`, the voice's key and update's `state.json`, through `LoadCredential=` | the company broker and the backend's ping; reads the bus |
 | records | `lamp-records check` (a timer, hourly) | root | `/run/lamp-records/` | `/etc/lampOS/records.json`, which install places (`deploy/product/settings/records.json`; it does nothing without it) | `last.json` |
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
@@ -125,7 +126,7 @@ eleven parts; the four it does not name are placed by what they serve
 |---|---|---|
 | 1 | memory, actions, health; **schedule, tasks** | The voice calls each of their sockets from its first turn (`LAMP_SCHEDULE_SOCKET`, `LAMP_TASKS_DIR`), as it does memory's |
 | 2 | voice | |
-| 3 | body, name, controls, policy; **ears, air** | Ears and air only publish on the bus, as name does |
+| 3 | body, name, controls, policy; **ears, air, mood** | Ears, air and mood only publish on the bus, as name does |
 | 4 | eyes, expression | |
 
 Outside `lampos.target`, each started by `multi-user.target` on its own:
@@ -668,9 +669,13 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      one (openharness#1410).
    - **Shown only in tests** (`crates/update/tests/install.rs`): the steps
      in their order through stand-ins; a Harness already there kept; each
-     failing step leaving no link and no record; run again, nothing. Its
-     lamp check needs a person's `sudo` on a lamp without Harness
-     (lamp-75c9).
+     failing step leaving no link and no record; run again, nothing. On a
+     lamp, only its "already there" path is shown: lamp-75c9, 19 Oct
+     19:45 (Eighth, #1843), with Harness at `/usr/local/bin` after
+     `harness-off`, it said "Harness is already at /usr/local/bin/harness:
+     kept as it is", set it at boot again (record, drop-in, linger, the
+     service running) and started `lamp-tasks` again. Installing on a lamp
+     without Harness still needs a person's `sudo` on one.
 
    **Undone by `lamp-update harness-off`** (as root, #811; the first
    builder's yes on #705, 18 Oct): with that record, as `lampos` with the
@@ -692,13 +697,20 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    finished finds it gone under the lock and changes nothing. The linger
    goes off whether or not install turned it on: nothing else turns on
    `lampos`'s linger today; if something did, install would have to note it
-   in the record for `harness-off` to leave it (not built). Shown
-   only in tests (`crates/update/tests/install.rs`): the real steps,
-   through stand-ins for `id`, `runuser … harness`, `loginctl` and `pgrep`
-   that log each call and fail on demand, in their order; each failing
-   step keeping the record for a later run; what the status and `pgrep`
-   still find, said; and the status reading. Its lamp check waits for a
-   lamp with Harness at `/usr/local/bin` (lamp-4ace has none).
+   in the record for `harness-off` to leave it (not built). In tests
+   (`crates/update/tests/install.rs`): the real steps, through stand-ins
+   for `id`, `runuser … harness`, `loginctl` and `pgrep` that log each call
+   and fail on demand, in their order; each failing step keeping the record
+   for a later run; what the status and `pgrep` still find, said; and the
+   status reading. **Shown on lamp-75c9** (19 Oct 19:45, Eighth, #1843,
+   with `harness-off-check.sh` and `lamp-update` from lamp-voice
+   `e3134347a`): before, the record, the drop-in, linger and the service
+   `installed/registered/running`; after `harness-off` (exit 0, "Harness
+   does not start at boot as lampos"), the record and the drop-in gone,
+   linger off, the service `installed:false, registered:false,
+   running:false`, and Harness, its link and `.harness` kept; run again,
+   "nothing to undo". `harnessd` was gone too, though `harness-off` never
+   stops it: linger off ended `lampos`'s user manager, which stopped it.
 
 Run again with nothing new and nothing owed, it writes nothing and asks
 nothing of systemd.

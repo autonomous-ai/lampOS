@@ -660,6 +660,7 @@ mod tests {
             attention: None,
             familiarity: lamp_msgs::Familiarity::Unknown,
             familiar,
+            breath: None,
         };
         let mut mood = bus
             .publisher_declared(MoodState::TOPIC, &MoodState::declaration(), "mood")
