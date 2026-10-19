@@ -438,8 +438,10 @@ the unchanged legacy client, used unless the new Days client is selected.
       ten minutes apart. The pass's results are scored against what each
       should keep. Each thing kept counts once: rightly if it carries the
       conversation's word as a whole word, wrongly if not. The score also
-      gives conversations missed, intrusive things kept, and whether the bar
-      passes (under 1 in 10 kept wrongly, none intrusive). A `--gap-seconds`
+      gives conversations missed and their share of those worth keeping
+      (`missed_of_worth`), intrusive things kept, and whether the bar
+      passes (`passes_wrong_and_intrusive`: under 1 in 10 kept wrongly,
+      none intrusive; it says nothing of what was missed). A `--gap-seconds`
       or `--limit` that doesn't give the set back one for one is refused.
     - **Tests:** `observe_dry::tests`: the cut, a whole run on a seeded copy
       with a scripted model, kept and nothing, and the given store byte for

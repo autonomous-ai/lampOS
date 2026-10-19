@@ -343,6 +343,8 @@ struct Score {
     missed: u64,
     intrusive_kept: u64,
     nothing_right: u64,
+    /// Conversations with something worth keeping.
+    worth: u64,
 }
 
 impl Score {
@@ -356,6 +358,7 @@ impl Score {
                         .any(|w| w.to_lowercase() == word.to_lowercase())
                 };
                 let right = kept.iter().filter(carries).count() as u64;
+                self.worth += 1;
                 if right == 0 {
                     self.missed += 1;
                 }
@@ -383,7 +386,13 @@ impl Score {
             "intrusive_kept": self.intrusive_kept,
             "nothing_right": self.nothing_right,
             "wrong_per_kept": if kept == 0 { Value::Null } else { json!(self.kept_wrongly as f64 / kept as f64) },
-            "passes": kept > 0 && self.kept_wrongly * 10 < kept && self.intrusive_kept == 0,
+            // The conversations worth keeping from that were missed: beside
+            // the bar, not in it, so the bar's line can't hide them (the
+            // reviewer's P3 on #2021).
+            "missed_of_worth": if self.worth == 0 { Value::Null } else { json!(self.missed as f64 / self.worth as f64) },
+            // The first builder's bar on #1693: under 1 in 10 kept wrongly,
+            // none intrusive. It says nothing of what was missed.
+            "passes_wrong_and_intrusive": kept > 0 && self.kept_wrongly * 10 < kept && self.intrusive_kept == 0,
         })
     }
 }
@@ -593,7 +602,7 @@ mod tests {
         assert_eq!(
             summary["bar"],
             json!({"kept_rightly":10,"kept_wrongly":1,"missed":0,"intrusive_kept":1,"nothing_right":9,
-                "wrong_per_kept":1.0/11.0,"passes":false})
+                "wrong_per_kept":1.0/11.0,"missed_of_worth":0.0,"passes_wrong_and_intrusive":false})
         );
         assert_eq!(summary["counts"]["conversations"], 20);
         assert!(!out.join("store").exists());
