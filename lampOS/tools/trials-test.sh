@@ -157,13 +157,30 @@ cat >"$T/bin/fake-call" <<'EOF'
 #!/usr/bin/env bash
 echo "call $1 $2" >>"$FAKE/calls"
 if [[ -e $FAKE/answer ]]; then cat "$FAKE/answer" >>"$FAKE/journal"; rm -f "$FAKE/answer"; fi
-echo '{"ok":true}'
+# As lamp-bus's pub: a second line at the call whose arguments hold match.
+if [[ -e $FAKE/answer2 ]] && [[ $* == *"$(cut -f1 "$FAKE/answer2")"* ]]; then
+  cut -f2- "$FAKE/answer2" >>"$FAKE/journal"; rm -f "$FAKE/answer2"
+fi
+# A part's socket other than lamp-skills' answers as root's helper does;
+# $FAKE/send-refused: it refuses the next line, once.
+if [[ $1 == */call.sock ]]; then
+  echo '{"ok":true}'
+elif [[ -e $FAKE/send-refused ]]; then
+  rm -f "$FAKE/send-refused"; echo '{"refused":"no"}'
+else
+  echo '{"done":{}}'
+fi
 EOF
 chmod +x "$T/bin/"*
 
 export TRIALS_THEN_WAIT=0
 export PATH="$T/bin:$PATH" FAKE=$T TRIALS_UNIT_DIR=$T/units TRIALS_ASIDE_DIR=$T/run TRIALS_PROC=$T/proc TRIALS_SUDO= \
-  LAMP_BUS_BIN=$T/bin/lamp-bus TRIALS_CALL=$T/bin/fake-call TRIALS_WAIT=2
+  LAMP_BUS_BIN=$T/bin/lamp-bus TRIALS_CALL=$T/bin/fake-call TRIALS_WAIT=2 TRIALS_ETC=$T/etc
+# The lamp's settings, for the settings row: a person's name with a quote in
+# it, and the zone.
+mkdir -p "$T/etc/lampOS/person"
+printf 'Saved "Name"\n' >"$T/etc/lampOS/person/name"
+echo Asia/Ho_Chi_Minh >"$T/etc/timezone"
 
 pass=0 fail=0
 ok() { pass=$((pass + 1)); }
@@ -175,7 +192,8 @@ no_dropin() { if ls "$T/units"/*.d/zz-trial.conf >/dev/null 2>&1; then bad "$1: 
 reset() {
   rm -rf "$T/units"/* "$T/calls" "$T/journal" "$T/answer" "$T/env-ignored" "$T/restarts" \
     "$T/restarts-before-failing" "$T/bus" "$T/state"/* "$T/pub-fails" "$T/skills"/* "$T/answer2" \
-    "$T/memory-sent" "$T/eyes"
+    "$T/memory-sent" "$T/eyes" \
+    "$T/send-refused" "$T/units"/lamp-setup-change*
   mkdir -p "$T/bus"
   : >"$T/calls"
 }
@@ -273,6 +291,27 @@ TRIALS_WAIT=1 "$SCRIPT" dusty >"$T/out" 2>&1; check "dusty with lamp-air not run
 has "dusty: lamp-air left as it is" "$T/out" "pause: lamp-air.service (not running: left as it is)"
 hasnt "dusty: lamp-air not stopped" "$T/calls" "systemctl stop lamp-air.service"
 hasnt "dusty: lamp-air not started" "$T/calls" "systemctl start lamp-air.service"
+
+# settings installs root's helper's two units for the trial (the socket's
+# group root), saves the old name and zone, sends the two changes, then sends
+# the saved lines back, stops the helper and removes the units; a change
+# refused fails the trial, and the put-back still runs and removes them.
+reset
+answer settings
+"$SCRIPT" settings >"$T/out" 2>&1; check "settings passes" 0 $?
+wait
+has "settings: the name sent" "$T/calls" 'call /run/lampos-setup-change/change.sock {"person_name":"Trial"}'
+has "settings: the zone sent" "$T/calls" 'call /run/lampos-setup-change/change.sock {"timezone":"Asia/Bangkok"}'
+has "settings: the old zone sent back" "$T/calls" 'call /run/lampos-setup-change/change.sock {"timezone":"Asia/Ho_Chi_Minh"}'
+has "settings: the old name sent back, escaped" "$T/calls" 'call /run/lampos-setup-change/change.sock {"person_name":"Saved \"Name\""}'
+hasnt "settings: the saved name never printed" "$T/out" "Saved"
+has "settings: the helper stopped" "$T/calls" "systemctl stop lamp-setup-change.socket"
+ls "$T/units"/lamp-setup-change* >/dev/null 2>&1 && bad "settings: the units are left" || ok
+reset
+touch "$T/send-refused"
+"$SCRIPT" settings >"$T/out" 2>&1; check "settings refused" 1 $?
+has "settings: says refused" "$T/out" "refused it"
+ls "$T/units"/lamp-setup-change* >/dev/null 2>&1 && bad "settings: the units are left after a refusal" || ok
 
 # light-out: --zone added to lamp-skills' own command line and carried,
 # nobody_s kept up every second until the end, then someone said back; an
